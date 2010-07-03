@@ -7,7 +7,7 @@ p.
 The simplest Suave application is a simple server that greets all requests with the string Hello World!
 
 pre. 
-web_server ("127.0.0.1",80) (ok "Hello World")
+web_server ("127.0.0.1",80) (ok "Hello World");
 
 
 h1. Composing bigger programs.
@@ -16,7 +16,7 @@ p.
 We write web applications by composing web-parts. A web-part have type (HttpRequest -> HttpRequest option). Each web-part has the option of stopping the evaluation by returning None or continue by passing the HttpRequest along. We can string together web-parts with the help of the operator >>=.
 
 pre. 
-let simple_app _ = dir "/hello" >>= ok "Hello World"  ;
+let simple_app _ = dir "/hello" >>= ok "Hello World" ;
 
 p. 
 To select between different routes or options we use the function choose; for example:
@@ -24,7 +24,7 @@ To select between different routes or options we use the function choose; for ex
 pre. 
 let complex_app _ = 
     choose [
-        Console.OpenStandardOutput() |> log >>= never ; 
+        Console.OpenStandardOutput() |> log >>= never; 
         dir "/hello" >>= never >>= ok "Never executes";
         dir "/hello" >>= ok "Hello World"  ;
     ]
