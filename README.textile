@@ -1,0 +1,62 @@
+h1. Introduction.
+
+p. 
+Suave is a simple web development F# library providing a lightweight web server and a set of combinators to manipulate route flow and task composition. Suave is inspired in the simplycity of Haapstack and born out of the necessity of embeding web server capabilities in my own applications. As of this post Suave is in its early stages and there is important functionality missing like HTTPS and cookies that is yet to be implemented.
+
+p. 
+The simplest Suave application is a simple server that greets all requests with the string Hello World!
+
+pre. 
+web_server ("127.0.0.1",80) (ok "Hello World")
+Composing bigger programs.
+
+p. 
+We write web applications by composing web-parts. A web-part have type (HttpRequest -> HttpRequest option). Each web-part has the option of stopping the evaluation by returning None or continue by passing the HttpRequest along. We can string together web-parts with the help of the operator >>=.
+
+pre. 
+let simple_app _ = dir "/hello" >>= ok "Hello World"  ;
+To select between different routes or options we use the function choose; for example:
+
+let complex_app _ = 
+    choose [
+        Console.OpenStandardOutput() |> log >>= never ; 
+        dir "/hello" >>= never >>= ok "Never executes";
+        dir "/hello" >>= ok "Hello World"  ;
+    ]
+
+p.	
+The function choose accepts a list of web-parts and execute each web-part in the list until one returns success. Since choose itself returns a web-part we can nest them for more complex logic.
+
+pre. 
+let nested_logic _= 
+    choose [
+        meth0d "GET" >>= choose 
+            [ dir "/hello" >>= ok "Hello GET" ; dir "/goodbye" >>= ok "Good bye GET" ];
+        meth0d "POST" >>= choose 
+            [ dir "/hello" >>= ok "Hello POST" ; dir "/goodbye" >>= ok "Good bye POST" ];
+    ]
+p. 
+To gain access to the undelying HttpRequest and read query and http form data we can use the warbler* combinator.
+
+pre. 
+let http_form _ = 
+    choose [
+         meth0d "GET"  >>= dir "/query" >>= warbler( fun x -> ok ("Hello " + (x.Query) ? name));
+         meth0d "POST" >>= dir "/query" >>= warbler( fun x -> ok ("Hello " + (x.Form)  ? name));
+         notfound "Found no handlers"
+    ]
+
+p. 
+Here is how http authentication would work:
+
+pre. 
+let requires_authentication _ = 
+    choose [
+         meth0d "GET" >>= dir "/public" >>= ok ("Hello anonymous");
+         //access to handlers bellow this one will require authentication
+         authenticate_basic ( fun x -> x.Username.Equals("foo") && x.Password.Equals("bar"));
+         meth0d "GET" >>= dir "/protected" >>= warbler( fun x -> ok ("Hello " + x.Username));
+    ]
+
+p. 
+*warbler gets its name from the famous book "To Mock a Mockingbird" by Raymond Smullyan.
