@@ -1,0 +1,92 @@
+﻿
+
+<head>
+    <style type="text/css">
+        .style1
+        {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+
+<h2>
+    Introduction.</h2>
+<p>
+    Suave is a simple web development F# library providing a lightweight web server 
+    and a set of combinators to manipulate route flow and task composition. Suave 
+    is inspired in the simplycity of Haapstack and born out of the necessity of 
+    embeding web server capabilities in my own applications.<span class="style1"> As 
+    of this post Suave is in its early stages and there is important functionality 
+    missing like HTTPS and cookies that is yet to be implemented.</span></p>
+<p>
+    The simplest Suave application is a simple server that greets all requests with 
+    the string Hello World!</p>
+<pre>web_server ("127.0.0.1",80) (ok "Hello World")</pre>
+<h2>
+    Composing bigger programs.</h2>
+<p>
+    We write web applications by composing web-parts. A web-part have type <i>
+    (HttpRequest -&gt; HttpRequest option).</i> Each web-part has the option of 
+    stopping the evaluation by returning None or continue by passing the <i>HttpRequest</i> 
+    along. We can string together web-parts with 
+    the help of the operator &gt;&gt;=<i>.</i></p>
+
+    <pre>let simple_app _ = dir "/hello" >>= ok "Hello World"  ;</pre>
+<p>
+    To select between different routes or options we use the function <i>choose</i>; for example:</p>
+
+<pre>
+let complex_app _ = 
+    choose [
+        Console.OpenStandardOutput() |> log >>= never ; 
+        dir "/hello" >>= never >>= ok "Never executes";
+        dir "/hello" >>= ok "Hello World"  ;
+    ]
+ </pre>
+
+<p>
+    The function <i>choose</i> accepts a list of web-parts and execute each web-part in the 
+    list until one returns success. Since <i>choose</i> itself returns a web-part we can 
+    nest them for more complex logic.</p>
+<pre>
+let nested_logic _= 
+    choose [
+        meth0d "GET" >>= choose 
+            [ dir "/hello" >>= ok "Hello GET" ; dir "/goodbye" >>= ok "Good bye GET" ];
+        meth0d "POST" >>= choose 
+            [ dir "/hello" >>= ok "Hello POST" ; dir "/goodbye" >>= ok "Good bye POST" ];
+    ]
+</pre>
+
+
+<p>
+    To gain access to the undelying HttpRequest and read query and http form data we 
+    can use the warbler* combinator.</p>
+
+
+<pre>
+let http_form _ = 
+    choose [
+         meth0d "GET"  >>= dir "/query" >>= warbler( fun x -> ok ("Hello " + (x.Query) ? name));
+         meth0d "POST" >>= dir "/query" >>= warbler( fun x -> ok ("Hello " + (x.Form)  ? name));
+         notfound "Found no handlers"
+    ]
+</pre>
+
+<p>Here is how http authentication works:</p>
+
+<pre>
+let requires_authentication _ = 
+    choose [
+         meth0d "GET" >>= dir "/public" >>= ok ("Hello anonymous");
+         //access to handlers bellow this one will require authentication
+         authenticate_basic ( fun x -> x.Username.Equals("foo") && x.Password.Equals("bar"));
+         meth0d "GET" >>= dir "/protected" >>= warbler( fun x -> ok ("Hello " + x.Username));
+    ]
+</pre>
+
+<p>*warbler gets its name from the famous book &quot;To Mock a Mockingbird&quot; by Raymond 
+    Smullyan.</p>
+
+
+
