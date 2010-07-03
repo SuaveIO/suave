@@ -8,7 +8,7 @@
     <ProjectGuid>{3dc9193e-bd0c-4486-9c58-56b630c36623}</ProjectGuid>
     <OutputType>Exe</OutputType>
     <RootNamespace>webframework</RootNamespace>
-    <AssemblyName>webframework</AssemblyName>
+    <AssemblyName>suave</AssemblyName>
     <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
     <Name>suave</Name>
   </PropertyGroup>
