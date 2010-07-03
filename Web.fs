@@ -38,7 +38,6 @@ let rec readTillEOL(stream: Stream, buff: byte[], count: int) =
    async{
        //TODO: we should read shunks, less context switching
        let! inp = stream.AsyncRead(1)
-       
        if count>0 && buff.[count-1] = EOL.[0] && inp.[0] = EOL.[1] then
           return (count-1)
        else
@@ -62,8 +61,10 @@ let writebytes (stream:Stream) b       =
 let toString ( buff: byte[], index:int, count:int) =
     Encoding.ASCII.GetString(buff,index,count)
     
+let max_buffer = 1024    
+    
 let read_line stream = async {
-    let buf = Array.zeroCreate 256 //max buff command
+    let buf = Array.zeroCreate max_buffer //max buff command
     let! count = readTillEOL(stream,buf,0)  
     return toString(buf, 0, count)  
 } 
@@ -80,7 +81,7 @@ let read_headers stream = async {
     let eof = ref false
     let headers = new Dictionary<string,string>()
     while not(!eof) do
-        let buf = Array.zeroCreate 256 //max buff command
+        let buf = Array.zeroCreate max_buffer
         let! count = readTillEOL(stream,buf,0)
         if count <> 0 then
             let line = toString(buf, 0, count)
