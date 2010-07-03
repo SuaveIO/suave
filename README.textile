@@ -8,15 +8,19 @@ The simplest Suave application is a simple server that greets all requests with 
 
 pre. 
 web_server ("127.0.0.1",80) (ok "Hello World")
-Composing bigger programs.
+
+h1. Composing bigger programs.
 
 p. 
 We write web applications by composing web-parts. A web-part have type (HttpRequest -> HttpRequest option). Each web-part has the option of stopping the evaluation by returning None or continue by passing the HttpRequest along. We can string together web-parts with the help of the operator >>=.
 
 pre. 
 let simple_app _ = dir "/hello" >>= ok "Hello World"  ;
+
+p. 
 To select between different routes or options we use the function choose; for example:
 
+pre. 
 let complex_app _ = 
     choose [
         Console.OpenStandardOutput() |> log >>= never ; 
@@ -35,6 +39,7 @@ let nested_logic _=
         meth0d "POST" >>= choose 
             [ dir "/hello" >>= ok "Hello POST" ; dir "/goodbye" >>= ok "Good bye POST" ];
     ]
+
 p. 
 To gain access to the undelying HttpRequest and read query and http form data we can use the warbler* combinator.
 
