@@ -9,6 +9,7 @@ The simplest Suave application is a simple server that greets all requests with 
 pre. 
 web_server ("127.0.0.1",80) (ok "Hello World")
 
+
 h1. Composing bigger programs.
 
 p. 
@@ -28,7 +29,7 @@ let complex_app _ =
         dir "/hello" >>= ok "Hello World"  ;
     ]
 
-p.	
+p. 
 The function choose accepts a list of web-parts and execute each web-part in the list until one returns success. Since choose itself returns a web-part we can nest them for more complex logic.
 
 pre. 
