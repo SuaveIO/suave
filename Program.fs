@@ -33,5 +33,6 @@ choose [
     meth0d "POST" >>= warbler( fun x -> ok (sprintf "POST data: %A" (x.Form)));
     notfound "Found no handlers"     
     ] 
-    |> web_server ("127.0.0.1",80)
-        
+    |> web_server [|"127.0.0.1",80; "192.168.13.146",80|]
+    |> Async.RunSynchronously
+    |> ignore

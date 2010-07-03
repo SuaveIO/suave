@@ -15,18 +15,23 @@ open System.Collections.Generic
 
 let stream (client:TcpClient) = client.GetStream()
 
-let tcp_ip_server (sourceip,sourceport) serve_client =
+let spawn f = 
+    let t = new Thread(ThreadStart(fun _ ->
+            try
+                f ()
+            with |x -> printf "client disconected: %A\n" x
+            )
+        , IsBackground = true)
+    t.Start()
+
+let tcp_ip_server (sourceip,sourceport) serve_client = async {
     let server = new TcpListener(IPAddress.Parse(sourceip),sourceport)
     server.Start()
     while true do
         let client = server.AcceptTcpClient()
-        let t = new Thread(ThreadStart(fun _ ->
-            try
-                serve_client client
-            with |x -> printf "client disconected: %A\n" x
-            )
-        , IsBackground = true)
-        t.Start()
+        //spawn (fun _ -> serve_client client)
+        do! serve_client client
+}        
 
 let eol = "\r\n"
 
@@ -136,19 +141,20 @@ let parse_url (line:string) =
 let read_post_data (stream:Stream) (bytes : int) = 
     stream.AsyncRead(bytes)
      
-let process_request (stream:Stream) =
+let process_request (stream:Stream) = async {
     
     let request = new HttpRequest()
     request.Stream <- stream
     
-    let first_line = read_line stream |> Async.RunSynchronously
+    let! first_line = read_line stream 
     
     let (meth,url,query) as q = parse_url (first_line)
     request.Url <- url
     request.Method <- meth
     request.Query <- query
     
-    let headers = read_headers stream |> Async.RunSynchronously
+    let! headers = read_headers stream 
+    
     request.Headers <- headers
     
     if meth.Equals("POST") then 
@@ -158,7 +164,9 @@ let process_request (stream:Stream) =
         if content_enconding.Equals("application/x-www-form-urlencoded") then
             let form_data = parse_data (toString (rawdata, 0, rawdata.Length))
             request.Form <- form_data
-    request
+            
+    return request
+}    
 
 let dir s (x:HttpRequest) = if s = x.Url then Some(x) else None
 let meth0d s (x:HttpRequest) = if s = x.Method then Some(x) else None
@@ -226,19 +234,26 @@ let log (s:Stream) (http_request:HttpRequest)  =
     s.Write(bytes,0,bytes.Length)
     succeed http_request
 
-let request_loop webpart (client:TcpClient)=   
+let request_loop webpart (client:TcpClient)= async {
     
-    let mutable keep_alive = true
+    let keep_alive = ref true
     let stream = stream client
     
-    while keep_alive do
-        let request = process_request stream
+    while !keep_alive do
+        let! request = process_request stream
         webpart request |> ignore
         stream.Flush()
-        keep_alive <- request.Headers ? connection .Equals("keep-alive")
+        keep_alive := request.Headers ? connection .Equals("keep-alive")
         
     stream.Close() 
-    client.Close()       
+    client.Close()   
+}
+    
+let parallelize input f = input |> Seq.map (f)  |> Async.Parallel        
    
-let web_server localp webpart =
-    tcp_ip_server localp (request_loop webpart)
+let web_server bindings webpart =
+    
+    bindings 
+    |> Array.map (fun x ->  tcp_ip_server x (request_loop webpart))
+    |> Async.Parallel
+    
