@@ -1,7 +1,7 @@
 h1. Introduction.
 
 p. 
-Suave is a simple web development F# library providing a lightweight web server and a set of combinators to manipulate route flow and task composition. Suave is inspired in the simplycity of Haapstack and born out of the necessity of embeding web server capabilities in my own applications. As of this post Suave is in its early stages and there is important functionality missing like HTTPS and cookies that is yet to be implemented.
+Suave is a simple web development F# library providing a lightweight web server and a set of combinators to manipulate route flow and task composition. Suave is inspired in the simplycity of Happstack and born out of the necessity of embeding web server capabilities in my own applications. As of this post Suave is in its early stages and there is important functionality missing like HTTPS and cookies that is yet to be implemented.
 
 p. 
 The simplest Suave application is a simple server that greets all requests with the string Hello World!
