@@ -24,14 +24,14 @@ let sslCert = new X509Certificate("suave.pfx","easy");
 
 choose [
     Console.OpenStandardOutput() |> log >>= never ; 
-    meth0d "GET" >>= dir "/hello" >>= never;
-    dir "/hello" >>= never >>= ok "Never executes";
-    dir "/hello" >>= ok "Hello World"  ;
-    dir "/hello" >>= dir "hello" >>= ok "Hello World";
-    dir "/query" >>= warbler( fun x -> ok ("Hello " + (x.Query) ? name));
-    dir "/date"  >>= warbler( fun x -> ok (DateTime.Now.ToString()));
+    meth0d "GET" >>= url "/hello" >>= never;
+    url "/hello" >>= never >>= ok "Never executes";
+    url "/hello" >>= ok "Hello World"  ;
+    url "/hello" >>= url "hello" >>= ok "Hello World";
+    url "/query" >>= warbler( fun x -> ok ("Hello " + (x.Query) ? name));
+    url "/date"  >>= warbler( fun x -> ok (DateTime.Now.ToString()));
     basic_auth; // from here on it will require authentication
-    meth0d "GET" >>= choose [ dir "/template.xml" >>= process_template data ;  ];
+    meth0d "GET" >>= choose [ url "/template.xml" >>= process_template data ;  ];
     meth0d "GET" >>= browse
     meth0d "POST" >>= warbler( fun x -> ok (sprintf "POST data: %A" (x.Form)));
     notfound "Found no handlers"     

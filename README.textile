@@ -16,7 +16,7 @@ p.
 We write web applications by composing web-parts. A web-part have type (HttpRequest -> HttpRequest option). Each web-part has the option of stopping the evaluation by returning None or continue by passing the HttpRequest along. We can string together web-parts with the help of the operator >>=.
 
 pre. 
-let simple_app _ = dir "/hello" >>= ok "Hello World" ;
+let simple_app _ = url "/hello" >>= ok "Hello World" ;
 
 p. 
 To select between different routes or options we use the function choose; for example:
@@ -25,8 +25,8 @@ pre.
 let complex_app _ = 
     choose [
         Console.OpenStandardOutput() |> log >>= never; 
-        dir "/hello" >>= never >>= ok "Never executes";
-        dir "/hello" >>= ok "Hello World"  ;
+        url "/hello" >>= never >>= ok "Never executes";
+        url "/hello" >>= ok "Hello World"  ;
     ]
 
 p. 
@@ -36,9 +36,9 @@ pre.
 let nested_logic _= 
     choose [
         meth0d "GET" >>= choose 
-            [ dir "/hello" >>= ok "Hello GET" ; dir "/goodbye" >>= ok "Good bye GET" ];
+            [ url "/hello" >>= ok "Hello GET" ; url "/goodbye" >>= ok "Good bye GET" ];
         meth0d "POST" >>= choose 
-            [ dir "/hello" >>= ok "Hello POST" ; dir "/goodbye" >>= ok "Good bye POST" ];
+            [ url "/hello" >>= ok "Hello POST" ; url "/goodbye" >>= ok "Good bye POST" ];
     ]
 
 p. 
@@ -47,8 +47,8 @@ To gain access to the undelying HttpRequest and read query and http form data we
 pre. 
 let http_form _ = 
     choose [
-         meth0d "GET"  >>= dir "/query" >>= warbler( fun x -> ok ("Hello " + (x.Query) ? name));
-         meth0d "POST" >>= dir "/query" >>= warbler( fun x -> ok ("Hello " + (x.Form)  ? name));
+         meth0d "GET"  >>= url "/query" >>= warbler( fun x -> ok ("Hello " + (x.Query) ? name));
+         meth0d "POST" >>= url "/query" >>= warbler( fun x -> ok ("Hello " + (x.Form)  ? name));
          notfound "Found no handlers"
     ]
 
@@ -58,10 +58,10 @@ Here is how http authentication would work:
 pre. 
 let requires_authentication _ = 
     choose [
-         meth0d "GET" >>= dir "/public" >>= ok ("Hello anonymous");
+         meth0d "GET" >>= url "/public" >>= ok ("Hello anonymous");
          //access to handlers bellow this one will require authentication
          authenticate_basic ( fun x -> x.Username.Equals("foo") && x.Password.Equals("bar"));
-         meth0d "GET" >>= dir "/protected" >>= warbler( fun x -> ok ("Hello " + x.Username));
+         meth0d "GET" >>= url "/protected" >>= warbler( fun x -> ok ("Hello " + x.Username));
     ]
 
 p. 
