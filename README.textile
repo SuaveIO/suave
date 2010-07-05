@@ -71,7 +71,6 @@ Suave supports binding the application to multiple TCP/IP addresses and ports co
 
 pre. 
 let sslCert = new X509Certificate("suave.pfx","easy");
-
 choose [
     Console.OpenStandardOutput() |> log >>= never ; // log to standard output
     url "/hello" >>= ok "Hello World" ; 
