@@ -64,6 +64,9 @@ let requires_authentication _ =
          meth0d "GET" >>= url "/protected" >>= warbler( fun x -> ok ("Hello " + x.Username));
     ]
 
+p. 
+*warbler gets its name from the famous book "To Mock a Mockingbird" by Raymond Smullyan.
+
 h1. Multiple bindings and SSL support
 
 p. 
@@ -80,5 +83,3 @@ choose [
     |> Async.RunSynchronously
     |> ignore 
 
-p. 
-*warbler gets its name from the famous book "To Mock a Mockingbird" by Raymond Smullyan.
