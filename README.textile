@@ -64,5 +64,22 @@ let requires_authentication _ =
          meth0d "GET" >>= url "/protected" >>= warbler( fun x -> ok ("Hello " + x.Username));
     ]
 
+h1. Multiple bindings and SSL support
+
+p. 
+Suave supports binding the application to multiple TCP/IP addresses and ports combinations. It also supports HTTPS.
+
+pre. 
+let sslCert = new X509Certificate("suave.pfx","easy");
+
+choose [
+    Console.OpenStandardOutput() |> log >>= never ; // log to standard output
+    url "/hello" >>= ok "Hello World" ; 
+    notfound "Found no handlers"     
+    ] 
+    |> web_server [|HTTP,"127.0.0.1",80; HTTPS(sslCert),"192.168.13.138",443|]
+    |> Async.RunSynchronously
+    |> ignore 
+
 p. 
 *warbler gets its name from the famous book "To Mock a Mockingbird" by Raymond Smullyan.
