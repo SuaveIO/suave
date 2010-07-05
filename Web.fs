@@ -15,22 +15,25 @@ open System.Collections.Generic
 
 let stream (client:TcpClient) = client.GetStream()
 
-let spawn f = 
-    let t = new Thread(ThreadStart(fun _ ->
-            try
-                f ()
-            with |x -> printf "client disconected: %A\n" x
-            )
-        , IsBackground = true)
-    t.Start()
+let mirror (clientStream:Stream) (serverStream:Stream) = async {
+    while true do
+        let! onebyte = clientStream.AsyncRead(1)
+        do! serverStream.AsyncWrite(onebyte) 
+}
 
+type TcpListener with
+    member x.AsyncAcceptTcpClient() = 
+        Async.FromBeginEnd(x.BeginAcceptTcpClient,x.EndAcceptTcpClient)  
+        
 let tcp_ip_server (sourceip,sourceport) serve_client = async {
+
     let server = new TcpListener(IPAddress.Parse(sourceip),sourceport)
     server.Start()
+
     while true do
-        let client = server.AcceptTcpClient()
-        //spawn (fun _ -> serve_client client)
-        do! serve_client client
+        
+        let! client = server.AsyncAcceptTcpClient() 
+        serve_client client |> Async.Start
 }        
 
 let eol = "\r\n"
@@ -51,17 +54,15 @@ let rec readTillEOL(stream: Stream, buff: byte[], count: int) =
           return! readTillEOL(stream,buff,count + 1)
    }
 
-let writeln (stream:Stream) s =
+let async_writeln (stream:Stream) s = async {
     let b = bytes s
-    stream.Write(b, 0, b.Length)
-    stream.Write(EOL, 0, 2)
-            
-let write (stream:Stream) s =
-    let b = bytes s
-    stream.Write(b, 0, b.Length)
-        
-let writebytes (stream:Stream) b       = 
-    stream.Write(b, 0, b.Length)
+    do! stream.AsyncWrite(b, 0, b.Length)
+    do! stream.AsyncWrite(EOL, 0, 2)    
+} 
+
+let async_writebytes (stream:Stream) b = async {
+    stream.Write(b, 0, b.Length)    
+}    
     
 let toString ( buff: byte[], index:int, count:int) =
     Encoding.ASCII.GetString(buff,index,count)
@@ -69,7 +70,7 @@ let toString ( buff: byte[], index:int, count:int) =
 let max_buffer = 1024    
     
 let read_line stream = async {
-    let buf = Array.zeroCreate max_buffer //max buff command
+    let buf = Array.zeroCreate max_buffer 
     let! count = readTillEOL(stream,buf,0)  
     return toString(buf, 0, count)  
 } 
@@ -172,16 +173,19 @@ let dir s (x:HttpRequest) = if s = x.Url then Some(x) else None
 let meth0d s (x:HttpRequest) = if s = x.Method then Some(x) else None
 
 let never _ = None
-let proto = "HTTP/1.1"
 
-let response statusCode message (content:string) headers (http_request:HttpRequest) =
-    writeln (http_request.Stream) (sprintf "%s %d %s" proto statusCode message)
-    List.iter (fun (x,y) -> writeln (http_request.Stream) (sprintf "%s:%s" x y )) headers
-    writeln (http_request.Stream) (sprintf "Content-Type:%s" "text/html")
+let proto_version = "HTTP/1.1"
+
+let response statusCode message (content:string) headers (http_request:HttpRequest) = async {
+    do! async_writeln (http_request.Stream) (sprintf "%s %d %s" proto_version statusCode message)
+    for (x,y) in headers do
+        do! async_writeln (http_request.Stream) (sprintf "%s:%s" x y )
+    do! async_writeln (http_request.Stream) (sprintf "Content-Type:%s" "text/html")
     let content_bytes = bytes content
-    writeln (http_request.Stream) (sprintf "Content-Length:%d" (content_bytes.Length))
-    writeln (http_request.Stream) ""
-    writebytes (http_request.Stream) content_bytes
+    do! async_writeln (http_request.Stream) (sprintf "Content-Length:%d" (content_bytes.Length))
+    do! async_writeln (http_request.Stream) ""
+    do! async_writebytes (http_request.Stream) content_bytes
+}    
     
 let challenge  =
     response 401 "Authorization Required" "401 Unauthorized." [ ("WWW-Authenticate","Basic realm=\"protected\"")] 
@@ -234,19 +238,41 @@ let log (s:Stream) (http_request:HttpRequest)  =
     s.Write(bytes,0,bytes.Length)
     succeed http_request
 
-let request_loop webpart (client:TcpClient)= async {
+open System.Net    
+open System.Net.Security
+open System.Security.Authentication
+open System.Security.Cryptography.X509Certificates;
+
+type Protocols = | HTTP | HTTPS of X509Certificate
     
-    let keep_alive = ref true
-    let stream = stream client
+let load_stream proto (stream: Stream)  = 
+    match proto with
+    |HTTP -> stream 
+    |HTTPS(cert) -> 
+                let sslStream = new SslStream(stream, true) 
+                sslStream.AuthenticateAsServer(cert, false, SslProtocols.Default, true)
+                sslStream :> Stream;
+
+let request_loop webpart proto (client:TcpClient) = async {
     
-    while !keep_alive do
-        let! request = process_request stream
-        webpart request |> ignore
-        stream.Flush()
-        keep_alive := request.Headers ? connection .Equals("keep-alive")
-        
-    stream.Close() 
-    client.Close()   
+    try
+    
+        let keep_alive = ref true
+        use stream = 
+            client.GetStream()
+            |> load_stream proto
+            
+        while !keep_alive do
+            let! request = process_request stream
+            let p = webpart request
+            match p with 
+            |Some(x) -> do! x
+            |None -> ()
+            stream.Flush()
+            keep_alive := request.Headers ? connection .Equals("keep-alive")
+            
+        client.Close()
+    with |x -> printf "client disconnected %A" x
 }
     
 let parallelize input f = input |> Seq.map (f)  |> Async.Parallel        
@@ -254,6 +280,6 @@ let parallelize input f = input |> Seq.map (f)  |> Async.Parallel
 let web_server bindings webpart =
     
     bindings 
-    |> Array.map (fun x ->  tcp_ip_server x (request_loop webpart))
+    |> Array.map (fun (proto,ip,port) ->  tcp_ip_server (ip,port) (request_loop webpart proto))
     |> Async.Parallel
     

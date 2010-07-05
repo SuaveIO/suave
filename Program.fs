@@ -1,5 +1,6 @@
 ﻿
 open System
+open System.Security.Cryptography.X509Certificates;
 
 open Suave.Web
 open Suave.Combinator
@@ -19,6 +20,8 @@ let authors =
     
 let data = Map [ "mysource", authors ] 
 
+let sslCert = new X509Certificate("suave.pfx","easy");
+
 choose [
     Console.OpenStandardOutput() |> log >>= never ; 
     meth0d "GET" >>= dir "/hello" >>= never;
@@ -33,6 +36,6 @@ choose [
     meth0d "POST" >>= warbler( fun x -> ok (sprintf "POST data: %A" (x.Form)));
     notfound "Found no handlers"     
     ] 
-    |> web_server [|"127.0.0.1",80; "192.168.13.146",80|]
+    |> web_server [|HTTP,"127.0.0.1",80; HTTPS(sslCert),"192.168.13.146",443|]
     |> Async.RunSynchronously
     |> ignore
