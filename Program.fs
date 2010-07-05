@@ -29,6 +29,7 @@ choose [
     url "/hello" >>= ok "Hello World"  ;
     url "/hello" >>= url "hello" >>= ok "Hello World";
     url "/query" >>= warbler( fun x -> ok ("Hello " + (x.Query) ? name));
+    url "/redirect" >>= redirect "/date"
     url "/date"  >>= warbler( fun x -> ok (DateTime.Now.ToString()));
     basic_auth; // from here on it will require authentication
     meth0d "GET" >>= choose [ url "/template.xml" >>= process_template data ;  ];
@@ -36,6 +37,6 @@ choose [
     meth0d "POST" >>= warbler( fun x -> ok (sprintf "POST data: %A" (x.Form)));
     notfound "Found no handlers"     
     ] 
-    |> web_server [|HTTP,"127.0.0.1",80; HTTPS(sslCert),"192.168.13.146",443|]
+    |> web_server [|HTTP,"127.0.0.1",80; HTTPS(sslCert),"192.168.13.138",443|]
     |> Async.RunSynchronously
     |> ignore

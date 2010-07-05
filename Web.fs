@@ -192,7 +192,7 @@ let challenge  =
 
 let ok s  = response  200 "OK" s []  >> succeed 
 let failure message = response 500 "Internal Error" message  [] >> succeed 
-let redirect url  = response 302 url "Content Moved"  [] >> succeed 
+let redirect url  = response 302 url "Content Moved"  [ ("Location", url)]  >> succeed 
 let notfound message = response 404 "Not Found" message  [] >>  succeed 
 
 let file filename  = 
