@@ -1,19 +1,26 @@
 h1. Introduction.
 
 p. 
-Suave is a simple web development F# library providing a lightweight web server and a set of combinators to manipulate route flow and task composition. Suave is inspired in the simplycity of Happstack and born out of the necessity of embeding web server capabilities in my own applications. As of this post Suave is in its early stages and there is important functionality missing like cookies that is yet to be implemented.
+Suave is a simple web development F# library providing a lightweight web server and a set of combinators to manipulate route flow and task composition. Suave is inspired in the simplicity of Happstack and born out of the necessity of embedding web server capabilities in my own applications. 
+Still in its early stages Suave suave supports HTTPS, multiple TCP/IP bindings, Keep-Alive. Suave also takes advantage of F# asynchronous workflows to perform non-blocking IO.
+
+h2. Hello World!
 
 p. 
-The simplest Suave application is a simple server that greets all requests with the string Hello World!
+The simplest Suave application is a simple server that greets all visitors with the string Hello World!
 
 pre. 
-web_server ("127.0.0.1",80) (ok "Hello World");
+web_server [|HTTP, "127.0.0.1",80|] (ok "Hello World")
+|> Async.RunSynchronously
+|> ignore; 
 
+p.
+web_server takes an array of bindings: [|HTTP, "127.0.0.1",80|] and a webpart: (ok "Hello World") and returns an asynchronous computation. Webparts are functions with the following type: HttpRequest -> Option<Async<unit>>. For every request web_server will evaluate the webpart, if the evaluation succeeds it will execute the resulting asynchronous computation. ok is a combinator that always succeed and writes its argument to the underlying response stream.
 
 h1. Composing bigger programs.
 
 p. 
-We write web applications by composing web-parts. A web-part have type (HttpRequest -> HttpRequest option). Each web-part has the option of stopping the evaluation by returning None or continue by passing the HttpRequest along. We can string together web-parts with the help of the operator >>=.
+Logic is expressed with the help of different combinators built around the option<HttpRequest> type. We build webparts out of functions of type (HttpRequest -> HttpRequest option) and the operator >>= in the following way.
 
 pre. 
 let simple_app _ = url "/hello" >>= ok "Hello World" ;
@@ -30,7 +37,7 @@ let complex_app _ =
     ]
 
 p. 
-The function choose accepts a list of web-parts and execute each web-part in the list until one returns success. Since choose itself returns a web-part we can nest them for more complex logic.
+The function choose accepts a list of webparts and execute each webpart in the list until one returns success. Since choose itself returns a webpart we can nest them for more complex logic.
 
 pre. 
 let nested_logic _= 
@@ -42,7 +49,7 @@ let nested_logic _=
     ]
 
 p. 
-To gain access to the undelying HttpRequest and read query and http form data we can use the warbler* combinator.
+To gain access to the underlying HttpRequest and read query and http form data we can use the warbler* combinator.
 
 pre. 
 let http_form _ = 
