@@ -13,6 +13,8 @@ open System.Security.Permissions
 open System.Security.Principal
 open System.Collections.Generic
 
+let suave_version = "0.1"
+
 let stream (client:TcpClient) = client.GetStream()
 
 let mirror (clientStream:Stream) (serverStream:Stream) = async {
@@ -98,6 +100,13 @@ let read_headers stream = async {
     return headers
 }
 
+let session_map = new Dictionary<string,Dictionary<string,obj>>()        
+        
+let session sessionId = 
+    if not (session_map.ContainsKey sessionId) then
+        session_map.Add(sessionId,new Dictionary<string,obj>())
+    session_map.[sessionId] 
+ 
 type HttpRequest() = 
     let mutable url : string = null
     let mutable meth0d : string = null
@@ -105,9 +114,12 @@ type HttpRequest() =
     let mutable query  : Dictionary<string,string> = new Dictionary<string,string>()
     let mutable headers: Dictionary<string,string> = new Dictionary<string,string>()
     let mutable form   : Dictionary<string,string> = new Dictionary<string,string>()
+    let mutable cookies   : Dictionary<string,(string*string)[]> = new Dictionary<string,(string*string)[]>()
     
     let mutable username: string = null
     let mutable password: string = null
+    
+    let mutable sessionId : string = null
     
     member h.Url with get() = url and set x = url <- x
     member h.Method with get() = meth0d and set x = meth0d <- x
@@ -115,18 +127,26 @@ type HttpRequest() =
     member h.Query with get() = query and set x = query <- x
     member h.Headers with get() = headers and set x = headers <- x
     member h.Form with get() = form and set x = form <- x
+    member h.Cookies with get() = cookies and set x = cookies <- x
     
     member h.Username with get() = username and set x = username <- x
     member h.Password with get() = password and set x = password <- x
+    
+    member h.SessionId with get() = sessionId and set x = sessionId <- x
+    
+    member h.Session with get() = session sessionId
 
 let empty_query_string () = new Dictionary<string,string>()
+
+let query (x:HttpRequest) = x.Query
+let form (x:HttpRequest) = x.Form
 
 let parse_data (s:string) = 
     
     let param = empty_query_string ()
-    let kk = s.Split('&')
-    Array.iter (fun (k:string) ->
-                            k.Split('=')  |> (fun d -> param.Add(d.[0],d.[1]))) kk
+    s.Split('&')
+    |> Array.iter (fun (k:string) ->
+                            k.Split('=')  |> (fun d -> if d.Length = 2 then param.Add(d.[0],d.[1]))) 
     param                            
 
 let parse_url (line:string) =
@@ -137,10 +157,16 @@ let parse_url (line:string) =
     if (indexOfMark>0) then
         (parts.[0],parts.[1].Substring(0,indexOfMark),parse_data (parts.[1].Substring(indexOfMark+1)))
     else 
-        (parts.[0],parts.[1],null)
+        (parts.[0],parts.[1],empty_query_string ())
     
 let read_post_data (stream:Stream) (bytes : int) = 
     stream.AsyncRead(bytes)
+    
+let parse_cookie (s:string) =
+    s.Split(';') 
+    |> Array.map (fun (x:string) -> 
+                        let parts = x.Split('='); 
+                        (parts.[0],parts.[1]))
      
 let process_request (stream:Stream) = async {
     
@@ -158,6 +184,12 @@ let process_request (stream:Stream) = async {
     
     request.Headers <- headers
     
+    request.Headers 
+    |> Seq.filter (fun x -> x.Key.Equals("cookie"))
+    |> Seq.iter (fun x -> 
+                    let cookie = parse_cookie x.Value; 
+                    request.Cookies.Add (fst(cookie.[0]),cookie))
+    
     if meth.Equals("POST") then 
         let content_enconding = headers.["content-type"]
         let content_length = Convert.ToInt32(headers.["content-length"])
@@ -167,8 +199,18 @@ let process_request (stream:Stream) = async {
             request.Form <- form_data
             
     return request
-}    
+} 
 
+//cookie-based session support   
+let session_support (request:HttpRequest) =
+    if request.Cookies.ContainsKey("suave_session_id") then
+        match request.Cookies ? suave_session_id with
+        |Some(attr) -> request.SessionId <- snd(attr.[0])
+        |None -> ()
+    else
+        request.SessionId <- Guid.NewGuid().ToString()
+    Some(request)
+        
 let url s (x:HttpRequest) = if s = x.Url then Some(x) else None
 let meth0d s (x:HttpRequest) = if s = x.Method then Some(x) else None
 
@@ -180,9 +222,17 @@ let response statusCode message (content:string) headers (http_request:HttpReque
     do! async_writeln (http_request.Stream) (sprintf "%s %d %s" proto_version statusCode message)
     for (x,y) in headers do
         do! async_writeln (http_request.Stream) (sprintf "%s:%s" x y )
-    do! async_writeln (http_request.Stream) (sprintf "Content-Type:%s" "text/html")
+    
+    //we need a way people can add cookies and stuff 
+    if not(String.IsNullOrEmpty(http_request.SessionId)) then
+        do! async_writeln (http_request.Stream) (sprintf "Set-Cookie: %s=%s" "suave_session_id" http_request.SessionId)
+    
+    do! async_writeln (http_request.Stream) (sprintf "Server: Suave/%s" suave_version)
+    
+    do! async_writeln (http_request.Stream) (sprintf "Content-Type: %s" "text/html")
     let content_bytes = bytes content
-    do! async_writeln (http_request.Stream) (sprintf "Content-Length:%d" (content_bytes.Length))
+    do! async_writeln (http_request.Stream) (sprintf "Content-Length: %d" (content_bytes.Length))
+    
     do! async_writeln (http_request.Stream) ""
     do! async_writebytes (http_request.Stream) content_bytes
 }    
@@ -200,7 +250,8 @@ let file filename  =
         ok (File.ReadAllText(filename)) 
     else
         response 404 "Not Found" (sprintf "%s File not found" filename)  [] >> succeed 
-        
+
+       
 let local_file str = sprintf "%s%s" Environment.CurrentDirectory str        
         
 let browse (http_request:HttpRequest) = 

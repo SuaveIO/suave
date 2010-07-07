@@ -27,10 +27,19 @@ choose [
     meth0d "GET" >>= url "/hello" >>= never;
     url "/hello" >>= never >>= ok "Never executes";
     url "/hello" >>= ok "Hello World"  ;
-    url "/hello" >>= url "hello" >>= ok "Hello World";
-    url "/query" >>= warbler( fun x -> ok ("Hello " + (x.Query) ? name));
-    url "/redirect" >>= redirect "/date"
-    url "/date"  >>= warbler( fun x -> ok (DateTime.Now.ToString()));
+    url "/query" >>= warbler( fun x -> cond (x.Query) ? name (fun y -> ok ("Hello " + y)) never);
+    url "/query" >>= ok "Hello beautiful";
+    url "/redirect" >>= redirect "/redirected"
+    url "/redirected" >>=  ok "You have been redirected.";
+    url "/date" >>= ok (DateTime.Now.ToString());
+    url "/session" 
+        >>= session_support 
+        >>= warbler ( fun x -> 
+            cond (x.Session) ? counter 
+                ( fun y -> 
+                    x.Session ? counter <- (y :?> int) + 1 :> obj ; 
+                    ok (sprintf "Hello %A time(s)"  (x.Session) ? counter))
+                 (x.Session ? counter <- 1 :> obj ; ok "First time"));
     basic_auth; // from here on it will require authentication
     meth0d "GET" >>= choose [ url "/template.xml" >>= process_template data ;  ];
     meth0d "GET" >>= browse
@@ -39,4 +48,4 @@ choose [
     ] 
     |> web_server [|HTTP,"127.0.0.1",80; HTTPS(sslCert),"192.168.13.138",443|]
     |> Async.RunSynchronously
-    |> ignore
+    |> ignore 
