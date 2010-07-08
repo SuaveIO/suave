@@ -48,6 +48,7 @@ let rec readTillEOL(stream: Stream, buff: byte[], count: int) =
    async{
        //TODO: we should read shunks, less context switching
        let! inp = stream.AsyncRead(1)
+       
        if count>0 && buff.[count-1] = EOL.[0] && inp.[0] = EOL.[1] then
           return (count-1)
        else
@@ -106,6 +107,10 @@ let session sessionId =
     if not (session_map.ContainsKey sessionId) then
         session_map.Add(sessionId,new Dictionary<string,obj>())
     session_map.[sessionId] 
+    
+type HttpResponse()=
+    let mutable headers: List<string*string> = new List<string*string>()
+    member h.Headers with get() = headers and set x = headers <- x
  
 type HttpRequest() = 
     let mutable url : string = null
@@ -121,6 +126,8 @@ type HttpRequest() =
     
     let mutable sessionId : string = null
     
+    let mutable response : HttpResponse = new HttpResponse()
+    
     member h.Url with get() = url and set x = url <- x
     member h.Method with get() = meth0d and set x = meth0d <- x
     member h.Stream with get() = stream and set x = stream <- x
@@ -135,6 +142,8 @@ type HttpRequest() =
     member h.SessionId with get() = sessionId and set x = sessionId <- x
     
     member h.Session with get() = session sessionId
+    
+    member h.Response with get() = response
 
 let empty_query_string () = new Dictionary<string,string>()
 
@@ -201,14 +210,20 @@ let process_request (stream:Stream) = async {
     return request
 } 
 
+let set_header a b (http_request:HttpRequest) = 
+    http_request.Response.Headers.Add(a,b)
+    http_request
+    
+let set_cookie cookie = set_header  "Set-Cookie"  cookie 
+
 //cookie-based session support   
 let session_support (request:HttpRequest) =
-    if request.Cookies.ContainsKey("suave_session_id") then
+    let sessionId = 
         match request.Cookies ? suave_session_id with
-        |Some(attr) -> request.SessionId <- snd(attr.[0])
-        |None -> ()
-    else
-        request.SessionId <- Guid.NewGuid().ToString()
+        |Some(attr) -> snd(attr.[0])
+        |None -> Guid.NewGuid().ToString()
+    request.SessionId <- sessionId
+    set_cookie (sprintf "%s=%s" "suave_session_id" sessionId) request |> ignore
     Some(request)
         
 let url s (x:HttpRequest) = if s = x.Url then Some(x) else None
@@ -218,40 +233,65 @@ let never _ = None
 
 let proto_version = "HTTP/1.1"
 
-let response statusCode message (content:string) headers (http_request:HttpRequest) = async {
-    do! async_writeln (http_request.Stream) (sprintf "%s %d %s" proto_version statusCode message)
-    for (x,y) in headers do
-        do! async_writeln (http_request.Stream) (sprintf "%s:%s" x y )
-    
-    //we need a way people can add cookies and stuff 
-    if not(String.IsNullOrEmpty(http_request.SessionId)) then
-        do! async_writeln (http_request.Stream) (sprintf "Set-Cookie: %s=%s" "suave_session_id" http_request.SessionId)
-    
-    do! async_writeln (http_request.Stream) (sprintf "Server: Suave/%s" suave_version)
-    
-    do! async_writeln (http_request.Stream) (sprintf "Content-Type: %s" "text/html")
-    let content_bytes = bytes content
-    do! async_writeln (http_request.Stream) (sprintf "Content-Length: %d" (content_bytes.Length))
-    
-    do! async_writeln (http_request.Stream) ""
-    do! async_writebytes (http_request.Stream) content_bytes
-}    
-    
-let challenge  =
-    response 401 "Authorization Required" "401 Unauthorized." [ ("WWW-Authenticate","Basic realm=\"protected\"")] 
+let response statusCode message (content:string) (http_request:HttpRequest) = async {
 
-let ok s  = response  200 "OK" s []  >> succeed 
-let failure message = response 500 "Internal Error" message  [] >> succeed 
-let redirect url  = response 302 url "Content Moved"  [ ("Location", url)]  >> succeed 
-let notfound message = response 404 "Not Found" message  [] >>  succeed 
+    do! async_writeln (http_request.Stream) (sprintf "%s %d %s" proto_version statusCode message)
+    do! async_writeln (http_request.Stream) (sprintf "Server: Suave/%s" suave_version)
+    do! async_writeln (http_request.Stream) (sprintf "Date: %s" (DateTime.Now.ToUniversalTime().ToString("R")))
+    
+    for (x,y) in http_request.Response.Headers do
+        do! async_writeln (http_request.Stream) (sprintf "%s: %s" x y )
+    
+    if not(http_request.Response.Headers.Exists(new Predicate<_>(fun (x,_) -> x.ToLower().Equals("content-type")))) then
+        do! async_writeln (http_request.Stream) (sprintf "Content-Type: %s" "text/html")
+    
+    let content_bytes = bytes content
+    
+    if content_bytes.Length > 0 then 
+        do! async_writeln (http_request.Stream) (sprintf "Content-Length: %d" (content_bytes.Length))
+        
+    do! async_writeln (http_request.Stream) ""
+    
+    if content_bytes.Length > 0 then
+        do! async_writebytes (http_request.Stream) content_bytes
+}
+
+let challenge  =
+    set_header "WWW-Authenticate" "Basic realm=\"protected\"" 
+    >> response 401 "Authorization Required" "401 Unauthorized." 
+
+let ok s  = response  200 "OK" s >> succeed 
+let failure message = response 500 "Internal Error" message >> succeed 
+
+let redirect url  = 
+    set_header "Location" url
+    >> response 302 url "Content Moved"
+    >> succeed 
+
+let notfound message = response 404 "Not Found" message >>  succeed 
+
+let mime_type = function
+    |".bmp" -> "image/bmp"
+    |".css" -> "text/css"
+    |".gif" -> "image/gif"
+    |".ico" -> "image/x-icon"
+    |".htm" 
+    |".html" -> "text/html";
+    |".jpe" 
+    |".jpeg"
+    |".jpg" -> "image/jpeg"
+    |".js" -> "application/x-javascript"
+    |".exe" -> "application/exe"
+    |_ -> "application/octet-streamu"
 
 let file filename  = 
     if File.Exists(filename) then
-        ok (File.ReadAllText(filename)) 
+        let file_info = new FileInfo(filename)
+        let mimes = mime_type (file_info.Extension)
+        set_header "Content-Type" mimes  >> ok (File.ReadAllText(filename)) 
     else
-        response 404 "Not Found" (sprintf "%s File not found" filename)  [] >> succeed 
+        response 404 "Not Found" (sprintf "%s File not found" filename) >> succeed 
 
-       
 let local_file str = sprintf "%s%s" Environment.CurrentDirectory str        
         
 let browse (http_request:HttpRequest) = 
@@ -326,9 +366,12 @@ let request_loop webpart proto (client:TcpClient) = async {
     with |x -> printf "client disconnected %A" x
 }
     
-let parallelize input f = input |> Seq.map (f)  |> Async.Parallel        
+let parallelize input f = input |> Seq.map (f)  |> Async.Parallel
+
+type Binding = Protocols * string * int      
+type WebPart = HttpRequest -> Async<unit> Option
    
-let web_server bindings webpart =
+let web_server bindings (webpart:WebPart) =
     
     bindings 
     |> Array.map (fun (proto,ip,port) ->  tcp_ip_server (ip,port) (request_loop webpart proto))
