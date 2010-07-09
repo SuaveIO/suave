@@ -362,7 +362,7 @@ let request_loop webpart proto (client:TcpClient) = async {
             stream.Flush()
             keep_alive := 
                 match request.Headers ? connection with 
-                |Some("keep-alive") -> true
+                |Some(x) when x.ToLower().Equals("keep-alive") -> true
                 |_ -> false
             
         client.Close()
