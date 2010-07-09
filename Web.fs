@@ -360,7 +360,10 @@ let request_loop webpart proto (client:TcpClient) = async {
             |Some(x) -> do! x
             |None -> ()
             stream.Flush()
-            keep_alive := request.Headers ? connection .Equals("keep-alive")
+            keep_alive := 
+                match request.Headers ? connection with 
+                |Some("keep-alive") -> true
+                |_ -> false
             
         client.Close()
     with |x -> printf "client disconnected %A" x

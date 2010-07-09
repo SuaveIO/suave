@@ -46,13 +46,10 @@ choose [
     meth0d "POST" >>= warbler( fun x -> ok (sprintf "POST data: %A" (x.Form)));
     notfound "Found no handlers"     
     ] 
-    |> web_server [|HTTP,"127.0.0.1",80; HTTPS(sslCert),"192.168.13.138",443|]
+    |> web_server [|HTTP,"64.34.120.90",80; HTTPS(sslCert),"64.34.120.90",443|]
     |> Async.RunSynchronously
     |> ignore
     
 web_server [|HTTP, "127.0.0.1",80|] (ok "Hello World")
 |> Async.RunSynchronously
-|> ignore;    
-
-
-let simple_app : WebPart = url "/hello" >>= ok "Hello World" ;
+|> ignore;
