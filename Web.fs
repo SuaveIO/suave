@@ -46,7 +46,7 @@ let EOL = bytes eol
 
 let rec readTillEOL(stream: Stream, buff: byte[], count: int) =
    async{
-       //TODO: we should read shunks, less context switching
+       
        let! inp = stream.AsyncRead(1)
        
        if count>0 && buff.[count-1] = EOL.[0] && inp.[0] = EOL.[1] then
