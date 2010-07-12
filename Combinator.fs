@@ -12,6 +12,8 @@ let bind p rest =
         
 let delay f = f()
 
+let never _ = None
+
 let (>>=) a b = fun x -> bind (a x) b
 
 let rec choose options arg = 
@@ -27,6 +29,10 @@ let look_up (target : IDictionary<'b,'a>) key  =
   match target.TryGetValue(key) with
   | (true, v) -> Some(v)
   | (false, _) -> None
+  
+let opt = function
+    |Some(x) -> x
+    |None    -> failwith "Invalid arg."
 
 let (?) (target : IDictionary<'b,'a>) key =
   look_up target key 

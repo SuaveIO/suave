@@ -14,6 +14,7 @@ open System.Security.Principal
 open System.Collections.Generic
 
 let suave_version = "0.1"
+let proto_version = "HTTP/1.1"
 
 let stream (client:TcpClient) = client.GetStream()
 
@@ -57,6 +58,23 @@ let rec readTillEOL(stream: Stream, buff: byte[], count: int) =
           return! readTillEOL(stream,buff,count + 1)
    }
 
+let read_until (marker:byte array) f (stream:Stream)  = 
+    
+    let buffer = Array.create marker.Length (byte(0))
+    
+    let rec loop index = async {
+        if index < Array.length marker then 
+            let! byte = stream.AsyncRead(1)
+            if byte.Length > 0 then 
+                buffer.[index] <- byte.[0]
+                if byte.[0] = marker.[index] then
+                    do! loop (index + 1)  
+                else 
+                    do! f buffer (index+1)
+                    do! loop 0
+    }
+    loop 0    
+
 let async_writeln (stream:Stream) s = async {
     let b = bytes s
     do! stream.AsyncWrite(b, 0, b.Length)
@@ -64,7 +82,7 @@ let async_writeln (stream:Stream) s = async {
 } 
 
 let async_writebytes (stream:Stream) b = async {
-    stream.Write(b, 0, b.Length)    
+    do! stream.AsyncWrite(b, 0, b.Length)    
 }    
     
 let toString ( buff: byte[], index:int, count:int) =
@@ -111,7 +129,13 @@ let session sessionId =
 type HttpResponse()=
     let mutable headers: List<string*string> = new List<string*string>()
     member h.Headers with get() = headers and set x = headers <- x
- 
+    
+type HttpUpload(fieldname,filename,mime_type,temp_file_name) =
+    member x.FieldName = fieldname
+    member x.FileName  = filename
+    member x.MimeType  = mime_type
+    member x.Path = temp_file_name
+    
 type HttpRequest() = 
     let mutable url : string = null
     let mutable meth0d : string = null
@@ -120,13 +144,11 @@ type HttpRequest() =
     let mutable headers: Dictionary<string,string> = new Dictionary<string,string>()
     let mutable form   : Dictionary<string,string> = new Dictionary<string,string>()
     let mutable cookies   : Dictionary<string,(string*string)[]> = new Dictionary<string,(string*string)[]>()
-    
     let mutable username: string = null
     let mutable password: string = null
-    
     let mutable sessionId : string = null
-    
     let mutable response : HttpResponse = new HttpResponse()
+    let mutable files  : List<HttpUpload> = new List<HttpUpload>()
     
     member h.Url with get() = url and set x = url <- x
     member h.Method with get() = meth0d and set x = meth0d <- x
@@ -135,15 +157,30 @@ type HttpRequest() =
     member h.Headers with get() = headers and set x = headers <- x
     member h.Form with get() = form and set x = form <- x
     member h.Cookies with get() = cookies and set x = cookies <- x
-    
     member h.Username with get() = username and set x = username <- x
     member h.Password with get() = password and set x = password <- x
-    
     member h.SessionId with get() = sessionId and set x = sessionId <- x
-    
     member h.Session with get() = session sessionId
-    
     member h.Response with get() = response
+    member h.Files with get() = files
+    
+    member h.Dispose(disposing:bool) =
+        
+        if disposing then
+            GC.SuppressFinalize(h)
+        
+        for upload in h.Files do
+            if File.Exists(upload.Path) then
+                try
+                    File.Delete(upload.Path)
+                with
+                |_ -> () // we tried
+            
+    override h.Finalize () = h.Dispose(false)           
+    
+    interface IDisposable with
+        member h.Dispose() =
+            h.Dispose(true)
 
 let empty_query_string () = new Dictionary<string,string>()
 
@@ -156,8 +193,8 @@ let parse_data (s:string) =
     s.Split('&')
     |> Array.iter (fun (k:string) ->
                             k.Split('=')  |> (fun d -> if d.Length = 2 then param.Add(d.[0],d.[1]))) 
-    param                            
-
+    param
+    
 let parse_url (line:string) =
     let parts = line.Split(' ')
     if(parts.Length <2 || parts.Length>3) then failwith "400"
@@ -176,6 +213,69 @@ let parse_cookie (s:string) =
     |> Array.map (fun (x:string) -> 
                         let parts = x.Split('='); 
                         (parts.[0],parts.[1]))
+                        
+let parse_key_value_pairs arr =
+    let dict = new Dictionary<string,string>()
+    arr 
+    |> Array.iter (fun (x:String) -> 
+                    let parts = x.Split('=');
+                    dict.Add(parts.[0],parts.[1]))
+    dict
+    
+let header_params (header:string option) =
+    match header with
+    |Some(x) -> let parts = x.Split(';')|> Array.map (fun x -> x.TrimStart())
+                parse_key_value_pairs (Array.sub parts 1 (parts.Length-1))
+                
+    |_ -> failwith "did not found header: %s." header
+        
+    
+let parse_multipart (stream:Stream) boundary (request:HttpRequest) = 
+    let rec loop boundary = 
+        async {
+        
+        let! firstline = read_line stream
+                
+        if not(firstline.Equals("--")) then 
+            
+            let! part_headers = read_headers stream 
+            let content_disposition = look_up part_headers "content-disposition"
+            
+            let fieldname = 
+                (header_params content_disposition) ? name |> opt
+                
+            let content_type = look_up part_headers "content-type"
+            
+            match content_type with
+            |Some(x) when x.StartsWith("multipart/mixed") 
+                -> 
+                    let subboundary = "--" + x.Substring(x.IndexOf('=')+1).TrimStart()
+                    do! loop subboundary  
+            |Some(x) 
+                -> 
+                    let temp_file_name = Path.GetTempFileName()
+                    use temp_file = new FileStream(temp_file_name,FileMode.Truncate)
+                    do! stream 
+                        |> read_until (bytes("\r\n" + boundary)) (fun x y -> async { do! temp_file.AsyncWrite(x,0,y) }  )
+                    let file_leght = temp_file.Length
+                    temp_file.Close()
+                    if  file_leght > int64(0) then
+                        let filename = 
+                            (header_params content_disposition) ? filename |> opt
+                        request.Files.Add(new HttpUpload(fieldname,filename,content_type |> opt,temp_file_name))
+                    else 
+                        File.Delete(temp_file_name)
+            |None-> 
+                    use mem = new MemoryStream()
+                    do! stream 
+                        |> read_until (bytes("\r\n" + boundary)) (fun x y -> async { do! mem.AsyncWrite(x,0,y) }  )
+                    
+                    let byts = mem.ToArray()
+                    request.Form.Add(fieldname, toString(byts,0,byts.Length))
+            
+            do! loop  boundary
+    } 
+    loop boundary   
      
 let process_request (stream:Stream) = async {
     
@@ -202,10 +302,14 @@ let process_request (stream:Stream) = async {
     if meth.Equals("POST") then 
         let content_enconding = headers.["content-type"]
         let content_length = Convert.ToInt32(headers.["content-length"])
-        let rawdata = read_post_data stream content_length  |> Async.RunSynchronously
+        
         if content_enconding.Equals("application/x-www-form-urlencoded") then
+            let! rawdata = read_post_data stream content_length
             let form_data = parse_data (toString (rawdata, 0, rawdata.Length))
             request.Form <- form_data
+        elif content_enconding.StartsWith("multipart/form-data") then
+            let boundary = "--" + content_enconding.Substring(content_enconding.IndexOf('=')+1).TrimStart()
+            do! parse_multipart stream boundary request
             
     return request
 } 
@@ -228,10 +332,6 @@ let session_support (request:HttpRequest) =
         
 let url s (x:HttpRequest) = if s = x.Url then Some(x) else None
 let meth0d s (x:HttpRequest) = if s = x.Method then Some(x) else None
-
-let never _ = None
-
-let proto_version = "HTTP/1.1"
 
 let response statusCode message (content:string) (http_request:HttpRequest) = async {
 
@@ -354,12 +454,13 @@ let request_loop webpart proto (client:TcpClient) = async {
             |> load_stream proto
             
         while !keep_alive do
-            let! request = process_request stream
+            use! request = process_request stream
             let p = webpart request
             match p with 
             |Some(x) -> do! x
             |None -> ()
             stream.Flush()
+            
             keep_alive := 
                 match request.Headers ? connection with 
                 |Some(x) when x.ToLower().Equals("keep-alive") -> true
