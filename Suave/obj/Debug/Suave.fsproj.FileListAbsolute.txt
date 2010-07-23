@@ -1,0 +1,6 @@
+Z:\workarea\suave\Suave\bin\Debug\notes.txt
+Z:\workarea\suave\Suave\bin\Debug\suave.pdb
+Z:\workarea\suave\Suave\obj\Debug\ResolveAssemblyReference.cache
+Z:\workarea\suave\Suave\obj\Debug\suave.pdb
+Z:\workarea\suave\Suave\bin\Debug\suave.dll
+Z:\workarea\suave\Suave\obj\Debug\suave.dll
