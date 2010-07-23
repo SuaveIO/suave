@@ -1,9 +1,0 @@
-﻿<html xmlns:far='http://codemaker.net/schema'>
-  <b>test</b>
-  <far:repeat source="mysource" target="item">
-    <p>
-      Hello <far:value source="item" name="FirstName" /> <far:value source="item" name="LastName" />!
-      You are <far:value source="item" name="Age" /> years old!
-    </p>
-  </far:repeat>
-</html>
