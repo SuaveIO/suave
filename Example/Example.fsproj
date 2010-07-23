@@ -31,9 +31,6 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Program.fs" />
-    <Content Include="template.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
     <None Include="test.html">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

@@ -35,8 +35,6 @@ type LoginForm() =
         
         user.FirstName <- "Pepe"
 
-        let chooseTemplate = Xml([])
-        
         bind (  "h", node, 
                Map [ "FirstName", Suave.Html.text_box (user.FirstName, fun x -> user.FirstName <- x :?> string);
                      "Submit"   , Suave.Html.submit ("Submit data", save_results );  
