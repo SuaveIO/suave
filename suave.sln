@@ -1,6 +1,6 @@
 ﻿
-Microsoft Visual Studio Solution File, Format Version 10.00
-# Visual Studio 2008
+Microsoft Visual Studio Solution File, Format Version 11.00
+# Visual Studio 2010
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Suave", "Suave\Suave.fsproj", "{3DC9193E-BD0C-4486-9C58-56B630C36623}"
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Example", "Example\Example.fsproj", "{6BACAAA2-C717-4B6E-93FC-1B54126F91B0}"
