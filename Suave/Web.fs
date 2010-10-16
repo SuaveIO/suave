@@ -27,7 +27,9 @@ let mirror (clientStream:Stream) (serverStream:Stream) = async {
 type TcpListener with
     member x.AsyncAcceptTcpClient() = 
         Async.FromBeginEnd(x.BeginAcceptTcpClient,x.EndAcceptTcpClient)  
-        
+
+type TcpWorker<'a> = TcpClient ->  Async<'a>
+     
 let tcp_ip_server (sourceip,sourceport) serve_client = async {
 
     let server = new TcpListener(IPAddress.Parse(sourceip),sourceport)
@@ -143,6 +145,7 @@ type HttpRequest() =
     let mutable query  : Dictionary<string,string> = new Dictionary<string,string>()
     let mutable headers: Dictionary<string,string> = new Dictionary<string,string>()
     let mutable form   : Dictionary<string,string> = new Dictionary<string,string>()
+    let mutable rawform   : byte[] = Array.empty;
     let mutable cookies   : Dictionary<string,(string*string)[]> = new Dictionary<string,(string*string)[]>()
     let mutable username: string = null
     let mutable password: string = null
@@ -156,6 +159,7 @@ type HttpRequest() =
     member h.Query with get() = query and set x = query <- x
     member h.Headers with get() = headers and set x = headers <- x
     member h.Form with get() = form and set x = form <- x
+    member h.RawForm with get() = rawform and set x = rawform <- x
     member h.Cookies with get() = cookies and set x = cookies <- x
     member h.Username with get() = username and set x = username <- x
     member h.Password with get() = password and set x = password <- x
@@ -307,6 +311,7 @@ let process_request (stream:Stream) = async {
             let! rawdata = read_post_data stream content_length
             let form_data = parse_data (toString (rawdata, 0, rawdata.Length))
             request.Form <- form_data
+            request.RawForm <- rawdata
         elif content_enconding.StartsWith("multipart/form-data") then
             let boundary = "--" + content_enconding.Substring(content_enconding.IndexOf('=')+1).TrimStart()
             do! parse_multipart stream boundary request
@@ -472,7 +477,7 @@ let request_loop webpart proto (client:TcpClient) = async {
     
 let parallelize input f = input |> Seq.map (f)  |> Async.Parallel
 
-type Binding = Protocols * string * int      
+type HttpBinding = Protocols * string * int      
 type WebPart = HttpRequest -> Async<unit> Option
    
 let web_server bindings (webpart:WebPart) =
