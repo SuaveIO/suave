@@ -45,7 +45,7 @@ let extractTemplate (nsx:string) (scope:Map<string,Binder>) (xml:Xml)   =
                        
             |(Element(Pat("lift",name),_,att),childs)  -> 
                         let obj = load_object name
-                        let action = Array.find (fun (x,_) -> x="action") att |> snd//attributes.["action"].Value
+                        let action = Array.find (fun (x,_) -> x="action") att |> snd
                         (invoke obj action (childs))  :?> Xml
                         
                         
@@ -97,9 +97,9 @@ let process_template (data:Map<string,Binder>) (http_request:HttpRequest) =
         let str = new StringWriter(sb)
         xml_to_string1 xml str
         let output = sb.ToString()
-        ok (output) http_request    
+        ok (fun _ -> output) http_request    
     with
-    |x -> failure (x.ToString()) http_request    
+    |x -> failure (fun _ -> x.ToString()) http_request    
 
 
 

@@ -4,8 +4,7 @@ open Combinator
 
 open System
 open System.IO
-open System.Net
-open System.Net.Sockets
+
 open System.Text
 open System.Diagnostics
 open System.Threading
@@ -15,32 +14,6 @@ open System.Collections.Generic
 
 let suave_version = "0.1"
 let proto_version = "HTTP/1.1"
-
-let stream (client:TcpClient) = client.GetStream()
-
-let mirror (clientStream:Stream) (serverStream:Stream) = async {
-    while true do
-        let! onebyte = clientStream.AsyncRead(1)
-        do! serverStream.AsyncWrite(onebyte) 
-}
-
-type TcpListener with
-    member x.AsyncAcceptTcpClient() = 
-        Async.FromBeginEnd(x.BeginAcceptTcpClient,x.EndAcceptTcpClient)  
-
-type TcpWorker<'a> = TcpClient ->  Async<'a>
-     
-let tcp_ip_server (sourceip,sourceport) serve_client = async {
-
-    let server = new TcpListener(IPAddress.Parse(sourceip),sourceport)
-    server.Start()
-
-    while true do
-        
-        let! client = server.AsyncAcceptTcpClient() 
-        serve_client client |> Async.Start
-}        
-
 let eol = "\r\n"
 
 let bytes (s:string) = Encoding.ASCII.GetBytes(s)
@@ -121,11 +94,13 @@ let read_headers stream = async {
     return headers
 }
 
-let session_map = new Dictionary<string,Dictionary<string,obj>>()        
+open System.Collections.Concurrent
+
+let session_map = new Dictionary<string,ConcurrentDictionary<string,obj>>()        
         
 let session sessionId = 
     if not (session_map.ContainsKey sessionId) then
-        session_map.Add(sessionId,new Dictionary<string,obj>())
+        session_map.Add(sessionId,new ConcurrentDictionary<string,obj>())
     session_map.[sessionId] 
     
 type HttpResponse()=
@@ -307,7 +282,7 @@ let process_request (stream:Stream) = async {
         let content_enconding = headers.["content-type"]
         let content_length = Convert.ToInt32(headers.["content-length"])
         
-        if content_enconding.Equals("application/x-www-form-urlencoded") then
+        if content_enconding.StartsWith("application/x-www-form-urlencoded") then
             let! rawdata = read_post_data stream content_length
             let form_data = parse_data (toString (rawdata, 0, rawdata.Length))
             request.Form <- form_data
@@ -338,7 +313,7 @@ let session_support (request:HttpRequest) =
 let url s (x:HttpRequest) = if s = x.Url then Some(x) else None
 let meth0d s (x:HttpRequest) = if s = x.Method then Some(x) else None
 
-let response statusCode message (content:string) (http_request:HttpRequest) = async {
+let response statusCode message (content:HttpRequest -> string) (http_request:HttpRequest) = async {
 
     do! async_writeln (http_request.Stream) (sprintf "%s %d %s" proto_version statusCode message)
     do! async_writeln (http_request.Stream) (sprintf "Server: Suave/%s" suave_version)
@@ -350,7 +325,7 @@ let response statusCode message (content:string) (http_request:HttpRequest) = as
     if not(http_request.Response.Headers.Exists(new Predicate<_>(fun (x,_) -> x.ToLower().Equals("content-type")))) then
         do! async_writeln (http_request.Stream) (sprintf "Content-Type: %s" "text/html")
     
-    let content_bytes = bytes content
+    let content_bytes = bytes (content http_request)
     
     if content_bytes.Length > 0 then 
         do! async_writeln (http_request.Stream) (sprintf "Content-Length: %d" (content_bytes.Length))
@@ -363,14 +338,15 @@ let response statusCode message (content:string) (http_request:HttpRequest) = as
 
 let challenge  =
     set_header "WWW-Authenticate" "Basic realm=\"protected\"" 
-    >> response 401 "Authorization Required" "401 Unauthorized." 
+    >> response 401 "Authorization Required" ("401 Unauthorized." |> cnst)
 
+//
 let ok s  = response  200 "OK" s >> succeed 
 let failure message = response 500 "Internal Error" message >> succeed 
 
 let redirect url  = 
     set_header "Location" url
-    >> response 302 url "Content Moved"
+    >> response 302 url ("Content Moved" |> cnst)
     >> succeed 
 
 let notfound message = response 404 "Not Found" message >>  succeed 
@@ -393,9 +369,9 @@ let file filename  =
     if File.Exists(filename) then
         let file_info = new FileInfo(filename)
         let mimes = mime_type (file_info.Extension)
-        set_header "Content-Type" mimes  >> ok (File.ReadAllText(filename)) 
+        set_header "Content-Type" mimes  >> ok (File.ReadAllText(filename) |> cnst) 
     else
-        response 404 "Not Found" (sprintf "%s File not found" filename) >> succeed 
+        response 404 "Not Found" (sprintf "%s File not found" filename |> cnst) >> succeed 
 
 let local_file str = sprintf "%s%s" Environment.CurrentDirectory str        
         
@@ -449,6 +425,8 @@ let load_stream proto (stream: Stream)  =
                 sslStream.AuthenticateAsServer(cert, false, SslProtocols.Default, true)
                 sslStream :> Stream;
 
+open System.Net.Sockets
+
 let request_loop webpart proto (client:TcpClient) = async {
     
     try
@@ -479,6 +457,8 @@ let parallelize input f = input |> Seq.map (f)  |> Async.Parallel
 
 type HttpBinding = Protocols * string * int      
 type WebPart = HttpRequest -> Async<unit> Option
+
+open Suave.Tcp
    
 let web_server bindings (webpart:WebPart) =
     
