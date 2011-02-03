@@ -313,10 +313,11 @@ let session_support (request:HttpRequest) =
 let url s (x:HttpRequest) = if s = x.Url then Some(x) else None
 let meth0d s (x:HttpRequest) = if s = x.Method then Some(x) else None
 
-let response statusCode message (content:HttpRequest -> string) (http_request:HttpRequest) = async {
+let response statusCode message (content:HttpRequest -> byte[]) (http_request:HttpRequest) = async {
 
     do! async_writeln (http_request.Stream) (sprintf "%s %d %s" proto_version statusCode message)
-    do! async_writeln (http_request.Stream) (sprintf "Server: Suave/%s" suave_version)
+    do! async_writeln (http_request.Stream) (sprintf "Server: Suave/%s (http://suaveframework.com)" suave_version)
+    do! async_writeln (http_request.Stream) (sprintf "X-Got-Pot: No")
     do! async_writeln (http_request.Stream) (sprintf "Date: %s" (DateTime.Now.ToUniversalTime().ToString("R")))
     
     for (x,y) in http_request.Response.Headers do
@@ -325,7 +326,7 @@ let response statusCode message (content:HttpRequest -> string) (http_request:Ht
     if not(http_request.Response.Headers.Exists(new Predicate<_>(fun (x,_) -> x.ToLower().Equals("content-type")))) then
         do! async_writeln (http_request.Stream) (sprintf "Content-Type: %s" "text/html")
     
-    let content_bytes = bytes (content http_request)
+    let content_bytes = content http_request
     
     if content_bytes.Length > 0 then 
         do! async_writeln (http_request.Stream) (sprintf "Content-Length: %d" (content_bytes.Length))
@@ -338,15 +339,14 @@ let response statusCode message (content:HttpRequest -> string) (http_request:Ht
 
 let challenge  =
     set_header "WWW-Authenticate" "Basic realm=\"protected\"" 
-    >> response 401 "Authorization Required" ("401 Unauthorized." |> cnst)
+    >> response 401 "Authorization Required" (bytes "401 Unauthorized." |> cnst)
 
-//
 let ok s  = response  200 "OK" s >> succeed 
 let failure message = response 500 "Internal Error" message >> succeed 
 
 let redirect url  = 
     set_header "Location" url
-    >> response 302 url ("Content Moved" |> cnst)
+    >> response 302 url (bytes "Content Moved" |> cnst)
     >> succeed 
 
 let notfound message = response 404 "Not Found" message >>  succeed 
@@ -355,6 +355,7 @@ let mime_type = function
     |".bmp" -> "image/bmp"
     |".css" -> "text/css"
     |".gif" -> "image/gif"
+    |".png" -> "image/png"
     |".ico" -> "image/x-icon"
     |".htm" 
     |".html" -> "text/html";
@@ -363,21 +364,43 @@ let mime_type = function
     |".jpg" -> "image/jpeg"
     |".js" -> "application/x-javascript"
     |".exe" -> "application/exe"
-    |_ -> "application/octet-streamu"
+    |_ -> "application/octet-stream"
 
 let file filename  = 
     if File.Exists(filename) then
         let file_info = new FileInfo(filename)
         let mimes = mime_type (file_info.Extension)
-        set_header "Content-Type" mimes  >> ok (File.ReadAllText(filename) |> cnst) 
+        //TODO: file should be read async
+        set_header "Content-Type" mimes  >> ok (File.ReadAllBytes(filename) |> cnst) 
     else
-        response 404 "Not Found" (sprintf "%s File not found" filename |> cnst) >> succeed 
+        never
 
 let local_file str = sprintf "%s%s" Environment.CurrentDirectory str        
-        
+
 let browse (http_request:HttpRequest) = 
-    let filename = local_file http_request.Url
-    file filename http_request     
+    file (local_file http_request.Url) http_request
+    
+let dir (http_request:HttpRequest) =   
+
+    let dirname = local_file http_request.Url
+    let result = new StringBuilder()
+
+    let filesize  (x:FileSystemInfo) =  
+        if (x.Attributes ||| FileAttributes.Directory =  FileAttributes.Directory) then 
+            String.Format("{0,-14}","<DIR>")
+        else 
+            String.Format("{0,14}",(new FileInfo(x.FullName)).Length)
+            
+    let formatdate (t:DateTime) = 
+        t.ToString("MM-dd-yy") + "  " + t.ToString("hh:mmtt")
+
+    let buildLine (x:FileSystemInfo) =  result.Append(x.LastWriteTime.ToString() + "       " + filesize(x) + " " + x.Name + "<br/>\n") |> ignore     
+    
+    if Directory.Exists(dirname) then
+        let di = new DirectoryInfo(dirname)
+        (di.GetFileSystemInfos()) |> Array.sortBy (fun x -> x.Name) |> Array.iter (buildLine)
+        ok (bytes (result.ToString()) |> cnst) http_request
+    else never http_request
 
 let closepipe (p:HttpRequest option) =
     match p with
@@ -404,7 +427,7 @@ let authenticate_basic f (p:HttpRequest) =
             challenge p |> succeed 
     else
         challenge p |> succeed 
-        
+      
 let log (s:Stream) (http_request:HttpRequest)  = 
     let bytes = bytes (sprintf "%A\n" (http_request.Method,http_request.Url,http_request.Query, http_request.Form, http_request.Headers))
     s.Write(bytes,0,bytes.Length)
@@ -450,7 +473,7 @@ let request_loop webpart proto (client:TcpClient) = async {
                 |_ -> false
             
         client.Close()
-    with |x -> printf "client disconnected %A" x
+    with |_ -> Log.log "client disconnected.\n"
 }
     
 let parallelize input f = input |> Seq.map (f)  |> Async.Parallel
@@ -461,8 +484,8 @@ type WebPart = HttpRequest -> Async<unit> Option
 open Suave.Tcp
    
 let web_server bindings (webpart:WebPart) =
-    
     bindings 
-    |> Array.map (fun (proto,ip,port) ->  tcp_ip_server (ip,port) (request_loop webpart proto))
+    |> Array.map (fun (proto,ip,port) ->  tcp_ip_server (ip,port) (request_loop webpart proto) (fun x -> false))
     |> Async.Parallel
+    |> Async.Ignore
     

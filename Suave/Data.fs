@@ -89,6 +89,12 @@ type SQLBuilder(conn: DbConnection) =
 
     member b.Query (a) = PrintfFormatProc sqlProcessor a
 
+    member b.Enum (a) = seq {
+        let cmd :DbCommand = PrintfFormatProc sqlProcessor a
+        use reader = cmd.ExecuteReader()
+        while reader.Read() do
+            yield (eval reader)
+        }
     member b.Connection = conn
 
     member b.Bind (cmd:DbCommand, rest) =
@@ -114,3 +120,4 @@ let sql conn = SQLBuilder(conn)
 let executeNonQuery (cmd:DbCommand) =
     cmd.ExecuteNonQuery() |> ignore
 
+let executeCommand cmd arg = cmd arg |> executeNonQuery 

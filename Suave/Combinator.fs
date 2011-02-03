@@ -4,6 +4,7 @@ open System.Collections.Generic
 
 let succeed x = Some(x)
 let fail = None
+let never _ = None
 
 let bind p rest =
     match p with
@@ -11,8 +12,6 @@ let bind p rest =
         | Some r -> rest r
         
 let delay f = f()
-
-let never _ = None
 
 let (>>=) a b = fun x -> bind (a x) b
 

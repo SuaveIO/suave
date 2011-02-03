@@ -33,6 +33,7 @@
   <ItemGroup>
     <Compile Include="Combinator.fs" />
     <Compile Include="Html.fs" />
+    <Compile Include="Log.fs" />
     <Compile Include="Tcp.fs" />
     <Compile Include="Web.fs" />
     <Compile Include="Template.fs" />
