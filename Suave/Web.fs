@@ -342,6 +342,9 @@ let challenge  =
     >> response 401 "Authorization Required" (bytes "401 Unauthorized." |> cnst)
 
 let ok s  = response  200 "OK" s >> succeed 
+
+let OK a = ok (bytes a |> cnst);
+
 let failure message = response 500 "Internal Error" message >> succeed 
 
 let redirect url  = 
@@ -485,7 +488,7 @@ open Suave.Tcp
    
 let web_server bindings (webpart:WebPart) =
     bindings 
-    |> Array.map (fun (proto,ip,port) ->  tcp_ip_server (ip,port) (request_loop webpart proto) (fun x -> false))
+    |> Array.map (fun (proto,ip,port) ->  tcp_ip_server (ip,port) (request_loop webpart proto))
     |> Async.Parallel
     |> Async.Ignore
     
