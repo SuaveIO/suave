@@ -10,7 +10,7 @@ p.
 The simplest Suave application is a simple server that greets all visitors with the string Hello World!
 
 pre. 
-web_server [|HTTP, "127.0.0.1",80|] (ok "Hello World")
+web_server [|HTTP, "127.0.0.1",80|] (OK "Hello World")
 |> Async.RunSynchronously
 |> ignore; 
 
@@ -23,7 +23,7 @@ p.
 Logic is expressed with the help of different combinators built around the option<HttpRequest> type. We build webparts out of functions of type (HttpRequest -> HttpRequest option) and the operator >>= in the following way.
 
 pre. 
-let simple_app _ = url "/hello" >>= ok "Hello World" ;
+let simple_app _ = url "/hello" >>= OK "Hello World" ;
 
 p. 
 To select between different routes or options we use the function choose; for example:
@@ -32,8 +32,8 @@ pre.
 let complex_app _ = 
     choose [
         Console.OpenStandardOutput() |> log >>= never; 
-        url "/hello" >>= never >>= ok "Never executes";
-        url "/hello" >>= ok "Hello World"  ;
+        url "/hello" >>= never >>= OK "Never executes";
+        url "/hello" >>= OK "Hello World"  ;
     ]
 
 p. 
@@ -43,9 +43,9 @@ pre.
 let nested_logic _= 
     choose [
         meth0d "GET" >>= choose 
-            [ url "/hello" >>= ok "Hello GET" ; url "/goodbye" >>= ok "Good bye GET" ];
+            [ url "/hello" >>= OK "Hello GET" ; url "/goodbye" >>= OK "Good bye GET" ];
         meth0d "POST" >>= choose 
-            [ url "/hello" >>= ok "Hello POST" ; url "/goodbye" >>= ok "Good bye POST" ];
+            [ url "/hello" >>= OK "Hello POST" ; url "/goodbye" >>= OK "Good bye POST" ];
     ]
 
 p. 
@@ -54,8 +54,8 @@ To gain access to the underlying HttpRequest and read query and http form data w
 pre. 
 let http_form _ = 
     choose [
-         meth0d "GET"  >>= url "/query" >>= warbler( fun x -> ok ("Hello " + (x.Query) ? name));
-         meth0d "POST" >>= url "/query" >>= warbler( fun x -> ok ("Hello " + (x.Form)  ? name));
+         meth0d "GET"  >>= url "/query" >>= warbler( fun x -> OK ("Hello " + (x.Query) ? name));
+         meth0d "POST" >>= url "/query" >>= warbler( fun x -> OK ("Hello " + (x.Form)  ? name));
          notfound "Found no handlers"
     ]
 
@@ -65,10 +65,10 @@ Here is how http authentication would work:
 pre. 
 let requires_authentication _ = 
     choose [
-         meth0d "GET" >>= url "/public" >>= ok ("Hello anonymous");
+         meth0d "GET" >>= url "/public" >>= OK ("Hello anonymous");
          //access to handlers bellow this one will require authentication
          authenticate_basic ( fun x -> x.Username.Equals("foo") && x.Password.Equals("bar"));
-         meth0d "GET" >>= url "/protected" >>= warbler( fun x -> ok ("Hello " + x.Username));
+         meth0d "GET" >>= url "/protected" >>= warbler( fun x -> OK ("Hello " + x.Username));
     ]
 
 p. 
@@ -83,7 +83,7 @@ pre.
 let sslCert = new X509Certificate("suave.pfx","easy");
 choose [
     Console.OpenStandardOutput() |> log >>= never ; // log to standard output
-    url "/hello" >>= ok "Hello World" ; 
+    url "/hello" >>= OK "Hello World" ; 
     notfound "Found no handlers"     
     ] 
     |> web_server [|HTTP,"127.0.0.1",80; HTTPS(sslCert),"192.168.13.138",443|]
