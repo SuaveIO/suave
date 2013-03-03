@@ -16,7 +16,7 @@ let close (d:TcpClient) =
     d.Client.Shutdown(SocketShutdown.Both)
     d.Close()
     
-let tcp_ip_server (sourceip,sourceport) (serve_client:TcpWorker<unit>) blacklisted = 
+let tcp_ip_server (sourceip,sourceport) (serve_client:TcpWorker<unit>)  = 
         
     log "starting listener:%s:%d\n" sourceip sourceport
 
@@ -47,9 +47,7 @@ let tcp_ip_server (sourceip,sourceport) (serve_client:TcpWorker<unit>) blacklist
         while not(token.IsCancellationRequested) do
             let! client = server.AsyncAcceptTcpClient() 
             let remoteAddress = (client.Client.RemoteEndPoint :?> IPEndPoint).Address
-            if not(blacklisted remoteAddress) then
-                             
-                Async.Start ((job client),token)
+            Async.Start ((job client),token)
         with x -> log "%A" x
     }
 
