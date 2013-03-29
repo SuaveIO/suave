@@ -3,8 +3,8 @@ open System
 open System.Security.Cryptography.X509Certificates;
 open System.Xml
 
+open Suave
 open Suave.Web
-open Suave.Combinator
 open Suave.Template
 open Suave.Html
 
@@ -45,9 +45,22 @@ type LoginForm() =
         
         tags |> flatMap (fun x -> bind ("t",node, Map [ "name", Suave.Html.text(x,ignore)]))
         
-
-
 let sslCert = new X509Certificate("suave.pfx","easy");
+
+let myapp : WebPart = 
+    choose [
+        meth0d "GET" >>= choose 
+            [ url "/hello" >>= OK "Hello GET" ; url "/goodbye" >>= OK "Good bye GET" ];
+        meth0d "POST" >>= choose 
+            [ url "/hello" >>= OK "Hello POST" ; url "/goodbye" >>= OK "Good bye POST" ];
+    ]
+
+// typed routes
+let testapp : WebPart = 
+    choose [
+        urlscan "/add/%d/%d" (fun (a,b) -> OK((a + b).ToString()))
+        notfound "Found no handlers" 
+    ]
         
 choose [
     Console.OpenStandardOutput() |> log >>= never ; 
@@ -76,7 +89,7 @@ choose [
                         let files = x.Files |> Seq.fold (fun x y -> x + "<br>" + (sprintf "(%s,%s,%s)" y.FileName y.MimeType y.Path)) "" ;
                         OK (sprintf "Upload successful.<br>POST data: %A<br>Uploaded files (%d): %s" (x.Form)(x.Files.Count) files));
     meth0d "POST" >>= warbler( fun x -> OK (sprintf "POST data: %A" (x.Form)));
-    notfound (bytes "Found no handlers" |> cnst)     
+    notfound "Found no handlers" 
     ] 
     |> web_server [|HTTP,"127.0.0.1",80; HTTPS(sslCert),"127.0.0.1",443|]
     |> Async.RunSynchronously

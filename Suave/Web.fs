@@ -1,6 +1,6 @@
 ﻿module Suave.Web
 
-open Combinator
+open Utils
 
 open System
 open System.IO
@@ -352,7 +352,9 @@ let redirect url  =
     >> response 302 url (bytes "Content Moved" |> cnst)
     >> succeed 
 
-let notfound message = response 404 "Not Found" message >>  succeed 
+let unhandled message = response 404 "Not Found" message >>  succeed 
+
+let notfound message = unhandled (cnst (bytes message))
 
 let mime_type = function
     |".bmp" -> "image/bmp"
@@ -492,3 +494,13 @@ let web_server bindings (webpart:WebPart) =
     |> Async.Parallel
     |> Async.Ignore
     
+open Suave.Sscanf
+
+let urlscan (pf:PrintfFormat<_,_,_,_,'t>) (h: 't ->  WebPart) :  WebPart = 
+    try
+        let t url = sscanf pf url // catch the exception if and fail
+        let F (r:HttpRequest) = 
+            let y = r.Url |> t |> h
+            y r
+        F
+    with _ -> never
