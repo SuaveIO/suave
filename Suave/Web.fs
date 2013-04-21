@@ -116,6 +116,7 @@ type HttpUpload(fieldname,filename,mime_type,temp_file_name) =
 type HttpRequest() = 
     let mutable url : string = null
     let mutable meth0d : string = null
+    let mutable remoteAddress : string = null
     let mutable stream : Stream = null
     let mutable query  : Dictionary<string,string> = new Dictionary<string,string>()
     let mutable headers: Dictionary<string,string> = new Dictionary<string,string>()
@@ -130,6 +131,7 @@ type HttpRequest() =
     
     member h.Url with get() = url and set x = url <- x
     member h.Method with get() = meth0d and set x = meth0d <- x
+    member h.RemoteAddress with get() = remoteAddress and set x = remoteAddress <- x
     member h.Stream with get() = stream and set x = stream <- x
     member h.Query with get() = query and set x = query <- x
     member h.Headers with get() = headers and set x = headers <- x
@@ -256,10 +258,11 @@ let parse_multipart (stream:Stream) boundary (request:HttpRequest) =
     } 
     loop boundary   
      
-let process_request (stream:Stream) = async {
+let process_request (stream:Stream) remoteip = async {
     
     let request = new HttpRequest()
     request.Stream <- stream
+    request.RemoteAddress <- remoteip
     
     let! first_line = read_line stream 
     
@@ -321,9 +324,12 @@ let request_loop webpart proto (client:TcpClient) = async {
         use stream = 
             client.GetStream()
             |> load_stream proto
-            
+        
+        let remote_endpoint = (client.Client.RemoteEndPoint :?> IPEndPoint)
+        let ipaddr = remote_endpoint.Address.ToString()
+
         while !keep_alive do
-            use! request = process_request stream
+            use! request = process_request stream ipaddr
             let p = webpart request
             match p with 
             |Some(x) -> do! x

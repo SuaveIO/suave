@@ -148,7 +148,7 @@ let authenticate_basic f (p:HttpRequest) =
         challenge p |> succeed 
       
 let log (s:Stream) (http_request:HttpRequest)  = 
-    let bytes = bytes (sprintf "%A\n" (http_request.Method,http_request.Url,http_request.Query, http_request.Form, http_request.Headers))
+    let bytes = bytes (sprintf "%A\n" (http_request.Method, http_request.RemoteAddress, http_request.Url, http_request.Query, http_request.Form, http_request.Headers))
     s.Write(bytes,0,bytes.Length)
     succeed http_request
 
