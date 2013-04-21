@@ -7,6 +7,7 @@ open Suave
 open Suave.Web
 open Suave.Template
 open Suave.Html
+open Suave.Http
 
 let basic_auth  = authenticate_basic ( fun x -> x.Username.Equals("foo") && x.Password.Equals("bar"))
 

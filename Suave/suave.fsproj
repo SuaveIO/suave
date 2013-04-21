@@ -37,6 +37,7 @@
     <Compile Include="Tcp.fs" />
     <Compile Include="Sscanf.fs" />
     <Compile Include="Web.fs" />
+    <Compile Include="Http.fs" />
     <Compile Include="Template.fs" />
     <Content Include="notes.txt">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

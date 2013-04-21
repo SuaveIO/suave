@@ -7,8 +7,9 @@ open System.IO
 open System.Reflection
 open System.Text
 
-open Html
 open Suave.Web  
+open Suave.Html
+open Suave.Http
 
 let load_object (str:string) =
     let entryAssembly = Assembly.GetEntryAssembly()
