@@ -158,8 +158,8 @@ let urlscan (pf:PrintfFormat<_,_,_,_,'t>) (h: 't ->  WebPart) :  WebPart =
     try
         let t url = sscanf pf url 
         let F (r:HttpRequest) = 
-            let y = r.Url |> t |> h
             try
+                let y = r.Url |> t |> h
                 y r
             with _ -> fail
         F
