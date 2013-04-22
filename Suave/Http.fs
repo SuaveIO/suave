@@ -24,31 +24,6 @@ let session_support (request:HttpRequest) =
 let url s (x:HttpRequest) = if s = x.Url then Some(x) else None
 let meth0d s (x:HttpRequest) = if s = x.Method then Some(x) else None
 
-(*note: we may refactor the function content down here and just pass the content bytes*)
-let response statusCode message (content:HttpRequest -> byte[]) (http_request:HttpRequest) = async {
-
-    do! async_writeln (http_request.Stream) (sprintf "%s %d %s" proto_version statusCode message)
-    do! async_writeln (http_request.Stream) (sprintf "Server: Suave/%s (http://suaveframework.com)" suave_version)
-    do! async_writeln (http_request.Stream) (sprintf "X-Got-Pot: No")
-    do! async_writeln (http_request.Stream) (sprintf "Date: %s" (DateTime.Now.ToUniversalTime().ToString("R")))
-    
-    for (x,y) in http_request.Response.Headers do
-        do! async_writeln (http_request.Stream) (sprintf "%s: %s" x y )
-    
-    if not(http_request.Response.Headers.Exists(new Predicate<_>(fun (x,_) -> x.ToLower().Equals("content-type")))) then
-        do! async_writeln (http_request.Stream) (sprintf "Content-Type: %s" "text/html")
-    
-    let content_bytes = content http_request
-    
-    if content_bytes.Length > 0 then 
-        do! async_writeln (http_request.Stream) (sprintf "Content-Length: %d" (content_bytes.Length))
-        
-    do! async_writeln (http_request.Stream) ""
-    
-    if content_bytes.Length > 0 then
-        do! async_writebytes (http_request.Stream) content_bytes
-}
-
 let challenge  =
     set_header "WWW-Authenticate" "Basic realm=\"protected\"" 
     >> response 401 "Authorization Required" (bytes "401 Unauthorized." |> cnst)
@@ -155,12 +130,12 @@ let log (s:Stream) (http_request:HttpRequest)  =
 open Suave.Sscanf
 
 let urlscan (pf:PrintfFormat<_,_,_,_,'t>) (h: 't ->  WebPart) :  WebPart = 
-    try
-        let t url = sscanf pf url 
-        let F (r:HttpRequest) = 
-            try
-                let y = r.Url |> t |> h
-                y r
-            with _ -> fail
-        F
-    with _ -> never
+        
+    let t url = sscanf pf url 
+        
+    let F (r:HttpRequest) = 
+        try
+            let y = r.Url |> t |> h
+            try y r with ex -> r |> ERROR (ex.ToString())
+        with _ -> fail
+    F

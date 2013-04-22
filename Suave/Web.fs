@@ -297,6 +297,30 @@ let process_request (stream:Stream) remoteip = async {
     return request
 } 
 
+(*note: we may need to refactor the function content down here and just pass the content bytes*)
+let response statusCode message (content:HttpRequest -> byte[]) (http_request:HttpRequest) = async {
+
+    do! async_writeln (http_request.Stream) (sprintf "%s %d %s" proto_version statusCode message)
+    do! async_writeln (http_request.Stream) (sprintf "Server: Suave/%s (http://suaveframework.com)" suave_version)
+    do! async_writeln (http_request.Stream) (sprintf "X-Got-Pot: No")
+    do! async_writeln (http_request.Stream) (sprintf "Date: %s" (DateTime.Now.ToUniversalTime().ToString("R")))
+    
+    for (x,y) in http_request.Response.Headers do
+        do! async_writeln (http_request.Stream) (sprintf "%s: %s" x y )
+    
+    if not(http_request.Response.Headers.Exists(new Predicate<_>(fun (x,_) -> x.ToLower().Equals("content-type")))) then
+        do! async_writeln (http_request.Stream) (sprintf "Content-Type: %s" "text/html")
+    
+    let content_bytes = content http_request
+    
+    if content_bytes.Length > 0 then 
+        do! async_writeln (http_request.Stream) (sprintf "Content-Length: %d" (content_bytes.Length))
+        
+    do! async_writeln (http_request.Stream) ""
+    
+    if content_bytes.Length > 0 then
+        do! async_writebytes (http_request.Stream) content_bytes
+}
 
 
 open System.Net    
@@ -317,7 +341,6 @@ let load_stream proto (stream: Stream)  =
 open System.Net.Sockets
 
 let request_loop webpart proto (client:TcpClient) = async {
-    
     try
     
         let keep_alive = ref true
