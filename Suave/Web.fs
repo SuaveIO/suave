@@ -258,7 +258,7 @@ let parse_multipart (stream:Stream) boundary (request:HttpRequest) =
     } 
     loop boundary   
      
-let process_request (stream:Stream) remoteip = async {
+let process_request proxyMode (stream:Stream) remoteip = async {
     
     let request = new HttpRequest()
     request.Stream <- stream
@@ -275,24 +275,26 @@ let process_request (stream:Stream) remoteip = async {
     
     request.Headers <- headers
     
-    request.Headers 
-    |> Seq.filter (fun x -> x.Key.Equals("cookie"))
-    |> Seq.iter (fun x -> 
-                    let cookie = parse_cookie x.Value; 
-                    request.Cookies.Add (fst(cookie.[0]),cookie))
+    //wont continue parsing if on proxyMode with the intention of forwarding the stream as it is
+    if not proxyMode then
+        request.Headers 
+        |> Seq.filter (fun x -> x.Key.Equals("cookie"))
+        |> Seq.iter (fun x -> 
+                        let cookie = parse_cookie x.Value; 
+                        request.Cookies.Add (fst(cookie.[0]),cookie))
     
-    if meth.Equals("POST") then 
-        let content_enconding = headers.["content-type"]
-        let content_length = Convert.ToInt32(headers.["content-length"])
+        if meth.Equals("POST") then 
+            let content_enconding = headers.["content-type"]
+            let content_length = Convert.ToInt32(headers.["content-length"])
         
-        if content_enconding.StartsWith("application/x-www-form-urlencoded") then
-            let! rawdata = read_post_data stream content_length
-            let form_data = parse_data (toString (rawdata, 0, rawdata.Length))
-            request.Form <- form_data
-            request.RawForm <- rawdata
-        elif content_enconding.StartsWith("multipart/form-data") then
-            let boundary = "--" + content_enconding.Substring(content_enconding.IndexOf('=')+1).TrimStart()
-            do! parse_multipart stream boundary request
+            if content_enconding.StartsWith("application/x-www-form-urlencoded") then
+                let! rawdata = read_post_data stream content_length
+                let form_data = parse_data (toString (rawdata, 0, rawdata.Length))
+                request.Form <- form_data
+                request.RawForm <- rawdata
+            elif content_enconding.StartsWith("multipart/form-data") then
+                let boundary = "--" + content_enconding.Substring(content_enconding.IndexOf('=')+1).TrimStart()
+                do! parse_multipart stream boundary request
             
     return request
 } 
@@ -340,7 +342,7 @@ let load_stream proto (stream: Stream)  =
 
 open System.Net.Sockets
 
-let request_loop webpart proto (client:TcpClient) = async {
+let request_loop webpart proto (processor: Stream -> String -> Async<HttpRequest>) (client:TcpClient) = async {
     try
     
         let keep_alive = ref true
@@ -352,7 +354,7 @@ let request_loop webpart proto (client:TcpClient) = async {
         let ipaddr = remote_endpoint.Address.ToString()
 
         while !keep_alive do
-            use! request = process_request stream ipaddr
+            use! request = processor stream ipaddr 
             let p = webpart request
             match p with 
             |Some(x) -> do! x
@@ -377,6 +379,31 @@ open Suave.Tcp
    
 let web_server bindings (webpart:WebPart) =
     bindings 
-    |> Array.map (fun (proto,ip,port) ->  tcp_ip_server (ip,port) (request_loop webpart proto))
+    |> Array.map (fun (proto,ip,port) ->  tcp_ip_server (ip,port) (request_loop webpart proto (process_request false)))
     |> Async.Parallel
     |> Async.Ignore
+
+open System.Net
+
+let forward ip port (p: HttpRequest) =
+    let buildWebHeadersCollection (h : Dictionary<string,string>) = 
+        let r = new WebHeaderCollection()
+        for e in h do
+            r.Add(e.Key,e.Value)
+        r
+    let q:HttpWebRequest = WebRequest.CreateHttp(p.Url)
+    q.Method <- p.Method
+    q.Headers <- buildWebHeadersCollection(p.Headers)
+    
+    async {
+        let! data = q.AsyncGetResponse()
+        do! p.Stream.AsyncWrite(data.GetResponseStream() |> read_fully)
+    } |> succeed
+
+let proxy_by_host proxyResolver (r:HttpRequest) =  
+    match proxyResolver (r.Headers ? host) with
+    |None -> never
+    |Some(ip,port) -> forward ip port
+
+let proxy_server bindings resolver =
+    web_server bindings (warbler(fun http -> proxy_by_host resolver http))
