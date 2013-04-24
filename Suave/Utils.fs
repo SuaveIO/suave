@@ -49,3 +49,10 @@ let cond d f g a =
 
 //- theorem: identity = (cnst |> warbler)
 //(warbler cnst) x = cnst x x = fun _ -> x
+
+open System.IO
+
+let read_fully (input:Stream) = 
+    use ms = new MemoryStream()
+    input.CopyTo(ms);
+    ms.ToArray();
