@@ -8,7 +8,7 @@ open System.Text
 let set_header a b (http_request:HttpRequest) = 
     http_request.Response.Headers.Add(a,b)
     http_request
-    
+
 let set_cookie cookie = set_header  "Set-Cookie"  cookie 
 
 //cookie-based session support   
@@ -20,30 +20,30 @@ let session_support (request:HttpRequest) =
     request.SessionId <- sessionId
     set_cookie (sprintf "%s=%s" "suave_session_id" sessionId) request |> ignore
     Some(request)
-        
+ 
 let url s (x:HttpRequest) = if s = x.Url then Some(x) else None
 let meth0d s (x:HttpRequest) = if s = x.Method then Some(x) else None
 
 let challenge  =
     set_header "WWW-Authenticate" "Basic realm=\"protected\"" 
-    >> response 401 "Authorization Required" (bytes "401 Unauthorized." |> cnst)
+    >> response 401 "Authorization Required" (bytes "401 Unauthorized.")
 
-let ok s  = response  200 "OK" s >> succeed 
+let ok s  = response  200 "OK" s  >> succeed 
 
-let OK a = ok (bytes a |> cnst);
+let OK a = ok (bytes a);
 
-let failure message = response 500 "Internal Error" message >> succeed 
+let failure message = response 500 "Internal Error" message  >> succeed 
 
-let ERROR a = failure (bytes a |> cnst)
+let ERROR a = failure (bytes a)
 
 let redirect url  = 
     set_header "Location" url
-    >> response 302 url (bytes "Content Moved" |> cnst)
+    >> response 302 url (bytes "Content Moved")
     >> succeed 
 
-let unhandled message = response 404 "Not Found" message >>  succeed 
+let unhandled message = response 404 "Not Found" message  >>  succeed 
 
-let notfound message = unhandled (cnst (bytes message))
+let notfound message = unhandled (bytes message)
 
 let mime_type = function
     |".bmp" -> "image/bmp"
@@ -65,18 +65,17 @@ let file filename  =
         let file_info = new FileInfo(filename)
         let mimes = mime_type (file_info.Extension)
         //TODO: file should be read async
-        set_header "Content-Type" mimes  >> ok (File.ReadAllBytes(filename) |> cnst) 
+        set_header "Content-Type" mimes  >> ok (File.ReadAllBytes(filename)) 
     else
         never
 
 let local_file str = sprintf "%s%s" Environment.CurrentDirectory str        
 
-let browse (http_request:HttpRequest) = 
-    file (local_file http_request.Url) http_request
-    
-let dir (http_request:HttpRequest) =   
+let browse url =  file (local_file url) 
 
-    let dirname = local_file http_request.Url
+let dir url =   
+
+    let dirname = local_file url
     let result = new StringBuilder()
 
     let filesize  (x:FileSystemInfo) =  
@@ -93,8 +92,8 @@ let dir (http_request:HttpRequest) =
     if Directory.Exists(dirname) then
         let di = new DirectoryInfo(dirname)
         (di.GetFileSystemInfos()) |> Array.sortBy (fun x -> x.Name) |> Array.iter (buildLine)
-        ok (bytes (result.ToString()) |> cnst) http_request
-    else never http_request
+        ok (bytes (result.ToString())) 
+    else never 
 
 let closepipe (p:HttpRequest option) =
     match p with

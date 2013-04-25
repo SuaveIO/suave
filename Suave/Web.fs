@@ -272,7 +272,6 @@ let process_request proxyMode (stream:Stream) remoteip = async {
     request.Query <- query
     
     let! headers = read_headers stream 
-    
     request.Headers <- headers
     
     //wont continue parsing if on proxyMode with the intention of forwarding the stream as it is
@@ -299,29 +298,28 @@ let process_request proxyMode (stream:Stream) remoteip = async {
     return request
 } 
 
-(*note: we may need to refactor the function content down here and just pass the content bytes*)
-let response statusCode message (content:HttpRequest -> byte[]) (http_request:HttpRequest) = async {
+let response statusCode message (content:byte[]) (request:HttpRequest) = async {
 
-    do! async_writeln (http_request.Stream) (sprintf "%s %d %s" proto_version statusCode message)
-    do! async_writeln (http_request.Stream) (sprintf "Server: Suave/%s (http://suaveframework.com)" suave_version)
-    do! async_writeln (http_request.Stream) (sprintf "X-Got-Pot: No")
-    do! async_writeln (http_request.Stream) (sprintf "Date: %s" (DateTime.Now.ToUniversalTime().ToString("R")))
+    let stream:Stream = request.Stream
     
-    for (x,y) in http_request.Response.Headers do
-        do! async_writeln (http_request.Stream) (sprintf "%s: %s" x y )
+    do! async_writeln stream (sprintf "%s %d %s" proto_version statusCode message)
+    do! async_writeln stream (sprintf "Server: Suave/%s (http://suaveframework.com)" suave_version)
+    do! async_writeln stream (sprintf "X-Got-Pot: No")
+    do! async_writeln stream (sprintf "Date: %s" (DateTime.Now.ToUniversalTime().ToString("R")))
     
-    if not(http_request.Response.Headers.Exists(new Predicate<_>(fun (x,_) -> x.ToLower().Equals("content-type")))) then
-        do! async_writeln (http_request.Stream) (sprintf "Content-Type: %s" "text/html")
+    for (x,y) in request.Response.Headers do
+        do! async_writeln stream (sprintf "%s: %s" x y )
     
-    let content_bytes = content http_request
+    if not(request.Response.Headers.Exists(new Predicate<_>(fun (x,_) -> x.ToLower().Equals("content-type")))) then
+        do! async_writeln stream (sprintf "Content-Type: %s" "text/html")
     
-    if content_bytes.Length > 0 then 
-        do! async_writeln (http_request.Stream) (sprintf "Content-Length: %d" (content_bytes.Length))
+    if content.Length > 0 then 
+        do! async_writeln stream (sprintf "Content-Length: %d" (content.Length))
         
-    do! async_writeln (http_request.Stream) ""
+    do! async_writeln stream ""
     
-    if content_bytes.Length > 0 then
-        do! async_writebytes (http_request.Stream) content_bytes
+    if content.Length > 0 then
+        do! async_writebytes stream content
 }
 
 
@@ -379,31 +377,60 @@ open Suave.Tcp
    
 let web_server bindings (webpart:WebPart) =
     bindings 
-    |> Array.map (fun (proto,ip,port) ->  tcp_ip_server (ip,port) (request_loop webpart proto (process_request false)))
+    |> Array.map (fun (proto,ip,port) -> tcp_ip_server (ip,port) (request_loop webpart proto (process_request false)))
     |> Async.Parallel
     |> Async.Ignore
 
 open System.Net
 
 let forward ip port (p: HttpRequest) =
+    
     let buildWebHeadersCollection (h : Dictionary<string,string>) = 
         let r = new WebHeaderCollection()
         for e in h do
-            r.Add(e.Key,e.Value)
+            if not (WebHeaderCollection.IsRestricted(e.Key)) then
+                r.Add(e.Key,e.Value)
         r
-    let q:HttpWebRequest = WebRequest.CreateHttp(p.Url)
+    let url = new UriBuilder("http",ip,port,p.Url)
+    let q:HttpWebRequest = WebRequest.Create(url.Uri) :?> HttpWebRequest
     q.Method <- p.Method
     q.Headers <- buildWebHeadersCollection(p.Headers)
+    //copy restricted headers
+    match p.Headers ? Accept with Some(v) -> q.Accept <- v | None -> ()
+    match p.Headers ? Connection with Some(v) -> q.Connection <- v | None -> ()
+    match p.Headers ? Date with Some(v) -> q.Date <-DateTime.Parse(v) | None -> ()
+    match p.Headers ? Expect with Some(v) -> q.Expect <- v | None -> ()
+    match p.Headers ? Host with Some(v) -> q.Host <- v | None -> ()
+    match p.Headers ? Range with Some(v) -> q.AddRange(Int64.Parse(v)) | None -> ()
+    match p.Headers ? Referer with Some(v) -> q.Referer <- v | None -> ()
+    match look_up p.Headers "Content-Type" with Some(v) -> q.ContentType <- v | None -> ()
+    match look_up p.Headers "Content-Length" with Some(v) -> q.ContentLength <- Int64.Parse(v) | None -> ()
+    match look_up p.Headers "If-Modified-Since" with Some(v) -> q.IfModifiedSince <- DateTime.Parse(v) | None -> ()
+    match look_up p.Headers "Transfer-Encoding" with Some(v) -> q.TransferEncoding <- v | None -> ()
+    match look_up p.Headers "User-Agent" with Some(v) -> q.UserAgent <- v | None -> ()
     
+    let content_length = Convert.ToInt32(p.Headers.["content-length"])
     async {
-        let! data = q.AsyncGetResponse()
-        do! p.Stream.AsyncWrite(data.GetResponseStream() |> read_fully)
+        let req = q.GetRequestStream()
+        //push unparsed POST data downstream
+        let! remaining_bytes = p.Stream.AsyncRead(content_length)
+        do! req.AsyncWrite(remaining_bytes)
+        let! data = q.AsyncGetResponse() 
+        let a = data :?> HttpWebResponse
+        let bytes = data.GetResponseStream() |> read_fully
+        do! response (int a.StatusCode) (a.StatusDescription) bytes p
+        do! p.Stream.AsyncWrite(bytes)
     } |> succeed
 
 let proxy_by_host proxyResolver (r:HttpRequest) =  
-    match proxyResolver (r.Headers ? host) with
+    match proxyResolver (r.Headers ? Host) with
     |None -> never
     |Some(ip,port) -> forward ip port
 
 let proxy_server bindings resolver =
-    web_server bindings (warbler(fun http -> proxy_by_host resolver http))
+     bindings 
+    |> Array.map (fun (proto,ip,port) -> tcp_ip_server (ip,port) (request_loop (warbler(fun http -> proxy_by_host resolver http)) proto (process_request true)))
+    |> Async.Parallel
+    |> Async.Ignore
+
+
