@@ -308,7 +308,8 @@ let response statusCode message (content:byte[]) (request:HttpRequest) = async {
     do! async_writeln stream (sprintf "Date: %s" (DateTime.Now.ToUniversalTime().ToString("R")))
     
     for (x,y) in request.Response.Headers do
-        do! async_writeln stream (sprintf "%s: %s" x y )
+        if not (List.exists (fun y -> x.ToLower().Equals(y)) ["server";"date";"content-length"]) then
+           do! async_writeln stream (sprintf "%s: %s" x y )
     
     if not(request.Response.Headers.Exists(new Predicate<_>(fun (x,_) -> x.ToLower().Equals("content-type")))) then
         do! async_writeln stream (sprintf "Content-Type: %s" "text/html")
@@ -365,7 +366,8 @@ let request_loop webpart proto (processor: Stream -> String -> Async<HttpRequest
                 |_ -> false
             
         client.Close()
-    with |_ -> Log.log "client disconnected.\n"
+    with | :? EndOfStreamException -> Log.log "client disconnected.\n"
+         | ex -> Log.log "client disconnected.\n%A" ex
 }
     
 let parallelize input f = input |> Seq.map (f)  |> Async.Parallel
@@ -383,6 +385,16 @@ let web_server bindings (webpart:WebPart) =
 
 open System.Net
 
+let copy_response_headers (headers1:WebHeaderCollection) (headers2:List<string*string>) =
+    for e in headers1 do
+        headers2.Add(e,headers1.[e])
+
+let send_web_response (data:HttpWebResponse) (p: HttpRequest)  = async {
+    copy_response_headers data.Headers (p.Response.Headers)
+    let bytes = data.GetResponseStream() |> read_fully
+    do! response (int data.StatusCode) (data.StatusDescription) bytes p
+    }
+
 let forward ip port (p: HttpRequest) =
     
     let buildWebHeadersCollection (h : Dictionary<string,string>) = 
@@ -395,35 +407,37 @@ let forward ip port (p: HttpRequest) =
     let q:HttpWebRequest = WebRequest.Create(url.Uri) :?> HttpWebRequest
     q.Method <- p.Method
     q.Headers <- buildWebHeadersCollection(p.Headers)
+    q.Proxy <- null
     //copy restricted headers
-    match p.Headers ? Accept with Some(v) -> q.Accept <- v | None -> ()
-    match p.Headers ? Connection with Some(v) -> q.Connection <- v | None -> ()
-    match p.Headers ? Date with Some(v) -> q.Date <-DateTime.Parse(v) | None -> ()
-    match p.Headers ? Expect with Some(v) -> q.Expect <- v | None -> ()
-    match p.Headers ? Host with Some(v) -> q.Host <- v | None -> ()
-    match p.Headers ? Range with Some(v) -> q.AddRange(Int64.Parse(v)) | None -> ()
-    match p.Headers ? Referer with Some(v) -> q.Referer <- v | None -> ()
-    match look_up p.Headers "Content-Type" with Some(v) -> q.ContentType <- v | None -> ()
-    match look_up p.Headers "Content-Length" with Some(v) -> q.ContentLength <- Int64.Parse(v) | None -> ()
-    match look_up p.Headers "If-Modified-Since" with Some(v) -> q.IfModifiedSince <- DateTime.Parse(v) | None -> ()
-    match look_up p.Headers "Transfer-Encoding" with Some(v) -> q.TransferEncoding <- v | None -> ()
-    match look_up p.Headers "User-Agent" with Some(v) -> q.UserAgent <- v | None -> ()
+    match p.Headers ? accept with Some(v) -> q.Accept <- v | None -> ()
+    //match p.Headers ? connection with Some(v) -> q.Connection <- v | None -> ()
+    match p.Headers ? date with Some(v) -> q.Date <-DateTime.Parse(v) | None -> ()
+    match p.Headers ? expect with Some(v) -> q.Expect <- v | None -> ()
+    match p.Headers ? host with Some(v) -> q.Host <- v | None -> ()
+    match p.Headers ? range with Some(v) -> q.AddRange(Int64.Parse(v)) | None -> ()
+    match p.Headers ? referer with Some(v) -> q.Referer <- v | None -> ()
+    match look_up p.Headers "content-type" with Some(v) -> q.ContentType <- v | None -> ()
+    match look_up p.Headers "content-length" with Some(v) -> q.ContentLength <- Int64.Parse(v) | None -> ()
+    match look_up p.Headers "if-modified-since" with Some(v) -> q.IfModifiedSince <- DateTime.Parse(v) | None -> ()
+    match look_up p.Headers "transfer-encoding" with Some(v) -> q.TransferEncoding <- v | None -> ()
+    match look_up p.Headers "user-agent" with Some(v) -> q.UserAgent <- v | None -> ()
     
-    let content_length = Convert.ToInt32(p.Headers.["content-length"])
     async {
-        let req = q.GetRequestStream()
-        //push unparsed POST data downstream
-        let! remaining_bytes = p.Stream.AsyncRead(content_length)
-        do! req.AsyncWrite(remaining_bytes)
-        let! data = q.AsyncGetResponse() 
-        let a = data :?> HttpWebResponse
-        let bytes = data.GetResponseStream() |> read_fully
-        do! response (int a.StatusCode) (a.StatusDescription) bytes p
-        do! p.Stream.AsyncWrite(bytes)
+        if p.Method = "POST" then 
+            let content_length = Convert.ToInt32(p.Headers.["content-length"])
+            let req = q.GetRequestStream()
+            //push unparsed POST data downstream
+            let! remaining_bytes = p.Stream.AsyncRead(content_length)
+            do! req.AsyncWrite(remaining_bytes)
+        try
+            let! data = q.AsyncGetResponse() 
+            do! send_web_response (data :?> HttpWebResponse) p
+        with
+            | :? WebException as ex -> do! send_web_response (ex.Response :?> HttpWebResponse) p
     } |> succeed
 
 let proxy_by_host proxyResolver (r:HttpRequest) =  
-    match proxyResolver (r.Headers ? Host) with
+    match proxyResolver (r.Headers ? host) with
     |None -> never
     |Some(ip,port) -> forward ip port
 
