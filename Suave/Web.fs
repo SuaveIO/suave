@@ -436,14 +436,14 @@ let forward ip port (p: HttpRequest) =
             | :? WebException as ex -> do! send_web_response (ex.Response :?> HttpWebResponse) p
     } |> succeed
 
-let proxy_by_host proxyResolver (r:HttpRequest) =  
-    match proxyResolver (r.Headers ? host) with
+let proxy proxyResolver (r:HttpRequest) =  
+    match proxyResolver r with
     |None -> never
     |Some(ip,port) -> forward ip port
 
 let proxy_server bindings resolver =
      bindings 
-    |> Array.map (fun (proto,ip,port) -> tcp_ip_server (ip,port) (request_loop (warbler(fun http -> proxy_by_host resolver http)) proto (process_request true)))
+    |> Array.map (fun (proto,ip,port) -> tcp_ip_server (ip,port) (request_loop (warbler(fun http -> proxy resolver http)) proto (process_request true)))
     |> Async.Parallel
     |> Async.Ignore
 
