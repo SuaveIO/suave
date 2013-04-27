@@ -6,6 +6,8 @@ open System.Net.Sockets
 
 open Log
 
+let MAX_BACK_LOG = Int32.MaxValue
+
 type TcpListener with
     member x.AsyncAcceptTcpClient() = 
         Async.FromBeginEnd(x.BeginAcceptTcpClient,x.EndAcceptTcpClient)  
@@ -22,8 +24,12 @@ let tcp_ip_server (sourceip,sourceport) (serve_client:TcpWorker<unit>)  =
 
     let server = new TcpListener(IPAddress.Parse(sourceip),sourceport)
     server.Server.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, (int)1)
-    server.Start()
-
+    server.Server.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.Linger, (int)1)
+    server.Start(MAX_BACK_LOG)
+    //consider: 
+    //echo 5 > /proc/sys/net/ipv4/tcp_fin_timeout
+    //echo 1 > /proc/sys/net/ipv4/tcp_tw_recycle
+    //custom kernel with shorter TCP_TIMEWAIT_LEN in include/net/tcp.h
     let job (d:#TcpClient) =  async {
             
             use! oo = Async.OnCancel ( fun () -> log "disconnected client\n";close d)
