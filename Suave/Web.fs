@@ -411,7 +411,7 @@ let forward ip port (p: HttpRequest) =
     //copy restricted headers
     match p.Headers ? accept with Some(v) -> q.Accept <- v | None -> ()
     //match p.Headers ? connection with Some(v) -> q.Connection <- v | None -> ()
-    match p.Headers ? date with Some(v) -> q.Date <-DateTime.Parse(v) | None -> ()
+    match p.Headers ? date with Some(v) -> q.Date <- DateTime.Parse(v) | None -> ()
     match p.Headers ? expect with Some(v) -> q.Expect <- v | None -> ()
     match p.Headers ? host with Some(v) -> q.Host <- v | None -> ()
     match p.Headers ? range with Some(v) -> q.AddRange(Int64.Parse(v)) | None -> ()
@@ -421,7 +421,7 @@ let forward ip port (p: HttpRequest) =
     match look_up p.Headers "if-modified-since" with Some(v) -> q.IfModifiedSince <- DateTime.Parse(v) | None -> ()
     match look_up p.Headers "transfer-encoding" with Some(v) -> q.TransferEncoding <- v | None -> ()
     match look_up p.Headers "user-agent" with Some(v) -> q.UserAgent <- v | None -> ()
-    
+    q.Headers.Add("X-Forwarded-For",p.RemoteAddress)
     async {
         if p.Method = "POST" then 
             let content_length = Convert.ToInt32(p.Headers.["content-length"])
