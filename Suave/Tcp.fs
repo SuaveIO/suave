@@ -24,7 +24,6 @@ let tcp_ip_server (sourceip,sourceport) (serve_client:TcpWorker<unit>)  =
 
     let server = new TcpListener(IPAddress.Parse(sourceip),sourceport)
     server.Server.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, (int)1)
-    server.Server.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.Linger, (int)1)
     server.Start(MAX_BACK_LOG)
     //consider: 
     //echo 5 > /proc/sys/net/ipv4/tcp_fin_timeout
