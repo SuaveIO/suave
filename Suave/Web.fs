@@ -185,7 +185,7 @@ let parse_url (line:string) =
     
     if (indexOfMark>0) then
         let raw_query = parts.[1].Substring(indexOfMark+1)
-        (parts.[0],parts.[1].Substring(0,indexOfMark),parse_data raw_query, raw_query)
+        (parts.[0],parts.[1].Substring(0,indexOfMark),parse_data raw_query, "?" + raw_query)
     else 
         (parts.[0],parts.[1],empty_query_string (), String.Empty)
     
