@@ -122,6 +122,7 @@ type HttpRequest() =
     let mutable headers: Dictionary<string,string> = new Dictionary<string,string>()
     let mutable form   : Dictionary<string,string> = new Dictionary<string,string>()
     let mutable rawform   : byte[] = Array.empty;
+    let mutable rawquery  : string = null;
     let mutable cookies   : Dictionary<string,(string*string)[]> = new Dictionary<string,(string*string)[]>()
     let mutable username: string = null
     let mutable password: string = null
@@ -137,6 +138,7 @@ type HttpRequest() =
     member h.Headers with get() = headers and set x = headers <- x
     member h.Form with get() = form and set x = form <- x
     member h.RawForm with get() = rawform and set x = rawform <- x
+    member h.RawQuery with get() = rawquery and set x = rawquery <- x
     member h.Cookies with get() = cookies and set x = cookies <- x
     member h.Username with get() = username and set x = username <- x
     member h.Password with get() = password and set x = password <- x
@@ -182,9 +184,10 @@ let parse_url (line:string) =
     let indexOfMark = parts.[1].IndexOf('?')
     
     if (indexOfMark>0) then
-        (parts.[0],parts.[1].Substring(0,indexOfMark),parse_data (parts.[1].Substring(indexOfMark+1)))
+        let raw_query = parts.[1].Substring(indexOfMark+1)
+        (parts.[0],parts.[1].Substring(0,indexOfMark),parse_data raw_query, raw_query)
     else 
-        (parts.[0],parts.[1],empty_query_string ())
+        (parts.[0],parts.[1],empty_query_string (), String.Empty)
     
 let read_post_data (stream:Stream) (bytes : int) = 
     stream.AsyncRead(bytes)
@@ -266,10 +269,11 @@ let process_request proxyMode (stream:Stream) remoteip = async {
     
     let! first_line = read_line stream 
     
-    let (meth,url,query) as q = parse_url (first_line)
+    let (meth,url,query, raw_query) as q = parse_url (first_line)
     request.Url <- url
     request.Method <- meth
     request.Query <- query
+    request.RawQuery <- raw_query
     
     let! headers = read_headers stream 
     request.Headers <- headers
@@ -403,7 +407,7 @@ let forward ip port (p: HttpRequest) =
             if not (WebHeaderCollection.IsRestricted(e.Key)) then
                 r.Add(e.Key,e.Value)
         r
-    let url = new UriBuilder("http",ip,port,p.Url)
+    let url = new UriBuilder("http",ip,port,p.Url,p.RawQuery)
     let q:HttpWebRequest = WebRequest.Create(url.Uri) :?> HttpWebRequest
     q.Method <- p.Method
     q.Headers <- buildWebHeadersCollection(p.Headers)
