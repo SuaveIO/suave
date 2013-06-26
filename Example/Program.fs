@@ -9,7 +9,7 @@ open Suave.Template
 open Suave.Html
 open Suave.Http
 
-let basic_auth  = authenticate_basic ( fun x -> x.Username.Equals("foo") && x.Password.Equals("bar"))
+let basic_auth  : WebPart  = authenticate_basic ( fun x -> x.Username.Equals("foo") && x.Password.Equals("bar"))
 
 type User() = 
     let mutable firstName = String.Empty
@@ -59,9 +59,13 @@ let myapp : WebPart =
 // typed routes
 let testapp : WebPart = 
     choose [
+        Console.OpenStandardOutput() |> log >>= never ; 
         urlscan "/add/%d/%d" (fun (a,b) -> OK((a + b).ToString()))
+        urlscan "/minus/%d/%d" (fun (a,b) -> OK((a - b).ToString()))
         notfound "Found no handlers" 
     ]
+
+System.Net.ServicePointManager.DefaultConnectionLimit <- Int32.MaxValue
         
 choose [
     Console.OpenStandardOutput() |> log >>= never ; 
@@ -72,7 +76,7 @@ choose [
     meth0d "GET" >>= url "/query" >>= OK "Hello beautiful" ;
     url "/redirect" >>= redirect "/redirected"
     url "/redirected" >>=  OK "You have been redirected." ;
-    url "/date" >>= ok (fun _ -> bytes (DateTime.Now.ToString()));
+    url "/date" >>= OK (DateTime.Now.ToString());
     url "/session" 
         >>= session_support 
         >>= warbler ( fun x -> 
@@ -83,7 +87,7 @@ choose [
                  (x.Session ? counter <- 1 :> obj ; OK "First time" ));
     basic_auth; // from here on it will require authentication
     meth0d "GET" >>= choose [ url "/lift.xml" >>= process_template data;  ];
-    meth0d "GET" >>= browse ;
+    meth0d "GET" >>= warbler (fun x -> browse x);
     meth0d "POST" >>= url "/upload" >>= OK "Upload successful." ;
     meth0d "POST" >>= url "/upload2" 
         >>= warbler( fun x -> 
