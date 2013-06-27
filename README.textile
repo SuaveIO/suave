@@ -51,9 +51,9 @@ The function choose accepts a list of webparts and execute each webpart in the l
 pre. 
 let nested_logic _= 
     choose [
-        meth0d "GET" >>= choose 
+        GET >>= choose 
             [ url "/hello" >>= OK "Hello GET" ; url "/goodbye" >>= OK "Good bye GET" ];
-        meth0d "POST" >>= choose 
+        POST >>= choose 
             [ url "/hello" >>= OK "Hello POST" ; url "/goodbye" >>= OK "Good bye POST" ];
     ]
 
@@ -63,8 +63,8 @@ To gain access to the underlying HttpRequest and read query and http form data w
 pre. 
 let http_form _ = 
     choose [
-         meth0d "GET"  >>= url "/query" >>= warbler( fun x -> OK ("Hello " + (x.Query) ? name));
-         meth0d "POST" >>= url "/query" >>= warbler( fun x -> OK ("Hello " + (x.Form)  ? name));
+         GET  >>= url "/query" >>= warbler( fun x -> OK ("Hello " + (x.Query) ? name));
+         POST >>= url "/query" >>= warbler( fun x -> OK ("Hello " + (x.Form)  ? name));
          notfound "Found no handlers"
     ]
 
@@ -74,10 +74,10 @@ Here is how http authentication would work:
 pre. 
 let requires_authentication _ = 
     choose [
-         meth0d "GET" >>= url "/public" >>= OK ("Hello anonymous");
+         GET >>= url "/public" >>= OK ("Hello anonymous");
          //access to handlers bellow this one will require authentication
          authenticate_basic ( fun x -> x.Username.Equals("foo") && x.Password.Equals("bar"));
-         meth0d "GET" >>= url "/protected" >>= warbler( fun x -> OK ("Hello " + x.Username));
+         GET >>= url "/protected" >>= warbler( fun x -> OK ("Hello " + x.Username));
     ]
 
 p. 
