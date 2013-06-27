@@ -50,9 +50,9 @@ let sslCert = new X509Certificate("suave.pfx","easy");
 
 let myapp : WebPart = 
     choose [
-        meth0d "GET" >>= choose 
+        GET >>= choose 
             [ url "/hello" >>= OK "Hello GET" ; url "/goodbye" >>= OK "Good bye GET" ];
-        meth0d "POST" >>= choose 
+        POST >>= choose 
             [ url "/hello" >>= OK "Hello POST" ; url "/goodbye" >>= OK "Good bye POST" ];
     ]
 
@@ -69,11 +69,11 @@ System.Net.ServicePointManager.DefaultConnectionLimit <- Int32.MaxValue
         
 choose [
     Console.OpenStandardOutput() |> log >>= never ; 
-    meth0d "GET" >>= url "/hello" >>= never;
+    GET >>= url "/hello" >>= never;
     url "/hello" >>= never >>= OK "Never executes" ;
     url "/hello" >>= OK "Hello World"   ;
-    meth0d "GET" >>= url "/query" >>= warbler( fun x -> cond (x.Query) ? name (fun y -> OK ("Hello " + y)) never);
-    meth0d "GET" >>= url "/query" >>= OK "Hello beautiful" ;
+    GET >>= url "/query" >>= warbler( fun x -> cond (x.Query) ? name (fun y -> OK ("Hello " + y)) never);
+    GET >>= url "/query" >>= OK "Hello beautiful" ;
     url "/redirect" >>= redirect "/redirected"
     url "/redirected" >>=  OK "You have been redirected." ;
     url "/date" >>= OK (DateTime.Now.ToString());
@@ -86,14 +86,14 @@ choose [
                     OK (sprintf "Hello %A time(s)"  y ))
                  (x.Session ? counter <- 1 :> obj ; OK "First time" ));
     basic_auth; // from here on it will require authentication
-    meth0d "GET" >>= choose [ url "/lift.xml" >>= process_template data;  ];
-    meth0d "GET" >>= warbler (fun x -> browse x);
-    meth0d "POST" >>= url "/upload" >>= OK "Upload successful." ;
-    meth0d "POST" >>= url "/upload2" 
+    GET >>= choose [ url "/lift.xml" >>= process_template data;  ];
+    GET >>= warbler (fun x -> browse x);
+    POST >>= url "/upload" >>= OK "Upload successful." ;
+    POST >>= url "/upload2" 
         >>= warbler( fun x -> 
                         let files = x.Files |> Seq.fold (fun x y -> x + "<br>" + (sprintf "(%s,%s,%s)" y.FileName y.MimeType y.Path)) "" ;
                         OK (sprintf "Upload successful.<br>POST data: %A<br>Uploaded files (%d): %s" (x.Form)(x.Files.Count) files));
-    meth0d "POST" >>= warbler( fun x -> OK (sprintf "POST data: %A" (x.Form)));
+    POST >>= warbler( fun x -> OK (sprintf "POST data: %A" (x.Form)));
     notfound "Found no handlers" 
     ] 
     |> web_server [|HTTP,"127.0.0.1",80; HTTPS(sslCert),"127.0.0.1",443|]

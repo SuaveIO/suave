@@ -24,6 +24,9 @@ let session_support (request:HttpRequest) =
 let url s (x:HttpRequest) = if s = x.Url then Some(x) else None
 let meth0d s (x:HttpRequest) = if s = x.Method then Some(x) else None
 
+let GET  (x:HttpRequest)  = meth0d "GET" x
+let POST (x:HttpRequest)  = meth0d "POST" x
+
 let challenge  =
     set_header "WWW-Authenticate" "Basic realm=\"protected\"" 
     >> response 401 "Authorization Required" (bytes "401 Unauthorized.")
