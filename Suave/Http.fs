@@ -76,6 +76,8 @@ let local_file str = sprintf "%s%s" Environment.CurrentDirectory str
 
 let browse (req:HttpRequest) =  file (local_file req.Url) 
 
+let browse_file filename = file (local_file filename)
+
 let dir url =   
 
     let dirname = local_file url
