@@ -174,8 +174,9 @@ let parse_data (s:string) =
     
     let param = empty_query_string ()
     s.Split('&')
-    |> Array.iter (fun (k:string) ->
-                            k.Split('=')  |> (fun d -> if d.Length = 2 then param.Add(d.[0],d.[1]))) 
+    |> Array.iter 
+        (fun (k:string) -> k.Split('=')  
+                            |> (fun d -> if d.Length = 2 then param.Add(d.[0],System.Web.HttpUtility.UrlDecode(d.[1])))) 
     param
     
 let parse_url (line:string) =
