@@ -99,6 +99,7 @@ open System.Collections.Concurrent
 let session_map = new Dictionary<string,ConcurrentDictionary<string,obj>>()        
         
 let session sessionId = 
+    if String.IsNullOrEmpty sessionId then failwith "session_support was not called"
     if not (session_map.ContainsKey sessionId) then
         session_map.Add(sessionId,new ConcurrentDictionary<string,obj>())
     session_map.[sessionId] 
