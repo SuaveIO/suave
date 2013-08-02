@@ -74,18 +74,22 @@ let file filename  =
 
 let local_file str = sprintf "%s%s" Environment.CurrentDirectory str        
 
-let browse (req:HttpRequest) =  file (local_file req.Url) 
+let browse : WebPart = warbler (fun req ->  file (local_file req.Url))
 
 let browse_file filename = file (local_file filename)
 
-let dir url =   
+type WebResult = Option<Async<unit>>
+
+let dir (req: HttpRequest) : WebResult =  
+
+    let url = req.Url
 
     let dirname = local_file url
     let result = new StringBuilder()
 
     let filesize  (x:FileSystemInfo) =  
         if (x.Attributes ||| FileAttributes.Directory =  FileAttributes.Directory) then 
-            String.Format("{0,-14}","<DIR>")
+            String.Format("{0,-14}",System.Web.HttpUtility.HtmlEncode("<DIR>"))
         else 
             String.Format("{0,14}",(new FileInfo(x.FullName)).Length)
             
@@ -97,8 +101,8 @@ let dir url =
     if Directory.Exists(dirname) then
         let di = new DirectoryInfo(dirname)
         (di.GetFileSystemInfos()) |> Array.sortBy (fun x -> x.Name) |> Array.iter (buildLine)
-        ok (bytes (result.ToString())) 
-    else never 
+        ok (bytes (result.ToString())) req
+    else fail 
 
 let closepipe (p:HttpRequest option) =
     match p with

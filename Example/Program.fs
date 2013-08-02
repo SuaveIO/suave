@@ -87,7 +87,8 @@ choose [
                  (x.Session ? counter <- 1 :> obj ; OK "First time" ));
     basic_auth; // from here on it will require authentication
     GET >>= choose [ url "/lift.xml" >>= process_template data;  ];
-    GET >>= warbler (fun x -> browse x);
+    GET >>= browse;//serves file if exists
+    GET >>= dir;//show directory listing
     POST >>= url "/upload" >>= OK "Upload successful." ;
     POST >>= url "/upload2" 
         >>= warbler( fun x -> 
