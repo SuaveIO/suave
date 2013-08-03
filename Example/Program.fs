@@ -54,6 +54,10 @@ let myapp : WebPart =
             [ url "/hello" >>= OK "Hello GET" ; url "/goodbye" >>= OK "Good bye GET" ];
         POST >>= choose 
             [ url "/hello" >>= OK "Hello POST" ; url "/goodbye" >>= OK "Good bye POST" ];
+        DELETE >>= choose 
+            [ url "/hello" >>= OK "Hello DELETE" ; url "/goodbye" >>= OK "Good bye DELETE" ];
+        PUT >>= choose 
+            [ url "/hello" >>= OK "Hello PUT" ; url "/goodbye" >>= OK "Good bye PUT" ];
     ]
 
 // typed routes
