@@ -26,6 +26,8 @@ let meth0d s (x:HttpRequest) = if s = x.Method then Some(x) else None
 
 let GET  (x:HttpRequest)  = meth0d "GET" x
 let POST (x:HttpRequest)  = meth0d "POST" x
+let DELETE (x:HttpRequest) = meth0d "DELETE" x
+let PUT (x:HttpRequest) = meth0d "PUT" x
 
 let challenge  =
     set_header "WWW-Authenticate" "Basic realm=\"protected\"" 
