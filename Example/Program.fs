@@ -1,50 +1,14 @@
 ﻿
 open System
 open System.Security.Cryptography.X509Certificates;
-open System.Xml
 
-open Suave
 open Suave.Web
-open Suave.Template
-open Suave.Html
 open Suave.Http
+open Suave.Types
+open Suave.Session
 
-let basic_auth  : WebPart  = authenticate_basic ( fun x -> x.Username.Equals("foo") && x.Password.Equals("bar"))
-
-type User() = 
-    let mutable firstName = String.Empty
-    member u.FirstName 
-        with get() = firstName   
-        and set x= firstName <- x    
-
-let pepe = new User()
-pepe.FirstName <- "Pepe"
-
-let tags = ["science";"art";"religion"]
-
-let data = Map["FirstName", Suave.Html.text (pepe.FirstName, fun (x:obj) -> pepe.FirstName <- x :?> string) ]
-
-type LoginForm() = 
-
-    let user = new User()
-    
-    let do_something_with user = ()  
-      
-    member m.init(node:Xml)  =
-    
-        let save_results _ = do_something_with user
-        
-        user.FirstName <- "Pepe"
-
-        bind (  "h", node, 
-               Map [ "FirstName", Suave.Html.text_box (user.FirstName, fun x -> user.FirstName <- x :?> string);
-                     "Submit"   , Suave.Html.submit ("Submit data", save_results );  
-                     "tags"     , fun xml -> tags |> flatMap (fun t -> bind ("t", xml , Map [ "name", Suave.Html.text (t, ignore)]))
-               ]);
-         
-    member m.tags(node:Xml) = 
-        
-        tags |> flatMap (fun x -> bind ("t",node, Map [ "name", Suave.Html.text(x,ignore)]))
+let basic_auth  : WebPart  = 
+    authenticate_basic ( fun x -> x.Username.Equals("foo") && x.Password.Equals("bar"))
         
 let sslCert = new X509Certificate("suave.pfx","easy");
 
@@ -80,17 +44,16 @@ choose [
     GET >>= url "/query" >>= OK "Hello beautiful" ;
     url "/redirect" >>= redirect "/redirected"
     url "/redirected" >>=  OK "You have been redirected." ;
-    url "/date" >>= OK (DateTime.Now.ToString());
+    url "/date" >>= warbler (fun _ -> OK (DateTime.Now.ToString()));
     url "/session" 
         >>= session_support 
         >>= warbler ( fun x -> 
-            cond (x.Session) ? counter 
+            cond (session x) ? counter 
                 ( fun y -> 
-                    x.Session ? counter <- (y :?> int) + 1 :> obj ; 
+                    (session x) ? counter <- (y :?> int) + 1 :> obj ; 
                     OK (sprintf "Hello %A time(s)"  y ))
-                 (x.Session ? counter <- 1 :> obj ; OK "First time" ));
+                 ((session x) ? counter <- 1 :> obj ; OK "First time" ));
     basic_auth; // from here on it will require authentication
-    GET >>= choose [ url "/lift.xml" >>= process_template data;  ];
     GET >>= browse;//serves file if exists
     GET >>= dir;//show directory listing
     POST >>= url "/upload" >>= OK "Upload successful." ;
@@ -101,6 +64,6 @@ choose [
     POST >>= warbler( fun x -> OK (sprintf "POST data: %A" (x.Form)));
     notfound "Found no handlers" 
     ] 
-    |> web_server [|HTTP,"127.0.0.1",80; HTTPS(sslCert),"127.0.0.1",443|]
+    |> web_server [|HTTP,"127.0.0.1",8083(*; HTTPS(sslCert),"127.0.0.1",443*)|]
     |> Async.RunSynchronously
     |> ignore
