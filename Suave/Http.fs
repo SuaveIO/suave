@@ -1,25 +1,17 @@
 ﻿module Suave.Http
 
-open Web
 open System
 open System.IO
 open System.Text
+
+open Utils
+open Types
 
 let set_header a b (http_request:HttpRequest) = 
     http_request.Response.Headers.Add(a,b)
     http_request
 
-let set_cookie cookie = set_header  "Set-Cookie"  cookie 
-
-//cookie-based session support   
-let session_support (request:HttpRequest) =
-    let sessionId = 
-        match request.Cookies ? suave_session_id with
-        |Some(attr) -> snd(attr.[0])
-        |None -> Guid.NewGuid().ToString()
-    request.SessionId <- sessionId
-    set_cookie (sprintf "%s=%s" "suave_session_id" sessionId) request |> ignore
-    Some(request)
+let set_cookie cookie = set_header  "Set-Cookie" cookie 
  
 let url s (x:HttpRequest) = if s = x.Url then Some(x) else None
 let meth0d s (x:HttpRequest) = if s = x.Method then Some(x) else None
@@ -28,6 +20,34 @@ let GET  (x:HttpRequest)  = meth0d "GET" x
 let POST (x:HttpRequest)  = meth0d "POST" x
 let DELETE (x:HttpRequest) = meth0d "DELETE" x
 let PUT (x:HttpRequest) = meth0d "PUT" x
+
+let suave_version = "0.1"
+let proto_version = "HTTP/1.1"
+
+let response statusCode message (content:byte[]) (request:HttpRequest) = async {
+
+    let stream:Stream = request.Stream
+    
+    do! async_writeln stream (sprintf "%s %d %s" proto_version statusCode message)
+    do! async_writeln stream (sprintf "Server: Suave/%s (http://suaveframework.com)" suave_version)
+    do! async_writeln stream (sprintf "X-Got-Pot: No")
+    do! async_writeln stream (sprintf "Date: %s" (DateTime.Now.ToUniversalTime().ToString("R")))
+    
+    for (x,y) in request.Response.Headers do
+        if not (List.exists (fun y -> x.ToLower().Equals(y)) ["server";"date";"content-length"]) then
+           do! async_writeln stream (sprintf "%s: %s" x y )
+    
+    if not(request.Response.Headers.Exists(new Predicate<_>(fun (x,_) -> x.ToLower().Equals("content-type")))) then
+        do! async_writeln stream (sprintf "Content-Type: %s" "text/html")
+    
+    if content.Length > 0 then 
+        do! async_writeln stream (sprintf "Content-Length: %d" (content.Length))
+        
+    do! async_writeln stream ""
+    
+    if content.Length > 0 then
+        do! async_writebytes stream content
+}
 
 let challenge  =
     set_header "WWW-Authenticate" "Basic realm=\"protected\"" 
@@ -64,13 +84,15 @@ let mime_type = function
     |".js" -> "application/x-javascript"
     |".exe" -> "application/exe"
     |_ -> "application/octet-stream"
+    
+let set_mime_type t = set_header "Content-Type" t
 
 let file filename  = 
     if File.Exists(filename) then
         let file_info = new FileInfo(filename)
         let mimes = mime_type (file_info.Extension)
         //TODO: file should be read async
-        set_header "Content-Type" mimes  >> ok (File.ReadAllBytes(filename)) 
+        set_mime_type mimes  >> ok (File.ReadAllBytes(filename)) 
     else
         never
 

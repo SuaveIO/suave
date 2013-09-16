@@ -85,6 +85,9 @@ let rec xml_to_string1 (Xml(nodes)) (stream:StringWriter) =
                 write_close_tag s n a stream
         |Text(s),childs -> stream.Write(s);xml_to_string1 childs stream
         |WhiteSpace(s),childs -> stream.Write(s);xml_to_string1 childs stream
+
+    
+open Types
     
 let process_template (data:Map<string,Binder>) (http_request:HttpRequest) =
     try 

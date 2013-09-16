@@ -25,6 +25,8 @@ let rec choose options arg =
                  
 let warbler f a = f a a //wich bird? A Warbler!
 
+let (>>==) a b = a >>= warbler (fun r ->  b r)
+
 let look_up (target : IDictionary<'b,'a>) key  = 
   match target.TryGetValue(key) with
   | (true, v) -> Some(v)
@@ -56,3 +58,30 @@ let read_fully (input:Stream) =
     use ms = new MemoryStream()
     input.CopyTo(ms);
     ms.ToArray();
+
+open System    
+open System.Text
+    
+let encode_base64 (s:string) = 
+    let bytes = ASCIIEncoding.ASCII.GetBytes(s);
+    Convert.ToBase64String(bytes);
+    
+let decode_base64 (s:string) =
+     let bytes = Convert.FromBase64String(s);
+     ASCIIEncoding.ASCII.GetString(bytes);
+     
+let eol = "\r\n"
+
+let bytes (s:string) = Encoding.ASCII.GetBytes(s)
+
+let EOL = bytes eol
+
+let async_writeln (stream:Stream) s = async {
+    let b = bytes s
+    do! stream.AsyncWrite(b, 0, b.Length)
+    do! stream.AsyncWrite(EOL, 0, 2)    
+}
+
+let async_writebytes (stream:Stream) b = async {
+    do! stream.AsyncWrite(b, 0, b.Length)    
+}
