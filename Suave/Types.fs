@@ -70,3 +70,12 @@ open System.Security.Cryptography.X509Certificates;
 type Protocols = | HTTP | HTTPS of X509Certificate
 type HttpBinding = Protocols * string * int      
 type WebPart = HttpRequest -> Async<unit> Option
+
+type ErrorHandler = Exception -> String -> HttpRequest -> Async<unit>
+
+type Config = { 
+    bindings : HttpBinding array; 
+    error_handler : ErrorHandler;
+    timeout : int
+    }
+

@@ -65,9 +65,9 @@ let proxy proxyResolver (r:HttpRequest) =
     |None -> never
     |Some(ip,port) -> forward ip port
 
-let proxy_server bindings resolver =
-     bindings 
-    |> Array.map (fun (proto,ip,port) -> tcp_ip_server (ip,port) (request_loop (warbler(fun http -> proxy resolver http)) proto (process_request true)))
+let proxy_server config resolver =
+     config.bindings
+    |> Array.map (fun (proto,ip,port) -> tcp_ip_server (ip,port) (request_loop (warbler(fun http -> proxy resolver http)) proto (process_request true) config.error_handler config.timeout))
     |> Async.Parallel
     |> Async.Ignore
 

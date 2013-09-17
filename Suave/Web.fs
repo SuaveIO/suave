@@ -226,16 +226,22 @@ let load_stream proto (stream: Stream)  =
 
 open System.Net.Sockets
 
-let eval_action x r = 
-    async { 
-        try
-            do! x 
-        with ex -> 
-            Log.log "action failed with:\n%A" ex
-            do! (response 500 "Internal Error" (bytes(ex.ToString())) r)
-    }
+type HttpProcessor = Stream -> String -> Async<HttpRequest>
 
-let request_loop webpart proto (processor: Stream -> String -> Async<HttpRequest>) (client:TcpClient) = 
+let request_loop webpart proto (processor: HttpProcessor) error_handler timeout (client:TcpClient) = 
+    let eval_action x r = 
+        async { 
+            try
+                do! x 
+            with ex -> do! error_handler ex "action failed with:" r
+        }
+    let run request  =
+        async{
+            let p = webpart request //routing
+            match p with 
+            |Some(x) -> do! eval_action x request
+            |None -> ()
+        }
     async {
         try
         
@@ -248,15 +254,12 @@ let request_loop webpart proto (processor: Stream -> String -> Async<HttpRequest
             let ipaddr = remote_endpoint.Address.ToString()
 
             while !keep_alive do
-                use! request = processor stream ipaddr 
+                use! request = processor stream ipaddr
                 try
-                    let p = webpart request //routing
-                    match p with 
-                    |Some(x) -> do! eval_action x request
-                    |None -> ()
-                with ex -> 
-                    Log.log "routing request failed.\n%A" ex
-                    do! (response 500 "Internal Error" (bytes(ex.ToString())) request)
+                    Async.RunSynchronously(run request,timeout) 
+                with
+                    | :? TimeoutException as ex -> do! error_handler ex "script timeout" request
+                    | ex -> do! error_handler ex "routing request failed" request
                     
                 stream.Flush()
                 
@@ -273,12 +276,39 @@ let request_loop webpart proto (processor: Stream -> String -> Async<HttpRequest
 let parallelize input f = input |> Seq.map (f)  |> Async.Parallel
 
 open Suave.Tcp
-   
-let web_server bindings (webpart:WebPart) =
-    bindings 
-    |> Array.map (fun (proto,ip,port) -> tcp_ip_server (ip,port) (request_loop webpart proto (process_request false)))
+
+let is_local_address (ip:string) = 
+    ip.Equals("127.0.0.1")
+    
+let default_error_handler (ex:Exception) msg (request:HttpRequest) =
+    async {
+        Log.log "%s.\n%A" msg ex
+        if is_local_address request.RemoteAddress then
+            do! (response 500 "Internal Error" (bytes(sprintf "<h1>%s</h1><br/>%A" ex.Message ex)) request)
+        else do! (response 500 "Internal Error" (bytes(request.RemoteAddress)) request)
+    }
+    
+let web_worker (proto, ip, port, error_handler, timeout) (webpart:WebPart) =
+    tcp_ip_server (ip,port) (request_loop webpart proto (process_request false) error_handler timeout)
+
+//returns the webserver as an asynchronous computation
+let web_server_async (config:Config) (webpart:WebPart) =
+    config.bindings 
+    |> Array.map (fun (proto,ip,port) -> web_worker (proto,ip,port,config.error_handler,config.timeout) webpart)
     |> Async.Parallel
     |> Async.Ignore
 
+//runs the web server and blocks    
+let web_server (config:Config) (webpart:WebPart) =
+    web_server_async config webpart
+    |> Async.RunSynchronously
+    |> ignore
+
+let defaultConfig = 
+    {
+        bindings = [| HTTP,"127.0.0.1", 8083 |];
+        error_handler = default_error_handler;
+        timeout = 60000 // 1 minute
+    }
 
 

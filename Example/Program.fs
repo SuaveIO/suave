@@ -34,6 +34,11 @@ let testapp : WebPart =
     ]
 
 System.Net.ServicePointManager.DefaultConnectionLimit <- Int32.MaxValue
+
+let timeout r =
+    async {
+     do! Async.Sleep 1500
+    } |> succeed
         
 choose [
     Console.OpenStandardOutput() |> log >>= never ; 
@@ -45,6 +50,7 @@ choose [
     url "/redirect" >>= redirect "/redirected"
     url "/redirected" >>=  OK "You have been redirected." ;
     url "/date" >>= warbler (fun _ -> OK (DateTime.Now.ToString()));
+    url "/timeout" >>= timeout;
     url "/session" 
         >>= session_support 
         >>= warbler ( fun x -> 
@@ -64,6 +70,8 @@ choose [
     POST >>= warbler( fun x -> OK (sprintf "POST data: %A" (x.Form)));
     notfound "Found no handlers" 
     ] 
-    |> web_server [|HTTP,"127.0.0.1",8083(*; HTTPS(sslCert),"127.0.0.1",443*)|]
-    |> Async.RunSynchronously
-    |> ignore
+    |> web_server { 
+        bindings = [|HTTP,"127.0.0.1",8082 (*; HTTPS(sslCert),"127.0.0.1",8083*)|]; 
+        error_handler = default_error_handler;
+        timeout = 1000 }
+    
