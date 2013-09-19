@@ -25,28 +25,31 @@ let suave_version = "0.1"
 let proto_version = "HTTP/1.1"
 
 let response statusCode message (content:byte[]) (request:HttpRequest) = async {
-
-    let stream:Stream = request.Stream
     
-    do! async_writeln stream (sprintf "%s %d %s" proto_version statusCode message)
-    do! async_writeln stream (sprintf "Server: Suave/%s (http://suaveframework.com)" suave_version)
-    do! async_writeln stream (sprintf "X-Got-Pot: No")
-    do! async_writeln stream (sprintf "Date: %s" (DateTime.Now.ToUniversalTime().ToString("R")))
-    
-    for (x,y) in request.Response.Headers do
-        if not (List.exists (fun y -> x.ToLower().Equals(y)) ["server";"date";"content-length"]) then
-           do! async_writeln stream (sprintf "%s: %s" x y )
-    
-    if not(request.Response.Headers.Exists(new Predicate<_>(fun (x,_) -> x.ToLower().Equals("content-type")))) then
-        do! async_writeln stream (sprintf "Content-Type: %s" "text/html")
-    
-    if content.Length > 0 then 
-        do! async_writeln stream (sprintf "Content-Length: %d" (content.Length))
+    try
+        let stream:Stream = request.Stream
         
-    do! async_writeln stream ""
-    
-    if content.Length > 0 then
-        do! async_writebytes stream content
+        do! async_writeln stream (sprintf "%s %d %s" proto_version statusCode message)
+        do! async_writeln stream (sprintf "Server: Suave/%s (http://suaveframework.com)" suave_version)
+        do! async_writeln stream (sprintf "X-Got-Pot: No")
+        do! async_writeln stream (sprintf "Date: %s" (DateTime.Now.ToUniversalTime().ToString("R")))
+        
+        for (x,y) in request.Response.Headers do
+            if not (List.exists (fun y -> x.ToLower().Equals(y)) ["server";"date";"content-length"]) then
+               do! async_writeln stream (sprintf "%s: %s" x y )
+        
+        if not(request.Response.Headers.Exists(new Predicate<_>(fun (x,_) -> x.ToLower().Equals("content-type")))) then
+            do! async_writeln stream (sprintf "Content-Type: %s" "text/html")
+        
+        if content.Length > 0 then 
+            do! async_writeln stream (sprintf "Content-Length: %d" (content.Length))
+            
+        do! async_writeln stream ""
+        
+        if content.Length > 0 then
+            do! async_writebytes stream content
+    with //the connection might drop while we are sending the response
+        | :? IOException as ex  -> raise (InternalFailure "Failure while writing to client stream")
 }
 
 let challenge  =

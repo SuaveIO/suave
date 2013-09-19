@@ -79,3 +79,4 @@ type Config = {
     timeout : int
     }
 
+exception InternalFailure of string
