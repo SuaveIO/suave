@@ -104,7 +104,7 @@ h1. Server configuration
 
 The first argument to @web_server@ is a configuration record with the following signature.
 
-pre.
+pre. 
 type Protocols = | HTTP | HTTPS of X509Certificate
 type HttpBinding = Protocols * string * int 
 type Config = { 
