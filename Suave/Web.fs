@@ -8,6 +8,7 @@ open System.IO
 open System.Text
 open System.Diagnostics
 open System.Threading
+open System.Threading.Tasks
 open System.Security.Permissions
 open System.Security.Principal
 open System.Collections.Generic
@@ -228,12 +229,14 @@ open System.Net.Sockets
 
 type HttpProcessor = Stream -> String -> Async<HttpRequest>
 
-let request_loop webpart proto (processor: HttpProcessor) error_handler timeout (client:TcpClient) = 
+let request_loop webpart proto (processor: HttpProcessor) error_handler (timeout:int) (client:TcpClient) = 
     let eval_action x r = 
         async { 
             try
                 do! x 
-            with ex -> do! error_handler ex "action failed with:" r
+            with
+                | InternalFailure(_) as ex -> raise ex
+                | ex -> do! error_handler ex "Action failed" r
         }
     let run request  =
         async{
@@ -256,10 +259,18 @@ let request_loop webpart proto (processor: HttpProcessor) error_handler timeout 
             while !keep_alive do
                 use! request = processor stream ipaddr
                 try
-                    Async.RunSynchronously(run request,timeout) 
+                    let timeoutTask = Task.Delay timeout
+                    let requestTask = Async.StartAsTask(run request)
+
+                    do! Task.WhenAny(timeoutTask,requestTask)
+                        |> Async.AwaitTask
+                        |> Async.Ignore
+                    
+                    if not(requestTask.IsCompleted) then 
+                        do! error_handler (new TimeoutException()) "script timeout" request
                 with
-                    | :? TimeoutException as ex -> do! error_handler ex "script timeout" request
-                    | ex -> do! error_handler ex "routing request failed" request
+                    | InternalFailure(_) as ex -> raise ex
+                    | ex -> do! error_handler ex "Routing request failed" request
                     
                 stream.Flush()
                 
@@ -269,8 +280,12 @@ let request_loop webpart proto (processor: HttpProcessor) error_handler timeout 
                     |_ -> false
                 
             client.Close()
-        with | :? EndOfStreamException -> Log.log "client disconnected.\n"
-             | ex -> Log.log "request failed.\n%A" ex
+        with | InternalFailure(_)  
+             | :? EndOfStreamException
+             | :? IOException  as ex 
+                    when ex.InnerException.GetType() = typeof<SocketException>
+                    -> Log.log "Client disconnected.\n"
+             | ex -> Log.log "Request failed.\n%A" ex
     }
     
 let parallelize input f = input |> Seq.map (f)  |> Async.Parallel
