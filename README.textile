@@ -100,3 +100,19 @@ choose [
         timeout = 3000
     }
 
+h1. Server configuration
+
+The first argument to @web_server@ is a configuration record with the following signature.
+
+pre.
+type Protocols = | HTTP | HTTPS of X509Certificate
+type HttpBinding = Protocols * string * int 
+type Config = { 
+    bindings : HttpBinding array; 
+    error_handler : Exception -> String -> HttpRequest -> Async<unit>;
+    timeout : int
+    }
+
+*bindings* array of bindings of the form _protocol, ip address, port_
+*error_handler* a handler to deal with runtime errors
+*timeout* maximun number of milliseconds before killing a request
