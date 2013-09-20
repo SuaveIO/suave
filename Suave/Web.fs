@@ -249,7 +249,7 @@ let request_loop webpart proto (processor: HttpProcessor) error_handler (timeout
         try
         
             let keep_alive = ref true
-            use stream = 
+            let stream = 
                 client.GetStream()
                 |> load_stream proto
             
@@ -278,8 +278,7 @@ let request_loop webpart proto (processor: HttpProcessor) error_handler (timeout
                     match request.Headers ? connection with 
                     |Some(x) when x.ToLower().Equals("keep-alive") -> true
                     |_ -> false
-                
-            client.Close()
+                    
         with | InternalFailure(_)  
              | :? EndOfStreamException
              | :? IOException  as ex 
