@@ -85,3 +85,11 @@ let async_writeln (stream:Stream) s = async {
 let async_writebytes (stream:Stream) b = async {
     do! stream.AsyncWrite(b, 0, b.Length)    
 }
+
+let unblock f =
+    async { 
+        do! Async.SwitchToNewThread ()
+        let res = f()
+        do! Async.SwitchToThreadPool ()
+        return res 
+    } 

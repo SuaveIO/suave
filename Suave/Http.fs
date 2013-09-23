@@ -3,6 +3,7 @@
 open System
 open System.IO
 open System.Text
+open System.Threading.Tasks
 
 open Utils
 open Types
@@ -89,13 +90,18 @@ let mime_type = function
     |_ -> "application/octet-stream"
     
 let set_mime_type t = set_header "Content-Type" t
+    
+let send_file filename r = 
+    async {
+        let! b = unblock (fun _ -> File.ReadAllBytes(filename))
+        do! response  200 "OK" b r
+    } |> succeed
 
 let file filename  = 
     if File.Exists(filename) then
         let file_info = new FileInfo(filename)
         let mimes = mime_type (file_info.Extension)
-        //TODO: file should be read async
-        set_mime_type mimes  >> ok (File.ReadAllBytes(filename)) 
+        set_mime_type mimes  >> send_file (filename) 
     else
         never
 
