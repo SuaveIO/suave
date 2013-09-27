@@ -259,17 +259,10 @@ let request_loop webpart proto (processor: HttpProcessor) error_handler (timeout
             while !keep_alive do
                 use! request = processor stream ipaddr
                 try
-                    let timeoutTask = Task.Delay timeout
-                    let requestTask = Async.StartAsTask(run request)
-
-                    do! Task.WhenAny(timeoutTask,requestTask)
-                        |> Async.AwaitTask
-                        |> Async.Ignore
-                    
-                    if not(requestTask.IsCompleted) then 
-                        do! error_handler (new TimeoutException()) "script timeout" request
+                    do! unblock(fun _ -> Async.RunSynchronously (run request,timeout))
                 with
                     | InternalFailure(_) as ex -> raise ex
+                    | :? TimeoutException as ex -> do! error_handler ex "script timeout" request
                     | ex -> do! error_handler ex "Routing request failed" request
                     
                 stream.Flush()
