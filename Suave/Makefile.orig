@@ -1,0 +1,48 @@
+MONOBIN = INSERT_MONO_BIN
+FSC = mono $(MONOBIN)/fsc.exe
+
+FILES = \
+	AssemblyInfo.fs \
+	Utils.fs \
+	Sscanf.fs \
+	Log.fs \
+	Data.fs \
+	Html.fs \
+	Json.fs \
+	Types.fs \
+	Http.fs \
+	Tcp.fs \
+	Web.fs \
+	Proxy.fs \
+	Session.fs
+
+REFERENCES = \
+	-r:$(MONOBIN)/mscorlib.dll \
+	-r:System.dll \
+	-r:System.Core.dll \
+	-r:System.Data.dll \
+	-r:System.Runtime.Serialization.dll \
+	-r:System.Web.dll \
+	-r:System.Xml.dll \
+	-r:$(MONOBIN)/FSharp.Core.dll 
+
+config=Release
+
+FSC_OPTS = --noframework --nologo
+
+ifeq ($(config),Debug)
+FSC_OPTS += --debug --optimize-
+else
+FSC_OPTS += --debug:pdbonly --optimize
+endif
+
+TARGETS = bin/suave.dll
+
+all: $(TARGETS)
+
+bin/suave.dll: $(FILES)
+	@-mkdir -p bin
+	$(FSC) $(FSC_OPTS) --target:library --out:bin/suave.dll $(REFERENCES) $(FILES)
+
+clean:
+	-rm -fr bin
