@@ -1,6 +1,0 @@
-﻿
-
-- Cookies	: DONE
-- SSL		: DONE
-
-
