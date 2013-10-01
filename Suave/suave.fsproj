@@ -55,9 +55,6 @@
     <Compile Include="Web.fs" />
     <Compile Include="Http.fs" />
     <Compile Include="Template.fs" />
-    <Content Include="notes.txt">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
     <Compile Include="Data.fs" />
     <Compile Include="Json.fs" />
     <Compile Include="AssemblyInfo.fs" />
