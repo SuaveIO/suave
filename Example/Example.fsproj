@@ -63,7 +63,8 @@
   <ItemGroup>
     <ProjectReference Include="..\Suave\Suave.fsproj">
       <Name>Suave</Name>
-      <Project>{3DC9193E-BD0C-4486-9C58-56B630C36623}</Project>
+      <Project>{3dc9193e-bd0c-4486-9c58-56b630c36623}</Project>
+      <Private>True</Private>
     </ProjectReference>
   </ItemGroup>
   <PropertyGroup>
