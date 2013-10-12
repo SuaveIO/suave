@@ -52,13 +52,13 @@
     <Compile Include="Log.fs" />
     <Compile Include="Tcp.fs" />
     <Compile Include="Sscanf.fs" />
-    <Compile Include="Web.fs" />
+    <Compile Include="Types.fs" />
     <Compile Include="Http.fs" />
+    <Compile Include="Web.fs" />
     <Compile Include="Template.fs" />
     <Compile Include="Data.fs" />
     <Compile Include="Json.fs" />
     <Compile Include="AssemblyInfo.fs" />
-    <Compile Include="Types.fs" />
     <Compile Include="Session.fs" />
     <Compile Include="Proxy.fs" />
   </ItemGroup>
