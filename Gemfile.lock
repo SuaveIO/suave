@@ -1,6 +1,6 @@
 GIT
   remote: git://github.com/Albacore/albacore.git
-  revision: c50edc22dc66563f535de8cad6fc43decb24f090
+  revision: 857689b3b03a39c2a8b8434aba29231bafefb5d1
   branch: clean_slate
   specs:
     albacore (0.7.2)
