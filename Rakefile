@@ -13,7 +13,8 @@ end
 
 desc "Perform full build"
 build :build => [:versioning, :restore] do |b|
-  b.sln = 'suave.sln'
+  b.file = 'suave.sln'
+  b.prop 'Configuration', 'Release'
 end
 
 directory 'build/pkg'
@@ -27,6 +28,7 @@ nugets_pack :create_nugets => ['build/pkg', :versioning, :build] do |p|
     exclude(/packages/)
   p.out     = 'build/pkg'
   p.exe     = 'buildsupport/NuGet.exe'
+  p.configuration = 'Release'
   
   p.with_metadata do |m|
     m.version       = ENV['NUGET_VERSION']
