@@ -93,9 +93,7 @@ let set_mime_type t = set_header "Content-Type" t
     
 let send_file filename r = 
     async {
-        use stream = new FileStream(filename, FileMode.Open, FileAccess.Read, FileShare.Read , 4096, true)
-        let b = Array.zeroCreate (int stream.Length)
-        let _ =  stream.ReadAsync(b,0, int b.Length )
+        let! b = unblock (fun _ -> File.ReadAllBytes(filename))
         do! response  200 "OK" b r
     } |> succeed
 
