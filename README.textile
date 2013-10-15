@@ -116,3 +116,19 @@ type Config = {
 *bindings* array of bindings of the form _protocol, ip address, port_
 *error_handler* a handler to deal with runtime errors
 *timeout* maximun number of milliseconds before killing a request
+
+h1. Coding Guidelines
+
+h2. Style Guide
+
+p.
+Two space indentation.
+
+pre.
+match x with // '|' characters at base of 'match'
+| A     -> ()
+| Bcdef -> "aligned arrows"
+
+h2. Testing
+
+Tests really required.
