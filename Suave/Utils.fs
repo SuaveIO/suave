@@ -102,7 +102,7 @@ let decode_base64 (s : string) =
   let bytes = Convert.FromBase64String s
   Encoding.ASCII.GetString bytes
 
-/// The end-of-line literal
+/// The end-of-line literal, \r\n (CRLF)
 let [<Literal>] eol = "\r\n"
 
 /// Get the ASCII bytes for the string
@@ -113,7 +113,7 @@ let bytes (s : string) =
 let bytes_utf8 (s : string) =
   Encoding.UTF8.GetBytes s
 
-/// The end-of-line 'literal' as bytes
+/// The end-of-line 'literal' as bytes, the \r\n (CRLF) byte pair
 let EOL = bytes eol
 
 /// Write the string s to the stream asynchronously

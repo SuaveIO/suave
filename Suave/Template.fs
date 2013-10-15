@@ -7,14 +7,14 @@ open System.IO
 open System.Reflection
 open System.Text
 
-open Suave.Web  
+open Suave.Web
 open Suave.Html
 open Suave.Http
 
 let load_object (str:string) =
     let entryAssembly = Assembly.GetEntryAssembly()
     entryAssembly.CreateInstance(str.Replace('.','+'))
-    
+
 let invoke object action args =
     let typ = object.GetType()
     let meth = typ.GetMethod(action,[| typeof<Xml>|])

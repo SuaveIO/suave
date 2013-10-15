@@ -6,7 +6,7 @@ open System
 open System.Data
 open System.Data.Common
 
-let eval<'T> (reader:DbDataReader) = 
+let eval<'T> (reader:DbDataReader) =
     let recordType = typeof<'T>
     if FSharpType.IsRecord(recordType) then 
         let fieldCount = FSharpType.GetRecordFields(recordType).Length

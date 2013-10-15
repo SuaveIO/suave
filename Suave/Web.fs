@@ -15,45 +15,47 @@ open System.Collections.Generic
 
 open Http
 
-let rec readTillEOL(stream: Stream, buff: byte[], count: int) =
-   async{
-       
-       let! inp = stream.AsyncRead(1)
-       
-       if count>0 && buff.[count-1] = EOL.[0] && inp.[0] = EOL.[1] then
-          return (count-1)
-       else
+/// Read the passed stream into buff until the EOL (CRLF) has been reached.
+let rec readTillEOL (stream : Stream) (buff : byte[]) (count : int) = async {
+  // TODO: are we really just reading a single byte at a time?
+  let! inp = stream.AsyncRead 1
+  if count > 0 && buff.[count - 1] = EOL.[0] && inp.[0] = EOL.[1] then
+    return count - 1
+  else
+    buff.[count] <- inp.[0]
+    return! readTillEOL stream buff (count + 1)
+}
 
-          buff.[count] <- inp.[0]
-          return! readTillEOL(stream,buff,count + 1)
-   }
+/// Read the stream until the marker appears.
+let read_until (marker : byte array) f (stream : Stream) =
+  let buffer = Array.create marker.Length (byte 0)
 
-let read_until (marker:byte array) f (stream:Stream)  = 
-    
-    let buffer = Array.create marker.Length (byte(0))
-    
-    let rec loop index = async {
-        if index < Array.length marker then 
-            let! byte = stream.AsyncRead(1)
-            if byte.Length > 0 then 
-                buffer.[index] <- byte.[0]
-                if byte.[0] = marker.[index] then
-                    do! loop (index + 1)  
-                else 
-                    do! f buffer (index+1)
-                    do! loop 0
-    }
-    loop 0    
-    
-let toString ( buff: byte[], index:int, count:int) =
-    Encoding.ASCII.GetString(buff,index,count)
-    
-let max_buffer = 1024    
-    
+  let rec loop index = async {
+    if index < Array.length marker then
+      // TODO: are we really just reading a single byte at a time?
+      let! byte = stream.AsyncRead 1
+      if byte.Length > 0 then
+        buffer.[index] <- byte.[0]
+        if byte.[0] = marker.[index] then
+          do! loop (index + 1)
+        else 
+          do! f buffer (index+1)
+          do! loop 0
+  }
+  loop 0
+
+/// Convert the byte array of ASCII-encoded chars to a string, starting at 'index' for 'count' characters
+/// (each character is necessarily one byte)
+let to_string (buff : byte[]) (index : int) (count : int) =
+  Encoding.ASCII.GetString(buff, index, count)
+
+/// The max buffer to use when dealing with streams
+let max_buffer = 1024
+
 let read_line stream = async {
-    let buf = Array.zeroCreate max_buffer 
-    let! count = readTillEOL(stream,buf,0)  
-    return toString(buf, 0, count)  
+  let buf = Array.zeroCreate max_buffer
+  let! count = readTillEOL stream buf 0
+  return to_string buf 0 count
 }
 
 let read_headers stream = async {
@@ -61,16 +63,16 @@ let read_headers stream = async {
     let headers = new Dictionary<string,string>()
     while not(!eof) do
         let buf = Array.zeroCreate max_buffer
-        let! count = readTillEOL(stream,buf,0)
+        let! count = readTillEOL stream buf 0
         if count <> 0 then
-            let line = toString(buf, 0, count)
+            let line = to_string buf 0 count
             let indexOfColon = line.IndexOf(':'); 
             headers.Add (line.Substring(0,indexOfColon).ToLower(),line.Substring(indexOfColon+1).TrimStart())
         else
             eof := true
     return headers
 }
-    
+
 open Suave.Types
 
 let empty_query_string () = new Dictionary<string,string>()
@@ -79,11 +81,11 @@ let query (x:HttpRequest) = x.Query
 let form (x:HttpRequest) = x.Form
 
 let parse_data (s:string) = 
-    
+
     let param = empty_query_string ()
     s.Split('&')
     |> Array.iter 
-        (fun (k:string) -> k.Split('=')  
+        (fun (k:string) -> k.Split('=')
                             |> (fun d -> if d.Length = 2 then param.Add(d.[0],System.Web.HttpUtility.UrlDecode(d.[1])))) 
     param
     
@@ -163,7 +165,7 @@ let parse_multipart (stream:Stream) boundary (request:HttpRequest) =
                         |> read_until (bytes("\r\n" + boundary)) (fun x y -> async { do! mem.AsyncWrite(x,0,y) }  )
                     
                     let byts = mem.ToArray()
-                    request.Form.Add(fieldname, toString(byts,0,byts.Length))
+                    request.Form.Add(fieldname, (to_string byts 0 byts.Length))
             
             do! loop  boundary
     } 
@@ -200,7 +202,7 @@ let process_request proxyMode (stream:Stream) remoteip = async {
         
             if content_enconding.StartsWith("application/x-www-form-urlencoded") then
                 let! rawdata = read_post_data stream content_length
-                let form_data = parse_data (toString (rawdata, 0, rawdata.Length))
+                let form_data = parse_data (to_string rawdata 0 rawdata.Length)
                 request.Form <- form_data
                 request.RawForm <- rawdata
             elif content_enconding.StartsWith("multipart/form-data") then
@@ -284,16 +286,16 @@ let parallelize input f = input |> Seq.map (f)  |> Async.Parallel
 
 open Suave.Tcp
 
-let is_local_address (ip:string) = 
-    ip.Equals("127.0.0.1")
+let is_local_address (ip : string) =
+  ip.Equals("127.0.0.1")
     
-let default_error_handler (ex:Exception) msg (request:HttpRequest) =
-    async {
-        Log.log "%s.\n%A" msg ex
-        if is_local_address request.RemoteAddress then
-            do! (response 500 "Internal Error" (bytes(sprintf "<h1>%s</h1><br/>%A" ex.Message ex)) request)
-        else do! (response 500 "Internal Error" (bytes(request.RemoteAddress)) request)
-    }
+let default_error_handler (ex : Exception) msg (request : HttpRequest) =
+  async {
+    Log.log "%s.\n%A" msg ex
+    if is_local_address request.RemoteAddress then
+      do! (response 500 "Internal Error" (bytes(sprintf "<h1>%s</h1><br/>%A" ex.Message ex)) request)
+    else do! (response 500 "Internal Error" (bytes(request.RemoteAddress)) request)
+  }
     
 let web_worker (proto, ip, port, error_handler, timeout) (webpart:WebPart) =
     tcp_ip_server (ip,port) (request_loop webpart proto (process_request false) error_handler timeout)
@@ -305,17 +307,15 @@ let web_server_async (config:Config) (webpart:WebPart) =
     |> Async.Parallel
     |> Async.Ignore
 
-//runs the web server and blocks    
+//runs the web server and blocks
 let web_server (config:Config) (webpart:WebPart) =
     web_server_async config webpart
     |> Async.RunSynchronously
     |> ignore
 
-let defaultConfig = 
+let defaultConfig =
     {
         bindings = [| HTTP,"127.0.0.1", 8083 |];
         error_handler = default_error_handler;
         timeout = 60000 // 1 minute
     }
-
-
