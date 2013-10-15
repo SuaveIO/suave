@@ -15,7 +15,7 @@ open Suave.Http
 [<Test>] 
 let ``hello world`` () = 
     
-    let server = web_server_async defaultConfig (OK "Hello World!")
+    let server = web_server_async default_config (OK "Hello World!")
     Async.Start(server)
     
     //give the server a chance to start
