@@ -1,4 +1,4 @@
-﻿module Suave.Template
+module Suave.Template
 
 open System
 open System.Collections.Generic

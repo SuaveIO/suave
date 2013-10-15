@@ -4,7 +4,7 @@ open System
 open Types
 open Http
 
-//cookie-based session support   
+/// cookie-based session support
 let session_support (request:HttpRequest) = 
     //sessions could expire, we need a timestamp .. to know when the session expires
     //we will probably also need a job that monitors the session and deletes the expired ones
@@ -22,11 +22,11 @@ let session_support (request:HttpRequest) =
 open System.Collections.Generic    
 open System.Collections.Concurrent
 
-let session_map = new ConcurrentDictionary<string,ConcurrentDictionary<string,obj>>()        
+let session_map = new ConcurrentDictionary<string,ConcurrentDictionary<string,obj>>()
         
 let session (request:HttpRequest) =
     let sessionId = request.SessionId 
     if String.IsNullOrEmpty sessionId then failwith "session_support was not called"
     if not (session_map.ContainsKey sessionId) then
         session_map.TryAdd(sessionId,new ConcurrentDictionary<string,obj>()) |> ignore
-    session_map.[sessionId] 
+    session_map.[sessionId]

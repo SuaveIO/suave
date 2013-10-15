@@ -63,10 +63,11 @@ let sscanf (pf:PrintfFormat<_,_,_,_,'t>) s : 't =
   //FSharpValue.MakeTuple(matches, typeof<'t>) :?> 't
   if matches.Length = 1 then matches.[0] :?> 't; else FSharpValue.MakeTuple(matches, typeof<'t>) :?> 't
 
-// some basic testing
-let (a,b) = sscanf "(%%%s,%M)" "(%hello, 4.53)"
-let (x,y,z) = sscanf "%s-%s-%s" "test-this-string"
-let (c,d,e,f,g,h,i) = sscanf "%b-%d-%i,%u,%x,%X,%o" "false-42--31,13,ff,FF,42"
-let (j,k,l,m,n,o,p) = sscanf "%f %F %g %G %e %E %c" "1 2.1 3.4 .3 43.2e32 0 f"
+module private BasicTesting =
+  // some basic testing
+  let (a,b) = sscanf "(%%%s,%M)" "(%hello, 4.53)"
+  let (x,y,z) = sscanf "%s-%s-%s" "test-this-string"
+  let (c,d,e,f,g,h,i) = sscanf "%b-%d-%i,%u,%x,%X,%o" "false-42--31,13,ff,FF,42"
+  let (j,k,l,m,n,o,p) = sscanf "%f %F %g %G %e %E %c" "1 2.1 3.4 .3 43.2e32 0 f"
 
-let aa = sscanf "(%s)" "(45.33)" //fails
+  let aa = sscanf "(%s)" "(45.33)" //fails

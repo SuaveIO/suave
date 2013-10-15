@@ -1,4 +1,4 @@
-﻿module Suave.Web
+module Suave.Web
 
 open Utils
 

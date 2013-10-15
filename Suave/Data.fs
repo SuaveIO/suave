@@ -21,7 +21,7 @@ let eval<'T> (reader:DbDataReader) =
             let dataObj = FSharpValue.MakeTuple(vals,recordType) :?> 'T
             dataObj
         else
-           reader.GetValue(0) :?> 'T 
+           reader.GetValue(0) :?> 'T
 
 let PrintfFormatProc (worker: string * obj list -> 'b)  (query: PrintfFormat<'a, _, _, 'b>) : 'a = 
 
