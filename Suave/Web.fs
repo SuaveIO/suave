@@ -288,7 +288,7 @@ let request_loop webpart proto (processor : HttpProcessor) error_handler (timeou
         | :? TimeoutException as ex -> do! error_handler ex "script timeout" request
         | ex -> do! error_handler ex "Routing request failed" request
 
-        stream.Flush() // TOOD: consider FlushAsync()?
+        do! awaitTask (stream.FlushAsync())
 
         keep_alive :=
           match request.Headers ? connection with

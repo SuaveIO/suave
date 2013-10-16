@@ -139,3 +139,7 @@ let unblock f =
     do! Async.SwitchToThreadPool ()
     return res
   }
+
+open System.Threading.Tasks
+
+let awaitTask (t: Task) = t |> Async.AwaitIAsyncResult |> Async.Ignore
