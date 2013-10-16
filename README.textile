@@ -123,19 +123,19 @@ h2. Style Guide
 
 p. Two space indentation.
 
-pre.
+pre. 
 match x with // '|' characters at base of 'match'
 | A     -> ()
 | Bcdef -> "aligned arrows" // space after '|' character
 
 p. Method formatting with no spaces after/before normal parenthesis
 
-pre.
+pre. 
 let my_method_name first_arg (second : WithType) = async { // and monad builder
   return! f first_arg second
 } // at base of 'let' kw
 
-p.
+p. 
 You need to document your methods with '///' to create XML-doc. A XML
 documentation file is generated together with the compilation and is distributed
 with the NuGet so that others can read your code's intentions easily.
