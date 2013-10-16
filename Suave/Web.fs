@@ -265,8 +265,7 @@ let request_loop webpart proto (processor : HttpProcessor) error_handler (timeou
   let run request = async {
     match webpart request with // routing
     | Some x -> do! eval_action x request
-    // TODO: doesn't () instead of return () mean that the async unit never completes?
-    | None -> ()
+    | None -> return ()
   }
   async {
     try
