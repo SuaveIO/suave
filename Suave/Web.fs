@@ -15,34 +15,79 @@ open System.Collections.Generic
 
 open Http
 
-/// Read the passed stream into buff until the EOL (CRLF) has been reached.
-let rec readTillEOL (stream : Stream) (buff : byte[]) (count : int) = async {
-  // TODO: are we really just reading a single byte at a time?
-  let! inp = stream.AsyncRead 1
-  if count > 0 && buff.[count - 1] = EOL.[0] && inp.[0] = EOL.[1] then
-    return count - 1
-  else
-    buff.[count] <- inp.[0]
-    return! readTillEOL stream buff (count + 1)
-}
+/// Returns the index of the first CRLF in the buffer
+let scan_crlf (b: byte[]) = 
+    let rec loop i = 
+        if i > b.Length - 1 then None
+        elif i > 0 && b.[i - 1] = EOL.[0] && b.[i] = EOL.[1] then Some (i - 1)
+        else loop (i + 1)
+    loop 0
+
+/// Read the passed stream into buff until the EOL (CRLF) has been reached 
+/// and returns an array containing excess data read past the marker
+let readTillEOL (stream : Stream) (buff: byte[]) (preread: byte[]) chunk_size =
+
+    let rec loop count (ahead: byte[]) = async {
+
+        if ahead.Length > 0 then 
+            return! scan_data count ahead
+        else
+            return! read_data count ahead }
+    and scan_data count (ahead: byte[]) = async {
+        match scan_crlf ahead with
+        | Some 0 -> return (0, Array.sub ahead 2 (ahead.Length - 2))
+        | Some index -> Array.blit ahead 0 buff count (index)
+                        return (count + index, Array.sub ahead (index + 2) (ahead.Length - index - 2))
+        | None -> return! read_data count ahead }
+    and read_data count (ahead: byte[])  = async {
+
+        let inp = Array.zeroCreate 512
+
+        let! bytesread = stream.AsyncRead inp
+        if bytesread <>0 then
+
+            let sub = Array.sub inp 0 bytesread
+            let inp = Array.append ahead sub
+
+            return! (scan_data count inp)
+       else return (0,ahead)
+    }
+    (loop 0 preread)
 
 /// Read the stream until the marker appears.
-let read_until (marker : byte array) f (stream : Stream) =
-  let buffer = Array.create marker.Length (byte 0)
+let read_until (marker : byte array) (f: byte[] -> int -> Async<unit>) (stream : Stream) preread chunk_size =
 
-  let rec loop index = async {
-    if index < Array.length marker then
-      // TODO: are we really just reading a single byte at a time?
-      let! byte = stream.AsyncRead 1
-      if byte.Length > 0 then
-        buffer.[index] <- byte.[0]
-        if byte.[0] = marker.[index] then
-          do! loop (index + 1)
-        else 
-          do! f buffer (index+1)
-          do! loop 0
-  }
-  loop 0
+    let rec loop count (ahead: byte[]) = 
+        async {
+            if ahead.Length > 0 then return! scan_data count ahead
+            else return! read_data count ahead
+        }
+    and scan_data count (data: byte[]) = 
+        async {
+            match kmp marker data  with
+            | Some 0 -> return (0, Array.sub data marker.Length (data.Length - marker.Length))
+            | Some index -> do! f data index
+                            return (count + index, Array.sub data (index + marker.Length) (data.Length - index - marker.Length))
+            | None -> return! read_data count data
+        }
+    and read_data count (ahead: byte[]) =
+        async {
+            let inp = Array.zeroCreate chunk_size
+
+            let! bytesread = stream.AsyncRead inp
+            if bytesread <>0 then
+
+                let sub = Array.sub inp 0 bytesread
+                let inp = Array.append ahead sub
+
+                return! scan_data count inp
+           else return (0,ahead)
+       }
+    (loop 0 preread)
+
+/// Alternative readTillEOL
+let _readTillEOL (stream : Stream) (buff: byte[]) (preread: byte[]) =
+    read_until EOL (fun b c -> async{ do Array.blit b 0 buff 0 c }) stream preread
 
 /// Convert the byte array of ASCII-encoded chars to a string, starting at 'index' for 'count' characters
 /// (each character is necessarily one byte)
@@ -50,30 +95,32 @@ let to_string (buff : byte[]) (index : int) (count : int) =
   Encoding.ASCII.GetString(buff, index, count)
 
 /// The max buffer to use when dealing with streams
-let max_buffer = 1024
+let max_line_size = 1024
 
 /// Read a line from the stream, calling to_string on the bytes before the EOL marker
-let read_line stream = async {
-  let buf = Array.zeroCreate max_buffer
-  let! count = readTillEOL stream buf 0
-  return to_string buf 0 count
+let read_line stream ahead = async {
+  let buf = Array.zeroCreate max_line_size
+  let! count, rem = readTillEOL stream buf ahead 512
+  return (to_string buf 0 count, rem)
 }
 
 /// Read all headers from the stream, returning a dictionary of the headers found
-let read_headers stream = async {
-  let eof = ref false
-  let headers = new Dictionary<string,string>()
-  while not(!eof) do
-    let buf = Array.zeroCreate max_buffer
-    let! count = readTillEOL stream buf 0
-    if count <> 0 then
-      let line = to_string buf 0 count
-      let indexOfColon = line.IndexOf(':')
-      headers.Add (line.Substring(0,indexOfColon).ToLower(),line.Substring(indexOfColon+1).TrimStart())
-    else
-      eof := true
-  return headers
-}
+let read_headers stream read =
+    let headers = new Dictionary<string,string>()
+    let rec loop (rem: byte[]) = async {
+        let buf = Array.zeroCreate max_line_size
+        let! count,new_rem = readTillEOL stream buf rem 512
+        if count <> 0 then
+          let line = to_string buf 0 count
+          let indexOfColon = line.IndexOf(':')
+          headers.Add (line.Substring(0,indexOfColon).ToLower(),line.Substring(indexOfColon+1).TrimStart())
+          return! loop new_rem
+        else return new_rem
+    }
+    async {
+        let! rem = loop read
+        return headers, rem
+    }
 
 open Suave.Types
 
@@ -139,13 +186,15 @@ let header_params (header : string option) =
   | _ -> failwith "did not find header: %s." header
 
 /// Parses multipart data from the stream, feeding it into the HttpRequest's property Files.
-let parse_multipart (stream : Stream) boundary (request : HttpRequest) =
-  let rec loop boundary = async {
-    let! firstline = read_line stream
+let parse_multipart (stream : Stream) boundary (request : HttpRequest) ahead =
+  let rec loop boundary read = async {
+    
+    let! firstline, read = read_line stream read
 
-    if not(firstline.Equals("--")) then
+    if firstline.Equals(boundary) then 
 
-      let! part_headers = read_headers stream
+      let! part_headers,rem = read_headers stream read
+
       let content_disposition = look_up part_headers "content-disposition"
 
       let fieldname = (header_params content_disposition) ? name |> opt
@@ -155,12 +204,11 @@ let parse_multipart (stream : Stream) boundary (request : HttpRequest) =
       match content_type with
       | Some(x) when x.StartsWith("multipart/mixed") ->
         let subboundary = "--" + x.Substring(x.IndexOf('=') + 1).TrimStart()
-        do! loop subboundary
+        return! loop subboundary rem
       | Some(x) ->
         let temp_file_name = Path.GetTempFileName()
         use temp_file = new FileStream(temp_file_name,FileMode.Truncate)
-        do! stream
-            |> read_until (bytes("\r\n" + boundary)) (fun x y -> async { do! temp_file.AsyncWrite(x,0,y) } )
+        let! count,rem = read_until (bytes("\r\n" + boundary)) (fun x y -> async { printfn "y = %d" y;do! temp_file.AsyncWrite(x,0,y) } ) stream read 10485760
         let file_leght = temp_file.Length
         temp_file.Close()
         if  file_leght > int64(0) then
@@ -169,17 +217,16 @@ let parse_multipart (stream : Stream) boundary (request : HttpRequest) =
           request.Files.Add(new HttpUpload(fieldname,filename,content_type |> opt,temp_file_name))
         else
           File.Delete temp_file_name
+          printfn "upload failed"
       | None ->
         use mem = new MemoryStream()
-        do! stream
-            |> read_until (bytes("\r\n" + boundary)) (fun x y -> async { do! mem.AsyncWrite(x,0,y) } )
+        
+        let! count,rem = read_until (bytes("\r\n" + boundary)) (fun x y -> async { printfn "y = %d" y;do! mem.AsyncWrite(x,0,y) } ) stream rem 10485760
 
         let byts = mem.ToArray()
         request.Form.Add(fieldname, (to_string byts 0 byts.Length))
-
-      do! loop  boundary
   }
-  loop boundary
+  loop boundary ahead
 
 /// Process the request, reading as it goes from the incoming 'stream', yielding a HttpRequest
 /// when done
@@ -189,39 +236,42 @@ let process_request proxyMode (stream : Stream) remoteip = async {
   request.Stream <- stream
   request.RemoteAddress <- remoteip
 
-  let! first_line = read_line stream
+  let! first_line,rem = read_line stream Array.empty
 
-  let (meth, url, query, raw_query) as q = parse_url (first_line)
-  request.Url      <- url
-  request.Method   <- meth
-  request.Query    <- query
-  request.RawQuery <- raw_query
+  if first_line.Length = 0 then return None
+  else
+      let (meth, url, query, raw_query) as q = parse_url (first_line)
+      request.Url      <- url
+      request.Method   <- meth
+      request.Query    <- query
+      request.RawQuery <- raw_query
 
-  let! headers = read_headers stream
-  request.Headers <- headers
+      let! headers,rem = read_headers stream rem
+      request.Headers <- headers
 
-  //wont continue parsing if on proxyMode with the intention of forwarding the stream as it is
-  if not proxyMode then
-    request.Headers
-    |> Seq.filter (fun x -> x.Key.Equals("cookie"))
-    |> Seq.iter (fun x ->
-                 let cookie = parse_cookie x.Value
-                 request.Cookies.Add (fst(cookie.[0]),cookie))
+      //wont continue parsing if on proxyMode with the intention of forwarding the stream as it is
+      if not proxyMode then
+        request.Headers
+        |> Seq.filter (fun x -> x.Key.Equals("cookie"))
+        |> Seq.iter (fun x ->
+                     let cookie = parse_cookie x.Value
+                     request.Cookies.Add (fst(cookie.[0]),cookie))
 
-    if meth.Equals("POST") then
-      let content_enconding = headers.["content-type"]
-      let content_length = Convert.ToInt32(headers.["content-length"])
-        
-      if content_enconding.StartsWith("application/x-www-form-urlencoded") then
-        let! rawdata = read_post_data stream content_length
-        let form_data = parse_data (to_string rawdata 0 rawdata.Length)
-        request.Form    <- form_data
-        request.RawForm <- rawdata
-      elif content_enconding.StartsWith("multipart/form-data") then
-        let boundary = "--" + content_enconding.Substring(content_enconding.IndexOf('=')+1).TrimStart()
-        do! parse_multipart stream boundary request
+        if meth.Equals("POST") then
 
-  return request
+          let content_enconding = headers.["content-type"]
+          let content_length = Convert.ToInt32(headers.["content-length"])
+
+          if content_enconding.StartsWith("application/x-www-form-urlencoded") then
+            let! rawdata = read_post_data stream content_length
+            let form_data = parse_data (to_string rawdata 0 rawdata.Length)
+            request.Form    <- form_data
+            request.RawForm <- rawdata
+          elif content_enconding.StartsWith("multipart/form-data") then
+            let boundary = "--" + content_enconding.Substring(content_enconding.IndexOf('=')+1).TrimStart()
+            do! parse_multipart stream boundary request rem
+
+      return Some(request)
 }
 
 open System.Net
@@ -245,7 +295,8 @@ let load_stream proto (stream : Stream) =
 open System.Net.Sockets
 
 /// A HttpProcessor takes a string and a listening IP, returning a HttpRequest that has been processed
-type HttpProcessor = Stream -> String -> Async<HttpRequest>
+type HttpProcessor = Stream -> String -> Async<HttpRequest option>
+type RequestResult = Done
 
 /// The request loop initialises a request against a web part, with a protocol, a processor to handle the
 /// incoming stream, an error handler, a timeout value (milliseconds) and a TcpClient to use for read-write
@@ -267,32 +318,31 @@ let request_loop webpart proto (processor : HttpProcessor) error_handler (timeou
     | Some x -> do! eval_action x request
     | None -> return ()
   }
-  async {
-    try
-      let keep_alive = ref true
-      let stream =
+  let stream =
         client.GetStream()
         |> load_stream proto
-
-      let remote_endpoint = (client.Client.RemoteEndPoint :?> IPEndPoint)
-      let ipaddr = remote_endpoint.Address.ToString()
-
-      // keep fetching HttpRequests while keep_alive is true
-      while !keep_alive do // keep_alive is a ref, ! dereferences it
-        use! request = processor stream ipaddr
-        try
-          do! unblock (fun _ -> Async.RunSynchronously(run request, timeout))
-        with
-        | InternalFailure(_) as ex  -> raise ex
-        | :? TimeoutException as ex -> do! error_handler ex "script timeout" request
-        | ex -> do! error_handler ex "Routing request failed" request
-
-        do! awaitTask (stream.FlushAsync())
-
-        keep_alive :=
-          match request.Headers ? connection with
-          | Some(x) when x.ToLower().Equals("keep-alive") -> true
-          | _ -> false
+  let remote_endpoint = (client.Client.RemoteEndPoint :?> IPEndPoint)
+  let ipaddr = remote_endpoint.Address.ToString()
+  
+  let rec loop _ = async {
+    let! result = processor stream ipaddr
+    match result with
+    //TODO: figure out how to dispose request
+    | Some request -> try
+                        do! unblock (fun _ -> Async.RunSynchronously(run request, timeout))
+                      with
+                        | InternalFailure(_) as ex  -> raise ex
+                        | :? TimeoutException as ex -> do! error_handler ex "script timeout" request
+                        | ex -> do! error_handler ex "Routing request failed" request
+                      match request.Headers ? connection with
+                      | Some(x) when x.ToLower().Equals("keep-alive") -> return! loop ()
+                      | _ -> return ()
+    | None -> return ()
+    do! awaitTask (stream.FlushAsync())
+  }
+  async {
+    try
+        do! loop ()
     with
     | InternalFailure(_)
     | :? EndOfStreamException

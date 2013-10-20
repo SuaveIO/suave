@@ -143,3 +143,42 @@ let unblock f =
 open System.Threading.Tasks
 
 let awaitTask (t: Task) = t |> Async.AwaitIAsyncResult |> Async.Ignore
+
+/// Asynchronouslyo write from the 'from' stream to the 'to' stream.
+let transfer (to_stream : Stream) (from : Stream) =
+    let buf = Array.zeroCreate<byte> 0x2000
+    let rec doBlock () =
+      async {
+        let! read = from.AsyncRead buf
+        if read <= 0 then
+          to_stream.Flush()
+          return ()
+        else
+          do! to_stream.AsyncWrite(buf, 0, read)
+          return! doBlock () }
+    doBlock ()
+
+/// Knuth-Morris-Pratt algorithm
+/// http://caml.inria.fr/pub/old_caml_site/Examples/oc/basics/kmp.ml
+let init_next p =
+  let m = Array.length p
+  let next = Array.create m 0
+  let i = ref 1
+  let j = ref 0
+  while !i < m - 1 do
+    if p.[!i] = p.[!j] then begin incr i; incr j; next.[!i] <- !j end else
+    if !j = 0 then begin incr i; next.[!i] <- 0 end else j := next.[!j]
+  next
+
+let kmp p =
+  let next = init_next p
+  let m = Array.length p
+  fun s ->
+    let n = Array.length s
+    let  i = ref 0
+    let j = ref 0 in
+    while !j < m && !i < n do
+      if s.[!i] = p.[!j] then begin incr i; incr j end else
+      if !j = 0 then incr i else j := next.[!j]
+    done;
+    if !j >= m then Some(!i - m) else None
