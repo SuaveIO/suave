@@ -49,6 +49,9 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Compile Include="Program.fs" />
+    <None Include="examples.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Reference Include="mscorlib" />
@@ -63,8 +66,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Suave\Suave.fsproj">
       <Name>Suave</Name>
-      <Project>{3dc9193e-bd0c-4486-9c58-56b630c36623}</Project>
-      <Private>True</Private>
+      <Project>{3DC9193E-BD0C-4486-9C58-56B630C36623}</Project>
     </ProjectReference>
   </ItemGroup>
   <PropertyGroup>
