@@ -21,8 +21,9 @@ type TcpWorker<'a> = TcpClient ->  Async<'a>
 
 /// Close the TCP client by closing its stream and then closing the client itself
 let close (d : TcpClient) =
-  d.GetStream().Close()
-  d.Close()
+    if d.Connected then
+        d.GetStream().Close()
+        d.Close()
 
 /// Stop the TCP listener server
 let stop_tcp (server : TcpListener) =
