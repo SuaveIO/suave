@@ -368,8 +368,8 @@ let is_local_address (ip : string) =
 let default_error_handler (ex : Exception) msg (request : HttpRequest) = async {
   Log.log "%s.\n%A" msg ex
   if is_local_address request.RemoteAddress then
-    do! (response 500 "Internal Error" (bytes_utf8 (sprintf "<h1>%s</h1><br/>%A" ex.Message ex)) request)
-  else do! (response 500 "Internal Error" (bytes_utf8 (request.RemoteAddress)) request)
+    do! (response 500 "Internal Error" (bytes_utf8 (sprintf "<h1>%s</h1><br/>%A" ex.Message ex) |> Bytes) request)
+  else do! (response 500 "Internal Error" (bytes_utf8 (request.RemoteAddress) |> Bytes) request)
 }
 
 /// Starts a new web worker, given the configuration and a web part to serve.

@@ -18,7 +18,8 @@ let copy_response_headers (headers1 : WebHeaderCollection) (headers2 : List<stri
 /// Send the web response from HttpWebResponse to the HttpRequest 'p'
 let send_web_response (data : HttpWebResponse) (p : HttpRequest)  = async {
   copy_response_headers data.Headers (p.Response.Headers)
-  let bytes = data.GetResponseStream() |> read_fully
+  //TODO: if downstream sends a content-lenght header copy from one stream to the other asynchronously
+  let bytes = data.GetResponseStream() |> read_fully |> Bytes
   do! response (int data.StatusCode) (data.StatusDescription) bytes p
 }
 

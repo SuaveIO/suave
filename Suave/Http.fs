@@ -47,8 +47,13 @@ let suave_version = "0.1.0"
 /// The protocol version that the server speaks
 let proto_version = "HTTP/1.1"
 
+/// The types of content we can write to the response stream
+type HttpContent =
+    | Bytes of byte []
+    | File of FileInfo
+
 /// Respond with a given status code, http message, content in the body to a http request.
-let response statusCode message (content : byte[]) (request : HttpRequest) = async {
+let response statusCode message (content : HttpContent) (request : HttpRequest) = async {
   try
     let stream:Stream = request.Stream
 
@@ -63,13 +68,17 @@ let response statusCode message (content : byte[]) (request : HttpRequest) = asy
     if not(request.Response.Headers.Exists(new Predicate<_>(fun (x,_) -> x.ToLower().Equals("content-type")))) then
       do! async_writeln stream (sprintf "Content-Type: %s" "text/html")
 
-    if content.Length > 0 then
-      do! async_writeln stream (sprintf "Content-Length: %d" (content.Length))
-
-    do! async_writeln stream ""
-
-    if content.Length > 0 then
-        do! async_writebytes stream content
+    match content with 
+    | Bytes bytes    -> if bytes.Length > 0 then
+                          do! async_writeln stream (sprintf "Content-Length: %d" (bytes.Length))
+                        do! async_writeln stream ""
+                        if bytes.Length > 0 then
+                          do! async_writebytes stream bytes
+    | File file_info -> if file_info.Length > 0L then
+                            do! async_writeln stream (sprintf "Content-Length: %d" (file_info.Length))
+                        do! async_writeln stream ""
+                        if file_info.Length > 0L then
+                            do! transfer stream (file_info.OpenRead())
 
   with //the connection might drop while we are sending the response
     | :? IOException as ex  -> raise (InternalFailure "Failure while writing to client stream")
@@ -79,27 +88,27 @@ let response statusCode message (content : byte[]) (request : HttpRequest) = asy
 /// and 401 Authorization Required response message.
 let challenge =
   set_header "WWW-Authenticate" "Basic realm=\"protected\""
-  >> response 401 "Authorization Required" (bytes "401 Unauthorized.")
+  >> response 401 "Authorization Required" (bytes "401 Unauthorized." |> Bytes)
 
 /// Write the bytes to the body as a byte array with a 200 OK status-code/message
 let ok s = response 200 "OK" s >> succeed
 
 /// Write the string as UTF-8 to the body of the response,
 /// with a 200 OK status-code/message.
-let OK a = ok (bytes_utf8 a)
+let OK a = ok (bytes_utf8 a |> Bytes)
 
 /// Write the bytes to the body as a byte array as a 500 Internal Error status-code/message.
 let failure message = response 500 "Internal Error" message >> succeed
 
 /// Write the error string as UTF-8 to the body of the response,
 /// with a 500 Internal Error status-code/message.
-let ERROR a = failure (bytes_utf8 a)
+let ERROR a = failure (bytes_utf8 a |> Bytes)
 
 /// Redirect the request to another location specified by the url parameter.
 /// Sets the Location header and returns 302 Content Moved status-code/message.
 let redirect url =
   set_header "Location" url
-  >> response 302 url (bytes "Content Moved")
+  >> response 302 url (bytes "Content Moved" |> Bytes)
   >> succeed
 
 /// Send a 404 Not Found with a byte array body specified by the 'message' parameter
@@ -107,7 +116,7 @@ let unhandled message = response 404 "Not Found" message >> succeed
 
 /// Write the 'message' string to the body as UTF-8 encoded text, while
 /// returning 404 Not Found to the response
-let notfound message = unhandled (bytes_utf8 message)
+let notfound message = unhandled (bytes_utf8 message |> Bytes)
 
 /// Map a file ending to a mime-type
 let mime_type = function
@@ -131,8 +140,7 @@ let set_mime_type t = set_header "Content-Type" t
 /// Send a file as a response to the request
 let send_file filename r =
   async {
-    let! b = unblock (fun _ -> File.ReadAllBytes(filename))
-    do! response  200 "OK" b r
+    do! response  200 "OK" (File (new FileInfo(filename))) r
   } |> succeed
 
 /// Send the file by the filename given. Will search relative to the current directory for
@@ -187,7 +195,7 @@ let dir (req : HttpRequest) : WebResult =
   if Directory.Exists dirname then
     let di = new DirectoryInfo(dirname)
     (di.GetFileSystemInfos()) |> Array.sortBy (fun x -> x.Name) |> Array.iter buildLine
-    ok (bytes (result.ToString())) req
+    ok (bytes (result.ToString()) |> Bytes) req
   else fail
 
 /// At the location where this function is applied, close the outbound stream

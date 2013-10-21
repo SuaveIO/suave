@@ -151,7 +151,7 @@ let transfer (to_stream : Stream) (from : Stream) =
       async {
         let! read = from.AsyncRead buf
         if read <= 0 then
-          to_stream.Flush()
+          do! awaitTask (to_stream.FlushAsync())
           return ()
         else
           do! to_stream.AsyncWrite(buf, 0, read)
