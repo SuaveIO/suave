@@ -9,9 +9,9 @@ Hello World!
 
 The simplest Suave application is a simple HTTP server that greets all visitors with the string `"Hello World!"`
 
-```fsharp
+{% highlight fsharp %}
 web_server defaultConfig (OK "Hello World!")
-```
+{% endhighlight %}
 
 The above statement will start a web server on default port 8083. `web_server` takes a configuration record and the webpart `(OK "Hello World")` 
 
@@ -22,24 +22,24 @@ Composing bigger programs.
 
 Logic is expressed with the help of different combinators built around the `option<HttpRequest>` type. We build webparts out of functions of type `HttpRequest -> HttpRequest option` and the operator `>>=` in the following way.
 
-```fsharp
+{% highlight fsharp %}
 let simple_app _ = url "/hello" >>= OK "Hello World" ;
-```
+{% endhighlight %}
 
 To select between different routes or options we use the function choose; for example:
 
-```fsharp 
+{% highlight fsharp %}
 let complex_app _ = 
     choose [
         Console.OpenStandardOutput() |> log >>= never; 
         url "/hello" >>= never >>= OK "Never executes";
         url "/hello" >>= OK "Hello World"  ;
     ]
-```
+{% endhighlight %}
 
 The function `choose` accepts a list of webparts and execute each webpart in the list until one returns success. Since choose itself returns a webpart we can nest them for more complex logic.
 
-```fsharp
+{% highlight fsharp %}
 let nested_logic _= 
     choose [
         GET >>= choose 
@@ -47,22 +47,22 @@ let nested_logic _=
         POST >>= choose 
             [ url "/hello" >>= OK "Hello POST" ; url "/goodbye" >>= OK "Good bye POST" ];
     ]
-```
+{% endhighlight %}
 
 To gain access to the underlying `HttpRequest` and read query and http form data we can use the `warbler` combinator.
 
-```fsharp 
+{% highlight fsharp %}
 let http_form _ = 
     choose [
          GET  >>= url "/query" >>= warbler( fun x -> OK ("Hello " + (x.Query) ? name));
          POST >>= url "/query" >>= warbler( fun x -> OK ("Hello " + (x.Form)  ? name));
          notfound "Found no handlers"
     ]
-```
+{% endhighlight %}
 
 Here is how http authentication would work:
 
-```fsharp
+{% highlight fsharp %}
 let requires_authentication _ = 
     choose [
          GET >>= url "/public" >>= OK ("Hello anonymous");
@@ -70,26 +70,27 @@ let requires_authentication _ =
          authenticate_basic ( fun x -> x.Username.Equals("foo") && x.Password.Equals("bar"));
          GET >>= url "/protected" >>= warbler( fun x -> OK ("Hello " + x.Username));
     ]
-```
+{% endhighlight %}
 
 `warbler` gets its name from the famous book "To Mock a Mockingbird" by Raymond Smullyan.
 
 Typed routes
 ------------
 
-```fsharp
+{% highlight fsharp %}
 let testapp : WebPart = 
     choose [
         urlscan "/add/%d/%d" (fun (a,b) -> OK((a + b).ToString()))
         notfound "Found no handlers" 
     ]
-```
+{% endhighlight %}
+
 Multiple bindings and SSL support
 ---------------------------------
 
 Suave supports binding the application to multiple TCP/IP addresses and ports combinations. It also supports HTTPS.
 
-```fsharp
+{% highlight fsharp %}
 let sslCert = new X509Certificate("suave.pfx","easy");
 choose [
     Console.OpenStandardOutput() |> log >>= never ; // log to standard output
@@ -100,13 +101,14 @@ choose [
         defaultConfig with bindings = [| HTTP, "127.0.0.1",80; HTTPS(sslCert), "192.168.13.138", 443 |];
         timeout = 3000
     }
-```
+{% endhighlight %}
+
 Server configuration
 --------------------
 
 The first argument to `web_server` is a configuration record with the following signature.
 
-```fsharp 
+{% highlight fsharp %}
 type Protocols = | HTTP | HTTPS of X509Certificate
 type HttpBinding = Protocols * string * int 
 type Config = { 
@@ -114,7 +116,8 @@ type Config = {
     error_handler : Exception -> String -> HttpRequest -> Async<unit>;
     timeout : int
     }
-```
+{% endhighlight %}
+
 *bindings* array of bindings of the form _protocol, ip address, port_
 *error_handler* a handler to deal with runtime errors
 *timeout* maximun number of milliseconds before killing a request
@@ -127,18 +130,19 @@ Style Guide
 
 Two space indentation.
 
-```fsharp
+{% highlight fsharp %}
 match x with // '|' characters at base of 'match'
 | A     -> ()
 | Bcdef -> "aligned arrows" // space after '|' character
-```
+{% endhighlight %}
+
 Method formatting with no spaces after/before normal parenthesis
 
-```fsharp
+{% highlight fsharp %}
 let my_method_name first_arg (second : WithType) = async { // and monad builder
   return! f first_arg second
 } // at base of 'let' kw
-```
+{% endhighlight %}
 
 You need to document your methods with '///' to create XML-doc. A XML
 documentation file is generated together with the compilation and is distributed
