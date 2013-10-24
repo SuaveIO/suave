@@ -31,7 +31,7 @@ nugets_pack :create_nugets => ['build/pkg', :versioning, :build] do |p|
   p.configuration = 'Release'
   
   p.with_metadata do |m|
-    m.version       = ENV['version']
+    m.version       = ENV['NUGET_VERSION']
     m.authors       = 'Ademar Gonzalez'
     m.description   = 'Suave is a simple web development F# library providing a lightweight web server and a set of combinators to manipulate route flow and task composition.'
     m.language      = 'en-GB'
