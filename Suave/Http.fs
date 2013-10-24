@@ -40,9 +40,8 @@ let TRACE  (x : HttpRequest) = meth0d "TRACE" x
 /// Match on OPTIONS requests
 let OPTIONS (x : HttpRequest) = meth0d "OPTIONS" x
 
-// TODO: same as nuget version?
 /// The version of the web server
-let suave_version = "0.1.0"
+let suave_version = "0.0.3"
 
 /// The protocol version that the server speaks
 let proto_version = "HTTP/1.1"
