@@ -5,3 +5,5 @@ obj/
 packages/
 build/
 suave.sln.DotSettings.user
+*/test-results/*
+*.userprefs
