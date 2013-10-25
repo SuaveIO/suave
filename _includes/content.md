@@ -10,7 +10,7 @@ Hello World!
 The simplest Suave application is a simple HTTP server that greets all visitors with the string `"Hello World!"`
 
 {% highlight fsharp %}
-web_server defaultConfig (OK "Hello World!")
+web_server default_config (OK "Hello World!")
 {% endhighlight %}
 
 The above statement will start a web server on default port 8083. `web_server` takes a configuration record and the webpart `(OK "Hello World")` 
@@ -98,7 +98,7 @@ choose [
     notfound "Found no handlers"     
     ] 
     |> web_server { 
-        defaultConfig with bindings = [| HTTP, "127.0.0.1",80; HTTPS(sslCert), "192.168.13.138", 443 |];
+        default_config with bindings = [| HTTP, "127.0.0.1",80; HTTPS(sslCert), "192.168.13.138", 443 |];
         timeout = 3000
     }
 {% endhighlight %}
