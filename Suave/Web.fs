@@ -16,7 +16,7 @@ open System.Collections.Generic
 open Http
 
 /// Returns the index of the first CRLF in the buffer
-let scan_crlf (b: byte[]) = 
+let scan_crlf (b: byte[]) =
     let rec loop i = 
         if i > b.Length - 1 then None
         elif i > 0 && b.[i - 1] = EOL.[0] && b.[i] = EOL.[1] then Some (i - 1)
@@ -25,7 +25,7 @@ let scan_crlf (b: byte[]) =
 
 /// Read the passed stream into buff until the EOL (CRLF) has been reached 
 /// and returns an array containing excess data read past the marker
-let readTillEOL (stream : Stream) (buff: byte[]) (preread: byte[]) chunk_size =
+let read_till_EOL (stream : Stream) (buff: byte[]) (preread: byte[]) chunk_size =
 
     let rec loop count (ahead: byte[]) = async {
 
@@ -100,7 +100,7 @@ let max_line_size = 1024
 /// Read a line from the stream, calling to_string on the bytes before the EOL marker
 let read_line stream ahead = async {
   let buf = Array.zeroCreate max_line_size
-  let! count, rem = readTillEOL stream buf ahead 512
+  let! count, rem = read_till_EOL stream buf ahead 512
   return (to_string buf 0 count, rem)
 }
 
@@ -109,7 +109,7 @@ let read_headers stream read =
     let headers = new Dictionary<string,string>()
     let rec loop (rem: byte[]) = async {
         let buf = Array.zeroCreate max_line_size
-        let! count,new_rem = readTillEOL stream buf rem 512
+        let! count,new_rem = read_till_EOL stream buf rem 512
         if count <> 0 then
           let line = to_string buf 0 count
           let indexOfColon = line.IndexOf(':')
@@ -236,7 +236,7 @@ let process_request proxyMode (stream : Stream) remoteip = async {
   request.Stream <- stream
   request.RemoteAddress <- remoteip
 
-  let! first_line,rem = read_line stream Array.empty
+  let! (first_line : string), rem = read_line stream Array.empty
 
   if first_line.Length = 0 then return None
   else
@@ -328,17 +328,18 @@ let request_loop webpart proto (processor : HttpProcessor) error_handler (timeou
     let! result = processor stream ipaddr
     match result with
     //TODO: figure out how to dispose request
-    | Some request -> try
-                        do! unblock (fun _ -> Async.RunSynchronously(run request, timeout))
-                      with
-                        | InternalFailure(_) as ex  -> raise ex
-                        | :? TimeoutException as ex -> do! error_handler ex "script timeout" request
-                        | ex -> do! error_handler ex "Routing request failed" request
-                      match request.Headers ? connection with
-                      | Some(x) when x.ToLower().Equals("keep-alive") -> return! loop ()
-                      | _ -> return ()
+    | Some (request : HttpRequest) ->
+      try
+        do! unblock (fun _ -> Async.RunSynchronously(run request, timeout))
+      with
+        | InternalFailure(_) as ex  -> raise ex
+        | :? TimeoutException as ex -> do! error_handler ex "script timeout" request
+        | ex -> do! error_handler ex "Routing request failed" request
+      match request.Headers?connection with
+      | Some (x : string)  when x.ToLower().Equals("keep-alive") -> return! loop ()
+      | _ -> return ()
     | None -> return ()
-    do! awaitTask (stream.FlushAsync())
+    do! stream.FlushAsync()
   }
   async {
     try
@@ -368,8 +369,8 @@ let is_local_address (ip : string) =
 let default_error_handler (ex : Exception) msg (request : HttpRequest) = async {
   Log.log "%s.\n%A" msg ex
   if is_local_address request.RemoteAddress then
-    do! (response 500 "Internal Error" (bytes_utf8 (sprintf "<h1>%s</h1><br/>%A" ex.Message ex) |> Bytes) request)
-  else do! (response 500 "Internal Error" (bytes_utf8 (request.RemoteAddress) |> Bytes) request)
+    do! (response 500 "Internal Error" (bytes_utf8 (sprintf "<h1>%s</h1><br/>%A" ex.Message ex)) request)
+  else do! (response 500 "Internal Error" (bytes_utf8 (request.RemoteAddress)) request)
 }
 
 /// Starts a new web worker, given the configuration and a web part to serve.

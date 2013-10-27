@@ -19,7 +19,7 @@ let copy_response_headers (headers1 : WebHeaderCollection) (headers2 : List<stri
 let send_web_response (data : HttpWebResponse) (p : HttpRequest)  = async {
   copy_response_headers data.Headers (p.Response.Headers)
   //TODO: if downstream sends a content-lenght header copy from one stream to the other asynchronously
-  let bytes = data.GetResponseStream() |> read_fully |> Bytes
+  let bytes = data.GetResponseStream() |> read_fully
   do! response (int data.StatusCode) (data.StatusDescription) bytes p
 }
 
@@ -59,7 +59,7 @@ let forward ip port (p : HttpRequest) =
         do! req.AsyncWrite remaining_bytes // TODO: should we really read all bytes at once?
       try
         let! data = q.AsyncGetResponse()
-        do! send_web_response (data :?> HttpWebResponse) p
+        do! send_web_response ((data : WebResponse) :?> HttpWebResponse) p
       with
       | :? WebException as ex -> do! send_web_response (ex.Response :?> HttpWebResponse) p
     } |> succeed
