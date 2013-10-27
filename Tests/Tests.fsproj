@@ -6,7 +6,7 @@
     <ProductVersion>12.0.0</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>{3BE234C3-2BD4-4E53-9D11-7C134374500D}</ProjectGuid>
-    <OutputType>Library</OutputType>
+    <OutputType>Exe</OutputType>
     <RootNamespace>Tests</RootNamespace>
     <AssemblyName>Tests</AssemblyName>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
@@ -41,18 +41,27 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
+    <Reference Include="FsCheck">
+      <HintPath>..\packages\FsCheck.0.9.1.0\lib\net40-Client\FsCheck.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="Fuchu">
+      <HintPath>..\packages\Fuchu.0.3.0.1\lib\net40-client\Fuchu.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="Fuchu.FsCheck">
+      <HintPath>..\packages\Fuchu.FsCheck.0.3.0.1\lib\net40-client\Fuchu.FsCheck.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
     <Reference Include="mscorlib" />
     <Reference Include="FSharp.Core, Version=4.3.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a" />
-    <Reference Include="nunit.framework">
-      <HintPath>..\packages\NUnit.2.6.3\lib\nunit.framework.dll</HintPath>
+    <Reference Include="RestSharp">
+      <HintPath>..\packages\RestSharp.104.3.3\lib\net4\RestSharp.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Numerics" />
-    <Reference Include="FsUnit.NUnit">
-      <HintPath>..\libs\FsUnit.NUnit.dll</HintPath>
-    </Reference>
     <Reference Include="System.Net.Http" />
     <ProjectReference Include="..\Suave\Suave.fsproj">
       <Name>Suave</Name>

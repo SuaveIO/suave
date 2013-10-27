@@ -301,7 +301,7 @@ type RequestResult = Done
 /// The request loop initialises a request against a web part, with a protocol, a processor to handle the
 /// incoming stream, an error handler, a timeout value (milliseconds) and a TcpClient to use for read-write
 /// communication -- getting the initial request stream.
-let request_loop webpart proto (processor : HttpProcessor) error_handler (timeout : int) (client : TcpClient) =
+let request_loop webpart proto (processor : HttpProcessor) error_handler (timeout : TimeSpan) (client : TcpClient) =
   /// Evaluate the (web part) action as an async value, handling errors with error_handler should one
   /// occur.
   let eval_action x r = async {
@@ -323,14 +323,14 @@ let request_loop webpart proto (processor : HttpProcessor) error_handler (timeou
         |> load_stream proto
   let remote_endpoint = (client.Client.RemoteEndPoint :?> IPEndPoint)
   let ipaddr = remote_endpoint.Address.ToString()
-  
+
   let rec loop _ = async {
     let! result = processor stream ipaddr
     match result with
     //TODO: figure out how to dispose request
     | Some (request : HttpRequest) ->
       try
-        do! unblock (fun _ -> Async.RunSynchronously(run request, timeout))
+        do! unblock (fun _ -> Async.RunSynchronously(run request, int (timeout.TotalMilliseconds)))
       with
         | InternalFailure(_) as ex  -> raise ex
         | :? TimeoutException as ex -> do! error_handler ex "script timeout" request
@@ -343,7 +343,7 @@ let request_loop webpart proto (processor : HttpProcessor) error_handler (timeou
   }
   async {
     try
-        do! loop ()
+      do! loop ()
     with
     | InternalFailure(_)
     | :? EndOfStreamException
@@ -380,20 +380,20 @@ let web_worker (proto, ip, port, error_handler, timeout) (webpart : WebPart) =
 /// Returns the webserver as an asynchronous computation
 let web_server_async (config : Config) (webpart : WebPart) =
   config.bindings
-  |> Array.map (fun (proto, ip, port) -> web_worker (proto, ip, port, config.error_handler, config.timeout) webpart)
+  |> List.map (fun { scheme = proto; ip = ip; port = port } ->
+      web_worker (proto, ip, port, config.error_handler, config.timeout) webpart)
   |> Async.Parallel
   |> Async.Ignore
 
 /// Runs the web server and blocks waiting for the asynchronous workflow to be cancelled or
 /// it returning itself.
-let web_server (config:Config) (webpart:WebPart) =
-  web_server_async config webpart
-  |> Async.RunSynchronously
-  |> ignore
+let web_server (config : Config) (webpart : WebPart) =
+  Async.RunSynchronously(web_server_async config webpart, cancellationToken = config.ct)
 
 /// The default configuration binds on IPv4, 127.0.0.1:8083 with a regular 500 Internal Error handler,
 /// with a timeout of one minute for computations to run.
 let default_config =
-  { bindings = [| HTTP, "127.0.0.1", 8083 |]
+  { bindings      = [ { scheme = HTTP; ip = IPAddress.Parse("127.0.0.1"); port = 8083us } ]
   ; error_handler = default_error_handler
-  ; timeout = 60000 } // 1 minute
+  ; timeout       = TimeSpan.FromMinutes(1.) // 1 minute
+  ; ct            = Async.DefaultCancellationToken } 

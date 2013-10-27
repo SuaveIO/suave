@@ -7,6 +7,11 @@ Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Example", "Example\Example.
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Tests", "Tests\Tests.fsproj", "{3BE234C3-2BD4-4E53-9D11-7C134374500D}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "docs", "docs", "{C7760769-4E33-4A06-BB7C-39B477B4FF1B}"
+	ProjectSection(SolutionItems) = preProject
+		README.textile = README.textile
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU

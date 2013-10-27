@@ -1,5 +1,6 @@
 
 open System
+open System.Net
 open System.Security.Cryptography.X509Certificates;
 
 open Suave.Web
@@ -72,6 +73,9 @@ choose [
   notfound "Found no handlers"
   ] 
   |> web_server
-      { bindings = [| HTTP, "127.0.0.1", 8082 (*; HTTPS(sslCert), "127.0.0.1", 8083*)|]
+      { bindings =
+        [ HttpBinding.Create(HTTP, "127.0.0.1", 8082)
+        ; (*{ scheme = HTTPS(sslCert); ip = IPAddress.Parse "127.0.0.1"; port = 8083us }*) ]
       ; error_handler = default_error_handler
-      ; timeout = 1000 }
+      ; timeout       = TimeSpan.FromMilliseconds 1000.
+      ; ct             = Async.DefaultCancellationToken }

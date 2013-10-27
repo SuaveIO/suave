@@ -93,12 +93,18 @@ let sslCert = new X509Certificate("suave.pfx","easy");
 choose [
     Console.OpenStandardOutput() |> log >>= never ; // log to standard output
     url "/hello" >>= OK "Hello World" ; 
-    notfound "Found no handlers"     
+    notfound "Found no handlers"
     ] 
-    |> web_server { 
-        default_config with bindings = [| HTTP, "127.0.0.1",80; HTTPS(sslCert), "192.168.13.138", 443 |];
-        timeout = 3000
-    }
+    |> web_server {
+        default_config with
+          bindings =
+            [ { scheme = HTTP
+              ; ip     = IPAddress.Parse "127.0.0.1"
+              ; port   = 80us }
+            ; { scheme = HTTPS sslCert
+              ; ip     = IPAddress.Parse "192.168.13.138"
+              ; port   = 443us ]
+          ; timeout = TimeSpan.FromMilliseconds 3000. }
 
 h1. Server configuration
 
