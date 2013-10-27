@@ -117,6 +117,6 @@ let process_template (data : Map<string,Binder>) (http_request : HttpRequest) =
     let str = new StringWriter(sb)
     xml_to_string1 xml str
     let output = sb.ToString()
-    ok (bytes_utf8 output |> Bytes) http_request
+    ok (bytes_utf8 output) http_request
   with
-  | x -> failure (bytes_utf8 (x.ToString()) |> Bytes) http_request
+  | x -> failure (bytes_utf8 (x.ToString())) http_request

@@ -58,7 +58,7 @@ let tcp_ip_server (sourceip, sourceport) (serve_client : TcpWorker<unit>) =
   async {
     try
       use! dd = Async.OnCancel(fun () -> stop_tcp server)
-      let! token = Async.CancellationToken
+      let! (token : Threading.CancellationToken) = Async.CancellationToken
       while not (token.IsCancellationRequested) do
         let! client = server.AsyncAcceptTcpClient()
         //let remoteAddress = (client.Client.RemoteEndPoint :?> IPEndPoint).Address
