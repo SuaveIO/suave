@@ -119,4 +119,4 @@ let process_template (data : Map<string,Binder>) (http_request : HttpRequest) =
     let output = sb.ToString()
     ok (bytes_utf8 output) http_request
   with
-  | x -> failure (bytes_utf8 (x.ToString())) http_request
+  | x -> INTERNAL_ERROR (x.ToString()) http_request

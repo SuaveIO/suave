@@ -5,8 +5,51 @@ open System.IO
 open System.Text
 open System.Threading.Tasks
 
-open Utils
-open Types
+open Suave.Utils
+open Suave.Types
+
+// literals
+
+let [<Literal>] SUAVE_VERSION = "0.0.3"
+
+let [<Literal>] HTTP_VERSION = "HTTP/1.1"
+
+// general response functions
+
+let response_f status_code reason_phrase (f_content : HttpRequest -> Async<unit>) (request : HttpRequest) = async {
+  try
+    let stream:Stream = request.Stream
+
+    do! async_writeln stream (sprintf "%s %d %s" HTTP_VERSION status_code reason_phrase)
+    do! async_writeln stream (sprintf "Server: Suave/%s (http://suaveframework.com)" SUAVE_VERSION)
+    do! async_writeln stream (sprintf "Date: %s" (DateTime.UtcNow.ToString("R")))
+
+    for (x,y) in request.Response.Headers do
+      if not (List.exists (fun y -> x.ToLower().Equals(y)) ["server";"date";"content-length"]) then
+        do! async_writeln stream (sprintf "%s: %s" x y )
+
+    if not(request.Response.Headers.Exists(new Predicate<_>(fun (x,_) -> x.ToLower().Equals("content-type")))) then
+      do! async_writeln stream (sprintf "Content-Type: %s" "text/html")
+
+    do! f_content request
+
+  with //the connection might drop while we are sending the response
+  | :? IOException as ex  -> raise (InternalFailure "Failure while writing to client stream")
+  }
+
+let response status_code reason_phrase (content : byte []) (request : HttpRequest) =
+  response_f status_code reason_phrase (
+    fun r -> async {
+      if content.Length > 0 then
+        do! async_writeln r.Stream (sprintf "Content-Length: %d" content.Length)
+
+      do! async_writeln r.Stream ""
+
+      if content.Length > 0 then
+        do! r.Stream.WriteAsync(content, 0, content.Length) })
+    request
+
+// modifiers
 
 /// Sets a header with the key and value specified
 let set_header key value (http_request : HttpRequest) =
@@ -15,6 +58,8 @@ let set_header key value (http_request : HttpRequest) =
 
 /// Sets a cookie with the passed value in the 'cookie' parameter
 let set_cookie cookie = set_header "Set-Cookie" cookie
+
+// filters/applicatives
 
 /// Match on the url
 let url    s (x : HttpRequest) = if s = x.Url    then Some x else None
@@ -35,69 +80,42 @@ let PATCH   (x : HttpRequest) = meth0d "PATCH" x
 let TRACE   (x : HttpRequest) = meth0d "TRACE" x
 let OPTIONS (x : HttpRequest) = meth0d "OPTIONS" x
 
-/// The version of the web server
-let suave_version = "0.0.3"
-
-/// The protocol version that the server speaks
-let proto_version = "HTTP/1.1"
-
-/// Respond with a given status code, http message, content in the body to a http request.
-let response_f status_code message (f_content : HttpRequest -> Async<unit>) (request : HttpRequest) = async {
-  try
-    let stream:Stream = request.Stream
-
-    do! async_writeln stream (sprintf "%s %d %s" proto_version status_code message)
-    do! async_writeln stream (sprintf "Server: Suave/%s (http://suaveframework.com)" suave_version)
-    do! async_writeln stream (sprintf "Date: %s" (DateTime.UtcNow.ToString("R")))
-
-    for (x,y) in request.Response.Headers do
-      if not (List.exists (fun y -> x.ToLower().Equals(y)) ["server";"date";"content-length"]) then
-        do! async_writeln stream (sprintf "%s: %s" x y )
-
-    if not(request.Response.Headers.Exists(new Predicate<_>(fun (x,_) -> x.ToLower().Equals("content-type")))) then
-      do! async_writeln stream (sprintf "Content-Type: %s" "text/html")
-
-    do! f_content request
-
-  with //the connection might drop while we are sending the response
-  | :? IOException as ex  -> raise (InternalFailure "Failure while writing to client stream")
-}
-
-/// Respond with a given status code, http message, content in the body to a http request.
-let response status_code message (content : byte []) (request : HttpRequest) =
-  response_f status_code message (
-    fun r -> async {
-      if content.Length > 0 then
-        do! async_writeln r.Stream (sprintf "Content-Length: %d" content.Length)
-
-      do! async_writeln r.Stream ""
-
-      if content.Length > 0 then
-        do! r.Stream.WriteAsync(content, 0, content.Length) })
-    request
-
-/// A challenge response with a WWW-Authenticate header,
-/// and 401 Authorization Required response message.
-let challenge =
-  set_header "WWW-Authenticate" "Basic realm=\"protected\""
-  >> response 401 "Authorization Required" (bytes "401 Unauthorized.")
+// TODO: let continue ... ?
+// TODO: let switching_protocols ... ?
 
 // also see: http://www.vinaysahni.com/best-practices-for-a-pragmatic-restful-api
 
-/// Write the bytes to the body as a byte array with a 200 OK status-code/message
 let ok s = response 200 "OK" s >> succeed
 
-/// Write the string as UTF-8 to the body of the response,
-/// with a 200 OK status-code/message.
 let OK a = ok (bytes_utf8 a)
 
 let created s = response 201 "Created" s >> succeed
 
 let CREATED s = created (bytes_utf8 s)
 
-let no_content () = response 204 "No Content" (Array.zeroCreate 0) >> succeed
+let accepted s = response 202 "Accepted" s >> succeed
 
-let NO_CONTENT () = no_content
+let ACCEPTED s = accepted (bytes_utf8 s)
+
+let no_content : HttpRequest -> Async<unit> option =
+  response 204 "No Content" (Array.zeroCreate 0) >> succeed
+
+let NO_CONTENT = no_content
+
+// 3xx Redirects
+
+let moved_permanently location =
+  set_header "Location" location
+  >> response 301 "Moved Permanently" (Array.zeroCreate 0)
+  >> succeed
+
+let MOVED_PERMANENTLY location = moved_permanently location
+
+let found location =
+  set_header "Location" location
+  >> response 302 "Found" (Array.zeroCreate 0)
+
+let FOUND location = found location
 
 let not_modified () = response 304 "Not Modified" (Array.zeroCreate 0) >> succeed
 
@@ -109,17 +127,26 @@ let BAD_REQUEST s = bad_request (bytes_utf8 s)
 
 // 401: see http://stackoverflow.com/questions/3297048/403-forbidden-vs-401-unauthorized-http-responses/12675357
 
-let unauthorized s = response 401 "Unauthorized" s >> succeed
+let unauthorized s =
+  set_header "WWW-Authenticate" "Basic realm=\"protected\""
+  >> response 401 "Unauthorized" s
 
 let UNAUTHORIZED s = unauthorized (bytes_utf8 s)
+
+/// A challenge response with a WWW-Authenticate header,
+/// and 401 Authorization Required response message.
+let challenge = UNAUTHORIZED "401 Unauthorized." 
 
 let forbidden s = response 403 "Forbidden" s >> succeed
 
 let FORBIDDEN s = forbidden (bytes_utf8 s)
 
-let not_found s = response 404 "Not Found" s >> succeed
+/// Send a 404 Not Found with a byte array body specified by the 'message' parameter
+let not_found message = response 404 "Not Found" message >> succeed
 
-let NOT_FOUND s = not_found (bytes_utf8 s)
+/// Write the 'message' string to the body as UTF-8 encoded text, while
+/// returning 404 Not Found to the response
+let NOT_FOUND message = not_found (bytes_utf8 message)
 
 let method_not_allowed s = response 405 "Method Not Allowed" s >> succeed
 
@@ -145,22 +172,15 @@ let TOO_MANY_REQUESTS s = too_many_requests (bytes_utf8 s)
 let internal_error message = response 500 "Internal Error" message >> succeed
 
 /// Write the error string as UTF-8 to the body of the response,
-/// with a 500 Internal Error status-code/message.
+/// with a 500 Internal Error status-code/reason phrase.
 let INTERNAL_ERROR a = internal_error (bytes_utf8 a)
 
 /// Redirect the request to another location specified by the url parameter.
-/// Sets the Location header and returns 302 Content Moved status-code/message.
+/// Sets the Location header and returns 302 Content Moved status-code/reason phrase.
 let redirect url =
   set_header "Location" url
-  >> response 302 url (bytes "Content Moved")
+  >> response 302 "Found" (bytes "Content Moved")
   >> succeed
-
-/// Send a 404 Not Found with a byte array body specified by the 'message' parameter
-let unhandled message = response 404 "Not Found" message >> succeed
-
-/// Write the 'message' string to the body as UTF-8 encoded text, while
-/// returning 404 Not Found to the response
-let notfound message = unhandled (bytes_utf8 message)
 
 /// Map a file ending to a mime-type
 let mime_type = function

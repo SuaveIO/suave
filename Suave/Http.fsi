@@ -2,6 +2,29 @@
 
 open Suave.Types
 
+/// The version of the web server
+val SUAVE_VERSION : string
+
+// generic 'response' and 'response_f' f-ns
+
+/// Respond with a given status code, http message, content in the body to a http request.
+val response_f : int -> string -> (HttpRequest -> Async<unit>) -> HttpRequest -> Async<unit>
+
+/// Respond with a given status code, http reason phrase, content in the body to a http request.
+val response : int -> string -> byte [] -> HttpRequest -> Async<unit>
+
+// Suave response modifiers/applicatives follow
+
+val set_header : string -> string -> HttpRequest -> HttpRequest
+
+val set_cookie : string -> HttpRequest -> HttpRequest
+
+// Suave filters/applicatives follow
+
+val url : string -> HttpRequest -> HttpRequest option
+
+val meth0d : string ->  HttpRequest -> HttpRequest option
+
 /// <summary>
 /// Match on GET requests.
 /// <para>The GET method means retrieve whatever information (in the form of an entity) is
@@ -210,3 +233,183 @@ val TRACE : HttpRequest -> HttpRequest option
 /// action or initiating a resource retrieval.
 /// Responses to this method are not cacheable. 
 val OPTIONS : HttpRequest -> HttpRequest option
+
+// Suave web parts/applicatives follow:
+
+
+// STATUS CODES AND REASON PHRASE //
+
+(*
+   The first digit of the Status-Code defines the class of response. The
+   last two digits do not have any categorization role. There are 5
+   values for the first digit:
+      - 1xx: Informational - Request received, continuing process
+      - 2xx: Success - The action was successfully received,
+        understood, and accepted
+      - 3xx: Redirection - Further action must be taken in order to
+        complete the request
+      - 4xx: Client Error - The request contains bad syntax or cannot
+        be fulfilled
+      - 5xx: Server Error - The server failed to fulfill an apparently
+        valid request
+*)
+
+/// <summary><para>
+/// 200
+/// </para><para>
+/// Write the bytes to the body as a byte array with a 200 OK status-code/message
+/// </para></summary>
+/// <remarks>
+/// </remarks>
+val ok : byte[] -> HttpRequest -> Async<unit> option
+
+/// <summary><para>
+/// 200
+/// </para><para>
+/// Write the bytes to the body as a byte array with a 200 OK status-code/message
+/// </para></summary>
+/// <remarks>
+/// </remarks>
+val OK : string -> HttpRequest -> Async<unit> option
+
+/// <summary><para>
+/// </para><para>
+/// </para><para>
+/// </para></summary>
+/// <remarks>
+/// </remarks>
+val created : byte[] -> HttpRequest -> Async<unit> option
+val CREATED : string -> HttpRequest -> Async<unit> option
+
+val accepted : byte[] -> HttpRequest -> Async<unit> option
+val ACCEPTED : string -> HttpRequest -> Async<unit> option
+
+val no_content : HttpRequest -> Async<unit> option
+val NO_CONTENT : string -> HttpRequest -> Async<unit> option
+
+(* 3xx Redirects:
+   This class of status code indicates that further action needs to be
+   taken by the user agent in order to fulfill the request.  The action
+   required MAY be carried out by the user agent without interaction
+   with the user if and only if the method used in the second request is
+   GET or HEAD. A client SHOULD detect infinite redirection loops, since
+   such loops generate network traffic for each redirection.
+*)
+
+/// <summary><para>
+/// 301
+/// </para><para>
+/// The requested resource has been assigned a new permanent URI and any
+/// future references to this resource SHOULD use one of the returned
+/// URIs.  Clients with link editing capabilities ought to automatically
+/// re-link references to the Request-URI to one or more of the new
+/// references returned by the server, where possible. This response is
+/// cacheable unless indicated otherwise.
+/// </para><para>
+/// The new permanent URI SHOULD be given by the Location field in the
+/// response. Unless the request method was HEAD, the entity of the
+/// response SHOULD contain a short hypertext note with a hyperlink to
+/// the new URI(s).
+/// </para><para>
+/// If the 301 status code is received in response to a request other
+/// than GET or HEAD, the user agent MUST NOT automatically redirect the
+/// request unless it can be confirmed by the user, since this might
+/// change the conditions under which the request was issued.
+/// </para></summary>
+/// <remarks>
+///    Note: When automatically redirecting a POST request after
+///    receiving a 301 status code, some existing HTTP/1.0 user agents
+///    will erroneously change it into a GET request.
+/// </remarks>
+val moved_permanently : string -> HttpRequest -> Async<unit> option
+
+/// <summary><para>
+/// 301
+/// </para><para>
+/// The requested resource has been assigned a new permanent URI and any
+/// future references to this resource SHOULD use one of the returned
+/// URIs.  Clients with link editing capabilities ought to automatically
+/// re-link references to the Request-URI to one or more of the new
+/// references returned by the server, where possible. This response is
+/// cacheable unless indicated otherwise.
+/// </para><para>
+/// The new permanent URI SHOULD be given by the Location field in the
+/// response. Unless the request method was HEAD, the entity of the
+/// response SHOULD contain a short hypertext note with a hyperlink to
+/// the new URI(s).
+/// </para><para>
+/// If the 301 status code is received in response to a request other
+/// than GET or HEAD, the user agent MUST NOT automatically redirect the
+/// request unless it can be confirmed by the user, since this might
+/// change the conditions under which the request was issued.
+/// </para></summary>
+/// <remarks>
+///    Note: When automatically redirecting a POST request after
+///    receiving a 301 status code, some existing HTTP/1.0 user agents
+///    will erroneously change it into a GET request.
+/// </remarks>
+val MOVED_PERMANENTLY : string -> HttpRequest -> Async<unit> option
+
+/// <summary><para>
+/// 302
+/// </para><para>
+/// The requested resource resides temporarily under a different URI.
+/// Since the redirection might be altered on occasion, the client SHOULD
+/// continue to use the Request-URI for future requests.  This response
+/// is only cacheable if indicated by a Cache-Control or Expires header
+/// field.
+/// </para><para>
+/// The temporary URI SHOULD be given by the Location field in the
+/// response. Unless the request method was HEAD, the entity of the
+/// response SHOULD contain a short hypertext note with a hyperlink to
+/// the new URI(s).
+/// </para><para>
+/// If the 302 status code is received in response to a request other
+/// than GET or HEAD, the user agent MUST NOT automatically redirect the
+/// request unless it can be confirmed by the user, since this might
+/// change the conditions under which the request was issued.
+/// </para></summary>
+/// <remarks>
+///    Note: RFC 1945 and RFC 2068 specify that the client is not allowed
+///    to change the method on the redirected request.  However, most
+///    existing user agent implementations treat 302 as if it were a 303
+///    response, performing a GET on the Location field-value regardless
+///    of the original request method. The status codes 303 and 307 have
+///    been added for servers that wish to make unambiguously clear which
+///    kind of reaction is expected of the client.
+/// </remarks>
+val found : string -> HttpRequest -> Async<unit> option
+
+/// <summary><para>
+/// 302
+/// </para><para>
+/// The requested resource resides temporarily under a different URI.
+/// Since the redirection might be altered on occasion, the client SHOULD
+/// continue to use the Request-URI for future requests.  This response
+/// is only cacheable if indicated by a Cache-Control or Expires header
+/// field.
+/// </para><para>
+/// The temporary URI SHOULD be given by the Location field in the
+/// response. Unless the request method was HEAD, the entity of the
+/// response SHOULD contain a short hypertext note with a hyperlink to
+/// the new URI(s).
+/// </para><para>
+/// If the 302 status code is received in response to a request other
+/// than GET or HEAD, the user agent MUST NOT automatically redirect the
+/// request unless it can be confirmed by the user, since this might
+/// change the conditions under which the request was issued.
+/// </para></summary>
+/// <remarks>
+///    Note: RFC 1945 and RFC 2068 specify that the client is not allowed
+///    to change the method on the redirected request.  However, most
+///    existing user agent implementations treat 302 as if it were a 303
+///    response, performing a GET on the Location field-value regardless
+///    of the original request method. The status codes 303 and 307 have
+///    been added for servers that wish to make unambiguously clear which
+///    kind of reaction is expected of the client.
+/// </remarks>
+val FOUND : string -> HttpRequest -> Async<unit> option
+
+
+// 4xx 
+val challenge : HttpRequest -> Async<unit>
