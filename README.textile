@@ -111,13 +111,34 @@ h1. Server configuration
 The first argument to @web_server@ is a configuration record with the following signature.
 
 pre. 
-type Protocols = | HTTP | HTTPS of X509Certificate
-type HttpBinding = Protocols * string * int 
-type Config = { 
-    bindings : HttpBinding array; 
-    error_handler : Exception -> String -> HttpRequest -> Async<unit>;
-    timeout : int
-    }
+/// Gets the supported protocols, HTTP and HTTPS with a certificate
+type Protocol =
+  /// The HTTP protocol is the core protocol
+  | HTTP
+  /// The HTTP protocol tunneled in a TLS tunnel
+  | HTTPS of X509Certificate
+
+/// A HTTP binding is a protocol is the product of HTTP or HTTP, a DNS or IP binding and a port number
+type HttpBinding =
+  /// The scheme in use
+  { scheme : Protocol
+  /// The host or IP address to bind to. This will be interpreted by the operating system
+  ; ip     : IPAddress
+  /// The port for the binding
+  ; port   : uint16 }
+
+/// The core configuration of suave
+type Config =
+  /// The bindings for the web server to launch with
+  { bindings      : HttpBinding list
+  /// An error handler to use for handling exceptions that are
+  /// are thrown from the web parts
+  ; error_handler : ErrorHandler
+  /// Timeout for responses to be generated
+  ; timeout       : TimeSpan
+  /// A cancellation token for the web server. Signalling this token
+  /// means that the web server shuts down
+  ; ct            : CancellationToken }
 
 *bindings* array of bindings of the form _protocol, ip address, port_
 *error_handler* a handler to deal with runtime errors
@@ -134,17 +155,27 @@ match x with // '|' characters at base of 'match'
 | A     -> ()
 | Bcdef -> "aligned arrows" // space after '|' character
 
+p. Parameters
+
+p. 
+Let type annotations be specified with spaces after the argument symbol and before
+the type.
+
+pre. tatic member FromString(scheme : string, ?cert) =
+
 p. Method formatting with no spaces after/before normal parenthesis
 
 pre. 
 let my_method_name first_arg (second : WithType) = async { // and monad builder
   return! f first_arg second
-} // at base of 'let' kw
+  } // at base of 'let' + 2 spaces
 
 p. 
 You need to document your methods with '///' to create XML-doc. A XML
 documentation file is generated together with the compilation and is distributed
 with the NuGet so that others can read your code's intentions easily.
+
+p. Don't put unnecessary parenthesis unless it makes the code more clear.
 
 h2. Testing
 
