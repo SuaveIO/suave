@@ -82,6 +82,8 @@ let challenge =
   set_header "WWW-Authenticate" "Basic realm=\"protected\""
   >> response 401 "Authorization Required" (bytes "401 Unauthorized.")
 
+// also see: http://www.vinaysahni.com/best-practices-for-a-pragmatic-restful-api
+
 /// Write the bytes to the body as a byte array with a 200 OK status-code/message
 let ok s = response 200 "OK" s >> succeed
 
@@ -89,12 +91,62 @@ let ok s = response 200 "OK" s >> succeed
 /// with a 200 OK status-code/message.
 let OK a = ok (bytes_utf8 a)
 
+let created s = response 201 "Created" s >> succeed
+
+let CREATED s = created (bytes_utf8 s)
+
+let no_content () = response 204 "No Content" (Array.zeroCreate 0) >> succeed
+
+let NO_CONTENT () = no_content
+
+let not_modified () = response 304 "Not Modified" (Array.zeroCreate 0) >> succeed
+
+let NOT_MODIFIED () = not_modified
+
+let bad_request s = response 400 "Bad Request" s >> succeed
+
+let BAD_REQUEST s = bad_request (bytes_utf8 s)
+
+// 401: see http://stackoverflow.com/questions/3297048/403-forbidden-vs-401-unauthorized-http-responses/12675357
+
+let unauthorized s = response 401 "Unauthorized" s >> succeed
+
+let UNAUTHORIZED s = unauthorized (bytes_utf8 s)
+
+let forbidden s = response 403 "Forbidden" s >> succeed
+
+let FORBIDDEN s = forbidden (bytes_utf8 s)
+
+let not_found s = response 404 "Not Found" s >> succeed
+
+let NOT_FOUND s = not_found (bytes_utf8 s)
+
+let method_not_allowed s = response 405 "Method Not Allowed" s >> succeed
+
+let METHOD_NOT_ALLOWED s = method_not_allowed (bytes_utf8 s)
+
+let gone s = response 410 "Gone" s >> succeed
+
+let GONE s = gone (bytes_utf8 s)
+
+let unsupported_media_type s = response 415 "Unsupported Media Type" s >> succeed
+
+let UNSUPPORTED_MEDIA_TYPE s = unsupported_media_type (bytes_utf8 s)
+
+let unprocessable_entity s = response 422 "Unprocessable Entity" s >> succeed
+
+let UNPROCESSABLE_ENTITY s = unprocessable_entity (bytes_utf8 s)
+
+let too_many_requests s = response 429 "Too Many Requests" s >> succeed
+
+let TOO_MANY_REQUESTS s = too_many_requests (bytes_utf8 s)
+
 /// Write the bytes to the body as a byte array as a 500 Internal Error status-code/message.
-let failure message = response 500 "Internal Error" message >> succeed
+let internal_error message = response 500 "Internal Error" message >> succeed
 
 /// Write the error string as UTF-8 to the body of the response,
 /// with a 500 Internal Error status-code/message.
-let ERROR a = failure (bytes_utf8 a)
+let INTERNAL_ERROR a = internal_error (bytes_utf8 a)
 
 /// Redirect the request to another location specified by the url parameter.
 /// Sets the Location header and returns 302 Content Moved status-code/message.
@@ -201,7 +253,7 @@ let dir (req : HttpRequest) : WebResult =
 
 /// At the location where this function is applied, close the outbound stream
 /// for further writing.
-let closepipe (p : HttpRequest option) =
+let close_pipe (p : HttpRequest option) =
   match p with
   | Some(x) ->
     x.Stream.Flush()
@@ -250,6 +302,6 @@ let urlscan (pf : PrintfFormat<_,_,_,_,'t>) (h : 't ->  WebPart) : WebPart =
   let F (r:HttpRequest) =
     try
       let y = r.Url |> t |> h
-      try y r with ex -> r |> ERROR (ex.ToString())
+      try y r with ex -> r |> INTERNAL_ERROR (ex.ToString())
     with _ -> fail
   F
