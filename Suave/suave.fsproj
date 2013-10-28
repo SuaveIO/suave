@@ -64,6 +64,7 @@
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="Session.fs" />
     <Compile Include="Proxy.fs" />
+    <Compile Include="Http.fsi" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="mscorlib" />

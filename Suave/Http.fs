@@ -18,26 +18,21 @@ let set_cookie cookie = set_header "Set-Cookie" cookie
 
 /// Match on the url
 let url    s (x : HttpRequest) = if s = x.Url    then Some x else None
+
 /// Match on the method
 let meth0d s (x : HttpRequest) = if s = x.Method then Some x else None
 
-/// Match on GET requests
-let GET    (x : HttpRequest) = meth0d "GET" x
-/// Match on POST requests
-let POST   (x : HttpRequest) = meth0d "POST" x
-/// Match on DELETE requests
-let DELETE (x : HttpRequest) = meth0d "DELETE" x
-/// Match on PUT requests
-let PUT    (x : HttpRequest) = meth0d "PUT" x
-/// Match on HEAD requests
-let HEAD   (x : HttpRequest) = meth0d "HEAD" x
-/// Match on CONNECT requests
+// see http://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html
+// see Http.fsi for documentation
+
+let GET     (x : HttpRequest) = meth0d "GET" x
+let POST    (x : HttpRequest) = meth0d "POST" x
+let DELETE  (x : HttpRequest) = meth0d "DELETE" x
+let PUT     (x : HttpRequest) = meth0d "PUT" x
+let HEAD    (x : HttpRequest) = meth0d "HEAD" x
 let CONNECT (x : HttpRequest) = meth0d "CONNECT" x
-/// Match on PATCH requests
-let PATCH  (x : HttpRequest) = meth0d "PATCH" x
-/// Match on TRACE requests
-let TRACE  (x : HttpRequest) = meth0d "TRACE" x
-/// Match on OPTIONS requests
+let PATCH   (x : HttpRequest) = meth0d "PATCH" x
+let TRACE   (x : HttpRequest) = meth0d "TRACE" x
 let OPTIONS (x : HttpRequest) = meth0d "OPTIONS" x
 
 /// The version of the web server
