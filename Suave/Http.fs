@@ -111,12 +111,26 @@ module Http =
   let found location =
     set_header "Location" location
     >> response 302 "Found" (Array.zeroCreate 0)
+    >> succeed
 
   let FOUND location = found location
 
-  let not_modified () = response 304 "Not Modified" (Array.zeroCreate 0) >> succeed
+  let redirect url =
+    set_header "Location" url
+    >> set_header "Content-Type" "text/html; charset=utf-8"
+    >> response 302 "Found" (bytes_utf8 <| sprintf "<html>
+  <body>
+    <a href=\"%s\">Content Moved</a>
+  </body>
+</html>
+" url)
+    >> succeed
 
-  let NOT_MODIFIED () = not_modified
+  let not_modified : HttpRequest -> Async<unit> option =
+    response 304 "Not Modified" (Array.zeroCreate 0) >> succeed
+
+  let NOT_MODIFIED : HttpRequest -> Async<unit> option =
+    not_modified
 
   let bad_request s = response 400 "Bad Request" s >> succeed
 
@@ -127,27 +141,34 @@ module Http =
   let unauthorized s =
     set_header "WWW-Authenticate" "Basic realm=\"protected\""
     >> response 401 "Unauthorized" s
+    >> succeed
 
   let UNAUTHORIZED s = unauthorized (bytes_utf8 s)
 
-  /// A challenge response with a WWW-Authenticate header,
-  /// and 401 Authorization Required response message.
-  let challenge = UNAUTHORIZED "401 Unauthorized." 
+  let challenge = UNAUTHORIZED "401 Unauthorized."
 
   let forbidden s = response 403 "Forbidden" s >> succeed
 
   let FORBIDDEN s = forbidden (bytes_utf8 s)
 
-  /// Send a 404 Not Found with a byte array body specified by the 'message' parameter
-  let not_found message = response 404 "Not Found" message >> succeed
+  let not_found s = response 404 "Not Found" s >> succeed
 
-  /// Write the 'message' string to the body as UTF-8 encoded text, while
-  /// returning 404 Not Found to the response
   let NOT_FOUND message = not_found (bytes_utf8 message)
 
   let method_not_allowed s = response 405 "Method Not Allowed" s >> succeed
 
   let METHOD_NOT_ALLOWED s = method_not_allowed (bytes_utf8 s)
+
+  let not_acceptable s = response 406 "Not Acceptable" s >> succeed
+
+  let NOT_ACCEPTABLE message = not_acceptable (bytes_utf8 message)
+
+  let request_timeout = response 408 "Request Timeout" (Array.zeroCreate 0) >> succeed
+  // all-caps req.timeout elided intentionally
+
+  let conflict s = response 409 "Conflict" s >> succeed
+
+  let CONFLICT message = conflict (bytes_utf8 message)
 
   let gone s = response 410 "Gone" s >> succeed
 
@@ -161,25 +182,19 @@ module Http =
 
   let UNPROCESSABLE_ENTITY s = unprocessable_entity (bytes_utf8 s)
 
+  let precondition_required body = response 428 "Precondition Required" body >> succeed
+
+  let PRECONDITION_REQUIRED body = precondition_required (bytes_utf8 body)
+
   let too_many_requests s = response 429 "Too Many Requests" s >> succeed
 
   let TOO_MANY_REQUESTS s = too_many_requests (bytes_utf8 s)
 
-  /// Write the bytes to the body as a byte array as a 500 Internal Error status-code/message.
   let internal_error message = response 500 "Internal Error" message >> succeed
 
-  /// Write the error string as UTF-8 to the body of the response,
-  /// with a 500 Internal Error status-code/reason phrase.
   let INTERNAL_ERROR a = internal_error (bytes_utf8 a)
 
-  /// Redirect the request to another location specified by the url parameter.
-  /// Sets the Location header and returns 302 Content Moved status-code/reason phrase.
-  let redirect url =
-    set_header "Location" url
-    >> response 302 "Found" (bytes "Content Moved")
-    >> succeed
 
-  /// Map a file ending to a mime-type
   let mime_type = function
     | ".bmp" -> "image/bmp"
     | ".css" -> "text/css"
@@ -195,10 +210,8 @@ module Http =
     | ".exe" -> "application/exe"
     | _ -> "application/octet-stream"
 
-  /// Set the Content-Type header to the mime type given
   let set_mime_type t = set_header "Content-Type" t
 
-  /// Send a file as a response to the request
   let send_file filename r =
     let write_file file (r : HttpRequest) = async {
       use fs = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.Read)
@@ -213,10 +226,6 @@ module Http =
 
     async { do! response_f 200 "OK" (write_file filename) r } |> succeed
 
-  /// Send the file by the filename given. Will search relative to the current directory for
-  /// the file path, unless you pass it a file with a slash at the start of its name, in which
-  /// case it will search the root of the file system that is hosting the current directory.
-  /// Will also set the MIME type based on the file extension.
   let file filename =
     if File.Exists filename then
       let file_info = new FileInfo(filename)
@@ -225,23 +234,14 @@ module Http =
     else
       never
 
-  /// Format a string with a local file path given a file name 'fileName'. You should
-  /// use this helper method to find the current directory and concatenate that current
-  /// directory to the filename which should be absolute and start with a path separator.
   let local_file fileName = sprintf "%s%s" Environment.CurrentDirectory fileName
 
-  /// 'browse' the file given as the filename, by sending it to the browser with a
-  /// MIME-type/Content-Type header based on its extension. Will service from the
-  /// current directory.
   let browse_file filename = file (local_file filename)
 
-  /// 'browse' the file in the sense that the contents of the file are sent based on the
-  /// request's Url property. Will serve from the current directory.
   let browse : WebPart = warbler (fun req -> file (local_file req.Url))
 
   type WebResult = Option<Async<unit>>
 
-  /// Serve a 'file browser' for a directory
   let dir (req : HttpRequest) : WebResult =
 
     let url = req.Url
@@ -268,8 +268,6 @@ module Http =
       ok (bytes (result.ToString())) req
     else fail
 
-  /// At the location where this function is applied, close the outbound stream
-  /// for further writing.
   let close_pipe (p : HttpRequest option) =
     match p with
     | Some(x) ->
@@ -277,8 +275,6 @@ module Http =
       x.Stream.Close()
     | None -> ()
 
-  /// Parse the authentication type, the user name and the password from
-  /// the token string
   let parse_authentication_token (token : string) =
     let parts = token.Split (' ')
     let enc = parts.[1].Trim()
@@ -286,9 +282,6 @@ module Http =
     let indexOfColon = decoded.IndexOf(':')
     (parts.[0].ToLower(), decoded.Substring(0,indexOfColon), decoded.Substring(indexOfColon+1))
 
-  /// Perform basic authentication on the request, applying a predicate
-  /// to check the request for authentication tokens such as 'username'
-  /// and 'password'. Otherwise, if failing, challenge the client again.
   let authenticate_basic f (p : HttpRequest) =
     let headers = p.Headers
     if headers.ContainsKey("authorization") then
@@ -299,11 +292,10 @@ module Http =
       if (typ.Equals("basic")) && f p then
         fail
       else
-        challenge p |> succeed
+        challenge p
     else
-      challenge p |> succeed
+      challenge p
 
-  /// Log the HttpRequest to the given stream
   let log (s : Stream) (http_request : HttpRequest) =
     let bytes = bytes (sprintf "%A\n" (http_request.Method, http_request.RemoteAddress, http_request.Url, http_request.Query, http_request.Form, http_request.Headers))
     s.Write(bytes, 0, bytes.Length)
@@ -311,9 +303,7 @@ module Http =
 
   open Suave.Sscanf
 
-  /// Strongly typed route matching! Matching the uri can be used with the 'parsers'
-  /// characters specified in Sscanf.
-  let urlscan (pf : PrintfFormat<_,_,_,_,'t>) (h : 't ->  WebPart) : WebPart =
+  let url_scan (pf : PrintfFormat<_,_,_,_,'t>) (h : 't ->  WebPart) : WebPart =
     let t url = sscanf pf url
 
     let F (r:HttpRequest) =
