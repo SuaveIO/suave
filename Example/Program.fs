@@ -31,7 +31,7 @@ let testapp : WebPart =
     Console.OpenStandardOutput() |> log >>= never ; 
     urlscan "/add/%d/%d"   (fun (a,b) -> OK((a + b).ToString()))
     urlscan "/minus/%d/%d" (fun (a,b) -> OK((a - b).ToString()))
-    notfound "Found no handlers"
+    NOT_FOUND "Found no handlers"
   ]
 
 System.Net.ServicePointManager.DefaultConnectionLimit <- Int32.MaxValue
@@ -70,7 +70,7 @@ choose [
                     let files = x.Files |> Seq.fold (fun x y -> x + "<br>" + (sprintf "(%s,%s,%s)" y.FileName y.MimeType y.Path)) "" ;
                     OK (sprintf "Upload successful.<br>POST data: %A<br>Uploaded files (%d): %s" (x.Form)(x.Files.Count) files)) ;
   POST >>= warbler( fun x -> OK (sprintf "POST data: %A" (x.Form)));
-  notfound "Found no handlers"
+  NOT_FOUND "Found no handlers"
   ] 
   |> web_server
       { bindings =
