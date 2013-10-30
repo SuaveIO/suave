@@ -1,5 +1,6 @@
 
 open System
+open System.Net
 open System.Security.Cryptography.X509Certificates;
 
 open Suave.Web
@@ -28,9 +29,9 @@ let myapp : WebPart =
 let testapp : WebPart =
   choose [
     Console.OpenStandardOutput() |> log >>= never ; 
-    urlscan "/add/%d/%d"   (fun (a,b) -> OK((a + b).ToString()))
-    urlscan "/minus/%d/%d" (fun (a,b) -> OK((a - b).ToString()))
-    notfound "Found no handlers"
+    url_scan "/add/%d/%d"   (fun (a,b) -> OK((a + b).ToString()))
+    url_scan "/minus/%d/%d" (fun (a,b) -> OK((a - b).ToString()))
+    NOT_FOUND "Found no handlers"
   ]
 
 System.Net.ServicePointManager.DefaultConnectionLimit <- Int32.MaxValue
@@ -43,7 +44,8 @@ let timeout r =
 choose [
   Console.OpenStandardOutput() |> log >>= never ;
   GET >>= url "/hello" >>= never ;
-  url "/hello" >>= never >>= OK "Never executes" ;
+  url "/neverme" >>= never >>= OK (Guid.NewGuid().ToString()) ;
+  url "/guid" >>= OK (Guid.NewGuid().ToString()) ;
   url "/hello" >>= OK "Hello World" ;
   GET >>= url "/query" >>= warbler( fun x -> cond (x.Query) ? name (fun y -> OK ("Hello " + y)) never) ;
   GET >>= url "/query" >>= OK "Hello beautiful" ;
@@ -69,9 +71,12 @@ choose [
                     let files = x.Files |> Seq.fold (fun x y -> x + "<br>" + (sprintf "(%s,%s,%s)" y.FileName y.MimeType y.Path)) "" ;
                     OK (sprintf "Upload successful.<br>POST data: %A<br>Uploaded files (%d): %s" (x.Form)(x.Files.Count) files)) ;
   POST >>= warbler( fun x -> OK (sprintf "POST data: %A" (x.Form)));
-  notfound "Found no handlers"
+  NOT_FOUND "Found no handlers"
   ] 
   |> web_server
-      { bindings = [| HTTP, "127.0.0.1", 8082 (*; HTTPS(sslCert), "127.0.0.1", 8083*)|]
+      { bindings =
+        [ HttpBinding.Create(HTTP, "127.0.0.1", 8082)
+        ; (*{ scheme = HTTPS(sslCert); ip = IPAddress.Parse "127.0.0.1"; port = 8083us }*) ]
       ; error_handler = default_error_handler
-      ; timeout = 1000 }
+      ; timeout       = TimeSpan.FromMilliseconds 1000.
+      ; ct             = Async.DefaultCancellationToken }

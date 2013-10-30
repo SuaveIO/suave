@@ -14,16 +14,16 @@ let MAX_BACK_LOG = Int32.MaxValue
 /// it nicer to consume in F#
 type TcpListener with
   member x.AsyncAcceptTcpClient() =
-    Async.FromBeginEnd(x.BeginAcceptTcpClient,x.EndAcceptTcpClient)
+    Async.FromBeginEnd(x.BeginAcceptTcpClient, x.EndAcceptTcpClient)
 
 /// A TCP Worker is a thing that takes a TCP client and returns an asynchronous workflow thereof
 type TcpWorker<'a> = TcpClient ->  Async<'a>
 
 /// Close the TCP client by closing its stream and then closing the client itself
 let close (d : TcpClient) =
-    if d.Connected then
-        d.GetStream().Close()
-        d.Close()
+  if d.Connected then
+    d.GetStream().Close()
+    d.Close()
 
 /// Stop the TCP listener server
 let stop_tcp (server : TcpListener) =
@@ -32,11 +32,11 @@ let stop_tcp (server : TcpListener) =
   log_str "stopped\n"
 
 /// Start a new TCP server with a specific IP, Port and with a serve_client worker
-let tcp_ip_server (sourceip, sourceport) (serve_client : TcpWorker<unit>) =
+let tcp_ip_server (sourceip : IPAddress, sourceport : uint16) (serve_client : TcpWorker<unit>) =
 
-  log "starting listener:%s:%d\n" sourceip sourceport
+  log "starting listener:%O:%d" sourceip sourceport
 
-  let server = new TcpListener(IPAddress.Parse(sourceip), sourceport)
+  let server = new TcpListener(sourceip, int sourceport)
   server.Server.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, (int)1)
   server.Start MAX_BACK_LOG
   //consider:
@@ -63,7 +63,10 @@ let tcp_ip_server (sourceip, sourceport) (serve_client : TcpWorker<unit>) =
         let! client = server.AsyncAcceptTcpClient()
         //let remoteAddress = (client.Client.RemoteEndPoint :?> IPEndPoint).Address
         Async.Start (job client, token)
-    with x -> log "Tcp server failed.\n%A\n" x
+      return ()
+    with x ->
+      log "Tcp server failed.\n%A\n" x
+      return ()
   }
 
 /// Get the stream from the TCP client

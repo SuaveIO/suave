@@ -73,6 +73,7 @@ let proxy proxy_resolver (r : HttpRequest) =
 /// Run a proxy server with the given configuration and given proxy resolver
 let proxy_server config resolver =
   config.bindings
-  |> Array.map (fun (proto,ip,port) -> tcp_ip_server (ip,port) (request_loop (warbler(fun http -> proxy resolver http)) proto (process_request true) config.error_handler config.timeout))
+  |> List.map (fun { scheme = proto; ip = ip; port = port } ->
+      tcp_ip_server (ip,port) (request_loop (warbler (fun http -> proxy resolver http)) proto (process_request true) config.error_handler config.timeout))
   |> Async.Parallel
   |> Async.Ignore

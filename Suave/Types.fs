@@ -70,14 +70,45 @@ type HttpRequest() =
 open System.Security.Cryptography.X509Certificates
 
 /// Gets the supported protocols, HTTP and HTTPS with a certificate
-type Protocols =
+type Protocol =
   /// The HTTP protocol is the core protocol
   | HTTP
   /// The HTTP protocol tunneled in a TLS tunnel
   | HTTPS of X509Certificate
+with
+  static member FromString(scheme : string, ?cert) =
+    match scheme.ToLowerInvariant() with
+    | "http" ->
+      HTTP
+    | "https" ->
+      if cert.IsNone then invalidArg "cert" "must supply a cert if you choose HTTPS protocol"
+      HTTPS (cert.Value)
+    | _ ->
+      invalidArg "scheme" "must supply 'http|https'"
+  override x.ToString() =
+    match x with
+    | HTTP    -> "http"
+    | HTTPS _ -> "https"
+
+open System.Net
 
 /// A HTTP binding is a protocol is the product of HTTP or HTTP, a DNS or IP binding and a port number
-type HttpBinding = Protocols * string * int
+type HttpBinding =
+  /// The scheme in use
+  { scheme : Protocol
+  /// The host or IP address to bind to. This will be interpreted by the operating system
+  ; ip     : IPAddress
+  /// The port for the binding
+  ; port   : uint16 }
+with
+  static member Create(proto, ip : string, port : int) =
+    { scheme = proto
+    ; ip     = IPAddress.Parse ip
+    ; port   = uint16 port }
+  /// Overrides the default ToString() method to provide an implementation that is assignable
+  /// to a BaseUri for a RestClient/HttpClient.
+  override x.ToString() =
+    sprintf "%O://%O:%d/" x.scheme x.ip x.port
 
 /// A web part is a thing that executes on a HttpRequest, asynchronously, maybe executing
 /// on the request.
@@ -87,11 +118,20 @@ type WebPart = HttpRequest -> Async<unit> option
 /// an asynchronous workflow for the handling of the error.
 type ErrorHandler = Exception -> String -> HttpRequest -> Async<unit>
 
+open System.Threading
+
 /// The core configuration of suave
 type Config =
-  { bindings      : HttpBinding array
+  /// The bindings for the web server to launch with
+  { bindings      : HttpBinding list
+  /// An error handler to use for handling exceptions that are
+  /// are thrown from the web parts
   ; error_handler : ErrorHandler
-  ; timeout       : int }
+  /// Timeout for responses to be generated
+  ; timeout       : TimeSpan
+  /// A cancellation token for the web server. Signalling this token
+  /// means that the web server shuts down
+  ; ct            : CancellationToken }
 
 /// An exception, raised e.g. if writing to the stream fails
 exception InternalFailure of string

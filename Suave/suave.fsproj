@@ -56,6 +56,7 @@
     <Compile Include="Tcp.fs" />
     <Compile Include="Sscanf.fs" />
     <Compile Include="Types.fs" />
+    <Compile Include="Http.fsi" />
     <Compile Include="Http.fs" />
     <Compile Include="Web.fs" />
     <Compile Include="Template.fs" />
