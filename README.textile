@@ -60,8 +60,9 @@ let http_form _ =
     ; POST >>= url "/query" >>= warbler(fun x -> OK ("Hello " + (x.Form)  ? name))
     ; notfound "Found no handlers" ]
 
-// or alternatively with >>== = warbler
+p. or alternatively with @>>== = warbler@
 
+pre. 
 let http_form _ = 
   choose
     [ GET  >>= url "/query" >>== (fun x -> OK ("Hello " + (x.Query) ? name))
@@ -75,9 +76,7 @@ pre.
 let requires_authentication _ = 
   choose
     [ GET >>= url "/public" >>= OK "Hello anonymous"
-
     //access to handlers bellow this one will require authentication
-
     ; authenticate_basic (fun x -> x.Username.Equals("foo") && x.Password.Equals("bar"))
     ; GET >>= url "/protected" >>== (fun x -> OK ("Hello " + x.Username)) ]
 
@@ -198,7 +197,7 @@ p.
 Let type annotations be specified with spaces after the argument symbol and before
 the type.
 
-pre. tatic member FromString(scheme : string, ?cert) =
+pre. static member FromString(scheme : string, ?cert) =
 
 p. Method formatting with no spaces after/before normal parenthesis
 
