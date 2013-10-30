@@ -334,6 +334,7 @@ let request_loop webpart proto (processor : HttpProcessor) error_handler (timeou
     | Some (request : HttpRequest) ->
       try
         do! unblock (fun _ -> Async.RunSynchronously(run request, int (timeout.TotalMilliseconds)))
+        do! stream.FlushAsync()
       with
         | InternalFailure(_) as ex  -> raise ex
         | :? TimeoutException as ex -> do! error_handler ex "script timeout" request
@@ -342,7 +343,6 @@ let request_loop webpart proto (processor : HttpProcessor) error_handler (timeou
       | Some (x : string)  when x.ToLower().Equals("keep-alive") -> return! loop ()
       | _ -> return ()
     | None -> return ()
-    do! stream.FlushAsync()
   }
   async {
     try
