@@ -234,11 +234,9 @@ let parse_multipart (stream : Stream) boundary (request : HttpRequest) ahead =
 
 /// Process the request, reading as it goes from the incoming 'stream', yielding a HttpRequest
 /// when done
-let process_request proxyMode (stream : Stream) remoteip = async {
+let process_request proxyMode (request: HttpRequest) = async {
 
-  let request = new HttpRequest()
-  request.Stream <- stream
-  request.RemoteAddress <- remoteip
+  let stream = request.Stream
 
   let! (first_line : string), rem = read_line stream Array.empty
 
@@ -298,7 +296,7 @@ let load_stream proto (stream : Stream) =
 open System.Net.Sockets
 
 /// A HttpProcessor takes a string and a listening IP, returning a HttpRequest that has been processed
-type HttpProcessor = Stream -> String -> Async<HttpRequest option>
+type HttpProcessor = HttpRequest -> Async<HttpRequest option>
 type RequestResult = Done
 
 /// The request loop initialises a request against a web part, with a protocol, a processor to handle the
@@ -326,11 +324,17 @@ let request_loop webpart proto (processor : HttpProcessor) error_handler (timeou
         |> load_stream proto
   let remote_endpoint = (client.Client.RemoteEndPoint :?> IPEndPoint)
   let ipaddr = remote_endpoint.Address.ToString()
+  
 
   let rec loop _ = async {
-    let! result = processor stream ipaddr
+  
+    use request = new HttpRequest()
+    request.Stream <- stream
+    request.RemoteAddress <- ipaddr
+    request.IsSecure <- match proto with HTTP -> false | HTTPS _ -> true
+    
+    let! result = processor request
     match result with
-    //TODO: figure out how to dispose request
     | Some (request : HttpRequest) ->
       try
         do! unblock (fun _ -> Async.RunSynchronously(run request, int (timeout.TotalMilliseconds)))

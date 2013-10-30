@@ -63,6 +63,8 @@ module Http =
   let url    s (x : HttpRequest) = if s = x.Url    then Some x else None
 
   let meth0d s (x : HttpRequest) = if s = x.Method then Some x else None
+  
+  let is_secure(x : HttpRequest) = if x.IsSecure   then Some x else None
 
   // see http://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html
   // see Http.fsi for documentation

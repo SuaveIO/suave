@@ -33,6 +33,7 @@ type HttpRequest() =
   let mutable sessionId     : string = null
   let mutable response      : HttpResponse = new HttpResponse()
   let mutable files         : List<HttpUpload> = new List<HttpUpload>()
+  let mutable isSecure      : bool = false
 
   member h.Url           with get() = url and set x = url <- x
   member h.Method        with get() = meth0d and set x = meth0d <- x
@@ -49,6 +50,7 @@ type HttpRequest() =
   member h.SessionId     with get() = sessionId and set x = sessionId <- x
   member h.Response      with get() = response
   member h.Files         with get() = files
+  member h.IsSecure      with get() = isSecure and set x = isSecure <- x
 
   member private h.Dispose(disposing : bool) =
     if disposing then
