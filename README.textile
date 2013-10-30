@@ -121,7 +121,7 @@ h2. Default-supported HTTP Verbs
 
 See "RFC 2616":http://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html.
 
-pre.
+pre. 
 /// Match on GET requests
 let GET     (x : HttpRequest) = meth0d "GET" x
 /// Match on POST requests
@@ -153,6 +153,7 @@ type Protocol =
   /// The HTTP protocol tunneled in a TLS tunnel
   | HTTPS of X509Certificate
 
+pre. 
 /// A HTTP binding is a protocol is the product of HTTP or HTTP, a DNS or IP binding and a port number
 type HttpBinding =
   /// The scheme in use
@@ -162,6 +163,7 @@ type HttpBinding =
   /// The port for the binding
   ; port   : uint16 }
 
+pre. 
 /// The core configuration of suave
 type Config =
   /// The bindings for the web server to launch with
