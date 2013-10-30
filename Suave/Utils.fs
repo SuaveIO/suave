@@ -120,14 +120,14 @@ let EOL = bytes eol
 /// as ASCII encoded text
 let async_writeln (stream : Stream) s = async {
   let b = bytes s
-  do! stream.AsyncWrite(b, 0, b.Length)
+  if b.Length > 0 then do! stream.AsyncWrite(b, 0, b.Length)
   do! stream.AsyncWrite(EOL, 0, 2)
 }
 
 /// Write the string s to the stream asynchronously
 /// from a byte array
-let async_writebytes (stream:Stream) b = async {
-  do! stream.AsyncWrite(b, 0, b.Length)
+let async_writebytes (stream:Stream) (b: byte[]) = async {
+  if b.Length > 0 then do! stream.AsyncWrite(b, 0, b.Length)
 }
 
 /// Launch the function f on its own asynchronous/thread context

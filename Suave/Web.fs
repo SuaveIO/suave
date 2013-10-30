@@ -279,9 +279,8 @@ let process_request proxyMode (stream : Stream) remoteip = async {
 }
 
 open System.Net
-open System.Net.Security
-open System.Security.Authentication
-open System.Security.Cryptography.X509Certificates;
+open OpenSSL.SSL
+open OpenSSL.X509
 
 open Types
 
@@ -293,7 +292,7 @@ let load_stream proto (stream : Stream) =
   | HTTP       -> stream
   | HTTPS cert ->
     let sslStream = new SslStream(stream, true)
-    sslStream.AuthenticateAsServer(cert, false, SslProtocols.Default, true)
+    sslStream.AuthenticateAsServer(cert)
     sslStream :> Stream
 
 open System.Net.Sockets

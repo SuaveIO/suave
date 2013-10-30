@@ -1,17 +1,19 @@
 
 open System
 open System.Net
-open System.Security.Cryptography.X509Certificates;
 
 open Suave.Web
 open Suave.Http
 open Suave.Types
 open Suave.Session
 
+open OpenSSL.X509
+open OpenSSL.Core
+
 let basic_auth  : WebPart =
   authenticate_basic ( fun x -> x.Username.Equals("foo") && x.Password.Equals("bar"))
 
-let sslCert = new X509Certificate("suave.pfx","easy");
+let sslCert = X509Certificate.FromPKCS12(BIO.File("suave.p12","r"),"easy")
 
 let myapp : WebPart =
   choose [
@@ -76,7 +78,7 @@ choose [
   |> web_server
       { bindings =
         [ HttpBinding.Create(HTTP, "127.0.0.1", 8082)
-        ; (*{ scheme = HTTPS(sslCert); ip = IPAddress.Parse "127.0.0.1"; port = 8083us }*) ]
+        ; { scheme = HTTPS(sslCert); ip = IPAddress.Parse "127.0.0.1"; port = 8083us } ]
       ; error_handler = default_error_handler
       ; timeout       = TimeSpan.FromMilliseconds 1000.
       ; ct             = Async.DefaultCancellationToken }

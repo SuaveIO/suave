@@ -67,7 +67,7 @@ type HttpRequest() =
     member h.Dispose() =
       h.Dispose true
 
-open System.Security.Cryptography.X509Certificates
+open OpenSSL.X509
 
 /// Gets the supported protocols, HTTP and HTTPS with a certificate
 type Protocol =
