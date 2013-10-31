@@ -25,6 +25,9 @@ module Http =
 
   /// Match on the method
   val meth0d : s:string -> x:HttpRequest -> HttpRequest option
+  
+  /// Match on the protocol
+  val is_secure : x:HttpRequest -> HttpRequest option
 
   /// <summary>
   /// Match on GET requests.
