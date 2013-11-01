@@ -306,7 +306,7 @@ let load_stream proto (stream : Stream) =
 
 open System.Net.Sockets
 
-/// A HttpProcessor takes a string and a listening IP, returning a HttpRequest that has been processed
+/// A HttpProcessor takes a HttpRequest instance, returning asynchronously a HttpRequest that has been parsed
 type HttpProcessor = HttpRequest -> Async<HttpRequest option>
 type RequestResult = Done
 
