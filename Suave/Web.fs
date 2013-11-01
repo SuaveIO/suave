@@ -160,8 +160,13 @@ let parse_url (line : string) =
     (parts.[0],parts.[1],empty_query_string (), String.Empty)
 
 /// Read the post data from the stream, given the number of bytes that makes up the post data.
-let read_post_data (stream : Stream) (bytes : int) =
-  stream.AsyncRead(bytes)
+let read_post_data (stream : Stream) (bytes : int) (read : byte[]) = async {
+    if read.Length >= bytes then
+      return (Array.sub read 0 bytes, Array.sub read bytes (read.Length - bytes))
+    else 
+      let! missing = stream.AsyncRead(bytes - read.Length)
+      return (Array.append read missing, Array.zeroCreate(0))
+  }
 
 /// Parse the cookie data in the string into a dictionary
 let parse_cookie (s : string) =
@@ -190,12 +195,12 @@ let header_params (header : string option) =
   | _ -> failwith "did not find header: %s." header
 
 /// Parses multipart data from the stream, feeding it into the HttpRequest's property Files.
-let parse_multipart (stream : Stream) boundary (request : HttpRequest) ahead =
+let parse_multipart (stream : Stream) boundary (request : HttpRequest) (ahead : byte[]) : Async<byte[]> =
   let rec loop boundary read = async {
 
     let! firstline, read = read_line stream read
 
-    if firstline.Equals boundary then
+    if not(firstline.Equals("--")) then
 
       let! part_headers,rem = read_headers stream read
 
@@ -205,32 +210,36 @@ let parse_multipart (stream : Stream) boundary (request : HttpRequest) ahead =
 
       let content_type = look_up part_headers "content-type"
 
-      match content_type with
-      | Some(x) when x.StartsWith("multipart/mixed") ->
-        let subboundary = "--" + x.Substring(x.IndexOf('=') + 1).TrimStart()
-        return! loop subboundary rem
-      | Some(x) ->
-        let temp_file_name = Path.GetTempFileName()
-        use temp_file = new FileStream(temp_file_name,FileMode.Truncate)
-        let! count,rem = read_until (bytes("\r\n" + boundary)) (fun x y -> async { printfn "y = %d" y;do! temp_file.AsyncWrite(x,0,y) } ) stream read 10485760
-        let file_leght = temp_file.Length
-        temp_file.Close()
-        if  file_leght > int64(0) then
-          let filename =
-            (header_params content_disposition) ? filename |> opt
-          request.Files.Add(new HttpUpload(fieldname,filename,content_type |> opt,temp_file_name))
-        else
-          File.Delete temp_file_name
-          printfn "upload failed"
-      | None ->
-        use mem = new MemoryStream()
-        
-        let! count,rem = read_until (bytes("\r\n" + boundary)) (fun x y -> async { printfn "y = %d" y;do! mem.AsyncWrite(x,0,y) } ) stream rem 10485760
+      return! parse_content content_type content_disposition fieldname rem
+    else return Array.zeroCreate(0)
+    }
+  and parse_content content_type content_disposition fieldname rem = async {
+    match content_type with
+    | Some(x) when x.StartsWith("multipart/mixed") ->
+      let subboundary = "--" + x.Substring(x.IndexOf('=') + 1).TrimStart()
+      return! loop subboundary rem
+    | Some(x) ->
+      let temp_file_name = Path.GetTempFileName()
+      use temp_file = new FileStream(temp_file_name,FileMode.Truncate)
+      let! a,b = read_until (bytes("\r\n" + boundary)) (fun x y -> async { do! temp_file.AsyncWrite(x,0,y) } ) stream rem 10485760
+      let file_leght = temp_file.Length
+      temp_file.Close()
+      if  file_leght > int64(0) then
+        let filename =
+          (header_params content_disposition) ? filename |> opt
+        request.Files.Add(new HttpUpload(fieldname,filename,content_type |> opt,temp_file_name))
+      else
+        File.Delete temp_file_name
+      return! loop boundary b
+    | None ->
+      use mem = new MemoryStream()
+      let! a,b = read_until (bytes("\r\n" + boundary)) (fun x y -> async { do! mem.AsyncWrite(x,0,y) } ) stream rem 10485760
+      let byts = mem.ToArray()
+      request.Form.Add(fieldname, (to_string byts 0 byts.Length)) 
 
-        let byts = mem.ToArray()
-        request.Form.Add(fieldname, (to_string byts 0 byts.Length))
-  }
-  loop boundary ahead
+      return! loop boundary b
+    }
+  loop boundary ahead 
 
 /// Process the request, reading as it goes from the incoming 'stream', yielding a HttpRequest
 /// when done
@@ -265,13 +274,15 @@ let process_request proxyMode (request: HttpRequest) = async {
         let content_length = Convert.ToInt32(headers.["content-length"])
 
         if content_enconding.StartsWith("application/x-www-form-urlencoded") then
-          let! rawdata = read_post_data stream content_length
+          let! rawdata,_ = read_post_data stream content_length rem
           let form_data = parse_data (to_string rawdata 0 rawdata.Length)
           request.Form    <- form_data
           request.RawForm <- rawdata
         elif content_enconding.StartsWith("multipart/form-data") then
           let boundary = "--" + content_enconding.Substring(content_enconding.IndexOf('=')+1).TrimStart()
-          do! parse_multipart stream boundary request rem
+          let! (rem : byte[]) = parse_multipart stream boundary request rem
+          assert (rem.Length = 0)
+          return ()
 
     return Some(request)
 }
