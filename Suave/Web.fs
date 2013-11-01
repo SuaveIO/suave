@@ -292,7 +292,7 @@ let process_request proxyMode (request: HttpRequest) = async {
           assert (rem.Length = 0)
           return ()
 
-    return Some(request)
+    return Some request
 }
 
 open System.Net
