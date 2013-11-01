@@ -229,7 +229,7 @@ let parse_multipart (stream : Stream) boundary (request : HttpRequest) (ahead : 
     | Some(x) ->
       let temp_file_name = Path.GetTempFileName()
       use temp_file = new FileStream(temp_file_name,FileMode.Truncate)
-      let! a,b = read_until (bytes("\r\n" + boundary)) (fun x y -> async { do! temp_file.AsyncWrite(x,0,y) } ) stream rem BIG_BUFFER_SIZE
+      let! a,b = read_until (bytes(eol + boundary)) (fun x y -> async { do! temp_file.AsyncWrite(x,0,y) } ) stream rem BIG_BUFFER_SIZE
       let file_leght = temp_file.Length
       temp_file.Close()
       if  file_leght > int64(0) then
@@ -241,7 +241,7 @@ let parse_multipart (stream : Stream) boundary (request : HttpRequest) (ahead : 
       return! loop boundary b
     | None ->
       use mem = new MemoryStream()
-      let! a,b = read_until (bytes("\r\n" + boundary)) (fun x y -> async { do! mem.AsyncWrite(x,0,y) } ) stream rem BIG_BUFFER_SIZE
+      let! a,b = read_until (bytes(eol + boundary)) (fun x y -> async { do! mem.AsyncWrite(x,0,y) } ) stream rem BIG_BUFFER_SIZE
       let byts = mem.ToArray()
       request.Form.Add(fieldname, (to_string byts 0 byts.Length)) 
 
