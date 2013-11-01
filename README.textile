@@ -60,8 +60,9 @@ let http_form _ =
     ; POST >>= url "/query" >>= warbler(fun x -> OK ("Hello " + (x.Form)  ? name))
     ; notfound "Found no handlers" ]
 
-// or alternatively with >>== = warbler
+p. or alternatively with @>>== = warbler@
 
+pre. 
 let http_form _ = 
   choose
     [ GET  >>= url "/query" >>== (fun x -> OK ("Hello " + (x.Query) ? name))
@@ -75,9 +76,7 @@ pre.
 let requires_authentication _ = 
   choose
     [ GET >>= url "/public" >>= OK "Hello anonymous"
-
     //access to handlers bellow this one will require authentication
-
     ; authenticate_basic (fun x -> x.Username.Equals("foo") && x.Password.Equals("bar"))
     ; GET >>= url "/protected" >>== (fun x -> OK ("Hello " + x.Username)) ]
 
@@ -121,7 +120,7 @@ h2. Default-supported HTTP Verbs
 
 See "RFC 2616":http://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html.
 
-pre.
+pre. 
 /// Match on GET requests
 let GET     (x : HttpRequest) = meth0d "GET" x
 /// Match on POST requests
@@ -153,6 +152,7 @@ type Protocol =
   /// The HTTP protocol tunneled in a TLS tunnel
   | HTTPS of X509Certificate
 
+pre. 
 /// A HTTP binding is a protocol is the product of HTTP or HTTP, a DNS or IP binding and a port number
 type HttpBinding =
   /// The scheme in use
@@ -162,6 +162,7 @@ type HttpBinding =
   /// The port for the binding
   ; port   : uint16 }
 
+pre. 
 /// The core configuration of suave
 type Config =
   /// The bindings for the web server to launch with
@@ -196,7 +197,7 @@ p.
 Let type annotations be specified with spaces after the argument symbol and before
 the type.
 
-pre. tatic member FromString(scheme : string, ?cert) =
+pre. static member FromString(scheme : string, ?cert) =
 
 p. Method formatting with no spaces after/before normal parenthesis
 
