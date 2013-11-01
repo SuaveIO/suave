@@ -15,6 +15,14 @@ open System.Collections.Generic
 
 open Http
 
+/// Chunk sizes
+
+/// When parsing headers and lines we will prefer reading from the stream in small chunk sizes
+let SHORT_BUFFER_SIZE = 512
+
+/// When parsing POST data and file uploads we will read from the stream in larger chunk sizes
+let BIG_BUFFER_SIZE = 1048576
+
 /// Returns the index of the first CRLF in the buffer
 let scan_crlf (b : byte[]) =
   let rec loop i =
@@ -47,7 +55,7 @@ let read_till_EOL (stream : Stream) (buff : byte[]) (preread : byte[]) chunk_siz
 
   and read_data count (ahead : byte[])  = async {
 
-    let inp = Array.zeroCreate 512
+    let inp = Array.zeroCreate SHORT_BUFFER_SIZE
 
     let! bytesread = stream.AsyncRead inp
     if bytesread <> 0 then
@@ -99,13 +107,13 @@ let _read_till_EOL (stream : Stream) (buff : byte[]) (preread : byte[]) =
 let to_string (buff : byte[]) (index : int) (count : int) =
   Encoding.ASCII.GetString(buff, index, count)
 
-/// The max buffer to use when dealing with streams
+/// The maximun line size we will read from the stream
 let max_line_size = 1024
 
 /// Read a line from the stream, calling to_string on the bytes before the EOL marker
 let read_line stream ahead = async {
   let buf = Array.zeroCreate max_line_size
-  let! count, rem = read_till_EOL stream buf ahead 512
+  let! count, rem = read_till_EOL stream buf ahead SHORT_BUFFER_SIZE
   return (to_string buf 0 count, rem)
 }
 
@@ -114,7 +122,7 @@ let read_headers stream read =
   let headers = new Dictionary<string,string>()
   let rec loop (rem: byte[]) = async {
     let buf = Array.zeroCreate max_line_size
-    let! count,new_rem = read_till_EOL stream buf rem 512
+    let! count,new_rem = read_till_EOL stream buf rem SHORT_BUFFER_SIZE
     if count <> 0 then
       let line = to_string buf 0 count
       let indexOfColon = line.IndexOf(':')
@@ -221,7 +229,7 @@ let parse_multipart (stream : Stream) boundary (request : HttpRequest) (ahead : 
     | Some(x) ->
       let temp_file_name = Path.GetTempFileName()
       use temp_file = new FileStream(temp_file_name,FileMode.Truncate)
-      let! a,b = read_until (bytes("\r\n" + boundary)) (fun x y -> async { do! temp_file.AsyncWrite(x,0,y) } ) stream rem 10485760
+      let! a,b = read_until (bytes("\r\n" + boundary)) (fun x y -> async { do! temp_file.AsyncWrite(x,0,y) } ) stream rem BIG_BUFFER_SIZE
       let file_leght = temp_file.Length
       temp_file.Close()
       if  file_leght > int64(0) then
@@ -233,7 +241,7 @@ let parse_multipart (stream : Stream) boundary (request : HttpRequest) (ahead : 
       return! loop boundary b
     | None ->
       use mem = new MemoryStream()
-      let! a,b = read_until (bytes("\r\n" + boundary)) (fun x y -> async { do! mem.AsyncWrite(x,0,y) } ) stream rem 10485760
+      let! a,b = read_until (bytes("\r\n" + boundary)) (fun x y -> async { do! mem.AsyncWrite(x,0,y) } ) stream rem BIG_BUFFER_SIZE
       let byts = mem.ToArray()
       request.Form.Add(fieldname, (to_string byts 0 byts.Length)) 
 
