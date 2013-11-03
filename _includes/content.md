@@ -51,7 +51,7 @@ let nested_logic _ =
         ; url "/goodbye" >>= OK "Good bye POST" ] ]
 {% endhighlight %}
 
-To gain access to the underlying `HttpRequest` and read query and http form data we can use the warbler* combinator.
+To gain access to the underlying `HttpRequest` and read query and http form data we can use the `warbler` combinator.
 
 {% highlight fsharp %}
 let http_form _ = 
@@ -61,7 +61,7 @@ let http_form _ =
     ; notfound "Found no handlers" ]
 {% endhighlight %}
 
-or alternatively with `>>== = warbler`
+or alternatively with `>>==`
 
 {% highlight fsharp %}
 let http_form _ = 
@@ -82,7 +82,7 @@ let requires_authentication _ =
     ; GET >>= url "/protected" >>== (fun x -> OK ("Hello " + x.Username)) ]
 {% endhighlight %}
 
-*warbler gets its name from the famous book "To Mock a Mockingbird" by Raymond Smullyan.
+`warbler` gets its name from the famous book "To Mock a Mockingbird" by Raymond Smullyan.
 
 Typed routes
 ------------
@@ -187,6 +187,9 @@ type Config =
   ; ct            : CancellationToken }
 {% endhighlight %}
 
-*bindings* array of bindings of the form _protocol, ip address, port_
-*error_handler* a handler to deal with runtime errors
-*timeout* maximun number of milliseconds before killing a request
+- `bindings` array of bindings of the form _protocol, ip address, port_
+
+- `error_handler` a handler to deal with runtime errors
+
+- `timeout` maximun number of milliseconds before killing a request
+
