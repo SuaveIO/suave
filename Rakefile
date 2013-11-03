@@ -12,7 +12,9 @@ nugets_restore :restore do |p|
 end
 
 desc "Perform full build"
-build :build => [:versioning, :restore] do |b|
+task :build => [:versioning, :restore, :build_quick]
+
+build :build_quick do |b|
   b.file = 'suave.sln'
   b.prop 'Configuration', 'Release'
 end
