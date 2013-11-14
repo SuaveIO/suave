@@ -4,6 +4,7 @@ module Http =
   open System
   open System.IO
   open System.Text
+  open System.Text.RegularExpressions
   open System.Threading.Tasks
 
   open Utils
@@ -65,6 +66,8 @@ module Http =
   let meth0d s (x : HttpRequest) = if s = x.Method then Some x else None
   
   let is_secure(x : HttpRequest) = if x.IsSecure   then Some x else None
+
+  let url_regex s (x : HttpRequest) = if Regex.IsMatch(x.Url,s) then Some x else None
 
   // see http://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html
   // see Http.fsi for documentation

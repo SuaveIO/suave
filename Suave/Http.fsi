@@ -29,6 +29,9 @@ module Http =
   /// Match on the protocol
   val is_secure : x:HttpRequest -> HttpRequest option
 
+  /// Applies the regex to the url and matchs on the result
+  val url_regex : s:string -> x:HttpRequest -> HttpRequest option
+
   /// <summary>
   /// Match on GET requests.
   /// <para>The GET method means retrieve whatever information (in the form of an entity) is

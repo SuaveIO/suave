@@ -45,7 +45,9 @@ let timeout r =
 
 choose [
   Console.OpenStandardOutput() |> log >>= never ;
+
   GET >>= url "/hello" >>= never ;
+  url_regex "(.*?)\.(dll|mdb|log)$" >>= FORBIDDEN "Access denied."
   url "/neverme" >>= never >>= OK (Guid.NewGuid().ToString()) ;
   url "/guid" >>= OK (Guid.NewGuid().ToString()) ;
   url "/hello" >>= OK "Hello World" ;
