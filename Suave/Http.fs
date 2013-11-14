@@ -23,7 +23,7 @@ module Http =
       let stream:Stream = request.Stream
 
       do! async_writeln stream (sprintf "%s %d %s" HTTP_VERSION status_code reason_phrase)
-      do! async_writeln stream (sprintf "Server: Suave/%s (http://suaveframework.com)" SUAVE_VERSION)
+      do! async_writeln stream (sprintf "Server: Suave/%s (http://suave.io)" SUAVE_VERSION)
       do! async_writeln stream (sprintf "Date: %s" (DateTime.UtcNow.ToString("R")))
 
       for (x,y) in request.Response.Headers do
