@@ -231,11 +231,25 @@ module Http =
 
     async { do! response_f 200 "OK" (write_file filename) r } |> succeed
 
+  let CACHE_CONTROL_MAX_AGE = 600
+
   let file filename =
     if File.Exists filename then
       let file_info = new FileInfo(filename)
-      let mimes = mime_type (file_info.Extension)
-      set_mime_type mimes >> send_file (filename)
+      let send_it _ = 
+        let mimes = mime_type (file_info.Extension)
+        set_header "Cache-Control" (sprintf "max-age=%d" CACHE_CONTROL_MAX_AGE)
+        >> set_header "Last-Modified" (file_info.LastAccessTimeUtc.ToString("R")) 
+        >> set_header "Expires" (DateTime.UtcNow.AddSeconds(float(CACHE_CONTROL_MAX_AGE)).ToString("R")) 
+        >> set_mime_type mimes 
+        >> send_file (filename)
+      warbler ( fun (r:HttpRequest) ->
+        let modified_since = (r.Headers ? ``if-modified-since`` )
+        match modified_since with
+        | Some v -> let date = DateTime.Parse v
+                    if file_info.LastWriteTime > date then send_it ()
+                    else NOT_MODIFIED
+        | None   -> send_it ())
     else
       never
 
