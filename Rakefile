@@ -78,17 +78,19 @@ task :increase_version_number do
   s = SemVer.find
   s.patch += 1
   s.save
+  ENV['NUGET_VERSION'] = s.format("%M.%m.%p%s")
 end
 
 desc 'release the next version'
 task :release_next => [ :increase_version_number, :assembly_info , :create_nuget ] do
-  s = SemVer.find
+  s = SemVer.find.format("%M.%m.%p%s")
   # commit and tag
-  system %w[git add .semver]
-  system %w[git add Suave/AssemblyInfo.fs]
-  system %W[git commit -m "released v#{s.to_s}"]
+  system %q[git add .semver]
+  system %q[git add Suave/AssemblyInfo.fs]
+  system "git commit -m \"released v#{s.to_s}\""
 #  Rake::Tasks['build'].invoke
-  system %w[buildsupport/NuGet.exe push #{ENV['NUGET_KEY']} build/pkg/suave.#{s.to_s}.nupkg]
+  system "mono buildsupport/NuGet.exe setApiKey #{ENV['NUGET_KEY']}"
+  system "mono buildsupport/NuGet.exe push build/pkg/suave.#{s.to_s}.nupkg"
 end
 
 task :default => :create_nuget
