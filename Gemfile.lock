@@ -1,9 +1,9 @@
 GIT
   remote: git://github.com/Albacore/albacore.git
-  revision: 857689b3b03a39c2a8b8434aba29231bafefb5d1
+  revision: 10948054d69797d3062e2983d1ad588b5131e46e
   branch: clean_slate
   specs:
-    albacore (0.7.2)
+    albacore (2.0.0.rc.2)
       ProcessPilot (~> 2.0)
       facter (~> 1.7)
       highline (~> 1.6)
@@ -19,9 +19,9 @@ GEM
     ProcessPilot (2.0.0.20120301)
       rUtilAnts (>= 1.0)
     facter (1.7.3)
-    highline (1.6.19)
+    highline (1.6.20)
     map (6.5.1)
-    mini_portile (0.5.1)
+    mini_portile (0.5.2)
     nokogiri (1.6.0)
       mini_portile (~> 0.5.0)
     rUtilAnts (2.0.0.20130827)
