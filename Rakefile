@@ -24,10 +24,12 @@ build :build_quick do |b|
   b.prop 'Configuration', 'Release'
 end
 
+directory 'build/pkg'
+
 desc "Create a nuget for Suave"
-task :create_nuget => ['build/pkg', :versioning, :build] do |p|
+task :create_nuget => [ 'build/pkg', :versioning, :build] do |p|
   p = Albacore::NugetModel::Package.new.with_metadata do |m|
-    m.id            = "suave"
+    m.id            = "Suave"
     m.version       = ENV['NUGET_VERSION']
     m.authors       = 'Ademar Gonzalez'
     m.description   = 'Suave is a simple web development F# library providing a lightweight web server and a set of combinators to manipulate route flow and task composition.'
