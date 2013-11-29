@@ -108,6 +108,7 @@ module Http =
   /// currently cached entities, those entries SHOULD be treated as stale. Responses to this
   /// method are not cacheable. 
   /// </para>
+  /// </summary>
   val DELETE : x:HttpRequest -> HttpRequest option
 
   /// <summary><para>
@@ -263,7 +264,7 @@ module Http =
   /// 201
   /// </para><para>
   /// Write the bytes to the body as a byte array
-  /// </para></para>
+  /// </para><para>
   /// The request has been fulfilled and resulted in a new resource being
   /// created. The newly created resource can be referenced by the URI(s)
   /// returned in the entity of the response, with the most specific URI
@@ -542,7 +543,7 @@ module Http =
   /// </para><para>
   /// Redirect the request to another location specified by the url parameter.
   /// Sets the Location header and returns 302 Content Moved status-code/reason phrase.
-  /// </para></summay>
+  /// </para></summary>
   val redirect : location:string -> (HttpRequest -> Async<unit> option)
 
   /// <summary><para>
