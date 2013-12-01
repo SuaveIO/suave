@@ -52,20 +52,21 @@ Theme Styles
 *******************************************************************************/
 
 body {
-  box-sizing: border-box;
   color:#373737;
-  background: #212121;
+  background: #f26822;
   font-size: 16px;
   font-family: 'Myriad Pro', Calibri, Helvetica, Arial, sans-serif;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  margin: 0px;
+  padding: 0px;
 }
 
 h1, h2, h3, h4, h5, h6 {
   margin: 10px 0;
   font-weight: 700;
-  color:#222222;
-  font-family: 'Lucida Grande', 'Calibri', Helvetica, Arial, sans-serif;
+  color:#39bebe;
+  font-family: 'Roboto Slab', serif;
   letter-spacing: -1px;
 }
 
@@ -140,31 +141,17 @@ img {
   position: relative;
   margin: 0 auto;
   max-width: 739px;
-  padding: 5px;
-  margin: 10px 0 10px 0;
-  border: 1px solid #ebebeb;
-
-  box-shadow: 0 0 5px #ebebeb;
-  -webkit-box-shadow: 0 0 5px #ebebeb;
-  -moz-box-shadow: 0 0 5px #ebebeb;
-  -o-box-shadow: 0 0 5px #ebebeb;
-  -ms-box-shadow: 0 0 5px #ebebeb;
 }
 
 pre, code {
   width: 100%;
   color: #222;
   background-color: #fff;
-
   font-family: Monaco, "Bitstream Vera Sans Mono", "Lucida Console", Terminal, monospace;
   font-size: 14px;
-
   border-radius: 2px;
   -moz-border-radius: 2px;
   -webkit-border-radius: 2px;
-
-
-
 }
 
 pre {
@@ -260,98 +247,78 @@ Full-Width Styles
 
 .inner {
   position: relative;
+  top:0px;
+  left:0px;
   max-width: 800px;
-  padding: 20px 10px;
   margin: 0 auto;
+}
+
+#logo {
+  border-width: 0px;
+  float: left;
 }
 
 #forkme_banner {
   display: block;
   position: absolute;
-  top:0;
-  right: 10px;
+  right: 0px;
   z-index: 10;
   padding: 10px 50px 10px 10px;
   color: #fff;
-  background: url('../images/blacktocat.png') #0090ff no-repeat 95% 50%;
+  background: url('../images/blacktocat.png') #000000 no-repeat 95% 50%;
   font-weight: 700;
-  box-shadow: 0 0 10px rgba(0,0,0,.5);
   border-bottom-left-radius: 2px;
   border-bottom-right-radius: 2px;
 }
 
 #header_wrap {
-  background: #212121;
-  background: -moz-linear-gradient(top, #373737, #212121);
-  background: -webkit-linear-gradient(top, #373737, #212121);
-  background: -ms-linear-gradient(top, #373737, #212121);
-  background: -o-linear-gradient(top, #373737, #212121);
-  background: linear-gradient(top, #373737, #212121);
-}
-
-#header_wrap .inner {
-  padding: 50px 10px 30px 10px;
-}
-
-#project_title {
-  margin: 0;
-  color: #fff;
-  font-size: 42px;
-  font-weight: 700;
-  text-shadow: #111 0px 0px 10px;
 }
 
 #project_tagline {
   color: #fff;
   font-size: 24px;
-  font-weight: 300;
+  font-weight: normal;
   background: none;
-  text-shadow: #111 0px 0px 10px;
+  width: 455px;
+  float: left;
+  margin-top: 50px;
+  margin-left: 5px;
 }
 
 #downloads {
   position: absolute;
-  width: 210px;
+  width: 294px;
   z-index: 10;
-  bottom: -40px;
+  bottom: -300px;
   right: 0;
-  height: 70px;
+  height: 94px;
   background: url('../images/icon_download.png') no-repeat 0% 90%;
 }
 
 .zip_download_link {
   display: block;
   float: right;
-  width: 90px;
-  height:70px;
+  width: 117px;
+  height:94px;
   text-indent: -5000px;
   overflow: hidden;
-  background: url(../images/sprite_download.png) no-repeat bottom left;
+  background: url(../images/folder2.gif) no-repeat bottom left;
+  margin-left: 20px;
 }
 
 .tar_download_link {
   display: block;
   float: right;
-  width: 90px;
-  height:70px;
+  width: 117px;
+  height:94px;
   text-indent: -5000px;
   overflow: hidden;
-  background: url(../images/sprite_download.png) no-repeat bottom right;
-  margin-left: 10px;
-}
-
-.zip_download_link:hover {
-  background: url(../images/sprite_download.png) no-repeat top left;
-}
-
-.tar_download_link:hover {
-  background: url(../images/sprite_download.png) no-repeat top right;
+  background: url(../images/folder1.gif) no-repeat bottom right;
+  margin-left: 20px;
 }
 
 #main_content_wrap {
   background: #f2f2f2;
-  border-top: 1px solid #111;
-  border-bottom: 1px solid #111;
 }
 
 #main_content {
@@ -359,7 +326,6 @@ Full-Width Styles
 }
 
 #footer_wrap {
-  background: #212121;
 }
 
 
