@@ -45,7 +45,7 @@ let read_till_EOL (stream : Stream) (buff : byte[]) (preread : byte[]) chunk_siz
   and scan_data count (ahead : byte[]) = async {
     match scan_crlf ahead with
     | Some 0 ->
-      return (0, Array.sub ahead 2 (ahead.Length - 2))
+      return (count, Array.sub ahead 2 (ahead.Length - 2))
     | Some index ->
       Array.blit ahead 0 buff count (index)
       return (count + index, Array.sub ahead (index + 2) (ahead.Length - index - 2))
@@ -59,17 +59,20 @@ let read_till_EOL (stream : Stream) (buff : byte[]) (preread : byte[]) chunk_siz
 
     let! bytesread = stream.AsyncRead inp
     if bytesread <> 0 then
-
       let sub = Array.sub inp 0 bytesread
-      let inp = Array.append ahead sub
-
-      return! scan_data count inp
-    else return (0, ahead)
+      if ahead.Length = 0 then 
+        return! scan_data count sub
+      else
+        let inp = Array.append ahead sub
+        return! scan_data count inp
+    else return (count, ahead)
     }
   (loop 0 preread)
 
 /// Read the stream until the marker appears.
 let read_until (marker : byte array) (f : byte[] -> int -> Async<unit>) (stream : Stream) preread chunk_size =
+
+  let inp = Array.zeroCreate chunk_size
 
   let rec loop count (ahead : byte[]) = async {
       if ahead.Length > 0 then return! scan_data count ahead
@@ -78,23 +81,25 @@ let read_until (marker : byte array) (f : byte[] -> int -> Async<unit>) (stream 
   and scan_data count (data : byte[]) = async {
     match kmp marker data  with
     | Some 0 ->
-      return (0, Array.sub data marker.Length (data.Length - marker.Length))
+      return (count, Array.sub data marker.Length (data.Length - marker.Length))
     | Some index ->
       do! f data index
       return (count + index, Array.sub data (index + marker.Length) (data.Length - index - marker.Length))
-    | None -> return! read_data count data
+    | None -> 
+      do! f data (data.Length - marker.Length)
+      return! read_data (count + data.Length - marker.Length) (Array.sub data (data.Length - marker.Length) marker.Length)
     }
   and read_data count (ahead : byte[]) = async {
-      let inp = Array.zeroCreate chunk_size
 
       let! bytesread = stream.AsyncRead inp
       if bytesread <> 0 then
-
         let sub = Array.sub inp 0 bytesread
-        let inp = Array.append ahead sub
-
-        return! scan_data count inp
-      else return (0, ahead)
+        if ahead.Length = 0 then 
+          return! scan_data count sub
+        else
+          let inp = Array.append ahead sub
+          return! scan_data count inp
+      else return (count, ahead)
     }
   (loop 0 preread)
 
