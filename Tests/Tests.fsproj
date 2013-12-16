@@ -63,7 +63,7 @@
     <Reference Include="System.Core" />
     <Reference Include="System.Numerics" />
     <Reference Include="System.Net.Http" />
-    <ProjectReference Include="..\Suave\Suave.fsproj">
+    <ProjectReference Include="..\Suave\suave.fsproj">
       <Name>Suave</Name>
       <Project>{3dc9193e-bd0c-4486-9c58-56b630c36623}</Project>
       <Private>True</Private>
