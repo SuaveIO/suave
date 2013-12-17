@@ -24,6 +24,8 @@ GEM
     mini_portile (0.5.2)
     nokogiri (1.6.0)
       mini_portile (~> 0.5.0)
+    nokogiri (1.6.0-x86-mingw32)
+      mini_portile (~> 0.5.0)
     rUtilAnts (2.0.0.20130827)
     rake (10.1.0)
     rubyzip (0.9.9)
@@ -31,6 +33,7 @@ GEM
 
 PLATFORMS
   ruby
+  x86-mingw32
 
 DEPENDENCIES
   albacore!
