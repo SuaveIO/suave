@@ -205,7 +205,8 @@ let header_params (header : string option) =
   | Some x ->
     let parts = x.Split(';') |> Array.map (fun x -> x.TrimStart())
     parse_key_value_pairs (Array.sub parts 1 (parts.Length - 1))
-  | _ -> failwith "did not find header: %s." header
+  | None ->
+    failwith "did not find header, because header_params received None"
 
 /// Parses multipart data from the stream, feeding it into the HttpRequest's property Files.
 let parse_multipart (stream : Stream) boundary (request : HttpRequest) (ahead : byte[]) : Async<byte[]> =
