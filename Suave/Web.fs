@@ -257,13 +257,13 @@ let parse_multipart (stream : Stream) boundary (request : HttpRequest) (ahead : 
 
 /// Process the request, reading as it goes from the incoming 'stream', yielding a HttpRequest
 /// when done
-let process_request proxyMode (request: HttpRequest) = async {
+let process_request proxyMode (request: HttpRequest) bytes = async {
 
   let stream = request.Stream
 
-  let! (first_line : string), rem = read_line stream Array.empty
+  let! (first_line : string), rem = read_line stream bytes
 
-  if first_line.Length = 0 then return None
+  if first_line.Length = 0 then return (None ,rem)
   else
     let (meth, url, query, raw_query) as q = parse_url (first_line)
     request.Url      <- url
@@ -298,7 +298,7 @@ let process_request proxyMode (request: HttpRequest) = async {
           assert (rem.Length = 0)
           return ()
 
-    return Some request
+    return (Some request,rem)
 }
 
 open System.Net
@@ -321,7 +321,7 @@ let load_stream proto (stream : Stream) =
 open System.Net.Sockets
 
 /// A HttpProcessor takes a HttpRequest instance, returning asynchronously a HttpRequest that has been parsed
-type HttpProcessor = HttpRequest -> Async<HttpRequest option>
+type HttpProcessor = HttpRequest -> byte array -> Async<HttpRequest option * byte array>
 type RequestResult = Done
 
 /// The request loop initialises a request against a web part, with a protocol, a processor to handle the
@@ -351,14 +351,14 @@ let request_loop webpart proto (processor : HttpProcessor) error_handler (timeou
   let ipaddr = remote_endpoint.Address.ToString()
   
 
-  let rec loop _ = async {
+  let rec loop bytes = async {
   
     use request = new HttpRequest()
     request.Stream <- stream
     request.RemoteAddress <- ipaddr
     request.IsSecure <- match proto with HTTP -> false | HTTPS _ -> true
     
-    let! result = processor request
+    let! result, rem = processor request bytes
     match result with
     | Some (request : HttpRequest) ->
       try
@@ -369,13 +369,13 @@ let request_loop webpart proto (processor : HttpProcessor) error_handler (timeou
         | :? TimeoutException as ex -> do! error_handler ex "script timeout" request
         | ex -> do! error_handler ex "Routing request failed" request
       match request.Headers?connection with
-      | Some (x : string)  when x.ToLower().Equals("keep-alive") -> return! loop ()
+      | Some (x : string)  when x.ToLower().Equals("keep-alive") -> return! loop rem
       | _ -> return ()
     | None -> return ()
   }
   async {
     try
-      do! loop ()
+      do! loop Array.empty
     with
     | InternalFailure(_)
     | :? EndOfStreamException
