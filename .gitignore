@@ -8,3 +8,6 @@ suave.sln.DotSettings.user
 */test-results/*
 *.userprefs
 *.swp
+*.lock
+*.nuspec
+

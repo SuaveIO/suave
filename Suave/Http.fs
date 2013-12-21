@@ -12,7 +12,7 @@ module Http =
 
   // literals
 
-  let [<Literal>] SUAVE_VERSION = "0.0.3"
+  let SUAVE_VERSION = Reflection.Assembly.GetExecutingAssembly().GetName().Version.ToString()
 
   let [<Literal>] HTTP_VERSION = "HTTP/1.1"
 
