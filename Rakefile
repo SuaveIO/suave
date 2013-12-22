@@ -96,3 +96,17 @@ task :release_next => [ :increase_version_number, :assembly_info , :create_nuget
 end
 
 task :default => :create_nuget
+
+namespace :tests do
+  desc 'run a stress test'
+  task :stress do
+    # todo: run background server
+    system 'httperf --hog --server=localhost --port=3000 --uri=/ --rate=1000 --num-conns=1000 --num-calls=1000 --burst-length=20 --http-version=1.0'
+  end
+
+  desc 'run the property-based tests'
+  task :property do
+    # todo: use command abstraction to bridge mono/non-mono
+    system 'mono ./Tests/bin/Release/Tests.exe'
+  end
+end
