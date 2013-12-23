@@ -99,10 +99,10 @@ let stream (client : TcpClient) = client.GetStream()
 open System.IO
 
 /// Mirror the stream byte-by-byte, one byte at a time
-let mirror (clientStream:Stream) (serverStream:Stream) = async {
+let mirror (client_stream : Stream) (server_stream : Stream) = async {
   try
   while true do
-    let! onebyte = clientStream.AsyncRead(1)
-    do! serverStream.AsyncWrite(onebyte)
+    let! onebyte = client_stream.AsyncRead(1)
+    do! server_stream.AsyncWrite(onebyte)
   with _ -> ()
 }

@@ -28,7 +28,7 @@ let invoke object action args =
 /// Active Pattern that checks whether 'x' the string contains a pattern
 /// and if so, returns the Pat( ... ) value containing the key-value pair
 /// that was matched before and after ':'
-let (|Pat|NoPat|) (x:String) =
+let (|Pat|NoPat|) (x : String) =
   if x.Contains(":") then
     let index = x.IndexOf(':')
     Pat(x.Substring(0,index), x.Substring(index+1))

@@ -61,11 +61,11 @@ module Http =
 
   // filters/applicatives
 
-  let url    s (x : HttpRequest) = if s = x.Url    then Some x else None
+  let url s (x : HttpRequest) = if s = x.Url then Some x else None
 
   let meth0d s (x : HttpRequest) = if s = x.Method then Some x else None
-  
-  let is_secure(x : HttpRequest) = if x.IsSecure   then Some x else None
+
+  let is_secure (x : HttpRequest) = if x.IsSecure then Some x else None
 
   let url_regex s (x : HttpRequest) = if Regex.IsMatch(x.Url,s) then Some x else None
 

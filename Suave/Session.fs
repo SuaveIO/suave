@@ -23,12 +23,12 @@ open System.Collections.Generic
 open System.Collections.Concurrent
 
 /// Static dictionary of sessions
-let session_map = new ConcurrentDictionary<string,ConcurrentDictionary<string,obj>>()
+let session_map = new ConcurrentDictionary<string, ConcurrentDictionary<string, obj>>()
 
 /// Get the session from the HttpRequest
 let session (request : HttpRequest) =
   let sessionId = request.SessionId
   if String.IsNullOrEmpty sessionId then failwith "session_support was not called"
   if not (session_map.ContainsKey sessionId) then
-    session_map.TryAdd(sessionId,new ConcurrentDictionary<string,obj>()) |> ignore
+    session_map.TryAdd(sessionId,new ConcurrentDictionary<string, obj>()) |> ignore
   session_map.[sessionId]

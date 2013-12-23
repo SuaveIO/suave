@@ -67,7 +67,7 @@ open RequestFactory
 [<Tests>]
 let gets =
   let run_with' = run_with default_config
-  
+
   testList "getting basic responses"
     [
       testProperty "200 OK returns equivalent" <|
