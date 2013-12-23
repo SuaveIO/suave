@@ -362,6 +362,7 @@ let request_loop webpart proto (processor : HttpProcessor) error_handler (timeou
     match result with
     | Some (request : HttpRequest) ->
       try
+        // TODO: can we make two test-cases; one without unblock, one with?
         do! unblock (fun _ -> Async.RunSynchronously(run request, int (timeout.TotalMilliseconds)))
         do! stream.FlushAsync()
       with
@@ -411,7 +412,9 @@ let default_error_handler (ex : Exception) msg (request : HttpRequest) = async {
 let web_worker (proto, ip, port, error_handler, timeout) (webpart : WebPart) =
   tcp_ip_server (ip,port) (request_loop webpart proto (process_request false) error_handler timeout)
 
-/// Returns the webserver as an asynchronous computation
+/// Returns the webserver as a tuple of 1) an async computation the yields unit when
+/// the web server is ready to serve quests, and 2) an async computation that yields
+/// when the web server is being shut down and is being terminated.
 let web_server_async (config : Config) (webpart : WebPart) =
   config.bindings
   |> List.map (fun { scheme = proto; ip = ip; port = port } ->
