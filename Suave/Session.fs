@@ -25,7 +25,7 @@ open System.Collections.Concurrent
 /// Static dictionary of sessions
 let session_map = new ConcurrentDictionary<string, ConcurrentDictionary<string, obj>>()
 
-/// Get the session from the HttpRequest
+/// Get the session from the HttpRequest -- WARNING, here be dragons; just a reference implementation
 let session (request : HttpRequest) =
   let sessionId = request.SessionId
   if String.IsNullOrEmpty sessionId then failwith "session_support was not called"

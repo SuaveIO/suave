@@ -28,7 +28,7 @@ type TcpListener with
     Async.FromBeginEnd(x.BeginAcceptTcpClient, x.EndAcceptTcpClient)
 
 /// A TCP Worker is a thing that takes a TCP client and returns an asynchronous workflow thereof
-type TcpWorker<'a> = TcpClient ->  Async<'a>
+type TcpWorker<'a> = TcpClient -> Async<'a>
 
 /// Close the TCP client by closing its stream and then closing the client itself
 let close (d : TcpClient) =
@@ -37,10 +37,10 @@ let close (d : TcpClient) =
     d.Close()
 
 /// Stop the TCP listener server
-let stop_tcp (server : TcpListener) =
-  log_str "stopping server .. "
+let stop_tcp reason (server : TcpListener) =
+  log "tcp:stop_tcp - %s - stopping server .. " reason
   server.Stop()
-  log_str "stopped\n"
+  log_str "tcp:stop_tcp - stopped\n"
 
 /// Start a new TCP server with a specific IP, Port and with a serve_client worker
 /// returning an async workflow whose result can be awaited (for when the tcp server has started
@@ -54,42 +54,51 @@ let tcp_ip_server (source_ip : IPAddress, source_port : uint16) (serve_client : 
     ; source_ip        = source_ip
     ; source_port      = source_port }
   let accepting_connections = new AsyncResultCell<StartedData>()
-  log "starting listener: %O" start_data
+  log "tcp:tcp_ip_server - starting listener: %O" start_data
 
   let server = new TcpListener(source_ip, int source_port)
   server.Server.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, (int)1)
   server.Start MAX_BACK_LOG
-
-  let start_data = { start_data with socket_bound_utc = Some(DateTime.UtcNow) }
-  accepting_connections.Complete start_data |> ignore
-  log "started listener: %O" start_data
 
   //consider:
   //echo 5 > /proc/sys/net/ipv4/tcp_fin_timeout
   //echo 1 > /proc/sys/net/ipv4/tcp_tw_recycle
   //custom kernel with shorter TCP_TIMEWAIT_LEN in include/net/tcp.h
   let job (d : #TcpClient) = async {
-    use! oo = Async.OnCancel ( fun () -> log "disconnected client\n"; close d)
+    use! oo = Async.OnCancel (fun () -> log "tcp:tcp_ip_server - disconnected client (async cancel)"; close d)
     try
       try
-        do! serve_client d
+        return! serve_client d
       with 
-        | :? System.IO.EndOfStreamException -> log "disconnected client\n"
-        | x -> log "Tcp request processing failed.\n%A\n" x
+        | :? System.IO.EndOfStreamException ->
+          log "tcp:tcp_ip_server - disconnected client (end of stream)"
+          return ()
+        | x ->
+          log "tcp:tcp_ip_server - tcp request processing failed.\n%A" x
+          return ()
     finally close d
   }
 
   // start a new async worker for each accepted TCP client
   accepting_connections.AwaitResult(), async {
     try
-      use! dd = Async.OnCancel(fun () -> stop_tcp server)
+      use! dd = Async.OnCancel(fun () -> stop_tcp "tcp_ip_server async cancelled" server)
       let! (token : Threading.CancellationToken) = Async.CancellationToken
+
+      let start_data = { start_data with socket_bound_utc = Some(DateTime.UtcNow) }
+      accepting_connections.Complete start_data |> ignore
+      log "tcp:tcp_ip_server - started listener: %O%s" start_data
+        (if token.IsCancellationRequested then ", cancellation requested" else "")
+
       while not (token.IsCancellationRequested) do
+        log "tcp:tcp_ip_server -> async accept tcp client"
         let! client = server.AsyncAcceptTcpClient()
+        log "tcp:tcp_ip_server <- async accept tcp client"
         Async.Start (job client, token)
+
       return ()
     with x ->
-      log "Tcp server failed.\n%A\n" x
+      log "tcp:tcp_ip_server - tcp server failed.\n%A" x
       return ()
   }
 
@@ -103,6 +112,6 @@ let mirror (client_stream : Stream) (server_stream : Stream) = async {
   try
   while true do
     let! onebyte = client_stream.AsyncRead(1)
-    do! server_stream.AsyncWrite(onebyte)
-  with _ -> ()
+    do! server_stream.AsyncWrite onebyte
+  with _ -> return ()
 }
