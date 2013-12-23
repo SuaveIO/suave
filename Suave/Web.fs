@@ -380,7 +380,7 @@ let request_loop webpart proto (processor : HttpProcessor) error_handler (timeou
     | InternalFailure(_)
     | :? EndOfStreamException
     | :? IOException as ex
-      when ex.InnerException.GetType() = typeof<SocketException> ->
+      when ex.InnerException <> null && ex.InnerException.GetType() = typeof<SocketException> ->
       Log.log "Client disconnected.\n"
     | ex -> Log.log "Request failed.\n%A" ex
   }
