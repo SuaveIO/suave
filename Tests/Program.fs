@@ -33,6 +33,7 @@ module RequestFactory =
 
     let listening, server = web_server_async config web_parts
     Async.Start(server, cts.Token)
+    Log.log "wait for listening"
     listening |> Async.RunSynchronously // wait for the server to start listening
 
     { cts = cts
@@ -71,7 +72,10 @@ let gets =
   testList "getting basic responses"
     [
       testProperty "200 OK returns equivalent" <|
-        fun resp_str -> run_with' (OK resp_str) |> req Method.GET "/hello" content = resp_str
+        fun resp_str -> (run_with' (OK resp_str) |> req Method.GET "/hello" content) = resp_str
+      testCase "204 No Content empty body" <|
+        fun _ -> Assert.Equal("empty string should always be returned by 204 No Content",
+                              "", (run_with' NO_CONTENT |> req Method.GET "/" content))
     ]
 
 [<EntryPoint>]
