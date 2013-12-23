@@ -31,8 +31,9 @@ module RequestFactory =
     let cts = new CancellationTokenSource()
     let config' = { config with ct = cts.Token }
 
-    let server = web_server_async config web_parts
-    Async.Start(server, cts.Token) // TODO: await fully started!
+    let listening, server = web_server_async config web_parts
+    Async.Start(server, cts.Token)
+    listening |> Async.RunSynchronously // wait for the server to start listening
 
     { cts = cts
     ; suave_config = config' }
@@ -51,6 +52,15 @@ module RequestFactory =
 [<Tests>]
 let smoking =
   testList "smoking hot" [ testCase "smoke" <| fun _ -> Assert.Equal("smoke test", true, true) ]
+
+[<Tests>]
+let utilities =
+  testList "trying some utility functions" [
+    testCase "loopback ipv4" <|
+      fun _ -> Assert.Equal("127.0.0.1 is a local address", true, is_local_address "127.0.0.1")
+    testCase "loopback ipv6" <|
+      fun _ -> Assert.Equal("::0 is a local address", true, is_local_address "::1")
+  ]
 
 open RequestFactory
 

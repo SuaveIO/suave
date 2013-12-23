@@ -53,6 +53,7 @@
     <PlatformTarget>x86</PlatformTarget>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="Async.fs" />
     <Compile Include="Utils.fs" />
     <Compile Include="Html.fs" />
     <Compile Include="Log.fs" />

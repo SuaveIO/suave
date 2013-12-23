@@ -125,15 +125,21 @@ open System.Threading
 /// The core configuration of suave
 type Config =
   /// The bindings for the web server to launch with
-  { bindings      : HttpBinding list
+  { bindings       : HttpBinding list
+
   /// An error handler to use for handling exceptions that are
   /// are thrown from the web parts
-  ; error_handler : ErrorHandler
+  ; error_handler  : ErrorHandler
+
   /// Timeout for responses to be generated
-  ; timeout       : TimeSpan
+  ; timeout        : TimeSpan
+
+  /// Timeout to wait for the socket bind to finish
+  ; listen_timeout : TimeSpan
+
   /// A cancellation token for the web server. Signalling this token
   /// means that the web server shuts down
-  ; ct            : CancellationToken }
+  ; ct             : CancellationToken }
 
 /// An exception, raised e.g. if writing to the stream fails
 exception InternalFailure of string
