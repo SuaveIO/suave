@@ -5,7 +5,7 @@ module Suave.Utils
 open System.Collections.Generic
 
 /// Return success with some value
-let succeed x = Some(x)
+let succeed x = Some x
 
 /// Return failure without any value
 let fail = None
@@ -80,9 +80,9 @@ let cond d f g a =
 open System.IO
 
 /// Fully transform the input stream to a byte array.
-let read_fully (input:Stream) =
+let read_fully (input : Stream) =
   use ms = new MemoryStream()
-  input.CopyTo(ms)
+  input.CopyTo ms
   ms.ToArray()
 
 open System
@@ -126,19 +126,18 @@ let async_writeln (stream : Stream) s = async {
 
 /// Write the string s to the stream asynchronously
 /// from a byte array
-let async_writebytes (stream:Stream) (b: byte[]) = async {
+let async_writebytes (stream : Stream) (b : byte[]) = async {
   if b.Length > 0 then do! stream.AsyncWrite(b, 0, b.Length)
 }
 
 /// Launch the function f on its own asynchronous/thread context
 /// so that it doesn't block execution.
-let unblock f =
-  async {
-    do! Async.SwitchToNewThread ()
-    let res = f()
-    do! Async.SwitchToThreadPool ()
-    return res
-  }
+let unblock f = async {
+  do! Async.SwitchToNewThread ()
+  let res = f()
+  do! Async.SwitchToThreadPool ()
+  return res
+}
 
 open System.Threading.Tasks
 
@@ -149,7 +148,7 @@ type Microsoft.FSharp.Control.Async with
     Async.FromContinuations(fun (_,econt,_) -> econt e)
 
   /// Await a task asynchronously
-  static member AwaitTask (t: Task) =
+  static member AwaitTask (t : Task) =
     let flattenExns (e : AggregateException) = e.Flatten().InnerExceptions |> Seq.nth 0
     let rewrapAsyncExn (it : Async<unit>) =
       async { try do! it with :? AggregateException as ae -> do! (Async.AsyncRaise <| flattenExns ae) }
@@ -165,20 +164,19 @@ type Microsoft.FSharp.Control.Async with
 /// 'Bind' of the 'async' builder. The new overload awaits on
 /// a standard .NET task
 type Microsoft.FSharp.Control.AsyncBuilder with
-  member x.Bind(t:Task, f:unit -> Async<'R>) : Async<'R> = async.Bind(Async.AwaitTask t, f)
+  member x.Bind(t : Task, f : unit -> Async<'R>) : Async<'R> = async.Bind(Async.AwaitTask t, f)
 
 /// Asynchronouslyo write from the 'from' stream to the 'to' stream.
 let transfer (to_stream : Stream) (from : Stream) =
   let buf = Array.zeroCreate<byte> 0x2000
-  let rec do_block () =
-    async {
-      let! read = from.AsyncRead buf
-      if read <= 0 then
-        do! to_stream.FlushAsync()
-        return ()
-      else
-        do! to_stream.AsyncWrite(buf, 0, read)
-        return! do_block () }
+  let rec do_block () = async {
+    let! read = from.AsyncRead buf
+    if read <= 0 then
+      do! to_stream.FlushAsync()
+      return ()
+    else
+      do! to_stream.AsyncWrite(buf, 0, read)
+      return! do_block () }
   do_block ()
 
 /// Knuth-Morris-Pratt algorithm
