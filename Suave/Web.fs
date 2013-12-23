@@ -390,11 +390,13 @@ let parallelize input f = input |> Seq.map f |> Async.Parallel
 
 open Suave.Tcp
 
-/// Gets whether the passed ip is a local ip address
+/// Gets whether the passed ip is a local IPv4 or IPv6 address.
+/// Example: 127.0.0.1, ::1 return true. If the IP cannot be parsed,
+/// returns false.
 let is_local_address (ip : string) =
-  // TODO: equal on IP address
-  // TODO: equal IPv6 too
-  ip.Equals("127.0.0.1")
+  match IPAddress.TryParse ip with
+  | false, _   -> false
+  | true,  ip' -> IPAddress.IsLoopback ip'
 
 /// The default error handler returns a 500 Internal Error in response to
 /// thrown exceptions.

@@ -52,6 +52,15 @@ module RequestFactory =
 let smoking =
   testList "smoking hot" [ testCase "smoke" <| fun _ -> Assert.Equal("smoke test", true, true) ]
 
+[<Tests>]
+let utilities =
+  testList "trying some utility functions" [
+    testCase "loopback ipv4" <|
+      fun _ -> Assert.Equal("127.0.0.1 is a local address", true, is_local_address "127.0.0.1")
+    testCase "loopback ipv6" <|
+      fun _ -> Assert.Equal("::0 is a local address", true, is_local_address "::1")
+  ]
+
 open RequestFactory
 
 [<Tests>]
