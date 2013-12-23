@@ -95,8 +95,6 @@ task :release_next => [ :increase_version_number, :assembly_info , :create_nuget
   system "mono buildsupport/NuGet.exe push build/pkg/suave.#{s.to_s}.nupkg"
 end
 
-task :default => :create_nuget
-
 namespace :tests do
   desc 'run a stress test'
   task :stress do
@@ -104,9 +102,11 @@ namespace :tests do
     system 'httperf --hog --server=localhost --port=3000 --uri=/ --rate=1000 --num-conns=1000 --num-calls=1000 --burst-length=20 --http-version=1.0'
   end
 
-  desc 'run the property-based tests'
-  task :property do
+  desc 'run the unit-tests'
+  task :unit do
     # todo: use command abstraction to bridge mono/non-mono
     system 'mono ./Tests/bin/Release/Tests.exe'
   end
 end
+
+task :default => [:build, :'tests:unit', :create_nuget]

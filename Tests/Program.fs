@@ -52,10 +52,12 @@ module RequestFactory =
 
   let req (methd : Method) (resource : string) ctx =
     let server = ctx.suave_config.bindings.Head.ToString()
-    use client = new System.Net.Http.HttpClient(BaseAddress = Uri server)
-    Log.log "tests:req GET %s, resource %s -> execute" server resource
-    let res = client.GetAsync(resource, HttpCompletionOption.ResponseContentRead, ctx.cts.Token).Result
-    Log.log "tests:req GET %s, resource %s <- execute" server resource
+    let uri_builder = UriBuilder server
+    uri_builder.Path <- resource
+    use client = new System.Net.Http.HttpClient()
+    Log.log "tests:req GET %O -> execute" uri_builder.Uri
+    let res = client.GetAsync(uri_builder.Uri, HttpCompletionOption.ResponseContentRead, ctx.cts.Token).Result
+    Log.log "tests:req GET %O <- execute" uri_builder.Uri
     ctx.Destroy()
     res.Content.ReadAsStringAsync().Result
 
