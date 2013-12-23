@@ -170,7 +170,7 @@ type Microsoft.FSharp.Control.AsyncBuilder with
 /// Asynchronouslyo write from the 'from' stream to the 'to' stream.
 let transfer (to_stream : Stream) (from : Stream) =
   let buf = Array.zeroCreate<byte> 0x2000
-  let rec doBlock () =
+  let rec do_block () =
     async {
       let! read = from.AsyncRead buf
       if read <= 0 then
@@ -178,8 +178,8 @@ let transfer (to_stream : Stream) (from : Stream) =
         return ()
       else
         do! to_stream.AsyncWrite(buf, 0, read)
-        return! doBlock () }
-  doBlock ()
+        return! do_block () }
+  do_block ()
 
 /// Knuth-Morris-Pratt algorithm
 /// http://caml.inria.fr/pub/old_caml_site/Examples/oc/basics/kmp.ml
