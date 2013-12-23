@@ -257,7 +257,7 @@ let parse_multipart (stream : Stream) boundary (request : HttpRequest) (ahead : 
 
 /// Process the request, reading as it goes from the incoming 'stream', yielding a HttpRequest
 /// when done
-let process_request proxyMode (request: HttpRequest) bytes = async {
+let process_request proxy_mode (request : HttpRequest) bytes = async {
 
   let stream = request.Stream
 
@@ -275,7 +275,7 @@ let process_request proxyMode (request: HttpRequest) bytes = async {
     request.Headers <- headers
 
     //wont continue parsing if on proxyMode with the intention of forwarding the stream as it is
-    if not proxyMode then
+    if not proxy_mode then
       request.Headers
       |> Seq.filter (fun x -> x.Key.Equals("cookie"))
       |> Seq.iter (fun x ->
@@ -335,7 +335,7 @@ let request_loop webpart proto (processor : HttpProcessor) error_handler (timeou
       do! x
     with
     | InternalFailure(_) as ex -> raise ex
-    | ex -> do! error_handler ex "Action failed" r
+    | ex -> do! error_handler ex "web:request_loop - action failed" r
   }
   /// Check if the web part can perform its work on the current request. If it can't
   /// it will return None and the run method will return.
@@ -365,7 +365,6 @@ let request_loop webpart proto (processor : HttpProcessor) error_handler (timeou
         Log.log "web:request_loop:loop -> unblock"
         do! unblock (fun _ -> Async.RunSynchronously(run request, int (timeout.TotalMilliseconds)))
         Log.log "web:request_loop:loop <- unblock"
-        // Log.log "web:request_loop:loop -> processor"
         Log.log "web:request_loop:loop -> flush"
         do! stream.FlushAsync()
         Log.log "web:request_loop:loop <- flush"
@@ -374,8 +373,10 @@ let request_loop webpart proto (processor : HttpProcessor) error_handler (timeou
         | :? TimeoutException as ex -> do! error_handler ex "script timeout" request
         | ex -> do! error_handler ex "Routing request failed" request
       match request.Headers?connection with
-      | Some (x : string)  when x.ToLower().Equals("keep-alive") -> return! loop rem
-      | _ -> return ()
+      | Some (x : string) when x.ToLower().Equals("keep-alive") ->
+        return! loop rem
+      | _ ->
+        return ()
     | None -> return ()
   }
   async {
@@ -386,10 +387,10 @@ let request_loop webpart proto (processor : HttpProcessor) error_handler (timeou
     | :? EndOfStreamException
     | :? IOException as ex
       when ex.InnerException <> null && ex.InnerException.GetType() = typeof<SocketException> ->
-      Log.log "Client disconnected.\n"
+      Log.log "web:request_loop - client disconnected.\n"
       return ()
     | ex ->
-      Log.log "Request failed.\n%A" ex
+      Log.log "web:request_loop - Request failed.\n%A" ex
       return ()
   }
 
@@ -409,7 +410,7 @@ let is_local_address (ip : string) =
 /// The default error handler returns a 500 Internal Error in response to
 /// thrown exceptions.
 let default_error_handler (ex : Exception) msg (request : HttpRequest) = async {
-  Log.log "%s.\n%A" msg ex
+  Log.log "web:default_error_handler - %s.\n%A" msg ex
   if is_local_address request.RemoteAddress then
     do! (response 500 "Internal Error" (bytes_utf8 (sprintf "<h1>%s</h1><br/>%A" ex.Message ex)) request)
   else do! (response 500 "Internal Error" (bytes_utf8 (request.RemoteAddress)) request)
