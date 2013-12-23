@@ -28,7 +28,7 @@ type TcpListener with
     Async.FromBeginEnd(x.BeginAcceptTcpClient, x.EndAcceptTcpClient)
 
 /// A TCP Worker is a thing that takes a TCP client and returns an asynchronous workflow thereof
-type TcpWorker<'a> = TcpClient ->  Async<'a>
+type TcpWorker<'a> = TcpClient -> Async<'a>
 
 /// Close the TCP client by closing its stream and then closing the client itself
 let close (d : TcpClient) =
@@ -60,10 +60,6 @@ let tcp_ip_server (source_ip : IPAddress, source_port : uint16) (serve_client : 
   server.Server.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, (int)1)
   server.Start MAX_BACK_LOG
 
-  let start_data = { start_data with socket_bound_utc = Some(DateTime.UtcNow) }
-  accepting_connections.Complete start_data |> ignore
-  log "started listener: %O" start_data
-
   //consider:
   //echo 5 > /proc/sys/net/ipv4/tcp_fin_timeout
   //echo 1 > /proc/sys/net/ipv4/tcp_tw_recycle
@@ -72,10 +68,14 @@ let tcp_ip_server (source_ip : IPAddress, source_port : uint16) (serve_client : 
     use! oo = Async.OnCancel ( fun () -> log "disconnected client\n"; close d)
     try
       try
-        do! serve_client d
+        return! serve_client d
       with 
-        | :? System.IO.EndOfStreamException -> log "disconnected client\n"
-        | x -> log "Tcp request processing failed.\n%A\n" x
+        | :? System.IO.EndOfStreamException ->
+          log "disconnected client\n"
+          return ()
+        | x ->
+          log "Tcp request processing failed.\n%A\n" x
+          return ()
     finally close d
   }
 
@@ -84,8 +84,14 @@ let tcp_ip_server (source_ip : IPAddress, source_port : uint16) (serve_client : 
     try
       use! dd = Async.OnCancel(fun () -> stop_tcp server)
       let! (token : Threading.CancellationToken) = Async.CancellationToken
+
+      let start_data = { start_data with socket_bound_utc = Some(DateTime.UtcNow) }
+      accepting_connections.Complete start_data |> ignore
+      log "started listener: %O" start_data
+
       while not (token.IsCancellationRequested) do
         let! client = server.AsyncAcceptTcpClient()
+        log "client accepted"
         Async.Start (job client, token)
       return ()
     with x ->

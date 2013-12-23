@@ -35,6 +35,7 @@ module RequestFactory =
     Async.Start(server, cts.Token)
     Log.log "wait for listening"
     listening |> Async.RunSynchronously // wait for the server to start listening
+    Log.log "DONE: wait for listening"
 
     { cts = cts
     ; suave_config = config' }

@@ -344,27 +344,31 @@ let request_loop webpart proto (processor : HttpProcessor) error_handler (timeou
     | Some x -> do! eval_action x request
     | None -> return ()
   }
-  let stream =
-        client.GetStream()
-        |> load_stream proto
+  let stream = client.GetStream() |> load_stream proto
   let remote_endpoint = (client.Client.RemoteEndPoint :?> IPEndPoint)
   let ipaddr = remote_endpoint.Address.ToString()
-  
 
   let rec loop bytes = async {
-  
+
     use request = new HttpRequest()
     request.Stream <- stream
     request.RemoteAddress <- ipaddr
     request.IsSecure <- match proto with HTTP -> false | HTTPS _ -> true
-    
+
+    Log.log "web:request_loop:loop -> processor"
     let! result, rem = processor request bytes
+    Log.log "web:request_loop:loop <- processor"
     match result with
     | Some (request : HttpRequest) ->
       try
         // TODO: can we make two test-cases; one without unblock, one with?
+        Log.log "web:request_loop:loop -> unblock"
         do! unblock (fun _ -> Async.RunSynchronously(run request, int (timeout.TotalMilliseconds)))
+        Log.log "web:request_loop:loop <- unblock"
+        // Log.log "web:request_loop:loop -> processor"
+        Log.log "web:request_loop:loop -> flush"
         do! stream.FlushAsync()
+        Log.log "web:request_loop:loop <- flush"
       with
         | InternalFailure(_) as ex  -> raise ex
         | :? TimeoutException as ex -> do! error_handler ex "script timeout" request
@@ -383,7 +387,10 @@ let request_loop webpart proto (processor : HttpProcessor) error_handler (timeou
     | :? IOException as ex
       when ex.InnerException <> null && ex.InnerException.GetType() = typeof<SocketException> ->
       Log.log "Client disconnected.\n"
-    | ex -> Log.log "Request failed.\n%A" ex
+      return ()
+    | ex ->
+      Log.log "Request failed.\n%A" ex
+      return ()
   }
 
 /// Parallelise the map of 'f' onto all items in the 'input' seq.
