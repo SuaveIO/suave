@@ -428,4 +428,4 @@ let default_config =
   { bindings      = [ { scheme = HTTP; ip = IPAddress.Parse("127.0.0.1"); port = 8083us } ]
   ; error_handler = default_error_handler
   ; timeout       = TimeSpan.FromMinutes(1.) // 1 minute
-  ; ct            = Async.DefaultCancellationToken } 
+  ; ct            = Async.DefaultCancellationToken }
