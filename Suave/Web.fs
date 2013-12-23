@@ -410,27 +410,35 @@ let default_error_handler (ex : Exception) msg (request : HttpRequest) = async {
 
 /// Starts a new web worker, given the configuration and a web part to serve.
 let web_worker (proto, ip, port, error_handler, timeout) (webpart : WebPart) =
-  tcp_ip_server (ip,port) (request_loop webpart proto (process_request false) error_handler timeout)
+  tcp_ip_server (ip, port) (request_loop webpart proto (process_request false) error_handler timeout)
 
 /// Returns the webserver as a tuple of 1) an async computation the yields unit when
 /// the web server is ready to serve quests, and 2) an async computation that yields
-/// when the web server is being shut down and is being terminated.
+/// when the web server is being shut down and is being terminated. The async values
+/// returned are not 'hot' in the sense that they have started running, so you must manually
+/// start the 'server' (second item in tuple), as this starts the TcpListener.
+/// Have a look at the example and the unit tests for more documentation.
+/// In other words: don't block on 'listening' unless you have started the server.
 let web_server_async (config : Config) (webpart : WebPart) =
-  config.bindings
-  |> List.map (fun { scheme = proto; ip = ip; port = port } ->
-      web_worker (proto, ip, port, config.error_handler, config.timeout) webpart)
-  |> Async.Parallel
-  |> Async.Ignore
+  let all =
+    config.bindings
+    |> List.map (fun { scheme = proto; ip = ip; port = port } ->
+        web_worker (proto, ip, port, config.error_handler, config.timeout) webpart)
+  let listening = all |> Seq.map fst |> Async.Parallel |> Async.Ignore
+  let server    = all |> Seq.map snd |> Async.Parallel |> Async.Ignore
+  listening, server
 
 /// Runs the web server and blocks waiting for the asynchronous workflow to be cancelled or
 /// it returning itself.
 let web_server (config : Config) (webpart : WebPart) =
-  Async.RunSynchronously(web_server_async config webpart, cancellationToken = config.ct)
+  Async.RunSynchronously(web_server_async config webpart |> snd, cancellationToken = config.ct)
 
 /// The default configuration binds on IPv4, 127.0.0.1:8083 with a regular 500 Internal Error handler,
-/// with a timeout of one minute for computations to run.
+/// with a timeout of one minute for computations to run. Waiting for 2 seconds for the socket bind
+/// to succeed.
 let default_config =
-  { bindings      = [ { scheme = HTTP; ip = IPAddress.Parse("127.0.0.1"); port = 8083us } ]
-  ; error_handler = default_error_handler
-  ; timeout       = TimeSpan.FromMinutes(1.) // 1 minute
-  ; ct            = Async.DefaultCancellationToken }
+  { bindings       = [ { scheme = HTTP; ip = IPAddress.Loopback; port = 8083us } ]
+  ; error_handler  = default_error_handler
+  ; timeout        = TimeSpan.FromMinutes(1.)
+  ; listen_timeout = TimeSpan.FromSeconds(2.)
+  ; ct             = Async.DefaultCancellationToken }

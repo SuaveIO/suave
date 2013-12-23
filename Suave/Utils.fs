@@ -139,33 +139,6 @@ let unblock f = async {
   return res
 }
 
-open System.Threading.Tasks
-
-type Microsoft.FSharp.Control.Async with
-
-  /// Raise an exception on the async computation/workflow.
-  static member AsyncRaise (e : #exn) =
-    Async.FromContinuations(fun (_,econt,_) -> econt e)
-
-  /// Await a task asynchronously
-  static member AwaitTask (t : Task) =
-    let flattenExns (e : AggregateException) = e.Flatten().InnerExceptions |> Seq.nth 0
-    let rewrapAsyncExn (it : Async<unit>) =
-      async { try do! it with :? AggregateException as ae -> do! (Async.AsyncRaise <| flattenExns ae) }
-    let tcs = new TaskCompletionSource<unit>(TaskCreationOptions.None)
-    t.ContinueWith((fun t' ->
-      if t.IsFaulted then tcs.SetException(t.Exception |> flattenExns)
-      elif t.IsCanceled then tcs.SetCanceled ()
-      else tcs.SetResult(())), TaskContinuationOptions.ExecuteSynchronously)
-    |> ignore
-    tcs.Task |> Async.AwaitTask |> rewrapAsyncExn
-
-/// Implements an extension method that overloads the standard
-/// 'Bind' of the 'async' builder. The new overload awaits on
-/// a standard .NET task
-type Microsoft.FSharp.Control.AsyncBuilder with
-  member x.Bind(t : Task, f : unit -> Async<'R>) : Async<'R> = async.Bind(Async.AwaitTask t, f)
-
 /// Asynchronouslyo write from the 'from' stream to the 'to' stream.
 let transfer (to_stream : Stream) (from : Stream) =
   let buf = Array.zeroCreate<byte> 0x2000

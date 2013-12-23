@@ -10,6 +10,17 @@ let log_str = log "%s"
 /// The max backlog of number of requests
 let MAX_BACK_LOG = Int32.MaxValue
 
+type StartedData =
+  { start_called_utc : DateTime
+  ; socket_bound_utc : DateTime option
+  ; source_ip        : IPAddress
+  ; source_port      : uint16 }
+  override x.ToString() =
+    sprintf "started %s <-> %s : %O:%d"
+      (x.start_called_utc.ToString("o"))
+      (x.socket_bound_utc |> Option.fold (fun _ t -> t.ToString("o")) "x")
+      x.source_ip x.source_port
+
 /// Asynchronous extension methods to TcpListener to make
 /// it nicer to consume in F#
 type TcpListener with
@@ -32,18 +43,32 @@ let stop_tcp (server : TcpListener) =
   log_str "stopped\n"
 
 /// Start a new TCP server with a specific IP, Port and with a serve_client worker
-let tcp_ip_server (sourceip : IPAddress, sourceport : uint16) (serve_client : TcpWorker<unit>) =
+/// returning an async workflow whose result can be awaited (for when the tcp server has started
+/// listening to its address/port combination), and an asynchronous workflow that
+/// yields when the full server is cancelled. If the 'has started listening' workflow
+/// returns None, then the start timeout expired.
+let tcp_ip_server (source_ip : IPAddress, source_port : uint16) (serve_client : TcpWorker<unit>) =
+  let start_data =
+    { start_called_utc = DateTime.UtcNow
+    ; socket_bound_utc = None
+    ; source_ip        = source_ip
+    ; source_port      = source_port }
+  let accepting_connections = new AsyncResultCell<StartedData>()
+  log "starting listener: %O" start_data
 
-  log "starting listener:%O:%d" sourceip sourceport
-
-  let server = new TcpListener(sourceip, int sourceport)
+  let server = new TcpListener(source_ip, int source_port)
   server.Server.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, (int)1)
   server.Start MAX_BACK_LOG
+
+  let start_data = { start_data with socket_bound_utc = Some(DateTime.UtcNow) }
+  accepting_connections.Complete start_data |> ignore
+  log "started listener: %O" start_data
+
   //consider:
   //echo 5 > /proc/sys/net/ipv4/tcp_fin_timeout
   //echo 1 > /proc/sys/net/ipv4/tcp_tw_recycle
   //custom kernel with shorter TCP_TIMEWAIT_LEN in include/net/tcp.h
-  let job (d:#TcpClient) = async {
+  let job (d : #TcpClient) = async {
     use! oo = Async.OnCancel ( fun () -> log "disconnected client\n"; close d)
     try
       try
@@ -55,13 +80,12 @@ let tcp_ip_server (sourceip : IPAddress, sourceport : uint16) (serve_client : Tc
   }
 
   // start a new async worker for each accepted TCP client
-  async {
+  accepting_connections.AwaitResult(), async {
     try
       use! dd = Async.OnCancel(fun () -> stop_tcp server)
       let! (token : Threading.CancellationToken) = Async.CancellationToken
       while not (token.IsCancellationRequested) do
         let! client = server.AsyncAcceptTcpClient()
-        //let remoteAddress = (client.Client.RemoteEndPoint :?> IPEndPoint).Address
         Async.Start (job client, token)
       return ()
     with x ->
