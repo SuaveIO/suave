@@ -361,7 +361,6 @@ let request_loop webpart proto (processor : HttpProcessor) error_handler (timeou
     match result with
     | Some (request : HttpRequest) ->
       try
-        // TODO: can we make two test-cases; one without unblock, one with?
         Log.log "web:request_loop:loop -> unblock"
         do! Async.WithTimeout (timeout, run request)
         Log.log "web:request_loop:loop <- unblock"
