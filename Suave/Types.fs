@@ -59,6 +59,7 @@ type HttpRequest() =
     form.Clear()
     cookies.Clear()
     files.Clear()
+    response.Headers.Clear()
 
   member private h.Dispose(disposing : bool) =
     if disposing then
