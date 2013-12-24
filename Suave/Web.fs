@@ -348,12 +348,12 @@ let request_loop webpart proto (processor : HttpProcessor) error_handler (timeou
   let remote_endpoint = (client.Client.RemoteEndPoint :?> IPEndPoint)
   let ipaddr = remote_endpoint.Address.ToString()
 
-  let rec loop bytes = async {
+  use request = new HttpRequest()
+  request.Stream <- stream
+  request.RemoteAddress <- ipaddr
+  request.IsSecure <- match proto with HTTP -> false | HTTPS _ -> true
 
-    use request = new HttpRequest()
-    request.Stream <- stream
-    request.RemoteAddress <- ipaddr
-    request.IsSecure <- match proto with HTTP -> false | HTTPS _ -> true
+  let rec loop bytes = async {
 
     Log.log "web:request_loop:loop -> processor"
     let! result, rem = processor request bytes
@@ -374,6 +374,7 @@ let request_loop webpart proto (processor : HttpProcessor) error_handler (timeou
         | ex -> do! error_handler ex "Routing request failed" request
       match request.Headers?connection with
       | Some (x : string) when x.ToLower().Equals("keep-alive") ->
+        request.Clear()
         return! loop rem
       | _ ->
         return ()

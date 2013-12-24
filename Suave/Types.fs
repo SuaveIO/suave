@@ -52,6 +52,14 @@ type HttpRequest() =
   member h.Files         with get() = files
   member h.IsSecure      with get() = isSecure and set x = isSecure <- x
 
+  /// Clears the request dictionaries for reuse
+  member h.Clear() =
+    query.Clear()
+    headers.Clear()
+    form.Clear()
+    cookies.Clear()
+    files.Clear()
+
   member private h.Dispose(disposing : bool) =
     if disposing then
       GC.SuppressFinalize(h)
