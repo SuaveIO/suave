@@ -1,4 +1,4 @@
-﻿[<AutoOpen>]
+[<AutoOpen>]
 module Suave.Async
 
 open System
