@@ -1249,10 +1249,9 @@ module Http =
   val authenticate_basic : f:(HttpRequest -> bool) -> p:HttpRequest -> Async<unit> option
 
   /// <summary><para>
-  /// Log the HttpRequest to the given stream
+  /// HERE BE DRAGONS: Not thread-safe.
+  /// Log the HttpRequest to the given stream. For debugging purposes.
   /// </para></summary>
-  /// <remarks>
-  /// </remarks>
   val log : s:System.IO.Stream -> http_request:HttpRequest -> HttpRequest option
 
   /// <summary><para>

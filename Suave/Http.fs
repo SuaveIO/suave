@@ -315,8 +315,11 @@ module Http =
     else
       challenge p
 
+  let log_format (http_request : HttpRequest) =
+    sprintf "%A\n" (http_request.Method, http_request.RemoteAddress, http_request.Url, http_request.Query, http_request.Form, http_request.Headers)
+
   let log (s : Stream) (http_request : HttpRequest) =
-    let bytes = bytes (sprintf "%A\n" (http_request.Method, http_request.RemoteAddress, http_request.Url, http_request.Query, http_request.Form, http_request.Headers))
+    let bytes = bytes (log_format http_request)
     s.Write(bytes, 0, bytes.Length)
     succeed http_request
 
