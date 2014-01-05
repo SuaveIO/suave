@@ -24,14 +24,14 @@ let send_web_response (data : HttpWebResponse) (p : HttpRequest)  = async {
 }
 
 /// Forward the HttpRequest 'p' to the 'ip':'port'
-let forward ip port (p : HttpRequest) =
+let forward (ip : IPAddress) (port : uint16) (p : HttpRequest) =
     let buildWebHeadersCollection (h : Dictionary<string,string>) = 
       let r = new WebHeaderCollection()
       for e in h do
         if not (WebHeaderCollection.IsRestricted e.Key) then
           r.Add(e.Key,e.Value)
       r
-    let url = new UriBuilder("http", ip, port, p.Url, p.RawQuery)
+    let url = new UriBuilder("http", ip.ToString(), int port, p.Url, p.RawQuery)
     let q:HttpWebRequest = WebRequest.Create(url.Uri) :?> HttpWebRequest
     q.Method  <- p.Method
     q.Headers <- buildWebHeadersCollection(p.Headers)
@@ -71,10 +71,18 @@ let proxy proxy_resolver (r : HttpRequest) =
   | None            -> never
 
 /// Run a proxy server with the given configuration and given proxy resolver.
+let proxy_server_async config resolver =
+  let all =
+    config.bindings
+    |> List.map (fun { scheme = proto; ip = ip; port = port } ->
+        tcp_ip_server (ip,port) (request_loop (warbler (fun http -> proxy resolver http)) proto (process_request true) config.error_handler config.timeout))
+  let listening = all |> Seq.map fst |> Async.Parallel |> Async.Ignore
+  let server    = all |> Seq.map snd |> Async.Parallel |> Async.Ignore
+  listening, server
+
 let proxy_server config resolver =
-  config.bindings
-  |> List.map (fun { scheme = proto; ip = ip; port = port } ->
-      tcp_ip_server (ip,port) (request_loop (warbler (fun http -> proxy resolver http)) proto (process_request true) config.error_handler config.timeout))
-  |> List.map snd // TODO: care about timeout for binding to socket instead of throwing away
-  |> Async.Parallel
-  |> Async.Ignore
+  Async.RunSynchronously(async {
+    let listening, server = proxy_server_async config resolver
+    do! listening
+    do! server },
+    cancellationToken = config.ct)
