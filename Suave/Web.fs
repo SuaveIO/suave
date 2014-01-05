@@ -261,20 +261,23 @@ let process_request proxy_mode (request : HttpRequest) bytes = async {
 
   let stream = request.Stream
 
+  Log.tracef(fun fmt -> fmt "web:process_request proxy:%b -> read_line" proxy_mode)
   let! (first_line : string), rem = read_line stream bytes
+  Log.tracef(fun fmt -> fmt "web:process_request proxy:%b <- read_line" proxy_mode)
 
-  if first_line.Length = 0 then return (None ,rem)
+  if first_line.Length = 0 then
+    return None, rem
   else
-    let (meth, url, query, raw_query) as q = parse_url (first_line)
+    let meth, url, query, raw_query as q = parse_url first_line
     request.Url      <- url
     request.Method   <- meth
     request.Query    <- query
     request.RawQuery <- raw_query
 
-    let! headers,rem = read_headers stream rem
+    let! headers, rem = read_headers stream rem
     request.Headers <- headers
 
-    //wont continue parsing if on proxyMode with the intention of forwarding the stream as it is
+    // won't continue parsing if on proxyMode with the intention of forwarding the stream as it is
     if not proxy_mode then
       request.Headers
       |> Seq.filter (fun x -> x.Key.Equals("cookie"))
@@ -289,16 +292,15 @@ let process_request proxy_mode (request : HttpRequest) bytes = async {
 
         if content_enconding.StartsWith("application/x-www-form-urlencoded") then
           let! rawdata,_ = read_post_data stream content_length rem
-          let form_data = parse_data (to_string rawdata 0 rawdata.Length)
+          let form_data  = parse_data (to_string rawdata 0 rawdata.Length)
           request.Form    <- form_data
           request.RawForm <- rawdata
         elif content_enconding.StartsWith("multipart/form-data") then
           let boundary = "--" + content_enconding.Substring(content_enconding.IndexOf('=')+1).TrimStart()
           let! (rem : byte[]) = parse_multipart stream boundary request rem
           assert (rem.Length = 0)
-          return ()
 
-    return (Some request,rem)
+    return Some request, rem
 }
 
 open System.Net

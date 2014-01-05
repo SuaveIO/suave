@@ -19,7 +19,9 @@ let private copy_response_headers (headers1 : WebHeaderCollection) (headers2 : L
 let private send_web_response (data : HttpWebResponse) (p : HttpRequest)  = async {
   copy_response_headers data.Headers (p.Response.Headers)
   //TODO: if downstream sends a Content-Length header copy from one stream to the other asynchronously
+  Log.trace (fun () -> "proxy:send_web_response:GetResponseStream -> read_fully")
   let bytes = data.GetResponseStream() |> read_fully
+  Log.trace (fun () -> "proxy:send_web_response:GetResponseStream <- read_fully")
   do! response (int data.StatusCode) (data.StatusDescription) bytes p
 }
 
@@ -54,10 +56,9 @@ let forward (ip : IPAddress) (port : uint16) (p : HttpRequest) =
   match look_up p.Headers "user-agent" with Some(v) -> q.UserAgent <- v | None -> ()
   q.Headers.Add("X-Forwarded-For", p.RemoteAddress)
   async {
-    if p.Method = "POST" then
+    if p.Method = "POST" || p.Method = "PUT" then
       let content_length = Convert.ToInt32(p.Headers.["content-length"])
-      let req = q.GetRequestStream()
-      do! p.Stream.CopyToAsync req
+      do! transfer_len p.Stream (q.GetRequestStream()) content_length
     try
       let! data = q.AsyncGetResponse()
       do! send_web_response ((data : WebResponse) :?> HttpWebResponse) p

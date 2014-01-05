@@ -139,7 +139,22 @@ let unblock f = async {
   return res
 }
 
-/// Asynchronouslyo write from the 'from' stream to the 'to' stream.
+/// Asynchronously write from the 'from' stream to the 'to' stream, with an upper bound on
+/// amount to transfer by len
+let transfer_len (to_stream : Stream) (from : Stream) len =
+  let buf_size = 0x2000
+  let buf = Array.zeroCreate<byte> 0x2000
+  let rec do_block left = async {
+    let! read = from.AsyncRead(buf, 0, Math.Min(buf_size, left))
+    if read <= 0 || left - read = 0 then
+      do! to_stream.FlushAsync()
+      return ()
+    else
+      do! to_stream.AsyncWrite(buf, 0, read)
+      return! do_block (left - read) }
+  do_block len
+
+/// Asynchronously write from the 'from' stream to the 'to' stream.
 let transfer (to_stream : Stream) (from : Stream) =
   let buf = Array.zeroCreate<byte> 0x2000
   let rec do_block () = async {
