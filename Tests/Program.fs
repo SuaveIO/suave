@@ -30,9 +30,10 @@ module RequestFactory =
   type SuaveTestCtx =
     { cts          : CancellationTokenSource
     ; suave_config : SuaveConfig }
-    member x.Destroy() =
-      x.cts.Cancel()
-      x.cts.Dispose()
+
+  let dispose_context (ctx : SuaveTestCtx) =
+    ctx.cts.Cancel()
+    ctx.cts.Dispose()
 
   let run_with_factory factory config web_parts : SuaveTestCtx =
     let binding = config.bindings.Head
@@ -60,7 +61,7 @@ module RequestFactory =
 //    Log.log "tests:req GET %O -> execute" uri_builder.Uri
     let res = client.GetAsync(uri_builder.Uri, HttpCompletionOption.ResponseContentRead, ctx.cts.Token).Result
 //    Log.log "tests:req GET %O <- execute" uri_builder.Uri
-    ctx.Destroy()
+    dispose_context ctx
     res.Content.ReadAsStringAsync().Result
 
 [<Tests>]
@@ -100,16 +101,24 @@ let gets =
 
 [<Tests>]
 let proxy =
-  testList "creating proxy" [
-    testCase "GET / returns 200 OK" <| fun _ ->
-      let bind :: _ = default_config.bindings
-      let target = run_with default_config (OK "Hello from Target!")
-      let proxy_config = { default_config with bindings = [ HttpBinding.Create(Protocol.HTTP, "127.0.0.1", 8084) ] }
-      let proxy = run_with_factory Proxy.proxy_server_async proxy_config (fun r -> Some(bind.ip, bind.port))
+  let bind :: _ = default_config.bindings
+  let to_target r = Some(bind.ip, bind.port)
 
-      Assert.Equal("target's WebPart should return its value",
-        "Hello from Target!",
-        proxy |> req GET "/")
+  let run_target = run_with default_config
+
+  let run_in_context item f_item f_body =
+    try
+      f_body item
+    finally
+      f_item item
+
+  let proxy_config = { default_config with bindings = [ HttpBinding.Create(Protocol.HTTP, "127.0.0.1", 8084) ] }
+  let proxy = run_with_factory Proxy.proxy_server_async proxy_config
+
+  testList "creating proxy" [
+    testProperty "GET / returns 200 OK with passed string" <| fun str ->
+      run_in_context (run_target (OK str)) dispose_context <| fun _ ->
+        Assert.Equal("target's WebPart should return its value", str, proxy to_target |> req GET "/")
     ]
 
 [<EntryPoint>]
