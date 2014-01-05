@@ -22,7 +22,7 @@ let eval<'T> (reader : DbDataReader) =
     let fieldCount = FSharpType.GetTupleElements(recordType).Length
     let vals = Array.create<obj> fieldCount null
     ignore (reader.GetValues(vals))
-    let dataObj = FSharpValue.MakeTuple(vals,recordType) :?> 'T
+    let dataObj = FSharpValue.MakeTuple(vals, recordType) :?> 'T
     dataObj
   else
     reader.GetValue(0) :?> 'T

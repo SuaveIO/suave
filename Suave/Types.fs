@@ -6,7 +6,7 @@ open System.Collections.Generic
 
 /// A holder for headers for the http response
 type HttpResponse() =
-  let mutable headers: List<string*string> = new List<string*string>()
+  let mutable headers : List<string*string> = new List<string*string>()
   member h.Headers with get()              = headers and set x = headers <- x
 
 /// A holder for uploaded file meta-data

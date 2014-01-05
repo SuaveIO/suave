@@ -1247,7 +1247,7 @@ module Http =
   /// <remarks>
   /// </remarks>
   val authenticate_basic : f:(HttpRequest -> bool) -> p:HttpRequest -> Async<unit> option
-  
+
   /// <summary><para>
   /// Formats the HttpRequest as in the default manner
   /// </para></summary>
