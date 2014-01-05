@@ -199,7 +199,6 @@ module Http =
 
   let INTERNAL_ERROR a = internal_error (bytes_utf8 a)
 
-
   let mime_type = function
     | ".bmp" -> "image/bmp"
     | ".css" -> "text/css"

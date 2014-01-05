@@ -53,15 +53,20 @@ module RequestFactory =
 
   let run_with = run_with_factory web_server_async
 
-  let req (methd : Method) (resource : string) ctx =
+  let req_resp (methd : Method) (resource : string) ctx =
     let server = ctx.suave_config.bindings.Head.ToString()
     let uri_builder = UriBuilder server
     uri_builder.Path <- resource
-    use client = new System.Net.Http.HttpClient()
-//    Log.log "tests:req GET %O -> execute" uri_builder.Uri
+    use handler = new Net.Http.HttpClientHandler(AllowAutoRedirect = false)
+    use client = new System.Net.Http.HttpClient(handler)
+    // Log.log "tests:req GET %O -> execute" uri_builder.Uri
     let res = client.GetAsync(uri_builder.Uri, HttpCompletionOption.ResponseContentRead, ctx.cts.Token).Result
-//    Log.log "tests:req GET %O <- execute" uri_builder.Uri
+    // Log.log "tests:req GET %O <- execute" uri_builder.Uri
     dispose_context ctx
+    res
+
+  let req (methd : Method) (resource : string) ctx : string =
+    let res = req_resp methd resource ctx
     res.Content.ReadAsStringAsync().Result
 
 [<Tests>]
@@ -115,15 +120,22 @@ let proxy =
     finally
       f_finally item
 
-  //  let sslCert = X509Certificate.FromPKCS12(BIO.File("suave.p12","r"), "easy")
-  //  let proxy_config = { default_config with bindings = [ HttpBinding.Create(Protocol.HTTPS(sslCert), "127.0.0.1", 8084) ] }
+  // let sslCert = X509Certificate.FromPKCS12(BIO.File("suave.p12","r"), "easy")
+  // let proxy_config = { default_config with bindings = [ HttpBinding.Create(Protocol.HTTPS(sslCert), "127.0.0.1", 8084) ] }
   let proxy_config = { default_config with bindings = [ HttpBinding.Create(Protocol.HTTP, "127.0.0.1", 8084) ] }
   let proxy = run_with_factory Proxy.proxy_server_async proxy_config
 
   testList "creating proxy" [
-    testProperty "GET / returns 200 OK with passed string" <| fun str ->
-      run_in_context (run_target (OK str)) dispose_context <| fun _ ->
-        Assert.Equal("target's WebPart should return its value", str, proxy to_target |> req GET "/")
+//    testProperty "GET / returns 200 OK with passed string" <| fun str ->
+//      run_in_context (run_target (OK str)) dispose_context <| fun _ ->
+//        Assert.Equal("target's WebPart should return its value", str, proxy to_target |> req GET "/")
+
+    testCase "GET /redirect returns 'redirect'" <| fun _ ->
+      run_in_context (run_target (url "/secret" >>= redirect "https://sts.example.se")) dispose_context <| fun _ ->
+        let res = proxy to_target |> req_resp GET "/secret"
+        Assert.Equal("should proxy redirect", Net.HttpStatusCode.Found, res.StatusCode)
+        Assert.Equal("should give Location-header together with redirect",
+          Uri("https://sts.example.se"), res.Headers.Location)
     ]
 
 [<EntryPoint>]
