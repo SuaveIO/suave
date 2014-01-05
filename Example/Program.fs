@@ -13,7 +13,7 @@ open OpenSSL.Core
 let basic_auth  : WebPart =
   authenticate_basic ( fun x -> x.Username.Equals("foo") && x.Password.Equals("bar"))
 
-let sslCert = X509Certificate.FromPKCS12(BIO.File("suave.p12","r"),"easy")
+let sslCert = X509Certificate.FromPKCS12(BIO.File("suave.p12","r"), "easy")
 
 let myapp : WebPart =
   choose [

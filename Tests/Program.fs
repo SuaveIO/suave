@@ -99,6 +99,9 @@ let gets =
                      "", (run_with' NO_CONTENT |> req GET "/"))
     ]
 
+open OpenSSL.X509
+open OpenSSL.Core
+
 [<Tests>]
 let proxy =
   let bind :: _ = default_config.bindings
@@ -106,12 +109,14 @@ let proxy =
 
   let run_target = run_with default_config
 
-  let run_in_context item f_item f_body =
+  let run_in_context item f_finally f_body =
     try
       f_body item
     finally
-      f_item item
+      f_finally item
 
+  //  let sslCert = X509Certificate.FromPKCS12(BIO.File("suave.p12","r"), "easy")
+  //  let proxy_config = { default_config with bindings = [ HttpBinding.Create(Protocol.HTTPS(sslCert), "127.0.0.1", 8084) ] }
   let proxy_config = { default_config with bindings = [ HttpBinding.Create(Protocol.HTTP, "127.0.0.1", 8084) ] }
   let proxy = run_with_factory Proxy.proxy_server_async proxy_config
 
