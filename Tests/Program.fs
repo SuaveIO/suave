@@ -63,15 +63,26 @@ module RequestFactory =
   let run_with = run_with_factory web_server_async
 
   let req_resp (methd : Method) (resource : string) ctx =
+    let to_http_method = function
+      | Method.GET -> HttpMethod.Get
+      | Method.POST -> HttpMethod.Post
+      | Method.DELETE -> HttpMethod.Delete
+      | Method.PUT-> HttpMethod.Put
+      | Method.HEAD -> HttpMethod.Head
+      | Method.TRACE -> HttpMethod.Trace
+      | Method.OPTIONS -> HttpMethod.Options
+      | _ -> failwithf "unsupported method %A by HttpClient" methd
+
     let server = ctx.suave_config.bindings.Head.ToString()
     let uri_builder = UriBuilder server
     uri_builder.Path <- resource
     use handler = new Net.Http.HttpClientHandler(AllowAutoRedirect = false)
-    use client = new System.Net.Http.HttpClient(handler)
-
+    use client = new Net.Http.HttpClient(handler)
+    let r = new HttpRequestMessage(to_http_method methd, uri_builder.Uri)
+    r.Headers.ConnectionClose <- Nullable(true)
     Log.tracef(fun fmt -> fmt "tests:req GET %O -> execute" uri_builder.Uri)
 
-    let get = client.GetAsync(uri_builder.Uri, HttpCompletionOption.ResponseContentRead, ctx.cts.Token)
+    let get = client.SendAsync(r, HttpCompletionOption.ResponseContentRead, ctx.cts.Token)
     let completed = get.Wait(5000)
     if not completed && System.Diagnostics.Debugger.IsAttached then System.Diagnostics.Debugger.Break()
     else Assert.Equal("should finish request in 5000ms", true, completed)
@@ -145,7 +156,8 @@ let proxy =
     testProperty "GET / returns 200 OK with passed string" <| fun str ->
       run_in_context (run_target (OK str)) dispose_context <| fun _ ->
         Assert.Equal("target's WebPart should return its value", str,
-          verbose_logging(fun () -> proxy to_target |> req GET "/"))
+//          verbose_logging(fun () -> proxy to_target |> req GET "/"))
+          proxy to_target |> req GET "/")
 
     testCase "GET /redirect returns 'redirect'" <| fun _ ->
       run_in_context (run_target (url "/secret" >>= redirect "https://sts.example.se")) dispose_context <| fun _ ->

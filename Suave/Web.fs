@@ -261,7 +261,7 @@ let process_request proxy_mode (request : HttpRequest) bytes = async {
 
   let stream = request.Stream
 
-  Log.tracef(fun fmt -> fmt "web:process_request proxy:%b -> read_line" proxy_mode)
+  Log.tracef(fun fmt -> fmt "web:process_request proxy:%b bytes:%A -> read_line" proxy_mode bytes)
   let! (first_line : string), rem = read_line stream bytes
   Log.tracef(fun fmt -> fmt "web:process_request proxy:%b <- read_line" proxy_mode)
 
@@ -376,10 +376,14 @@ let request_loop webpart proto (processor : HttpProcessor) error_handler (timeou
       match request.Headers?connection with
       | Some (x : string) when x.ToLower().Equals("keep-alive") ->
         request.Clear()
+        Log.tracef(fun fmt -> fmt "web:request_loop:loop 'Connection: keep-alive' recurse (!), rem: %A" rem)
         return! loop rem
       | _ ->
+        Log.trace(fun () -> "web:request_loop:loop  'Connection: close', exiting")
         return ()
-    | None -> return ()
+    | None ->
+      Log.trace(fun () -> "web:request_loop:loop 'result = None', exiting")
+      return ()
   }
   async {
     try
