@@ -355,18 +355,18 @@ let request_loop webpart proto (processor : HttpProcessor) error_handler (timeou
 
   let rec loop bytes = async {
 
-    Log.log "web:request_loop:loop -> processor"
+    // Log.log "web:request_loop:loop -> processor"
     let! result, rem = processor request bytes
-    Log.log "web:request_loop:loop <- processor"
+    // Log.log "web:request_loop:loop <- processor"
     match result with
     | Some (request : HttpRequest) ->
       try
-        Log.log "web:request_loop:loop -> unblock"
+        // Log.log "web:request_loop:loop -> unblock"
         do! Async.WithTimeout (timeout, run request)
-        Log.log "web:request_loop:loop <- unblock"
-        Log.log "web:request_loop:loop -> flush"
+        // Log.log "web:request_loop:loop <- unblock"
+        // Log.log "web:request_loop:loop -> flush"
         do! stream.FlushAsync()
-        Log.log "web:request_loop:loop <- flush"
+        // Log.log "web:request_loop:loop <- flush"
       with
         | InternalFailure(_) as ex  -> raise ex
         | :? TimeoutException as ex -> do! error_handler ex "script timeout" request
@@ -427,7 +427,7 @@ let web_worker (proto, ip, port, error_handler, timeout) (webpart : WebPart) =
 /// start the 'server' (second item in tuple), as this starts the TcpListener.
 /// Have a look at the example and the unit tests for more documentation.
 /// In other words: don't block on 'listening' unless you have started the server.
-let web_server_async (config : Config) (webpart : WebPart) =
+let web_server_async (config : SuaveConfig) (webpart : WebPart) =
   let all =
     config.bindings
     |> List.map (fun { scheme = proto; ip = ip; port = port } ->
@@ -438,8 +438,12 @@ let web_server_async (config : Config) (webpart : WebPart) =
 
 /// Runs the web server and blocks waiting for the asynchronous workflow to be cancelled or
 /// it returning itself.
-let web_server (config : Config) (webpart : WebPart) =
-  Async.RunSynchronously(web_server_async config webpart |> snd, cancellationToken = config.ct)
+let web_server (config : SuaveConfig) (webpart : WebPart) =
+  Async.RunSynchronously(async {
+    let listening, server = web_server_async config webpart
+    do! listening
+    do! server },
+    cancellationToken = config.ct)
 
 /// The default configuration binds on IPv4, 127.0.0.1:8083 with a regular 500 Internal Error handler,
 /// with a timeout of one minute for computations to run. Waiting for 2 seconds for the socket bind
