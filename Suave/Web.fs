@@ -354,19 +354,19 @@ let request_loop webpart proto (processor : HttpProcessor) error_handler (timeou
   request.IsSecure <- match proto with HTTP -> false | HTTPS _ -> true
 
   let rec loop bytes = async {
-
-    // Log.log "web:request_loop:loop -> processor"
+    Log.trace(fun () -> "web:request_loop:loop -> processor")
     let! result, rem = processor request bytes
-    // Log.log "web:request_loop:loop <- processor"
+    Log.trace(fun () -> "web:request_loop:loop <- processor")
+
     match result with
     | Some (request : HttpRequest) ->
       try
-        // Log.log "web:request_loop:loop -> unblock"
+        Log.trace(fun () -> "web:request_loop:loop -> unblock")
         do! Async.WithTimeout (timeout, run request)
-        // Log.log "web:request_loop:loop <- unblock"
-        // Log.log "web:request_loop:loop -> flush"
+        Log.trace(fun () -> "web:request_loop:loop <- unblock")
+        Log.trace(fun () -> "web:request_loop:loop -> flush")
         do! stream.FlushAsync()
-        // Log.log "web:request_loop:loop <- flush"
+        Log.trace(fun () -> "web:request_loop:loop <- flush")
       with
         | InternalFailure(_) as ex  -> raise ex
         | :? TimeoutException as ex -> do! error_handler ex "script timeout" request
@@ -387,10 +387,10 @@ let request_loop webpart proto (processor : HttpProcessor) error_handler (timeou
     | :? EndOfStreamException
     | :? IOException as ex
       when ex.InnerException <> null && ex.InnerException.GetType() = typeof<SocketException> ->
-      Log.log "web:request_loop - client disconnected.\n"
+      Log.trace(fun () -> "web:request_loop - client disconnected")
       return ()
     | ex ->
-      Log.log "web:request_loop - Request failed.\n%A" ex
+      Log.tracef(fun fmt -> fmt "web:request_loop - Request failed.\n%A" ex)
       return ()
   }
 
@@ -410,7 +410,7 @@ let is_local_address (ip : string) =
 /// The default error handler returns a 500 Internal Error in response to
 /// thrown exceptions.
 let default_error_handler (ex : Exception) msg (request : HttpRequest) = async {
-  Log.log "web:default_error_handler - %s.\n%A" msg ex
+  Log.logf "web:default_error_handler - %s.\n%A" msg ex
   if is_local_address request.RemoteAddress then
     do! (response 500 "Internal Error" (bytes_utf8 (sprintf "<h1>%s</h1><br/>%A" ex.Message ex)) request)
   else do! (response 500 "Internal Error" (bytes_utf8 (request.RemoteAddress)) request)

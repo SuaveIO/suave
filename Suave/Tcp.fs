@@ -4,9 +4,6 @@ open System
 open System.Net
 open System.Net.Sockets
 
-open Log
-let log_str = log "%s"
-
 /// The max backlog of number of requests
 let MAX_BACK_LOG = Int32.MaxValue
 
@@ -33,14 +30,16 @@ type TcpWorker<'a> = TcpClient -> Async<'a>
 /// Close the TCP client by closing its stream and then closing the client itself
 let close (d : TcpClient) =
   if d.Connected then
-    d.GetStream().Close()
-    d.Close()
+    try // we race the network to act on the stream/client, so swallow any errors
+      d.GetStream().Close()
+      d.Close()
+    with _ -> ()
 
 /// Stop the TCP listener server
 let stop_tcp reason (server : TcpListener) =
-  // log "tcp:stop_tcp - %s - stopping server .. " reason
+  Log.tracef(fun fmt -> fmt "tcp:stop_tcp - %s - stopping server .. " reason)
   server.Stop()
-  // log_str "tcp:stop_tcp - stopped\n"
+  Log.trace(fun () -> "tcp:stop_tcp - stopped")
 
 /// Start a new TCP server with a specific IP, Port and with a serve_client worker
 /// returning an async workflow whose result can be awaited (for when the tcp server has started
@@ -65,17 +64,17 @@ let tcp_ip_server (source_ip : IPAddress, source_port : uint16) (serve_client : 
   //echo 1 > /proc/sys/net/ipv4/tcp_tw_recycle
   //custom kernel with shorter TCP_TIMEWAIT_LEN in include/net/tcp.h
   let job (d : #TcpClient) = async {
-    use! oo = Async.OnCancel (fun () -> (* log "tcp:tcp_ip_server - disconnected client (async cancel)";*)
+    use! oo = Async.OnCancel (fun () -> Log.trace(fun () -> "tcp:tcp_ip_server - disconnected client (async cancel)")
                                         close d)
     try
       try
         return! serve_client d
       with 
         | :? System.IO.EndOfStreamException ->
-          log "tcp:tcp_ip_server - disconnected client (end of stream)"
+          Log.trace(fun () -> "tcp:tcp_ip_server - disconnected client (end of stream)")
           return ()
         | x ->
-          log "tcp:tcp_ip_server - tcp request processing failed.\n%A" x
+          Log.tracef(fun fmt -> fmt "tcp:tcp_ip_server - tcp request processing failed.\n%A" x)
           return ()
     finally close d
   }
@@ -88,8 +87,9 @@ let tcp_ip_server (source_ip : IPAddress, source_port : uint16) (serve_client : 
 
       let start_data = { start_data with socket_bound_utc = Some(DateTime.UtcNow) }
       accepting_connections.Complete start_data |> ignore
-//      log "tcp:tcp_ip_server - started listener: %O%s" start_data
-//        (if token.IsCancellationRequested then ", cancellation requested" else "")
+
+      Log.tracef(fun fmt -> fmt "tcp:tcp_ip_server - started listener: %O%s" start_data
+                              (if token.IsCancellationRequested then ", cancellation requested" else ""))
 
       while not (token.IsCancellationRequested) do
         //log "tcp:tcp_ip_server -> async accept tcp client"
@@ -99,7 +99,7 @@ let tcp_ip_server (source_ip : IPAddress, source_port : uint16) (serve_client : 
 
       return ()
     with x ->
-      log "tcp:tcp_ip_server - tcp server failed.\n%A" x
+      Log.tracef(fun fmt -> fmt "tcp:tcp_ip_server - tcp server failed.\n%A" x)
       return ()
   }
 

@@ -1,5 +1,7 @@
 module Suave.Tests
 
+#nowarn "25"
+
 module Resp =
   open System.Net.Http
   let content (r : HttpResponseMessage) = r.Content
@@ -35,18 +37,25 @@ module RequestFactory =
     ctx.cts.Cancel()
     ctx.cts.Dispose()
 
+  let verbose_logging f =
+    Log.enable_trace <- true
+    try
+      f ()
+    finally
+      Log.enable_trace <- false
+
   let run_with_factory factory config web_parts : SuaveTestCtx =
     let binding = config.bindings.Head
     let base_uri = binding.ToString()
     let cts = new CancellationTokenSource()
-//    cts.Token.Register(fun () -> Log.log "tests:run_with - cancelled") |> ignore
+    cts.Token.Register(fun () -> Log.trace(fun () -> "tests:run_with - cancelled")) |> ignore
     let config' = { config with ct = cts.Token }
 
     let listening, server = factory config web_parts
     Async.Start(server, cts.Token)
-    // Log.log "tests:run_with_factory -> listening"
+    Log.trace(fun () -> "tests:run_with_factory -> listening")
     listening |> Async.RunSynchronously // wait for the server to start listening
-    // Log.log "tests:run_with_factory <- listening"
+    Log.trace(fun () -> "tests:run_with_factory <- listening")
 
     { cts = cts
     ; suave_config = config' }
@@ -59,11 +68,18 @@ module RequestFactory =
     uri_builder.Path <- resource
     use handler = new Net.Http.HttpClientHandler(AllowAutoRedirect = false)
     use client = new System.Net.Http.HttpClient(handler)
-    // Log.log "tests:req GET %O -> execute" uri_builder.Uri
-    let res = client.GetAsync(uri_builder.Uri, HttpCompletionOption.ResponseContentRead, ctx.cts.Token).Result
-    // Log.log "tests:req GET %O <- execute" uri_builder.Uri
+
+    Log.tracef(fun fmt -> fmt "tests:req GET %O -> execute" uri_builder.Uri)
+
+    let get = client.GetAsync(uri_builder.Uri, HttpCompletionOption.ResponseContentRead, ctx.cts.Token)
+    let completed = get.Wait(5000)
+    if not completed && System.Diagnostics.Debugger.IsAttached then System.Diagnostics.Debugger.Break()
+    else Assert.Equal("should finish request in 5000ms", true, completed)
+
+    Log.tracef(fun fmt -> fmt "tests:req GET %O <- execute" uri_builder.Uri)
+
     dispose_context ctx
-    res
+    get.Result
 
   let req (methd : Method) (resource : string) ctx : string =
     let res = req_resp methd resource ctx
@@ -128,7 +144,8 @@ let proxy =
   testList "creating proxy" [
     testProperty "GET / returns 200 OK with passed string" <| fun str ->
       run_in_context (run_target (OK str)) dispose_context <| fun _ ->
-        Assert.Equal("target's WebPart should return its value", str, proxy to_target |> req GET "/")
+        Assert.Equal("target's WebPart should return its value", str,
+          verbose_logging(fun () -> proxy to_target |> req GET "/"))
 
     testCase "GET /redirect returns 'redirect'" <| fun _ ->
       run_in_context (run_target (url "/secret" >>= redirect "https://sts.example.se")) dispose_context <| fun _ ->
@@ -136,6 +153,15 @@ let proxy =
         Assert.Equal("should proxy redirect", Net.HttpStatusCode.Found, res.StatusCode)
         Assert.Equal("should give Location-header together with redirect",
           Uri("https://sts.example.se"), res.Headers.Location)
+
+    testCase "Should proxy 500 Internal Server Error too" <| fun _ ->
+      run_in_context (run_target (INTERNAL_ERROR "Oh noes")) dispose_context <| fun _ ->
+        Assert.Equal("should have correct status code",
+          Net.HttpStatusCode.InternalServerError,
+          (proxy to_target |> req_resp GET "/").StatusCode)
+        Assert.Equal("should have correct content",
+          "Oh noes",
+          (proxy to_target |> req_resp GET "/").Content.ReadAsStringAsync().Result)
     ]
 
 [<EntryPoint>]

@@ -52,7 +52,8 @@ let rec parser (reader : XmlReader) (Xml(l) as k) =
     | XmlNodeType.Text       -> parser reader (Xml(l @ [Text(reader.Value),Xml([])]))
     | XmlNodeType.Whitespace -> parser reader (Xml(l @ [WhiteSpace(reader.Value),Xml([])]))
     | XmlNodeType.Comment    -> parser reader k
-    | x                      -> printf "got:%A, name:%s\n" x (x.ToString());Xml(l)
+    | x                      -> Log.logf "got: %A, name: %O" x x
+                                Xml(l)
   else
     k
 
@@ -64,11 +65,11 @@ type BindParam = { name : string; calcValue : Xml -> Xml }
 
 /// Create a submit element
 let submit ((value:obj) ,(func: obj -> unit)) : Binder =
-  (fun s ->  Xml([Element("input","",[| "type","submit"; "value",value.ToString(); "name","auto"|]),Xml([])]))
+  (fun s ->  Xml([Element("input","",[| "type","submit"; "value",value.ToString(); "name","auto"|]), Xml([])]))
 
 /// Create a text-box
 let text_box ((value:obj) ,(func: obj -> unit)) : Binder =
-  (fun s ->  Xml([Element("input","",[| "type","text"; "value",value.ToString(); "name","auto"|]),Xml([])]))
+  (fun s ->  Xml([Element("input","",[| "type","text"; "value",value.ToString(); "name","auto"|]), Xml([])]))
 
 /// Create a text node in the HTML, i.e. plain text inside some XML.
 let text ((value:obj) ,(func: obj -> unit)) : Binder =

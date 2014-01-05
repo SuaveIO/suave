@@ -70,7 +70,7 @@ type HttpRequest() =
         try
           File.Delete(upload.Path)
         with
-        | _ as e -> Log.log "%A" e // we tried
+        | _ as e -> Log.logf "%A" e // we tried
 
   override h.Finalize() = h.Dispose false
 

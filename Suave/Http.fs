@@ -36,6 +36,7 @@ module Http =
       do! f_content request
 
     with //the connection might drop while we are sending the response
+    | :? ObjectDisposedException -> () // this happens without it being a problem
     | :? IOException as ex  -> raise (InternalFailure "Failure while writing to client stream")
     }
 
@@ -123,12 +124,12 @@ module Http =
   let redirect url =
     set_header "Location" url
     >> set_header "Content-Type" "text/html; charset=utf-8"
-    >> response 302 "Found" (bytes_utf8 <| sprintf "<html>
+    >> response 302 "Found" (bytes_utf8(sprintf "<html>
   <body>
     <a href=\"%s\">Content Moved</a>
   </body>
 </html>
-" url)
+" url))
     >> succeed
 
   let not_modified : HttpRequest -> Async<unit> option =

@@ -43,7 +43,24 @@ type ConsoleLogger(lvl) =
       if level >= lvl then
         let w = System.Console.WriteLine : string -> unit
         let line = f ()
-        w <| sprintf "%s: %s" (DateTime.UtcNow.ToString("o")) line.message
+        w(sprintf "%s: %s" (DateTime.UtcNow.ToString("o")) line.message)
 
-let log format =
-  Printf.kprintf (fun s -> System.Console.WriteLine(sprintf "%s: %s" (DateTime.UtcNow.ToString("o")) s)) format
+// TODO: use abstraction above
+
+let mutable enable_trace = false
+
+let trace f_str =
+  if enable_trace then
+    System.Console.WriteLine(sprintf "%s: %s" (DateTime.UtcNow.ToString("o")) (f_str ()))
+
+let tracef format =
+  if enable_trace then
+    format (Printf.kprintf (fun s -> System.Console.WriteLine(sprintf "%s: %s" (DateTime.UtcNow.ToString("o")) s)))
+
+let log str =
+  System.Console.WriteLine(sprintf "%s: %s" (DateTime.UtcNow.ToString("o")) str)
+
+let logf format =
+  Printf.kprintf
+    (fun s -> System.Console.WriteLine(sprintf "%s: %s" (DateTime.UtcNow.ToString("o")) s))
+    format

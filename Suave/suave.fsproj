@@ -55,8 +55,8 @@
   <ItemGroup>
     <Compile Include="Async.fs" />
     <Compile Include="Utils.fs" />
-    <Compile Include="Html.fs" />
     <Compile Include="Log.fs" />
+    <Compile Include="Html.fs" />
     <Compile Include="Tcp.fs" />
     <Compile Include="Sscanf.fs" />
     <Compile Include="Types.fs" />
