@@ -36,7 +36,6 @@ let forward (ip : IPAddress) (port : uint16) (p : HttpRequest) =
   q.AllowAutoRedirect         <- false
   q.AllowReadStreamBuffering  <- false
   q.AllowWriteStreamBuffering <- false
-  // q.UserAgent <- p.UserAgent
   q.Method  <- p.Method
   q.Headers <- buildWebHeadersCollection p.Headers
   q.Proxy   <- null

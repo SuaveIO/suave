@@ -126,9 +126,9 @@ let proxy =
   let proxy = run_with_factory Proxy.proxy_server_async proxy_config
 
   testList "creating proxy" [
-//    testProperty "GET / returns 200 OK with passed string" <| fun str ->
-//      run_in_context (run_target (OK str)) dispose_context <| fun _ ->
-//        Assert.Equal("target's WebPart should return its value", str, proxy to_target |> req GET "/")
+    testProperty "GET / returns 200 OK with passed string" <| fun str ->
+      run_in_context (run_target (OK str)) dispose_context <| fun _ ->
+        Assert.Equal("target's WebPart should return its value", str, proxy to_target |> req GET "/")
 
     testCase "GET /redirect returns 'redirect'" <| fun _ ->
       run_in_context (run_target (url "/secret" >>= redirect "https://sts.example.se")) dispose_context <| fun _ ->
