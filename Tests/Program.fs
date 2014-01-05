@@ -29,35 +29,37 @@ type Method =
 module RequestFactory =
   type SuaveTestCtx =
     { cts          : CancellationTokenSource
-    ; suave_config : Suave.Types.Config }
+    ; suave_config : SuaveConfig }
     member x.Destroy() =
       x.cts.Cancel()
       x.cts.Dispose()
 
-  let run_with config web_parts : SuaveTestCtx =
+  let run_with_factory factory config web_parts : SuaveTestCtx =
     let binding = config.bindings.Head
     let base_uri = binding.ToString()
     let cts = new CancellationTokenSource()
-    cts.Token.Register(fun () -> Log.log "tests:run_with - cancelled") |> ignore
+//    cts.Token.Register(fun () -> Log.log "tests:run_with - cancelled") |> ignore
     let config' = { config with ct = cts.Token }
 
-    let listening, server = web_server_async config web_parts
+    let listening, server = factory config web_parts
     Async.Start(server, cts.Token)
-    Log.log "tests:run_with -> listening"
+    // Log.log "tests:run_with_factory -> listening"
     listening |> Async.RunSynchronously // wait for the server to start listening
-    Log.log "tests:run_with <- listening"
+    // Log.log "tests:run_with_factory <- listening"
 
     { cts = cts
     ; suave_config = config' }
+
+  let run_with = run_with_factory web_server_async
 
   let req (methd : Method) (resource : string) ctx =
     let server = ctx.suave_config.bindings.Head.ToString()
     let uri_builder = UriBuilder server
     uri_builder.Path <- resource
     use client = new System.Net.Http.HttpClient()
-    Log.log "tests:req GET %O -> execute" uri_builder.Uri
+//    Log.log "tests:req GET %O -> execute" uri_builder.Uri
     let res = client.GetAsync(uri_builder.Uri, HttpCompletionOption.ResponseContentRead, ctx.cts.Token).Result
-    Log.log "tests:req GET %O <- execute" uri_builder.Uri
+//    Log.log "tests:req GET %O <- execute" uri_builder.Uri
     ctx.Destroy()
     res.Content.ReadAsStringAsync().Result
 
@@ -70,10 +72,11 @@ let smoking =
 [<Tests>]
 let utilities =
   testList "trying some utility functions" [
-    testCase "loopback ipv4" <|
-      fun _ -> Assert.Equal("127.0.0.1 is a local address", true, is_local_address "127.0.0.1")
-    testCase "loopback ipv6" <|
-      fun _ -> Assert.Equal("::0 is a local address", true, is_local_address "::1")
+    testCase "loopback ipv4" <| fun _ ->
+      Assert.Equal("127.0.0.1 is a local address", true, is_local_address "127.0.0.1")
+
+    testCase "loopback ipv6" <| fun _ ->
+      Assert.Equal("::0 is a local address", true, is_local_address "::1")
   ]
 
 open RequestFactory
@@ -84,15 +87,29 @@ let gets =
 
   testList "getting basic responses"
     [
-      testCase "200 OK returns 'a'" <|
-        fun _ -> Assert.Equal("expecting non-empty response", "a", run_with' (OK "a") |> req GET "/")
+      testCase "200 OK returns 'a'" <| fun _ ->
+        Assert.Equal("expecting non-empty response", "a", run_with' (OK "a") |> req GET "/")
 
-      testProperty "200 OK returns equivalent" <|
-        fun resp_str -> (run_with' (OK resp_str) |> req GET "/hello") = resp_str
+      testProperty "200 OK returns equivalent" <| fun resp_str ->
+        (run_with' (OK resp_str) |> req GET "/hello") = resp_str
 
-      testCase "204 No Content empty body" <|
-        fun _ -> Assert.Equal("empty string should always be returned by 204 No Content",
-                              "", (run_with' NO_CONTENT |> req GET "/"))
+      testCase "204 No Content empty body" <| fun _ ->
+        Assert.Equal("empty string should always be returned by 204 No Content",
+                     "", (run_with' NO_CONTENT |> req GET "/"))
+    ]
+
+[<Tests>]
+let proxy =
+  testList "creating proxy" [
+    testCase "GET / returns 200 OK" <| fun _ ->
+      let bind :: _ = default_config.bindings
+      let target = run_with default_config (OK "Hello from Target!")
+      let proxy_config = { default_config with bindings = [ HttpBinding.Create(Protocol.HTTP, "127.0.0.1", 8084) ] }
+      let proxy = run_with_factory Proxy.proxy_server_async proxy_config (fun r -> Some(bind.ip, bind.port))
+
+      Assert.Equal("target's WebPart should return its value",
+        "Hello from Target!",
+        proxy |> req GET "/")
     ]
 
 [<EntryPoint>]

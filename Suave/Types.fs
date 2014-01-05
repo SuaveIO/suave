@@ -132,7 +132,7 @@ type ErrorHandler = Exception -> String -> HttpRequest -> Async<unit>
 open System.Threading
 
 /// The core configuration of suave
-type Config =
+type SuaveConfig =
   /// The bindings for the web server to launch with
   { bindings       : HttpBinding list
 

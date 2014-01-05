@@ -55,6 +55,9 @@
       <HintPath>..\packages\Fuchu.FsCheck.0.3.0.1\lib\net40-client\Fuchu.FsCheck.dll</HintPath>
       <Private>True</Private>
     </Reference>
+    <Reference Include="ManagedOpenSsl">
+      <HintPath>..\libs\ManagedOpenSsl.dll</HintPath>
+    </Reference>
     <Reference Include="mscorlib" />
     <Reference Include="FSharp.Core, Version=4.3.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a" />
     <Reference Include="System" />

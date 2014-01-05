@@ -76,7 +76,7 @@ choose [
                     OK (sprintf "Upload successful.<br>POST data: %A<br>Uploaded files (%d): %s" (x.Form)(x.Files.Count) files)) ;
   POST >>= warbler( fun x -> OK (sprintf "POST data: %A" (x.Form)));
   NOT_FOUND "Found no handlers"
-  ] 
+  ]
   |> web_server
       { bindings =
         [ HttpBinding.Create(HTTP, "127.0.0.1", 8082)

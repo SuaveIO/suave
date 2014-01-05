@@ -38,9 +38,9 @@ let close (d : TcpClient) =
 
 /// Stop the TCP listener server
 let stop_tcp reason (server : TcpListener) =
-  log "tcp:stop_tcp - %s - stopping server .. " reason
+  // log "tcp:stop_tcp - %s - stopping server .. " reason
   server.Stop()
-  log_str "tcp:stop_tcp - stopped\n"
+  // log_str "tcp:stop_tcp - stopped\n"
 
 /// Start a new TCP server with a specific IP, Port and with a serve_client worker
 /// returning an async workflow whose result can be awaited (for when the tcp server has started
@@ -54,7 +54,7 @@ let tcp_ip_server (source_ip : IPAddress, source_port : uint16) (serve_client : 
     ; source_ip        = source_ip
     ; source_port      = source_port }
   let accepting_connections = new AsyncResultCell<StartedData>()
-  log "tcp:tcp_ip_server - starting listener: %O" start_data
+  // log "tcp:tcp_ip_server - starting listener: %O" start_data
 
   let server = new TcpListener(source_ip, int source_port)
   server.Server.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, (int)1)
@@ -65,7 +65,8 @@ let tcp_ip_server (source_ip : IPAddress, source_port : uint16) (serve_client : 
   //echo 1 > /proc/sys/net/ipv4/tcp_tw_recycle
   //custom kernel with shorter TCP_TIMEWAIT_LEN in include/net/tcp.h
   let job (d : #TcpClient) = async {
-    use! oo = Async.OnCancel (fun () -> log "tcp:tcp_ip_server - disconnected client (async cancel)"; close d)
+    use! oo = Async.OnCancel (fun () -> (* log "tcp:tcp_ip_server - disconnected client (async cancel)";*)
+                                        close d)
     try
       try
         return! serve_client d
@@ -87,13 +88,13 @@ let tcp_ip_server (source_ip : IPAddress, source_port : uint16) (serve_client : 
 
       let start_data = { start_data with socket_bound_utc = Some(DateTime.UtcNow) }
       accepting_connections.Complete start_data |> ignore
-      log "tcp:tcp_ip_server - started listener: %O%s" start_data
-        (if token.IsCancellationRequested then ", cancellation requested" else "")
+//      log "tcp:tcp_ip_server - started listener: %O%s" start_data
+//        (if token.IsCancellationRequested then ", cancellation requested" else "")
 
       while not (token.IsCancellationRequested) do
-        log "tcp:tcp_ip_server -> async accept tcp client"
+        //log "tcp:tcp_ip_server -> async accept tcp client"
         let! client = server.AsyncAcceptTcpClient()
-        log "tcp:tcp_ip_server <- async accept tcp client"
+        //log "tcp:tcp_ip_server <- async accept tcp client"
         Async.Start (job client, token)
 
       return ()
