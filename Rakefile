@@ -19,6 +19,12 @@ end
 desc "Perform full build"
 task :build => [:versioning, :restore, :build_quick]
 
+build :clean do |b|
+  b.file = 'suave.sln'
+  b.prop 'Configuration', 'Release'
+  b.target = 'Clean'
+end
+
 build :build_quick do |b|
   b.file = 'suave.sln'
   b.prop 'Configuration', 'Release'
