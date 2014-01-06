@@ -87,8 +87,5 @@ let proxy_server_async config resolver =
   listening, server
 
 let proxy_server config resolver =
-  Async.RunSynchronously(async {
-    let listening, server = proxy_server_async config resolver
-    do! listening
-    do! server },
+  Async.RunSynchronously(proxy_server_async config resolver |> snd,
     cancellationToken = config.ct)
