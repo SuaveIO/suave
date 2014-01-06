@@ -9,6 +9,7 @@ module Http =
 
   open Utils
   open Types
+  open Socket
 
   // literals
 
@@ -20,18 +21,18 @@ module Http =
 
   let response_f status_code reason_phrase (f_content : HttpRequest -> Async<unit>) (request : HttpRequest) = async {
     try
-      let stream:Stream = request.Stream
+      let connection:Connection = request.Connection
 
-      do! async_writeln stream (sprintf "%s %d %s" HTTP_VERSION status_code reason_phrase)
-      do! async_writeln stream (sprintf "Server: Suave/%s (http://suave.io)" SUAVE_VERSION)
-      do! async_writeln stream (sprintf "Date: %s" (DateTime.UtcNow.ToString("R")))
+      do! async_writeln connection (sprintf "%s %d %s" HTTP_VERSION status_code reason_phrase)
+      do! async_writeln connection (sprintf "Server: Suave/%s (http://suave.io)" SUAVE_VERSION)
+      do! async_writeln connection (sprintf "Date: %s" (DateTime.UtcNow.ToString("R")))
 
       for (x,y) in request.Response.Headers do
         if not (List.exists (fun y -> x.ToLower().Equals(y)) ["server";"date";"content-length"]) then
-          do! async_writeln stream (sprintf "%s: %s" x y )
+          do! async_writeln connection (sprintf "%s: %s" x y )
 
       if not(request.Response.Headers.Exists(new Predicate<_>(fun (x,_) -> x.ToLower().Equals("content-type")))) then
-        do! async_writeln stream (sprintf "Content-Type: %s" "text/html")
+        do! async_writeln connection (sprintf "Content-Type: %s" "text/html")
 
       do! f_content request
 
@@ -44,12 +45,12 @@ module Http =
     response_f status_code reason_phrase (
       fun r -> async {
         if content.Length > 0 then
-          do! async_writeln r.Stream (sprintf "Content-Length: %d" content.Length)
+          do! async_writeln r.Connection (sprintf "Content-Length: %d" content.Length)
 
-        do! async_writeln r.Stream ""
+        do! async_writeln r.Connection ""
 
         if content.Length > 0 then
-          do! r.Stream.WriteAsync(content, 0, content.Length) })
+          do! r.Connection.writer (new ArraySegment<_>(content, 0, content.Length)) })
       request
 
   // modifiers
@@ -222,12 +223,12 @@ module Http =
       use fs = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.Read)
 
       if fs.Length > 0L then
-        do! async_writeln r.Stream (sprintf "Content-Length: %d" fs.Length)
+        do! async_writeln r.Connection (sprintf "Content-Length: %d" fs.Length)
 
-      do! async_writeln r.Stream ""
+      do! async_writeln r.Connection ""
 
       if fs.Length > 0L then
-        do! transfer r.Stream fs }
+        do! transfer_x r.Connection fs }
 
     async { do! response_f 200 "OK" (write_file filename) r } |> succeed
 
@@ -290,8 +291,7 @@ module Http =
   let close_pipe (p : HttpRequest option) =
     match p with
     | Some(x) ->
-      x.Stream.Flush()
-      x.Stream.Close()
+      x.Connection.shutdown()
     | None -> ()
 
   let parse_authentication_token (token : string) =

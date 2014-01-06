@@ -57,8 +57,11 @@
     <Compile Include="Utils.fs" />
     <Compile Include="Log.fs" />
     <Compile Include="Html.fs" />
+    <Compile Include="Socket.fs" />
     <Compile Include="Tcp.fs" />
     <Compile Include="Sscanf.fs" />
+    <Compile Include="Native.fs" />
+    <Compile Include="OpenSSL.fs" />
     <Compile Include="Types.fs" />
     <Compile Include="Http.fsi" />
     <Compile Include="Http.fs" />

@@ -3,10 +3,12 @@ module Suave.Types
 open System
 open System.IO
 open System.Collections.Generic
+open System.Net.Sockets
+open Socket
 
 /// A holder for headers for the http response
 type HttpResponse() =
-  let mutable headers : List<string*string> = new List<string*string>()
+  let mutable headers: List<string*string> = new List<string*string>()
   member h.Headers with get()              = headers and set x = headers <- x
 
 /// A holder for uploaded file meta-data
@@ -17,7 +19,7 @@ type HttpUpload(fieldname : string, filename : string, mime_type : string, temp_
   member x.Path      = temp_file_name
 
 /// A holder for the data extracted from the request
-type HttpRequest() =
+type HttpRequest(connection : Connection) =
   let mutable url           : string = null
   let mutable meth0d        : string = null
   let mutable remoteAddress : string = null
@@ -25,7 +27,7 @@ type HttpRequest() =
   let mutable query         : Dictionary<string,string> = new Dictionary<string,string>()
   let mutable headers       : Dictionary<string,string> = new Dictionary<string,string>()
   let mutable form          : Dictionary<string,string> = new Dictionary<string,string>()
-  let mutable rawform       : byte [] = Array.empty
+  let mutable rawform       : byte[] = Array.empty
   let mutable rawquery      : string = null
   let mutable cookies       : Dictionary<string,(string*string)[]> = new Dictionary<string,(string*string)[]>()
   let mutable username      : string = null
@@ -38,7 +40,7 @@ type HttpRequest() =
   member h.Url           with get() = url and set x = url <- x
   member h.Method        with get() = meth0d and set x = meth0d <- x
   member h.RemoteAddress with get() = remoteAddress and set x = remoteAddress <- x
-  member h.Stream        with get() = stream and set x = stream <- x
+  member h.Connection        with get() = connection
   member h.Query         with get() = query and set x = query <- x
   member h.Headers       with get() = headers and set x = headers <- x
   member h.Form          with get() = form and set x = form <- x

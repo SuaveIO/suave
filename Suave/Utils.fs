@@ -116,20 +116,6 @@ let bytes_utf8 (s : string) =
 /// The end-of-line 'literal' as bytes, the \r\n (CRLF) byte pair
 let EOL = bytes eol
 
-/// Write the string s to the stream asynchronously
-/// as ASCII encoded text
-let async_writeln (stream : Stream) s = async {
-  let b = bytes s
-  if b.Length > 0 then do! stream.AsyncWrite(b, 0, b.Length)
-  do! stream.AsyncWrite(EOL, 0, 2)
-}
-
-/// Write the string s to the stream asynchronously
-/// from a byte array
-let async_writebytes (stream : Stream) (b : byte[]) = async {
-  if b.Length > 0 then do! stream.AsyncWrite(b, 0, b.Length)
-}
-
 /// Launch the function f on its own asynchronous/thread context
 /// so that it doesn't block execution.
 let unblock f = async {

@@ -9,6 +9,7 @@ open Suave.Types
 open Suave.Http
 open Suave.Web
 open Suave.Tcp
+open Socket
 
 /// Copies the headers from 'headers1' to 'headers2'
 let private copy_response_headers (headers1 : WebHeaderCollection) (headers2 : List<string*string>) =
@@ -58,7 +59,7 @@ let forward (ip : IPAddress) (port : uint16) (p : HttpRequest) =
   async {
     if p.Method = "POST" || p.Method = "PUT" then
       let content_length = Convert.ToInt32(p.Headers.["content-length"])
-      do! transfer_len p.Stream (q.GetRequestStream()) content_length
+      do! transfer_len_x p.Connection (q.GetRequestStream()) content_length
     try
       let! data = q.AsyncGetResponse()
       do! send_web_response ((data : WebResponse) :?> HttpWebResponse) p
