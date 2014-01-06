@@ -52,8 +52,7 @@ let rec parser (reader : XmlReader) (Xml(l) as k) =
     | XmlNodeType.Text       -> parser reader (Xml(l @ [Text(reader.Value),Xml([])]))
     | XmlNodeType.Whitespace -> parser reader (Xml(l @ [WhiteSpace(reader.Value),Xml([])]))
     | XmlNodeType.Comment    -> parser reader k
-    | x                      -> Log.logf "got: %A, name: %O" x x
-                                Xml(l)
+    | x                      -> Xml(l)
   else
     k
 
