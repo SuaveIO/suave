@@ -65,22 +65,23 @@ let inline read_till_EOL (connection : Connection) (buff : byte[]) (preread : Ar
   else read_data 0  preread
 
 /// Read the stream until the marker appears.
-let read_until (marker : byte array) (f : byte[] -> int -> Async<unit>) (connection : Connection) (preread : ArraySegment<_>) chunk_size =
+let read_until (marker : byte array) (f : ArraySegment<_> -> int -> Async<unit>) (connection : Connection) (preread : ArraySegment<_>) chunk_size =
 
   let rec scan_data count  (segment : ArraySegment<byte>)  = async {
-    let data = segment.Array
-    match kmp marker data  with
+    //Log.tracef (fun fmt -> fmt "read_until -> scan_data count:%d segment.Offset: %d segment.Count: %d" count segment.Offset segment.Count)
+    // kmp_x returns an index relative to the Offset of segment
+    match kmp_x marker segment  with
     | Some 0 ->
-      return (count,  ArraySegment<_>(data, marker.Length, (data.Length - marker.Length)))
+      return (count,  ArraySegment<_>(segment.Array, segment.Offset + marker.Length, segment.Count - marker.Length))
     | Some index ->
-      do! f data index
-      return (count + index, new ArraySegment<_>( data, (index + marker.Length), (data.Length - index - marker.Length)))
+      do! f segment index
+      return (count + index, new ArraySegment<_>(segment.Array, segment.Offset + index + marker.Length, segment.Count - index - marker.Length))
     | None -> 
-      do! f data (data.Length - marker.Length)
-      return! read_data (count + data.Length - marker.Length) (ArraySegment<_>(data, (data.Length - marker.Length), marker.Length))
+      do! f segment (segment.Count - marker.Length)
+      return! read_data (count + segment.Count - marker.Length) (ArraySegment<_>(segment.Array, segment.Offset + segment.Count - marker.Length, marker.Length))
     }
   and read_data count (ahead : ArraySegment<_>) = async {
-
+      //Log.tracef (fun fmt -> fmt "read_until -> read_data count:%d segment.Offset: %d segment.Count: %d" count ahead.Offset ahead.Count)
       let inp = Array.zeroCreate chunk_size 
       let! bytesread = connection.reader  (fun a -> Array.blit a.Array a.Offset inp 0 a.Count; a.Count)
      if bytesread <> 0 then
@@ -88,16 +89,19 @@ let read_until (marker : byte array) (f : byte[] -> int -> Async<unit>) (connect
       if ahead.Count = 0 then 
         return! scan_data count sub
       else
-        let inp = Array.append ahead.Array sub.Array
-        return! scan_data count (ArraySegment inp)
+        let arr = Array.zeroCreate (bytesread + ahead.Count)
+        Array.blit (ahead.Array) ahead.Offset arr 0 ahead.Count
+        Array.blit inp 0 arr ahead.Count bytesread
+        return! scan_data count (ArraySegment arr)
     else return (count, ahead)
     }
+  
   if preread.Count > marker.Length then scan_data 0 preread
   else read_data 0 preread
 
 /// Alternative read_till_EOL
 let _read_till_EOL(connection : Connection) (buff : byte[]) (preread : ArraySegment<_>) =
-  read_until EOL (fun b c -> async { do Array.blit b 0 buff 0 c }) connection preread
+  read_until EOL (fun b c -> async { do Array.blit b.Array b.Offset buff 0 c }) connection preread
 
 /// Convert the byte array of ASCII-encoded chars to a string, starting at 'index' for 'count' characters
 /// (each character is necessarily one byte)
@@ -225,7 +229,9 @@ let parse_multipart (connection : Connection) boundary (request : HttpRequest) (
     | Some(x) ->
       let temp_file_name = Path.GetTempFileName()
       use temp_file = new FileStream(temp_file_name,FileMode.Truncate)
-      let! a,b = read_until (bytes(eol + boundary)) (fun x y -> async { do! temp_file.AsyncWrite(x,0,y) } ) connection rem BIG_BUFFER_SIZE
+      Log.trace (fun () -> "parse_content -> read_until")
+      let! a,b = read_until (bytes(eol + boundary)) (fun x y -> async { do! temp_file.AsyncWrite(x.Array,x.Offset,y) } ) connection rem BIG_BUFFER_SIZE
+      Log.trace (fun () -> "parse_content <- read_until")
       let file_leght = temp_file.Length
       temp_file.Close()
       if  file_leght > int64(0) then
@@ -237,7 +243,7 @@ let parse_multipart (connection : Connection) boundary (request : HttpRequest) (
       return! loop boundary b
     | None ->
       use mem = new MemoryStream()
-      let! a,b = read_until (bytes(eol + boundary)) (fun x y -> async { do! mem.AsyncWrite(x,0,y) } ) connection rem BIG_BUFFER_SIZE
+      let! a,b = read_until (bytes(eol + boundary)) (fun x y -> async { do! mem.AsyncWrite(x.Array,x.Offset,y) } ) connection rem BIG_BUFFER_SIZE
       let byts = mem.ToArray()
       request.form.Add(fieldname, (to_string byts 0 byts.Length)) 
 

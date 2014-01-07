@@ -177,3 +177,16 @@ let kmp p =
       if !j = 0 then incr i else j := next.[!j]
     done;
     if !j >= m then Some(!i - m) else None
+
+let kmp_x p =
+  let next = init_next p
+  let m = Array.length p
+  fun (s:ArraySegment<_>) ->
+    let n = s.Count
+    let  i = ref 0
+    let j = ref 0 in
+    while !j < m && !i < n do
+      if s.Array.[s.Offset + !i] = p.[!j] then begin incr i; incr j end else
+      if !j = 0 then incr i else j := next.[!j]
+    done;
+    if !j >= m then Some(!i - m) else None
