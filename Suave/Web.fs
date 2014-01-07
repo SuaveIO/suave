@@ -444,17 +444,7 @@ let web_server_async (config : SuaveConfig) (webpart : WebPart) =
 /// Runs the web server and blocks waiting for the asynchronous workflow to be cancelled or
 /// it returning itself.
 let web_server (config : SuaveConfig) (webpart : WebPart) =
-  //Async.RunSynchronously(web_server_async config webpart |> snd, cancellationToken = config.ct)
-  Async.RunSynchronously(async {
-    let listening, server = web_server_async config webpart
-    let! _  = Async.Parallel [| listening; server |]
-    //Log.log "web_server -> listening"
-    //do! listening
-    //Log.log "web_server <- listening"
-    //do! server 
-    return ()
-    },
-    cancellationToken = config.ct)
+  Async.RunSynchronously(web_server_async config webpart |> snd, cancellationToken = config.ct)
 
 /// The default configuration binds on IPv4, 127.0.0.1:8083 with a regular 500 Internal Error handler,
 /// with a timeout of one minute for computations to run. Waiting for 2 seconds for the socket bind
