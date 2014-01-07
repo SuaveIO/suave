@@ -18,7 +18,7 @@ let private copy_response_headers (headers1 : WebHeaderCollection) (headers2 : L
 
 /// Send the web response from HttpWebResponse to the HttpRequest 'p'
 let private send_web_response (data : HttpWebResponse) (p : HttpRequest)  = async {
-  copy_response_headers data.Headers (p.Response.Headers)
+  copy_response_headers data.Headers (p.response.Headers)
   //TODO: if downstream sends a Content-Length header copy from one stream to the other asynchronously
   Log.trace (fun () -> "proxy:send_web_response:GetResponseStream -> read_fully")
   let bytes = data.GetResponseStream() |> read_fully
@@ -34,32 +34,32 @@ let forward (ip : IPAddress) (port : uint16) (p : HttpRequest) =
       if not (WebHeaderCollection.IsRestricted e.Key) then
         r.Add(e.Key, e.Value)
     r
-  let url = new UriBuilder("http", ip.ToString(), int port, p.Url, p.RawQuery)
+  let url = new UriBuilder("http", ip.ToString(), int port, p.url, p.raw_query)
   let q = WebRequest.Create(url.Uri) :?> HttpWebRequest
   q.AllowAutoRedirect         <- false
   q.AllowReadStreamBuffering  <- false
   q.AllowWriteStreamBuffering <- false
-  q.Method  <- p.Method
-  q.Headers <- buildWebHeadersCollection p.Headers
+  q.Method  <- p.``method``
+  q.Headers <- buildWebHeadersCollection p.headers
   q.Proxy   <- null
   //copy restricted headers
-  match p.Headers ? accept with Some(v) -> q.Accept <- v | None -> ()
+  match p.headers ? accept with Some(v) -> q.Accept <- v | None -> ()
   //match p.Headers ? connection with Some(v) -> q.Connection <- v | None -> ()
-  match p.Headers ? date with Some(v) -> q.Date <- DateTime.Parse(v) | None -> ()
-  match p.Headers ? expect with Some(v) -> q.Expect <- v | None -> ()
-  match p.Headers ? host with Some(v) -> q.Host <- v | None -> ()
-  match p.Headers ? range with Some(v) -> q.AddRange(Int64.Parse(v)) | None -> ()
-  match p.Headers ? referer with Some(v) -> q.Referer <- v | None -> ()
-  match look_up p.Headers "content-type" with Some(v) -> q.ContentType <- v | None -> ()
-  match look_up p.Headers "content-length" with Some(v) -> q.ContentLength <- Int64.Parse(v) | None -> ()
-  match look_up p.Headers "if-modified-since" with Some(v) -> q.IfModifiedSince <- DateTime.Parse(v) | None -> ()
-  match look_up p.Headers "transfer-encoding" with Some(v) -> q.TransferEncoding <- v | None -> ()
-  match look_up p.Headers "user-agent" with Some(v) -> q.UserAgent <- v | None -> ()
-  q.Headers.Add("X-Forwarded-For", p.RemoteAddress)
+  match p.headers ? date with Some(v) -> q.Date <- DateTime.Parse(v) | None -> ()
+  match p.headers ? expect with Some(v) -> q.Expect <- v | None -> ()
+  match p.headers ? host with Some(v) -> q.Host <- v | None -> ()
+  match p.headers ? range with Some(v) -> q.AddRange(Int64.Parse(v)) | None -> ()
+  match p.headers ? referer with Some(v) -> q.Referer <- v | None -> ()
+  match look_up p.headers "content-type" with Some(v) -> q.ContentType <- v | None -> ()
+  match look_up p.headers "content-length" with Some(v) -> q.ContentLength <- Int64.Parse(v) | None -> ()
+  match look_up p.headers "if-modified-since" with Some(v) -> q.IfModifiedSince <- DateTime.Parse(v) | None -> ()
+  match look_up p.headers "transfer-encoding" with Some(v) -> q.TransferEncoding <- v | None -> ()
+  match look_up p.headers "user-agent" with Some(v) -> q.UserAgent <- v | None -> ()
+  q.Headers.Add("X-Forwarded-For", p.remote_address)
   async {
-    if p.Method = "POST" || p.Method = "PUT" then
-      let content_length = Convert.ToInt32(p.Headers.["content-length"])
-      do! transfer_len_x p.Connection (q.GetRequestStream()) content_length
+    if p.``method`` = "POST" || p.``method`` = "PUT" then
+      let content_length = Convert.ToInt32(p.headers.["content-length"])
+      do! transfer_len_x p.connection (q.GetRequestStream()) content_length
     try
       let! data = q.AsyncGetResponse()
       do! send_web_response ((data : WebResponse) :?> HttpWebResponse) p

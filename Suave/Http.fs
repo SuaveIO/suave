@@ -21,17 +21,17 @@ module Http =
 
   let response_f status_code reason_phrase (f_content : HttpRequest -> Async<unit>) (request : HttpRequest) = async {
     try
-      let connection:Connection = request.Connection
+      let connection:Connection = request.connection
 
       do! async_writeln connection (sprintf "%s %d %s" HTTP_VERSION status_code reason_phrase)
       do! async_writeln connection (sprintf "Server: Suave/%s (http://suave.io)" SUAVE_VERSION)
       do! async_writeln connection (sprintf "Date: %s" (DateTime.UtcNow.ToString("R")))
 
-      for (x,y) in request.Response.Headers do
+      for (x,y) in request.response.Headers do
         if not (List.exists (fun y -> x.ToLower().Equals(y)) ["server";"date";"content-length"]) then
           do! async_writeln connection (sprintf "%s: %s" x y )
 
-      if not(request.Response.Headers.Exists(new Predicate<_>(fun (x,_) -> x.ToLower().Equals("content-type")))) then
+      if not(request.response.Headers.Exists(new Predicate<_>(fun (x,_) -> x.ToLower().Equals("content-type")))) then
         do! async_writeln connection (sprintf "Content-Type: %s" "text/html")
 
       do! f_content request
@@ -45,31 +45,31 @@ module Http =
     response_f status_code reason_phrase (
       fun r -> async {
         if content.Length > 0 then
-          do! async_writeln r.Connection (sprintf "Content-Length: %d" content.Length)
+          do! async_writeln r.connection (sprintf "Content-Length: %d" content.Length)
 
-        do! async_writeln r.Connection ""
+        do! async_writeln r.connection ""
 
         if content.Length > 0 then
-          do! r.Connection.writer (new ArraySegment<_>(content, 0, content.Length)) })
+          do! r.connection.writer (new ArraySegment<_>(content, 0, content.Length)) })
       request
 
   // modifiers
 
   let set_header key value (http_request : HttpRequest) =
-    http_request.Response.Headers.Add(key, value)
+    http_request.response.Headers.Add(key, value)
     http_request
 
   let set_cookie cookie = set_header "Set-Cookie" cookie
 
   // filters/applicatives
 
-  let url s (x : HttpRequest) = if s = x.Url then Some x else None
+  let url s (x : HttpRequest) = if s = x.url then Some x else None
 
-  let meth0d s (x : HttpRequest) = if s = x.Method then Some x else None
+  let meth0d s (x : HttpRequest) = if s = x.``method`` then Some x else None
 
-  let is_secure (x : HttpRequest) = if x.IsSecure then Some x else None
+  let is_secure (x : HttpRequest) = if x.is_secure then Some x else None
 
-  let url_regex s (x : HttpRequest) = if Regex.IsMatch(x.Url,s) then Some x else None
+  let url_regex s (x : HttpRequest) = if Regex.IsMatch(x.url,s) then Some x else None
 
   // see http://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html
   // see Http.fsi for documentation
@@ -223,12 +223,12 @@ module Http =
       use fs = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.Read)
 
       if fs.Length > 0L then
-        do! async_writeln r.Connection (sprintf "Content-Length: %d" fs.Length)
+        do! async_writeln r.connection (sprintf "Content-Length: %d" fs.Length)
 
-      do! async_writeln r.Connection ""
+      do! async_writeln r.connection ""
 
       if fs.Length > 0L then
-        do! transfer_x r.Connection fs }
+        do! transfer_x r.connection fs }
 
     async { do! response_f 200 "OK" (write_file filename) r } |> succeed
 
@@ -245,7 +245,7 @@ module Http =
         >> set_mime_type mimes 
         >> send_file (filename)
       warbler ( fun (r:HttpRequest) ->
-        let modified_since = (r.Headers ? ``if-modified-since`` )
+        let modified_since = (r.headers ? ``if-modified-since`` )
         match modified_since with
         | Some v -> let date = DateTime.Parse v
                     if file_info.LastWriteTime > date then send_it ()
@@ -258,13 +258,13 @@ module Http =
 
   let browse_file filename = file (local_file filename)
 
-  let browse : WebPart = warbler (fun req -> file (local_file req.Url))
+  let browse : WebPart = warbler (fun req -> file (local_file req.url))
 
   type WebResult = Option<Async<unit>>
 
   let dir (req : HttpRequest) : WebResult =
 
-    let url = req.Url
+    let url = req.url
 
     let dirname = local_file url
     let result = new StringBuilder()
@@ -291,7 +291,7 @@ module Http =
   let close_pipe (p : HttpRequest option) =
     match p with
     | Some(x) ->
-      x.Connection.shutdown()
+      x.connection.shutdown()
     | None -> ()
 
   let parse_authentication_token (token : string) =
@@ -302,12 +302,12 @@ module Http =
     (parts.[0].ToLower(), decoded.Substring(0,indexOfColon), decoded.Substring(indexOfColon+1))
 
   let authenticate_basic f (p : HttpRequest) =
-    let headers = p.Headers
+    let headers = p.headers
     if headers.ContainsKey("authorization") then
       let header = headers.["authorization"]
       let (typ,username,password) = parse_authentication_token header
-      p.Username <- username
-      p.Password <- password
+      p.user_name <- username
+      p.password <- password
       if (typ.Equals("basic")) && f p then
         fail
       else
@@ -316,7 +316,7 @@ module Http =
       challenge p
 
   let log_format (http_request : HttpRequest) =
-    sprintf "%A\n" (http_request.Method, http_request.RemoteAddress, http_request.Url, http_request.Query, http_request.Form, http_request.Headers)
+    sprintf "%A\n" (http_request.``method``, http_request.remote_address, http_request.url, http_request.query, http_request.form, http_request.headers)
 
   let log (s : Stream) (http_request : HttpRequest) =
     let bytes = bytes (log_format http_request)
@@ -330,7 +330,7 @@ module Http =
 
     let F (r:HttpRequest) =
       try
-        let y = r.Url |> t |> h
+        let y = r.url |> t |> h
         try y r with ex -> r |> INTERNAL_ERROR (ex.ToString())
       with _ -> fail
     F

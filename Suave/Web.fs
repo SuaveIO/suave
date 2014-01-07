@@ -134,14 +134,13 @@ open Suave.Types
 let empty_query_string () = new Dictionary<string,string>()
 
 /// Gets the query from the HttpRequest // TODO: Move to a module for HttpRequest
-let query (x : HttpRequest) = x.Query
+let query (x : HttpRequest) = x.query
 /// Gets the form from the HttpRequest // TODO: Move to a module for HttpRequest
-let form  (x : HttpRequest) = x.Form
+let form  (x : HttpRequest) = x.form
 
 /// Parse the data in the string to a dictionary, assuming k/v pairs are separated
 /// by the ampersand character.
-let parse_data (s : string) =
-  let param = empty_query_string ()
+let parse_data (s : string) (param : Dictionary<string,string>) =
   s.Split('&')
   |> Array.iter (fun (k : string) ->
        k.Split('=')
@@ -149,16 +148,16 @@ let parse_data (s : string) =
   param
 
 /// TO BE DONE
-let parse_url (line : string) =
+let parse_url (line : string) (dict : Dictionary<string,string>) =
   let parts = line.Split(' ')
   if parts.Length < 2 || parts.Length > 3 then failwith "400"
   let indexOfMark = parts.[1].IndexOf('?')
 
   if indexOfMark > 0 then
     let raw_query = parts.[1].Substring(indexOfMark + 1)
-    (parts.[0], parts.[1].Substring(0,indexOfMark), parse_data raw_query, "?" + raw_query)
+    (parts.[0], parts.[1].Substring(0,indexOfMark), parse_data raw_query dict, "?" + raw_query)
   else
-    (parts.[0],parts.[1],empty_query_string (), String.Empty)
+    (parts.[0],parts.[1],dict, String.Empty)
 
 /// Read the post data from the stream, given the number of bytes that makes up the post data.
 let read_post_data (connection : Connection) (bytes : int) (read : ArraySegment<_>) = async {
@@ -231,7 +230,7 @@ let parse_multipart (connection : Connection) boundary (request : HttpRequest) (
       if  file_leght > int64(0) then
         let filename =
           (header_params content_disposition) ? filename |> opt
-        request.Files.Add(new HttpUpload(fieldname,filename,content_type |> opt,temp_file_name))
+        request.files.Add(new HttpUpload(fieldname,filename,content_type |> opt,temp_file_name))
       else
         File.Delete temp_file_name
       return! loop boundary b
@@ -239,7 +238,7 @@ let parse_multipart (connection : Connection) boundary (request : HttpRequest) (
       use mem = new MemoryStream()
       let! a,b = read_until (bytes(eol + boundary)) (fun x y -> async { do! mem.AsyncWrite(x,0,y) } ) connection rem BIG_BUFFER_SIZE
       let byts = mem.ToArray()
-      request.Form.Add(fieldname, (to_string byts 0 byts.Length)) 
+      request.form.Add(fieldname, (to_string byts 0 byts.Length)) 
 
       return! loop boundary b
     }
@@ -249,7 +248,7 @@ let parse_multipart (connection : Connection) boundary (request : HttpRequest) (
 /// when done
 let process_request proxy_mode (request : HttpRequest) (bytes:ArraySegment<_>) = async {
 
-  let connection = request.Connection
+  let connection = request.connection
 
   Log.tracef(fun fmt -> fmt "web:process_request proxy:%b bytes:%A -> read_line" proxy_mode bytes)
   let! (first_line : string), rem = read_line connection bytes
@@ -258,22 +257,22 @@ let process_request proxy_mode (request : HttpRequest) (bytes:ArraySegment<_>) =
   if first_line.Length = 0 then
     return None, rem
   else
-    let meth, url, query, raw_query as q = parse_url first_line
-    request.Url      <- url
-    request.Method   <- meth
-    request.Query    <- query
-    request.RawQuery <- raw_query
+    let meth, url, _, raw_query as q = parse_url first_line request.query
 
-    let headers = request.Headers
+    request.url      <- url
+    request.``method``   <- meth
+    request.raw_query <- raw_query
+
+    let headers = request.headers
     let! rem = read_headers connection rem headers
     
     // won't continue parsing if on proxyMode with the intention of forwarding the stream as it is
     if not proxy_mode then
-      request.Headers
+      request.headers
       |> Seq.filter (fun x -> x.Key.Equals("cookie"))
       |> Seq.iter (fun x ->
                     let cookie = parse_cookie x.Value
-                    request.Cookies.Add (fst(cookie.[0]),cookie))
+                    request.cookies.Add (fst(cookie.[0]),cookie))
 
       if meth.Equals("POST") then
 
@@ -282,9 +281,9 @@ let process_request proxy_mode (request : HttpRequest) (bytes:ArraySegment<_>) =
 
         if content_enconding.StartsWith("application/x-www-form-urlencoded") then
           let! (rawdata : ArraySegment<_>),_ = read_post_data connection content_length rem
-          let form_data  = parse_data (to_string rawdata.Array 0 rawdata.Count)
-          request.Form    <- form_data
-          request.RawForm <- rawdata.Array
+          let form_data  = parse_data (to_string rawdata.Array 0 rawdata.Count) request.form
+          //request.form    <- form_data
+          request.raw_form <- rawdata.Array
         elif content_enconding.StartsWith("multipart/form-data") then
           let boundary = "--" + content_enconding.Substring(content_enconding.IndexOf('=')+1).TrimStart()
           let! (rem : ArraySegment<_>) = parse_multipart connection boundary request rem
@@ -354,9 +353,9 @@ let request_loop webpart proto (processor : HttpProcessor) error_handler (timeou
         | InternalFailure(_) as ex  -> raise ex
         | :? TimeoutException as ex -> do! error_handler ex "script timeout" request
         | ex -> do! error_handler ex "Routing request failed" request
-      match request.Headers?connection with
+      match request.headers?connection with
       | Some (x : string) when x.ToLower().Equals("keep-alive") ->
-        request.Clear()
+        clear request
         Log.tracef(fun fmt -> fmt "web:request_loop:loop 'Connection: keep-alive' recurse (!), rem: %A" rem)
         return! loop rem request
       | _ ->
@@ -368,9 +367,24 @@ let request_loop webpart proto (processor : HttpProcessor) error_handler (timeou
   }
   async {
     let! connection = load_connection proto connection
-    use request = new HttpRequest(connection)
-    request.RemoteAddress <- connection.ipaddr
-    request.IsSecure <- match proto with HTTP -> false | HTTPS _ -> true
+    let request = {
+      connection = connection;
+      url = null;
+      ``method`` = null;
+      query = new Dictionary<string,string>();
+      headers = new Dictionary<string,string>();
+      form = new Dictionary<string,string>();
+      raw_form = null;
+      raw_query = null;
+      cookies = new Dictionary<string,(string*string)[]>();
+      user_name = null;
+      password = null;
+      session_id = null;
+      response = new HttpResponse();
+      files = new List<HttpUpload>()
+      remote_address = connection.ipaddr;
+      is_secure = match proto with HTTP -> false | HTTPS _ -> true;
+      }
     try
       return! loop (ArraySegment(Array.empty)) request
     with
@@ -402,9 +416,9 @@ let is_local_address (ip : string) =
 /// thrown exceptions.
 let default_error_handler (ex : Exception) msg (request : HttpRequest) = async {
   Log.logf "web:default_error_handler - %s.\n%A" msg ex
-  if is_local_address request.RemoteAddress then
+  if is_local_address request.remote_address then
     do! (response 500 "Internal Error" (bytes_utf8 (sprintf "<h1>%s</h1><br/>%A" ex.Message ex)) request)
-  else do! (response 500 "Internal Error" (bytes_utf8 (request.RemoteAddress)) request)
+  else do! (response 500 "Internal Error" (bytes_utf8 (request.remote_address)) request)
 }
 
 /// Starts a new web worker, given the configuration and a web part to serve.
@@ -430,12 +444,17 @@ let web_server_async (config : SuaveConfig) (webpart : WebPart) =
 /// Runs the web server and blocks waiting for the asynchronous workflow to be cancelled or
 /// it returning itself.
 let web_server (config : SuaveConfig) (webpart : WebPart) =
-  Async.RunSynchronously(web_server_async config webpart |> snd, cancellationToken = config.ct)
-  (*Async.RunSynchronously(async {
+  //Async.RunSynchronously(web_server_async config webpart |> snd, cancellationToken = config.ct)
+  Async.RunSynchronously(async {
     let listening, server = web_server_async config webpart
-    do! listening
-    do! server },
-    cancellationToken = config.ct)*)
+    let! _  = Async.Parallel [| listening; server |]
+    //Log.log "web_server -> listening"
+    //do! listening
+    //Log.log "web_server <- listening"
+    //do! server 
+    return ()
+    },
+    cancellationToken = config.ct)
 
 /// The default configuration binds on IPv4, 127.0.0.1:8083 with a regular 500 Internal Error handler,
 /// with a timeout of one minute for computations to run. Waiting for 2 seconds for the socket bind

@@ -11,11 +11,11 @@ let session_support (request : HttpRequest) =
   //to sessions survive restart they could be file based like php.. that would be kind of slow
   //lookup the session id in the cookies
   let sessionId =
-    match request.Cookies ? suave_session_id with
+    match request.cookies ? suave_session_id with
     | Some(attr) -> snd(attr.[0])
     | None -> Guid.NewGuid().ToString()
 
-  request.SessionId <- sessionId
+  request.session_id <- sessionId
   set_cookie (sprintf "%s=%s" "suave_session_id" sessionId) request |> ignore
   Some request
 
@@ -27,7 +27,7 @@ let session_map = new ConcurrentDictionary<string, ConcurrentDictionary<string, 
 
 /// Get the session from the HttpRequest -- WARNING, here be dragons; just a reference implementation
 let session (request : HttpRequest) =
-  let sessionId = request.SessionId
+  let sessionId = request.session_id
   if String.IsNullOrEmpty sessionId then failwith "session_support was not called"
   if not (session_map.ContainsKey sessionId) then
     session_map.TryAdd(sessionId,new ConcurrentDictionary<string, obj>()) |> ignore

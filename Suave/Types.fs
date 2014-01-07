@@ -19,66 +19,40 @@ type HttpUpload(fieldname : string, filename : string, mime_type : string, temp_
   member x.Path      = temp_file_name
 
 /// A holder for the data extracted from the request
-type HttpRequest(connection : Connection) =
-  let mutable url           : string = null
-  let mutable meth0d        : string = null
-  let mutable remoteAddress : string = null
-  let mutable stream        : Stream = null
-  let mutable query         : Dictionary<string,string> = new Dictionary<string,string>()
-  let mutable headers       : Dictionary<string,string> = new Dictionary<string,string>()
-  let mutable form          : Dictionary<string,string> = new Dictionary<string,string>()
-  let mutable rawform       : byte[] = Array.empty
-  let mutable rawquery      : string = null
-  let mutable cookies       : Dictionary<string,(string*string)[]> = new Dictionary<string,(string*string)[]>()
-  let mutable username      : string = null
-  let mutable password      : string = null
-  let mutable sessionId     : string = null
-  let mutable response      : HttpResponse = new HttpResponse()
-  let mutable files         : List<HttpUpload> = new List<HttpUpload>()
-  let mutable isSecure      : bool = false
-
-  member h.Url           with get() = url and set x = url <- x
-  member h.Method        with get() = meth0d and set x = meth0d <- x
-  member h.RemoteAddress with get() = remoteAddress and set x = remoteAddress <- x
-  member h.Connection        with get() = connection
-  member h.Query         with get() = query and set x = query <- x
-  member h.Headers       with get() = headers and set x = headers <- x
-  member h.Form          with get() = form and set x = form <- x
-  member h.RawForm       with get() = rawform and set x = rawform <- x
-  member h.RawQuery      with get() = rawquery and set x = rawquery <- x
-  member h.Cookies       with get() = cookies and set x = cookies <- x
-  member h.Username      with get() = username and set x = username <- x
-  member h.Password      with get() = password and set x = password <- x
-  member h.SessionId     with get() = sessionId and set x = sessionId <- x
-  member h.Response      with get() = response
-  member h.Files         with get() = files
-  member h.IsSecure      with get() = isSecure and set x = isSecure <- x
+type HttpRequest = {
+  connection    : Connection;
+  mutable url           : string;
+  mutable ``method``    : string;
+  remote_address : string;
+  query         : Dictionary<string,string>;
+  headers       : Dictionary<string,string>;
+  form          : Dictionary<string,string>;
+  mutable raw_form       : byte[];
+  mutable raw_query      : string;
+  cookies       : Dictionary<string,(string*string)[]> ;
+  mutable user_name      : string ;
+  mutable password      : string ;
+  mutable session_id     : string ;
+  response      : HttpResponse ;
+  files         : List<HttpUpload> ;
+  is_secure      : bool  }
 
   /// Clears the request dictionaries for reuse
-  member h.Clear() =
-    query.Clear()
-    headers.Clear()
-    form.Clear()
-    cookies.Clear()
-    files.Clear()
-    response.Headers.Clear()
+let clear(request:HttpRequest) =
+    request.query.Clear()
+    request.headers.Clear()
+    request.form.Clear()
+    request.cookies.Clear()
+    request.files.Clear()
+    request.response.Headers.Clear()
 
-  member private h.Dispose(disposing : bool) =
-    if disposing then
-      GC.SuppressFinalize(h)
-
-    for upload in h.Files do
+let delete_files (request:HttpRequest) =
+  for upload in request.files do
       if File.Exists(upload.Path) then
         try
           File.Delete(upload.Path)
         with
         | _ as e -> Log.logf "%A" e // we tried
-
-  override h.Finalize() = h.Dispose false
-
-  interface IDisposable with
-    member h.Dispose() =
-      h.Dispose true
 
 open OpenSSL.X509
 
