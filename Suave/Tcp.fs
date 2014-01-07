@@ -150,7 +150,7 @@ let tcp_ip_server (source_ip : IPAddress, source_port : uint16) (serve_client : 
                               (if token.IsCancellationRequested then ", cancellation requested" else ""))
 
       while not (token.IsCancellationRequested) do
-        let! args = unblock (fun _ -> a.Pop())
+        let args = a.Pop()
         let! (socket : Socket) = accept listenSocket args
         let client = { 
           ipaddr =  (socket.RemoteEndPoint :?> IPEndPoint).Address.ToString();
