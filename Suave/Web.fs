@@ -162,11 +162,12 @@ let parse_url (line : string) (dict : Dictionary<string,string>) =
 /// Read the post data from the stream, given the number of bytes that makes up the post data.
 let read_post_data (connection : Connection) (bytes : int) (read : ArraySegment<_>) = async {
     if read.Count >= bytes then
-      return (ArraySegment( read.Array, 0 ,bytes), ArraySegment( read.Array, bytes, (read.Count - bytes)))
+      return (ArraySegment( read.Array, read.Offset,bytes), ArraySegment( read.Array, read.Offset + bytes, (read.Count - bytes)))
     else 
-      let missing = Array.zeroCreate(bytes - read.Count)
-      let! _ = connection.reader (fun a -> Array.blit a.Array a.Offset missing 0 a.Count; a.Count)
-      return (ArraySegment(Array.append read.Array missing), ArraySegment(Array.zeroCreate(0)))
+      let missing = Array.zeroCreate bytes
+      Array.blit read.Array read.Offset missing 0 read.Count
+      let! _ = connection.reader (fun a -> Array.blit a.Array a.Offset missing a.Count (bytes - a.Count); a.Count)
+      return (ArraySegment missing, ArraySegment(Array.zeroCreate(0)))
   }
 
 /// Parse the cookie data in the string into a dictionary
@@ -281,9 +282,11 @@ let process_request proxy_mode (request : HttpRequest) (bytes:ArraySegment<_>) =
 
         if content_enconding.StartsWith("application/x-www-form-urlencoded") then
           let! (rawdata : ArraySegment<_>),_ = read_post_data connection content_length rem
-          let form_data  = parse_data (to_string rawdata.Array 0 rawdata.Count) request.form
-          //request.form    <- form_data
-          request.raw_form <- rawdata.Array
+          let str = to_string rawdata.Array rawdata.Offset rawdata.Count
+          let _  = parse_data str request.form
+          let raw_form = Array.zeroCreate rawdata.Count
+          Array.blit rawdata.Array rawdata.Offset raw_form 0 rawdata.Count
+          request.raw_form <- raw_form
         elif content_enconding.StartsWith("multipart/form-data") then
           let boundary = "--" + content_enconding.Substring(content_enconding.IndexOf('=')+1).TrimStart()
           let! (rem : ArraySegment<_>) = parse_multipart connection boundary request rem
