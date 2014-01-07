@@ -80,8 +80,6 @@ let MAX_CONCURRENT_OPS = 10000
 
 let (a,b,c,d) = create_pools MAX_CONCURRENT_OPS
 
-let bufferManager = new BufferManager(62400000,512)
-
 let receive (socket: Socket) (f : ArraySegment<_> -> int)= async {
   let args = b.Pop()
   let! bs = asyncDo socket.ReceiveAsync ignore (fun a -> f(trans a)) args
@@ -152,7 +150,7 @@ let tcp_ip_server (source_ip : IPAddress, source_port : uint16) (serve_client : 
                               (if token.IsCancellationRequested then ", cancellation requested" else ""))
 
       while not (token.IsCancellationRequested) do
-        let args = a.Pop()
+        let! args = unblock (fun _ -> a.Pop())
         let! (socket : Socket) = accept listenSocket args
         let client = { 
           ipaddr =  (socket.RemoteEndPoint :?> IPEndPoint).Address.ToString();
