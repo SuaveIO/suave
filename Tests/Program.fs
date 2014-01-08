@@ -62,7 +62,7 @@ module RequestFactory =
 
   let run_with = run_with_factory web_server_async
 
-  let req_resp (methd : Method) (resource : string) ctx =
+  let req_resp (methd : Method) (resource : string) data ctx =
     let to_http_method = function
       | Method.GET -> HttpMethod.Get
       | Method.POST -> HttpMethod.Post
@@ -80,20 +80,24 @@ module RequestFactory =
     use client = new Net.Http.HttpClient(handler)
     let r = new HttpRequestMessage(to_http_method methd, uri_builder.Uri)
     r.Headers.ConnectionClose <- Nullable(true)
-    Log.tracef(fun fmt -> fmt "tests:req GET %O -> execute" uri_builder.Uri)
-
-    let get = client.SendAsync(r, HttpCompletionOption.ResponseContentRead, ctx.cts.Token)
+    Log.tracef(fun fmt -> fmt "tests:req %A %O -> execute" methd uri_builder.Uri)
+    let get = 
+        match data with
+        | Some data ->
+            client.PostAsync(uri_builder.Uri, data, ctx.cts.Token)
+        | None ->
+            client.SendAsync(r, HttpCompletionOption.ResponseContentRead, ctx.cts.Token)
     let completed = get.Wait(5000)
     if not completed && System.Diagnostics.Debugger.IsAttached then System.Diagnostics.Debugger.Break()
     else Assert.Equal("should finish request in 5000ms", true, completed)
 
-    Log.tracef(fun fmt -> fmt "tests:req GET %O <- execute" uri_builder.Uri)
+    Log.tracef(fun fmt -> fmt "tests:req %A %O <- execute" methd uri_builder.Uri)
 
     dispose_context ctx
     get.Result
 
-  let req (methd : Method) (resource : string) ctx : string =
-    let res = req_resp methd resource ctx
+  let req methd resource data ctx =
+    let res = req_resp methd resource data ctx
     res.Content.ReadAsStringAsync().Result
 
 [<Tests>]
@@ -121,15 +125,32 @@ let gets =
   testList "getting basic responses"
     [
       testCase "200 OK returns 'a'" <| fun _ ->
-        Assert.Equal("expecting non-empty response", "a", run_with' (OK "a") |> req GET "/")
+        Assert.Equal("expecting non-empty response", "a", run_with' (OK "a") |> req GET "/" None)
 
       testProperty "200 OK returns equivalent" <| fun resp_str ->
-        (run_with' (OK resp_str) |> req GET "/hello") = resp_str
+        (run_with' (OK resp_str) |> req GET "/hello" None) = resp_str
 
       testCase "204 No Content empty body" <| fun _ ->
         Assert.Equal("empty string should always be returned by 204 No Content",
-                     "", (run_with' NO_CONTENT |> req GET "/"))
+                     "", (run_with' NO_CONTENT |> req GET "/" None))
     ]
+
+[<Tests>]
+let posts =
+    let run_with' = run_with default_config
+
+    let webId =
+        choose [
+            (fun x -> Some (x.raw_form |> Text.Encoding.UTF8.GetString)) >>= never
+            warbler (fun x -> OK (x.raw_form |> Text.Encoding.UTF8.GetString))
+        ]
+
+    testList "posting basic data"
+      [
+        testCase "POST data round trips with no content-type" <| fun _ ->
+            use data = new StringContent("bob")
+            Assert.Equal("expecting data to be returned", "bob", run_with' webId |> req POST "/" (Some data))
+      ]
 
 open OpenSSL.X509
 open OpenSSL.Core
@@ -157,11 +178,11 @@ let proxy =
       run_in_context (run_target (OK str)) dispose_context <| fun _ ->
         Assert.Equal("target's WebPart should return its value", str,
 //          verbose_logging(fun () -> proxy to_target |> req GET "/"))
-          proxy to_target |> req GET "/")
+          proxy to_target |> req GET "/" None)
 
     testCase "GET /redirect returns 'redirect'" <| fun _ ->
       run_in_context (run_target (url "/secret" >>= redirect "https://sts.example.se")) dispose_context <| fun _ ->
-        let res = proxy to_target |> req_resp GET "/secret"
+        let res = proxy to_target |> req_resp GET "/secret" None
         Assert.Equal("should proxy redirect", Net.HttpStatusCode.Found, res.StatusCode)
         Assert.Equal("should give Location-header together with redirect",
           Uri("https://sts.example.se"), res.Headers.Location)
@@ -170,13 +191,14 @@ let proxy =
       run_in_context (run_target (INTERNAL_ERROR "Oh noes")) dispose_context <| fun _ ->
         Assert.Equal("should have correct status code",
           Net.HttpStatusCode.InternalServerError,
-          (proxy to_target |> req_resp GET "/").StatusCode)
+          (proxy to_target |> req_resp GET "/" None).StatusCode)
         Assert.Equal("should have correct content",
           "Oh noes",
-          (proxy to_target |> req_resp GET "/").Content.ReadAsStringAsync().Result)
+          (proxy to_target |> req_resp GET "/" None).Content.ReadAsStringAsync().Result)
     ]
 
 [<EntryPoint>]
 let main args =
   let r = defaultMainThisAssembly args
+  Console.ReadLine() |> ignore
   r
