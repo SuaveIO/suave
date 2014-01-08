@@ -170,7 +170,7 @@ let read_post_data (connection : Connection) (bytes : int) (read : ArraySegment<
     else 
       let missing = Array.zeroCreate bytes
       Array.blit read.Array read.Offset missing 0 read.Count
-      let! _ = connection.reader (fun a -> Array.blit a.Array a.Offset missing a.Count (bytes - a.Count); a.Count)
+      let! _ = connection.reader (fun a -> Array.blit a.Array a.Offset missing read.Count (bytes - read.Count); a.Count)
       return (ArraySegment missing, ArraySegment(Array.zeroCreate(0)))
   }
 
@@ -274,7 +274,8 @@ let process_request proxy_mode (request : HttpRequest) (bytes:ArraySegment<_>) =
     let! rem = read_headers connection rem headers
     
     // won't continue parsing if on proxyMode with the intention of forwarding the stream as it is
-    if not proxy_mode then
+    if proxy_mode then return Some request, rem
+    else
       request.headers
       |> Seq.filter (fun x -> x.Key.Equals("cookie"))
       |> Seq.iter (fun x ->
@@ -298,17 +299,19 @@ let process_request proxy_mode (request : HttpRequest) (bytes:ArraySegment<_>) =
               let raw_form = Array.zeroCreate rawdata.Count
               Array.blit rawdata.Array rawdata.Offset raw_form 0 rawdata.Count
               request.raw_form <- raw_form
+              return Some request, rem
         | Some ce when ce.StartsWith("multipart/form-data") ->
               let boundary = "--" + ce.Substring(ce.IndexOf('=')+1).TrimStart()
               let! (rem : ArraySegment<_>) = parse_multipart connection boundary request rem
               assert (rem.Count = 0)
+              return Some request, rem
         | Some _ | None ->
               let! (rawdata : ArraySegment<_>),_ = read_post_data connection content_length rem
               let raw_form = Array.zeroCreate rawdata.Count
               Array.blit rawdata.Array rawdata.Offset raw_form 0 rawdata.Count
               request.raw_form <- raw_form
-
-    return Some request, rem
+              return Some request, rem
+      else return Some request, rem
 }
 
 open System.Net
