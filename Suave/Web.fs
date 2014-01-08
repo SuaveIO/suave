@@ -283,20 +283,30 @@ let process_request proxy_mode (request : HttpRequest) (bytes:ArraySegment<_>) =
 
       if meth.Equals("POST") then
 
-        let content_enconding = headers.["content-type"]
+        let content_encoding =
+            match headers.TryGetValue("content-type") with
+            | true, encoding -> Some encoding
+            | false, _ -> None
+
         let content_length = Convert.ToInt32(headers.["content-length"])
 
-        if content_enconding.StartsWith("application/x-www-form-urlencoded") then
-          let! (rawdata : ArraySegment<_>),_ = read_post_data connection content_length rem
-          let str = to_string rawdata.Array rawdata.Offset rawdata.Count
-          let _  = parse_data str request.form
-          let raw_form = Array.zeroCreate rawdata.Count
-          Array.blit rawdata.Array rawdata.Offset raw_form 0 rawdata.Count
-          request.raw_form <- raw_form
-        elif content_enconding.StartsWith("multipart/form-data") then
-          let boundary = "--" + content_enconding.Substring(content_enconding.IndexOf('=')+1).TrimStart()
-          let! (rem : ArraySegment<_>) = parse_multipart connection boundary request rem
-          assert (rem.Count = 0)
+        match content_encoding with
+        | Some ce when ce.StartsWith("application/x-www-form-urlencoded") ->
+              let! (rawdata : ArraySegment<_>),_ = read_post_data connection content_length rem
+              let str = to_string rawdata.Array rawdata.Offset rawdata.Count
+              let _  = parse_data str request.form
+              let raw_form = Array.zeroCreate rawdata.Count
+              Array.blit rawdata.Array rawdata.Offset raw_form 0 rawdata.Count
+              request.raw_form <- raw_form
+        | Some ce when ce.StartsWith("multipart/form-data") ->
+              let boundary = "--" + ce.Substring(ce.IndexOf('=')+1).TrimStart()
+              let! (rem : ArraySegment<_>) = parse_multipart connection boundary request rem
+              assert (rem.Count = 0)
+        | Some _ | None ->
+              let! (rawdata : ArraySegment<_>),_ = read_post_data connection content_length rem
+              let raw_form = Array.zeroCreate rawdata.Count
+              Array.blit rawdata.Array rawdata.Offset raw_form 0 rawdata.Count
+              request.raw_form <- raw_form
 
     return Some request, rem
 }
