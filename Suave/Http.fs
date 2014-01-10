@@ -17,22 +17,24 @@ module Http =
 
   let [<Literal>] HTTP_VERSION = "HTTP/1.1"
 
+  /// Server header
+  let server_header = String.Concat [| "Server: Suave/"; SUAVE_VERSION; " (http://suave.io)" |]
+
   // general response functions
 
-  let response_f status_code reason_phrase (f_content : HttpRequest -> Async<unit>) (request : HttpRequest) = async {
+  let response_f (status_code: int) reason_phrase (f_content : HttpRequest -> Async<unit>) (request : HttpRequest) = async {
     try
       let connection:Connection = request.connection
-
-      do! async_writeln connection (sprintf "%s %d %s" HTTP_VERSION status_code reason_phrase)
-      do! async_writeln connection (sprintf "Server: Suave/%s (http://suave.io)" SUAVE_VERSION)
-      do! async_writeln connection (sprintf "Date: %s" (DateTime.UtcNow.ToString("R")))
+      do! async_writeln connection (String.concat " " [ HTTP_VERSION ; status_code.ToString() ; reason_phrase])
+      do! async_writeln connection server_header
+      do! async_writeln connection (String.Concat( [|  "Date: "; DateTime.UtcNow.ToString("R") |]))
 
       for (x,y) in request.response.Headers do
         if not (List.exists (fun y -> x.ToLower().Equals(y)) ["server";"date";"content-length"]) then
-          do! async_writeln connection (sprintf "%s: %s" x y )
+          do! async_writeln connection (String.Concat [| x; ": "; y |])
 
       if not(request.response.Headers.Exists(new Predicate<_>(fun (x,_) -> x.ToLower().Equals("content-type")))) then
-        do! async_writeln connection (sprintf "Content-Type: %s" "text/html")
+        do! async_writeln connection "Content-Type: text/html"
 
       do! f_content request
 
@@ -45,7 +47,7 @@ module Http =
     response_f status_code reason_phrase (
       fun r -> async {
         if content.Length > 0 then
-          do! async_writeln r.connection (sprintf "Content-Length: %d" content.Length)
+          do! async_writeln r.connection (String.Concat [|  "Content-Length: "; content.Length.ToString() |])
 
         do! async_writeln r.connection ""
 
