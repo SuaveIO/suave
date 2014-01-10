@@ -5,13 +5,13 @@ module Suave.Utils
 open System.Collections.Generic
 
 /// Return success with some value
-let succeed x = Some x
+let inline succeed x = Some x
 
 /// Return failure without any value
 let fail = None
 
 /// Return failure with a value that is ignored
-let never _ = None
+let inline never _ = None
 
 /// bind f inp evaluates to match inp with None -> None | Some x -> f x
 /// The same as Option.bind.
@@ -23,7 +23,7 @@ let delay f = f()
 /// Compose (bind) two arguments, 'a' and 'b', so that the result of
 /// the composition can be applied to an argument of 'a' and then passed
 /// to 'b', if 'a' yields a value.
-let (>>=) a b = fun x -> bind b (a x)
+let inline (>>=) a b = fun x -> Option.bind b (a x)
 
 /// Entry-point for composing the applicative routes of the http application,
 /// by iterating the options, applying the context, arg, to the predicate
@@ -38,10 +38,10 @@ let rec choose options arg =
     | None   -> choose tail arg
 
 /// Pipe the request through a bird that can peck at it.
-let warbler f a = f a a //which bird? A Warbler!
+let inline warbler f a = f a a //which bird? A Warbler!
 
 /// Pipe the request through a bird that can peck at it.
-let (>>==) a b = a >>= warbler (fun r -> b r)
+let inline (>>==) a b = a >>= warbler (fun r -> b r)
 
 /// Try find a value by key in a dictionary
 let look_up (target : IDictionary<'b,'a>) key =
@@ -92,13 +92,13 @@ open System.Text
 // Test usage of these to ensure that ASCII is the correct encoding to use here.
 
 /// Encode the string as ASCII encoded in Base64.
-let encode_base64 (s : string) =
+let inline encode_base64 (s : string) =
   let bytes = Encoding.ASCII.GetBytes s
   Convert.ToBase64String bytes
 
 /// Decode the string containing Base64-encoded ASCII string data to
 /// a .Net string
-let decode_base64 (s : string) =
+let inline decode_base64 (s : string) =
   let bytes = Convert.FromBase64String s
   Encoding.ASCII.GetString bytes
 
@@ -106,11 +106,11 @@ let decode_base64 (s : string) =
 let [<Literal>] eol = "\r\n"
 
 /// Get the ASCII bytes for the string
-let bytes (s : string) =
+let inline bytes (s : string) =
   Encoding.ASCII.GetBytes s
 
 /// Get the UTF-8 bytes for the string
-let bytes_utf8 (s : string) =
+let inline bytes_utf8 (s : string) =
   Encoding.UTF8.GetBytes s
 
 /// The end-of-line 'literal' as bytes, the \r\n (CRLF) byte pair
