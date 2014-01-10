@@ -80,7 +80,7 @@ exception SocketIssue of SocketError with
 
 type AsyncUserToken(?socket : Socket) =
   let mutable _socket = match socket with Some x -> x | None -> null
-  let mutable _continuation : System.EventHandler<_> = null
+  let mutable _continuation : SocketAsyncEventArgs -> unit = fun _ -> ()
   member x.Socket 
     with get () = _socket and set a = _socket <- a
   member x.Continuation
@@ -99,7 +99,7 @@ let inline asyncDo (op: A -> bool) (prepare: A -> unit) (select: A -> 'T) args =
             let result = select args
             ok result
         | e -> error (SocketIssue e)
-    (args.UserToken :?> AsyncUserToken).Continuation <- System.EventHandler<_>(fun _ -> k)
+    (args.UserToken :?> AsyncUserToken).Continuation <- k
     if not (op args) then
         k args
 /// Prepares the arguments by setting the buffer.

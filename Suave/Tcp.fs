@@ -54,7 +54,7 @@ let create_pools max_ops =
     let readEventArg = new SocketAsyncEventArgs()
     let userToken =  new AsyncUserToken()
     readEventArg.UserToken <- userToken
-    readEventArg.add_Completed(System.EventHandler<_>(fun a x -> userToken.Continuation.Invoke(a,x) ))
+    readEventArg.add_Completed(System.EventHandler<SocketAsyncEventArgs>(fun _ -> userToken.Continuation))
     // assign a byte buffer from the buffer pool to the SocketAsyncEventArg object
     bufferManager.SetBuffer(readEventArg) |> ignore
     readAsyncArgsPool.Push(readEventArg)
@@ -62,14 +62,14 @@ let create_pools max_ops =
     let writeEventArg = new SocketAsyncEventArgs()
     let userToken =  new AsyncUserToken()
     writeEventArg.UserToken <- userToken
-    writeEventArg.add_Completed(System.EventHandler<_>(fun a x -> userToken.Continuation.Invoke(a,x) ))
-            
+    writeEventArg.add_Completed(System.EventHandler<_>(fun _ -> userToken.Continuation))
+
     writeAsyncArgsPool.Push(writeEventArg)
 
     let acceptEventArg = new SocketAsyncEventArgs()
     let userToken =  new AsyncUserToken()
     acceptEventArg.UserToken <- userToken
-    acceptEventArg.add_Completed(System.EventHandler<_>(fun a x -> userToken.Continuation.Invoke(a,x) ))
+    acceptEventArg.add_Completed(System.EventHandler<_>(fun _ -> userToken.Continuation))
             
     acceptAsyncArgsPool.Push(acceptEventArg)
 
