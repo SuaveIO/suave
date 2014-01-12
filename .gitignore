@@ -11,3 +11,4 @@ suave.sln.DotSettings.user
 *.lock
 *.nuspec
 
+.bundle/
