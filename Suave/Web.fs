@@ -365,9 +365,9 @@ let request_loop
   /// Check if the web part can perform its work on the current request. If it can't
   /// it will return None and the run method will return.
   let run request = async {
-    match webpart request with // routing
+    match webpart request with // run the web part
     | Some x -> do! eval_action x request
-    | None -> return ()
+    | None   -> return ()
   }
 
   let rec loop (bytes : ArraySegment<_>) request = async {
@@ -399,24 +399,23 @@ let request_loop
   }
   async {
     let! connection = load_connection proto connection
-    let request = {
-      connection = connection;
-      url = null;
-      ``method`` = null;
-      query = new Dictionary<string,string>();
-      headers = new Dictionary<string,string>();
-      form = new Dictionary<string,string>();
-      raw_form = null;
-      raw_query = null;
-      cookies = new Dictionary<string,(string*string)[]>();
-      user_name = null;
-      password = null;
-      session_id = null;
-      response = new HttpResponse();
-      files = new List<HttpUpload>()
-      remote_address = connection.ipaddr;
-      is_secure = match proto with HTTP -> false | HTTPS _ -> true;
-      }
+    let request =
+      { connection     = connection
+      ; url            = null
+      ; ``method``     = null
+      ; query          = new Dictionary<string,string>()
+      ; headers        = new Dictionary<string,string>()
+      ; form           = new Dictionary<string,string>()
+      ; raw_form       = null
+      ; raw_query      = null
+      ; cookies        = new Dictionary<string,(string*string)[]>()
+      ; user_name      = null
+      ; password       = null
+      ; session_id     = null
+      ; response       = new HttpResponse()
+      ; files          = new List<HttpUpload>()
+      ; remote_address = connection.ipaddr
+      ; is_secure      = match proto with HTTP -> false | HTTPS _ -> true }
     try
       return! loop (ArraySegment(Array.empty)) request
     with
