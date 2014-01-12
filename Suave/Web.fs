@@ -343,16 +343,18 @@ open System.Net.Sockets
 type HttpProcessor = HttpRequest -> ArraySegment<byte> -> Async<HttpRequest option * ArraySegment<byte>>
 type RequestResult = Done
 
-/// The request loop initialises a request against a web part, with a protocol, a processor to handle the
-/// incoming stream, an error handler, a timeout value (milliseconds) and a TcpClient to use for read-write
+/// The request loop initialises a request with a processor to handle the
+/// incoming stream and possibly pass the request to the web parts, a protocol,
+/// a web part, an error handler, a timeout value for executing the web part
+/// in milliseconds and a Connection to use for read-write
 /// communication -- getting the initial request stream.
 let request_loop
-  (webpart : WebPart)
-  (proto : Protocol)
-  (processor : HttpProcessor)
-  (error_handler : ErrorHandler)
-  (timeout : TimeSpan)
-  (connection : Connection) =
+  (processor        : HttpProcessor)
+  (proto            : Protocol)
+  (web_part         : WebPart)
+  (web_part_timeout : TimeSpan)
+  (error_handler    : ErrorHandler)
+  (connection       : Connection) =
   /// Evaluate the (web part) action as an async value, handling errors with error_handler should one
   /// occur.
   let eval_action x r = async {
@@ -365,7 +367,7 @@ let request_loop
   /// Check if the web part can perform its work on the current request. If it can't
   /// it will return None and the run method will return.
   let run request = async {
-    match webpart request with // run the web part
+    match web_part request with // run the web part
     | Some x -> do! eval_action x request
     | None   -> return ()
   }
@@ -379,7 +381,7 @@ let request_loop
     | Some (request : HttpRequest) ->
       try
         Log.trace(fun () -> "web:request_loop:loop -> unblock")
-        do! Async.WithTimeout (timeout, run request)
+        do! Async.WithTimeout (web_part_timeout, run request)
         Log.trace(fun () -> "web:request_loop:loop <- unblock")
       with
         | InternalFailure(_) as ex  -> raise ex
@@ -454,7 +456,7 @@ let default_error_handler (ex : Exception) msg (request : HttpRequest) = async {
 
 /// Starts a new web worker, given the configuration and a web part to serve.
 let web_worker (proto, ip, port, error_handler, timeout) (webpart : WebPart) =
-  tcp_ip_server (ip, port) (request_loop webpart proto (process_request false) error_handler timeout)
+  tcp_ip_server (ip, port) (request_loop (process_request false) proto webpart timeout error_handler)
 
 /// Returns the webserver as a tuple of 1) an async computation the yields unit when
 /// the web server is ready to serve quests, and 2) an async computation that yields
@@ -467,7 +469,7 @@ let web_server_async (config : SuaveConfig) (webpart : WebPart) =
   let all =
     config.bindings
     |> List.map (fun { scheme = proto; ip = ip; port = port } ->
-        web_worker (proto, ip, port, config.error_handler, config.timeout) webpart)
+        web_worker (proto, ip, port, config.error_handler, config.web_part_timeout) webpart)
   let listening = all |> Seq.map fst |> Async.Parallel |> Async.Ignore
   let server    = all |> Seq.map snd |> Async.Parallel |> Async.Ignore
   listening, server
@@ -481,8 +483,8 @@ let web_server (config : SuaveConfig) (webpart : WebPart) =
 /// with a timeout of one minute for computations to run. Waiting for 2 seconds for the socket bind
 /// to succeed.
 let default_config =
-  { bindings       = [ { scheme = HTTP; ip = IPAddress.Loopback; port = 8083us } ]
-  ; error_handler  = default_error_handler
-  ; timeout        = TimeSpan.FromMinutes(1.)
-  ; listen_timeout = TimeSpan.FromSeconds(2.)
-  ; ct             = Async.DefaultCancellationToken }
+  { bindings         = [ { scheme = HTTP; ip = IPAddress.Loopback; port = 8083us } ]
+  ; error_handler    = default_error_handler
+  ; web_part_timeout = TimeSpan.FromMinutes(1.)
+  ; listen_timeout   = TimeSpan.FromSeconds(2.)
+  ; ct               = Async.DefaultCancellationToken }
