@@ -63,15 +63,6 @@ type Protocol =
   /// The HTTP protocol tunneled in a TLS tunnel
   | HTTPS of X509Certificate
 with
-  static member FromString(scheme : string, ?cert) =
-    match scheme.ToLowerInvariant() with
-    | "http" ->
-      HTTP
-    | "https" ->
-      if cert.IsNone then invalidArg "cert" "must supply a cert if you choose HTTPS protocol"
-      HTTPS (cert.Value)
-    | _ ->
-      invalidArg "scheme" "must supply 'http|https'"
   override x.ToString() =
     match x with
     | HTTP    -> "http"
