@@ -75,8 +75,8 @@ type SocketAsyncEventArgsPool(capacity : int) =
   member x.Count with get() = m_pool.Count
  
 exception SocketIssue of SocketError with
-    override this.ToString() =
-        string this.Data0
+  override this.ToString() =
+    string this.Data0
 
 type AsyncUserToken(?socket : Socket) =
   let mutable _socket = match socket with Some x -> x | None -> null
@@ -90,34 +90,40 @@ type A = System.Net.Sockets.SocketAsyncEventArgs
 type B = System.ArraySegment<byte>
 
 /// Wraps the Socket.xxxAsync logic into F# async logic.
-let inline asyncDo (op: A -> bool) (prepare: A -> unit) (select: A -> 'T) args =
+let inline async_do (op : A -> bool) (prepare : A -> unit) (select : A -> 'T) args =
   Async.FromContinuations <| fun (ok, error, _) ->
     prepare args
-    let k (args: A) =
-        match args.SocketError with
-        | System.Net.Sockets.SocketError.Success ->
-            let result = select args
-            ok result
-        | e -> error (SocketIssue e)
+    let k (args : A) =
+      match args.SocketError with
+      | System.Net.Sockets.SocketError.Success ->
+        let result = select args
+        ok result
+      | e -> error (SocketIssue e)
     (args.UserToken :?> AsyncUserToken).Continuation <- k
     if not (op args) then
-        k args
+      k args
+
 /// Prepares the arguments by setting the buffer.
-let inline setBuffer (buf: B) (args: A) =
-    args.SetBuffer(buf.Array, buf.Offset, buf.Count)
+let inline set_buffer (buf: B) (args: A) =
+  args.SetBuffer(buf.Array, buf.Offset, buf.Count)
 
 let inline accept (socket: Socket) =
-    asyncDo socket.AcceptAsync ignore (fun a -> a.AcceptSocket)
+  async_do socket.AcceptAsync ignore (fun a -> a.AcceptSocket)
 
-let inline trans (a:SocketAsyncEventArgs) = 
-    new ArraySegment<_>(a.Buffer,a.Offset,a.BytesTransferred)
+let inline trans (a : SocketAsyncEventArgs) =
+  new ArraySegment<_>(a.Buffer, a.Offset, a.BytesTransferred)
 
-type Connection = { 
-  ipaddr : string;
-  reader : (ArraySegment<byte> -> int) -> Async<int>;
-  writer : ArraySegment<byte> -> Async<unit>;
-  shutdown : unit -> unit 
-  }
+/// A connection (TCP implied) is a thing that can read and write from a socket
+/// and that can be closed.
+type Connection =
+  /// IP Address connected to
+  { ipaddr   : string
+  /// The reader function
+  ; reader   : (ArraySegment<byte> -> int) -> Async<int>
+  /// The writer function
+  ; writer   : ArraySegment<byte> -> Async<unit>
+  /// The shutdown function
+  ; shutdown : unit -> unit }
 
 /// Write the string s to the stream asynchronously
 /// as ASCII encoded text

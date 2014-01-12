@@ -72,24 +72,24 @@ let create_pools max_ops =
     acceptEventArg.add_Completed(System.EventHandler<_>(fun _ -> userToken.Continuation))
             
     acceptAsyncArgsPool.Push(acceptEventArg)
+  )
 
-    )
   (acceptAsyncArgsPool, readAsyncArgsPool, writeAsyncArgsPool, bufferManager)
 
 let MAX_CONCURRENT_OPS = 10000
 
-let (a,b,c,d) = create_pools MAX_CONCURRENT_OPS
+let (a, b, c, d) = create_pools MAX_CONCURRENT_OPS
 
-let receive (socket: Socket) (f : ArraySegment<_> -> int)= async {
+let receive (socket : Socket) (f : ArraySegment<_> -> int) = async {
   let args = b.Pop()
-  let! bs = asyncDo socket.ReceiveAsync ignore (fun a -> f(trans a)) args
+  let! bs = async_do socket.ReceiveAsync ignore (fun a -> f(trans a)) args
   b.Push(args)
   return bs
-  }
+}
  
-let send (socket: Socket) (buf: B) = async {
+let send (socket : Socket) (buf : B) = async {
   let args = c.Pop()
-  do! asyncDo socket.SendAsync (setBuffer buf) ignore args
+  do! async_do socket.SendAsync (set_buffer buf) ignore args
   c.Push(args)
   }
 
