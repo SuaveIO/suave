@@ -228,7 +228,7 @@ let parse_multipart (connection : Connection) boundary (request : HttpRequest) (
       return! loop subboundary rem
     | Some(x) ->
       let temp_file_name = Path.GetTempFileName()
-      use temp_file = new FileStream(temp_file_name,FileMode.Truncate)
+      use temp_file = new FileStream(temp_file_name, FileMode.Truncate)
       Log.trace (fun () -> "parse_content -> read_until")
       let! a,b = read_until (bytes(eol + boundary)) (fun x y -> async { do! temp_file.AsyncWrite(x.Array,x.Offset,y) } ) connection rem BIG_BUFFER_SIZE
       Log.trace (fun () -> "parse_content <- read_until")
@@ -243,7 +243,7 @@ let parse_multipart (connection : Connection) boundary (request : HttpRequest) (
       return! loop boundary b
     | None ->
       use mem = new MemoryStream()
-      let! a,b = read_until (bytes(eol + boundary)) (fun x y -> async { do! mem.AsyncWrite(x.Array,x.Offset,y) } ) connection rem BIG_BUFFER_SIZE
+      let! a, b = read_until (bytes(eol + boundary)) (fun x y -> async { do! mem.AsyncWrite(x.Array, x.Offset, y) } ) connection rem BIG_BUFFER_SIZE
       let byts = mem.ToArray()
       request.form.Add(fieldname, (to_string byts 0 byts.Length)) 
 
@@ -285,32 +285,32 @@ let process_request proxy_mode (request : HttpRequest) (bytes:ArraySegment<_>) =
       if meth.Equals("POST") then
 
         let content_encoding =
-            match headers.TryGetValue("content-type") with
-            | true, encoding -> Some encoding
-            | false, _ -> None
+          match headers.TryGetValue("content-type") with
+          | true, encoding -> Some encoding
+          | false, _ -> None
 
         let content_length = Convert.ToInt32(headers.["content-length"])
 
         match content_encoding with
         | Some ce when ce.StartsWith("application/x-www-form-urlencoded") ->
-              let! (rawdata : ArraySegment<_>),_ = read_post_data connection content_length rem
-              let str = to_string rawdata.Array rawdata.Offset rawdata.Count
-              let _  = parse_data str request.form
-              let raw_form = Array.zeroCreate rawdata.Count
-              Array.blit rawdata.Array rawdata.Offset raw_form 0 rawdata.Count
-              request.raw_form <- raw_form
-              return Some request, rem
+          let! (rawdata : ArraySegment<_>),_ = read_post_data connection content_length rem
+          let str = to_string rawdata.Array rawdata.Offset rawdata.Count
+          let _  = parse_data str request.form
+          let raw_form = Array.zeroCreate rawdata.Count
+          Array.blit rawdata.Array rawdata.Offset raw_form 0 rawdata.Count
+          request.raw_form <- raw_form
+          return Some request, rem
         | Some ce when ce.StartsWith("multipart/form-data") ->
-              let boundary = "--" + ce.Substring(ce.IndexOf('=')+1).TrimStart()
-              let! (rem : ArraySegment<_>) = parse_multipart connection boundary request rem
-              assert (rem.Count = 0)
-              return Some request, rem
+          let boundary = "--" + ce.Substring(ce.IndexOf('=')+1).TrimStart()
+          let! (rem : ArraySegment<_>) = parse_multipart connection boundary request rem
+          assert (rem.Count = 0)
+          return Some request, rem
         | Some _ | None ->
-              let! (rawdata : ArraySegment<_>),_ = read_post_data connection content_length rem
-              let raw_form = Array.zeroCreate rawdata.Count
-              Array.blit rawdata.Array rawdata.Offset raw_form 0 rawdata.Count
-              request.raw_form <- raw_form
-              return Some request, rem
+          let! (rawdata : ArraySegment<_>),_ = read_post_data connection content_length rem
+          let raw_form = Array.zeroCreate rawdata.Count
+          Array.blit rawdata.Array rawdata.Offset raw_form 0 rawdata.Count
+          request.raw_form <- raw_form
+          return Some request, rem
       else return Some request, rem
 }
 
