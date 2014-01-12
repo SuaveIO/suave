@@ -8,8 +8,8 @@ open Socket
 
 /// A holder for headers for the http response
 type HttpResponse() =
-  let mutable headers: List<string*string> = new List<string*string>()
-  member h.Headers with get()              = headers and set x = headers <- x
+  let mutable headers : List<string*string> = new List<string*string>()
+  member h.Headers with get()               = headers and set x = headers <- x
 
 /// A holder for uploaded file meta-data
 type HttpUpload(fieldname : string, filename : string, mime_type : string, temp_file_name : string) =
@@ -18,41 +18,42 @@ type HttpUpload(fieldname : string, filename : string, mime_type : string, temp_
   member x.MimeType  = mime_type
   member x.Path      = temp_file_name
 
-/// A holder for the data extracted from the request
-type HttpRequest = {
-  connection    : Connection;
-  mutable url           : string;
-  mutable ``method``    : string;
-  remote_address : string;
-  query         : Dictionary<string,string>;
-  headers       : Dictionary<string,string>;
-  form          : Dictionary<string,string>;
-  mutable raw_form       : byte[];
-  mutable raw_query      : string;
-  cookies       : Dictionary<string,(string*string)[]> ;
-  mutable user_name      : string ;
-  mutable password      : string ;
-  mutable session_id     : string ;
-  response      : HttpResponse ;
-  files         : List<HttpUpload> ;
-  is_secure      : bool  }
+/// A holder for the data extracted from the request.
+type HttpRequest =
+  { connection         : Connection
+  ; mutable url        : string
+  ; mutable ``method`` : string
+  ; remote_address     : string
+  ; query              : Dictionary<string,string>
+  ; headers            : Dictionary<string,string>
+  ; form               : Dictionary<string,string>
+  ; mutable raw_form   : byte[]
+  ; mutable raw_query  : string
+  ; cookies            : Dictionary<string,(string*string)[]>
+  ; mutable user_name  : string
+  ; mutable password   : string
+  ; mutable session_id : string
+  ; response           : HttpResponse
+  ; files              : List<HttpUpload>
+  ; is_secure          : bool  }
 
-  /// Clears the request dictionaries for reuse
-let clear(request:HttpRequest) =
-    request.query.Clear()
-    request.headers.Clear()
-    request.form.Clear()
-    request.cookies.Clear()
-    request.files.Clear()
-    request.response.Headers.Clear()
+/// Clear the request dictionaries for to reuse the request object instance.
+let internal clear (request : HttpRequest) =
+  request.query.Clear()
+  request.headers.Clear()
+  request.form.Clear()
+  request.cookies.Clear()
+  request.files.Clear()
+  request.response.Headers.Clear()
 
-let delete_files (request:HttpRequest) =
+/// Delete all HttpRequest files that were uploaded
+let internal delete_files (request : HttpRequest) =
   for upload in request.files do
-      if File.Exists(upload.Path) then
-        try
-          File.Delete(upload.Path)
-        with
-        | _ as e -> Log.logf "%A" e // we tried
+    if File.Exists(upload.Path) then
+      try
+        File.Delete(upload.Path)
+      with
+      | _ as e -> Log.logf "%A" e // we tried
 
 open OpenSSL.X509
 
@@ -79,6 +80,8 @@ type HttpBinding =
   /// The port for the binding
   ; port   : uint16 }
 with
+  /// Create a HttpBinding for the given protocol, an IP address to bind to and a port
+  /// to listen on.
   static member Create(proto, ip : string, port : int) =
     { scheme = proto
     ; ip     = IPAddress.Parse ip
@@ -98,7 +101,9 @@ type ErrorHandler = Exception -> String -> HttpRequest -> Async<unit>
 
 open System.Threading
 
-/// The core configuration of suave
+/// The core configuration of suave. See also Suave.Web.default_config which
+/// you can use to bootstrap the configuration:
+/// <code>{ default_config with bindings = [ ... ] }</code>
 type SuaveConfig =
   /// The bindings for the web server to launch with
   { bindings       : HttpBinding list
