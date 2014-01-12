@@ -81,11 +81,12 @@ let proxy_server_async config resolver =
   let all =
     config.bindings
     |> List.map (fun { scheme = proto; ip = ip; port = port } ->
-        tcp_ip_server (ip,port) (request_loop (warbler (fun http -> proxy resolver http)) proto (process_request true) config.error_handler config.timeout))
+        tcp_ip_server (ip, port) (request_loop (warbler (fun http -> proxy resolver http)) proto (process_request true) config.error_handler config.timeout))
   let listening = all |> Seq.map fst |> Async.Parallel |> Async.Ignore
   let server    = all |> Seq.map snd |> Async.Parallel |> Async.Ignore
   listening, server
 
+/// Run a proxy server synchronously.
 let proxy_server config resolver =
   Async.RunSynchronously(proxy_server_async config resolver |> snd,
     cancellationToken = config.ct)

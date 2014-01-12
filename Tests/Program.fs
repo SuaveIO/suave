@@ -82,11 +82,11 @@ module RequestFactory =
     r.Headers.ConnectionClose <- Nullable(true)
     Log.tracef(fun fmt -> fmt "tests:req %A %O -> execute" methd uri_builder.Uri)
     let get = 
-        match data with
-        | Some data ->
-            client.PostAsync(uri_builder.Uri, data, ctx.cts.Token)
-        | None ->
-            client.SendAsync(r, HttpCompletionOption.ResponseContentRead, ctx.cts.Token)
+      match data with
+      | Some data ->
+        client.PostAsync(uri_builder.Uri, data, ctx.cts.Token)
+      | None ->
+        client.SendAsync(r, HttpCompletionOption.ResponseContentRead, ctx.cts.Token)
     let completed = get.Wait(5000)
     if not completed && System.Diagnostics.Debugger.IsAttached then System.Diagnostics.Debugger.Break()
     else Assert.Equal("should finish request in 5000ms", true, completed)
@@ -140,16 +140,16 @@ let posts =
     let run_with' = run_with default_config
 
     let webId =
-        choose [
-            (fun x -> Some (x.raw_form |> Text.Encoding.UTF8.GetString)) >>= never
-            warbler (fun x -> OK (x.raw_form |> Text.Encoding.UTF8.GetString))
-        ]
+      choose [
+        (fun x -> Some (x.raw_form |> Text.Encoding.UTF8.GetString)) >>= never
+        warbler (fun x -> OK (x.raw_form |> Text.Encoding.UTF8.GetString))
+      ]
 
     testList "posting basic data"
       [
         testCase "POST data round trips with no content-type" <| fun _ ->
-            use data = new StringContent("bob")
-            Assert.Equal("expecting data to be returned", "bob", run_with' webId |> req POST "/" (Some data))
+          use data = new StringContent("bob")
+          Assert.Equal("expecting data to be returned", "bob", run_with' webId |> req POST "/" (Some data))
       ]
 
 open OpenSSL.X509
