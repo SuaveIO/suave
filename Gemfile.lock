@@ -1,9 +1,9 @@
-GIT
-  remote: git://github.com/Albacore/albacore.git
-  revision: 999ea1ba5c87c695b91cd162754be13fdce3233a
-  branch: clean_slate
+GEM
+  remote: https://rubygems.org/
   specs:
-    albacore (2.0.0.rc.4)
+    ProcessPilot (2.0.0.20120301)
+      rUtilAnts (>= 1.0)
+    albacore (2.0.0.rc.5)
       ProcessPilot (~> 2.0)
       facter (~> 1.7)
       highline (~> 1.6)
@@ -12,12 +12,6 @@ GIT
       rake (> 10)
       rubyzip (= 0.9.9)
       semver2 (~> 3.3)
-
-GEM
-  remote: https://rubygems.org/
-  specs:
-    ProcessPilot (2.0.0.20120301)
-      rUtilAnts (>= 1.0)
     facter (1.7.4)
     highline (1.6.20)
     map (6.5.1)
@@ -36,4 +30,4 @@ PLATFORMS
   x86-mingw32
 
 DEPENDENCIES
-  albacore!
+  albacore (~> 2.0.0.rc.5)

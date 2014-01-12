@@ -84,7 +84,7 @@ end
 task :increase_version_number do
   # inc patch version in .semver
   s = SemVer.find
-  s.patch += 1
+  s.minor += 1
   s.save
   ENV['NUGET_VERSION'] = s.format("%M.%m.%p%s")
 end
@@ -97,8 +97,8 @@ task :release_next => [ :increase_version_number, :assembly_info , :create_nuget
   system %q[git add Suave/AssemblyInfo.fs]
   system "git commit -m \"released v#{s.to_s}\""
 #  Rake::Tasks['build'].invoke
-  system "mono buildsupport/NuGet.exe setApiKey #{ENV['NUGET_KEY']}"
-  system "mono buildsupport/NuGet.exe push build/pkg/suave.#{s.to_s}.nupkg"
+  system "buildsupport/NuGet.exe setApiKey #{ENV['NUGET_KEY']}", clr_command: true
+  system "buildsupport/NuGet.exe push build/pkg/suave.#{s.to_s}.nupkg", clr_command: true
 end
 
 namespace :tests do
@@ -111,7 +111,7 @@ namespace :tests do
   desc 'run the unit-tests'
   task :unit do
     # todo: use command abstraction to bridge mono/non-mono
-    system 'mono ./Tests/bin/Release/Tests.exe'
+    system 'Tests/bin/Release/Tests.exe', clr_command: true
   end
 end
 
