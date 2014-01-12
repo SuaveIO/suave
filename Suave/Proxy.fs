@@ -76,7 +76,8 @@ let proxy proxy_resolver (r : HttpRequest) =
   | Some (ip, port) -> forward ip port
   | None            -> never
 
-/// Run a proxy server with the given configuration and given proxy resolver.
+/// Run a proxy server with the given configuration and given upstream/target
+/// resolver.
 let proxy_server_async config resolver =
   let all =
     config.bindings

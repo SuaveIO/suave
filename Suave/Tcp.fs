@@ -91,7 +91,7 @@ let send (socket : Socket) (buf : B) = async {
   let args = c.Pop()
   do! async_do socket.SendAsync (set_buffer buf) ignore args
   c.Push(args)
-  }
+}
 
 /// Start a new TCP server with a specific IP, Port and with a serve_client worker
 /// returning an async workflow whose result can be awaited (for when the tcp server has started
@@ -105,7 +105,6 @@ let tcp_ip_server (source_ip : IPAddress, source_port : uint16) (serve_client : 
     ; source_ip        = source_ip
     ; source_port      = source_port }
   let accepting_connections = new AsyncResultCell<StartedData>()
-  //log "tcp:tcp_ip_server - starting listener: %O" start_data
 
   let localEndPoint = new IPEndPoint(source_ip,int source_port)
   let listenSocket = new Socket(localEndPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);

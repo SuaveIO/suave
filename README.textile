@@ -43,10 +43,10 @@ The function @choose@ accepts a list of webparts and execute each webpart in the
 pre. 
 let nested_logic _ =
   choose
-    [ GET >>= choose 
+    [ GET >>= choose
         [ url "/hello" >>= OK "Hello GET"
         ; url "/goodbye" >>= OK "Good bye GET" ]
-    ; POST >>= choose 
+    ; POST >>= choose
         [ url "/hello" >>= OK "Hello POST"
         ; url "/goodbye" >>= OK "Good bye POST" ] ]
 
@@ -54,7 +54,7 @@ p.
 To gain access to the underlying @HttpRequest@ and read query and http form data we can use the warbler* combinator.
 
 pre. 
-let http_form _ = 
+let http_form _ =
   choose
     [ GET  >>= url "/query" >>= warbler(fun x -> OK ("Hello " + (x.Query) ? name))
     ; POST >>= url "/query" >>= warbler(fun x -> OK ("Hello " + (x.Form)  ? name))
@@ -63,7 +63,7 @@ let http_form _ =
 p. or alternatively with @>>== = warbler@
 
 pre. 
-let http_form _ = 
+let http_form _ =
   choose
     [ GET  >>= url "/query" >>== (fun x -> OK ("Hello " + (x.Query) ? name))
     ; POST >>= url "/query" >>== (fun x -> OK ("Hello " + (x.Form)  ? name))
@@ -98,7 +98,7 @@ Suave supports binding the application to multiple TCP/IP addresses and ports co
 
 pre. 
 let sslCert = new X509Certificate("suave.pfx","easy");
-let cfg = 
+let cfg =
   { default_config with
       bindings =
         [ { scheme = HTTP
@@ -163,22 +163,27 @@ type HttpBinding =
   ; port   : uint16 }
 
 pre. 
-/// The core configuration of suave
-type Config =
+
+/// The core configuration of suave. See also Suave.Web.default_config which
+/// you can use to bootstrap the configuration:
+/// <code>{ default_config with bindings = [ ... ] }</code>
+type SuaveConfig =
   /// The bindings for the web server to launch with
-  { bindings      : HttpBinding list
+  { bindings       : HttpBinding list
+
   /// An error handler to use for handling exceptions that are
   /// are thrown from the web parts
-  ; error_handler : ErrorHandler
+  ; error_handler  : ErrorHandler
+
   /// Timeout for responses to be generated
-  ; timeout       : TimeSpan
+  ; timeout        : TimeSpan
+
+  /// Timeout to wait for the socket bind to finish
+  ; listen_timeout : TimeSpan
+
   /// A cancellation token for the web server. Signalling this token
   /// means that the web server shuts down
-  ; ct            : CancellationToken }
-
-*bindings* array of bindings of the form _protocol, ip address, port_
-*error_handler* a handler to deal with runtime errors
-*timeout* maximun number of milliseconds before killing a request
+  ; ct             : CancellationToken }
 
 h1. Coding Guidelines
 

@@ -253,7 +253,7 @@ let parse_multipart (connection : Connection) boundary (request : HttpRequest) (
 
 /// Process the request, reading as it goes from the incoming 'stream', yielding a HttpRequest
 /// when done
-let process_request proxy_mode (request : HttpRequest) (bytes:ArraySegment<_>) = async {
+let process_request proxy_mode (request : HttpRequest) (bytes : ArraySegment<_>) = async {
 
   let connection = request.connection
 
@@ -266,13 +266,13 @@ let process_request proxy_mode (request : HttpRequest) (bytes:ArraySegment<_>) =
   else
     let meth, url, _, raw_query as q = parse_url first_line request.query
 
-    request.url      <- url
-    request.``method``   <- meth
-    request.raw_query <- raw_query
+    request.url        <- url
+    request.``method`` <- meth
+    request.raw_query  <- raw_query
 
     let headers = request.headers
     let! rem = read_headers connection rem headers
-    
+
     // won't continue parsing if on proxyMode with the intention of forwarding the stream as it is
     if proxy_mode then return Some request, rem
     else
@@ -282,12 +282,14 @@ let process_request proxy_mode (request : HttpRequest) (bytes:ArraySegment<_>) =
                     let cookie = parse_cookie x.Value
                     request.cookies.Add (fst(cookie.[0]),cookie))
 
+      // TODO: can't assume only POST can have form data, PUT can also be done
+      // from forms
       if meth.Equals("POST") then
 
         let content_encoding =
           match headers.TryGetValue("content-type") with
           | true, encoding -> Some encoding
-          | false, _ -> None
+          | false, _       -> None
 
         let content_length = Convert.ToInt32(headers.["content-length"])
 
@@ -296,6 +298,8 @@ let process_request proxy_mode (request : HttpRequest) (bytes:ArraySegment<_>) =
           let! (rawdata : ArraySegment<_>),_ = read_post_data connection content_length rem
           let str = to_string rawdata.Array rawdata.Offset rawdata.Count
           let _  = parse_data str request.form
+          // TODO: can't we instead of copying, do an LMAX and use the buffer as a circular
+          // queue?
           let raw_form = Array.zeroCreate rawdata.Count
           Array.blit rawdata.Array rawdata.Offset raw_form 0 rawdata.Count
           request.raw_form <- raw_form
@@ -327,7 +331,7 @@ open OpenSSL
 let inline load_connection proto (connection : Connection) = async{
   match proto with
   | HTTP       -> return connection
-  | HTTPS cert -> 
+  | HTTPS cert ->
     let ssl = authenticate_as_server cert
     do! accept connection ssl
     return { connection with reader = ssl_receive connection ssl; writer = ssl_send connection ssl }
@@ -342,7 +346,13 @@ type RequestResult = Done
 /// The request loop initialises a request against a web part, with a protocol, a processor to handle the
 /// incoming stream, an error handler, a timeout value (milliseconds) and a TcpClient to use for read-write
 /// communication -- getting the initial request stream.
-let request_loop webpart proto (processor : HttpProcessor) error_handler (timeout : TimeSpan) (connection : Connection) =
+let request_loop
+  (webpart : WebPart)
+  (proto : Protocol)
+  (processor : HttpProcessor)
+  (error_handler : ErrorHandler)
+  (timeout : TimeSpan)
+  (connection : Connection) =
   /// Evaluate the (web part) action as an async value, handling errors with error_handler should one
   /// occur.
   let eval_action x r = async {
@@ -360,7 +370,7 @@ let request_loop webpart proto (processor : HttpProcessor) error_handler (timeou
     | None -> return ()
   }
 
-  let rec loop (bytes:ArraySegment<_>) request = async {
+  let rec loop (bytes : ArraySegment<_>) request = async {
     Log.trace(fun () -> "web:request_loop:loop -> processor")
     let! result, rem = processor request bytes
     Log.trace(fun () -> "web:request_loop:loop <- processor")

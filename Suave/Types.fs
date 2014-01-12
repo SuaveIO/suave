@@ -8,7 +8,7 @@ open Socket
 
 /// A holder for headers for the http response
 type HttpResponse() =
-  let mutable headers : List<string*string> = new List<string*string>()
+  let mutable headers : List<string*string> = new List<string * string>()
   member h.Headers with get()               = headers and set x = headers <- x
 
 /// A holder for uploaded file meta-data
@@ -71,6 +71,8 @@ with
 
 open System.Net
 
+type Port = uint16
+
 /// A HTTP binding is a protocol is the product of HTTP or HTTP, a DNS or IP binding and a port number
 type HttpBinding =
   /// The scheme in use
@@ -78,7 +80,7 @@ type HttpBinding =
   /// The host or IP address to bind to. This will be interpreted by the operating system
   ; ip     : IPAddress
   /// The port for the binding
-  ; port   : uint16 }
+  ; port   : Port }
 with
   /// Create a HttpBinding for the given protocol, an IP address to bind to and a port
   /// to listen on.
