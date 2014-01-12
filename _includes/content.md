@@ -126,24 +126,17 @@ Default-supported HTTP Verbs
 
 See "RFC 2616":http://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html.
 
+These applicatives match on HTTP verbs.
+
 {% highlight fsharp %}
-/// Match on GET requests
 let GET     (x : HttpRequest) = meth0d "GET" x
-/// Match on POST requests
 let POST    (x : HttpRequest) = meth0d "POST" x
-/// Match on DELETE requests
 let DELETE  (x : HttpRequest) = meth0d "DELETE" x
-/// Match on PUT requests
 let PUT     (x : HttpRequest) = meth0d "PUT" x
-/// Match on HEAD requests
 let HEAD    (x : HttpRequest) = meth0d "HEAD" x
-/// Match on CONNECT requests
 let CONNECT (x : HttpRequest) = meth0d "CONNECT" x
-/// Match on PATCH requests
 let PATCH   (x : HttpRequest) = meth0d "PATCH" x
-/// Match on TRACE requests
 let TRACE   (x : HttpRequest) = meth0d "TRACE" x
-/// Match on OPTIONS requests
 let OPTIONS (x : HttpRequest) = meth0d "OPTIONS" x
 {% endhighlight %}
 
@@ -173,23 +166,47 @@ type HttpBinding =
 {% endhighlight %}
 
 {% highlight fsharp %}
-/// The core configuration of suave
-type Config =
+/// The core configuration of suave. See also Suave.Web.default_config which
+/// you can use to bootstrap the configuration:
+/// <code>{ default_config with bindings = [ ... ] }</code>
+type SuaveConfig =
   /// The bindings for the web server to launch with
-  { bindings      : HttpBinding list
+  { bindings       : HttpBinding list
+
   /// An error handler to use for handling exceptions that are
   /// are thrown from the web parts
-  ; error_handler : ErrorHandler
+  ; error_handler  : ErrorHandler
+
   /// Timeout for responses to be generated
-  ; timeout       : TimeSpan
+  ; timeout        : TimeSpan
+
+  /// Timeout to wait for the socket bind to finish
+  ; listen_timeout : TimeSpan
+
   /// A cancellation token for the web server. Signalling this token
   /// means that the web server shuts down
-  ; ct            : CancellationToken }
+  ; ct             : CancellationToken }
 {% endhighlight %}
 
-- `bindings` array of bindings of the form _protocol, ip address, port_
+  - `bindings`: list of bindings of the form _protocol, ip address, port_
+  - `error_handler`: a handler to deal with runtime errors
+  - `timeout`: maximun number of milliseconds before killing a request
 
-- `error_handler` a handler to deal with runtime errors
+### The WebPart
 
-- `timeout` maximun number of milliseconds before killing a request
+A web part is a thing that executes on a HttpRequest, asynchronously, maybe executing
+on the request.
+
+{% highlight fsharp %}
+type WebPart = HttpRequest -> Async<unit> option
+{% endhighlight %}
+
+### The ErrorHandler
+
+An error handler takes the exception, a programmer-provided message, a request (that failed) and returns
+an asynchronous workflow for the handling of the error.
+
+{% highlight fsharp %}
+type ErrorHandler = Exception -> String -> HttpRequest -> Async<unit>
+{% endhighlight %}
 
