@@ -192,6 +192,12 @@ type SuaveConfig =
   - `error_handler`: a handler to deal with runtime errors
   - `timeout`: maximun number of milliseconds before killing a request
 
+## Overview
+
+A request life-cycle begins with the `HttpProcessor` that takes an `HttpRequest`
+and the request as bytes and starts parsing it. It returns an `HttpRequest
+option` that, if Some, gets run against the WebParts passed.
+
 ### The WebPart
 
 A web part is a thing that executes on a HttpRequest, asynchronously, maybe executing
@@ -203,8 +209,9 @@ type WebPart = HttpRequest -> Async<unit> option
 
 ### The ErrorHandler
 
-An error handler takes the exception, a programmer-provided message, a request (that failed) and returns
-an asynchronous workflow for the handling of the error.
+An error handler takes the exception, a programmer-provided message, a request
+(that failed) and returns an asynchronous workflow for the handling of the
+error.
 
 {% highlight fsharp %}
 type ErrorHandler = Exception -> String -> HttpRequest -> Async<unit>
