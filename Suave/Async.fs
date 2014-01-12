@@ -6,6 +6,7 @@ open System.IO
 open System.Threading.Tasks
 open System.Threading
 
+/// Helper to just invoke the three 'funcs' once.
 let internal invoke_once funcs =
   let counter = ref 0
   let invoke_once' f x =
@@ -15,6 +16,8 @@ let internal invoke_once funcs =
   (invoke_once' a, invoke_once' b, invoke_once' c)
 
 type Microsoft.FSharp.Control.Async with
+  /// Spawn an async with a timeout, throwing <see cref="System.TimeoutException" /> after
+  /// the timeout.
   static member WithTimeout(timeout : TimeSpan, computation : 'a Async) : 'a Async =
     let callback (success, error, cancellation) =
       let (success, error, cancellation) = invoke_once (success, error, cancellation)
@@ -64,6 +67,8 @@ type AsyncResultCell<'a>() =
   member x.Complete result =
     source.TrySetResult result
 
+  /// Await the result of the AsyncResultCell, yielding Some(:'T)
+  /// after the timeout or otherwise None.
   member x.AwaitResult(?timeout : TimeSpan) = async {
     match timeout with
     | None ->
@@ -77,4 +82,6 @@ type AsyncResultCell<'a>() =
       | :? TimeoutException as e ->
         return None }
 
+  /// WARNING: do not use, will block the event loop.
+  /// Await the result synchronously.
   member x.Result () = source.Task.Result
