@@ -81,7 +81,7 @@ choose [
       { bindings =
         [ HttpBinding.Create(HTTP, "127.0.0.1", 8082)
         ; { scheme = HTTPS(sslCert); ip = IPAddress.Parse "127.0.0.1"; port = 8083us } ]
-      ; error_handler  = default_error_handler
-      ; timeout        = TimeSpan.FromMilliseconds 1000.
-      ; listen_timeout = TimeSpan.FromMilliseconds 2000.
-      ; ct             = Async.DefaultCancellationToken }
+      ; error_handler    = default_error_handler
+      ; web_part_timeout = TimeSpan.FromMilliseconds 1000.
+      ; listen_timeout   = TimeSpan.FromMilliseconds 2000.
+      ; ct               = Async.DefaultCancellationToken }

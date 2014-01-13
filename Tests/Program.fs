@@ -196,7 +196,10 @@ let proxy =
           "Oh noes",
           (proxy to_target |> req_resp GET "/" None).Content.ReadAsStringAsync().Result)
 
-
+    testCase "Proxy decides to return directly" <| fun _ ->
+      run_in_context (run_target (OK "upstream reply")) dispose_context <| fun _ ->
+//          let subject = proxy (choose [ 
+        Assert.Equal("", true, true)
     ]
 
 [<EntryPoint>]
