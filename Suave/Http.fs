@@ -46,8 +46,9 @@ module Http =
   let response status_code reason_phrase (content : byte []) (request : HttpRequest) =
     response_f status_code reason_phrase (
       fun r -> async {
-        if content.Length > 0 then
-          do! async_writeln r.connection (String.Concat [|  "Content-Length: "; content.Length.ToString() |])
+
+        // http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.13
+        do! async_writeln r.connection (String.Concat [|  "Content-Length: "; content.Length.ToString() |])
 
         do! async_writeln r.connection ""
 
