@@ -164,14 +164,29 @@ let parse_url (line : string) (dict : Dictionary<string,string>) =
     (parts.[0],parts.[1],dict, String.Empty)
 
 /// Read the post data from the stream, given the number of bytes that makes up the post data.
-let read_post_data (connection : Connection) (bytes : int) (read : ArraySegment<_>) = async {
+let read_post_data (connection : Connection) (bytes : int) (read : ArraySegment<_>) =
+    let read_bytes bytes_needed  missing = async{
+       let counter = ref 0
+       let rem = ref (ArraySegment(Array.zeroCreate 0))
+       while !counter < bytes_needed do
+        let! bytes_transmited = connection.reader (fun a -> 
+          if a.Count > bytes_needed - !counter 
+          then
+            Array.blit a.Array a.Offset missing (read.Count + !counter) (bytes_needed - !counter)
+            rem := ArraySegment(a.Array, a.Offset + bytes_needed - !counter, bytes_needed - !counter)
+          else
+            Array.blit a.Array a.Offset missing (read.Count + !counter) a.Count
+          a.Count)
+        counter := !counter + bytes_transmited
+       return (ArraySegment missing, !rem)
+    }
+    async {
     if read.Count >= bytes then
-      return (ArraySegment( read.Array, read.Offset,bytes), ArraySegment( read.Array, read.Offset + bytes, (read.Count - bytes)))
+      return (ArraySegment( read.Array, read.Offset, bytes), ArraySegment( read.Array, read.Offset + bytes, read.Count - bytes))
     else 
       let missing = Array.zeroCreate bytes
       Array.blit read.Array read.Offset missing 0 read.Count
-      let! _ = connection.reader (fun a -> Array.blit a.Array a.Offset missing read.Count (bytes - read.Count); a.Count)
-      return (ArraySegment missing, ArraySegment(Array.zeroCreate(0)))
+      return! read_bytes (bytes - read.Count) missing
   }
 
 /// Parse the cookie data in the string into a dictionary
