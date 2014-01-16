@@ -101,6 +101,13 @@ task :release_next => [ :increase_version_number, :assembly_info , :create_nuget
   system "buildsupport/NuGet.exe push build/pkg/suave.#{s.to_s}.nupkg", clr_command: true
 end
 
+desc 'build documentation'
+task :build_documentation do
+  system 'git checkout gh-pages'
+  system 'bundle exec jekyll build'
+  ## TODO: cp _site to final destination 
+end
+
 namespace :tests do
   desc 'run a stress test'
   task :stress do
