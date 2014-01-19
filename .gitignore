@@ -12,3 +12,4 @@ suave.sln.DotSettings.user
 *.nuspec
 
 .bundle/
+gh-pages/

@@ -16,7 +16,7 @@ nugets_restore :restore do |p|
   p.exe = 'buildsupport/NuGet.exe'
 end
 
-desc "Perform full build"
+desc 'Perform full build'
 task :build => [:versioning, :restore, :build_quick]
 
 build :clean do |b|
@@ -32,7 +32,7 @@ end
 
 directory 'build/pkg'
 
-desc "Create a nuget for Suave"
+desc 'Create a nuget for Suave'
 task :create_nuget => [ 'build/pkg', :versioning, :build] do |p|
   p = Albacore::NugetModel::Package.new.with_metadata do |m|
     m.id            = "Suave"
@@ -63,7 +63,7 @@ task :create_nuget => [ 'build/pkg', :versioning, :build] do |p|
   pkg, spkg = cmd.execute nuspec_path
 end
 
-desc "Create the assembly info file"
+desc 'Create the assembly info file'
 task :assembly_info do 
   x = Albacore::Asmver::Config.new()
 
@@ -101,11 +101,28 @@ task :release_next => [ :increase_version_number, :assembly_info , :create_nuget
   system "buildsupport/NuGet.exe push build/pkg/suave.#{s.to_s}.nupkg", clr_command: true
 end
 
-desc 'build documentation'
-task :build_documentation do
-  system 'git checkout gh-pages'
-  system 'bundle exec jekyll build'
-  ## TODO: cp _site to final destination 
+namespace :docs do
+  desc 'clean generated documentation'
+  task :clean do
+    FileUtils.rm_rf 'gh-pages' if Dir.exists? 'gh-pages'
+  end
+
+  desc 'build documentation'
+  task :build => :clean do
+    system 'git clone https://github.com/SuaveIO/suave.git -b gh-pages gh-pages' unless Dir.exists? 'gh-pages'
+    Dir.chdir 'gh-pages' do
+      Bundler.with_clean_env do
+        system 'bundle'
+        system 'bundle exec jekyll build'
+      end
+    end
+  end
+
+  desc 'build and push docs'
+  task :push => :'docs:build' do
+    system "sshpass -p #{ENV['SUAVE_SERVER_PASS']} scp -P #{ENV['SUAVE_SERVER_PORT']} -r _site/* suave@northpole.cloudapp.net:/home/suave/site",
+      work_dir: 'gh-pages'
+  end
 end
 
 namespace :tests do
@@ -117,9 +134,9 @@ namespace :tests do
 
   desc 'run the unit-tests'
   task :unit do
-    # todo: use command abstraction to bridge mono/non-mono
     system 'Tests/bin/Release/Tests.exe', clr_command: true
   end
 end
 
 task :default => [:build, :'tests:unit', :create_nuget]
+

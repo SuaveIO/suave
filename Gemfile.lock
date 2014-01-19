@@ -3,7 +3,7 @@ GEM
   specs:
     ProcessPilot (2.0.0.20120301)
       rUtilAnts (>= 1.0)
-    albacore (2.0.0.rc.5)
+    albacore (2.0.0.rc.6)
       ProcessPilot (~> 2.0)
       facter (~> 1.7)
       highline (~> 1.6)
