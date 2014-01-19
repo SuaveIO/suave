@@ -3,7 +3,6 @@ require 'albacore'
 
 desc 'build documentation'
 task :build do
-  system 'bundle'
   system 'bundle exec jekyll build'
 end
 
