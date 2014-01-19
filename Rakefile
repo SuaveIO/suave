@@ -61,6 +61,11 @@ task :create_nuget => [ 'build/pkg', :versioning, :build] do |p|
   File.write(nuspec_path,p.to_xml)
   cmd = Albacore::NugetsPack::Cmd.new "buildsupport/NuGet.exe", out: "build/pkg"
   pkg, spkg = cmd.execute nuspec_path
+  Albacore.publish :artifact, OpenStruct.new(
+    :nuspec   => nuspec_path,
+    :nupkg    => pkg,
+    :location => pkg
+  )
 end
 
 desc 'Create the assembly info file'
