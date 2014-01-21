@@ -455,7 +455,7 @@ let request_loop
   /// Check if the web part can perform its work on the current request. If it can't
   /// it will return None and the run method will return.
   let run request = async {
-    match web_part request with // routing
+    match web_part request with // run the web part
     | Some x -> do! eval_action x request
     | None -> return ()
   }
@@ -463,16 +463,16 @@ let request_loop
   let line_buffer = connection.get_buffer()
 
   let rec loop (bytes : BufferSegment option) request = async {
-    Log.tracef(fun fmt -> fmt "web:request_loop:loop -> processor")
+    Log.trace(fun () -> "web:request_loop:loop -> processor")
     let! result, rem = processor request bytes line_buffer
-    Log.tracef(fun fmt -> fmt "web:request_loop:loop <- processor")
+    Log.trace(fun () -> "web:request_loop:loop <- processor")
 
     match result with
     | Some (request : HttpRequest) ->
       try
-        Log.tracef(fun fmt -> fmt "web:request_loop:loop -> unblock")
+        Log.trace(fun () -> "web:request_loop:loop -> unblock")
         do! Async.WithTimeout (web_part_timeout, run request)
-        Log.tracef(fun fmt  -> fmt ":request_loop:loop <- unblock")
+        Log.trace(fun () -> "web:request_loop:loop <- unblock")
       with
         | InternalFailure(_) as ex  -> raise ex
         | :? TimeoutException as ex -> do! error_handler ex "script timeout" request

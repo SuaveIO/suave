@@ -94,6 +94,8 @@ let inline trans (a : SocketAsyncEventArgs) =
 
 open System.Net
 
+/// A connection (TCP implied) is a thing that can read and write from a socket
+/// and that can be closed.
 type Connection = { 
   ipaddr : IPAddress;
   read   : ArraySegment<byte> -> Async<int>;
