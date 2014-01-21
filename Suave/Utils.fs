@@ -109,6 +109,9 @@ let [<Literal>] eol = "\r\n"
 let inline bytes (s : string) =
   Encoding.ASCII.GetBytes s
 
+let inline bytes_to_buffer (s : string) (buff : byte array) (offset : int) =
+  Encoding.ASCII.GetBytes (s, 0, s.Length,buff, offset)
+
 /// Get the UTF-8 bytes for the string
 let inline bytes_utf8 (s : string) =
   Encoding.UTF8.GetBytes s
@@ -187,6 +190,27 @@ let kmp_x p =
     let j = ref 0 in
     while !j < m && !i < n do
       if s.Array.[s.Offset + !i] = p.[!j] then begin incr i; incr j end else
+      if !j = 0 then incr i else j := next.[!j]
+    done;
+    if !j >= m then Some(!i - m) else None
+
+let inline unite (a : ArraySegment<_>) (b : ArraySegment<_>) = 
+  fun (i : int) -> 
+    if   i < 0       then failwith "invalid args"
+    elif i < a.Count then a.Array.[a.Offset + i]
+    elif i < a.Count + b.Count then b.Array.[b.Offset + (i - a.Count)]
+    else failwith "invalid args"
+
+let kmp_x_x p =
+  let next = init_next p
+  let m = Array.length p
+  fun (v:ArraySegment<_>) (w:ArraySegment<_>) ->
+    let n = v.Count + w.Count
+    let s = unite v w
+    let  i = ref 0
+    let j = ref 0 in
+    while !j < m && !i < n do
+      if s !i = p.[!j] then begin incr i; incr j end else
       if !j = 0 then incr i else j := next.[!j]
     done;
     if !j >= m then Some(!i - m) else None

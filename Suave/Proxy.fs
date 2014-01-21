@@ -55,7 +55,7 @@ let forward (ip : IPAddress) (port : uint16) (p : HttpRequest) =
   match look_up p.headers "if-modified-since" with Some(v) -> q.IfModifiedSince <- DateTime.Parse(v) | None -> ()
   match look_up p.headers "transfer-encoding" with Some(v) -> q.TransferEncoding <- v | None -> ()
   match look_up p.headers "user-agent" with Some(v) -> q.UserAgent <- v | None -> ()
-  q.Headers.Add("X-Forwarded-For", p.remote_address)
+  q.Headers.Add("X-Forwarded-For", p.remote_address .ToString())
   async {
     if p.``method`` = "POST" || p.``method`` = "PUT" then
       let content_length = Convert.ToInt32(p.headers.["content-length"])
@@ -82,12 +82,11 @@ let proxy_server_async config resolver =
   let all =
     config.bindings
     |> List.map (fun { scheme = proto; ip = ip; port = port } ->
-        tcp_ip_server (ip, port) (request_loop (process_request true) proto (warbler (fun http -> proxy resolver http)) config.web_part_timeout config.error_handler))
+        tcp_ip_server (ip, port, config.buffer_size, config.max_ops) (request_loop (process_request true) proto (warbler (fun http -> proxy resolver http)) config.web_part_timeout config.error_handler))
   let listening = all |> Seq.map fst |> Async.Parallel |> Async.Ignore
   let server    = all |> Seq.map snd |> Async.Parallel |> Async.Ignore
   listening, server
 
-/// Run a proxy server synchronously.
 let proxy_server config resolver =
   Async.RunSynchronously(proxy_server_async config resolver |> snd,
     cancellationToken = config.ct)

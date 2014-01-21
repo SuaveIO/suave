@@ -2,6 +2,7 @@
 
 open System
 open System.Collections.Generic
+open System.Collections.Concurrent
 open System.Net.Sockets
  
 // This class creates a single large buffer which can be divided up  
@@ -15,61 +16,39 @@ type  BufferManager(totalBytes, bufferSize) =
 
   let mutable m_numBytes = totalBytes // the total number of bytes controlled by the buffer pool 
   let m_buffer = Array.zeroCreate(totalBytes); // the underlying byte array maintained by the Buffer Manager
-  let m_freeIndexPool = new Stack<int>();
-  let mutable m_currentIndex = 0
+  let m_freeIndexPool = new ConcurrentStack<int>();
 
+  // Pops a buffer from the buffer pool
+  member x.PopBuffer() : ArraySegment<byte> =
+    let offset = ref -1
+    if m_freeIndexPool.TryPop(offset) then
+      Log.tracef (fun fmt -> fmt "reserving buffer: %d" !offset )
+      ArraySegment(m_buffer, !offset, bufferSize)
+    else 
+      failwith "failed to obtain a buffer"
 
-  // Assigns a buffer from the buffer pool to the  
-  // specified SocketAsyncEventArgs object 
-  // 
-  // <returns>true if the buffer was successfully set, else false</returns> 
-  member x.PopBuffer() =
-    lock m_freeIndexPool (fun () ->
-    if (m_freeIndexPool.Count > 0) then 
-      ArraySegment(m_buffer, m_freeIndexPool.Pop(), bufferSize)
-    else
-      if ((m_numBytes - bufferSize) < m_currentIndex) then 
-        failwith "we ran out of buffers"
-      else
-        m_currentIndex <- m_currentIndex + bufferSize
-        ArraySegment(m_buffer, m_currentIndex - bufferSize, bufferSize))
+  member x.Init() = 
+    let mutable counter = 0
+    while counter < totalBytes - bufferSize do
+      m_freeIndexPool.Push(counter)
+      counter <- counter + bufferSize
 
-  // Assigns a buffer from the buffer pool to the  
-  // specified SocketAsyncEventArgs object 
-  // 
-  // <returns>true if the buffer was successfully set, else false</returns> 
-  member x.SetBuffer(args : SocketAsyncEventArgs) =
-    if (m_freeIndexPool.Count > 0) then 
-      args.SetBuffer(m_buffer, m_freeIndexPool.Pop(), bufferSize)
-      true
-    else
-      if ((m_numBytes - bufferSize) < m_currentIndex) then 
-        failwith "we ran out of buffers"
-      else
-        args.SetBuffer(m_buffer, m_currentIndex, bufferSize)
-        m_currentIndex <- m_currentIndex + bufferSize
-        true
-
-  // Removes the buffer from a SocketAsyncEventArg object.   
-  // This frees the buffer back to the buffer pool 
-  member x.FreeBuffer(args : SocketAsyncEventArgs) =
-    m_freeIndexPool.Push(args.Offset);
-    args.SetBuffer(null, 0, 0);
-
-  // Removes the buffer from a SocketAsyncEventArg object.   
-  // This frees the buffer back to the buffer pool 
+  // Frees the buffer back to the buffer pool
+  // WARNING: there is nothing preventing you from freeing the same offset more than once with nasty consequences
   member x.FreeBuffer(args : ArraySegment<_>) =
-    lock m_freeIndexPool (fun () -> m_freeIndexPool.Push(args.Offset))
+    Log.tracef (fun fmt -> fmt "freeing buffer: %d" args.Offset )
+    m_freeIndexPool.Push(args.Offset)
 
-type SocketAsyncEventArgsPool(capacity : int) =
+type SocketAsyncEventArgsPool() =
 
-  let m_pool = new Stack<SocketAsyncEventArgs>(capacity)
+  let m_pool = new ConcurrentStack<SocketAsyncEventArgs>()
 
   member x.Push(item : SocketAsyncEventArgs) =
-    lock m_pool (fun () -> m_pool.Push(item))
+    m_pool.Push(item)
 
   member x.Pop() =
-    lock m_pool (fun () -> m_pool.Pop())
+   let arg = ref null
+   if m_pool.TryPop(arg) then !arg else failwith "failed to obtain socket args."
 
   // The number of SocketAsyncEventArgs instances in the pool 
   member x.Count with get() = m_pool.Count
@@ -90,7 +69,7 @@ type A = System.Net.Sockets.SocketAsyncEventArgs
 type B = System.ArraySegment<byte>
 
 /// Wraps the Socket.xxxAsync logic into F# async logic.
-let inline async_do (op : A -> bool) (prepare : A -> unit) (select : A -> 'T) args =
+let inline async_do (op : A -> bool) (prepare : A -> unit) (select: A -> 'T) (args : A) =
   Async.FromContinuations <| fun (ok, error, _) ->
     prepare args
     let k (args : A) =
@@ -104,39 +83,43 @@ let inline async_do (op : A -> bool) (prepare : A -> unit) (select : A -> 'T) ar
       k args
 
 /// Prepares the arguments by setting the buffer.
-let inline set_buffer (buf: B) (args: A) =
-  args.SetBuffer(buf.Array, buf.Offset, buf.Count)
+let inline set_buffer (buf : B) (args: A) =
+    args.SetBuffer(buf.Array, buf.Offset, buf.Count)
 
-let inline accept (socket: Socket) =
-  async_do socket.AcceptAsync ignore (fun a -> a.AcceptSocket)
+let inline accept (socket : Socket) =
+    async_do socket.AcceptAsync ignore (fun a -> a.AcceptSocket)
 
-let inline trans (a : SocketAsyncEventArgs) =
-  new ArraySegment<_>(a.Buffer, a.Offset, a.BytesTransferred)
+let inline trans (a : SocketAsyncEventArgs) = 
+    new ArraySegment<_>(a.Buffer,a.Offset,a.BytesTransferred)
 
-/// A connection (TCP implied) is a thing that can read and write from a socket
-/// and that can be closed.
-type Connection =
-  /// IP Address connected to
-  { ipaddr   : string
-  /// The reader function
-  ; reader   : (ArraySegment<byte> -> int) -> Async<int>
-  /// The writer function
-  ; writer   : ArraySegment<byte> -> Async<unit>
-  /// The shutdown function
-  ; shutdown : unit -> unit }
+open System.Net
+
+type Connection = { 
+  ipaddr : IPAddress;
+  read   : ArraySegment<byte> -> Async<int>;
+  write  : ArraySegment<byte> -> Async<unit>;
+  get_buffer  : unit -> ArraySegment<byte>;
+  free_buffer : ArraySegment<byte> -> unit;
+  shutdown : unit -> unit 
+  }
+
+let eol_array_segment = new ArraySegment<_>(EOL, 0, 2)
 
 /// Write the string s to the stream asynchronously
 /// as ASCII encoded text
-let inline async_writeln (connection : Connection) s = async {
-  let b = bytes s
-  if b.Length > 0 then do! connection.writer (new ArraySegment<_>(b, 0, b.Length))
-  do! connection.writer (new ArraySegment<_>(EOL, 0, 2))
+let inline async_writeln (connection : Connection) (s : string) = async {
+  if s.Length > 0 then 
+    let buff = connection.get_buffer()
+    let c = bytes_to_buffer s buff.Array buff.Offset
+    do! connection.write (new ArraySegment<_>(buff.Array, buff.Offset, c))
+    connection.free_buffer buff
+  do! connection.write eol_array_segment
 }
 
 /// Write the string s to the stream asynchronously
 /// from a byte array
 let inline async_writebytes (connection : Connection) (b : byte[]) = async {
-  if b.Length > 0 then do! connection.writer (new ArraySegment<_>(b, 0, b.Length))
+  if b.Length > 0 then do! connection.write (new ArraySegment<_>(b, 0, b.Length))
 }
 
 open System.IO
@@ -151,7 +134,7 @@ let transfer_x (to_stream : Connection) (from : Stream) =
     if read <= 0 then
       return ()
     else
-      do! to_stream.writer (new ArraySegment<_>(buf,0,read))
+      do! to_stream.write (new ArraySegment<_>(buf,0,read))
       return! do_block () }
   do_block ()
 
@@ -165,6 +148,6 @@ let transfer_len_x (to_stream : Connection) (from : Stream) len =
     if read <= 0 || left - read = 0 then
       return ()
     else
-      do! to_stream.writer (new ArraySegment<_>(buf,0,read))
+      do! to_stream.write (new ArraySegment<_>(buf,0,read))
       return! do_block (left - read) }
   do_block len

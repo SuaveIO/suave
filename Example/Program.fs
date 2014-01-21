@@ -84,4 +84,6 @@ choose [
       ; error_handler    = default_error_handler
       ; web_part_timeout = TimeSpan.FromMilliseconds 1000.
       ; listen_timeout   = TimeSpan.FromMilliseconds 2000.
-      ; ct               = Async.DefaultCancellationToken }
+      ; ct               = Async.DefaultCancellationToken
+      ; buffer_size = 2048
+      ; max_ops = 100 }

@@ -115,33 +115,33 @@ let authenticate_as_server (cert : X509Certificate) =
 open Microsoft.FSharp.NativeInterop
 
 let read_to_bio  (con : Connection) read_bio ssl = async {
-
   let bytes_pending = BIO_ctrl_pending read_bio
   if bytes_pending = 0u then 
-    let! bytes_received = con.reader (fun a ->
-      let buff = Array.zeroCreate a.Count
-      Array.blit a.Array a.Offset buff 0 a.Count
-      BIO_write(read_bio, buff, a.Count) 
-    )
-    ()
+    let a = con.get_buffer ()
+    let! bytes_read = con.read a
+    let buff = Array.zeroCreate bytes_read
+    Array.blit a.Array a.Offset buff 0 bytes_read
+    con.free_buffer a
+    BIO_write(read_bio, buff, bytes_read) |> ignore
   }
 
 let write_from_bio  (con : Connection) write_bio = async {
-
   let bytes_pending = BIO_ctrl_pending write_bio
+
   if bytes_pending > 0u  then 
     let encrypted_buff = Array.zeroCreate SSL3_RT_MAX_PACKET_SIZE
     let len = BIO_read(write_bio,encrypted_buff,encrypted_buff.Length)
-    do! con.writer  (new ArraySegment<_>(encrypted_buff,0,len))
+    do! con.write  (new ArraySegment<_>(encrypted_buff,0,len))
   return ()
   }
 
 let rec accept conn (ssl, read_bio, write_bio) = async{
-
+  
   let ret = SSL_accept ssl  
   if(ret < 0) then 
 
     let bytes_pending = BIO_ctrl_pending write_bio
+    
     if bytes_pending > 0u  then do! write_from_bio conn write_bio
     
     let error = SSL_get_error (ssl, ret)
@@ -157,7 +157,7 @@ let rec accept conn (ssl, read_bio, write_bio) = async{
   return ()
   }
 
-let ssl_receive (con : Connection)  (context, read_bio, write_bio) (f : ArraySegment<_> -> int) = async {
+let ssl_receive (con : Connection)  (context, read_bio, write_bio) (bu: B) = async {
 
   let write_bytes_pending = BIO_ctrl_pending write_bio
   if write_bytes_pending > 0u  then do! write_from_bio con write_bio
@@ -165,38 +165,41 @@ let ssl_receive (con : Connection)  (context, read_bio, write_bio) (f : ArraySeg
   //we need to check if there is data in the read bio before asking for more to the socket
   let bytes_pending = BIO_ctrl_pending read_bio
   if bytes_pending = 0u then 
+    let a = con.get_buffer ()
+    let! bytes_read = con.read a
 
-    let! bytes_received = con.reader (fun a ->
-      let buff = Array.zeroCreate a.Count
-      Array.blit a.Array a.Offset buff 0 a.Count
-      //Copy encrypted data into the SSL read_bio
-      BIO_write(read_bio, buff, a.Count)
-      )
-    ()
-
-  let bytes_pending = BIO_ctrl_pending read_bio
+    let buff = Array.zeroCreate bytes_read
+    Array.blit a.Array a.Offset buff 0 bytes_read
+    
+    //Copy encrypted data into the SSL read_bio
+    con.free_buffer a
+    BIO_write(read_bio, buff, bytes_read) |> ignore
 
   let decrypted_bytes_read = 
+    let bytes_pending = BIO_ctrl_pending read_bio
+
     if bytes_pending > 0ul then
       let buff = Array.zeroCreate SSL3_RT_MAX_PACKET_SIZE
+      //SSL_read wants a 0 based array
       let decrypted_bytes_read = SSL_read (context, buff, SSL3_RT_MAX_PACKET_SIZE)
       if decrypted_bytes_read < 0  then 
         let error = SSL_get_error (context, decrypted_bytes_read)
-        Log.logf "SSL_get_error <- %d" error
-        0
+        failwith "SSL_get_error <- %d" error
       else
-        //decrypted_bytes_read
-        f (ArraySegment(buff,0,decrypted_bytes_read))
+        //copy them to buf
+        Array.blit buff 0 bu.Array bu.Offset decrypted_bytes_read
+        decrypted_bytes_read
     else 0
+
   return decrypted_bytes_read
   }
 
 let ssl_send (con : Connection)  (context, _ , write_bio)  (buf: ArraySegment<_>)= async {
 
-  SSL_write (context, buf.Array, buf.Count) |> ignore
-  let bytes_pending = BIO_ctrl_pending write_bio
+  //SSL_write wants a 0 based array
+  let e = SSL_write (context, Array.sub buf.Array buf.Offset buf.Count, buf.Count) 
+  //let bytes_pending = BIO_ctrl_pending write_bio
   let encrypted_buff = Array.zeroCreate SSL3_RT_MAX_PACKET_SIZE
   let len = BIO_read(write_bio,encrypted_buff,encrypted_buff.Length)
-
-  return! con.writer  (new ArraySegment<_>(encrypted_buff,0,len))
+  return! con.write  (new ArraySegment<_>(encrypted_buff,0,len))
   }

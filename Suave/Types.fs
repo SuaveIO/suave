@@ -5,6 +5,7 @@ open System.IO
 open System.Collections.Generic
 open System.Net.Sockets
 open Socket
+open System.Net
 
 /// A holder for headers for the http response
 type HttpResponse() =
@@ -23,7 +24,7 @@ type HttpRequest =
   { connection         : Connection
   ; mutable url        : string
   ; mutable ``method`` : string
-  ; remote_address     : string
+  ; remote_address     : IPAddress
   ; query              : Dictionary<string,string>
   ; headers            : Dictionary<string,string>
   ; form               : Dictionary<string,string>
@@ -122,7 +123,13 @@ type SuaveConfig =
 
   /// A cancellation token for the web server. Signalling this token
   /// means that the web server shuts down
-  ; ct               : CancellationToken }
+  ; ct               : CancellationToken
+
+  /// buffer size for socket operations
+  ; buffer_size    : int
+
+  /// max number of concurrent socket operations
+  ; max_ops        : int }
 
 /// An exception, raised e.g. if writing to the stream fails
 exception InternalFailure of string

@@ -53,7 +53,7 @@ module Http =
         do! async_writeln r.connection ""
 
         if content.Length > 0 then
-          do! r.connection.writer (new ArraySegment<_>(content, 0, content.Length)) })
+          do! r.connection.write (new ArraySegment<_>(content, 0, content.Length)) })
       request
 
   // modifiers

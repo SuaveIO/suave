@@ -49,7 +49,7 @@ module RequestFactory =
     let base_uri = binding.ToString()
     let cts = new CancellationTokenSource()
     cts.Token.Register(fun () -> Log.trace(fun () -> "tests:run_with - cancelled")) |> ignore
-    let config' = { config with ct = cts.Token }
+    let config' = { config with ct = cts.Token; buffer_size = 128; max_ops = 10 }
 
     let listening, server = factory config web_parts
     Async.Start(server, cts.Token)

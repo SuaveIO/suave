@@ -40,83 +40,79 @@ let stop_tcp reason (socket : Socket) =
   socket.Close()
   Log.trace(fun () -> "tcp:stop_tcp - stopped")
 
-let create_pools max_ops =
+let create_pools max_ops buffer_size =
 
-  let acceptAsyncArgsPool = new SocketAsyncEventArgsPool(max_ops)
-  let readAsyncArgsPool   = new SocketAsyncEventArgsPool(max_ops)
-  let writeAsyncArgsPool  = new SocketAsyncEventArgsPool(max_ops)
+  let acceptAsyncArgsPool = new SocketAsyncEventArgsPool()
+  let readAsyncArgsPool   = new SocketAsyncEventArgsPool()
+  let writeAsyncArgsPool  = new SocketAsyncEventArgsPool()
 
-  let bufferManager = new BufferManager(62400000,512)
+  let bufferManager = new BufferManager(buffer_size * (max_ops + 1) ,buffer_size)
+  bufferManager.Init()
 
-  [| 0 .. max_ops|] 
+  [| 0 .. max_ops - 1|] 
   |> Array.iter (fun x ->
     //Pre-allocate a set of reusable SocketAsyncEventArgs
     let readEventArg = new SocketAsyncEventArgs()
     let userToken =  new AsyncUserToken()
     readEventArg.UserToken <- userToken
-    readEventArg.add_Completed(System.EventHandler<SocketAsyncEventArgs>(fun _ -> userToken.Continuation))
-    // assign a byte buffer from the buffer pool to the SocketAsyncEventArg object
-    bufferManager.SetBuffer(readEventArg) |> ignore
+    readEventArg.add_Completed(fun a b -> userToken.Continuation b)
+
+    //bufferManager.SetBuffer(readEventArg) |> ignore
     readAsyncArgsPool.Push(readEventArg)
 
     let writeEventArg = new SocketAsyncEventArgs()
     let userToken =  new AsyncUserToken()
     writeEventArg.UserToken <- userToken
-    writeEventArg.add_Completed(System.EventHandler<_>(fun _ -> userToken.Continuation))
+    writeEventArg.add_Completed(fun a b -> userToken.Continuation b)
 
     writeAsyncArgsPool.Push(writeEventArg)
 
     let acceptEventArg = new SocketAsyncEventArgs()
     let userToken =  new AsyncUserToken()
     acceptEventArg.UserToken <- userToken
-    acceptEventArg.add_Completed(System.EventHandler<_>(fun _ -> userToken.Continuation))
+    acceptEventArg.add_Completed(fun a b -> userToken.Continuation b)
             
     acceptAsyncArgsPool.Push(acceptEventArg)
-  )
 
+    )
   (acceptAsyncArgsPool, readAsyncArgsPool, writeAsyncArgsPool, bufferManager)
 
-let MAX_CONCURRENT_OPS = 10000
+// NOTE: performance tip, on mono set nursery-size with a value larger than MAX_CONCURRENT_OPS * BUFFER_SIZE
+// i.e: export MONO_GC_PARAMS=nursery-size=128m
+// The nursery size must be a power of two in bytes
 
-let (a, b, c, d) = create_pools MAX_CONCURRENT_OPS
-
-let receive (socket : Socket) (f : ArraySegment<_> -> int) = async {
-  let args = b.Pop()
-  let! bs = async_do socket.ReceiveAsync ignore (fun a -> f(trans a)) args
-  b.Push(args)
-  return bs
-}
+let inline receive (socket: Socket) (args : A)  (buf: B) = 
+  async_do socket.ReceiveAsync (set_buffer buf)  (fun a -> a.BytesTransferred) args
  
-let send (socket : Socket) (buf : B) = async {
-  let args = c.Pop()
-  do! async_do socket.SendAsync (set_buffer buf) ignore args
-  c.Push(args)
-}
+let inline send (socket: Socket) (args : A) (buf: B) =
+  async_do socket.SendAsync (set_buffer buf) ignore args
 
 /// Start a new TCP server with a specific IP, Port and with a serve_client worker
 /// returning an async workflow whose result can be awaited (for when the tcp server has started
 /// listening to its address/port combination), and an asynchronous workflow that
 /// yields when the full server is cancelled. If the 'has started listening' workflow
 /// returns None, then the start timeout expired.
-let tcp_ip_server (source_ip : IPAddress, source_port : uint16) (serve_client : TcpWorker<unit>) =
+let tcp_ip_server (source_ip : IPAddress, source_port : uint16, buffer_size : int, mac_concurrent_ops : int) (serve_client : TcpWorker<unit>) =
   let start_data =
     { start_called_utc = DateTime.UtcNow
     ; socket_bound_utc = None
     ; source_ip        = source_ip
     ; source_port      = source_port }
   let accepting_connections = new AsyncResultCell<StartedData>()
+  //log "tcp:tcp_ip_server - starting listener: %O" start_data
+
+  let (a,b,c,bufferManager) = create_pools mac_concurrent_ops buffer_size
 
   let localEndPoint = new IPEndPoint(source_ip,int source_port)
   let listenSocket = new Socket(localEndPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
   listenSocket.Bind(localEndPoint);
-  // start the server with a listen backlog of 100 connections
   listenSocket.Listen(MAX_BACK_LOG)
 
   //consider:
   //echo 5 > /proc/sys/net/ipv4/tcp_fin_timeout
   //echo 1 > /proc/sys/net/ipv4/tcp_tw_recycle
   //custom kernel with shorter TCP_TIMEWAIT_LEN in include/net/tcp.h
-  let inline job (args:SocketAsyncEventArgs) (d : Connection) = async {
+  let inline job (accept_args:A) (read_args : A) (write_args : A) (d : Connection) = async {
     use! oo = Async.OnCancel (fun () -> Log.trace(fun () -> "tcp:tcp_ip_server - disconnected client (async cancel)")
                                         close d)
     try
@@ -130,9 +126,13 @@ let tcp_ip_server (source_ip : IPAddress, source_port : uint16) (serve_client : 
           Log.tracef(fun fmt -> fmt "tcp:tcp_ip_server - tcp request processing failed.\n%A" x)
           return ()
     finally
-      if args.AcceptSocket <> null then
-        if(args.AcceptSocket.Connected || args.AcceptSocket.IsBound) then args.AcceptSocket.Disconnect(true)
-      a.Push(args)
+      if accept_args.AcceptSocket <> null then
+        if(accept_args.AcceptSocket.Connected || accept_args.AcceptSocket.IsBound) then accept_args.AcceptSocket.Disconnect(true)
+
+      a.Push(accept_args)
+      b.Push(read_args)
+      c.Push(write_args)
+
       close d
   }
 
@@ -149,15 +149,19 @@ let tcp_ip_server (source_ip : IPAddress, source_port : uint16) (serve_client : 
                               (if token.IsCancellationRequested then ", cancellation requested" else ""))
 
       while not (token.IsCancellationRequested) do
-        let args = a.Pop()
-        let! (socket : Socket) = accept listenSocket args
+        let accept_args = a.Pop()
+        let read_args = b.Pop()
+        let write_args = c.Pop()
+        let! (socket : Socket) = accept listenSocket accept_args
         let client = { 
-          ipaddr =  (socket.RemoteEndPoint :?> IPEndPoint).Address.ToString();
-          reader = receive socket ;
-          writer = send socket;
+          ipaddr =  (socket.RemoteEndPoint :?> IPEndPoint).Address;
+          read  = receive socket read_args;
+          write = send socket write_args;
+          get_buffer = bufferManager.PopBuffer;
+          free_buffer = bufferManager.FreeBuffer;
           shutdown = fun () -> if socket <> null && socket.Connected then socket.Shutdown(SocketShutdown.Both)
           }
-        Async.Start (job args client, token)
+        Async.Start (job accept_args read_args write_args client, token)
 
       return ()
     with x ->
