@@ -361,7 +361,7 @@ let process_request proxy_mode (request : HttpRequest) (bytes : BufferSegment op
 
     let headers = request.headers
     let! rem = read_headers connection rem headers line_buffer
-    
+
     // won't continue parsing if on proxyMode with the intention of forwarding the stream as it is
     if proxy_mode then return Some request, rem
     else
@@ -376,34 +376,33 @@ let process_request proxy_mode (request : HttpRequest) (bytes : BufferSegment op
       if meth.Equals("POST") then
 
         let content_encoding =
-            match headers.TryGetValue("content-type") with
-            | true, encoding -> Some encoding
-            | false, _ -> None
+          match headers.TryGetValue("content-type") with
+          | true, encoding -> Some encoding
+          | false, _ -> None
 
         let content_length = Convert.ToInt32(headers.["content-length"])
 
         match content_encoding with
         | Some ce when ce.StartsWith("application/x-www-form-urlencoded") ->
-              let! (rawdata : ArraySegment<_>),rem = read_post_data connection content_length rem
-              let str = to_string rawdata.Array rawdata.Offset rawdata.Count
-              let _  = parse_data str request.form
-              // TODO: can't we instead of copying, do an LMAX and use the buffer as a circular
-              // queue?
-              let raw_form = Array.zeroCreate rawdata.Count
-              Array.blit rawdata.Array rawdata.Offset raw_form 0 rawdata.Count
-              request.raw_form <- raw_form
-              return Some request, rem
+          let! (rawdata : ArraySegment<_>),rem = read_post_data connection content_length rem
+          let str = to_string rawdata.Array rawdata.Offset rawdata.Count
+          let _  = parse_data str request.form
+          // TODO: can't we instead of copying, do an LMAX and use the buffer as a circular
+          // queue?
+          let raw_form = Array.zeroCreate rawdata.Count
+          Array.blit rawdata.Array rawdata.Offset raw_form 0 rawdata.Count
+          request.raw_form <- raw_form
+          return Some request, rem
         | Some ce when ce.StartsWith("multipart/form-data") ->
-              let boundary = "--" + ce.Substring(ce.IndexOf('=')+1).TrimStart()
-              let! rem = parse_multipart connection boundary request rem line_buffer
-              //assert (rem.Count = 0)
-              return Some request, rem
-        | Some _ | None ->
-              let! (rawdata : ArraySegment<_>),_ = read_post_data connection content_length rem
-              let raw_form = Array.zeroCreate rawdata.Count
-              Array.blit rawdata.Array rawdata.Offset raw_form 0 rawdata.Count
-              request.raw_form <- raw_form
-              return Some request, rem
+          let boundary = "--" + ce.Substring(ce.IndexOf('=')+1).TrimStart()
+          let! rem = parse_multipart connection boundary request rem line_buffer
+          return Some request, rem
+        | Some _ | None -> 
+          let! (rawdata : ArraySegment<_>),_ = read_post_data connection content_length rem
+          let raw_form = Array.zeroCreate rawdata.Count
+          Array.blit rawdata.Array rawdata.Offset raw_form 0 rawdata.Count
+          request.raw_form <- raw_form
+          return Some request, rem
       else return Some request, rem
 }
 
