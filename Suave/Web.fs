@@ -236,9 +236,9 @@ let inline parse_url (line : string) (dict : Dictionary<string,string>) =
 
   if indexOfMark > 0 then
     let raw_query = parts.[1].Substring(indexOfMark + 1)
-    (parts.[0], parts.[1].Substring(0,indexOfMark), parse_data raw_query dict, "?" + raw_query)
+    (parts.[0], parts.[1].Substring(0,indexOfMark), parse_data raw_query dict, "?" + raw_query, parts.[2])
   else
-    (parts.[0],parts.[1],dict, String.Empty)
+    (parts.[0], parts.[1], dict, String.Empty, parts.[2])
 
 /// Read the post data from the stream, given the number of bytes that makes up the post data.
 let read_post_data (connection : Connection) (bytes : int) (read : BufferSegment option) = async {
@@ -353,11 +353,12 @@ let process_request proxy_mode (request : HttpRequest) (bytes : BufferSegment op
   if first_line.Length = 0 then
     return None, rem
   else
-    let meth, url, _, raw_query as q = parse_url first_line request.query
+    let meth, url, _, raw_query, http_version = parse_url first_line request.query
 
     request.url      <- url
     request.``method``   <- meth
     request.raw_query <- raw_query
+    request.http_version <- http_version
 
     let headers = request.headers
     let! rem = read_headers connection rem headers line_buffer
@@ -384,7 +385,7 @@ let process_request proxy_mode (request : HttpRequest) (bytes : BufferSegment op
 
         match content_encoding with
         | Some ce when ce.StartsWith("application/x-www-form-urlencoded") ->
-          let! (rawdata : ArraySegment<_>),rem = read_post_data connection content_length rem
+          let! (rawdata : ArraySegment<_>), rem = read_post_data connection content_length rem
           let str = to_string rawdata.Array rawdata.Offset rawdata.Count
           let _  = parse_data str request.form
           // TODO: can't we instead of copying, do an LMAX and use the buffer as a circular
@@ -481,9 +482,17 @@ let request_loop
         clear request
         Log.tracef(fun fmt -> fmt "web:request_loop:loop 'Connection: keep-alive' recurse (!), rem: %A" rem)
         return! loop rem request
-      | _ ->
+      | Some _ ->
         Log.trace(fun () -> "web:request_loop:loop  'Connection: close', exiting")
         return ()
+      | None ->
+        if request.http_version.Equals("HTTP/1.1") then
+          clear request
+          Log.trace(fun () -> "web:request_loop:loop  'Connection: keep-alive' recurse (!)")
+          return! loop rem request
+        else
+          Log.trace(fun () -> "web:request_loop:loop  'Connection: close', exiting")
+          return ()
     | None ->
       Log.trace(fun () -> "web:request_loop:loop 'result = None', exiting")
       return ()
@@ -492,6 +501,7 @@ let request_loop
     let! connection = load_connection proto connection
     let request =
       { connection     = connection
+      ; http_version   = null
       ; url            = null
       ; ``method``     = null
       ; query          = new Dictionary<string,string>()

@@ -21,9 +21,10 @@ type HttpUpload(fieldname : string, filename : string, mime_type : string, temp_
 
 /// A holder for the data extracted from the request.
 type HttpRequest =
-  { connection         : Connection
-  ; mutable url        : string
-  ; mutable ``method`` : string
+  { connection           : Connection
+  ; mutable http_version : string
+  ; mutable url          : string
+  ; mutable ``method``   : string
   ; remote_address     : IPAddress
   ; query              : Dictionary<string,string>
   ; headers            : Dictionary<string,string>
