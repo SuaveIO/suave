@@ -100,6 +100,10 @@ module RequestFactory =
     let res = req_resp methd resource data ctx
     res.Content.ReadAsStringAsync().Result
 
+  let req_headers methd resource data ctx =
+    let res = req_resp methd resource data ctx
+    res.Content.Headers
+
 [<Tests>]
 let smoking =
   testList "smoking hot" [
@@ -133,6 +137,10 @@ let gets =
       testCase "204 No Content empty body" <| fun _ ->
         Assert.Equal("empty string should always be returned by 204 No Content",
                      "", (run_with' NO_CONTENT |> req GET "/" None))
+
+      testCase "302 FOUND sends content-lenght header" <| fun _ ->
+        Assert.Equal("302 FOUND sends content-lenght header",
+                     true, (req_headers GET "/" None (run_with' (FOUND "/url"))).Contains("Content-Length"))
     ]
 
 [<Tests>]
