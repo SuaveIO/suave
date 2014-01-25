@@ -40,12 +40,15 @@ type BufferSegment = {
   lenght : int;
   }
 
+let inline mk_buffer_segment buffer offset lenght = 
+  Some { buffer = buffer; offset = offset; lenght = lenght}
+
 /// Read the passed stream into buff until the EOL (CRLF) has been reached 
 /// and returns an array containing excess data read past the marker
 let read_till_EOL (connection : Connection) (select) (preread : BufferSegment option) =
 
   let rec scan_data count (pair : BufferSegment) = async {
-    match scan_crlf (ArraySegment(pair.buffer.Array,pair.offset,pair.lenght)) with
+    match scan_crlf (ArraySegment(pair.buffer.Array, pair.offset, pair.lenght)) with
     //returns index relating to the original array
     | Some x when x = pair.offset ->
       if pair.lenght = 2 then 
@@ -53,15 +56,15 @@ let read_till_EOL (connection : Connection) (select) (preread : BufferSegment op
         connection.free_buffer pair.buffer
         return (count, None )
       else 
-        return (count, Some { buffer = pair.buffer; offset = pair.offset + 2; lenght = pair.lenght - 2})
+        return (count, mk_buffer_segment pair.buffer (pair.offset + 2) (pair.lenght - 2))
     | Some index ->
-      select (ArraySegment(pair.buffer.Array,pair.offset, index - pair.offset)) (index - pair.offset)
-      let new_lenght = pair.lenght - index + pair.offset - 2
-      if new_lenght = 0 then
+      select (ArraySegment(pair.buffer.Array, pair.offset, index - pair.offset)) (index - pair.offset)
+      let number_of_bytes_to_select = pair.lenght - index + pair.offset - 2
+      if number_of_bytes_to_select = 0 then
         connection.free_buffer pair.buffer
         return (count + (index - pair.offset ), None)
       else
-        return (count + (index - pair.offset ), Some { buffer = pair.buffer; offset =  index  + 2; lenght = new_lenght })
+        return (count + (index - pair.offset ), mk_buffer_segment pair.buffer (index  + 2) number_of_bytes_to_select)
     | None ->
       return! read_data count (Some pair)
     }
@@ -70,42 +73,39 @@ let read_till_EOL (connection : Connection) (select) (preread : BufferSegment op
     let cn = left.lenght
     let dn = right.lenght
 
-    match scan_crlf_x (ArraySegment(left.buffer.Array,left.offset,cn)) (ArraySegment(right.buffer.Array,right.offset,dn)) with
+    match scan_crlf_x (ArraySegment(left.buffer.Array, left.offset, cn)) (ArraySegment(right.buffer.Array, right.offset, dn)) with
     | Some index when index < cn ->
       select (ArraySegment(left.buffer.Array,left.offset,index)) index
-      let new_lenght = cn - index - 2
-      if new_lenght = 0 then
+      let number_of_bytes_to_select = cn - index - 2
+      if number_of_bytes_to_select = 0 then
         connection.free_buffer left.buffer
         return (count + index, None) // asumes d is empty
       else 
-        return (count + index, Some { buffer = left.buffer; offset = left.offset + index + 2; lenght = new_lenght}) // asumes d is empty
+        return (count + index, mk_buffer_segment left.buffer (left.offset + index + 2) number_of_bytes_to_select) // asumes d is empty
     | Some index -> 
-      select (ArraySegment(left.buffer.Array,left.offset,left.lenght)) left.lenght // here we can free c's original buffer --
+      select (ArraySegment(left.buffer.Array, left.offset, left.lenght)) left.lenght // here we can free c's original buffer --
       connection.free_buffer  left.buffer
-      select (ArraySegment(right.buffer.Array,right.offset,index - left.lenght)) (index - left.lenght)
-      let new_lenght = dn - (index - cn) - 2
-      if new_lenght = 0 then
+      select (ArraySegment(right.buffer.Array, right.offset, index - left.lenght)) (index - left.lenght)
+      let number_of_bytes_to_select = dn - (index - cn) - 2
+      if number_of_bytes_to_select = 0 then
         return (count + index, None )
       else 
-        return (count + index, Some { buffer = right.buffer; offset = right.offset + (index - cn) + 2; lenght = new_lenght})
+        return (count + index, mk_buffer_segment right.buffer (right.offset + (index - cn) + 2) number_of_bytes_to_select)
     | None -> 
-      select  (ArraySegment(left.buffer.Array,left.offset,left.lenght)) left.lenght // free c's original buffer
+      select (ArraySegment(left.buffer.Array, left.offset, left.lenght)) left.lenght // free c's original buffer
       connection.free_buffer  left.buffer
-      if dn > 1 then
-        select (ArraySegment(right.buffer.Array,right.offset,right.lenght-1)) (dn - 1)
-        let new_lenght  = right.lenght - 1
-        if new_lenght = 0 then
-          return! read_data (count + cn + dn - 2) None
-        else
-          return! read_data (count + cn + dn - 2) (Some { buffer = right.buffer; offset = right.offset + right.lenght - 1; lenght = new_lenght })
+      let count' = count + cn + dn - 2
+      let number_of_bytes_to_select  = right.lenght - 1
+      if number_of_bytes_to_select > 0 then
+        select (ArraySegment(right.buffer.Array, right.offset, right.lenght-1)) number_of_bytes_to_select
+        return! read_data (count' + number_of_bytes_to_select) (mk_buffer_segment right.buffer (right.offset + right.lenght - 1) 1)
       else
-        return! read_data (count + cn + dn - 2) (Some right)
+        return! read_data count' (Some right)
     }
   and read_data count (ahead :BufferSegment option)  = async {
     let buff = connection.get_buffer ()
     let! b = connection.read buff 
     if b > 0 then 
-      
       match ahead with 
       | Some data ->
         return! scan_data_x count data {buffer = buff; offset = buff.Offset ; lenght = b}
@@ -123,42 +123,62 @@ let read_till_EOL (connection : Connection) (select) (preread : BufferSegment op
 /// Read the stream until the marker appears.
 let read_until (marker : byte array) (f : ArraySegment<_> -> int -> Async<unit>) (connection : Connection) (preread : BufferSegment option) =
 
+  let marker_lenght = marker.Length
+
   let rec scan_data count  (segment : BufferSegment)  = async {
-    match kmp_x marker (ArraySegment(segment.buffer.Array,segment.offset,segment.lenght))  with
+    match kmp_x marker (ArraySegment(segment.buffer.Array, segment.offset, segment.lenght))  with
     | Some 0 ->
-      return (count,  Some { buffer = segment.buffer; offset = segment.offset + marker.Length; lenght = segment.lenght - marker.Length})
+      if segment.lenght = marker_lenght then 
+        connection.free_buffer segment.buffer
+        return (count, None )
+      else
+        return (count,  mk_buffer_segment segment.buffer (segment.offset + marker_lenght) (segment.lenght - marker_lenght))
     | Some index ->
-      do! f (ArraySegment(segment.buffer.Array,segment.offset,index)) index
-      return (count + index, Some { buffer = segment.buffer; offset = segment.offset + index + marker.Length; lenght = segment.lenght - index - marker.Length})
+      do! f (ArraySegment(segment.buffer.Array, segment.offset, index)) index
+      //discard the marker
+      if index = segment.lenght - marker_lenght then
+        connection.free_buffer segment.buffer
+        return (count, None )
+      else
+        return (count + index, mk_buffer_segment segment.buffer (segment.offset + index + marker_lenght) (segment.lenght - index - marker_lenght))
     | None -> 
-      do! f (ArraySegment(segment.buffer.Array,segment.offset,segment.lenght - marker.Length)) (segment.lenght - marker.Length)
-      return! read_data (count + segment.lenght - marker.Length) (Some { buffer = segment.buffer; offset = segment.offset + segment.lenght - marker.Length; lenght = marker.Length})
+      return! read_data count (Some segment)
     }
   and scan_data_x  count (left : BufferSegment) (right: BufferSegment) = async  {
 
     let cn = left.lenght
     let dn = right.lenght
-    
-    match kmp_x_x marker (ArraySegment(left.buffer.Array,left.offset,cn)) (ArraySegment(right.buffer.Array,right.offset,dn)) with
+
+    match kmp_x_x marker (ArraySegment(left.buffer.Array, left.offset,cn)) (ArraySegment(right.buffer.Array, right.offset,dn)) with
     | Some index when index < cn ->
-      do! f (ArraySegment(left.buffer.Array,left.offset,index)) index
-      return (count + index, Some { buffer = left.buffer; offset = left.offset + index + 2; lenght = cn - index - 2}) // asumes d is empty
-    | Some index -> 
-      do! f (ArraySegment(left.buffer.Array,left.offset,left.lenght)) left.lenght//here we can free c's original buffer --
-      connection.free_buffer  left.buffer
-      do! f (ArraySegment(right.buffer.Array,right.offset,index)) index
-      return (count + index, Some { buffer = right.buffer; offset = right.offset + (index - cn) + 2; lenght = dn - (index - cn) - 2})
-    | None -> 
-      do! f  (ArraySegment(left.buffer.Array,left.offset,left.lenght)) left.lenght //free c's original buffer
-      connection.free_buffer  left.buffer
-      if dn > 1 then 
-        do! f (ArraySegment(right.buffer.Array,right.offset,right.lenght-1)) (dn - 1)
-        return! read_data (count + cn + dn - 2) (Some { buffer = right.buffer; offset = right.offset + right.lenght - 1; lenght = right.lenght - 1 })
+      do! f (ArraySegment(left.buffer.Array, left.offset,index)) index
+      let number_of_bytes_to_select = cn - index - marker_lenght
+      if number_of_bytes_to_select = 0 then 
+        connection.free_buffer left.buffer
+        return (count + index, None)
       else
-        return! read_data (count + cn + dn - 2) (Some right)
+        return (count + index, mk_buffer_segment  left.buffer (left.offset + index + marker_lenght) number_of_bytes_to_select) // asumes d is empty
+    | Some index -> 
+      do! f (ArraySegment(left.buffer.Array, left.offset, left.lenght)) left.lenght//here we can free c's original buffer --
+      connection.free_buffer  left.buffer
+      do! f (ArraySegment(right.buffer.Array, right.offset, index)) index
+      let number_of_bytes_to_select = dn - (index - cn) - marker_lenght
+      if number_of_bytes_to_select = 0 then
+        return (count + index, None)
+      else
+        return (count + index, mk_buffer_segment right.buffer (right.offset + (index - cn) + marker_lenght) number_of_bytes_to_select)
+    | None -> 
+      do! f  (ArraySegment(left.buffer.Array, left.offset, left.lenght)) left.lenght //free c's original buffer
+      connection.free_buffer  left.buffer
+      let number_of_bytes_to_select  = right.lenght - marker_lenght + 1
+      if number_of_bytes_to_select > 0 then 
+        do! f (ArraySegment(right.buffer.Array, right.offset, right.lenght-1)) number_of_bytes_to_select
+        return! read_data (count + cn + number_of_bytes_to_select) (mk_buffer_segment right.buffer (right.offset + right.lenght - marker_lenght + 1) (marker_lenght - 1))
+      else
+        return! read_data (count + cn) (Some right)
     } 
   and read_data count (ahead : BufferSegment option) = async {
-    
+
     let a = connection.get_buffer ()
     let! bytes_read = connection.read a
     if bytes_read > 0 then 
@@ -169,7 +189,6 @@ let read_until (marker : byte array) (f : ArraySegment<_> -> int -> Async<unit>)
         return! scan_data count {buffer = a; offset = a.Offset ; lenght = bytes_read}
     else
       return failwith "client disconnected."
-   
     }
   match preread with
   | Some data ->
