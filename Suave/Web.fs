@@ -260,26 +260,34 @@ let inline parse_url (line : string) (dict : Dictionary<string,string>) =
     (parts.[0], parts.[1], dict, String.Empty, parts.[2])
 
 /// Read the post data from the stream, given the number of bytes that makes up the post data.
-let read_post_data (connection : Connection) (bytes : int) (read : BufferSegment option) = async {
-  match read with 
-  | Some data ->
-    if data.lenght >= bytes then
-    //TODO : check if we need to free data.buffer
-      return (ArraySegment(data.buffer.Array,data.offset,bytes), Some { buffer = data.buffer; offset = data.offset + bytes; lenght = data.lenght - bytes })
-    else 
+let read_post_data (connection : Connection) (bytes : int) (read : BufferSegment option) =
+    let read_bytes bytes_needed  missing read_offset = async{
+       let counter = ref 0
+       let rem = ref None
+       let a = connection.get_buffer ()
+       while !counter < bytes_needed do
+        let! bytes_transmited = connection.read a
+        if bytes_transmited > bytes_needed - !counter 
+        then
+          Array.blit a.Array a.Offset missing (read_offset + !counter) (bytes_needed - !counter)
+          rem := Some { buffer = a; offset =  a.Offset + bytes_needed - !counter; lenght = bytes_needed - !counter}
+        else
+          Array.blit a.Array a.Offset missing (read_offset + !counter) bytes_transmited
+        counter := !counter + bytes_transmited
+       return (ArraySegment missing, !rem)
+    }
+    async {
+    match read with
+    | Some segment ->
+      if segment.lenght >= bytes then
+        return (ArraySegment(segment.buffer.Array, segment.offset, bytes), Some { buffer = segment.buffer; offset = segment.offset + bytes; lenght = segment.lenght - bytes })
+      else 
+        let missing = Array.zeroCreate bytes
+        Array.blit segment.buffer.Array segment.offset missing 0 segment.lenght
+        return! read_bytes (bytes - segment.lenght) missing segment.offset
+    | None ->
       let missing = Array.zeroCreate bytes
-      Array.blit data.buffer.Array data.offset missing 0 data.lenght
-      connection.free_buffer data.buffer//or maybe here we could just reuse it
-      let a = connection.get_buffer ()
-      let! bytes_read = connection.read a
-      Array.blit a.Array a.Offset missing data.lenght (bytes - data.lenght)
-      return (ArraySegment missing, Some { buffer = a ; offset = a.Offset + bytes ; lenght = bytes_read - bytes + data.lenght})
-  | None -> 
-    let missing = Array.zeroCreate bytes
-    let a = connection.get_buffer ()
-    let! bytes_read = connection.read a
-    Array.blit a.Array a.Offset missing 0 bytes
-    return (ArraySegment missing, Some { buffer = a ; offset = a.Offset + bytes ; lenght = bytes_read - bytes})
+      return! read_bytes bytes missing 0
   }
 
 /// Parse the cookie data in the string into a dictionary
