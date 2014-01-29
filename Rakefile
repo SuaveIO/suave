@@ -133,8 +133,7 @@ end
 namespace :tests do
   desc 'run a stress test'
   task :stress do
-    # todo: run background server
-    system 'httperf --hog --server=localhost --port=3000 --uri=/ --rate=1000 --num-conns=1000 --num-calls=1000 --burst-length=20 --http-version=1.0'
+    system 'Pong/bin/Release/Pong.exe', clr_command: true
   end
 
   desc 'run the unit-tests'

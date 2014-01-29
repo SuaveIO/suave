@@ -14,6 +14,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "docs", "docs", "{C7760769-4
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Experimental", "Experimental\Experimental.fsproj", "{488FC139-5013-46A2-9982-2C40A6F1F777}"
 EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Pong", "Pong\Pong.fsproj", "{68D30567-3281-41FB-BD69-30FB32196B79}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -36,6 +38,10 @@ Global
 		{488FC139-5013-46A2-9982-2C40A6F1F777}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{488FC139-5013-46A2-9982-2C40A6F1F777}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{488FC139-5013-46A2-9982-2C40A6F1F777}.Release|Any CPU.Build.0 = Release|Any CPU
+		{68D30567-3281-41FB-BD69-30FB32196B79}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{68D30567-3281-41FB-BD69-30FB32196B79}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{68D30567-3281-41FB-BD69-30FB32196B79}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{68D30567-3281-41FB-BD69-30FB32196B79}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
