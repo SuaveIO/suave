@@ -21,7 +21,7 @@ open System.Diagnostics
 
 let execute cmd args =
 
-  let proc = new Process();
+  use proc = new Process();
 
   proc.StartInfo.FileName         <- cmd
   proc.StartInfo.CreateNoWindow   <- true
