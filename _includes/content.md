@@ -146,26 +146,6 @@ Server configuration
 The first argument to `web_server` is a configuration record with the following signature.
 
 {% highlight fsharp %}
-/// Gets the supported protocols, HTTP and HTTPS with a certificate
-type Protocol =
-  /// The HTTP protocol is the core protocol
-  | HTTP
-  /// The HTTP protocol tunneled in a TLS tunnel
-  | HTTPS of X509Certificate
-{% endhighlight %}
-
-{% highlight fsharp %}
-/// A HTTP binding is a protocol is the product of HTTP or HTTP, a DNS or IP binding and a port number
-type HttpBinding =
-  /// The scheme in use
-  { scheme : Protocol
-  /// The host or IP address to bind to. This will be interpreted by the operating system
-  ; ip     : IPAddress
-  /// The port for the binding
-  ; port   : uint16 }
-{% endhighlight %}
-
-{% highlight fsharp %}
 /// The core configuration of suave. See also Suave.Web.default_config which
 /// you can use to bootstrap the configuration:
 /// <code>{ default_config with bindings = [ ... ] }</code>
@@ -185,12 +165,35 @@ type SuaveConfig =
 
   /// A cancellation token for the web server. Signalling this token
   /// means that the web server shuts down
-  ; ct             : CancellationToken }
+  ; ct             : CancellationToken
+
+  /// Buffer size used for socket IO, default value is 8192 (8 Kilobytes)
+  ; buffer_size    : int
+
+  /// Maximun number of accept, receive and send operations the server can handle simultaneously
+  /// default value is 100
+  ; max_ops        : int }
 {% endhighlight %}
 
-  - `bindings`: list of bindings of the form _protocol, ip address, port_
-  - `error_handler`: a handler to deal with runtime errors
-  - `timeout`: maximun number of milliseconds before killing a request
+With `Protocol` and `HttpBinding` defined like follows:
+
+{% highlight fsharp %}
+/// Gets the supported protocols, HTTP and HTTPS with a certificate
+type Protocol =
+  /// The HTTP protocol is the core protocol
+  | HTTP
+  /// The HTTP protocol tunneled in a TLS tunnel
+  | HTTPS of X509Certificate
+
+/// A HTTP binding is a protocol is the product of HTTP or HTTP, a DNS or IP binding and a port number
+type HttpBinding =
+  /// The scheme in use
+  { scheme : Protocol
+  /// The host or IP address to bind to. This will be interpreted by the operating system
+  ; ip     : IPAddress
+  /// The port for the binding
+  ; port   : uint16 }
+{% endhighlight %}
 
 ## Overview
 
