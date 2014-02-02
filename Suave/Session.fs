@@ -16,7 +16,14 @@ let session_support (request : HttpRequest) =
     | None -> Guid.NewGuid().ToString()
 
   request.session_id <- sessionId
-  set_cookie (sprintf "%s=%s" "suave_session_id" sessionId) request |> ignore
+  set_cookie { name = "suave_session_id"
+    ; value = sessionId
+    ; path = Some "/"
+    ; domain = None
+    ; secure = true
+    ; http_only = false
+    ; expires = Some (DateTime.UtcNow.AddMinutes(30.0)) //cookie expires in 30 minutes
+    ; version = None } request |> ignore
   Some request
 
 open System.Collections.Generic

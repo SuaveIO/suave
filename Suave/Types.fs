@@ -7,6 +7,18 @@ open System.Net.Sockets
 open Socket
 open System.Net
 
+/// HTTP cookie
+type HttpCookie =
+  { name      : string
+  ; value     : string
+  ; expires   : DateTime option
+  ; path      : string option
+  ; domain    : string option
+  ; secure    : bool
+  ; http_only : bool
+  ; version   : string option
+  }
+
 /// A holder for headers for the http response
 type HttpResponse() =
   let mutable headers : List<string*string> = new List<string * string>()

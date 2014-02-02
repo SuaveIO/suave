@@ -16,7 +16,7 @@ module Http =
   val set_header : key:string -> value:string -> http_request:HttpRequest -> HttpRequest
 
   /// Sets a cookie with the passed value in the 'cookie' parameter
-  val set_cookie : cookie:string -> (HttpRequest -> HttpRequest)
+  val set_cookie : cookie:HttpCookie -> (HttpRequest -> HttpRequest)
 
 // Suave filters/applicatives follow
 

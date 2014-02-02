@@ -62,7 +62,17 @@ module Http =
     http_request.response.Headers.Add(key, value)
     http_request
 
-  let set_cookie cookie = set_header "Set-Cookie" cookie
+  let cookie_to_string (x : HttpCookie) = 
+    let attributes = new System.Collections.Generic.List<string>()
+    attributes.Add(String.Format("{0}={1}", x.name ,x.value))
+    match x.domain  with | Some n -> attributes.Add(String.Format("Domain={0}", n))  | _ -> ()
+    match x.path    with | Some n -> attributes.Add(String.Format("Path={0}", n))    | _ -> ()
+    match x.expires with | Some n -> attributes.Add(String.Format("Expires={0}", n.ToString("R"))) | _ -> ()
+    if x.http_only then attributes.Add(String.Format("HttpOnly"))
+    if x.secure    then attributes.Add(String.Format("Secure"))
+    String.concat "; " attributes
+
+  let set_cookie (cookie : HttpCookie) = set_header "Set-Cookie" (cookie_to_string cookie)
 
   // filters/applicatives
 
