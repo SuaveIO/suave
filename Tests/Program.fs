@@ -62,7 +62,7 @@ module RequestFactory =
 
   let run_with = run_with_factory web_server_async
 
-  let req_resp (methd : Method) (resource : string) data ctx =
+  let req_resp (methd : Method) (resource : string) data (cookies : Net.CookieContainer option) ctx =
     let to_http_method = function
       | Method.GET -> HttpMethod.Get
       | Method.POST -> HttpMethod.Post
@@ -77,6 +77,7 @@ module RequestFactory =
     let uri_builder = UriBuilder server
     uri_builder.Path <- resource
     use handler = new Net.Http.HttpClientHandler(AllowAutoRedirect = false)
+    match cookies with | Some cnt -> handler.CookieContainer <- cnt | _ -> ()
     use client = new Net.Http.HttpClient(handler)
     let r = new HttpRequestMessage(to_http_method methd, uri_builder.Uri)
     r.Headers.ConnectionClose <- Nullable(true)
@@ -97,12 +98,17 @@ module RequestFactory =
     get.Result
 
   let req methd resource data ctx =
-    let res = req_resp methd resource data ctx
+    let res = req_resp methd resource data None ctx
     res.Content.ReadAsStringAsync().Result
 
   let req_headers methd resource data ctx =
-    let res = req_resp methd resource data ctx
+    let res = req_resp methd resource data None ctx
     res.Content.Headers
+
+  let req_cookies methd resource data ctx =
+    let cookies = new Net.CookieContainer()
+    let res = req_resp methd resource data (Some cookies) ctx
+    cookies
 
 [<Tests>]
 let smoking =
@@ -172,6 +178,26 @@ let posts =
           Assert.Equal("expecting form data to be returned", assertion, run_with' (getFormValue "assertion") |> req POST "/" (Some data))
       ]
 
+[<Tests>]
+let cookies =
+  let run_with' = run_with default_config
+
+  testList "Cookies basic tests"
+    [
+      testCase "cookie data makes round trip" <| fun _ ->
+        Assert.Equal("expecting cookie value"
+        , "42"
+        , (req_cookies GET "/" None
+          (run_with' (set_cookie { name = "mycookie"
+            ; value = "42"
+            ; expires = None
+            ; domain = None
+            ; path = Some "/"
+            ; http_only = false
+            ; secure = false
+            ; version = None} >> succeed >>= OK "test"))).GetCookies(Uri("http://127.0.0.1")).[0].Value)
+    ]
+
 open OpenSSL.X509
 open OpenSSL.Core
 
@@ -202,7 +228,7 @@ let proxy =
 
     testCase "GET /redirect returns 'redirect'" <| fun _ ->
       run_in_context (run_target (url "/secret" >>= redirect "https://sts.example.se")) dispose_context <| fun _ ->
-        let res = proxy to_target |> req_resp GET "/secret" None
+        let res = proxy to_target |> req_resp GET "/secret" None None
         Assert.Equal("should proxy redirect", Net.HttpStatusCode.Found, res.StatusCode)
         Assert.Equal("should give Location-header together with redirect",
           Uri("https://sts.example.se"), res.Headers.Location)
@@ -211,10 +237,10 @@ let proxy =
       run_in_context (run_target (INTERNAL_ERROR "Oh noes")) dispose_context <| fun _ ->
         Assert.Equal("should have correct status code",
           Net.HttpStatusCode.InternalServerError,
-          (proxy to_target |> req_resp GET "/" None).StatusCode)
+          (proxy to_target |> req_resp GET "/" None None).StatusCode)
         Assert.Equal("should have correct content",
           "Oh noes",
-          (proxy to_target |> req_resp GET "/" None).Content.ReadAsStringAsync().Result)
+          (proxy to_target |> req_resp GET "/" None None).Content.ReadAsStringAsync().Result)
 
     testCase "Proxy decides to return directly" <| fun _ ->
       run_in_context (run_target (OK "upstream reply")) dispose_context <| fun _ ->
