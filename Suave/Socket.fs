@@ -110,12 +110,10 @@ let eol_array_segment = new ArraySegment<_>(EOL, 0, 2)
 
 /// Write the string s to the stream asynchronously
 /// as ASCII encoded text
-let inline async_writeln (connection : Connection) (s : string) = async {
+let inline async_writeln (connection : Connection) (s : string) (buff : ArraySegment<byte>) = async {
   if s.Length > 0 then 
-    let buff = connection.get_buffer()
     let c = bytes_to_buffer s buff.Array buff.Offset
     do! connection.write (new ArraySegment<_>(buff.Array, buff.Offset, c))
-    connection.free_buffer buff
   do! connection.write eol_array_segment
 }
 

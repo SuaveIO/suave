@@ -49,7 +49,8 @@ type HttpRequest =
   ; mutable session_id : string
   ; response           : HttpResponse
   ; files              : List<HttpUpload>
-  ; is_secure          : bool  }
+  ; is_secure          : bool
+  ; line_buffer        : ArraySegment<byte>  }
 
 /// Clear the request dictionaries for to reuse the request object instance.
 let internal clear (request : HttpRequest) =

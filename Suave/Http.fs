@@ -25,16 +25,16 @@ module Http =
   let response_f (status_code: int) reason_phrase (f_content : HttpRequest -> Async<unit>) (request : HttpRequest) = async {
     try
       let connection:Connection = request.connection
-      do! async_writeln connection (String.concat " " [ HTTP_VERSION ; status_code.ToString() ; reason_phrase])
-      do! async_writeln connection server_header
-      do! async_writeln connection (String.Concat( [|  "Date: "; DateTime.UtcNow.ToString("R") |]))
+      do! async_writeln connection (String.concat " " [ HTTP_VERSION ; status_code.ToString() ; reason_phrase]) request.line_buffer
+      do! async_writeln connection server_header request.line_buffer
+      do! async_writeln connection (String.Concat( [|  "Date: "; DateTime.UtcNow.ToString("R") |])) request.line_buffer
 
       for (x,y) in request.response.Headers do
         if not (List.exists (fun y -> x.ToLower().Equals(y)) ["server";"date";"content-length"]) then
-          do! async_writeln connection (String.Concat [| x; ": "; y |])
+          do! async_writeln connection (String.Concat [| x; ": "; y |]) request.line_buffer
 
       if not(request.response.Headers.Exists(new Predicate<_>(fun (x,_) -> x.ToLower().Equals("content-type")))) then
-        do! async_writeln connection "Content-Type: text/html"
+        do! async_writeln connection "Content-Type: text/html" request.line_buffer
 
       do! f_content request
 
@@ -48,9 +48,9 @@ module Http =
       fun r -> async {
 
         // http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.13
-        do! async_writeln r.connection (String.Concat [|  "Content-Length: "; content.Length.ToString() |])
+        do! async_writeln r.connection (String.Concat [|  "Content-Length: "; content.Length.ToString() |]) request.line_buffer
 
-        do! async_writeln r.connection ""
+        do! async_writeln r.connection "" request.line_buffer
 
         if content.Length > 0 then
           do! r.connection.write (new ArraySegment<_>(content, 0, content.Length)) })
@@ -236,9 +236,9 @@ module Http =
       use fs = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.Read)
 
       if fs.Length > 0L then
-        do! async_writeln r.connection (sprintf "Content-Length: %d" fs.Length)
+        do! async_writeln r.connection (sprintf "Content-Length: %d" fs.Length) r.line_buffer
 
-      do! async_writeln r.connection ""
+      do! async_writeln r.connection "" r.line_buffer
 
       if fs.Length > 0L then
         do! transfer_x r.connection fs }

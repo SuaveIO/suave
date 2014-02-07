@@ -481,11 +481,9 @@ let request_loop
     | None -> return ()
   }
 
-  let line_buffer = connection.get_buffer()
-
   let rec loop (bytes : BufferSegment option) request = async {
     Log.trace(fun () -> "web:request_loop:loop -> processor")
-    let! result = processor request bytes line_buffer
+    let! result = processor request bytes request.line_buffer
     Log.trace(fun () -> "web:request_loop:loop <- processor")
 
     match result with
@@ -542,7 +540,8 @@ let request_loop
       ; response       = new HttpResponse()
       ; files          = new List<HttpUpload>()
       ; remote_address = connection.ipaddr
-      ; is_secure      = match proto with HTTP -> false | HTTPS _ -> true }
+      ; is_secure      = match proto with HTTP -> false | HTTPS _ -> true
+      ; line_buffer = connection.get_buffer() }
     try
       try
         do! loop None request
@@ -556,7 +555,7 @@ let request_loop
       | ex ->
         Log.tracef(fun fmt -> fmt "web:request_loop - Request failed.\n%A" ex)
     finally
-      connection.free_buffer line_buffer
+      connection.free_buffer request.line_buffer
   }
 
 /// Parallelise the map of 'f' onto all items in the 'input' seq.
