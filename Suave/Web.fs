@@ -575,12 +575,10 @@ let is_local_address (ip : string) =
 /// The default error handler returns a 500 Internal Error in response to
 /// thrown exceptions.
 let default_error_handler (ex : Exception) msg (request : HttpRequest) = async {
-  try
-    Log.logf "web:default_error_handler - %s.\n%A" msg ex
-    if IPAddress.IsLoopback request.remote_address then
-      do! (response 500 "Internal Error" (bytes_utf8 (sprintf "<h1>%s</h1><br/>%A" ex.Message ex)) request)
-    else do! (response 500 "Internal Error" (bytes_utf8 ("Internal Error")) request)
-  with _ -> return ()
+  Log.logf "web:default_error_handler - %s.\n%A" msg ex
+  if IPAddress.IsLoopback request.remote_address then
+    do! (response 500 "Internal Error" (bytes_utf8 (sprintf "<h1>%s</h1><br/>%A" ex.Message ex)) request)
+  else do! (response 500 "Internal Error" (bytes_utf8 ("Internal Error")) request)
 }
 
 /// Starts a new web worker, given the configuration and a web part to serve.
