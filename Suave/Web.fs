@@ -472,20 +472,12 @@ let request_loop
   (web_part_timeout : TimeSpan)
   (error_handler    : ErrorHandler)
   (connection       : Connection) =
-  /// Evaluate the (web part) action as an async value, handling errors with error_handler should one
-  /// occur.
-  let eval_action x r = async {
-    try
-      do! x
-    with
-    | InternalFailure(_) as ex -> raise ex
-    | ex -> do! error_handler ex "web:request_loop - action failed" r
-  }
+
   /// Check if the web part can perform its work on the current request. If it can't
   /// it will return None and the run method will return.
   let run request = async {
     match web_part request with // run the web part
-    | Some x -> do! eval_action x request
+    | Some x -> do! x
     | None -> return ()
   }
 
@@ -505,6 +497,7 @@ let request_loop
       with
         | InternalFailure(_) as ex  -> raise ex
         | :? TimeoutException as ex -> raise ex
+        | :? SocketIssue as ex      -> raise ex
         | ex -> do! error_handler ex "Routing request failed" request
       if connection.is_connected () then
         match request.headers?connection with
