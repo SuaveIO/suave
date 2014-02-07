@@ -102,7 +102,8 @@ type Connection = {
   write  : ArraySegment<byte> -> Async<unit>;
   get_buffer  : unit -> ArraySegment<byte>;
   free_buffer : ArraySegment<byte> -> unit;
-  shutdown : unit -> unit 
+  shutdown : unit -> unit;
+  is_connected: unit -> bool 
   }
 
 let eol_array_segment = new ArraySegment<_>(EOL, 0, 2)

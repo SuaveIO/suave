@@ -506,22 +506,26 @@ let request_loop
         | InternalFailure(_) as ex  -> raise ex
         | :? TimeoutException as ex -> raise ex
         | ex -> do! error_handler ex "Routing request failed" request
-      match request.headers?connection with
-      | Some (x : string) when x.ToLower().Equals("keep-alive") ->
-        clear request
-        Log.tracef(fun fmt -> fmt "web:request_loop:loop 'Connection: keep-alive' recurse (!), rem: %A" rem)
-        return! loop rem request
-      | Some _ ->
-        Log.trace(fun () -> "web:request_loop:loop  'Connection: close', exiting")
-        return ()
-      | None ->
-        if request.http_version.Equals("HTTP/1.1") then
+      if connection.is_connected () then
+        match request.headers?connection with
+        | Some (x : string) when x.ToLower().Equals("keep-alive") ->
           clear request
-          Log.trace(fun () -> "web:request_loop:loop  'Connection: keep-alive' recurse (!)")
+          Log.tracef(fun fmt -> fmt "web:request_loop:loop 'Connection: keep-alive' recurse (!), rem: %A" rem)
           return! loop rem request
-        else
+        | Some _ ->
           Log.trace(fun () -> "web:request_loop:loop  'Connection: close', exiting")
           return ()
+        | None ->
+          if request.http_version.Equals("HTTP/1.1") then
+            clear request
+            Log.trace(fun () -> "web:request_loop:loop  'Connection: keep-alive' recurse (!)")
+            return! loop rem request
+          else
+            Log.trace(fun () -> "web:request_loop:loop  'Connection: close', exiting")
+            return ()
+      else
+        Log.trace(fun () -> "web:request_loop:loop 'is_connected = false', exiting")
+        return ()
     | None ->
       Log.trace(fun () -> "web:request_loop:loop 'result = None', exiting")
       return ()

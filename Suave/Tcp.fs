@@ -87,6 +87,9 @@ let inline receive (socket: Socket) (args : A)  (buf: B) =
 let inline send (socket: Socket) (args : A) (buf: B) =
   async_do socket.SendAsync (set_buffer buf) ignore args
 
+let inline is_good (args : A) = 
+    args.SocketError = SocketError.Success
+
 /// Start a new TCP server with a specific IP, Port and with a serve_client worker
 /// returning an async workflow whose result can be awaited (for when the tcp server has started
 /// listening to its address/port combination), and an asynchronous workflow that
@@ -159,7 +162,8 @@ let tcp_ip_server (source_ip : IPAddress, source_port : uint16, buffer_size : in
           write = send socket write_args;
           get_buffer = bufferManager.PopBuffer;
           free_buffer = bufferManager.FreeBuffer;
-          shutdown = fun () -> if socket <> null && socket.Connected then socket.Shutdown(SocketShutdown.Both)
+          shutdown = fun () -> if socket <> null && socket.Connected then socket.Shutdown(SocketShutdown.Both);
+          is_connected = fun _ -> is_good read_args && is_good write_args
           }
         Async.Start (job accept_args read_args write_args client, token)
 
