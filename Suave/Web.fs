@@ -104,14 +104,20 @@ let read_till_EOL (connection : Connection) (select) (preread : BufferSegment op
     }
   and read_data count (ahead :BufferSegment option)  = async {
     let buff = connection.get_buffer ()
-    let! b = connection.read buff 
-    if b > 0 then 
-      match ahead with 
-      | Some data ->
-        return! scan_data_x count data {buffer = buff; offset = buff.Offset ; lenght = b}
-      | None ->
-        return! scan_data count {buffer = buff; offset = buff.Offset ; lenght = b}
-    else return failwith "client closed"
+    try
+      let! b = connection.read buff 
+      if b > 0 then 
+        match ahead with 
+        | Some data ->
+          return! scan_data_x count data {buffer = buff; offset = buff.Offset ; lenght = b}
+        | None ->
+          return! scan_data count {buffer = buff; offset = buff.Offset ; lenght = b}
+      else 
+        connection.free_buffer buff
+        return failwith "client closed"
+    with ex ->
+      connection.free_buffer buff
+      return raise ex
     }
   match preread with 
   | Some data ->
@@ -481,6 +487,18 @@ let request_loop
     | None -> return ()
   }
 
+  let free (s : BufferSegment option) = 
+    match s with 
+    | None -> ()
+    | Some x -> connection.free_buffer x.buffer
+
+  let exit rem msg = async {
+    free rem
+    Log.trace(fun () -> msg)
+    return ()
+    }
+   
+
   let rec loop (bytes : BufferSegment option) request = async {
     Log.trace(fun () -> "web:request_loop:loop -> processor")
     let! result = processor request bytes request.line_buffer
@@ -493,9 +511,9 @@ let request_loop
         do! Async.WithTimeout (web_part_timeout, run request)
         Log.trace(fun () -> "web:request_loop:loop <- unblock")
       with
-        | InternalFailure(_) as ex  -> raise ex
-        | :? TimeoutException as ex -> raise ex
-        | :? SocketIssue as ex      -> raise ex
+        | InternalFailure(_) as ex  -> free rem; raise ex
+        | :? TimeoutException as ex -> free rem; raise ex
+        | :? SocketIssue as ex      -> free rem; raise ex
         | ex -> do! error_handler ex "Routing request failed" request
       if connection.is_connected () then
         match request.headers?connection with
@@ -504,6 +522,7 @@ let request_loop
           Log.tracef(fun fmt -> fmt "web:request_loop:loop 'Connection: keep-alive' recurse (!), rem: %A" rem)
           return! loop rem request
         | Some _ ->
+          free rem;
           Log.trace(fun () -> "web:request_loop:loop  'Connection: close', exiting")
           return ()
         | None ->
@@ -512,9 +531,11 @@ let request_loop
             Log.trace(fun () -> "web:request_loop:loop  'Connection: keep-alive' recurse (!)")
             return! loop rem request
           else
+            free rem;
             Log.trace(fun () -> "web:request_loop:loop  'Connection: close', exiting")
             return ()
       else
+        free rem;
         Log.trace(fun () -> "web:request_loop:loop 'is_connected = false', exiting")
         return ()
     | None ->
