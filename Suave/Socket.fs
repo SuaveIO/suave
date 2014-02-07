@@ -73,11 +73,13 @@ let inline async_do (op : A -> bool) (prepare : A -> unit) (select: A -> 'T) (ar
   Async.FromContinuations <| fun (ok, error, _) ->
     prepare args
     let k (args : A) =
-      match args.SocketError with
-      | System.Net.Sockets.SocketError.Success ->
-        let result = select args
-        ok result
-      | e -> error (SocketIssue e)
+      try
+        match args.SocketError with
+        | System.Net.Sockets.SocketError.Success ->
+          let result = select args
+          ok result
+        | e -> error (SocketIssue e)
+      with ex -> error ex
     (args.UserToken :?> AsyncUserToken).Continuation <- k
     if not (op args) then
       k args
