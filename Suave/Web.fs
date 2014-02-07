@@ -502,7 +502,7 @@ let request_loop
         Log.trace(fun () -> "web:request_loop:loop <- unblock")
       with
         | InternalFailure(_) as ex  -> raise ex
-        | :? TimeoutException as ex -> do! error_handler ex "script timeout" request
+        | :? TimeoutException as ex -> raise ex
         | ex -> do! error_handler ex "Routing request failed" request
       match request.headers?connection with
       | Some (x : string) when x.ToLower().Equals("keep-alive") ->
