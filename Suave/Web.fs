@@ -113,7 +113,6 @@ let read_till_EOL (connection : Connection) (select) (preread : BufferSegment op
         | None ->
           return! scan_data count {buffer = buff; offset = buff.Offset ; lenght = b}
       else 
-        connection.free_buffer buff
         return failwith "client closed"
     with ex ->
       connection.free_buffer buff
