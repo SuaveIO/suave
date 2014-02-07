@@ -369,69 +369,71 @@ let parse_multipart (connection : Connection) boundary (request : HttpRequest) (
 
 /// Process the request, reading as it goes from the incoming 'stream', yielding a HttpRequest
 /// when done
-let process_request proxy_mode (request : HttpRequest) (bytes : BufferSegment option) line_buffer = async {
+let process_request proxy_mode (request : HttpRequest) (bytes : BufferSegment option) line_buffer : Async<(HttpRequest * BufferSegment option) option> = async {
 
   let connection = request.connection
-
-  Log.tracef(fun fmt -> fmt "web:process_request proxy:%b bytes:%A -> read_line" proxy_mode bytes)
-  let! (first_line : string), rem = read_line connection bytes line_buffer
-  Log.tracef(fun fmt -> fmt "web:process_request proxy:%b <- read_line" proxy_mode)
-
-  if first_line.Length = 0 then
-    return None, rem
-  else
-    let meth, url, _, raw_query, http_version = parse_url first_line request.query
-
-    request.url      <- url
-    request.``method``   <- meth
-    request.raw_query <- raw_query
-    request.http_version <- http_version
-
-    let headers = request.headers
-    let! rem = read_headers connection rem headers line_buffer
-
-    // won't continue parsing if on proxyMode with the intention of forwarding the stream as it is
-    if proxy_mode then return Some request, rem
+  try
+    Log.tracef(fun fmt -> fmt "web:process_request proxy:%b bytes:%A -> read_line" proxy_mode bytes)
+    let! (first_line : string), rem = read_line connection bytes line_buffer
+    Log.tracef(fun fmt -> fmt "web:process_request proxy:%b <- read_line" proxy_mode)
+    
+    if first_line.Length = 0 then
+      return None
     else
-      request.headers
-      |> Seq.filter (fun x -> x.Key.Equals("cookie"))
-      |> Seq.iter (fun x ->
-                    let cookie = parse_cookie x.Value
-                    request.cookies.Add (fst(cookie.[0]),cookie))
+      let meth, url, _, raw_query, http_version = parse_url first_line request.query
 
-      // TODO: can't assume only POST can have form data, PUT can also be done
-      // from forms
-      if meth.Equals("POST") then
+      request.url      <- url
+      request.``method``   <- meth
+      request.raw_query <- raw_query
+      request.http_version <- http_version
 
-        let content_encoding =
-          match headers.TryGetValue("content-type") with
-          | true, encoding -> Some encoding
-          | false, _ -> None
+      let headers = request.headers
+      let! rem = read_headers connection rem headers line_buffer
 
-        let content_length = Convert.ToInt32(headers.["content-length"])
+      // won't continue parsing if on proxyMode with the intention of forwarding the stream as it is
+      if proxy_mode then return Some (request, rem)
+      else
+        request.headers
+        |> Seq.filter (fun x -> x.Key.Equals("cookie"))
+        |> Seq.iter (fun x ->
+                      let cookie = parse_cookie x.Value
+                      request.cookies.Add (fst(cookie.[0]),cookie))
 
-        match content_encoding with
-        | Some ce when ce.StartsWith("application/x-www-form-urlencoded") ->
-          let! (rawdata : ArraySegment<_>), rem = read_post_data connection content_length rem
-          let str = to_string rawdata.Array rawdata.Offset rawdata.Count
-          let _  = parse_data str request.form
-          // TODO: can't we instead of copying, do an LMAX and use the buffer as a circular
-          // queue?
-          let raw_form = Array.zeroCreate rawdata.Count
-          Array.blit rawdata.Array rawdata.Offset raw_form 0 rawdata.Count
-          request.raw_form <- raw_form
-          return Some request, rem
-        | Some ce when ce.StartsWith("multipart/form-data") ->
-          let boundary = "--" + ce.Substring(ce.IndexOf('=')+1).TrimStart()
-          let! rem = parse_multipart connection boundary request rem line_buffer
-          return Some request, rem
-        | Some _ | None -> 
-          let! (rawdata : ArraySegment<_>),_ = read_post_data connection content_length rem
-          let raw_form = Array.zeroCreate rawdata.Count
-          Array.blit rawdata.Array rawdata.Offset raw_form 0 rawdata.Count
-          request.raw_form <- raw_form
-          return Some request, rem
-      else return Some request, rem
+        // TODO: can't assume only POST can have form data, PUT can also be done
+        // from forms
+        if meth.Equals("POST") then
+
+          let content_encoding =
+            match headers.TryGetValue("content-type") with
+            | true, encoding -> Some encoding
+            | false, _ -> None
+
+          let content_length = Convert.ToInt32(headers.["content-length"])
+
+          match content_encoding with
+          | Some ce when ce.StartsWith("application/x-www-form-urlencoded") ->
+            let! (rawdata : ArraySegment<_>), rem = read_post_data connection content_length rem
+            let str = to_string rawdata.Array rawdata.Offset rawdata.Count
+            let _  = parse_data str request.form
+            // TODO: can't we instead of copying, do an LMAX and use the buffer as a circular
+            // queue?
+            let raw_form = Array.zeroCreate rawdata.Count
+            Array.blit rawdata.Array rawdata.Offset raw_form 0 rawdata.Count
+            request.raw_form <- raw_form
+            return Some (request, rem)
+          | Some ce when ce.StartsWith("multipart/form-data") ->
+            let boundary = "--" + ce.Substring(ce.IndexOf('=')+1).TrimStart()
+            let! rem = parse_multipart connection boundary request rem line_buffer
+            return Some (request, rem)
+          | Some _ | None -> 
+            let! (rawdata : ArraySegment<_>),_ = read_post_data connection content_length rem
+            let raw_form = Array.zeroCreate rawdata.Count
+            Array.blit rawdata.Array rawdata.Offset raw_form 0 rawdata.Count
+            request.raw_form <- raw_form
+            return Some (request, rem)
+        else return Some (request, rem)
+  with ex -> 
+    return None
 }
 
 open System.Net
@@ -455,7 +457,7 @@ let inline load_connection proto (connection : Connection) = async{
 open System.Net.Sockets
 
 /// A HttpProcessor takes a HttpRequest instance, returning asynchronously a HttpRequest that has been parsed
-type HttpProcessor = HttpRequest -> BufferSegment option -> ArraySegment<byte>-> Async<HttpRequest option * (BufferSegment option)>
+type HttpProcessor = HttpRequest -> BufferSegment option -> ArraySegment<byte>-> Async<(HttpRequest * (BufferSegment option)) option>
 type RequestResult = Done
 
 /// The request loop initialises a request with a processor to handle the
@@ -491,11 +493,11 @@ let request_loop
 
   let rec loop (bytes : BufferSegment option) request = async {
     Log.trace(fun () -> "web:request_loop:loop -> processor")
-    let! result, rem = processor request bytes line_buffer
+    let! result = processor request bytes line_buffer
     Log.trace(fun () -> "web:request_loop:loop <- processor")
 
     match result with
-    | Some (request : HttpRequest) ->
+    | Some (request : HttpRequest, rem) ->
       try
         Log.trace(fun () -> "web:request_loop:loop -> unblock")
         do! Async.WithTimeout (web_part_timeout, run request)
