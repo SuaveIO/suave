@@ -22,8 +22,11 @@ type Microsoft.FSharp.Control.Async with
     let callback (success, error, cancellation) =
       let (success, error, cancellation) = invoke_once (success, error, cancellation)
       let fetchResult = async {
-        let! result = computation
-        success result }
+        try
+          let! result = computation
+          success result
+        with ex -> 
+          error ex }
       let timeoutExpired = async {
         do! Async.Sleep (int timeout.TotalMilliseconds)
         let ex = new TimeoutException ("Timeout expired") :> Exception
