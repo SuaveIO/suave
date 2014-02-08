@@ -53,7 +53,7 @@ module Http =
      | _ -> false
 
   let transform (content : byte []) (request : HttpRequest) : Async<byte []> =
-    async{
+    async {
       if accepts_gzip request then 
         do! async_writeln request.connection "Content-Encoding: gzip" request.line_buffer
         return! gzip_encode content
