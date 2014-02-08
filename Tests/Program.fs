@@ -9,6 +9,7 @@ module Resp =
 open System
 open System.Threading
 open System.Net.Http
+open System.Net.Http.Headers
 
 open Suave.Types
 open Suave.Web
@@ -62,7 +63,7 @@ module RequestFactory =
 
   let run_with = run_with_factory web_server_async
 
-  let req_resp (methd : Method) (resource : string) data (cookies : Net.CookieContainer option) ctx =
+  let req_resp (methd : Method) (resource : string) data (cookies : Net.CookieContainer option) (compressed : bool) ctx =
     let to_http_method = function
       | Method.GET -> HttpMethod.Get
       | Method.POST -> HttpMethod.Post
@@ -77,6 +78,7 @@ module RequestFactory =
     let uri_builder = UriBuilder server
     uri_builder.Path <- resource
     use handler = new Net.Http.HttpClientHandler(AllowAutoRedirect = false)
+    if compressed then handler.AutomaticDecompression <- Net.DecompressionMethods.GZip
     match cookies with | Some cnt -> handler.CookieContainer <- cnt | _ -> ()
     use client = new Net.Http.HttpClient(handler)
     let r = new HttpRequestMessage(to_http_method methd, uri_builder.Uri)
@@ -98,16 +100,20 @@ module RequestFactory =
     get.Result
 
   let req methd resource data ctx =
-    let res = req_resp methd resource data None ctx
+    let res = req_resp methd resource data None false ctx
+    res.Content.ReadAsStringAsync().Result
+
+  let req_gzip methd resource data ctx =
+    let res = req_resp methd resource data None true ctx
     res.Content.ReadAsStringAsync().Result
 
   let req_headers methd resource data ctx =
-    let res = req_resp methd resource data None ctx
+    let res = req_resp methd resource data None false ctx
     res.Content.Headers
 
   let req_cookies methd resource data ctx =
     let cookies = new Net.CookieContainer()
-    let res = req_resp methd resource data (Some cookies) ctx
+    let res = req_resp methd resource data (Some cookies) false ctx
     cookies
 
 [<Tests>]
@@ -118,12 +124,19 @@ let smoking =
 
 [<Tests>]
 let utilities =
+
+  let gzip_decode_sync s = Async.RunSynchronously (gzip_decode s)
+  let gzip_encode_sync s = Async.RunSynchronously (gzip_encode s)
+
   testList "trying some utility functions" [
     testCase "loopback ipv4" <| fun _ ->
       Assert.Equal("127.0.0.1 is a local address", true, is_local_address "127.0.0.1")
 
     testCase "loopback ipv6" <| fun _ ->
       Assert.Equal("::0 is a local address", true, is_local_address "::1")
+
+    testProperty "gzip_encode/gzip_decode" <| fun str ->
+      Assert.Equal("compress >> decompress == identity", str, Text.Encoding.Unicode.GetString(gzip_decode_sync(gzip_encode_sync(Text.Encoding.Unicode.GetBytes(str)))))
   ]
 
 open RequestFactory
@@ -217,6 +230,16 @@ let cookies =
             .GetCookies(Uri("http://127.0.0.1")).[0].HttpOnly)
     ]
 
+[<Tests>]
+let compression =
+  let run_with' = run_with default_config
+
+  testList "getting basic gzip responses"
+    [
+      testCase "200 OK returns 'Havana'" <| fun _ ->
+        Assert.Equal("expecting 'Havana'", "Havana", run_with' (OK "Havana") |> req_gzip GET "/" None)
+    ]
+
 open OpenSSL.X509
 open OpenSSL.Core
 
@@ -247,7 +270,7 @@ let proxy =
 
     testCase "GET /redirect returns 'redirect'" <| fun _ ->
       run_in_context (run_target (url "/secret" >>= redirect "https://sts.example.se")) dispose_context <| fun _ ->
-        let res = proxy to_target |> req_resp GET "/secret" None None
+        let res = proxy to_target |> req_resp GET "/secret" None None false
         Assert.Equal("should proxy redirect", Net.HttpStatusCode.Found, res.StatusCode)
         Assert.Equal("should give Location-header together with redirect",
           Uri("https://sts.example.se"), res.Headers.Location)
@@ -256,10 +279,10 @@ let proxy =
       run_in_context (run_target (INTERNAL_ERROR "Oh noes")) dispose_context <| fun _ ->
         Assert.Equal("should have correct status code",
           Net.HttpStatusCode.InternalServerError,
-          (proxy to_target |> req_resp GET "/" None None).StatusCode)
+          (proxy to_target |> req_resp GET "/" None None false).StatusCode)
         Assert.Equal("should have correct content",
           "Oh noes",
-          (proxy to_target |> req_resp GET "/" None None).Content.ReadAsStringAsync().Result)
+          (proxy to_target |> req_resp GET "/" None None false).Content.ReadAsStringAsync().Result)
 
     testCase "Proxy decides to return directly" <| fun _ ->
       run_in_context (run_target (OK "upstream reply")) dispose_context <| fun _ ->

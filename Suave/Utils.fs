@@ -214,3 +214,24 @@ let kmp_x_x p =
       if !j = 0 then incr i else j := next.[!j]
     done;
     if !j >= m then Some(!i - m) else None
+
+open System.IO.Compression
+
+let gzip_encode (bytes : byte [])=
+  async{
+    use memory =  new MemoryStream() 
+    use gzip = new GZipStream(memory, CompressionMode.Compress)
+    do! gzip.WriteAsync(bytes, 0, bytes.Length)
+    gzip.Close()
+    let result = memory.ToArray()
+    return result
+  }
+
+let gzip_decode (bytes : byte []) =
+  async{
+    use compressed =  new MemoryStream(bytes) 
+    use gzip = new GZipStream(compressed, CompressionMode.Decompress)
+    use result = new MemoryStream()
+    do! gzip.CopyToAsync(result)
+    return result.ToArray()
+  }

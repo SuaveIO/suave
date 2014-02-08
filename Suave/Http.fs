@@ -43,9 +43,29 @@ module Http =
     | :? IOException as ex  -> raise (InternalFailure "Failure while writing to client stream")
     }
 
-  let response status_code reason_phrase (content : byte []) (request : HttpRequest) =
+  let accepts_gzip request =
+     let encondings = request.headers?``accept-encoding``
+     match encondings with
+     | Some (value : string) -> 
+       value.Split ',' 
+       |> Array.map (fun s -> s.Trim())
+       |> Array.exists (fun s -> s.Equals("gzip"))
+     | _ -> false
+
+  let transform (content : byte []) (request : HttpRequest) : Async<byte []> =
+    async{
+      if accepts_gzip request then 
+        do! async_writeln request.connection "Content-Encoding: gzip" request.line_buffer
+        return! gzip_encode content
+      else 
+        return content
+    }
+
+  let response status_code reason_phrase (cnt : byte []) (request : HttpRequest) =
     response_f status_code reason_phrase (
       fun r -> async {
+
+        let! (content : byte []) = transform cnt request
 
         // http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.13
         do! async_writeln r.connection (String.Concat [|  "Content-Length: "; content.Length.ToString() |]) request.line_buffer
