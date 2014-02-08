@@ -125,9 +125,6 @@ let smoking =
 [<Tests>]
 let utilities =
 
-  let gzip_decode_sync s = Async.RunSynchronously (gzip_decode s)
-  let gzip_encode_sync s = Async.RunSynchronously (gzip_encode s)
-
   testList "trying some utility functions" [
     testCase "loopback ipv4" <| fun _ ->
       Assert.Equal("127.0.0.1 is a local address", true, is_local_address "127.0.0.1")
@@ -136,7 +133,7 @@ let utilities =
       Assert.Equal("::0 is a local address", true, is_local_address "::1")
 
     testProperty "gzip_encode/gzip_decode" <| fun str ->
-      Assert.Equal("compress >> decompress == identity", str, Text.Encoding.Unicode.GetString(gzip_decode_sync(gzip_encode_sync(Text.Encoding.Unicode.GetBytes(str)))))
+      Assert.Equal("compress >> decompress == identity", str, Text.Encoding.Unicode.GetString(gzip_decode(gzip_encode(Text.Encoding.Unicode.GetBytes(str)))))
   ]
 
 open RequestFactory

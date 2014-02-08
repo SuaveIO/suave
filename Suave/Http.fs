@@ -56,7 +56,7 @@ module Http =
     async {
       if accepts_gzip request then 
         do! async_writeln request.connection "Content-Encoding: gzip" request.line_buffer
-        return! gzip_encode content
+        return gzip_encode content
       else 
         return content
     }
