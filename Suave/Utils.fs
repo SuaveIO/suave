@@ -218,7 +218,7 @@ let kmp_x_x p =
 open System.IO.Compression
 
 let gzip_encode (bytes : byte [])=
-  async{
+  async {
     use memory =  new MemoryStream() 
     use gzip = new GZipStream(memory, CompressionMode.Compress)
     do! gzip.WriteAsync(bytes, 0, bytes.Length)
@@ -228,7 +228,7 @@ let gzip_encode (bytes : byte [])=
   }
 
 let gzip_decode (bytes : byte []) =
-  async{
+  async {
     use compressed =  new MemoryStream(bytes) 
     use gzip = new GZipStream(compressed, CompressionMode.Decompress)
     use result = new MemoryStream()
