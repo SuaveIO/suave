@@ -218,15 +218,29 @@ let kmp_x_x p =
 open System.IO.Compression
 
 let gzip_encode (bytes : byte [])=
-    use memory =  new MemoryStream() 
-    use gzip = new GZipStream(memory, CompressionMode.Compress)
-    do gzip.Write(bytes, 0, bytes.Length)
-    gzip.Close()
-    memory.ToArray()
+  use memory =  new MemoryStream() 
+  use gzip = new GZipStream(memory, CompressionMode.Compress)
+  do gzip.Write(bytes, 0, bytes.Length)
+  gzip.Close()
+  memory.ToArray()
 
 let gzip_decode (bytes : byte []) =
-    use compressed =  new MemoryStream(bytes) 
-    use gzip = new GZipStream(compressed, CompressionMode.Decompress)
-    use result = new MemoryStream()
-    gzip.CopyTo(result)
-    result.ToArray()
+  use compressed =  new MemoryStream(bytes) 
+  use gzip = new GZipStream(compressed, CompressionMode.Decompress)
+  use result = new MemoryStream()
+  gzip.CopyTo(result)
+  result.ToArray()
+
+let deflate_encode (bytes : byte [])=
+  use memory =  new MemoryStream() 
+  use gzip = new DeflateStream(memory, CompressionMode.Compress)
+  do gzip.Write(bytes, 0, bytes.Length)
+  gzip.Close()
+  memory.ToArray()
+
+let deflate_decode (bytes : byte []) =
+  use compressed =  new MemoryStream(bytes) 
+  use gzip = new DeflateStream(compressed, CompressionMode.Decompress)
+  use result = new MemoryStream()
+  gzip.CopyTo(result)
+  result.ToArray()

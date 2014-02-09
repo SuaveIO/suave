@@ -63,7 +63,7 @@ module RequestFactory =
 
   let run_with = run_with_factory web_server_async
 
-  let req_resp (methd : Method) (resource : string) data (cookies : Net.CookieContainer option) (compressed : bool) ctx =
+  let req_resp (methd : Method) (resource : string) data (cookies : Net.CookieContainer option) (decompressionMethod : Net.DecompressionMethods) ctx =
     let to_http_method = function
       | Method.GET -> HttpMethod.Get
       | Method.POST -> HttpMethod.Post
@@ -78,7 +78,7 @@ module RequestFactory =
     let uri_builder = UriBuilder server
     uri_builder.Path <- resource
     use handler = new Net.Http.HttpClientHandler(AllowAutoRedirect = false)
-    if compressed then handler.AutomaticDecompression <- Net.DecompressionMethods.GZip
+    handler.AutomaticDecompression <- decompressionMethod
     match cookies with | Some cnt -> handler.CookieContainer <- cnt | _ -> ()
     use client = new Net.Http.HttpClient(handler)
     let r = new HttpRequestMessage(to_http_method methd, uri_builder.Uri)
@@ -100,20 +100,24 @@ module RequestFactory =
     get.Result
 
   let req methd resource data ctx =
-    let res = req_resp methd resource data None false ctx
+    let res = req_resp methd resource data None Net.DecompressionMethods.None ctx
     res.Content.ReadAsStringAsync().Result
 
   let req_gzip methd resource data ctx =
-    let res = req_resp methd resource data None true ctx
+    let res = req_resp methd resource data None Net.DecompressionMethods.GZip ctx
+    res.Content.ReadAsStringAsync().Result
+
+  let req_deflate methd resource data ctx =
+    let res = req_resp methd resource data None Net.DecompressionMethods.Deflate ctx
     res.Content.ReadAsStringAsync().Result
 
   let req_headers methd resource data ctx =
-    let res = req_resp methd resource data None false ctx
+    let res = req_resp methd resource data None Net.DecompressionMethods.None ctx
     res.Content.Headers
 
   let req_cookies methd resource data ctx =
     let cookies = new Net.CookieContainer()
-    let res = req_resp methd resource data (Some cookies) false ctx
+    let res = req_resp methd resource data (Some cookies) Net.DecompressionMethods.None ctx
     cookies
 
 [<Tests>]
@@ -231,10 +235,13 @@ let cookies =
 let compression =
   let run_with' = run_with default_config
 
-  testList "getting basic gzip responses"
+  testList "getting basic gzip/deflate responses"
     [
-      testCase "200 OK returns 'Havana'" <| fun _ ->
+      testCase "200 OK returns 'Havana' with gzip " <| fun _ ->
         Assert.Equal("expecting 'Havana'", "Havana", run_with' (OK "Havana") |> req_gzip GET "/" None)
+
+      testCase "200 OK returns 'Havana' with deflate " <| fun _ ->
+        Assert.Equal("expecting 'Havana'", "Havana", run_with' (OK "Havana") |> req_deflate GET "/" None)
     ]
 
 open OpenSSL.X509
@@ -267,7 +274,7 @@ let proxy =
 
     testCase "GET /redirect returns 'redirect'" <| fun _ ->
       run_in_context (run_target (url "/secret" >>= redirect "https://sts.example.se")) dispose_context <| fun _ ->
-        let res = proxy to_target |> req_resp GET "/secret" None None false
+        let res = proxy to_target |> req_resp GET "/secret" None None Net.DecompressionMethods.None
         Assert.Equal("should proxy redirect", Net.HttpStatusCode.Found, res.StatusCode)
         Assert.Equal("should give Location-header together with redirect",
           Uri("https://sts.example.se"), res.Headers.Location)
@@ -276,10 +283,10 @@ let proxy =
       run_in_context (run_target (INTERNAL_ERROR "Oh noes")) dispose_context <| fun _ ->
         Assert.Equal("should have correct status code",
           Net.HttpStatusCode.InternalServerError,
-          (proxy to_target |> req_resp GET "/" None None false).StatusCode)
+          (proxy to_target |> req_resp GET "/" None None Net.DecompressionMethods.None).StatusCode)
         Assert.Equal("should have correct content",
           "Oh noes",
-          (proxy to_target |> req_resp GET "/" None None false).Content.ReadAsStringAsync().Result)
+          (proxy to_target |> req_resp GET "/" None None Net.DecompressionMethods.None).Content.ReadAsStringAsync().Result)
 
     testCase "Proxy decides to return directly" <| fun _ ->
       run_in_context (run_target (OK "upstream reply")) dispose_context <| fun _ ->

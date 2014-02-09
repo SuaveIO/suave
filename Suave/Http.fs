@@ -43,21 +43,29 @@ module Http =
     | :? IOException as ex  -> raise (InternalFailure "Failure while writing to client stream")
     }
 
-  let accepts_gzip request =
+  let load_encoder s =
+    match s with
+    | "gzip"    -> Some (s, gzip_encode)
+    | "deflate" -> Some (s, deflate_encode)
+    | _         -> None
+
+  let get_encoder request =
      let encondings = request.headers?``accept-encoding``
      match encondings with
      | Some (value : string) -> 
        value.Split ',' 
        |> Array.map (fun s -> s.Trim())
-       |> Array.exists (fun s -> s.Equals("gzip"))
-     | _ -> false
+       |> Array.tryPick (fun s -> load_encoder s)
+     | _ -> None
 
   let transform (content : byte []) (request : HttpRequest) : Async<byte []> =
     async {
-      if accepts_gzip request then 
-        do! async_writeln request.connection "Content-Encoding: gzip" request.line_buffer
-        return gzip_encode content
-      else 
+      let enconding = get_encoder request
+      match enconding with
+      | Some (n,encoder) ->
+        do! async_writeln request.connection (String.Concat [| "Content-Encoding: "; n |]) request.line_buffer
+        return encoder content
+      | None ->
         return content
     }
 
