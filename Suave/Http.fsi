@@ -1218,16 +1218,6 @@ module Http =
   val dir : req:HttpRequest -> WebResult
 
   /// <summary><para>
-  /// At the location where this function is applied, close the outbound stream
-  /// for further writing.
-  /// </para><para>
-  /// </para><para>
-  /// </para></summary>
-  /// <remarks>
-  /// </remarks>
-  val close_pipe : p:HttpRequest option -> unit
-
-  /// <summary><para>
   /// Parse the authentication type, the user name and the password from
   /// the token string
   /// </para><para>

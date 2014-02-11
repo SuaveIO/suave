@@ -329,12 +329,6 @@ module Http =
       ok (bytes (result.ToString())) req
     else fail
 
-  let close_pipe (p : HttpRequest option) =
-    match p with
-    | Some(x) ->
-      x.connection.shutdown()
-    | None -> ()
-
   let parse_authentication_token (token : string) =
     let parts = token.Split (' ')
     let enc = parts.[1].Trim()
