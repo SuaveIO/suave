@@ -31,14 +31,31 @@ open Socket
 /// A TCP Worker is a thing that takes a TCP client and returns an asynchronous workflow thereof
 type TcpWorker<'a> = Connection -> Async<'a>
 
-/// Close the TCP client by closing its stream and then closing the client itself
-let inline close (d : Connection) = try d.shutdown() with _ -> ()
+/// Disconnect a socket for reuse
+let close_socket (s : Socket) =
+  try
+    if s <> null then
+      if s.Connected || s.IsBound then 
+        s.Disconnect(true)
+  with _ -> ()
+
+/// Shoots down a socket for good
+let shutdown_socket (s : Socket) =
+  try
+    if s <> null then
+      try 
+        s.Shutdown(SocketShutdown.Both)
+      with _ -> ()
+      s.Close()
+  with _ -> ()
 
 /// Stop the TCP listener server
 let stop_tcp reason (socket : Socket) =
-  Log.tracef(fun fmt -> fmt "tcp:stop_tcp - %s - stopping server .. " reason)
-  socket.Close()
-  Log.trace(fun () -> "tcp:stop_tcp - stopped")
+  try
+    Log.tracef(fun fmt -> fmt "tcp:stop_tcp - %s - stopping server .. " reason)
+    socket.Close()
+    Log.trace(fun () -> "tcp:stop_tcp - stopped")
+  with ex -> Log.tracef(fun fmt -> fmt "tcp:stop_tcp - failure while stopping. %A" ex)
 
 let create_pools max_ops buffer_size =
 
@@ -102,7 +119,6 @@ let tcp_ip_server (source_ip : IPAddress, source_port : uint16, buffer_size : in
     ; source_ip        = source_ip
     ; source_port      = source_port }
   let accepting_connections = new AsyncResultCell<StartedData>()
-  //log "tcp:tcp_ip_server - starting listener: %O" start_data
 
   let (a,b,c,bufferManager) = create_pools mac_concurrent_ops buffer_size
 
@@ -115,39 +131,34 @@ let tcp_ip_server (source_ip : IPAddress, source_port : uint16, buffer_size : in
   //echo 5 > /proc/sys/net/ipv4/tcp_fin_timeout
   //echo 1 > /proc/sys/net/ipv4/tcp_tw_recycle
   //custom kernel with shorter TCP_TIMEWAIT_LEN in include/net/tcp.h
-  let inline job (accept_args:A) (socket : Socket) = async {
-    
-   try
+  let inline job (accept_args:A) = async {
+    let socket = accept_args.AcceptSocket
+    try
+      let read_args = b.Pop()
+      let write_args = c.Pop()
+      let client = { 
+        ipaddr =  (socket.RemoteEndPoint :?> IPEndPoint).Address;
+        read  = receive socket read_args;
+        write = send socket write_args;
+        get_buffer = bufferManager.PopBuffer;
+        free_buffer = bufferManager.FreeBuffer;
+        is_connected = fun _ -> is_good read_args && is_good write_args
+      }
+      use! oo = Async.OnCancel (fun () -> Log.trace(fun () -> "tcp:tcp_ip_server - disconnected client (async cancel)")
+                                          shutdown_socket socket)
       try
-        let read_args = b.Pop()
-        let write_args = c.Pop()
-        let client = { 
-          ipaddr =  (socket.RemoteEndPoint :?> IPEndPoint).Address;
-          read  = receive socket read_args;
-          write = send socket write_args;
-          get_buffer = bufferManager.PopBuffer;
-          free_buffer = bufferManager.FreeBuffer;
-          shutdown = fun () -> if socket <> null && socket.Connected then socket.Shutdown(SocketShutdown.Both);
-          is_connected = fun _ -> is_good read_args && is_good write_args
-          }
-        use! oo = Async.OnCancel (fun () -> Log.trace(fun () -> "tcp:tcp_ip_server - disconnected client (async cancel)")
-                                            close client)
         do! serve_client client
-        close client
+      finally
+        shutdown_socket socket
+        accept_args.AcceptSocket <- null
+        a.Push(accept_args)
         b.Push(read_args)
         c.Push(write_args)
-      with 
-        | :? System.IO.EndOfStreamException ->
-          Log.trace(fun () -> "tcp:tcp_ip_server - disconnected client (end of stream)")
-          return ()
-        | x ->
-          Log.tracef(fun fmt -> fmt "tcp:tcp_ip_server - tcp request processing failed.\n%A" x)
-          return ()
-    finally
-      if accept_args.AcceptSocket <> null then
-          if(accept_args.AcceptSocket.Connected || accept_args.AcceptSocket.IsBound) 
-          then accept_args.AcceptSocket.Disconnect(true)
-      a.Push(accept_args)
+    with 
+    | :? System.IO.EndOfStreamException ->
+      Log.trace(fun () -> "tcp:tcp_ip_server - disconnected client (end of stream)")
+    | x ->
+     Log.tracef(fun fmt -> fmt "tcp:tcp_ip_server - tcp request processing failed.\n%A" x)
   }
 
   // start a new async worker for each accepted TCP client
@@ -165,8 +176,8 @@ let tcp_ip_server (source_ip : IPAddress, source_port : uint16, buffer_size : in
       while not (token.IsCancellationRequested) do
         try
           let accept_args = a.Pop()
-          let! (socket : Socket) = accept listenSocket accept_args
-          Async.Start (job accept_args socket, token)
+          let! _ = accept listenSocket accept_args
+          Async.Start (job accept_args, token)
         with ex -> Log.tracef(fun fmt -> fmt "tcp:tcp_ip_server - failed to accept a client.\n%A" ex)
       return ()
     with x ->
