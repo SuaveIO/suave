@@ -1182,7 +1182,7 @@ module Http =
   /// </para></summary>
   /// <remarks>
   /// </remarks>
-  val local_file : fileName:string -> string
+  val local_file : fileName:string -> rootDir:string -> string
 
   /// <summary><para>
   /// 'browse' the file given as the filename, by sending it to the browser with a

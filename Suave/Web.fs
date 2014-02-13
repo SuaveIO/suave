@@ -464,6 +464,13 @@ open System.Net.Sockets
 /// A HttpProcessor takes a HttpRequest instance, returning asynchronously a HttpRequest that has been parsed
 type HttpProcessor = HttpRequest -> BufferSegment option -> ArraySegment<byte>-> Async<(HttpRequest * (BufferSegment option)) option>
 type RequestResult = Done
+type HttpRuntime =
+  { protocol : Protocol
+  ; web_part_timeout : TimeSpan
+  ; error_handler : ErrorHandler
+  ; mime_types_map   : MimeTypesMap
+  ; home_directory   : string
+  ; compression_folder   : string }
 
 /// The request loop initialises a request with a processor to handle the
 /// incoming stream and possibly pass the request to the web parts, a protocol,
@@ -472,13 +479,16 @@ type RequestResult = Done
 /// communication -- getting the initial request stream.
 let request_loop
   (processor        : HttpProcessor)
-  (proto            : Protocol)
+  (runtime          : HttpRuntime)
   (web_part         : WebPart)
-  (web_part_timeout : TimeSpan)
-  (error_handler    : ErrorHandler)
-  (mime_types_map   : MimeTypesMap)
   (connection       : Connection) =
 
+  let proto         = runtime.protocol
+  let web_part_timeout = runtime.web_part_timeout
+  let error_handler    = runtime.error_handler
+  let mime_types_map   = runtime.mime_types_map
+  let home_directory   = runtime.home_directory
+  let compression_folder = runtime.compression_folder
   /// Check if the web part can perform its work on the current request. If it can't
   /// it will return None and the run method will return.
   let run request = async {
@@ -563,7 +573,9 @@ let request_loop
       ; remote_address = connection.ipaddr
       ; is_secure      = match proto with HTTP -> false | HTTPS _ -> true
       ; line_buffer    = connection.get_buffer()
-      ; mime_types     = mime_types_map }
+      ; mime_types     = mime_types_map
+      ; home_directory = home_directory
+      ; compression_folder = compression_folder }
     try
       try
         do! loop None request
@@ -602,9 +614,26 @@ let default_error_handler (ex : Exception) msg (request : HttpRequest) = async {
   else do! (response 500 "Internal Error" (bytes_utf8 ("Internal Error")) request)
 }
 
+let mk_runtime_config proto timeout error_handler mime_types home_directory compression_folder =
+  { protocol       = proto
+  ; web_part_timeout = timeout
+  ; error_handler  = error_handler
+  ; mime_types_map = mime_types
+  ; home_directory = home_directory
+  ; compression_folder = compression_folder }
+
 /// Starts a new web worker, given the configuration and a web part to serve.
-let web_worker (proto, ip, port, error_handler, timeout, buffer_size, max_ops, mime_types) (webpart : WebPart) =
-  tcp_ip_server (ip, port, buffer_size, max_ops) (request_loop (process_request false) proto webpart timeout error_handler mime_types)
+let web_worker (proto, ip, port, error_handler, timeout, buffer_size, max_ops, mime_types, home_directory, compression_folder) (webpart : WebPart) =
+  let runtime_config = 
+    mk_runtime_config proto timeout error_handler mime_types home_directory compression_folder
+  tcp_ip_server (ip, port, buffer_size, max_ops) (request_loop (process_request false) runtime_config webpart)
+
+open System.IO
+
+let resolve_directory home_directory =
+  match home_directory with
+  | None   -> Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location)
+  | Some s -> s
 
 /// Returns the webserver as a tuple of 1) an async computation the yields unit when
 /// the web server is ready to serve quests, and 2) an async computation that yields
@@ -614,10 +643,12 @@ let web_worker (proto, ip, port, error_handler, timeout, buffer_size, max_ops, m
 /// Have a look at the example and the unit tests for more documentation.
 /// In other words: don't block on 'listening' unless you have started the server.
 let web_server_async (config : SuaveConfig) (webpart : WebPart) =
+  let home_dir = resolve_directory config.home_folder
+  let compression_folder = Path.Combine(resolve_directory config.compressed_files_folder, "_temporary_compressed_files")
   let all =
     config.bindings
     |> List.map (fun { scheme = proto; ip = ip; port = port } ->
-        web_worker (proto, ip, port, config.error_handler, config.web_part_timeout, config.buffer_size, config.max_ops, config.mime_types_map) webpart)
+        web_worker (proto, ip, port, config.error_handler, config.web_part_timeout, config.buffer_size, config.max_ops, config.mime_types_map, home_dir, compression_folder) webpart)
   let listening = all |> Seq.map fst |> Async.Parallel |> Async.Ignore
   let server    = all |> Seq.map snd |> Async.Parallel |> Async.Ignore
   listening, server
@@ -630,7 +661,7 @@ let web_server (config : SuaveConfig) (webpart : WebPart) =
 /// The default configuration binds on IPv4, 127.0.0.1:8083 with a regular 500 Internal Error handler,
 /// with a timeout of one minute for computations to run. Waiting for 2 seconds for the socket bind
 /// to succeed.
-let default_config =
+let default_config : SuaveConfig =
   { bindings         = [ { scheme = HTTP; ip = IPAddress.Loopback; port = 8083us } ]
   ; error_handler    = default_error_handler
   ; web_part_timeout = TimeSpan.FromMinutes(1.)
@@ -638,4 +669,6 @@ let default_config =
   ; ct               = Async.DefaultCancellationToken
   ; buffer_size      = 8192 // 8 Kilobytes
   ; max_ops          = 100
-  ; mime_types_map   = default_mime_types_map }
+  ; mime_types_map   = default_mime_types_map
+  ; home_folder      = None
+  ; compressed_files_folder = None }

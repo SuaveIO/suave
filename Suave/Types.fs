@@ -58,7 +58,11 @@ type HttpRequest =
   ; files              : List<HttpUpload>
   ; is_secure          : bool
   ; line_buffer        : ArraySegment<byte>
-  ; mime_types         : MimeTypesMap }
+  ; mime_types         : MimeTypesMap
+  // TODO: agregate and separate some of these properties into a HttpRuntime record 
+  // and pack it side by side HttpRequest in a HttpContext record.
+  ; home_directory     : string
+  ; compression_folder : string }
 
 /// Clear the request dictionaries for to reuse the request object instance.
 let internal clear (request : HttpRequest) =
@@ -154,7 +158,13 @@ type SuaveConfig =
   ; max_ops        : int
 
   /// MIME types
-  ; mime_types_map : MimeTypesMap }
+  ; mime_types_map : MimeTypesMap
+
+  /// Home or root directory
+  ; home_folder    : string option
+
+  /// Folder for temporary compressed files
+  ; compressed_files_folder : string option }
 
 /// An exception, raised e.g. if writing to the stream fails
 exception InternalFailure of string

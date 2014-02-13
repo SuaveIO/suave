@@ -292,10 +292,6 @@ module Http =
 
   let compressed_files_map = new ConcurrentDictionary<string,string>()
 
-  let compression_folder = 
-    let current_path = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location)
-    Path.Combine (current_path, "_temporary_compressed_files")
-
   let compress n path (fs : FileStream) = async {
     use new_fs = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.Write)
     if n = "gzip" then
@@ -311,7 +307,7 @@ module Http =
     new_fs.Close()
   }
 
-  let transform_x (filename : string) compression r : Async<FileStream> = async {
+  let transform_x (filename : string) compression compression_folder r : Async<FileStream> = async {
     let fs = new FileStream(filename, FileMode.Open, FileAccess.Read, FileShare.Read)
     if compression && fs.Length > int64(MIN_BYTES_TO_COMPRESS) && fs.Length < int64(MAX_BYTES_TO_COMPRESS) then
       let enconding = parse_encoder r 
@@ -334,7 +330,7 @@ module Http =
   let send_file filename (compression : bool) r =
     let write_file file (r : HttpRequest) = async {
 
-      use! fs = transform_x file compression r
+      use! fs = transform_x file compression r.compression_folder r
 
       do! async_writeln r.connection (sprintf "Content-Length: %d" (fs : FileStream).Length) r.line_buffer
       do! async_writeln r.connection "" r.line_buffer
@@ -370,13 +366,18 @@ module Http =
       else
         None
 
-  let local_file (fileName : string) = 
-    let current_path = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location)
-    Path.Combine(current_path, fileName.TrimStart(Path.DirectorySeparatorChar))
+  let local_file (fileName : string) (root_path : string) =
+    let calculated_path = Path.Combine(root_path, fileName.TrimStart(Path.DirectorySeparatorChar))
+    if calculated_path = Path.GetFullPath(calculated_path) then
+      if calculated_path.StartsWith root_path then
+        calculated_path
+      else failwith "File canonalization issue."
+    else failwith "File canonalization issue."
 
-  let browse_file filename = file (local_file filename)
+  let browse_file filename = 
+    fun (r : HttpRequest) -> file (local_file filename r.home_directory) r
 
-  let browse : WebPart = warbler (fun req -> file (local_file req.url))
+  let browse : WebPart = warbler (fun r -> file (local_file r.url r.home_directory))
 
   type WebResult = Option<Async<unit>>
 
@@ -384,7 +385,7 @@ module Http =
 
     let url = req.url
 
-    let dirname = local_file url
+    let dirname = local_file url req.home_directory
     let result = new StringBuilder()
 
     let filesize  (x : FileSystemInfo) =

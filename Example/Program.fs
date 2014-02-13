@@ -92,4 +92,6 @@ choose [
       ; ct               = Async.DefaultCancellationToken
       ; buffer_size      = 2048
       ; max_ops          = 100
-      ; mime_types_map   = default_mime_types_map }
+      ; mime_types_map   = default_mime_types_map
+      ; home_folder      = None
+      ; compressed_files_folder = None }
