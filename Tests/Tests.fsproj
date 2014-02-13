@@ -52,19 +52,19 @@
       <Link>libeay32.dll</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Include="test-text-file.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Reference Include="FsCheck">
       <HintPath>..\packages\FsCheck.0.9.1.0\lib\net40-Client\FsCheck.dll</HintPath>
-      <Private>True</Private>
     </Reference>
     <Reference Include="Fuchu">
       <HintPath>..\packages\Fuchu.0.3.0.1\lib\net40-client\Fuchu.dll</HintPath>
-      <Private>True</Private>
     </Reference>
     <Reference Include="Fuchu.FsCheck">
       <HintPath>..\packages\Fuchu.FsCheck.0.3.0.1\lib\net40-client\Fuchu.FsCheck.dll</HintPath>
-      <Private>True</Private>
     </Reference>
     <Reference Include="ManagedOpenSsl">
       <HintPath>..\libs\ManagedOpenSsl.dll</HintPath>
@@ -73,20 +73,17 @@
     <Reference Include="FSharp.Core, Version=4.3.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a" />
     <Reference Include="nunit.framework">
       <HintPath>..\packages\NUnit.2.6.3\lib\nunit.framework.dll</HintPath>
-      <Private>True</Private>
     </Reference>
     <Reference Include="PerfUtil">
       <HintPath>..\packages\PerfUtil.0.1.4\lib\net45\PerfUtil.dll</HintPath>
-      <Private>True</Private>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Numerics" />
     <Reference Include="System.Net.Http" />
     <ProjectReference Include="..\Suave\suave.fsproj">
-      <Name>Suave</Name>
-      <Project>{3dc9193e-bd0c-4486-9c58-56b630c36623}</Project>
-      <Private>True</Private>
+      <Name>suave</Name>
+      <Project>{3DC9193E-BD0C-4486-9C58-56B630C36623}</Project>
     </ProjectReference>
   </ItemGroup>
 </Project>
