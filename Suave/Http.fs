@@ -352,26 +352,24 @@ module Http =
         let mimes = r.mime_types (file_info.Extension)
         match mimes with
         | Some value ->
-
           let send_it _ = 
             set_header "Last-Modified" (file_info.LastAccessTimeUtc.ToString("R"))
             >> set_mime_type value.name 
             >> send_file filename value.compression
 
-          
           let modified_since = (r.headers ? ``if-modified-since`` )
           match modified_since with
           | Some v -> let date = DateTime.Parse v
                       if file_info.LastWriteTime > date then send_it () r
                       else NOT_MODIFIED r
           | None   -> send_it () r
-
         | None -> None
       else
         None
 
-  // BUG: Concatenating strings here is a security risk; we need to make sure we don't serve unintended files
-  let local_file fileName = sprintf "%s%s" Environment.CurrentDirectory fileName
+  let local_file (fileName : string) = 
+    let current_path = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location)
+    Path.Combine(current_path, fileName.TrimStart(Path.DirectorySeparatorChar))
 
   let browse_file filename = file (local_file filename)
 
