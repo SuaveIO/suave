@@ -250,7 +250,8 @@ open System.Text
 let compression =
   let run_with' = run_with default_config
 
-  let test_file_size = (new FileInfo("test-text-file.txt")).Length
+  let current_path = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location)
+  let test_file_size = (new FileInfo(Path.Combine(current_path,"test-text-file.txt"))).Length
 
   testList "getting basic gzip/deflate responses"
     [
