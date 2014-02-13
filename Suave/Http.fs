@@ -74,8 +74,9 @@ module Http =
   
   // You should only gzip files above a certain size threshold; we recommend a minimum range
   // between 150 and 1000 bytes. Gzipping files below 150 bytes can actually make them larger
-  let MIN_BYTES_TO_COMPRESS =   500
-  let MAX_BYTES_TO_COMPRESS = 10000
+
+  let MIN_BYTES_TO_COMPRESS =       500 // 500 bytes
+  let MAX_BYTES_TO_COMPRESS = 524288000 // 500 megabytes
 
   let transform (content : byte []) (request : HttpRequest) : Async<byte []> =
     async {
@@ -291,7 +292,9 @@ module Http =
 
   let compressed_files_map = new ConcurrentDictionary<string,string>()
 
-  let compression_folder = "_temporary_compressed_files"
+  let compression_folder = 
+    let current_path = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location)
+    Path.Combine (current_path, "_temporary_compressed_files")
 
   let compress n path (fs : FileStream) = async {
     use new_fs = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.Write)
