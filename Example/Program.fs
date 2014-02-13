@@ -43,6 +43,11 @@ let timeout r =
     do! Async.Sleep 1500
   } |> succeed
 
+// Adds a new mime type to the default map
+let mime_types x =
+  default_mime_types_map 
+    >=> (function | ".avi" -> mk_mime_type "video/avi" false | _ -> None)
+
 choose [
   Console.OpenStandardOutput() |> log >>= never ;
 
@@ -85,5 +90,6 @@ choose [
       ; web_part_timeout = TimeSpan.FromMilliseconds 1000.
       ; listen_timeout   = TimeSpan.FromMilliseconds 2000.
       ; ct               = Async.DefaultCancellationToken
-      ; buffer_size = 2048
-      ; max_ops = 100 }
+      ; buffer_size      = 2048
+      ; max_ops          = 100
+      ; mime_types_map   = default_mime_types_map }
