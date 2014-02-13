@@ -150,6 +150,11 @@ let utilities =
 
     testProperty "gzip_encode/gzip_decode" <| fun str ->
       Assert.Equal("compress >> decompress == identity", str, Text.Encoding.Unicode.GetString(gzip_decode(gzip_encode(Text.Encoding.Unicode.GetBytes(str)))))
+
+    testCase "`local_file` does not suffer from canonicalization attacks" <| fun _ ->
+      Assert.Raise("'../../passwd' is not a valid path"
+      , typeof<AssertException>
+      , fun _ -> local_file "../../passwd" |> ignore )
   ]
 
 open RequestFactory
