@@ -103,6 +103,10 @@ module RequestFactory =
     let res = req_resp methd resource data None Net.DecompressionMethods.None ctx
     res.Content.ReadAsStringAsync().Result
 
+  let req_bytes methd resource data ctx =
+    let res = req_resp methd resource data None Net.DecompressionMethods.None ctx
+    res.Content.ReadAsByteArrayAsync().Result
+
   let req_gzip methd resource data ctx =
     let res = req_resp methd resource data None Net.DecompressionMethods.GZip ctx
     res.Content.ReadAsStringAsync().Result
@@ -110,6 +114,14 @@ module RequestFactory =
   let req_deflate methd resource data ctx =
     let res = req_resp methd resource data None Net.DecompressionMethods.Deflate ctx
     res.Content.ReadAsStringAsync().Result
+
+  let req_gzip_bytes methd resource data ctx =
+    let res = req_resp methd resource data None Net.DecompressionMethods.GZip ctx
+    res.Content.ReadAsByteArrayAsync().Result
+
+  let req_deflate_bytes methd resource data ctx =
+    let res = req_resp methd resource data None Net.DecompressionMethods.Deflate ctx
+    res.Content.ReadAsByteArrayAsync().Result
 
   let req_headers methd resource data ctx =
     let res = req_resp methd resource data None Net.DecompressionMethods.None ctx
@@ -231,9 +243,14 @@ let cookies =
             .GetCookies(Uri("http://127.0.0.1")).[0].HttpOnly)
     ]
 
+open System.IO
+open System.Text
+
 [<Tests>]
 let compression =
   let run_with' = run_with default_config
+
+  let test_file_size = (new FileInfo("test-text-file.txt")).Length
 
   testList "getting basic gzip/deflate responses"
     [
@@ -242,6 +259,21 @@ let compression =
 
       testCase "200 OK returns 'Havana' with deflate " <| fun _ ->
         Assert.Equal("expecting 'Havana'", "Havana", run_with' (OK "Havana") |> req_deflate GET "/" None)
+
+      testCase "verifiying we get the same size uncompressed" <| fun _ ->
+        Assert.Equal("lenght should match"
+        , test_file_size
+        , (run_with' (file "test-text-file.txt") |> req_bytes GET "/" None).Length |> int64)
+
+      testCase "gzip static file" <| fun _ ->
+        Assert.Equal("lenght should match"
+        , test_file_size
+        , (run_with' (file "test-text-file.txt") |> req_gzip_bytes GET "/" None).Length |> int64 )
+
+      testCase "deflate static file" <| fun _ ->
+        Assert.Equal("lenght should match"
+        , test_file_size
+        , (run_with' (file "test-text-file.txt") |> req_deflate_bytes GET "/" None).Length |> int64 )
     ]
 
 open OpenSSL.X509
