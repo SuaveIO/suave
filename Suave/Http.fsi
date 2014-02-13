@@ -1129,6 +1129,11 @@ module Http =
   /// </remarks>
   val redirect : url:string -> (HttpRequest -> Async<unit> option)
 
+  /// <summary>
+  /// Creates a MIME type record
+  /// </summary>
+  val mk_mime_type : string -> bool -> MimeType option
+
   /// <summary><para>
   /// Map a file ending to a mime-type
   /// </para><para>
@@ -1136,7 +1141,7 @@ module Http =
   /// </para></summary>
   /// <remarks>
   /// </remarks>
-  val mime_type : _arg1:string -> string
+  val default_mime_types_map : _arg1:string -> MimeType option
 
   /// <summary><para>
   /// Set the Content-Type header to the mime type given
@@ -1154,7 +1159,7 @@ module Http =
   /// </para></summary>
   /// <remarks>
   /// </remarks>
-  val send_file : filename:string -> r:HttpRequest -> Async<unit> option
+  val send_file : filename:string -> compression:bool -> r:HttpRequest -> Async<unit> option
 
   /// <summary><para>
   /// Send the file by the filename given. Will search relative to the current directory for

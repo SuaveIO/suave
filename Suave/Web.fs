@@ -476,6 +476,7 @@ let request_loop
   (web_part         : WebPart)
   (web_part_timeout : TimeSpan)
   (error_handler    : ErrorHandler)
+  (mime_types_map   : MimeTypesMap)
   (connection       : Connection) =
 
   /// Check if the web part can perform its work on the current request. If it can't
@@ -561,7 +562,8 @@ let request_loop
       ; files          = new List<HttpUpload>()
       ; remote_address = connection.ipaddr
       ; is_secure      = match proto with HTTP -> false | HTTPS _ -> true
-      ; line_buffer = connection.get_buffer() }
+      ; line_buffer    = connection.get_buffer()
+      ; mime_types     = mime_types_map }
     try
       try
         do! loop None request
@@ -601,8 +603,8 @@ let default_error_handler (ex : Exception) msg (request : HttpRequest) = async {
 }
 
 /// Starts a new web worker, given the configuration and a web part to serve.
-let web_worker (proto, ip, port, error_handler, timeout, buffer_size, max_ops) (webpart : WebPart) =
-  tcp_ip_server (ip, port, buffer_size, max_ops) (request_loop (process_request false) proto webpart timeout error_handler)
+let web_worker (proto, ip, port, error_handler, timeout, buffer_size, max_ops, mime_types) (webpart : WebPart) =
+  tcp_ip_server (ip, port, buffer_size, max_ops) (request_loop (process_request false) proto webpart timeout error_handler mime_types)
 
 /// Returns the webserver as a tuple of 1) an async computation the yields unit when
 /// the web server is ready to serve quests, and 2) an async computation that yields
@@ -615,7 +617,7 @@ let web_server_async (config : SuaveConfig) (webpart : WebPart) =
   let all =
     config.bindings
     |> List.map (fun { scheme = proto; ip = ip; port = port } ->
-        web_worker (proto, ip, port, config.error_handler, config.web_part_timeout, config.buffer_size, config.max_ops) webpart)
+        web_worker (proto, ip, port, config.error_handler, config.web_part_timeout, config.buffer_size, config.max_ops, config.mime_types_map) webpart)
   let listening = all |> Seq.map fst |> Async.Parallel |> Async.Ignore
   let server    = all |> Seq.map snd |> Async.Parallel |> Async.Ignore
   listening, server
@@ -635,4 +637,5 @@ let default_config =
   ; listen_timeout   = TimeSpan.FromSeconds(2.)
   ; ct               = Async.DefaultCancellationToken
   ; buffer_size      = 8192 // 8 Kilobytes
-  ; max_ops          = 100 }
+  ; max_ops          = 100
+  ; mime_types_map   = default_mime_types_map }

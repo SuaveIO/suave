@@ -82,7 +82,7 @@ let proxy_server_async config resolver =
   let all =
     config.bindings
     |> List.map (fun { scheme = proto; ip = ip; port = port } ->
-        tcp_ip_server (ip, port, config.buffer_size, config.max_ops) (request_loop (process_request true) proto (warbler (fun http -> proxy resolver http)) config.web_part_timeout config.error_handler))
+        tcp_ip_server (ip, port, config.buffer_size, config.max_ops) (request_loop (process_request true) proto (warbler (fun http -> proxy resolver http)) config.web_part_timeout config.error_handler config.mime_types_map))
   let listening = all |> Seq.map fst |> Async.Parallel |> Async.Ignore
   let server    = all |> Seq.map snd |> Async.Parallel |> Async.Ignore
   listening, server

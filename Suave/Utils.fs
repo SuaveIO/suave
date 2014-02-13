@@ -25,6 +25,12 @@ let delay f = f()
 /// to 'b', if 'a' yields a value.
 let inline (>>=) a b = fun x -> Option.bind b (a x)
 
+/// Left-to-right Kleisli composition of monads.
+let (>=>) a b = fun x -> 
+  match a x with
+  | None   -> b x
+  | r      -> r
+
 /// Entry-point for composing the applicative routes of the http application,
 /// by iterating the options, applying the context, arg, to the predicate
 /// from the list of options, until there's a match/a Some(x) which can be

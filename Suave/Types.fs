@@ -18,6 +18,13 @@ type HttpCookie =
   ; http_only : bool
   ; version   : string option
   }
+ 
+// A file's mime type and if compression is enabled or not
+type MimeType = 
+  { name         : string
+  ; compression  : bool }
+
+type MimeTypesMap = string -> MimeType option
 
 /// A holder for headers for the http response
 type HttpResponse() =
@@ -50,7 +57,8 @@ type HttpRequest =
   ; response           : HttpResponse
   ; files              : List<HttpUpload>
   ; is_secure          : bool
-  ; line_buffer        : ArraySegment<byte>  }
+  ; line_buffer        : ArraySegment<byte>
+  ; mime_types         : MimeTypesMap }
 
 /// Clear the request dictionaries for to reuse the request object instance.
 let internal clear (request : HttpRequest) =
@@ -143,7 +151,13 @@ type SuaveConfig =
   ; buffer_size    : int
 
   /// max number of concurrent socket operations
-  ; max_ops        : int }
+  ; max_ops        : int
+
+  /// MIME types
+  ; mime_types_map : MimeTypesMap }
 
 /// An exception, raised e.g. if writing to the stream fails
 exception InternalFailure of string
+
+// Supported HTTP compression encondings
+type ContentEncoding = GZip | Deflate | Identity

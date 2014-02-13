@@ -58,14 +58,36 @@ module Http =
        |> Array.tryPick (fun s -> load_encoder s)
      | _ -> None
 
+  let parse_encoder request =
+    let encondings = request.headers?``accept-encoding``
+    match encondings with
+    | Some (value : string) -> 
+      value.Split ','
+      |> Array.map (fun s -> s.Trim())
+      |> Array.tryPick 
+        (fun s -> 
+          match s with
+          | "gzip"    -> Some (s)
+          | "deflate" -> Some (s)
+          | _         -> None)
+    | _ -> None
+  
+  // You should only gzip files above a certain size threshold; we recommend a minimum range
+  // between 150 and 1000 bytes. Gzipping files below 150 bytes can actually make them larger
+  let MIN_BYTES_TO_COMPRESS =   500
+  let MAX_BYTES_TO_COMPRESS = 10000
+
   let transform (content : byte []) (request : HttpRequest) : Async<byte []> =
     async {
-      let enconding = get_encoder request
-      match enconding with
-      | Some (n,encoder) ->
-        do! async_writeln request.connection (String.Concat [| "Content-Encoding: "; n |]) request.line_buffer
-        return encoder content
-      | None ->
+      if content.Length > MIN_BYTES_TO_COMPRESS && content.Length < MAX_BYTES_TO_COMPRESS then
+        let enconding = get_encoder request 
+        match enconding with
+        | Some (n,encoder) ->
+          do! async_writeln request.connection (String.Concat [| "Content-Encoding: "; n |]) request.line_buffer
+          return encoder content
+        | None ->
+          return content
+      else
         return content
     }
 
@@ -242,30 +264,76 @@ module Http =
 
   let INTERNAL_ERROR a = internal_error (bytes_utf8 a)
 
-  let mime_type = function
-    | ".bmp" -> "image/bmp"
-    | ".css" -> "text/css"
-    | ".gif" -> "image/gif"
-    | ".png" -> "image/png"
-    | ".ico" -> "image/x-icon"
+  let mk_mime_type a b = 
+    { name = a
+    ; compression  = b } |> Some
+
+  let default_mime_types_map = function
+    | ".bmp" -> mk_mime_type "image/bmp" false
+    | ".css" -> mk_mime_type "text/css" true
+    | ".gif" -> mk_mime_type "image/gif" false
+    | ".png" -> mk_mime_type "image/png" false
+    | ".ico" -> mk_mime_type "image/x-icon" false
     | ".htm"
-    | ".html" -> "text/html";
+    | ".html" -> mk_mime_type "text/html" true
     | ".jpe"
     | ".jpeg"
-    | ".jpg" -> "image/jpeg"
-    | ".js"  -> "application/x-javascript"
-    | ".exe" -> "application/exe"
-    | _ -> "application/octet-stream"
+    | ".jpg" -> mk_mime_type "image/jpeg" false
+    | ".js"  -> mk_mime_type "application/x-javascript" true
+    | ".exe" -> mk_mime_type "application/exe" false
+    | ".txt" -> mk_mime_type "text/plain" true
+    | _      -> None
 
   let set_mime_type t = set_header "Content-Type" t
 
-  let send_file filename r =
+  open System.IO.Compression
+  open System.Collections.Concurrent
+
+  let compressed_files_map = new ConcurrentDictionary<string,string>()
+
+  let compression_folder = "_temporary_compressed_files"
+
+  let compress n path (fs : FileStream) = async {
+    use new_fs = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.Write)
+    if n = "gzip" then
+      use gzip = new GZipStream(new_fs, CompressionMode.Compress)
+      do! fs.CopyToAsync gzip
+      gzip.Close()
+    elif n = "deflate" then
+      use deflate = new DeflateStream(new_fs, CompressionMode.Compress)
+      do! fs.CopyToAsync deflate
+      deflate.Close()
+    else
+      return failwith "invalid case."
+    new_fs.Close()
+  }
+
+  let transform_x (filename : string) compression r : Async<FileStream> = async {
+    let fs = new FileStream(filename, FileMode.Open, FileAccess.Read, FileShare.Read)
+    if compression && fs.Length > int64(MIN_BYTES_TO_COMPRESS) && fs.Length < int64(MAX_BYTES_TO_COMPRESS) then
+      let enconding = parse_encoder r 
+      match enconding with
+      | Some (n) ->
+        do! async_writeln r.connection (String.Concat [| "Content-Encoding: "; n |]) r.line_buffer
+        if not (compressed_files_map.ContainsKey filename) then
+          let temp_file_name = Path.GetRandomFileName()
+          if not (Directory.Exists compression_folder) then Directory.CreateDirectory compression_folder |> ignore
+          let new_path = Path.Combine(compression_folder,temp_file_name)
+          do! compress n new_path fs
+          compressed_files_map.TryAdd(filename,new_path) |> ignore
+        return new FileStream(compressed_files_map.[filename] ,FileMode.Open, FileAccess.Read, FileShare.Read)
+      | None ->
+        return fs
+    else
+      return fs
+   }
+
+  let send_file filename (compression : bool) r =
     let write_file file (r : HttpRequest) = async {
-      use fs = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.Read)
 
-      if fs.Length > 0L then
-        do! async_writeln r.connection (sprintf "Content-Length: %d" fs.Length) r.line_buffer
+      use! fs = transform_x file compression r
 
+      do! async_writeln r.connection (sprintf "Content-Length: %d" (fs : FileStream).Length) r.line_buffer
       do! async_writeln r.connection "" r.line_buffer
 
       if fs.Length > 0L then
@@ -273,28 +341,36 @@ module Http =
 
     async { do! response_f 200 "OK" (write_file filename) r } |> succeed
 
-  let CACHE_CONTROL_MAX_AGE = 600
+  // If a response includes both an Expires header and a max-age directive,
+  // the max-age directive overrides the Expires header, even if the Expires header is more restrictive 
+  // 'Cache-Control' and 'Expires' headers should be left up to the user
 
   let file filename =
-    if File.Exists filename then
-      let file_info = new FileInfo(filename)
-      let send_it _ = 
-        let mimes = mime_type (file_info.Extension)
-        set_header "Cache-Control" (sprintf "max-age=%d" CACHE_CONTROL_MAX_AGE)
-        >> set_header "Last-Modified" (file_info.LastAccessTimeUtc.ToString("R")) 
-        >> set_header "Expires" (DateTime.UtcNow.AddSeconds(float(CACHE_CONTROL_MAX_AGE)).ToString("R")) 
-        >> set_mime_type mimes 
-        >> send_file (filename)
-      warbler ( fun (r:HttpRequest) ->
-        let modified_since = (r.headers ? ``if-modified-since`` )
-        match modified_since with
-        | Some v -> let date = DateTime.Parse v
-                    if file_info.LastWriteTime > date then send_it ()
-                    else NOT_MODIFIED
-        | None   -> send_it ())
-    else
-      never
+    fun (r : HttpRequest) ->
+      if File.Exists filename then
+        let file_info = new FileInfo(filename)
+        let mimes = r.mime_types (file_info.Extension)
+        match mimes with
+        | Some value ->
 
+          let send_it _ = 
+            set_header "Last-Modified" (file_info.LastAccessTimeUtc.ToString("R"))
+            >> set_mime_type value.name 
+            >> send_file filename value.compression
+
+          
+          let modified_since = (r.headers ? ``if-modified-since`` )
+          match modified_since with
+          | Some v -> let date = DateTime.Parse v
+                      if file_info.LastWriteTime > date then send_it () r
+                      else NOT_MODIFIED r
+          | None   -> send_it () r
+
+        | None -> None
+      else
+        None
+
+  // BUG: Concatenating strings here is a security risk; we need to make sure we don't serve unintended files
   let local_file fileName = sprintf "%s%s" Environment.CurrentDirectory fileName
 
   let browse_file filename = file (local_file filename)
