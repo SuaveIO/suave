@@ -105,9 +105,9 @@ open Types
 /// binding the 'user' elements to values from the 'data' bindings. If the processing
 /// is successful, return the data as UTF-8 string in the response body; otherwise
 /// write the exception as a string to a 500 Internal Error response.
-let process_template (data : Map<string,Binder>) (http_request : HttpRequest) =
+let process_template (data : Map<string,Binder>) ({ request = http_request; runtime = runtime; connection = _} as ctx : HttpContext) =
   try
-    let xmlReader = new XmlTextReader(local_file http_request.url http_request.home_directory)
+    let xmlReader = new XmlTextReader(local_file http_request.url runtime.home_directory)
     xmlReader.Namespaces <- false
 
     let transform = parser xmlReader (Xml [])
@@ -117,6 +117,6 @@ let process_template (data : Map<string,Binder>) (http_request : HttpRequest) =
     let str = new StringWriter(sb)
     xml_to_string1 xml str
     let output = sb.ToString()
-    ok (bytes_utf8 output) http_request
+    ok (bytes_utf8 output) ctx
   with
-  | x -> INTERNAL_ERROR (x.ToString()) http_request
+  | x -> INTERNAL_ERROR (x.ToString()) ctx
