@@ -132,6 +132,8 @@ module RequestFactory =
     let res = req_resp methd resource data (Some cookies) Net.DecompressionMethods.None ctx
     cookies
 
+let current_path = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location)
+
 [<Tests>]
 let smoking =
   testList "smoking hot" [
@@ -151,10 +153,19 @@ let utilities =
     testProperty "gzip_encode/gzip_decode" <| fun str ->
       Assert.Equal("compress >> decompress == identity", str, Text.Encoding.Unicode.GetString(gzip_decode(gzip_encode(Text.Encoding.Unicode.GetBytes(str)))))
 
-    testCase "`local_file` does not suffer from canonicalization attacks" <| fun _ ->
-      Assert.Raise("'../../passwd' is not a valid path"
-      , typeof<AssertException>
-      , fun _ -> local_file "../../passwd" |> ignore )
+  ]
+
+[<Tests>]
+let ``canonicalization attacks`` =
+
+  testList "canonicalization attacks" [
+
+    testCase "should throw" <| fun _ ->
+      Assert.Raise("'../../passwd' is not a valid path", typeof<Exception>, fun _ -> local_file "../../passwd" current_path |> ignore)
+
+    testCase "should throw" <| fun _ ->
+      Assert.Raise("'..\..\passwd' is not a valid path", typeof<Exception>, fun _ -> local_file "..\..\passwd" current_path |> ignore)
+
   ]
 
 open RequestFactory
@@ -251,11 +262,10 @@ let cookies =
 open System.IO
 open System.Text
 
-[<Tests>]
+//[<Tests>]
 let compression =
   let run_with' = run_with default_config
 
-  let current_path = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location)
   let test_file_size = (new FileInfo(Path.Combine(current_path,"test-text-file.txt"))).Length
 
   testList "getting basic gzip/deflate responses"

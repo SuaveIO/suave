@@ -367,12 +367,12 @@ module Http =
         None
 
   let local_file (fileName : string) (root_path : string) =
-    let calculated_path = Path.Combine(root_path, fileName.TrimStart(Path.DirectorySeparatorChar))
+    let calculated_path = Path.Combine(root_path, fileName.TrimStart([| Path.DirectorySeparatorChar; Path.AltDirectorySeparatorChar |]))
     if calculated_path = Path.GetFullPath(calculated_path) then
       if calculated_path.StartsWith root_path then
         calculated_path
-      else failwith "File canonalization issue."
-    else failwith "File canonalization issue."
+      else raise <| Exception("File canonalization issue.")
+    else raise <| Exception("File canonalization issue.")
 
   let browse_file filename = 
     fun (r : HttpRequest) -> file (local_file filename r.home_directory) r
