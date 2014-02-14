@@ -17,17 +17,19 @@ let private copy_response_headers (headers1 : WebHeaderCollection) (headers2 : L
     headers2.Add(e, headers1.[e])
 
 /// Send the web response from HttpWebResponse to the HttpRequest 'p'
-let private send_web_response (data : HttpWebResponse) (p : HttpRequest)  = async {
+let private send_web_response (data : HttpWebResponse) (ctx : HttpContext)  = async {
+  let p = ctx.request
   copy_response_headers data.Headers (p.response.Headers)
   //TODO: if downstream sends a Content-Length header copy from one stream to the other asynchronously
   Log.trace (fun () -> "proxy:send_web_response:GetResponseStream -> read_fully")
   let bytes = data.GetResponseStream() |> read_fully
   Log.trace (fun () -> "proxy:send_web_response:GetResponseStream <- read_fully")
-  do! response (int data.StatusCode) (data.StatusDescription) bytes p
+  do! response (int data.StatusCode) (data.StatusDescription) bytes ctx
 }
 
 /// Forward the HttpRequest 'p' to the 'ip':'port'
-let forward (ip : IPAddress) (port : uint16) (p : HttpRequest) =
+let forward (ip : IPAddress) (port : uint16) (ctx : HttpContext) =
+  let p = ctx.request
   let buildWebHeadersCollection (h : Dictionary<string,string>) =
     let r = new WebHeaderCollection()
     for e in h do
@@ -59,15 +61,15 @@ let forward (ip : IPAddress) (port : uint16) (p : HttpRequest) =
   async {
     if p.``method`` = "POST" || p.``method`` = "PUT" then
       let content_length = Convert.ToInt32(p.headers.["content-length"])
-      do! transfer_len_x p.connection (q.GetRequestStream()) content_length
+      do! transfer_len_x ctx.connection (q.GetRequestStream()) content_length
     try
       let! data = q.AsyncGetResponse()
-      do! send_web_response ((data : WebResponse) :?> HttpWebResponse) p
+      do! send_web_response ((data : WebResponse) :?> HttpWebResponse) ctx
     with
     | :? WebException as ex when ex.Response <> null ->
-      do! send_web_response (ex.Response :?> HttpWebResponse) p
+      do! send_web_response (ex.Response :?> HttpWebResponse) ctx
     | :? WebException as ex when ex.Response = null ->
-      do! response 502 "Bad Gateway" (bytes_utf8 "suave proxy: Could not connect to upstream") p
+      do! response 502 "Bad Gateway" (bytes_utf8 "suave proxy: Could not connect to upstream") ctx
   } |> succeed
 
 /// Proxy the HttpRequest 'r' with the proxy found with 'proxy_resolver'
@@ -88,8 +90,8 @@ let proxy_server_async (config : SuaveConfig) resolver =
     |> List.map (fun { scheme = proto; ip = ip; port = port } ->
         tcp_ip_server (ip, port, config.buffer_size, config.max_ops) 
           (request_loop (process_request true) 
-          (mk_runtime_config proto config.web_part_timeout config.error_handler config.mime_types_map home_dir compression_folder) 
-          (warbler (fun http -> proxy resolver http))))
+          (mk_http_runtime proto config.web_part_timeout config.error_handler config.mime_types_map home_dir compression_folder) 
+          (warbler (fun http -> proxy resolver http.request))))
   let listening = all |> Seq.map fst |> Async.Parallel |> Async.Ignore
   let server    = all |> Seq.map snd |> Async.Parallel |> Async.Ignore
   listening, server

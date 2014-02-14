@@ -5,7 +5,8 @@ open Types
 open Http
 
 /// Cookie-based session support
-let session_support (request : HttpRequest) =
+let session_support (ctx : HttpContext) =
+  let request = ctx.request
   //sessions could expire, we need a timestamp .. to know when the session expires
   //we will probably also need a job that monitors the session and deletes the expired ones
   //to sessions survive restart they could be file based like php.. that would be kind of slow
@@ -23,8 +24,8 @@ let session_support (request : HttpRequest) =
     ; secure = true
     ; http_only = false
     ; expires = Some (DateTime.UtcNow.AddMinutes(30.0)) //cookie expires in 30 minutes
-    ; version = None } request |> ignore
-  Some request
+    ; version = None } ctx |> ignore
+  Some ctx
 
 open System.Collections.Generic
 open System.Collections.Concurrent

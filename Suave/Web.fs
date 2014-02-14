@@ -374,9 +374,9 @@ let parse_multipart (connection : Connection) boundary (request : HttpRequest) (
 
 /// Process the request, reading as it goes from the incoming 'stream', yielding a HttpRequest
 /// when done
-let process_request proxy_mode (request : HttpRequest) (bytes : BufferSegment option) line_buffer : Async<(HttpRequest * BufferSegment option) option> = async {
+let process_request proxy_mode (request : HttpRequest) (connection : Connection)  (bytes : BufferSegment option): Async<(HttpRequest * BufferSegment option) option> = async {
 
-  let connection = request.connection
+  let line_buffer = connection.line_buffer
   try
     Log.tracef(fun fmt -> fmt "web:process_request proxy:%b bytes:%A -> read_line" proxy_mode bytes)
     let! (first_line : string), rem = read_line connection bytes line_buffer
@@ -462,15 +462,8 @@ let inline load_connection proto (connection : Connection) = async{
 open System.Net.Sockets
 
 /// A HttpProcessor takes a HttpRequest instance, returning asynchronously a HttpRequest that has been parsed
-type HttpProcessor = HttpRequest -> BufferSegment option -> ArraySegment<byte>-> Async<(HttpRequest * (BufferSegment option)) option>
+type HttpProcessor = HttpRequest -> Connection -> BufferSegment option -> Async<(HttpRequest * (BufferSegment option)) option>
 type RequestResult = Done
-type HttpRuntime =
-  { protocol : Protocol
-  ; web_part_timeout : TimeSpan
-  ; error_handler : ErrorHandler
-  ; mime_types_map   : MimeTypesMap
-  ; home_directory   : string
-  ; compression_folder   : string }
 
 /// The request loop initialises a request with a processor to handle the
 /// incoming stream and possibly pass the request to the web parts, a protocol,
@@ -483,16 +476,14 @@ let request_loop
   (web_part         : WebPart)
   (connection       : Connection) =
 
-  let proto         = runtime.protocol
+  let proto            = runtime.protocol
   let web_part_timeout = runtime.web_part_timeout
   let error_handler    = runtime.error_handler
-  let mime_types_map   = runtime.mime_types_map
-  let home_directory   = runtime.home_directory
-  let compression_folder = runtime.compression_folder
+
   /// Check if the web part can perform its work on the current request. If it can't
   /// it will return None and the run method will return.
-  let run request = async {
-    match web_part request with // run the web part
+  let run ctx = async {
+    match web_part ctx with // run the web part
     | Some x -> do! x
     | None -> return ()
   }
@@ -511,20 +502,21 @@ let request_loop
 
   let rec loop (bytes : BufferSegment option) request = async {
     Log.trace(fun () -> "web:request_loop:loop -> processor")
-    let! result = processor request bytes request.line_buffer
+    let! result = processor request connection bytes
     Log.trace(fun () -> "web:request_loop:loop <- processor")
 
     match result with
     | Some (request : HttpRequest, rem) ->
+      let ctx = { request = request; runtime = runtime; connection = connection }
       try
         Log.trace(fun () -> "web:request_loop:loop -> unblock")
-        do! Async.WithTimeout (web_part_timeout, run request)
+        do! Async.WithTimeout (web_part_timeout, run ctx)
         Log.trace(fun () -> "web:request_loop:loop <- unblock")
       with
         | InternalFailure(_) as ex  -> free rem; raise ex
         | :? TimeoutException as ex -> free rem; raise ex
         | :? SocketIssue as ex      -> free rem; raise ex
-        | ex -> do! error_handler ex "Routing request failed" request
+        | ex -> do! error_handler ex "Routing request failed" ctx
       if connection.is_connected () then
         match request.headers?connection with
         | Some (x : string) when x.ToLower().Equals("keep-alive") ->
@@ -555,8 +547,7 @@ let request_loop
   async {
     let! connection = load_connection proto connection
     let request =
-      { connection     = connection
-      ; http_version   = null
+      { http_version   = null
       ; url            = null
       ; ``method``     = null
       ; query          = new Dictionary<string,string>()
@@ -571,25 +562,18 @@ let request_loop
       ; response       = new HttpResponse()
       ; files          = new List<HttpUpload>()
       ; remote_address = connection.ipaddr
-      ; is_secure      = match proto with HTTP -> false | HTTPS _ -> true
-      ; line_buffer    = connection.get_buffer()
-      ; mime_types     = mime_types_map
-      ; home_directory = home_directory
-      ; compression_folder = compression_folder }
+      ; is_secure      = match proto with HTTP -> false | HTTPS _ -> true }
     try
-      try
-        do! loop None request
-      with
-      | InternalFailure(_)
-      | :? EndOfStreamException
-      | :? IOException as ex
-        when ex.InnerException <> null && ex.InnerException.GetType() = typeof<SocketException> ->
-        Log.trace(fun () -> "web:request_loop - client disconnected")
-        return ()
-      | ex ->
-        Log.tracef(fun fmt -> fmt "web:request_loop - Request failed.\n%A" ex)
-    finally
-      connection.free_buffer request.line_buffer
+      do! loop None request
+    with
+    | InternalFailure(_)
+    | :? EndOfStreamException
+    | :? IOException as ex
+      when ex.InnerException <> null && ex.InnerException.GetType() = typeof<SocketException> ->
+      Log.trace(fun () -> "web:request_loop - client disconnected")
+      return ()
+    | ex ->
+      Log.tracef(fun fmt -> fmt "web:request_loop - Request failed.\n%A" ex)
   }
 
 /// Parallelise the map of 'f' onto all items in the 'input' seq.
@@ -607,14 +591,15 @@ let is_local_address (ip : string) =
 
 /// The default error handler returns a 500 Internal Error in response to
 /// thrown exceptions.
-let default_error_handler (ex : Exception) msg (request : HttpRequest) = async {
+let default_error_handler (ex : Exception) msg (ctx : HttpContext) = async {
+  let request = ctx.request
   Log.logf "web:default_error_handler - %s.\n%A" msg ex
   if IPAddress.IsLoopback request.remote_address then
-    do! (response 500 "Internal Error" (bytes_utf8 (sprintf "<h1>%s</h1><br/>%A" ex.Message ex)) request)
-  else do! (response 500 "Internal Error" (bytes_utf8 ("Internal Error")) request)
+    do! (response 500 "Internal Error" (bytes_utf8 (sprintf "<h1>%s</h1><br/>%A" ex.Message ex)) ctx)
+  else do! (response 500 "Internal Error" (bytes_utf8 ("Internal Error")) ctx)
 }
 
-let mk_runtime_config proto timeout error_handler mime_types home_directory compression_folder =
+let mk_http_runtime proto timeout error_handler mime_types home_directory compression_folder =
   { protocol       = proto
   ; web_part_timeout = timeout
   ; error_handler  = error_handler
@@ -623,10 +608,8 @@ let mk_runtime_config proto timeout error_handler mime_types home_directory comp
   ; compression_folder = compression_folder }
 
 /// Starts a new web worker, given the configuration and a web part to serve.
-let web_worker (proto, ip, port, error_handler, timeout, buffer_size, max_ops, mime_types, home_directory, compression_folder) (webpart : WebPart) =
-  let runtime_config = 
-    mk_runtime_config proto timeout error_handler mime_types home_directory compression_folder
-  tcp_ip_server (ip, port, buffer_size, max_ops) (request_loop (process_request false) runtime_config webpart)
+let web_worker (ip, port, buffer_size, max_ops, runtime) (webpart : WebPart) =
+  tcp_ip_server (ip, port, buffer_size, max_ops) (request_loop (process_request false) runtime webpart)
 
 open System.IO
 
@@ -643,12 +626,14 @@ let resolve_directory home_directory =
 /// Have a look at the example and the unit tests for more documentation.
 /// In other words: don't block on 'listening' unless you have started the server.
 let web_server_async (config : SuaveConfig) (webpart : WebPart) =
-  let home_dir = resolve_directory config.home_folder
+  let content_folder = resolve_directory config.home_folder
   let compression_folder = Path.Combine(resolve_directory config.compressed_files_folder, "_temporary_compressed_files")
   let all =
     config.bindings
     |> List.map (fun { scheme = proto; ip = ip; port = port } ->
-        web_worker (proto, ip, port, config.error_handler, config.web_part_timeout, config.buffer_size, config.max_ops, config.mime_types_map, home_dir, compression_folder) webpart)
+      let http_runtime = 
+        mk_http_runtime proto config.web_part_timeout config.error_handler config.mime_types_map content_folder compression_folder
+      web_worker (ip, port, config.buffer_size, config.max_ops, http_runtime) webpart)
   let listening = all |> Seq.map fst |> Async.Parallel |> Async.Ignore
   let server    = all |> Seq.map snd |> Async.Parallel |> Async.Ignore
   listening, server

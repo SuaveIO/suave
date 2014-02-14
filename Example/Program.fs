@@ -56,7 +56,7 @@ choose [
   url "/neverme" >>= never >>= OK (Guid.NewGuid().ToString()) ;
   url "/guid" >>= OK (Guid.NewGuid().ToString()) ;
   url "/hello" >>= OK "Hello World" ;
-  GET >>= url "/query" >>= warbler( fun x -> cond (x.query) ? name (fun y -> OK ("Hello " + y)) never) ;
+  GET >>= url "/query" >>= request( fun x -> cond (x.query) ? name (fun y -> OK ("Hello " + y)) never) ;
   GET >>= url "/query" >>= OK "Hello beautiful" ;
   url "/redirect" >>= redirect "/redirected"
   url "/redirected" >>=  OK "You have been redirected." ;
@@ -64,22 +64,21 @@ choose [
   url "/timeout" >>= timeout;
   url "/session"
     >>= session_support
-    // alternative to warbler
-    >>== (fun x ->
-      cond (session x) ? counter
-          ( fun y ->
+    >>= request (fun x ->
+        cond (session x) ? counter
+          (fun y ->
               (session x) ? counter <- (y :?> int) + 1 :> obj ;
               OK (sprintf "Hello %A time(s)"  y ))
-            ((session x) ? counter <- 1 :> obj ; OK "First time" )) ;
+          ((session x) ? counter <- 1 :> obj ; OK "First time" )) ;
   basic_auth; // from here on it will require authentication
   GET >>= browse; //serves file if exists
   GET >>= dir; //show directory listing
   POST >>= url "/upload" >>= OK "Upload successful." ;
   POST >>= url "/upload2"
-      >>= warbler(fun x ->
+      >>= request(fun x ->
                     let files = x.files |> Seq.fold (fun x y -> x + "<br>" + (sprintf "(%s,%s,%s)" y.FileName y.MimeType y.Path)) "" ;
                     OK (sprintf "Upload successful.<br>POST data: %A<br>Uploaded files (%d): %s" (x.form)(x.files.Count) files)) ;
-  POST >>= warbler( fun x -> OK (sprintf "POST data: %A" (x.raw_form)));
+  POST >>= request( fun x -> OK (sprintf "POST data: %A" (x.raw_form)));
   NOT_FOUND "Found no handlers"
   ]
   |> web_server

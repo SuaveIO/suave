@@ -136,24 +136,26 @@ let tcp_ip_server (source_ip : IPAddress, source_port : uint16, buffer_size : in
     try
       let read_args = b.Pop()
       let write_args = c.Pop()
-      let client = { 
+      let connection = { 
         ipaddr =  (socket.RemoteEndPoint :?> IPEndPoint).Address;
         read  = receive socket read_args;
         write = send socket write_args;
         get_buffer = bufferManager.PopBuffer;
         free_buffer = bufferManager.FreeBuffer;
-        is_connected = fun _ -> is_good read_args && is_good write_args
+        is_connected = fun _ -> is_good read_args && is_good write_args;
+        line_buffer    = bufferManager.PopBuffer()
       }
       use! oo = Async.OnCancel (fun () -> Log.trace(fun () -> "tcp:tcp_ip_server - disconnected client (async cancel)")
                                           shutdown_socket socket)
       try
-        do! serve_client client
+        do! serve_client connection
       finally
         shutdown_socket socket
         accept_args.AcceptSocket <- null
         a.Push(accept_args)
         b.Push(read_args)
         c.Push(write_args)
+        bufferManager.FreeBuffer connection.line_buffer
     with 
     | :? System.IO.EndOfStreamException ->
       Log.trace(fun () -> "tcp:tcp_ip_server - disconnected client (end of stream)")

@@ -99,20 +99,22 @@ open System.Net
 /// A connection (TCP implied) is a thing that can read and write from a socket
 /// and that can be closed.
 type Connection = { 
-  ipaddr : IPAddress;
-  read   : ArraySegment<byte> -> Async<int>;
-  write  : ArraySegment<byte> -> Async<unit>;
-  get_buffer  : unit -> ArraySegment<byte>;
-  free_buffer : ArraySegment<byte> -> unit;
-  is_connected: unit -> bool 
+  ipaddr       : IPAddress;
+  read         : ArraySegment<byte> -> Async<int>;
+  write        : ArraySegment<byte> -> Async<unit>;
+  get_buffer   : unit -> ArraySegment<byte>;
+  free_buffer  : ArraySegment<byte> -> unit;
+  is_connected : unit -> bool ;
+  line_buffer  : ArraySegment<byte>
   }
 
 let eol_array_segment = new ArraySegment<_>(EOL, 0, 2)
 
 /// Write the string s to the stream asynchronously
 /// as ASCII encoded text
-let inline async_writeln (connection : Connection) (s : string) (buff : ArraySegment<byte>) = async {
-  if s.Length > 0 then 
+let inline async_writeln (connection : Connection) (s : string) = async {
+  if s.Length > 0 then
+    let buff = connection.line_buffer
     let c = bytes_to_buffer s buff.Array buff.Offset
     do! connection.write (new ArraySegment<_>(buff.Array, buff.Offset, c))
   do! connection.write eol_array_segment

@@ -40,8 +40,7 @@ type HttpUpload(fieldname : string, filename : string, mime_type : string, temp_
 
 /// A holder for the data extracted from the request.
 type HttpRequest =
-  { connection           : Connection
-  ; mutable http_version : string
+  { mutable http_version : string
   ; mutable url          : string
   ; mutable ``method``   : string
   ; remote_address     : IPAddress
@@ -56,13 +55,7 @@ type HttpRequest =
   ; mutable session_id : string
   ; response           : HttpResponse
   ; files              : List<HttpUpload>
-  ; is_secure          : bool
-  ; line_buffer        : ArraySegment<byte>
-  ; mime_types         : MimeTypesMap
-  // TODO: agregate and separate some of these properties into a HttpRuntime record 
-  // and pack it side by side HttpRequest in a HttpContext record.
-  ; home_directory     : string
-  ; compression_folder : string }
+  ; is_secure          : bool }
 
 /// Clear the request dictionaries for to reuse the request object instance.
 let internal clear (request : HttpRequest) =
@@ -120,13 +113,29 @@ with
   override x.ToString() =
     sprintf "%O://%O:%d/" x.scheme x.ip x.port
 
-/// A web part is a thing that executes on a HttpRequest, asynchronously, maybe executing
-/// on the request.
-type WebPart = HttpRequest -> Async<unit> option
-
 /// An error handler takes the exception, a programmer-provided message, a request (that failed) and returns
 /// an asynchronous workflow for the handling of the error.
-type ErrorHandler = Exception -> String -> HttpRequest -> Async<unit>
+type ErrorHandler = Exception -> String -> HttpContext -> Async<unit>
+
+and HttpRuntime =
+  { protocol           : Protocol
+  //; connection         : Connection
+  ; web_part_timeout   : TimeSpan
+  ; error_handler      : ErrorHandler
+  ; mime_types_map     : MimeTypesMap
+  ; home_directory     : string
+  ; compression_folder : string }
+
+and HttpContext = 
+  { request    : HttpRequest
+  ; runtime    : HttpRuntime
+  ; connection : Connection }
+
+let request f (a : HttpContext) = f a.request a
+
+/// A web part is a thing that executes on a HttpRequest, asynchronously, maybe executing
+/// on the request.
+type WebPart = HttpContext -> Async<unit> option
 
 open System.Threading
 

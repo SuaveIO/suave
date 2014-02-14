@@ -5,32 +5,32 @@ module Http =
   // generic 'response' and 'response_f' f-ns
 
   /// Respond with a given status code, http message, content in the body to a http request.
-  val response_f : status_code:int -> reason_phrase:string -> f_content:(HttpRequest -> Async<unit>) -> request:HttpRequest -> Async<unit>
+  val response_f : status_code:int -> reason_phrase:string -> f_content:(HttpRequest -> Async<unit>) -> request:HttpContext -> Async<unit>
 
   /// Respond with a given status code, http reason phrase, content in the body to a http request.
-  val response : status_code:int -> reason_phrase:string -> content:byte [] -> request:HttpRequest -> Async<unit>
+  val response : status_code:int -> reason_phrase:string -> content:byte [] -> request:HttpContext -> Async<unit>
 
 // Suave response modifiers/applicatives follow
 
   /// Sets a header with the key and value specified
-  val set_header : key:string -> value:string -> http_request:HttpRequest -> HttpRequest
+  val set_header : key:string -> value:string -> ctx:HttpContext -> HttpContext
 
   /// Sets a cookie with the passed value in the 'cookie' parameter
-  val set_cookie : cookie:HttpCookie -> (HttpRequest -> HttpRequest)
+  val set_cookie : cookie:HttpCookie -> (HttpContext -> HttpContext)
 
 // Suave filters/applicatives follow
 
   /// Match on the url
-  val url : s:string -> x:HttpRequest -> HttpRequest option
+  val url : s:string -> x:HttpContext -> HttpContext option
 
   /// Match on the method
-  val meth0d : s:string -> x:HttpRequest -> HttpRequest option
+  val meth0d : s:string -> x:HttpContext -> HttpContext option
   
   /// Match on the protocol
-  val is_secure : x:HttpRequest -> HttpRequest option
+  val is_secure : x:HttpContext -> HttpContext option
 
   /// Applies the regex to the url and matchs on the result
-  val url_regex : s:string -> x:HttpRequest -> HttpRequest option
+  val url_regex : s:string -> x:HttpContext -> HttpContext option
 
   /// <summary>
   /// Match on GET requests.
@@ -48,7 +48,7 @@ module Http =
   /// allowing cached entities to be refreshed without requiring multiple requests
   /// or transferring data already held by the client.
   /// </para></summary>
-  val GET : x:HttpRequest -> HttpRequest option
+  val GET : x:HttpContext -> HttpContext option
 
   /// <summary>
   /// <para>Match on POST requests.</para>
@@ -87,7 +87,7 @@ module Http =
   /// used to direct the user agent to retrieve a cacheable resource.
   /// </para>
   /// </summary>
-  val POST : x:HttpRequest -> HttpRequest option
+  val POST : x:HttpContext -> HttpContext option
 
   /// <summary><para>
   /// Match on DELETE requests.
@@ -109,7 +109,7 @@ module Http =
   /// method are not cacheable. 
   /// </para>
   /// </summary>
-  val DELETE : x:HttpRequest -> HttpRequest option
+  val DELETE : x:HttpContext -> HttpContext option
 
   /// <summary><para>
   /// Match on PUT requests
@@ -155,7 +155,7 @@ module Http =
   /// Unless otherwise specified for a particular entity-header, the entity-headers in the
   /// PUT request SHOULD be applied to the resource created or modified by the PUT.
   /// </para></summary>
-  val PUT : x:HttpRequest -> HttpRequest option
+  val PUT : x:HttpContext -> HttpContext option
 
   /// <summary><para>
   /// Match on HEAD requests.
@@ -173,7 +173,7 @@ module Http =
   /// current entity (as would be indicated by a change in Content-Length, Content-MD5,
   /// ETag or Last-Modified), then the cache MUST treat the cache entry as stale.
   /// </para></summary>
-  val HEAD : x:HttpRequest -> HttpRequest option
+  val HEAD : x:HttpContext -> HttpContext option
 
   /// <summary><para>
   /// Match on CONNECT requests.
@@ -181,7 +181,7 @@ module Http =
   /// This specification (RFC 2616) reserves the method name CONNECT for use with a
   /// proxy that can dynamically switch to being a tunnel (e.g. SSL tunneling [44]).
   /// </para></summary>
-  val CONNECT : x:HttpRequest -> HttpRequest option
+  val CONNECT : x:HttpContext -> HttpContext option
 
   /// <summary><para>
   /// Match on PATCH requests.
@@ -208,7 +208,7 @@ module Http =
   /// PATCH.
   /// </para></summary>
   /// <remarks>From http://tools.ietf.org/html/rfc5789#page-2</remarks>
-  val PATCH : x:HttpRequest -> HttpRequest option
+  val PATCH : x:HttpContext -> HttpContext option
 
   /// <summary><para>
   /// Match on TRACE requests.
@@ -231,7 +231,7 @@ module Http =
   /// the entity-body, with a Content-Type of "message/http". Responses to this method
   /// MUST NOT be cached.
   /// </para></summary>
-  val TRACE : x:HttpRequest -> HttpRequest option
+  val TRACE : x:HttpContext -> HttpContext option
 
   /// Match on OPTIONS requests
   /// The OPTIONS method represents a request for information about the communication
@@ -240,7 +240,7 @@ module Http =
   /// with a resource, or the capabilities of a server, without implying a resource
   /// action or initiating a resource retrieval.
   /// Responses to this method are not cacheable.
-  val OPTIONS : x:HttpRequest -> HttpRequest option
+  val OPTIONS : x:HttpContext -> HttpContext option
 
   /// <summary><para>
   /// 200
@@ -249,7 +249,7 @@ module Http =
   /// </para></summary>
   /// <remarks>
   /// </remarks>
-  val ok : s:byte [] -> (HttpRequest -> Async<unit> option)
+  val ok : s:byte [] -> WebPart
 
   /// <summary><para>
   /// 200
@@ -258,7 +258,7 @@ module Http =
   /// </para></summary>
   /// <remarks>
   /// </remarks>
-  val OK : a:string -> (HttpRequest -> Async<unit> option)
+  val OK : a:string -> WebPart
 
   /// <summary><para>
   /// 201
@@ -281,7 +281,7 @@ module Http =
   /// the current value of the entity tag for the requested variant just
   /// created, see section 14.19.
   /// </para></summary>
-  val created : s:byte [] -> (HttpRequest -> Async<unit> option)
+  val created : s:byte [] -> WebPart
 
   /// <summary><para>
   /// 201
@@ -302,7 +302,7 @@ module Http =
   /// the current value of the entity tag for the requested variant just
   /// created, see section 14.19.
   /// </para></summary>
-  val CREATED : s:string -> (HttpRequest -> Async<unit> option)
+  val CREATED : s:string -> WebPart
 
   /// <summary><para>
   /// 202
@@ -322,7 +322,7 @@ module Http =
   /// and either a pointer to a status monitor or some estimate of when the
   /// user can expect the request to be fulfilled.
   /// </para></summary>
-  val accepted : s:byte [] -> (HttpRequest -> Async<unit> option)
+  val accepted : s:byte [] -> WebPart
 
   /// <summary><para>
   /// 202
@@ -342,7 +342,7 @@ module Http =
   /// and either a pointer to a status monitor or some estimate of when the
   /// user can expect the request to be fulfilled.
   /// </para></summary>
-  val ACCEPTED : s:string -> (HttpRequest -> Async<unit> option)
+  val ACCEPTED : s:string -> WebPart
 
   /// <summary><para>
   /// 204
@@ -363,7 +363,7 @@ module Http =
   /// The 204 response MUST NOT include a message-body, and thus is always
   /// terminated by the first empty line after the header fields.
   /// </para></summary>
-  val no_content : (HttpRequest -> Async<unit> option)
+  val no_content : WebPart
 
   /// <summary><para>
   /// 204
@@ -384,7 +384,7 @@ module Http =
   /// The 204 response MUST NOT include a message-body, and thus is always
   /// terminated by the first empty line after the header fields.
   /// </para></summary>
-  val NO_CONTENT : (HttpRequest -> Async<unit> option)
+  val NO_CONTENT : WebPart
 
 (*
 10.3 Redirection 3xx
@@ -427,7 +427,7 @@ module Http =
   ///    receiving a 301 status code, some existing HTTP/1.0 user agents
   ///    will erroneously change it into a GET request.
   /// </remarks>
-  val moved_permanently : location:string -> (HttpRequest -> Async<unit> option)
+  val moved_permanently : location:string -> WebPart
 
   /// <summary><para>
   /// 301
@@ -454,7 +454,7 @@ module Http =
   ///    receiving a 301 status code, some existing HTTP/1.0 user agents
   ///    will erroneously change it into a GET request.
   /// </remarks>
-  val MOVED_PERMANENTLY : location:string -> (HttpRequest -> Async<unit> option)
+  val MOVED_PERMANENTLY : location:string -> WebPart
 
   /// <summary><para>
   /// 302
@@ -489,7 +489,7 @@ module Http =
   ///    been added for servers that wish to make unambiguously clear which
   ///    kind of reaction is expected of the client.
   /// </remarks>
-  val found : location:string -> (HttpRequest -> Async<unit> option)
+  val found : location:string -> WebPart
 
   /// <summary><para>
   /// 302
@@ -524,7 +524,7 @@ module Http =
   ///    been added for servers that wish to make unambiguously clear which
   ///    kind of reaction is expected of the client.
   /// </remarks>
-  val FOUND : location:string -> (HttpRequest -> Async<unit> option)
+  val FOUND : location:string -> WebPart
   
   /// <summary><para>
   /// Composite:
@@ -544,7 +544,7 @@ module Http =
   /// Redirect the request to another location specified by the url parameter.
   /// Sets the Location header and returns 302 Content Moved status-code/reason phrase.
   /// </para></summary>
-  val redirect : location:string -> (HttpRequest -> Async<unit> option)
+  val redirect : location:string -> WebPart
 
   /// <summary><para>
   /// If the client has performed a conditional GET request and access is
@@ -583,7 +583,7 @@ module Http =
   /// cache MUST update the entry to reflect any new field values given in
   /// the response.
   /// </para></summary>
-  val not_modified : (HttpRequest -> Async<unit> option)
+  val not_modified : WebPart
 
   /// <summary><para>
   /// If the client has performed a conditional GET request and access is
@@ -622,7 +622,7 @@ module Http =
   /// cache MUST update the entry to reflect any new field values given in
   /// the response.
   /// </para></summary>
-  val NOT_MODIFIED : (HttpRequest -> Async<unit> option)
+  val NOT_MODIFIED : WebPart
 
 (*  10.4 Client Error 4xx
 
@@ -649,7 +649,7 @@ module Http =
   /// syntax. The client SHOULD NOT repeat the request without
   /// modifications.
   /// </para></summary>
-  val bad_request : s:byte [] -> (HttpRequest -> Async<unit> option)
+  val bad_request : s:byte [] -> WebPart
 
   /// <summary><para>
   /// 400
@@ -658,7 +658,7 @@ module Http =
   /// syntax. The client SHOULD NOT repeat the request without
   /// modifications.
   /// </para></summary>
-  val BAD_REQUEST : s:string -> (HttpRequest -> Async<unit> option)
+  val BAD_REQUEST : s:string -> WebPart
 
   /// <summary><para>
   /// 401
@@ -679,7 +679,7 @@ module Http =
   /// </para></summary>
   /// <remarks>
   /// </remarks>
-  val unauthorized : s:byte [] -> (HttpRequest -> Async<unit> option)
+  val unauthorized : s:byte [] -> WebPart
 
   /// <summary><para>
   /// 401
@@ -700,7 +700,7 @@ module Http =
   /// </para></summary>
   /// <remarks>
   /// </remarks>
-  val UNAUTHORIZED : s:string -> (HttpRequest -> Async<unit> option)
+  val UNAUTHORIZED : s:string -> WebPart
 
   /// <summary><para>
   /// Composite:
@@ -716,7 +716,7 @@ module Http =
   /// <remarks>
   /// Also see authenticate_basic and unauthorized
   /// </remarks>
-  val challenge : (HttpRequest -> Async<unit> option)
+  val challenge : WebPart
 
   /// <summary><para>
   /// 403
@@ -729,7 +729,7 @@ module Http =
   /// make this information available to the client, the status code 404
   /// (Not Found) can be used instead.
   /// </para></summary>
-  val forbidden : s:byte [] -> (HttpRequest -> Async<unit> option)
+  val forbidden : s:byte [] -> WebPart
   
   /// <summary><para>
   /// 403
@@ -742,7 +742,7 @@ module Http =
   /// make this information available to the client, the status code 404
   /// (Not Found) can be used instead.
   /// </para></summary>
-  val FORBIDDEN : s:string -> (HttpRequest -> Async<unit> option)
+  val FORBIDDEN : s:string -> WebPart
 
   /// <summary><para>
   /// 404
@@ -758,7 +758,7 @@ module Http =
   /// reveal exactly why the request has been refused, or when no other
   /// response is applicable.
   /// </para></summary>
-  val not_found : message:byte [] -> (HttpRequest -> Async<unit> option)
+  val not_found : message:byte [] -> WebPart
   
   /// <summary><para>
   /// 404
@@ -775,7 +775,7 @@ module Http =
   /// reveal exactly why the request has been refused, or when no other
   /// response is applicable.
   /// </para></summary>
-  val NOT_FOUND : message:string -> (HttpRequest -> Async<unit> option)
+  val NOT_FOUND : message:string -> WebPart
 
   /// <summary><para>
   /// 405
@@ -785,7 +785,7 @@ module Http =
   /// Allow header containing a list of valid methods for the requested
   /// resource.
   /// </para></summary>
-  val method_not_allowed : s:byte [] -> (HttpRequest -> Async<unit> option)
+  val method_not_allowed : s:byte [] -> WebPart
 
   /// <summary><para>
   /// 405
@@ -795,7 +795,7 @@ module Http =
   /// Allow header containing a list of valid methods for the requested
   /// resource.
   /// </para></summary>
-  val METHOD_NOT_ALLOWED : s:string -> (HttpRequest -> Async<unit> option)
+  val METHOD_NOT_ALLOWED : s:string -> WebPart
 
   /// <summary><para>
   /// 406
@@ -826,7 +826,7 @@ module Http =
   /// </para></summary>
   /// <remarks>
   /// </remarks>
-  val not_acceptable : s:byte[] -> (HttpRequest -> Async<unit> option)
+  val not_acceptable : s:byte[] -> WebPart
   
   /// <summary><para>
   /// 406
@@ -857,7 +857,7 @@ module Http =
   /// </para></summary>
   /// <remarks>
   /// </remarks>
-  val NOT_ACCEPTABLE : s:string -> (HttpRequest -> Async<unit> option)
+  val NOT_ACCEPTABLE : s:string -> WebPart
 
   /// <summary><para>
   /// 408
@@ -866,7 +866,7 @@ module Http =
   /// was prepared to wait. The client MAY repeat the request without
   /// modifications at any later time.
   /// </para></summary>
-  val request_timeout : (HttpRequest -> Async<unit> option)
+  val request_timeout : WebPart
 
   /// <summary><para>
   /// 409
@@ -889,7 +889,7 @@ module Http =
   /// between the two versions in a format defined by the response
   /// Content-Type.
   /// </para></summary>
-  val conflict : byte[] -> (HttpRequest -> Async<unit> option)
+  val conflict : byte[] -> WebPart
   
   /// <summary><para>
   /// 409
@@ -912,7 +912,7 @@ module Http =
   /// between the two versions in a format defined by the response
   /// Content-Type.
   /// </para></summary>
-  val CONFLICT : string -> (HttpRequest -> Async<unit> option)
+  val CONFLICT : string -> WebPart
 
   /// <summary><para>
   /// 410
@@ -935,7 +935,7 @@ module Http =
   /// to keep the mark for any length of time -- that is left to the
   /// discretion of the server owner.
   /// </para></summary>
-  val gone : s:byte [] -> (HttpRequest -> Async<unit> option)
+  val gone : s:byte [] -> WebPart
   
   /// <summary><para>
   /// 410
@@ -958,7 +958,7 @@ module Http =
   /// to keep the mark for any length of time -- that is left to the
   /// discretion of the server owner.
   /// </para></summary>
-  val GONE : s:string -> (HttpRequest -> Async<unit> option)
+  val GONE : s:string -> WebPart
 
   /// <summary><para>
   /// 415
@@ -967,7 +967,7 @@ module Http =
   /// the request is in a format not supported by the requested resource
   /// for the requested method.
   /// </para></summary>
-  val unsupported_media_type : s:byte [] -> (HttpRequest -> Async<unit> option)
+  val unsupported_media_type : s:byte [] -> WebPart
 
   /// <summary><para>
   /// 415
@@ -976,7 +976,7 @@ module Http =
   /// the request is in a format not supported by the requested resource
   /// for the requested method.
   /// </para></summary>
-  val UNSUPPORTED_MEDIA_TYPE : s:string -> (HttpRequest -> Async<unit> option)
+  val UNSUPPORTED_MEDIA_TYPE : s:string -> WebPart
 
   /// <summary><para>
   /// 422
@@ -985,7 +985,7 @@ module Http =
   /// </para><para>
   /// </para></summary>
   /// <remarks>(WebDAV; RFC 4918)</remarks>
-  val unprocessable_entity : s:byte [] -> (HttpRequest -> Async<unit> option)
+  val unprocessable_entity : s:byte [] -> WebPart
 
   /// <summary><para>
   /// 422
@@ -994,7 +994,7 @@ module Http =
   /// </para><para>
   /// </para></summary>
   /// <remarks>(WebDAV; RFC 4918)</remarks>
-  val UNPROCESSABLE_ENTITY : s:string -> (HttpRequest -> Async<unit> option)
+  val UNPROCESSABLE_ENTITY : s:string -> WebPart
 
   /// <summary><para>
   /// 428
@@ -1031,7 +1031,7 @@ module Http =
   /// <remarks>
   /// https://tools.ietf.org/html/rfc6585
   /// </remarks>
-  val precondition_required : byte[] -> (HttpRequest -> Async<unit> option)
+  val precondition_required : byte[] -> WebPart
 
   /// <summary><para>
   /// 428
@@ -1068,7 +1068,7 @@ module Http =
   /// <remarks>
   /// https://tools.ietf.org/html/rfc6585
   /// </remarks>
-  val PRECONDITION_REQUIRED : string -> (HttpRequest -> Async<unit> option)
+  val PRECONDITION_REQUIRED : string -> WebPart
 
   /// <summary><para>
   /// 429
@@ -1080,7 +1080,7 @@ module Http =
   /// <remarks>
   /// https://tools.ietf.org/html/rfc6585
   /// </remarks>
-  val too_many_requests : s:byte [] -> (HttpRequest -> Async<unit> option)
+  val too_many_requests : s:byte [] -> WebPart
   
   /// <summary><para>
   /// 429
@@ -1092,7 +1092,7 @@ module Http =
   /// <remarks>
   /// https://tools.ietf.org/html/rfc6585
   /// </remarks>
-  val TOO_MANY_REQUESTS : s:string -> (HttpRequest -> Async<unit> option)
+  val TOO_MANY_REQUESTS : s:string -> WebPart
 
 (*
 10.5 Server Error 5xx
@@ -1111,7 +1111,7 @@ module Http =
   /// The server encountered an unexpected condition which prevented it
   /// from fulfilling the request.
   /// </para></summary>
-  val internal_error : message:byte [] -> (HttpRequest -> Async<unit> option)
+  val internal_error : message:byte [] -> WebPart
   
   /// <summary><para>
   /// 500
@@ -1119,7 +1119,7 @@ module Http =
   /// The server encountered an unexpected condition which prevented it
   /// from fulfilling the request.
   /// </para></summary>
-  val INTERNAL_ERROR : a:string -> (HttpRequest -> Async<unit> option)
+  val INTERNAL_ERROR : a:string -> WebPart
 
   /// <summary><para>
   /// </para><para>
@@ -1127,7 +1127,7 @@ module Http =
   /// </para></summary>
   /// <remarks>
   /// </remarks>
-  val redirect : url:string -> (HttpRequest -> Async<unit> option)
+  val redirect : url:string -> WebPart
 
   /// <summary>
   /// Creates a MIME type record
@@ -1150,7 +1150,7 @@ module Http =
   /// </para></summary>
   /// <remarks>
   /// </remarks>
-  val set_mime_type : t:string -> (HttpRequest -> HttpRequest)
+  val set_mime_type : t:string -> (HttpContext -> HttpContext)
 
   /// <summary><para>
   /// Send a file as a response to the request
@@ -1159,7 +1159,7 @@ module Http =
   /// </para></summary>
   /// <remarks>
   /// </remarks>
-  val send_file : filename:string -> compression:bool -> r:HttpRequest -> Async<unit> option
+  val send_file : filename:string -> compression:bool -> WebPart
 
   /// <summary><para>
   /// Send the file by the filename given. Will search relative to the current directory for
@@ -1171,7 +1171,7 @@ module Http =
   /// </para></summary>
   /// <remarks>
   /// </remarks>
-  val file : filename:string -> (HttpRequest -> Async<unit> option)
+  val file : filename:string -> WebPart
 
   /// <summary><para>
   /// Format a string with a local file path given a file name 'fileName'. You should
@@ -1193,7 +1193,7 @@ module Http =
   /// </para></summary>
   /// <remarks>
   /// </remarks>
-  val browse_file : filename:string -> (HttpRequest -> Async<unit> option)
+  val browse_file : filename:string -> WebPart
 
   /// <summary><para>
   /// 'browse' the file in the sense that the contents of the file are sent based on the
@@ -1220,7 +1220,7 @@ module Http =
   /// </para></summary>
   /// <remarks>
   /// </remarks>
-  val dir : req:HttpRequest -> WebResult
+  val dir : req:HttpContext -> WebResult
 
   /// <summary><para>
   /// Parse the authentication type, the user name and the password from
@@ -1241,18 +1241,18 @@ module Http =
   /// </para></summary>
   /// <remarks>
   /// </remarks>
-  val authenticate_basic : f:(HttpRequest -> bool) -> p:HttpRequest -> Async<unit> option
+  val authenticate_basic : f:(HttpRequest -> bool) -> p:HttpContext -> Async<unit> option
 
   /// <summary><para>
   /// Formats the HttpRequest as in the default manner
   /// </para></summary>
-  val log_format : http_request:HttpRequest -> string
+  val log_format : ctx:HttpRequest -> string
 
   /// <summary><para>
   /// HERE BE DRAGONS: Not thread-safe.
   /// Log the HttpRequest to the given stream. For debugging purposes.
   /// </para></summary>
-  val log : s:System.IO.Stream -> http_request:HttpRequest -> HttpRequest option
+  val log : s:System.IO.Stream -> ctx:HttpContext -> HttpContext option
 
   /// <summary><para>
   /// Strongly typed route matching! Matching the uri can be used with the 'parsers'

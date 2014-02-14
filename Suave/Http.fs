@@ -22,19 +22,19 @@ module Http =
 
   // general response functions
 
-  let response_f (status_code: int) reason_phrase (f_content : HttpRequest -> Async<unit>) (request : HttpRequest) = async {
+  let response_f (status_code: int) reason_phrase (f_content : HttpRequest -> Async<unit>) ({request = request; runtime = runtime; connection = connection } as context : HttpContext) = async {
     try
-      let connection:Connection = request.connection
-      do! async_writeln connection (String.concat " " [ HTTP_VERSION ; status_code.ToString() ; reason_phrase]) request.line_buffer
-      do! async_writeln connection server_header request.line_buffer
-      do! async_writeln connection (String.Concat( [|  "Date: "; DateTime.UtcNow.ToString("R") |])) request.line_buffer
+      //let connection:Connection = runtime.connection
+      do! async_writeln connection (String.concat " " [ HTTP_VERSION ; status_code.ToString() ; reason_phrase])
+      do! async_writeln connection server_header
+      do! async_writeln connection (String.Concat( [|  "Date: "; DateTime.UtcNow.ToString("R") |]))
 
       for (x,y) in request.response.Headers do
         if not (List.exists (fun y -> x.ToLower().Equals(y)) ["server";"date";"content-length"]) then
-          do! async_writeln connection (String.Concat [| x; ": "; y |]) request.line_buffer
+          do! async_writeln connection (String.Concat [| x; ": "; y |])
 
       if not(request.response.Headers.Exists(new Predicate<_>(fun (x,_) -> x.ToLower().Equals("content-type")))) then
-        do! async_writeln connection "Content-Type: text/html" request.line_buffer
+        do! async_writeln connection "Content-Type: text/html"
 
       do! f_content request
 
@@ -78,13 +78,14 @@ module Http =
   let MIN_BYTES_TO_COMPRESS =       500 // 500 bytes
   let MAX_BYTES_TO_COMPRESS = 524288000 // 500 megabytes
 
-  let transform (content : byte []) (request : HttpRequest) : Async<byte []> =
+  let transform (content : byte []) (ctx : HttpContext) : Async<byte []> =
     async {
       if content.Length > MIN_BYTES_TO_COMPRESS && content.Length < MAX_BYTES_TO_COMPRESS then
+        let request = ctx.request
         let enconding = get_encoder request 
         match enconding with
         | Some (n,encoder) ->
-          do! async_writeln request.connection (String.Concat [| "Content-Encoding: "; n |]) request.line_buffer
+          do! async_writeln ctx.connection (String.Concat [| "Content-Encoding: "; n |])
           return encoder content
         | None ->
           return content
@@ -92,26 +93,26 @@ module Http =
         return content
     }
 
-  let response status_code reason_phrase (cnt : byte []) (request : HttpRequest) =
+  let response status_code reason_phrase (cnt : byte []) ({request = request; runtime = runtime; connection = connection } as context : HttpContext) =
     response_f status_code reason_phrase (
       fun r -> async {
 
-        let! (content : byte []) = transform cnt request
+        let! (content : byte []) = transform cnt context
 
         // http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.13
-        do! async_writeln r.connection (String.Concat [|  "Content-Length: "; content.Length.ToString() |]) request.line_buffer
+        do! async_writeln connection (String.Concat [|  "Content-Length: "; content.Length.ToString() |])
 
-        do! async_writeln r.connection "" request.line_buffer
+        do! async_writeln connection ""
 
         if content.Length > 0 then
-          do! r.connection.write (new ArraySegment<_>(content, 0, content.Length)) })
-      request
+          do! connection.write (new ArraySegment<_>(content, 0, content.Length)) })
+      context
 
   // modifiers
 
-  let set_header key value (http_request : HttpRequest) =
+  let set_header key value ({request = http_request; runtime = _ } as ctx : HttpContext) =
     http_request.response.Headers.Add(key, value)
-    http_request
+    ctx
 
   let cookie_to_string (x : HttpCookie) = 
     let attributes = new System.Collections.Generic.List<string>()
@@ -127,26 +128,26 @@ module Http =
 
   // filters/applicatives
 
-  let url s (x : HttpRequest) = if s = x.url then Some x else None
+  let url s (x : HttpContext) = if s = x.request.url then Some x else None
 
-  let meth0d s (x : HttpRequest) = if s = x.``method`` then Some x else None
+  let meth0d s (x : HttpContext) = if s = x.request.``method`` then Some x else None
 
-  let is_secure (x : HttpRequest) = if x.is_secure then Some x else None
+  let is_secure (x : HttpContext) = if x.request.is_secure then Some x else None
 
-  let url_regex s (x : HttpRequest) = if Regex.IsMatch(x.url,s) then Some x else None
+  let url_regex s (x : HttpContext) = if Regex.IsMatch(x.request.url,s) then Some x else None
 
   // see http://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html
   // see Http.fsi for documentation
 
-  let GET     (x : HttpRequest) = meth0d "GET" x
-  let POST    (x : HttpRequest) = meth0d "POST" x
-  let DELETE  (x : HttpRequest) = meth0d "DELETE" x
-  let PUT     (x : HttpRequest) = meth0d "PUT" x
-  let HEAD    (x : HttpRequest) = meth0d "HEAD" x
-  let CONNECT (x : HttpRequest) = meth0d "CONNECT" x
-  let PATCH   (x : HttpRequest) = meth0d "PATCH" x
-  let TRACE   (x : HttpRequest) = meth0d "TRACE" x
-  let OPTIONS (x : HttpRequest) = meth0d "OPTIONS" x
+  let GET     (x : HttpContext) = meth0d "GET" x
+  let POST    (x : HttpContext) = meth0d "POST" x
+  let DELETE  (x : HttpContext) = meth0d "DELETE" x
+  let PUT     (x : HttpContext) = meth0d "PUT" x
+  let HEAD    (x : HttpContext) = meth0d "HEAD" x
+  let CONNECT (x : HttpContext) = meth0d "CONNECT" x
+  let PATCH   (x : HttpContext) = meth0d "PATCH" x
+  let TRACE   (x : HttpContext) = meth0d "TRACE" x
+  let OPTIONS (x : HttpContext) = meth0d "OPTIONS" x
 
   // TODO: let continue ... ?
   // TODO: let switching_protocols ... ?
@@ -165,7 +166,7 @@ module Http =
 
   let ACCEPTED s = accepted (bytes_utf8 s)
 
-  let no_content : HttpRequest -> Async<unit> option =
+  let no_content : WebPart =
     response 204 "No Content" (Array.zeroCreate 0) >> succeed
 
   let NO_CONTENT = no_content
@@ -197,10 +198,10 @@ module Http =
 " url))
     >> succeed
 
-  let not_modified : HttpRequest -> Async<unit> option =
+  let not_modified : WebPart =
     response 304 "Not Modified" (Array.zeroCreate 0) >> succeed
 
-  let NOT_MODIFIED : HttpRequest -> Async<unit> option =
+  let NOT_MODIFIED : WebPart =
     not_modified
 
   let bad_request s = response 400 "Bad Request" s >> succeed
@@ -307,13 +308,13 @@ module Http =
     new_fs.Close()
   }
 
-  let transform_x (filename : string) compression compression_folder r : Async<FileStream> = async {
+  let transform_x (filename : string) compression compression_folder ({ request = q; runtime = r; connection = connection } as ctx) : Async<FileStream> = async {
     let fs = new FileStream(filename, FileMode.Open, FileAccess.Read, FileShare.Read)
     if compression && fs.Length > int64(MIN_BYTES_TO_COMPRESS) && fs.Length < int64(MAX_BYTES_TO_COMPRESS) then
-      let enconding = parse_encoder r 
+      let enconding = parse_encoder q 
       match enconding with
       | Some (n) ->
-        do! async_writeln r.connection (String.Concat [| "Content-Encoding: "; n |]) r.line_buffer
+        do! async_writeln connection (String.Concat [| "Content-Encoding: "; n |])
         if not (compressed_files_map.ContainsKey filename) then
           let temp_file_name = Path.GetRandomFileName()
           if not (Directory.Exists compression_folder) then Directory.CreateDirectory compression_folder |> ignore
@@ -327,16 +328,19 @@ module Http =
       return fs
    }
 
-  let send_file filename (compression : bool) r =
-    let write_file file (r : HttpRequest) = async {
+  let send_file filename (compression : bool) (r : HttpContext) =
+    let write_file file (q : HttpRequest) = async {
+      
+      let connection = r.connection
+      let runtime    = r.runtime
 
-      use! fs = transform_x file compression r.compression_folder r
+      use! fs = transform_x file compression runtime.compression_folder r
 
-      do! async_writeln r.connection (sprintf "Content-Length: %d" (fs : FileStream).Length) r.line_buffer
-      do! async_writeln r.connection "" r.line_buffer
+      do! async_writeln connection (sprintf "Content-Length: %d" (fs : FileStream).Length)
+      do! async_writeln connection ""
 
       if fs.Length > 0L then
-        do! transfer_x r.connection fs }
+        do! transfer_x connection fs }
 
     async { do! response_f 200 "OK" (write_file filename) r } |> succeed
 
@@ -345,10 +349,10 @@ module Http =
   // 'Cache-Control' and 'Expires' headers should be left up to the user
 
   let file filename =
-    fun (r : HttpRequest) ->
+    fun ({request = r; runtime = q} as ctx) ->
       if File.Exists filename then
         let file_info = new FileInfo(filename)
-        let mimes = r.mime_types (file_info.Extension)
+        let mimes = q.mime_types_map (file_info.Extension)
         match mimes with
         | Some value ->
           let send_it _ = 
@@ -359,9 +363,9 @@ module Http =
           let modified_since = (r.headers ? ``if-modified-since`` )
           match modified_since with
           | Some v -> let date = DateTime.Parse v
-                      if file_info.LastWriteTime > date then send_it () r
-                      else NOT_MODIFIED r
-          | None   -> send_it () r
+                      if file_info.LastWriteTime > date then send_it () ctx
+                      else NOT_MODIFIED ctx
+          | None   -> send_it () ctx
         | None -> None
       else
         None
@@ -375,17 +379,20 @@ module Http =
     else raise <| Exception("File canonalization issue.")
 
   let browse_file filename = 
-    fun (r : HttpRequest) -> file (local_file filename r.home_directory) r
+    fun ({request = r; runtime = q} as h) -> file (local_file filename q.home_directory) h
 
-  let browse : WebPart = warbler (fun r -> file (local_file r.url r.home_directory))
+  let browse : WebPart = warbler (fun {request = r; runtime = q } -> file (local_file r.url q.home_directory))
 
   type WebResult = Option<Async<unit>>
 
-  let dir (req : HttpRequest) : WebResult =
+  let dir (ctx : HttpContext) : WebResult =
+
+    let req = ctx.request
+    let runtime = ctx.runtime
 
     let url = req.url
 
-    let dirname = local_file url req.home_directory
+    let dirname = local_file url runtime.home_directory
     let result = new StringBuilder()
 
     let filesize  (x : FileSystemInfo) =
@@ -404,7 +411,7 @@ module Http =
     if Directory.Exists dirname then
       let di = new DirectoryInfo(dirname)
       (di.GetFileSystemInfos()) |> Array.sortBy (fun x -> x.Name) |> Array.iter buildLine
-      ok (bytes (result.ToString())) req
+      ok (bytes (result.ToString())) ctx
     else fail
 
   let parse_authentication_token (token : string) =
@@ -414,7 +421,8 @@ module Http =
     let indexOfColon = decoded.IndexOf(':')
     (parts.[0].ToLower(), decoded.Substring(0,indexOfColon), decoded.Substring(indexOfColon+1))
 
-  let authenticate_basic f (p : HttpRequest) =
+  let authenticate_basic f (ctx : HttpContext) =
+    let p = ctx.request
     let headers = p.headers
     if headers.ContainsKey("authorization") then
       let header = headers.["authorization"]
@@ -424,26 +432,27 @@ module Http =
       if (typ.Equals("basic")) && f p then
         fail
       else
-        challenge p
+        challenge ctx
     else
-      challenge p
+      challenge ctx
 
   let log_format (http_request : HttpRequest) =
     sprintf "%A\n" (http_request.``method``, http_request.remote_address, http_request.url, http_request.query, http_request.form, http_request.headers)
 
-  let log (s : Stream) (http_request : HttpRequest) =
+  let log (s : Stream) (ctx : HttpContext) =
+    let http_request = ctx.request
     let bytes = bytes (log_format http_request)
     s.Write(bytes, 0, bytes.Length)
-    succeed http_request
+    succeed ctx
 
   open Suave.Sscanf
 
   let url_scan (pf : PrintfFormat<_,_,_,_,'t>) (h : 't ->  WebPart) : WebPart =
     let t url = sscanf pf url
 
-    let F (r:HttpRequest) =
+    let F (r:HttpContext) =
       try
-        let y = r.url |> t |> h
+        let y = r.request.url |> t |> h
         try y r with ex -> r |> INTERNAL_ERROR (ex.ToString())
       with _ -> fail
     F
