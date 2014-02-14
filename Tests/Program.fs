@@ -262,7 +262,7 @@ let cookies =
 open System.IO
 open System.Text
 
-//[<Tests>]
+[<Tests>]
 let compression =
   let run_with' = run_with default_config
 
