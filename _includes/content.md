@@ -2,9 +2,9 @@ Introduction.
 =============
 
 Suave is a simple web development F# library providing a lightweight web server and a set of combinators to manipulate route flow and task composition. Suave is inspired in the simplicity of Happstack and born out of the necessity of embedding web server capabilities in my own applications. 
-Still in its early stages Suave supports HTTPS, multiple TCP/IP bindings, Basic Access Authentication, Keep-Alive. Suave also takes advantage of F# asynchronous workflows to perform non-blocking IO. In fact, Suave is written in a **completely non-blocking** fashion throughout.
+Still in its early stages Suave supports HTTPS, multiple TCP/IP bindings, Basic Access Authentication, Keep-Alive. Suave also takes advantage of F# asynchronous workflows to perform non-blocking IO. In fact, Suave is written in a **completely non-blocking** fashion throughout. Suave **runs on Linux**, OSX and Windows flawlessly
 
-What follows is a tutorial on how to create applications. Scroll past the tutorial to see detailed function documentation.
+What follows is a tutorial on how to create Suave applications. Scroll past the tutorial to see detailed function documentation.
 
 Tutorial: Hello World!
 ----------------------
@@ -17,12 +17,12 @@ web_server default_config (OK "Hello World!")
 
 The above statement will start a web server on default port 8083. `web_server` takes a configuration record and the webpart `(OK "Hello World")` 
 
-Webparts are functions with the following type: `HttpRequest -> Option<Async<unit>>`. For every request `web_server` will evaluate the webpart, if the evaluation succeeds it will execute the resulting asynchronous computation. `OK` is a combinator that always succeed and writes its argument to the underlying response stream.
+Webparts are functions with the following type: `HttpContext -> Option<Async<unit>>`. For every request `web_server` will evaluate the webpart, if the evaluation succeeds it will execute the resulting asynchronous computation. `OK` is a combinator that always succeed and writes its argument to the underlying response stream.
 
 Tutorial: Composing bigger programs.
 ------------------------------------
 
-Logic is expressed with the help of different combinators built around the `option<HttpRequest>` type. We build webparts out of functions of type `HttpRequest -> HttpRequest option` and the operator `>>=` in the following way.
+Logic is expressed with the help of different combinators built around the `option<HttpContext>` type. We build webparts out of functions of type `HttpContext -> HttpContext option` and the operator `>>=` in the following way.
 
 {% highlight fsharp %}
 let simple_app _ = url "/hello" >>= OK "Hello World" ;
@@ -51,27 +51,17 @@ let nested_logic _ =
         ; url "/goodbye" >>= OK "Good bye POST" ] ]
 {% endhighlight %}
 
-To gain access to the underlying `HttpRequest` and read query and http form data we can use the `warbler` combinator.
+To gain access to the underlying `HttpRequest` and read query and http form data we can use the `request` combinator.
 
 {% highlight fsharp %}
 let http_form _ = 
   choose
-    [ GET  >>= url "/query" >>= warbler(fun x -> OK ("Hello " + (x.Query) ? name))
-    ; POST >>= url "/query" >>= warbler(fun x -> OK ("Hello " + (x.Form)  ? name))
+    [ GET  >>= url "/query" >>= request(fun x -> OK ("Hello " + (x.Query) ? name))
+    ; POST >>= url "/query" >>= request(fun x -> OK ("Hello " + (x.Form)  ? name))
     ; notfound "Found no handlers" ]
 {% endhighlight %}
 
-or alternatively with `>>==`
-
-{% highlight fsharp %}
-let http_form _ = 
-  choose
-    [ GET  >>= url "/query" >>== (fun x -> OK ("Hello " + (x.Query) ? name))
-    ; POST >>= url "/query" >>== (fun x -> OK ("Hello " + (x.Form)  ? name))
-    ; notfound "Found no handlers" ]
-{% endhighlight %}
-
-Here is how http authentication would work:
+To protect a route with HTTP Basic Authentication the combinator `authenticate_basic` is used like in the following example.
 
 {% highlight fsharp %}
 let requires_authentication _ = 
@@ -82,15 +72,13 @@ let requires_authentication _ =
     ; GET >>= url "/protected" >>== (fun x -> OK ("Hello " + x.Username)) ]
 {% endhighlight %}
 
-`warbler` gets its name from the famous book "To Mock a Mockingbird" by Raymond Smullyan.
-
 Typed routes
 ------------
 
 {% highlight fsharp %}
 let testapp : WebPart = 
   choose
-    [ urlscan "/add/%d/%d" (fun (a,b) -> OK((a + b).ToString()))
+    [ url_scan "/add/%d/%d" (fun (a,b) -> OK((a + b).ToString()))
     ; notfound "Found no handlers" ]
 {% endhighlight %}
 
@@ -172,10 +160,21 @@ type SuaveConfig =
 
   /// Maximun number of accept, receive and send operations the server can handle simultaneously
   /// default value is 100
-  ; max_ops        : int }
+  ; max_ops        : int
+
+  /// MIME types, registry of file extensions Suave can serve and if they can be compressed
+  ; mime_types_map : string -> MimeType option
+
+  /// Home or root directory, the directory where content will be served from
+  /// if no directory is specified the directory where suave.dll lives is assumed the home directory
+  ; home_folder    : string option
+
+  /// Folder for temporary compressed files, directory where to cache compressed static files
+  /// if no directory is specified the directory where suave.dll lives is assumed
+  ; compressed_files_folder : string option }
 {% endhighlight %}
 
-With `Protocol` and `HttpBinding` defined like follows:
+With `Protocol` , `HttpBinding` and `MimeType` defined like follows:
 
 {% highlight fsharp %}
 /// Gets the supported protocols, HTTP and HTTPS with a certificate
@@ -185,7 +184,8 @@ type Protocol =
   /// The HTTP protocol tunneled in a TLS tunnel
   | HTTPS of X509Certificate
 
-/// A HTTP binding is a protocol is the product of HTTP or HTTP, a DNS or IP binding and a port number
+/// A HTTP binding is a protocol is the product of HTTP or HTTP, a DNS or IP binding 
+/// and a port number
 type HttpBinding =
   /// The scheme in use
   { scheme : Protocol
@@ -193,7 +193,45 @@ type HttpBinding =
   ; ip     : IPAddress
   /// The port for the binding
   ; port   : uint16 }
+
+type MimeType = 
+  /// The name of the mime type, i.e "text/plain"
+  { name         : string
+  /// If the server will compress the file when clients ask for gzip or 
+  /// deflate in the `Accept-Encoding` header
+  ; compression  : bool }
 {% endhighlight %}
+
+## Serving static files, HTTP Compression and MIME types
+
+Suave supports **gzip** and **deflate** http compression encodings.  Http compression is configured via the MIME types map in the server configuration record. By default Suave does not serve files with extensions not registered in the mime types map.
+
+The default mime types map `default_mime_types_map` looks like this.
+
+{% highlight fsharp %}
+let default_mime_types_map = function
+    | ".css" -> mk_mime_type "text/css" true
+    | ".gif" -> mk_mime_type "image/gif" false
+    | ".png" -> mk_mime_type "image/png" false
+    | ".htm"
+    | ".html" -> mk_mime_type "text/html" true
+    | ".jpe"
+    | ".jpeg"
+    | ".jpg" -> mk_mime_type "image/jpeg" false
+    | ".js"  -> mk_mime_type "application/x-javascript" true
+    | _      -> None
+{% endhighlight %}
+
+You can register additional MIME extensions by creating a new mime map in the following fashion.
+
+{% highlight fsharp %}
+// Adds a new mime type to the default map
+let mime_types x =
+  default_mime_types_map 
+    >=> (function | ".avi" -> mk_mime_type "video/avi" false | _ -> None)
+{% endhighlight %}
+
+
 
 ## Overview
 
@@ -203,11 +241,11 @@ option` that, if Some, gets run against the WebParts passed.
 
 ### The WebPart
 
-A web part is a thing that executes on a HttpRequest, asynchronously, maybe executing
+A web part is a thing that executes on a HttpContext, asynchronously, maybe executing
 on the request.
 
 {% highlight fsharp %}
-type WebPart = HttpRequest -> Async<unit> option
+type WebPart = HttpContext -> Async<unit> option
 {% endhighlight %}
 
 ### The ErrorHandler
@@ -217,6 +255,6 @@ An error handler takes the exception, a programmer-provided message, a request
 error.
 
 {% highlight fsharp %}
-type ErrorHandler = Exception -> String -> HttpRequest -> Async<unit>
+type ErrorHandler = Exception -> String -> HttpContext -> Async<unit>
 {% endhighlight %}
 
