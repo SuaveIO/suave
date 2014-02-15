@@ -71,7 +71,7 @@ let requires_authentication _ =
     [ GET >>= url "/public" >>= OK "Hello anonymous"
     //access to handlers bellow this one will require authentication
     ; authenticate_basic (fun x -> x.Username.Equals("foo") && x.Password.Equals("bar"))
-    ; GET >>= url "/protected" >>== (fun x -> OK ("Hello " + x.Username)) ]
+    ; GET >>= url "/protected" >>= request(fun x -> OK ("Hello " + x.Username)) ]
 {% endhighlight %}
 
 Typed routes
