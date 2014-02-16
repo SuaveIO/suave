@@ -7,7 +7,7 @@ open System.IO
 
 /// Representation of the things that go into an HTML element
 type Element =
-  /// The element itself; a name, TODO SOMETHING and an array of attribute-value pairs.
+  /// The element itself; a name, a xml namespace and an array of attribute-value pairs.
   | Element of string * string * ( (string * string)[] )
   /// A text element inside the HTML element
   | Text of string
