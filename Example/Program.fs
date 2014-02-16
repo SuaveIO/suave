@@ -60,7 +60,7 @@ choose [
   GET >>= url "/query" >>= OK "Hello beautiful" ;
   url "/redirect" >>= redirect "/redirected"
   url "/redirected" >>=  OK "You have been redirected." ;
-  url "/date" >>= warbler (fun _ -> OK (DateTime.Now.ToString()));
+  url "/date" >>= warbler (fun _ -> OK (DateTime.UtcNow.ToString("o")));
   url "/timeout" >>= timeout;
   url "/session"
     >>= session_support
