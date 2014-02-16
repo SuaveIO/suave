@@ -4,9 +4,18 @@ Introduction.
 Suave is inspired in the simplicity of Happstack and born out of the necessity of embedding web server capabilities in my own applications. 
 Still in its early stages Suave supports HTTPS, multiple TCP/IP bindings, Basic Access Authentication, Keep-Alive and HTTP compression.
 
-Suave also takes advantage of F# asynchronous workflows to perform non-blocking IO. In fact, Suave is written in a **completely non-blocking** fashion throughout. Suave **runs on Linux**, OSX and Windows flawlessly.
+Suave also takes advantage of F# asynchronous workflows to perform non-blocking IO. In fact, Suave is written in a **completely non-blocking** fashion throughout. Suave **runs on Linux**, OS X and Windows flawlessly.
 
 What follows is a tutorial on how to create Suave applications. Scroll past the tutorial to see detailed function documentation.
+
+NuGet
+-----
+
+To install Suave, run the following command in the [Package Manager Console](http://docs.nuget.org/docs/start-here/using-the-package-manager-console)
+
+{% highlight dosbatch %}
+PM> Install-Package Suave
+{% endhighlight %}
 
 Tutorial: Hello World!
 ----------------------
