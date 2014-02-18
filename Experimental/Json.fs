@@ -6,8 +6,8 @@ open System.Runtime.Serialization.Json
 open System.Text
 
 /// Convert the object to a JSON representation inside a byte array (can be made string of)
-let to_json<'a> o =
-  let dcs = DataContractJsonSerializer(typeof<'a>)
+let to_json<'a> (o: 'a) =
+  let dcs = DataContractJsonSerializer(o.GetType())
   let ms = new MemoryStream()
   dcs.WriteObject(ms, o)
   ms.ToArray()
