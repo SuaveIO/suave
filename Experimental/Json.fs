@@ -19,3 +19,11 @@ let from_json<'a> (bytes:byte []) =
   ms.Write(bytes, 0, bytes.Length)
   ms.Seek(0L, SeekOrigin.Begin) |> ignore
   dcs.ReadObject(ms) :?> 'a
+
+/// Expose function f through a json call; lets you write like
+///
+/// let app =
+///   url "/path"  >>= request (map_json some_function);
+///
+let map_json f ( r : Types.HttpRequest) =
+  f  (from_json(r.raw_form)) |> to_json |> Http.ok
