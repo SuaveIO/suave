@@ -500,14 +500,14 @@ let request_loop
     }
    
 
-  let rec loop (bytes : BufferSegment option) request = async {
+  let rec loop (bytes : BufferSegment option) request cn = async {
     Log.trace(fun () -> "web:request_loop:loop -> processor")
-    let! result = processor request connection bytes
+    let! result = processor request cn bytes
     Log.trace(fun () -> "web:request_loop:loop <- processor")
 
     match result with
     | Some (request : HttpRequest, rem) ->
-      let ctx = { request = request; runtime = runtime; connection = connection }
+      let ctx = { request = request; runtime = runtime; connection = cn }
       try
         Log.trace(fun () -> "web:request_loop:loop -> unblock")
         do! Async.WithTimeout (web_part_timeout, run ctx)
@@ -522,7 +522,7 @@ let request_loop
         | Some (x : string) when x.ToLower().Equals("keep-alive") ->
           clear request
           Log.tracef(fun fmt -> fmt "web:request_loop:loop 'Connection: keep-alive' recurse (!), rem: %A" rem)
-          return! loop rem request
+          return! loop rem request cn
         | Some _ ->
           free rem;
           Log.trace(fun () -> "web:request_loop:loop  'Connection: close', exiting")
@@ -531,7 +531,7 @@ let request_loop
           if request.http_version.Equals("HTTP/1.1") then
             clear request
             Log.trace(fun () -> "web:request_loop:loop  'Connection: keep-alive' recurse (!)")
-            return! loop rem request
+            return! loop rem request cn
           else
             free rem;
             Log.trace(fun () -> "web:request_loop:loop  'Connection: close', exiting")
@@ -564,7 +564,7 @@ let request_loop
       ; remote_address = connection.ipaddr
       ; is_secure      = match proto with HTTP -> false | HTTPS _ -> true }
     try
-      do! loop None request
+      do! loop None request connection
     with
     | InternalFailure(_)
     | :? EndOfStreamException
