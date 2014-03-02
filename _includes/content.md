@@ -67,9 +67,9 @@ To gain access to the underlying `HttpRequest` and read query and http form data
 {% highlight fsharp %}
 let http_form _ = 
   choose
-    [ GET  >>= url "/query" >>= request(fun x -> OK ("Hello " + (x.Query) ? name))
-    ; POST >>= url "/query" >>= request(fun x -> OK ("Hello " + (x.Form)  ? name))
-    ; notfound "Found no handlers" ]
+    [ GET  >>= url "/query" >>= request(fun x -> OK ("Hello " + (opt <| x.query ? name)))
+    ; POST >>= url "/query" >>= request(fun x -> OK ("Hello " + (opt <| x.form  ? name)))
+    ; NOT_FOUND "Found no handlers" ]
 {% endhighlight %}
 
 To protect a route with HTTP Basic Authentication the combinator `authenticate_basic` is used like in the following example.
@@ -90,7 +90,7 @@ Typed routes
 let testapp : WebPart = 
   choose
     [ url_scan "/add/%d/%d" (fun (a,b) -> OK((a + b).ToString()))
-    ; notfound "Found no handlers" ]
+    ; NOT_FOUND "Found no handlers" ]
 {% endhighlight %}
 
 Multiple bindings and SSL support
@@ -113,7 +113,7 @@ let cfg =
 choose 
   [ Console.OpenStandardOutput() |> log >>= never // log to standard output
   ; url "/hello" >>= OK "Hello World"
-  ; notfound "Found no handlers" ]
+  ; NOT_FOUND "Found no handlers" ]
 |> web_server cfg
 {% endhighlight %}
 
