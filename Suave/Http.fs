@@ -293,13 +293,13 @@ module Http =
 
   let compressed_files_map = new ConcurrentDictionary<string,string>()
 
-  let compress n path (fs : FileStream) = async {
+  let compress encoding path (fs : FileStream) = async {
     use new_fs = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.Write)
-    if n = "gzip" then
+    if encoding = "gzip" then
       use gzip = new GZipStream(new_fs, CompressionMode.Compress)
       do! fs.CopyToAsync gzip
       gzip.Close()
-    elif n = "deflate" then
+    elif encoding = "deflate" then
       use deflate = new DeflateStream(new_fs, CompressionMode.Compress)
       do! fs.CopyToAsync deflate
       deflate.Close()
@@ -308,24 +308,35 @@ module Http =
     new_fs.Close()
   }
 
-  let transform_x (filename : string) compression compression_folder ({ request = q; runtime = r; connection = connection } as ctx) : Async<FileStream> = async {
-    let fs = new FileStream(filename, FileMode.Open, FileAccess.Read, FileShare.Read)
-    if compression && fs.Length > int64(MIN_BYTES_TO_COMPRESS) && fs.Length < int64(MAX_BYTES_TO_COMPRESS) then
-      let enconding = parse_encoder q 
-      match enconding with
-      | Some (n) ->
-        do! async_writeln connection (String.Concat [| "Content-Encoding: "; n |])
-        if not (compressed_files_map.ContainsKey filename) then
-          let temp_file_name = Path.GetRandomFileName()
-          if not (Directory.Exists compression_folder) then Directory.CreateDirectory compression_folder |> ignore
-          let new_path = Path.Combine(compression_folder,temp_file_name)
-          do! compress n new_path fs
-          compressed_files_map.TryAdd(filename,new_path) |> ignore
-        return new FileStream(compressed_files_map.[filename] ,FileMode.Open, FileAccess.Read, FileShare.Read)
-      | None ->
+  let transform_x (path : string) compression compression_folder ({ request = q; runtime = r; connection = connection } as ctx) : Async<FileStream> = 
+    let fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read)
+    let compress_file n = async {
+      let temp_file_name = Path.GetRandomFileName()
+      if not (Directory.Exists compression_folder) then Directory.CreateDirectory compression_folder |> ignore
+      let new_path = Path.Combine(compression_folder,temp_file_name)
+      do! compress n new_path fs
+      return new_path
+    }
+    async {
+      if compression && fs.Length > int64(MIN_BYTES_TO_COMPRESS) && fs.Length < int64(MAX_BYTES_TO_COMPRESS) then
+        let enconding = parse_encoder q 
+        match enconding with
+        | Some (n) ->
+          do! async_writeln connection (String.Concat [| "Content-Encoding: "; n |])
+          if compressed_files_map.ContainsKey path then
+            let file_info = new FileInfo(path)
+            let cmpr_info = new FileInfo(compressed_files_map.[path])
+            if file_info.LastWriteTime > cmpr_info.CreationTime then
+              let! new_path =  compress_file n
+              compressed_files_map.[path] <- new_path
+          else
+            let! new_path =  compress_file n
+            compressed_files_map.TryAdd(path,new_path) |> ignore
+          return new FileStream(compressed_files_map.[path] , FileMode.Open, FileAccess.Read, FileShare.Read)
+        | None ->
+          return fs
+      else
         return fs
-    else
-      return fs
    }
 
   let send_file filename (compression : bool) (r : HttpContext) =
