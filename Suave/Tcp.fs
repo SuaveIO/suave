@@ -127,17 +127,25 @@ let tcp_ip_server (source_ip : IPAddress, source_port : uint16, buffer_size : in
   listenSocket.Bind(localEndPoint);
   listenSocket.Listen(MAX_BACK_LOG)
 
+
+  let number_of_clients = ref 0
+
   //consider:
   //echo 5 > /proc/sys/net/ipv4/tcp_fin_timeout
   //echo 1 > /proc/sys/net/ipv4/tcp_tw_recycle
   //custom kernel with shorter TCP_TIMEWAIT_LEN in include/net/tcp.h
   let inline job (accept_args:A) = async {
+
     let socket = accept_args.AcceptSocket
+    let ip_address = (socket.RemoteEndPoint :?> IPEndPoint).Address
+    Interlocked.Increment(number_of_clients) |> ignore
+    Log.tracef(fun fmt -> fmt "tcp:tcp_ip_server - client '%s' accepted, %d clients connected." (ip_address.ToString()) !number_of_clients)
+
     try
       let read_args = b.Pop()
       let write_args = c.Pop()
       let connection = { 
-        ipaddr =  (socket.RemoteEndPoint :?> IPEndPoint).Address;
+        ipaddr = ip_address;
         read  = receive socket read_args;
         write = send socket write_args;
         get_buffer = bufferManager.PopBuffer;
@@ -156,6 +164,8 @@ let tcp_ip_server (source_ip : IPAddress, source_port : uint16, buffer_size : in
         b.Push(read_args)
         c.Push(write_args)
         bufferManager.FreeBuffer connection.line_buffer
+        Interlocked.Decrement(number_of_clients) |> ignore
+        Log.tracef(fun fmt -> fmt "tcp:tcp_ip_server - client '%s' disconnected, %d clients connected." (ip_address.ToString()) !number_of_clients)
     with 
     | :? System.IO.EndOfStreamException ->
       Log.trace(fun () -> "tcp:tcp_ip_server - disconnected client (end of stream)")
