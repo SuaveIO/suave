@@ -128,7 +128,7 @@ let tcp_ip_server (source_ip : IPAddress, source_port : uint16, buffer_size : in
   listenSocket.Listen(MAX_BACK_LOG)
 
 
-  let number_of_clients = ref 0
+  let number_of_clients = ref 0L
 
   //consider:
   //echo 5 > /proc/sys/net/ipv4/tcp_fin_timeout
