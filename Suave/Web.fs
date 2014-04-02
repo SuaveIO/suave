@@ -404,9 +404,7 @@ let process_request proxy_mode (request : HttpRequest) (connection : Connection)
                       let cookie = parse_cookie x.Value
                       request.cookies.Add (fst(cookie.[0]),cookie))
 
-        // TODO: can't assume only POST can have form data, PUT can also be done
-        // from forms
-        if meth.Equals("POST") then
+        if meth.Equals("POST") || meth.Equals("PUT") then
 
           let content_encoding =
             match headers.TryGetValue("content-type") with
