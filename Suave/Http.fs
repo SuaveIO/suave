@@ -382,6 +382,9 @@ module Http =
         None
 
   let local_file (fileName : string) (root_path : string) =
+    let fileName = 
+      if Path.DirectorySeparatorChar.Equals('/') then fileName
+      else fileName.Replace('/', Path.DirectorySeparatorChar)
     let calculated_path = Path.Combine(root_path, fileName.TrimStart([| Path.DirectorySeparatorChar; Path.AltDirectorySeparatorChar |]))
     if calculated_path = Path.GetFullPath(calculated_path) then
       if calculated_path.StartsWith root_path then
