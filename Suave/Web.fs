@@ -463,6 +463,86 @@ open System.Net.Sockets
 type HttpProcessor = HttpRequest -> Connection -> BufferSegment option -> Async<(HttpRequest * (BufferSegment option)) option>
 type RequestResult = Done
 
+let mk_request connection proto =
+    { http_version   = null
+    ; url            = null
+    ; ``method``     = null
+    ; query          = new Dictionary<string,string>()
+    ; headers        = new Dictionary<string,string>()
+    ; form           = new Dictionary<string,string>()
+    ; raw_form       = null
+    ; raw_query      = null
+    ; cookies        = new Dictionary<string,(string*string)[]>()
+    ; user_name      = null
+    ; password       = null
+    ; session_id     = null
+    ; response       = new HttpResponse()
+    ; files          = new List<HttpUpload>()
+    ; remote_address = connection.ipaddr
+    ; is_secure      = match proto with HTTP -> false | HTTPS _ -> true }
+
+let free connection (s : BufferSegment option) = 
+  match s with 
+  | None -> ()
+  | Some x -> connection.free_buffer x.buffer
+
+/// Check if the web part can perform its work on the current request. If it can't
+/// it will return None and the run method will return.
+let run ctx web_part = async {
+  match web_part ctx with // run the web part
+  | Some x -> do! x
+  | None -> return ()
+}
+
+let http_loop processor runtime req cn web_part =
+
+  let rec loop (bytes : BufferSegment option) request = async {
+    
+    Log.trace(fun () -> "web:request_loop:loop -> processor")
+    let! result = processor request cn bytes
+    Log.trace(fun () -> "web:request_loop:loop <- processor")
+
+    match result with
+    | Some (request : HttpRequest, rem) ->
+      let ctx = { request = request; runtime = runtime; connection = cn }
+      try
+        Log.trace(fun () -> "web:request_loop:loop -> unblock")
+        do! Async.WithTimeout (runtime.web_part_timeout, run ctx web_part)
+        Log.trace(fun () -> "web:request_loop:loop <- unblock")
+      with
+        | InternalFailure(_) as ex  -> free cn rem; raise ex
+        | :? TimeoutException as ex -> free cn rem; raise ex
+        | :? SocketIssue as ex      -> free cn rem; raise ex
+        | ex -> do! runtime.error_handler ex "Routing request failed" ctx
+      if cn.is_connected () then
+        match request.headers?connection with
+        | Some (x : string) when x.ToLower().Equals("keep-alive") ->
+          clear request
+          Log.tracef(fun fmt -> fmt "web:request_loop:loop 'Connection: keep-alive' recurse (!), rem: %A" rem)
+          return! loop rem request
+        | Some _ ->
+          free cn rem;
+          Log.trace(fun () -> "web:request_loop:loop  'Connection: close', exiting")
+          return ()
+        | None ->
+          if request.http_version.Equals("HTTP/1.1") then
+            clear request
+            Log.trace(fun () -> "web:request_loop:loop  'Connection: keep-alive' recurse (!)")
+            return! loop rem request
+          else
+            free cn rem;
+            Log.trace(fun () -> "web:request_loop:loop  'Connection: close', exiting")
+            return ()
+      else
+        free cn rem;
+        Log.trace(fun () -> "web:request_loop:loop 'is_connected = false', exiting")
+        return ()
+    | None ->
+      Log.trace(fun () -> "web:request_loop:loop 'result = None', exiting")
+      return ()
+  }
+  loop None req
+
 /// The request loop initialises a request with a processor to handle the
 /// incoming stream and possibly pass the request to the web parts, a protocol,
 /// a web part, an error handler, a timeout value for executing the web part
@@ -475,94 +555,12 @@ let request_loop
   (connection       : Connection) =
 
   let proto            = runtime.protocol
-  let web_part_timeout = runtime.web_part_timeout
-  let error_handler    = runtime.error_handler
 
-  /// Check if the web part can perform its work on the current request. If it can't
-  /// it will return None and the run method will return.
-  let run ctx = async {
-    match web_part ctx with // run the web part
-    | Some x -> do! x
-    | None -> return ()
-  }
-
-  let free (s : BufferSegment option) = 
-    match s with 
-    | None -> ()
-    | Some x -> connection.free_buffer x.buffer
-
-  let exit rem msg = async {
-    free rem
-    Log.trace(fun () -> msg)
-    return ()
-    }
-   
-
-  let rec loop (bytes : BufferSegment option) request cn = async {
-    Log.trace(fun () -> "web:request_loop:loop -> processor")
-    let! result = processor request cn bytes
-    Log.trace(fun () -> "web:request_loop:loop <- processor")
-
-    match result with
-    | Some (request : HttpRequest, rem) ->
-      let ctx = { request = request; runtime = runtime; connection = cn }
-      try
-        Log.trace(fun () -> "web:request_loop:loop -> unblock")
-        do! Async.WithTimeout (web_part_timeout, run ctx)
-        Log.trace(fun () -> "web:request_loop:loop <- unblock")
-      with
-        | InternalFailure(_) as ex  -> free rem; raise ex
-        | :? TimeoutException as ex -> free rem; raise ex
-        | :? SocketIssue as ex      -> free rem; raise ex
-        | ex -> do! error_handler ex "Routing request failed" ctx
-      if connection.is_connected () then
-        match request.headers?connection with
-        | Some (x : string) when x.ToLower().Equals("keep-alive") ->
-          clear request
-          Log.tracef(fun fmt -> fmt "web:request_loop:loop 'Connection: keep-alive' recurse (!), rem: %A" rem)
-          return! loop rem request cn
-        | Some _ ->
-          free rem;
-          Log.trace(fun () -> "web:request_loop:loop  'Connection: close', exiting")
-          return ()
-        | None ->
-          if request.http_version.Equals("HTTP/1.1") then
-            clear request
-            Log.trace(fun () -> "web:request_loop:loop  'Connection: keep-alive' recurse (!)")
-            return! loop rem request cn
-          else
-            free rem;
-            Log.trace(fun () -> "web:request_loop:loop  'Connection: close', exiting")
-            return ()
-      else
-        free rem;
-        Log.trace(fun () -> "web:request_loop:loop 'is_connected = false', exiting")
-        return ()
-    | None ->
-      Log.trace(fun () -> "web:request_loop:loop 'result = None', exiting")
-      return ()
-  }
   async {
     let! connection = load_connection proto connection
-    let request =
-      { http_version   = null
-      ; url            = null
-      ; ``method``     = null
-      ; query          = new Dictionary<string,string>()
-      ; headers        = new Dictionary<string,string>()
-      ; form           = new Dictionary<string,string>()
-      ; raw_form       = null
-      ; raw_query      = null
-      ; cookies        = new Dictionary<string,(string*string)[]>()
-      ; user_name      = null
-      ; password       = null
-      ; session_id     = null
-      ; response       = new HttpResponse()
-      ; files          = new List<HttpUpload>()
-      ; remote_address = connection.ipaddr
-      ; is_secure      = match proto with HTTP -> false | HTTPS _ -> true }
+    let request = mk_request connection proto
     try
-      do! loop None request connection
+      do! http_loop processor runtime request connection web_part
     with
     | InternalFailure(_)
     | :? EndOfStreamException
