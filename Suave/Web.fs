@@ -429,7 +429,7 @@ let process_request proxy_mode (request : HttpRequest) (connection : Connection)
             let! rem = parse_multipart connection boundary request rem line_buffer
             return Some (request, rem)
           | Some _ | None -> 
-            let! (rawdata : ArraySegment<_>),_ = read_post_data connection content_length rem
+            let! (rawdata : ArraySegment<_>), rem = read_post_data connection content_length rem
             let raw_form = Array.zeroCreate rawdata.Count
             Array.blit rawdata.Array rawdata.Offset raw_form 0 rawdata.Count
             request.raw_form <- raw_form
