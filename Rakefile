@@ -7,6 +7,8 @@ require 'albacore/task_types/nugets_pack'
 require 'albacore/task_types/asmver'
 require 'albacore/ext/teamcity'
 
+require 'semver'
+
 Albacore::Tasks::Versionizer.new :versioning
 
 include ::Albacore::NugetsPack
