@@ -181,5 +181,5 @@ type SuaveConfig =
 /// An exception, raised e.g. if writing to the stream fails
 exception InternalFailure of string
 
-// Supported HTTP compression encondings
+/// Supported HTTP compression encondings
 type ContentEncoding = GZip | Deflate | Identity
