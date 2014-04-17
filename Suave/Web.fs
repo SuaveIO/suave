@@ -223,7 +223,12 @@ module ParsingAndControl =
   let read_headers connection read (headers : Dictionary<string,string>) (buf : ArraySegment<byte>) =
     let rec loop (rem : BufferSegment option) = async {
       let offset = ref 0
-      let! count, new_rem = read_till_EOL connection (fun a count -> Array.blit a.Array a.Offset buf.Array (buf.Offset + !offset) count; offset := !offset + count) rem
+      let! count, new_rem =
+        read_till_EOL
+          connection
+          (fun a count -> Array.blit a.Array a.Offset buf.Array (buf.Offset + !offset) count
+                          offset := !offset + count)
+          rem
       if count <> 0 then
         let line = to_string buf.Array buf.Offset count
         let indexOfColon = line.IndexOf(':')
