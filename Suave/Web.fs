@@ -252,7 +252,8 @@ module ParsingAndControl =
          |> (fun d -> if d.Length = 2 then param.Add(d.[0], System.Web.HttpUtility.UrlDecode(d.[1]))))
     param
 
-  /// TO BE DONE
+  /// parse the url into its constituents and fill out the passed dictionary with
+  /// query string key-value pairs
   let inline parse_url (line : string) (dict : Dictionary<string,string>) =
     let parts = line.Split(' ')
     if parts.Length < 2 || parts.Length > 3 then failwith (sprintf "invalid url: '%s'" line)
@@ -260,9 +261,10 @@ module ParsingAndControl =
 
     if indexOfMark > 0 then
       let raw_query = parts.[1].Substring(indexOfMark + 1)
-      (parts.[0], parts.[1].Substring(0,indexOfMark), parse_data raw_query dict, "?" + raw_query, parts.[2])
+      parse_data raw_query dict |> ignore
+      (parts.[0], parts.[1].Substring(0,indexOfMark), "?" + raw_query, parts.[2])
     else
-      (parts.[0], parts.[1], dict, String.Empty, parts.[2])
+      (parts.[0], parts.[1], String.Empty, parts.[2])
 
   /// Read the post data from the stream, given the number of bytes that makes up the post data.
   let read_post_data (connection : Connection) (bytes : int) (read : BufferSegment option) =
@@ -385,7 +387,7 @@ module ParsingAndControl =
       if first_line.Length = 0 then
         return None
       else
-        let meth, url, _, raw_query, http_version = parse_url first_line request.query
+        let meth, url, raw_query, http_version = parse_url first_line request.query
 
         request.url          <- url
         request.``method``   <- meth
