@@ -554,7 +554,7 @@ module ParsingAndControl =
 
     async {
       let! connection = load_connection runtime.protocol connection
-      let request = mk_request connection runtime.protocol
+      let request     = mk_request connection runtime.protocol
       try
         do! http_loop processor runtime request connection web_part
       with
@@ -566,6 +566,7 @@ module ParsingAndControl =
         return ()
       | ex ->
         Log.tracef(fun fmt -> fmt "web:request_loop - Request failed.\n%A" ex)
+        return ()
     }
 
   /// Parallelise the map of 'f' onto all items in the 'input' seq.
