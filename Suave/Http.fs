@@ -453,10 +453,20 @@ module Http =
   let log_format (http_request : HttpRequest) =
     sprintf "%A\n" (http_request.``method``, http_request.remote_address, http_request.url, http_request.query, http_request.form, http_request.headers)
 
-  let log (s : Stream) (ctx : HttpContext) =
-    let http_request = ctx.request
-    let bytes = bytes (log_format http_request)
-    s.Write(bytes, 0, bytes.Length)
+  let log (logger : Log.Logger) (formatter : HttpRequest -> string) (ctx : HttpContext) =
+    // raw web logs are absolutely not Info level logs, making it debug:
+    let th =
+      ctx.user_state |> Map.tryFind "suave$tracing"
+      |> Option.map (fun t -> t :?> Log.TraceHeader)
+
+    logger.Log Log.LogLevel.Debug <| fun _ ->
+      { tracing       = th
+      ; message       = formatter ctx.request
+      ; level         = Log.LogLevel.Debug
+      ; path          = "suave/web-requests"
+      ; ``exception`` = None
+      ; ts_utc_ticks  = DateTime.UtcNow.Ticks }
+
     succeed ctx
 
   open Suave.Sscanf

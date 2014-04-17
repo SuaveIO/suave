@@ -1249,10 +1249,9 @@ module Http =
   val log_format : ctx:HttpRequest -> string
 
   /// <summary><para>
-  /// HERE BE DRAGONS: Not thread-safe.
-  /// Log the HttpRequest to the given stream. For debugging purposes.
+  /// Log the HttpRequest to the given logger.
   /// </para></summary>
-  val log : s:System.IO.Stream -> ctx:HttpContext -> HttpContext option
+  val log : Log.Logger -> (HttpRequest -> string) -> ctx:HttpContext -> HttpContext option
 
   /// <summary><para>
   /// Strongly typed route matching! Matching the uri can be used with the 'parsers'

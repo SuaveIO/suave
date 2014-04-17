@@ -126,10 +126,13 @@ and HttpRuntime =
   ; home_directory     : string
   ; compression_folder : string }
 
-and HttpContext = 
+and HttpContext =
   { request    : HttpRequest
   ; runtime    : HttpRuntime
-  ; connection : Connection }
+  ; connection : Connection
+  // TODO: handling user state doesn't fit here: https://github.com/basho/webmachine/wiki/Resource-Functions
+  ; user_state : Map<string, obj> }
+
 
 let request f (a : HttpContext) = f a.request a
 

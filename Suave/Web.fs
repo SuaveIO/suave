@@ -504,7 +504,7 @@ let http_loop processor runtime req cn web_part =
 
     match result with
     | Some (request : HttpRequest, rem) ->
-      let ctx = { request = request; runtime = runtime; connection = cn }
+      let ctx = { request = request; runtime = runtime; connection = cn; user_state = Map.empty }
       try
         Log.trace(fun () -> "web:request_loop:loop -> unblock")
         do! Async.WithTimeout (runtime.web_part_timeout, run ctx web_part)
@@ -652,4 +652,5 @@ let default_config : SuaveConfig =
   ; max_ops          = 100
   ; mime_types_map   = default_mime_types_map
   ; home_folder      = None
-  ; compressed_files_folder = None }
+  ; compressed_files_folder = None
+  ; logger           = Log.Loggers.sane_defaults_for Log.LogLevel.Info }

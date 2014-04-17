@@ -110,20 +110,21 @@ type LogLine =
     /// distributed tracing and the LogLine is an annotation instead
   { tracing       : TraceHeader option
     /// the level that this log line has
-    level         : LogLevel
+  ; level         : LogLevel
     /// the source of the log line, e.g. 'ModuleName.FunctionName'
-    path          : string
+  ; path          : string
     /// the message that the application wants to log
-    message       : string
+  ; message       : string
     /// an optional exception
-    ``exception`` : exn option
+  ; ``exception`` : exn option
     /// timestamp when this log line was created
-    ts_utc_ticks  : int64 }
+  ; ts_utc_ticks  : int64 }
 
 /// The primary Logger abstraction that you can log data into
 type Logger =
   /// log - evaluate the function if the log level matches - by making it
   /// a function we don't needlessly need to evaluate it
+  /// Calls to this method must be thread-safe and not change any state
   abstract member Log : LogLevel -> (unit -> LogLine) -> unit
 
 module Loggers =
@@ -133,6 +134,7 @@ module Loggers =
       member x.Log level f_line =
         other_loggers |> List.iter (fun l -> l.Log level f_line)
 
+  /// let the ISO8601 love flow
   let internal default_formatter (line : LogLine) =
     // [I] 2014-04-05T12:34:56Z: Hello World! [my.sample.app]
     "[" + Char.ToUpperInvariant(line.level.ToString().[0]).ToString() + "] " +
@@ -177,7 +179,7 @@ module Loggers =
       member x.Log level f_line = if level >= min_level then log (f_line ())
 
   let sane_defaults_for level =
-    if level >= Info then
+    if level >= Warn then
       ConsoleWindowLogger(level) :> Logger
     else
       CombiningLogger(
@@ -190,7 +192,7 @@ let trace f_str =
 let tracef format =
     format (Printf.kprintf (fun s -> System.Console.WriteLine(sprintf "%s: %s" (DateTime.UtcNow.ToString("o")) s)))
 
-let log str =
+let log_str logger str =
   System.Console.WriteLine(sprintf "%s: %s" (DateTime.UtcNow.ToString("o")) str)
 
 let logf format =
