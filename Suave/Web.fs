@@ -395,6 +395,7 @@ module ParsingAndControl =
         let! rem = read_headers connection rem request.headers line_buffer
 
         // won't continue parsing if on proxyMode with the intention of forwarding the stream as it is
+        // TODO: proxy mode might need headers and contents of request, but won't get it through this impl
         if proxy_mode then return Some (request, rem)
         else
           request.headers
