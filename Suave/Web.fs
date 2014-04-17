@@ -540,7 +540,7 @@ module ParsingAndControl =
           match request.headers?connection with
           | Some (x : string) when x.ToLower().Equals("keep-alive") ->
             clear request
-            verbosef (fun fmt -> fmt "web:request_loop:loop 'Connection: keep-alive' recurse (!), rem: %A" rem)
+            verbosef (fun fmt -> fmt "'Connection: keep-alive' recurse (!), rem: %A" rem)
             return! loop rem request
           | Some _ ->
             free cn rem;
