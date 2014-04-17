@@ -16,11 +16,10 @@ type HttpCookie =
   ; domain    : string option
   ; secure    : bool
   ; http_only : bool
-  ; version   : string option
-  }
+  ; version   : string option }
  
 // A file's mime type and if compression is enabled or not
-type MimeType = 
+type MimeType =
   { name         : string
   ; compression  : bool }
 
@@ -43,19 +42,19 @@ type HttpRequest =
   { mutable http_version : string
   ; mutable url          : string
   ; mutable ``method``   : string
-  ; remote_address     : IPAddress
-  ; query              : Dictionary<string,string>
-  ; headers            : Dictionary<string,string>
-  ; form               : Dictionary<string,string>
-  ; mutable raw_form   : byte[]
-  ; mutable raw_query  : string
-  ; cookies            : Dictionary<string,(string*string)[]>
-  ; mutable user_name  : string
-  ; mutable password   : string
-  ; mutable session_id : string
-  ; response           : HttpResponse
-  ; files              : List<HttpUpload>
-  ; is_secure          : bool }
+  ; query                : Dictionary<string,string>
+  ; headers              : Dictionary<string,string>
+  ; form                 : Dictionary<string,string>
+  ; mutable raw_form     : byte[]
+  ; mutable raw_query    : string
+  ; cookies              : Dictionary<string,(string*string)[]>
+  ; mutable user_name    : string
+  ; mutable password     : string
+  ; mutable session_id   : string
+  ; response             : HttpResponse
+  ; files                : List<HttpUpload>
+  ; mutable trace        : Log.TraceHeader
+  ; is_secure            : bool }
 
 /// Clear the request dictionaries for to reuse the request object instance.
 let internal clear (request : HttpRequest) =
@@ -129,9 +128,7 @@ and HttpRuntime =
 and HttpContext =
   { request    : HttpRequest
   ; runtime    : HttpRuntime
-  ; connection : Connection
-  // TODO: handling user state doesn't fit here: https://github.com/basho/webmachine/wiki/Resource-Functions
-  ; user_state : Map<string, obj> }
+  ; connection : Connection }
 
 
 let request f (a : HttpContext) = f a.request a

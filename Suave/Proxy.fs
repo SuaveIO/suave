@@ -57,7 +57,7 @@ let forward (ip : IPAddress) (port : uint16) (ctx : HttpContext) =
   match look_up p.headers "if-modified-since" with Some(v) -> q.IfModifiedSince <- DateTime.Parse(v) | None -> ()
   match look_up p.headers "transfer-encoding" with Some(v) -> q.TransferEncoding <- v | None -> ()
   match look_up p.headers "user-agent" with Some(v) -> q.UserAgent <- v | None -> ()
-  q.Headers.Add("X-Forwarded-For", p.remote_address .ToString())
+  q.Headers.Add("X-Forwarded-For", ctx.connection.ipaddr.ToString())
   async {
     if p.``method`` = "POST" || p.``method`` = "PUT" then
       let content_length = Convert.ToInt32(p.headers.["content-length"])

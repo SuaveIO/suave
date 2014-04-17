@@ -34,32 +34,31 @@ let inline scan_crlf_x (c : ArraySegment<byte>) (d : ArraySegment<byte>) =
     else loop (i + 1)
   loop 0
 
-type BufferSegment = { 
-  buffer : ArraySegment<byte>;
-  offset : int;
-  lenght : int;
-  }
+type BufferSegment =
+  { buffer : ArraySegment<byte>
+  ; offset : int
+  ; length : int }
 
-let inline mk_buffer_segment buffer offset lenght = 
-  Some { buffer = buffer; offset = offset; lenght = lenght}
+let inline mk_buffer_segment buffer offset length =
+  Some { buffer = buffer; offset = offset; length = length }
 
 /// Read the passed stream into buff until the EOL (CRLF) has been reached 
 /// and returns an array containing excess data read past the marker
 let read_till_EOL (connection : Connection) (select) (preread : BufferSegment option) =
 
   let rec scan_data count (pair : BufferSegment) = async {
-    match scan_crlf (ArraySegment(pair.buffer.Array, pair.offset, pair.lenght)) with
+    match scan_crlf (ArraySegment(pair.buffer.Array, pair.offset, pair.length)) with
     //returns index relating to the original array
     | Some x when x = pair.offset ->
-      if pair.lenght = 2 then 
+      if pair.length = 2 then
         //there is only a '\r','\n' left
         connection.free_buffer pair.buffer
         return (count, None )
       else 
-        return (count, mk_buffer_segment pair.buffer (pair.offset + 2) (pair.lenght - 2))
+        return (count, mk_buffer_segment pair.buffer (pair.offset + 2) (pair.length - 2))
     | Some index ->
       select (ArraySegment(pair.buffer.Array, pair.offset, index - pair.offset)) (index - pair.offset)
-      let number_of_bytes_to_select = pair.lenght - index + pair.offset - 2
+      let number_of_bytes_to_select = pair.length - index + pair.offset - 2
       if number_of_bytes_to_select = 0 then
         connection.free_buffer pair.buffer
         return (count + (index - pair.offset ), None)
@@ -70,8 +69,8 @@ let read_till_EOL (connection : Connection) (select) (preread : BufferSegment op
     }
   and scan_data_x  count (left : BufferSegment) (right: BufferSegment) = async  {
 
-    let cn = left.lenght
-    let dn = right.lenght
+    let cn = left.length
+    let dn = right.length
 
     match scan_crlf_x (ArraySegment(left.buffer.Array, left.offset, cn)) (ArraySegment(right.buffer.Array, right.offset, dn)) with
     | Some index when index < cn ->
@@ -83,102 +82,102 @@ let read_till_EOL (connection : Connection) (select) (preread : BufferSegment op
       else 
         return (count + index, mk_buffer_segment left.buffer (left.offset + index + 2) number_of_bytes_to_select) // asumes d is empty
     | Some index -> 
-      select (ArraySegment(left.buffer.Array, left.offset, left.lenght)) left.lenght // here we can free c's original buffer --
+      select (ArraySegment(left.buffer.Array, left.offset, left.length)) left.length // here we can free c's original buffer --
       connection.free_buffer  left.buffer
-      select (ArraySegment(right.buffer.Array, right.offset, index - left.lenght)) (index - left.lenght)
+      select (ArraySegment(right.buffer.Array, right.offset, index - left.length)) (index - left.length)
       let number_of_bytes_to_select = dn - (index - cn) - 2
       if number_of_bytes_to_select = 0 then
         return (count + index, None )
       else 
         return (count + index, mk_buffer_segment right.buffer (right.offset + (index - cn) + 2) number_of_bytes_to_select)
     | None -> 
-      select (ArraySegment(left.buffer.Array, left.offset, left.lenght)) left.lenght // free c's original buffer
+      select (ArraySegment(left.buffer.Array, left.offset, left.length)) left.length // free c's original buffer
       connection.free_buffer  left.buffer
       let count' = count + cn + dn - 2
-      let number_of_bytes_to_select  = right.lenght - 1
+      let number_of_bytes_to_select  = right.length - 1
       if number_of_bytes_to_select > 0 then
-        select (ArraySegment(right.buffer.Array, right.offset, right.lenght-1)) number_of_bytes_to_select
-        return! read_data (count' + number_of_bytes_to_select) (mk_buffer_segment right.buffer (right.offset + right.lenght - 1) 1)
+        select (ArraySegment(right.buffer.Array, right.offset, right.length-1)) number_of_bytes_to_select
+        return! read_data (count' + number_of_bytes_to_select) (mk_buffer_segment right.buffer (right.offset + right.length - 1) 1)
       else
         return! read_data count' (Some right)
     }
   and read_data count (ahead :BufferSegment option)  = async {
     let buff = connection.get_buffer ()
     try
-      let! b = connection.read buff 
-      if b > 0 then 
-        match ahead with 
+      let! b = connection.read buff
+      if b > 0 then
+        match ahead with
         | Some data ->
-          return! scan_data_x count data {buffer = buff; offset = buff.Offset ; lenght = b}
+          return! scan_data_x count data { buffer = buff; offset = buff.Offset; length = b }
         | None ->
-          return! scan_data count {buffer = buff; offset = buff.Offset ; lenght = b}
+          return! scan_data count { buffer = buff; offset = buff.Offset; length = b }
       else 
         return failwith "client closed"
     with ex ->
       connection.free_buffer buff
       return raise ex
     }
-  match preread with 
+  match preread with
   | Some data ->
-    if data.lenght > 1 then scan_data 0  data 
-    else read_data 0  preread
+    if data.length > 1 then scan_data 0  data
+    else read_data 0 preread
   | None ->
     read_data 0 preread
 
 /// Read the stream until the marker appears.
 let read_until (marker : byte array) (f : ArraySegment<_> -> int -> Async<unit>) (connection : Connection) (preread : BufferSegment option) =
 
-  let marker_lenght = marker.Length
+  let marker_length = marker.Length
 
-  let rec scan_data count  (segment : BufferSegment)  = async {
-    match kmp_x marker (ArraySegment(segment.buffer.Array, segment.offset, segment.lenght))  with
+  let rec scan_data count (segment : BufferSegment) = async {
+    match kmp_x marker (ArraySegment(segment.buffer.Array, segment.offset, segment.length)) with
     | Some 0 ->
-      if segment.lenght = marker_lenght then 
+      if segment.length = marker_length then
         connection.free_buffer segment.buffer
         return (count, None )
       else
-        return (count,  mk_buffer_segment segment.buffer (segment.offset + marker_lenght) (segment.lenght - marker_lenght))
+        return (count, mk_buffer_segment segment.buffer (segment.offset + marker_length) (segment.length - marker_length))
     | Some index ->
       do! f (ArraySegment(segment.buffer.Array, segment.offset, index)) index
-      //discard the marker
-      if index = segment.lenght - marker_lenght then
+      // discard the marker
+      if index = segment.length - marker_length then
         connection.free_buffer segment.buffer
         return (count, None )
       else
-        return (count + index, mk_buffer_segment segment.buffer (segment.offset + index + marker_lenght) (segment.lenght - index - marker_lenght))
-    | None -> 
+        return (count + index, mk_buffer_segment segment.buffer (segment.offset + index + marker_length) (segment.length - index - marker_length))
+    | None ->
       return! read_data count (Some segment)
     }
-  and scan_data_x  count (left : BufferSegment) (right: BufferSegment) = async  {
+  and scan_data_x  count (left : BufferSegment) (right: BufferSegment) = async {
 
-    let cn = left.lenght
-    let dn = right.lenght
+    let cn = left.length
+    let dn = right.length
 
     match kmp_x_x marker (ArraySegment(left.buffer.Array, left.offset,cn)) (ArraySegment(right.buffer.Array, right.offset,dn)) with
     | Some index when index < cn ->
       do! f (ArraySegment(left.buffer.Array, left.offset,index)) index
-      let number_of_bytes_to_select = cn - index - marker_lenght
-      if number_of_bytes_to_select = 0 then 
+      let number_of_bytes_to_select = cn - index - marker_length
+      if number_of_bytes_to_select = 0 then
         connection.free_buffer left.buffer
         return (count + index, None)
       else
-        return (count + index, mk_buffer_segment  left.buffer (left.offset + index + marker_lenght) number_of_bytes_to_select) // asumes d is empty
+        return (count + index, mk_buffer_segment  left.buffer (left.offset + index + marker_length) number_of_bytes_to_select) // asumes d is empty
     | Some index -> 
-      do! f (ArraySegment(left.buffer.Array, left.offset, left.lenght)) left.lenght//here we can free c's original buffer --
+      do! f (ArraySegment(left.buffer.Array, left.offset, left.length)) left.length //here we can free c's original buffer --
       connection.free_buffer  left.buffer
       do! f (ArraySegment(right.buffer.Array, right.offset, index)) index
-      let number_of_bytes_to_select = dn - (index - cn) - marker_lenght
+      let number_of_bytes_to_select = dn - (index - cn) - marker_length
       if number_of_bytes_to_select = 0 then
         return (count + index, None)
       else
-        return (count + index, mk_buffer_segment right.buffer (right.offset + (index - cn) + marker_lenght) number_of_bytes_to_select)
+        return (count + index, mk_buffer_segment right.buffer (right.offset + (index - cn) + marker_length) number_of_bytes_to_select)
     | None -> 
-      do! f  (ArraySegment(left.buffer.Array, left.offset, left.lenght)) left.lenght //free c's original buffer
+      do! f  (ArraySegment(left.buffer.Array, left.offset, left.length)) left.length //free c's original buffer
       connection.free_buffer  left.buffer
-      let number_of_bytes_to_select  = right.lenght - marker_lenght + 1
+      let number_of_bytes_to_select  = right.length - marker_length + 1
       if number_of_bytes_to_select > 0 then 
-        do! f (ArraySegment(right.buffer.Array, right.offset, right.lenght-1)) number_of_bytes_to_select
-        return! read_data (count + cn + number_of_bytes_to_select) (mk_buffer_segment right.buffer (right.offset + right.lenght - marker_lenght + 1) (marker_lenght - 1))
+        do! f (ArraySegment(right.buffer.Array, right.offset, right.length-1)) number_of_bytes_to_select
+        return! read_data (count + cn + number_of_bytes_to_select) (mk_buffer_segment right.buffer (right.offset + right.length - marker_length + 1) (marker_length - 1))
       else
         return! read_data (count + cn) (Some right)
     } 
@@ -189,15 +188,15 @@ let read_until (marker : byte array) (f : ArraySegment<_> -> int -> Async<unit>)
     if bytes_read > 0 then 
       match ahead with 
       | Some data ->
-        return! scan_data_x count data {buffer = a; offset = a.Offset ; lenght = bytes_read}
+        return! scan_data_x count data {buffer = a; offset = a.Offset ; length = bytes_read}
       | None -> 
-        return! scan_data count {buffer = a; offset = a.Offset ; lenght = bytes_read}
+        return! scan_data count {buffer = a; offset = a.Offset ; length = bytes_read}
     else
       return failwith "client disconnected."
     }
   match preread with
   | Some data ->
-    if data.lenght > marker.Length then scan_data 0 data
+    if data.length > marker.Length then scan_data 0 data
     else read_data 0 preread
   | None -> read_data 0 preread
 
@@ -211,7 +210,7 @@ let inline to_string (buff : byte[]) (index : int) (count : int) =
   Encoding.ASCII.GetString(buff, index, count)
 
 /// Read a line from the stream, calling to_string on the bytes before the EOL marker
-let read_line (connection:Connection) ahead (buf:ArraySegment<byte>) = async {
+let read_line (connection : Connection) ahead (buf : ArraySegment<byte>) = async {
   let offset = ref 0
   let! count, rem = read_till_EOL connection (fun a count -> Array.blit a.Array a.Offset buf.Array (buf.Offset + !offset) count; offset := !offset + count) ahead
   let result = to_string buf.Array buf.Offset count
@@ -219,15 +218,14 @@ let read_line (connection:Connection) ahead (buf:ArraySegment<byte>) = async {
 }
 
 /// Read all headers from the stream, returning a dictionary of the headers found
-let read_headers connection read (headers: Dictionary<string,string>) (buf:ArraySegment<byte>)  =
+let read_headers connection read (headers : Dictionary<string,string>) (buf : ArraySegment<byte>) =
   let rec loop (rem : BufferSegment option) = async {
-
     let offset = ref 0
-    let! count,new_rem = read_till_EOL connection (fun a count -> Array.blit a.Array a.Offset buf.Array (buf.Offset + !offset) count; offset := !offset + count) rem
+    let! count, new_rem = read_till_EOL connection (fun a count -> Array.blit a.Array a.Offset buf.Array (buf.Offset + !offset) count; offset := !offset + count) rem
     if count <> 0 then
       let line = to_string buf.Array buf.Offset count
       let indexOfColon = line.IndexOf(':')
-      headers.Add (line.Substring(0,indexOfColon).ToLower(),line.Substring(indexOfColon+1).TrimStart())
+      headers.Add (line.Substring(0, indexOfColon).ToLower(), line.Substring(indexOfColon+1).TrimStart())
       return! loop new_rem
     else return new_rem
   }
@@ -266,30 +264,30 @@ let inline parse_url (line : string) (dict : Dictionary<string,string>) =
 
 /// Read the post data from the stream, given the number of bytes that makes up the post data.
 let read_post_data (connection : Connection) (bytes : int) (read : BufferSegment option) =
-    let read_bytes bytes_needed  missing read_offset = async{
-       let counter = ref 0
-       let rem = ref None
-       let a = connection.get_buffer ()
-       while !counter < bytes_needed do
-        let! bytes_transmited = connection.read a
-        if bytes_transmited > bytes_needed - !counter 
-        then
-          Array.blit a.Array a.Offset missing (read_offset + !counter) (bytes_needed - !counter)
-          rem := Some { buffer = a; offset =  a.Offset + bytes_needed - !counter; lenght = bytes_needed - !counter}
-        else
-          Array.blit a.Array a.Offset missing (read_offset + !counter) bytes_transmited
-        counter := !counter + bytes_transmited
-       return (ArraySegment missing, !rem)
-    }
-    async {
+  let read_bytes bytes_needed  missing read_offset = async {
+    let counter = ref 0
+    let rem = ref None
+    let a = connection.get_buffer ()
+    while !counter < bytes_needed do
+      let! bytes_transmited = connection.read a
+      if bytes_transmited > bytes_needed - !counter
+      then
+        Array.blit a.Array a.Offset missing (read_offset + !counter) (bytes_needed - !counter)
+        rem := Some { buffer = a; offset =  a.Offset + bytes_needed - !counter; length = bytes_needed - !counter }
+      else
+        Array.blit a.Array a.Offset missing (read_offset + !counter) bytes_transmited
+      counter := !counter + bytes_transmited
+    return (ArraySegment missing, !rem)
+  }
+  async {
     match read with
     | Some segment ->
-      if segment.lenght >= bytes then
-        return (ArraySegment(segment.buffer.Array, segment.offset, bytes), Some { buffer = segment.buffer; offset = segment.offset + bytes; lenght = segment.lenght - bytes })
+      if segment.length >= bytes then
+        return (ArraySegment(segment.buffer.Array, segment.offset, bytes), Some { buffer = segment.buffer; offset = segment.offset + bytes; length = segment.length - bytes })
       else 
         let missing = Array.zeroCreate bytes
-        Array.blit segment.buffer.Array segment.offset missing 0 segment.lenght
-        return! read_bytes (bytes - segment.lenght) missing segment.offset
+        Array.blit segment.buffer.Array segment.offset missing 0 segment.length
+        return! read_bytes (bytes - segment.length) missing segment.offset
     | None ->
       let missing = Array.zeroCreate bytes
       return! read_bytes bytes missing 0
@@ -366,11 +364,11 @@ let parse_multipart (connection : Connection) boundary (request : HttpRequest) (
       use mem = new MemoryStream()
       let! a, b = read_until (bytes(eol + boundary)) (fun x y -> async { do! mem.AsyncWrite(x.Array, x.Offset, y) } ) connection rem
       let byts = mem.ToArray()
-      request.form.Add(fieldname, (to_string byts 0 byts.Length)) 
+      request.form.Add(fieldname, (to_string byts 0 byts.Length))
 
       return! loop boundary b
     }
-  loop boundary ahead 
+  loop boundary ahead
 
 /// Process the request, reading as it goes from the incoming 'stream', yielding a HttpRequest
 /// when done
@@ -381,19 +379,18 @@ let process_request proxy_mode (request : HttpRequest) (connection : Connection)
     Log.tracef(fun fmt -> fmt "web:process_request proxy:%b bytes:%A -> read_line" proxy_mode bytes)
     let! (first_line : string), rem = read_line connection bytes line_buffer
     Log.tracef(fun fmt -> fmt "web:process_request proxy:%b <- read_line" proxy_mode)
-    
+
     if first_line.Length = 0 then
       return None
     else
       let meth, url, _, raw_query, http_version = parse_url first_line request.query
 
-      request.url      <- url
+      request.url          <- url
       request.``method``   <- meth
-      request.raw_query <- raw_query
+      request.raw_query    <- raw_query
       request.http_version <- http_version
 
-      let headers = request.headers
-      let! rem = read_headers connection rem headers line_buffer
+      let! rem = read_headers connection rem request.headers line_buffer
 
       // won't continue parsing if on proxyMode with the intention of forwarding the stream as it is
       if proxy_mode then return Some (request, rem)
@@ -407,18 +404,18 @@ let process_request proxy_mode (request : HttpRequest) (connection : Connection)
         if meth.Equals("POST") || meth.Equals("PUT") then
 
           let content_encoding =
-            match headers.TryGetValue("content-type") with
+            match request.headers.TryGetValue("content-type") with
             | true, encoding -> Some encoding
             | false, _ -> None
 
-          let content_length = Convert.ToInt32(headers.["content-length"])
+          let content_length = Convert.ToInt32(request.headers.["content-length"])
 
           match content_encoding with
           | Some ce when ce.StartsWith("application/x-www-form-urlencoded") ->
             let! (rawdata : ArraySegment<_>), rem = read_post_data connection content_length rem
             let str = to_string rawdata.Array rawdata.Offset rawdata.Count
             let _  = parse_data str request.form
-            // TODO: can't we instead of copying, do an LMAX and use the buffer as a circular
+            // TODO: can't we instead of copying, do a LMAX and use the buffer as a circular
             // queue?
             let raw_form = Array.zeroCreate rawdata.Count
             Array.blit rawdata.Array rawdata.Offset raw_form 0 rawdata.Count
@@ -428,14 +425,14 @@ let process_request proxy_mode (request : HttpRequest) (connection : Connection)
             let boundary = "--" + ce.Substring(ce.IndexOf('=')+1).TrimStart()
             let! rem = parse_multipart connection boundary request rem line_buffer
             return Some (request, rem)
-          | Some _ | None -> 
+          | Some _ | None ->
             let! (rawdata : ArraySegment<_>), rem = read_post_data connection content_length rem
             let raw_form = Array.zeroCreate rawdata.Count
             Array.blit rawdata.Array rawdata.Offset raw_form 0 rawdata.Count
             request.raw_form <- raw_form
             return Some (request, rem)
         else return Some (request, rem)
-  with ex -> 
+  with ex ->
     return None
 }
 
@@ -451,7 +448,7 @@ open OpenSSL
 let inline load_connection proto (connection : Connection) = async{
   match proto with
   | HTTP       -> return connection
-  | HTTPS cert -> 
+  | HTTPS cert ->
     let ssl = authenticate_as_server cert
     do! accept connection ssl
     return { connection with read = ssl_receive connection ssl; write = ssl_send connection ssl }
@@ -464,25 +461,25 @@ type HttpProcessor = HttpRequest -> Connection -> BufferSegment option -> Async<
 type RequestResult = Done
 
 let mk_request connection proto =
-    { http_version   = null
-    ; url            = null
-    ; ``method``     = null
-    ; query          = new Dictionary<string,string>()
-    ; headers        = new Dictionary<string,string>()
-    ; form           = new Dictionary<string,string>()
-    ; raw_form       = null
-    ; raw_query      = null
-    ; cookies        = new Dictionary<string,(string*string)[]>()
-    ; user_name      = null
-    ; password       = null
-    ; session_id     = null
-    ; response       = new HttpResponse()
-    ; files          = new List<HttpUpload>()
-    ; remote_address = connection.ipaddr
-    ; is_secure      = match proto with HTTP -> false | HTTPS _ -> true }
+  { http_version   = null
+  ; url            = null
+  ; ``method``     = null
+  ; query          = new Dictionary<string,string>()
+  ; headers        = new Dictionary<string,string>()
+  ; form           = new Dictionary<string,string>()
+  ; raw_form       = null
+  ; raw_query      = null
+  ; cookies        = new Dictionary<string,(string*string)[]>()
+  ; user_name      = null
+  ; password       = null
+  ; session_id     = null
+  ; response       = new HttpResponse()
+  ; files          = new List<HttpUpload>()
+  ; is_secure      = match proto with HTTP -> false | HTTPS _ -> true
+  ; trace          = Log.TraceHeader.Empty }
 
-let free connection (s : BufferSegment option) = 
-  match s with 
+let free connection (s : BufferSegment option) =
+  match s with
   | None -> ()
   | Some x -> connection.free_buffer x.buffer
 
@@ -497,14 +494,13 @@ let run ctx web_part = async {
 let http_loop processor runtime req cn web_part =
 
   let rec loop (bytes : BufferSegment option) request = async {
-    
     Log.trace(fun () -> "web:request_loop:loop -> processor")
     let! result = processor request cn bytes
     Log.trace(fun () -> "web:request_loop:loop <- processor")
 
     match result with
     | Some (request : HttpRequest, rem) ->
-      let ctx = { request = request; runtime = runtime; connection = cn; user_state = Map.empty }
+      let ctx = { request = request; runtime = runtime; connection = cn }
       try
         Log.trace(fun () -> "web:request_loop:loop -> unblock")
         do! Async.WithTimeout (runtime.web_part_timeout, run ctx web_part)
@@ -590,7 +586,7 @@ let is_local_address (ip : string) =
 let default_error_handler (ex : Exception) msg (ctx : HttpContext) = async {
   let request = ctx.request
   Log.logf "web:default_error_handler - %s.\n%A" msg ex
-  if IPAddress.IsLoopback request.remote_address then
+  if IPAddress.IsLoopback ctx.connection.ipaddr then
     do! (response 500 "Internal Error" (bytes_utf8 (sprintf "<h1>%s</h1><br/>%A" ex.Message ex)) ctx)
   else do! (response 500 "Internal Error" (bytes_utf8 ("Internal Error")) ctx)
 }

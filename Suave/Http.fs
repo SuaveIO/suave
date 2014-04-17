@@ -450,18 +450,14 @@ module Http =
     else
       challenge ctx
 
-  let log_format (http_request : HttpRequest) =
-    sprintf "%A\n" (http_request.``method``, http_request.remote_address, http_request.url, http_request.query, http_request.form, http_request.headers)
+  let log_format (ctx : HttpContext) =
+    let r = ctx.request
+    sprintf "%A\n" (r.``method``, ctx.connection.ipaddr, r.url, r.query, r.form, r.headers)
 
-  let log (logger : Log.Logger) (formatter : HttpRequest -> string) (ctx : HttpContext) =
-    // raw web logs are absolutely not Info level logs, making it debug:
-    let th =
-      ctx.user_state |> Map.tryFind "suave$tracing"
-      |> Option.map (fun t -> t :?> Log.TraceHeader)
-
+  let log (logger : Log.Logger) (formatter : HttpContext -> string) (ctx : HttpContext) =
     logger.Log Log.LogLevel.Debug <| fun _ ->
-      { tracing       = th
-      ; message       = formatter ctx.request
+      { trace         = ctx.request.trace
+      ; message       = formatter ctx
       ; level         = Log.LogLevel.Debug
       ; path          = "suave/web-requests"
       ; ``exception`` = None

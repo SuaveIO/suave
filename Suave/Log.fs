@@ -93,22 +93,39 @@ type LogLevel =
       member x.Equals other =
         x.ToInt() = other.ToInt()
 
+/// A record that keeps track of what request this is.
+/// In an uint64 there are 18 446 744 073 709 551 616 number
+/// of possible values, so you can be fairly certain a given request
+/// id is unique, given a good random number generator.
 type TraceHeader =
-  { trace_id       : uint64
-    span_id        : uint64
-    span_parent_id : uint64 option }
-  static member NewTrace(?span_parent_id) =
-    { trace_id       = Globals.random.NextUInt64()
-      span_id        = Globals.random.NextUInt64()
-      span_parent_id = span_parent_id }
+    /// if this is the 'first' traced request, then trace_id equals
+    /// req_id. If it's the second, then trace_id = req_parent_id
+    /// or otherwise third or later then trace_id, req_id and req_parent_id
+    /// are all disjunct
+  { trace_id      : uint64
+    /// the request id assigned when suave received the http request
+    /// In ZipKin/Dapper-speak, this is the span id
+  ; req_id        : uint64
+    /// possibly a parent
+    /// In ZipKin/Dapper-speak, this is the span parent id
+  ; req_parent_id : uint64 option }
+  static member Empty =
+    { trace_id = 0UL
+    ; req_id   = 0UL
+    ; req_parent_id = None }
+  static member NewTrace(?trace_id, ?span_parent_id) =
+    let new_id = Globals.random.NextUInt64()
+    { trace_id      = defaultArg trace_id new_id
+    ; req_id        = new_id
+    ; req_parent_id = span_parent_id }
 
 /// When logging, write a log line like this with the source of your
 /// log line as well as a message and an optional exception.
 type LogLine =
     /// the trace id and span id
-    /// TODO: support tracing infrastructure, if this is set, then we support
-    /// distributed tracing and the LogLine is an annotation instead
-  { tracing       : TraceHeader option
+    /// If using tracing, then this LogLine is an annotation to a
+    /// span instead of a 'pure' log entry
+  { trace         : TraceHeader
     /// the level that this log line has
   ; level         : LogLevel
     /// the source of the log line, e.g. 'ModuleName.FunctionName'
@@ -199,17 +216,3 @@ let logf format =
   Printf.kprintf
     (fun s -> System.Console.WriteLine(sprintf "%s: %s" (DateTime.UtcNow.ToString("o")) s))
     format
-
-module MayNotUseGlobals =
-  type internal LoggingConfiguration =
-    { min_level : LogLevel
-      factory   : unit -> Logger }
-
-  let configure (min_level : LogLevel) (logger_factory : unit -> Logger) =
-    Globals.logging_config := Some (box
-      { min_level = min_level
-        factory   = logger_factory })
-
-    { new IDisposable with
-        member x.Dispose() =
-          Globals.logging_config := None }
