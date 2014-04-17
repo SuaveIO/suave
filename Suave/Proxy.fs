@@ -79,18 +79,18 @@ let proxy proxy_resolver (r : HttpRequest) =
   | None            -> never
 
 open System.IO
- 
+
 /// Run a proxy server with the given configuration and given upstream/target
 /// resolver.
 let proxy_server_async (config : SuaveConfig) resolver =
-  let home_dir = resolve_directory config.home_folder
-  let compression_folder = Path.Combine(resolve_directory config.compressed_files_folder, "_temporary_compressed_files")
+  let home_dir = ParsingAndControl.resolve_directory config.home_folder
+  let compression_folder = Path.Combine(ParsingAndControl.resolve_directory config.compressed_files_folder, "_temporary_compressed_files")
   let all =
     config.bindings
     |> List.map (fun { scheme = proto; ip = ip; port = port } ->
-        tcp_ip_server (ip, port, config.buffer_size, config.max_ops) 
-          (request_loop (process_request true) 
-          (mk_http_runtime proto config.web_part_timeout config.error_handler config.mime_types_map home_dir compression_folder) 
+        tcp_ip_server (ip, port, config.buffer_size, config.max_ops)
+          (ParsingAndControl.request_loop (ParsingAndControl.process_request true)
+          (ParsingAndControl.mk_http_runtime proto config.web_part_timeout config.error_handler config.mime_types_map home_dir compression_folder)
           (warbler (fun http -> proxy resolver http.request))))
   let listening = all |> Seq.map fst |> Async.Parallel |> Async.Ignore
   let server    = all |> Seq.map snd |> Async.Parallel |> Async.Ignore

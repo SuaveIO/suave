@@ -1,16 +1,17 @@
-module Suave.Tests
+module Suave.Tests.Program
 
 #nowarn "25"
 
 module Resp =
   open System.Net.Http
   let content (r : HttpResponseMessage) = r.Content
-  
+
 open System
 open System.Threading
 open System.Net.Http
 open System.Net.Http.Headers
 
+open Suave
 open Suave.Types
 open Suave.Web
 open Suave.Http
@@ -146,10 +147,10 @@ let utilities =
 
   testList "trying some utility functions" [
     testCase "loopback ipv4" <| fun _ ->
-      Assert.Equal("127.0.0.1 is a local address", true, is_local_address "127.0.0.1")
+      Assert.Equal("127.0.0.1 is a local address", true, ParsingAndControl.is_local_address "127.0.0.1")
 
     testCase "loopback ipv6" <| fun _ ->
-      Assert.Equal("::0 is a local address", true, is_local_address "::1")
+      Assert.Equal("::0 is a local address", true, ParsingAndControl.is_local_address "::1")
 
     testProperty "gzip_encode/gzip_decode" <| fun str ->
       Assert.Equal("compress >> decompress == identity", str, Text.Encoding.Unicode.GetString(gzip_decode(gzip_encode(Text.Encoding.Unicode.GetBytes(str)))))

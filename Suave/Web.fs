@@ -379,6 +379,9 @@ module ParsingAndControl =
       }
     loop boundary ahead
 
+  let parse_trace_headers headers =
+    Log.TraceHeader.NewTrace()
+
   /// Process the request, reading as it goes from the incoming 'stream', yielding a HttpRequest
   /// when done
   let process_request proxy_mode (request : HttpRequest) (connection : Connection)  (bytes : BufferSegment option): Async<(HttpRequest * BufferSegment option) option> = async {
@@ -400,6 +403,7 @@ module ParsingAndControl =
         request.http_version <- http_version
 
         let! rem = read_headers connection rem request.headers line_buffer
+        do parse_trace_headers request
 
         // won't continue parsing if on proxyMode with the intention of forwarding the stream as it is
         // TODO: proxy mode might need headers and contents of request, but won't get it through this impl
@@ -603,6 +607,10 @@ module ParsingAndControl =
   let web_worker (ip, port, buffer_size, max_ops, runtime) (webpart : WebPart) =
     tcp_ip_server (ip, port, buffer_size, max_ops) (request_loop (process_request false) runtime webpart)
 
+  let resolve_directory home_directory =
+    match home_directory with
+    | None   -> System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location)
+    | Some s -> s
 
 ////////////////////////////////////////////////////
 
@@ -628,12 +636,8 @@ let default_error_handler (ex : Exception) msg (ctx : HttpContext) = async {
 /// Have a look at the example and the unit tests for more documentation.
 /// In other words: don't block on 'listening' unless you have started the server.
 let web_server_async (config : SuaveConfig) (webpart : WebPart) =
-  let resolve_directory home_directory =
-    match home_directory with
-    | None   -> System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location)
-    | Some s -> s
-  let content_folder = resolve_directory config.home_folder
-  let compression_folder = System.IO.Path.Combine(resolve_directory config.compressed_files_folder, "_temporary_compressed_files")
+  let content_folder = ParsingAndControl.resolve_directory config.home_folder
+  let compression_folder = System.IO.Path.Combine(ParsingAndControl.resolve_directory config.compressed_files_folder, "_temporary_compressed_files")
   let all =
     config.bindings
     |> List.map (fun { scheme = proto; ip = ip; port = port } ->
