@@ -1,4 +1,12 @@
-﻿module Suave.Log
+﻿#if INTERACTIVE
+#load "Async.fs"
+open Suave.Async
+#load "Utils.fs"
+#load "Globals.fs"
+open Suave
+#else
+module Suave.Log
+#endif
 
 open System
 open System.Diagnostics
@@ -203,7 +211,7 @@ module Loggers =
         [ ConsoleWindowLogger(level)
           OutputWindowLogger(level) ]) :> Logger
 
-let private mk_line path trace ex message =
+let internal mk_line path trace ex message =
   { message       = message
   ; level         = Verbose
   ; path          = path
