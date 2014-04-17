@@ -547,16 +547,14 @@ module ParsingAndControl =
   /// in milliseconds and a Connection to use for read-write
   /// communication -- getting the initial request stream.
   let request_loop
-    (processor        : HttpProcessor)
-    (runtime          : HttpRuntime)
-    (web_part         : WebPart)
-    (connection       : Connection) =
-
-    let proto            = runtime.protocol
+    (processor  : HttpProcessor)
+    (runtime    : HttpRuntime)
+    (web_part   : WebPart)
+    (connection : Connection) =
 
     async {
-      let! connection = load_connection proto connection
-      let request = mk_request connection proto
+      let! connection = load_connection runtime.protocol connection
+      let request = mk_request connection runtime.protocol
       try
         do! http_loop processor runtime request connection web_part
       with

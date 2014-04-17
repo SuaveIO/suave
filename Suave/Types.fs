@@ -118,7 +118,6 @@ type ErrorHandler = Exception -> String -> HttpContext -> Async<unit>
 
 and HttpRuntime =
   { protocol           : Protocol
-  //; connection         : Connection
   ; web_part_timeout   : TimeSpan
   ; error_handler      : ErrorHandler
   ; mime_types_map     : MimeTypesMap
