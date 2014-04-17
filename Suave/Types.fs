@@ -67,15 +67,6 @@ let internal clear (request : HttpRequest) =
   request.response.Headers.Clear()
   request.trace <- Log.TraceHeader.Empty
 
-/// Delete all HttpRequest files that were uploaded
-let internal delete_files (request : HttpRequest) =
-  for upload in request.files do
-    if File.Exists(upload.Path) then
-      try
-        File.Delete(upload.Path)
-      with
-      | _ as e -> Log.logf "%A" e // we tried
-
 open OpenSSL.X509
 
 /// Gets the supported protocols, HTTP and HTTPS with a certificate

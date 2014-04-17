@@ -469,12 +469,12 @@ module ParsingAndControl =
   /// Load a readable plain-text stream, based on the protocol in use. If plain HTTP
   /// is being used, the stream is returned as it, otherwise a new SslStream is created
   /// to decipher the stream, without client certificates.
-  let inline load_connection proto (connection : Connection) = async{
+  let inline load_connection (logger : Log.Logger) proto (connection : Connection) = async{
     match proto with
     | HTTP       -> return connection
     | HTTPS cert ->
       let ssl = authenticate_as_server cert
-      do! accept connection ssl
+      do! accept logger connection ssl
       return { connection with read = ssl_receive connection ssl; write = ssl_send connection ssl }
     }
 
@@ -577,7 +577,7 @@ module ParsingAndControl =
     (connection : Connection) =
 
     async {
-      let! connection = load_connection runtime.protocol connection
+      let! connection = load_connection runtime.logger runtime.protocol connection
       let request     = mk_request connection runtime.protocol
       try
         do! http_loop processor runtime request connection web_part
@@ -634,7 +634,7 @@ open Suave.Types
 /// thrown exceptions.
 let default_error_handler (ex : Exception) msg (ctx : HttpContext) = async {
   let request = ctx.request
-  Log.logf "web:default_error_handler - %s.\n%A" msg ex
+  msg |> Log.verbosee ctx.runtime.logger "Web.default_error_handler" ctx.request.trace ex
   if IPAddress.IsLoopback ctx.connection.ipaddr then
     do! (Http.response 500 "Internal Error" (bytes_utf8 (sprintf "<h1>%s</h1><br/>%A" ex.Message ex)) ctx)
   else do! (Http.response 500 "Internal Error" (bytes_utf8 ("Internal Error")) ctx)

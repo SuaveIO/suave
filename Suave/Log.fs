@@ -228,8 +228,3 @@ let interne (logger : Logger) path =
 
 let internf (logger : Logger) path f_format =
   f_format (Printf.kprintf (verbose logger path (TraceHeader.Empty)))
-
-let logf format =
-  Printf.kprintf
-    (fun s -> System.Console.WriteLine(sprintf "%s: %s" (DateTime.UtcNow.ToString("o")) s))
-    format

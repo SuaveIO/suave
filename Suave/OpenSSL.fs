@@ -134,9 +134,8 @@ let write_from_bio  (con : Connection) write_bio = async {
   return ()
   }
 
-let rec accept conn (ssl, read_bio, write_bio) = async{
-  
-  let ret = SSL_accept ssl  
+let rec accept (logger : Log.Logger) conn (ssl, read_bio, write_bio) = async{
+  let ret = SSL_accept ssl
   if(ret < 0) then 
 
     let bytes_pending = BIO_ctrl_pending write_bio
@@ -147,16 +146,16 @@ let rec accept conn (ssl, read_bio, write_bio) = async{
     match error with 
     | x when x = SSL_ERROR_WANT_READ -> 
       do! read_to_bio conn read_bio ssl
-      return! accept conn (ssl, read_bio, write_bio)
+      return! accept logger conn (ssl, read_bio, write_bio)
     | x when x = SSL_ERROR_WANT_WRITE -> 
       do! read_to_bio conn read_bio ssl
-      return! accept conn (ssl, read_bio, write_bio)
-    | d -> Log.logf "accept:SSL_ERROR: %d" d
+      return! accept logger conn (ssl, read_bio, write_bio)
+    | d -> "OpenSSL error accepting socket" |> Log.interne logger "OpenSSL.accept" (new Exception(sprintf "error code %d" d))
   
   return ()
   }
 
-let ssl_receive (con : Connection)  (context, read_bio, write_bio) (bu: B) = async {
+let ssl_receive (con : Connection) (context, read_bio, write_bio) (bu: B) = async {
 
   let write_bytes_pending = BIO_ctrl_pending write_bio
   if write_bytes_pending > 0u  then do! write_from_bio con write_bio
