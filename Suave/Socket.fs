@@ -5,14 +5,14 @@ open System.Collections.Generic
 open System.Collections.Concurrent
 open System.Net.Sockets
  
-/// This class creates a single large buffer which can be divided up  
-/// and assigned to SocketAsyncEventArgs objects for use with each  
+/// This class creates a single large buffer which can be divided up
+/// and assigned to SocketAsyncEventArgs objects for use with each
 /// socket I/O operation.
-/// This enables bufffers to be easily reused and guards against  
+/// This enables bufffers to be easily reused and guards against
 /// fragmenting heap memory.
-///  
-/// The operations exposed on the BufferManager class are not thread safe. 
-type BufferManager(totalBytes, bufferSize) =
+///
+/// The operations exposed on the BufferManager class are not thread safe.
+type BufferManager(totalBytes, bufferSize, logger) =
 
   let mutable m_numBytes = totalBytes // the total number of bytes controlled by the buffer pool 
   let m_buffer = Array.zeroCreate(totalBytes); // the underlying byte array maintained by the Buffer Manager
@@ -22,7 +22,7 @@ type BufferManager(totalBytes, bufferSize) =
   member x.PopBuffer() : ArraySegment<byte> =
     let offset = ref -1
     if m_freeIndexPool.TryPop(offset) then
-      Log.tracef (fun fmt -> fmt "reserving buffer: %d" !offset )
+      Log.internf logger "Socket.BufferManager" (fun fmt -> fmt "reserving buffer: %d" !offset )
       ArraySegment(m_buffer, !offset, bufferSize)
     else 
       failwith "failed to obtain a buffer"
@@ -36,7 +36,7 @@ type BufferManager(totalBytes, bufferSize) =
   /// Frees the buffer back to the buffer pool
   /// WARNING: there is nothing preventing you from freeing the same offset more than once with nasty consequences
   member x.FreeBuffer(args : ArraySegment<_>) =
-    Log.tracef (fun fmt -> fmt "freeing buffer: %d" args.Offset )
+    Log.internf logger "Socket.BufferManager" (fun fmt -> fmt "freeing buffer: %d" args.Offset )
     m_freeIndexPool.Push(args.Offset)
 
 type SocketAsyncEventArgsPool() =

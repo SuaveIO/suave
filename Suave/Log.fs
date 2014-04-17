@@ -203,14 +203,31 @@ module Loggers =
         [ ConsoleWindowLogger(level)
           OutputWindowLogger(level) ]) :> Logger
 
-let trace f_str =
-    System.Console.WriteLine(sprintf "%s: %s" (DateTime.UtcNow.ToString("o")) (f_str ()))
+let private mk_line path trace ex message =
+  { message       = message
+  ; level         = Verbose
+  ; path          = path
+  ; ``exception`` = ex
+  ; trace         = trace
+  ; ts_utc_ticks  = DateTime.UtcNow.Ticks }
 
-let tracef format =
-    format (Printf.kprintf (fun s -> System.Console.WriteLine(sprintf "%s: %s" (DateTime.UtcNow.ToString("o")) s)))
+let verbose (logger : Logger) path trace message =
+  logger.Log Verbose (fun _ -> mk_line path trace None message)
 
-let log_str logger str =
-  System.Console.WriteLine(sprintf "%s: %s" (DateTime.UtcNow.ToString("o")) str)
+let verbosef logger path trace f_format =
+  f_format (Printf.kprintf (verbose logger path trace))
+
+let verbosee (logger : Logger) path trace ex message =
+  logger.Log Verbose (fun _ -> mk_line path trace (Some ex) message)
+
+let intern (logger : Logger) path =
+  verbose logger path (TraceHeader.Empty)
+
+let interne (logger : Logger) path =
+  verbosee logger path (TraceHeader.Empty)
+
+let internf (logger : Logger) path f_format =
+  f_format (Printf.kprintf (verbose logger path (TraceHeader.Empty)))
 
 let logf format =
   Printf.kprintf

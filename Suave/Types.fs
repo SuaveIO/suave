@@ -124,7 +124,8 @@ and HttpRuntime =
   ; error_handler      : ErrorHandler
   ; mime_types_map     : MimeTypesMap
   ; home_directory     : string
-  ; compression_folder : string }
+  ; compression_folder : string
+  ; logger             : Log.Logger }
 
 and HttpContext =
   { request    : HttpRequest

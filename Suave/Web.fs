@@ -330,7 +330,11 @@ module ParsingAndControl =
       failwith "did not find header, because header_params received None"
 
   /// Parses multipart data from the stream, feeding it into the HttpRequest's property Files.
-  let parse_multipart (connection : Connection) boundary (request : HttpRequest) (ahead : BufferSegment option) line_buffer : Async<BufferSegment option> =
+  let parse_multipart (connection : Connection)
+                      boundary
+                      (request : HttpRequest)
+                      (ahead : BufferSegment option)
+                      line_buffer : Async<BufferSegment option> =
     let rec loop boundary read = async {
 
       let! firstline, read = read_line connection read line_buffer
@@ -357,9 +361,7 @@ module ParsingAndControl =
       | Some(x) ->
         let temp_file_name = Path.GetTempFileName()
         use temp_file = new FileStream(temp_file_name, FileMode.Truncate)
-        Log.trace (fun () -> "parse_content -> read_until")
         let! a, b = read_until (bytes(eol + boundary)) (fun x y -> async { do! temp_file.AsyncWrite(x.Array, x.Offset, y) } ) connection rem
-        Log.trace (fun () -> "parse_content <- read_until")
         let file_length = temp_file.Length
         temp_file.Close()
         if file_length > int64(0) then
@@ -389,13 +391,15 @@ module ParsingAndControl =
 
   /// Process the request, reading as it goes from the incoming 'stream', yielding a HttpRequest
   /// when done
-  let process_request proxy_mode (request : HttpRequest) (connection : Connection)  (bytes : BufferSegment option): Async<(HttpRequest * BufferSegment option) option> = async {
+  let process_request proxy_mode
+                      (request : HttpRequest)
+                      (connection : Connection)
+                      (bytes : BufferSegment option)
+                      : Async<(HttpRequest * BufferSegment option) option> = async {
 
     let line_buffer = connection.line_buffer
     try
-      Log.tracef(fun fmt -> fmt "web:process_request proxy:%b bytes:%A -> read_line" proxy_mode bytes)
       let! (first_line : string), rem = read_line connection bytes line_buffer
-      Log.tracef(fun fmt -> fmt "web:process_request proxy:%b <- read_line" proxy_mode)
 
       if first_line.Length = 0 then
         return None
@@ -511,20 +515,22 @@ module ParsingAndControl =
     | None -> return ()
   }
 
-  let http_loop processor runtime req cn web_part =
+  let http_loop processor (runtime : HttpRuntime) req cn web_part =
 
     let rec loop (bytes : BufferSegment option) request = async {
-      Log.trace(fun () -> "web:request_loop:loop -> processor")
+      let verbose  = Log.verbose runtime.logger "Web.request_loop.loop" request.trace
+      let verbosef = Log.verbosef runtime.logger "Web.request_loop.loop" request.trace
+      verbose "-> processor"
       let! result = processor request cn bytes
-      Log.trace(fun () -> "web:request_loop:loop <- processor")
+      verbose "<- processor"
 
       match result with
       | Some (request : HttpRequest, rem) ->
         let ctx = { request = request; runtime = runtime; connection = cn }
         try
-          Log.trace(fun () -> "web:request_loop:loop -> unblock")
+          verbose "-> unblock"
           do! Async.WithTimeout (runtime.web_part_timeout, run ctx web_part)
-          Log.trace(fun () -> "web:request_loop:loop <- unblock")
+          verbose "<- unblock"
         with
           | InternalFailure(_) as ex  -> free cn rem; raise ex
           | :? TimeoutException as ex -> free cn rem; raise ex
@@ -534,27 +540,27 @@ module ParsingAndControl =
           match request.headers?connection with
           | Some (x : string) when x.ToLower().Equals("keep-alive") ->
             clear request
-            Log.tracef(fun fmt -> fmt "web:request_loop:loop 'Connection: keep-alive' recurse (!), rem: %A" rem)
+            verbosef (fun fmt -> fmt "web:request_loop:loop 'Connection: keep-alive' recurse (!), rem: %A" rem)
             return! loop rem request
           | Some _ ->
             free cn rem;
-            Log.trace(fun () -> "web:request_loop:loop  'Connection: close', exiting")
+            verbose "'Connection: close', exiting"
             return ()
           | None ->
             if request.http_version.Equals("HTTP/1.1") then
               clear request
-              Log.trace(fun () -> "web:request_loop:loop  'Connection: keep-alive' recurse (!)")
+              verbose "'Connection: keep-alive' recurse (!)"
               return! loop rem request
             else
               free cn rem;
-              Log.trace(fun () -> "web:request_loop:loop  'Connection: close', exiting")
+              verbose "'Connection: close', exiting"
               return ()
         else
           free cn rem;
-          Log.trace(fun () -> "web:request_loop:loop 'is_connected = false', exiting")
+          verbose "'is_connected = false', exiting"
           return ()
       | None ->
-        Log.trace(fun () -> "web:request_loop:loop 'result = None', exiting")
+        verbose "'result = None', exiting"
         return ()
     }
     loop None req
@@ -580,10 +586,10 @@ module ParsingAndControl =
       | :? EndOfStreamException
       | :? IOException as ex
         when ex.InnerException <> null && ex.InnerException.GetType() = typeof<SocketException> ->
-        Log.trace(fun () -> "web:request_loop - client disconnected")
+        "client disconnected" |> Log.verbose runtime.logger "web.request_loop" request.trace
         return ()
       | ex ->
-        Log.tracef(fun fmt -> fmt "web:request_loop - Request failed.\n%A" ex)
+        "request failed" |> Log.verbosee runtime.logger "web.request_loop" request.trace ex
         return ()
     }
 
@@ -600,17 +606,18 @@ module ParsingAndControl =
     | false, _   -> false
     | true,  ip' -> IPAddress.IsLoopback ip'
 
-  let mk_http_runtime proto timeout error_handler mime_types home_directory compression_folder =
-    { protocol       = proto
-    ; web_part_timeout = timeout
-    ; error_handler  = error_handler
-    ; mime_types_map = mime_types
-    ; home_directory = home_directory
-    ; compression_folder = compression_folder }
+  let mk_http_runtime proto timeout error_handler mime_types home_directory compression_folder logger =
+    { protocol           = proto
+    ; web_part_timeout   = timeout
+    ; error_handler      = error_handler
+    ; mime_types_map     = mime_types
+    ; home_directory     = home_directory
+    ; compression_folder = compression_folder
+    ; logger             = logger }
 
   /// Starts a new web worker, given the configuration and a web part to serve.
-  let web_worker (ip, port, buffer_size, max_ops, runtime) (webpart : WebPart) =
-    tcp_ip_server (ip, port, buffer_size, max_ops) (request_loop (process_request false) runtime webpart)
+  let web_worker (ip, port, buffer_size, max_ops, runtime : HttpRuntime) (webpart : WebPart) =
+    tcp_ip_server (ip, port, buffer_size, max_ops) runtime.logger (request_loop (process_request false) runtime webpart)
 
   let resolve_directory home_directory =
     match home_directory with
@@ -647,7 +654,9 @@ let web_server_async (config : SuaveConfig) (webpart : WebPart) =
     config.bindings
     |> List.map (fun { scheme = proto; ip = ip; port = port } ->
       let http_runtime =
-        ParsingAndControl.mk_http_runtime proto config.web_part_timeout config.error_handler config.mime_types_map content_folder compression_folder
+        ParsingAndControl.mk_http_runtime
+          proto config.web_part_timeout config.error_handler
+          config.mime_types_map content_folder compression_folder config.logger
       ParsingAndControl.web_worker (ip, port, config.buffer_size, config.max_ops, http_runtime) webpart)
   let listening = all |> Seq.map fst |> Async.Parallel |> Async.Ignore
   let server    = all |> Seq.map snd |> Async.Parallel |> Async.Ignore

@@ -13,3 +13,7 @@ let crypt_random = System.Security.Cryptography.RandomNumberGenerator.Create()
 // parameterless constructor to create different Random objects in close succession
 // creates random number generators that produce identical sequences of random numbers."
 // - MSDN.
+
+
+/// From the TCP module, keeps track of the number of clients
+let number_of_clients = ref 0L
