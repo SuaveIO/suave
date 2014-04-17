@@ -379,8 +379,13 @@ module ParsingAndControl =
       }
     loop boundary ahead
 
-  let parse_trace_headers headers =
-    Log.TraceHeader.NewTrace()
+  let parse_trace_headers (headers : IDictionary<string, string>) =
+    let parse_uint64 = (function | true, value -> Some value
+                                 | false, _    -> None
+                       ) << UInt64.TryParse
+    let parent = "x-b3-spanid"  |> look_up headers |> Option.bind parse_uint64
+    let trace  = "x-b3-traceid" |> look_up headers |> Option.bind parse_uint64
+    Log.TraceHeader.Create(trace, parent)
 
   /// Process the request, reading as it goes from the incoming 'stream', yielding a HttpRequest
   /// when done
@@ -403,7 +408,7 @@ module ParsingAndControl =
         request.http_version <- http_version
 
         let! rem = read_headers connection rem request.headers line_buffer
-        do parse_trace_headers request
+        request.trace <- parse_trace_headers request.headers
 
         // won't continue parsing if on proxyMode with the intention of forwarding the stream as it is
         // TODO: proxy mode might need headers and contents of request, but won't get it through this impl

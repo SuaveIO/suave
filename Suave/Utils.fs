@@ -93,6 +93,10 @@ module RandomExtensions =
       x.NextBytes buffer
       BitConverter.ToUInt64(buffer, 0)
 
+module Option =
+  let or_default value opt =
+    opt |> Option.fold (fun s t -> t) value
+
 open System.IO
 
 /// Fully transform the input stream to a byte array.

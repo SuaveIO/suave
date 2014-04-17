@@ -113,9 +113,9 @@ type TraceHeader =
     { trace_id = 0UL
     ; req_id   = 0UL
     ; req_parent_id = None }
-  static member NewTrace(?trace_id, ?span_parent_id) =
+  static member Create(trace_id, span_parent_id) =
     let new_id = Globals.random.NextUInt64()
-    { trace_id      = defaultArg trace_id new_id
+    { trace_id      = trace_id |> Option.or_default new_id
     ; req_id        = new_id
     ; req_parent_id = span_parent_id }
 

@@ -20,11 +20,17 @@ let parsing_tests =
     // more variants.
     testCase "parsing full span/trace headers" <| fun _ ->
       let headers =
-        [ "X-B3-SpanId" => "1234567"
-          ""            => "7654321" ]
+        [ "x-b3-spanid"       => "1234567"
+          "x-b3-traceid"      => "7654321"
+          "x-b3-parentspanid" => "1818181" ]
+          // these are not supported:
+          //"X-B3-Flags"        => ""
+          //"X-B3-Sampled"      => "true" ]
         |> Map.ofList
-      Assert.Equal(
-        "shold parse trace id, span id and parent span id",
-        parse_trace_headers headers,
-        TraceHeader.NewTrace())
+
+      // the server generates a new one with the client's as the parent?
+      // is the semantics that client sends its SpanId and that
+      let expected = TraceHeader.Create(Some 7654321UL, Some 1234567UL)
+      Assert.Equal("should parse trace id", expected.trace_id, (parse_trace_headers headers).trace_id)
+      Assert.Equal("should parse span id to parent span id", expected.req_parent_id, (parse_trace_headers headers).req_parent_id)
     ]
