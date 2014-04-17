@@ -82,8 +82,7 @@ let init_open_ssl _ =
   OPENSSL_add_all_algorithms_noconf()
 
   let seed = Array.zeroCreate 128
-  let rng = RandomNumberGenerator.Create()
-  rng.GetBytes(seed)
+  Globals.crypt_random.GetBytes(seed)
   RAND_seed(seed, seed.Length)
 
 open System.Runtime.InteropServices

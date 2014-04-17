@@ -39,11 +39,12 @@ module RequestFactory =
     ctx.cts.Dispose()
 
   let verbose_logging f =
-    Log.enable_trace <- true
+    //Log.enable_trace <- true // TODO!
     try
       f ()
     finally
-      Log.enable_trace <- false
+      //Log.enable_trace <- false // TODO!
+      ()
 
   let run_with_factory factory config web_parts : SuaveTestCtx =
     let binding = config.bindings.Head
