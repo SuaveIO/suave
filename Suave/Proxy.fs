@@ -45,18 +45,19 @@ let forward (ip : IPAddress) (port : uint16) (ctx : HttpContext) =
   q.Headers <- buildWebHeadersCollection p.headers
   q.Proxy   <- null
   //copy restricted headers
-  match p.headers ? accept with Some(v) -> q.Accept <- v | None -> ()
-  //match p.Headers ? connection with Some(v) -> q.Connection <- v | None -> ()
-  match p.headers ? date with Some(v) -> q.Date <- DateTime.Parse(v) | None -> ()
-  match p.headers ? expect with Some(v) -> q.Expect <- v | None -> ()
-  match p.headers ? host with Some(v) -> q.Host <- v | None -> ()
-  match p.headers ? range with Some(v) -> q.AddRange(Int64.Parse(v)) | None -> ()
-  match p.headers ? referer with Some(v) -> q.Referer <- v | None -> ()
-  match look_up p.headers "content-type" with Some(v) -> q.ContentType <- v | None -> ()
-  match look_up p.headers "content-length" with Some(v) -> q.ContentLength <- Int64.Parse(v) | None -> ()
-  match look_up p.headers "if-modified-since" with Some(v) -> q.IfModifiedSince <- DateTime.Parse(v) | None -> ()
-  match look_up p.headers "transfer-encoding" with Some(v) -> q.TransferEncoding <- v | None -> ()
-  match look_up p.headers "user-agent" with Some(v) -> q.UserAgent <- v | None -> ()
+  let header = look_up p.headers
+  header "accept"            |> Option.iter (fun v -> q.Accept <- v)
+  header "date"              |> Option.iter (fun v -> q.Date <- DateTime.Parse v)
+  header "expect"            |> Option.iter (fun v -> q.Expect <- v)
+  header "host"              |> Option.iter (fun v -> q.Host <- v)
+  header "range"             |> Option.iter (fun v -> q.AddRange(Int64.Parse v))
+  header "referer"           |> Option.iter (fun v -> q.Referer <- v)
+  header "content-type"      |> Option.iter (fun v -> q.ContentType <- v)
+  header "content-length"    |> Option.iter (fun v -> q.ContentLength <- Int64.Parse(v))
+  header "if-modified-since" |> Option.iter (fun v -> q.IfModifiedSince <- DateTime.Parse v)
+  header "transfer-encoding" |> Option.iter (fun v -> q.TransferEncoding <- v)
+  header "user-agent"        |> Option.iter (fun v -> q.UserAgent <- v)
+
   q.Headers.Add("X-Forwarded-For", ctx.connection.ipaddr.ToString())
   async {
     if p.``method`` = "POST" || p.``method`` = "PUT" then
