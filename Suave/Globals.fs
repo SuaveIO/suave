@@ -14,6 +14,5 @@ let crypt_random = System.Security.Cryptography.RandomNumberGenerator.Create()
 // creates random number generators that produce identical sequences of random numbers."
 // - MSDN.
 
-
 /// From the TCP module, keeps track of the number of clients
-let number_of_clients = ref 0L
+let internal number_of_clients = ref 0L
