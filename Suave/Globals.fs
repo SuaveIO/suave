@@ -13,10 +13,3 @@ let crypt_random = System.Security.Cryptography.RandomNumberGenerator.Create()
 // parameterless constructor to create different Random objects in close succession
 // creates random number generators that produce identical sequences of random numbers."
 // - MSDN.
-
-/// the logging configuration is global, or else we need to extend all function
-/// with a parameter holding the logger, transitively upwards towards the point
-/// of program composition. While this is an option, logging is intended no to
-/// have side-effects, so making it globally configured is a fair trade-off
-/// against complexity in the rest of suave.
-let internal logging_config : obj option ref = ref None
