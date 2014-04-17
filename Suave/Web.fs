@@ -1,23 +1,22 @@
 module Suave.Web
 
-open Utils
-
-open System
-open System.IO
-
-open System.Text
-open System.Diagnostics
-open System.Threading
-open System.Threading.Tasks
-open System.Security.Permissions
-open System.Security.Principal
-open System.Collections.Generic
-
-open Http
-open Socket
-
 /// Parsing and control flow handling for webr requests
 module ParsingAndControl =
+  open Utils
+
+  open System
+  open System.IO
+
+  open System.Text
+  open System.Diagnostics
+  open System.Threading
+  open System.Threading.Tasks
+  open System.Security.Permissions
+  open System.Security.Principal
+  open System.Collections.Generic
+
+  open Http
+  open Socket
 
   /// Returns the index of the first CRLF in the buffer
   let inline scan_crlf (b : ArraySegment<byte>) =
@@ -584,34 +583,34 @@ module ParsingAndControl =
     | false, _   -> false
     | true,  ip' -> IPAddress.IsLoopback ip'
 
+  let mk_http_runtime proto timeout error_handler mime_types home_directory compression_folder =
+    { protocol       = proto
+    ; web_part_timeout = timeout
+    ; error_handler  = error_handler
+    ; mime_types_map = mime_types
+    ; home_directory = home_directory
+    ; compression_folder = compression_folder }
+
+  /// Starts a new web worker, given the configuration and a web part to serve.
+  let web_worker (ip, port, buffer_size, max_ops, runtime) (webpart : WebPart) =
+    tcp_ip_server (ip, port, buffer_size, max_ops) (request_loop (process_request false) runtime webpart)
+
+
+////////////////////////////////////////////////////
+
+open System
+open System.Net
+open Suave.Types
+
 /// The default error handler returns a 500 Internal Error in response to
 /// thrown exceptions.
 let default_error_handler (ex : Exception) msg (ctx : HttpContext) = async {
   let request = ctx.request
   Log.logf "web:default_error_handler - %s.\n%A" msg ex
   if IPAddress.IsLoopback ctx.connection.ipaddr then
-    do! (response 500 "Internal Error" (bytes_utf8 (sprintf "<h1>%s</h1><br/>%A" ex.Message ex)) ctx)
-  else do! (response 500 "Internal Error" (bytes_utf8 ("Internal Error")) ctx)
+    do! (Http.response 500 "Internal Error" (bytes_utf8 (sprintf "<h1>%s</h1><br/>%A" ex.Message ex)) ctx)
+  else do! (Http.response 500 "Internal Error" (bytes_utf8 ("Internal Error")) ctx)
 }
-
-let mk_http_runtime proto timeout error_handler mime_types home_directory compression_folder =
-  { protocol       = proto
-  ; web_part_timeout = timeout
-  ; error_handler  = error_handler
-  ; mime_types_map = mime_types
-  ; home_directory = home_directory
-  ; compression_folder = compression_folder }
-
-/// Starts a new web worker, given the configuration and a web part to serve.
-let web_worker (ip, port, buffer_size, max_ops, runtime) (webpart : WebPart) =
-  tcp_ip_server (ip, port, buffer_size, max_ops) (request_loop (process_request false) runtime webpart)
-
-open System.IO
-
-let resolve_directory home_directory =
-  match home_directory with
-  | None   -> Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location)
-  | Some s -> s
 
 /// Returns the webserver as a tuple of 1) an async computation the yields unit when
 /// the web server is ready to serve quests, and 2) an async computation that yields
@@ -621,14 +620,18 @@ let resolve_directory home_directory =
 /// Have a look at the example and the unit tests for more documentation.
 /// In other words: don't block on 'listening' unless you have started the server.
 let web_server_async (config : SuaveConfig) (webpart : WebPart) =
+  let resolve_directory home_directory =
+    match home_directory with
+    | None   -> System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location)
+    | Some s -> s
   let content_folder = resolve_directory config.home_folder
-  let compression_folder = Path.Combine(resolve_directory config.compressed_files_folder, "_temporary_compressed_files")
+  let compression_folder = System.IO.Path.Combine(resolve_directory config.compressed_files_folder, "_temporary_compressed_files")
   let all =
     config.bindings
     |> List.map (fun { scheme = proto; ip = ip; port = port } ->
-      let http_runtime = 
-        mk_http_runtime proto config.web_part_timeout config.error_handler config.mime_types_map content_folder compression_folder
-      web_worker (ip, port, config.buffer_size, config.max_ops, http_runtime) webpart)
+      let http_runtime =
+        ParsingAndControl.mk_http_runtime proto config.web_part_timeout config.error_handler config.mime_types_map content_folder compression_folder
+      ParsingAndControl.web_worker (ip, port, config.buffer_size, config.max_ops, http_runtime) webpart)
   let listening = all |> Seq.map fst |> Async.Parallel |> Async.Ignore
   let server    = all |> Seq.map snd |> Async.Parallel |> Async.Ignore
   listening, server
@@ -644,12 +647,12 @@ let web_server (config : SuaveConfig) (webpart : WebPart) =
 let default_config : SuaveConfig =
   { bindings         = [ { scheme = HTTP; ip = IPAddress.Loopback; port = 8083us } ]
   ; error_handler    = default_error_handler
-  ; web_part_timeout = TimeSpan.FromMinutes(1.)
+  ; web_part_timeout = TimeSpan.FromHours(5.)
   ; listen_timeout   = TimeSpan.FromSeconds(2.)
   ; ct               = Async.DefaultCancellationToken
-  ; buffer_size      = 8192 // 8 Kilobytes
+  ; buffer_size      = 8192 // 8 KiB
   ; max_ops          = 100
-  ; mime_types_map   = default_mime_types_map
+  ; mime_types_map   = Http.default_mime_types_map
   ; home_folder      = None
   ; compressed_files_folder = None
   ; logger           = Log.Loggers.sane_defaults_for Log.LogLevel.Info }
