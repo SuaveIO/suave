@@ -418,17 +418,18 @@ module ParsingAndControl =
               let! (rawdata : ArraySegment<_>), rem = read_post_data connection content_length rem
               let str = to_string rawdata.Array rawdata.Offset rawdata.Count
               let _  = parse_data str request.form
-              // TODO: can't we instead of copying, do a LMAX and use the buffer as a circular
-              // queue?
+              // TODO: we can defer reading of body until we need it
               let raw_form = Array.zeroCreate rawdata.Count
               Array.blit rawdata.Array rawdata.Offset raw_form 0 rawdata.Count
               request.raw_form <- raw_form
               return Some (request, rem)
             | Some ce when ce.StartsWith("multipart/form-data") ->
               let boundary = "--" + ce.Substring(ce.IndexOf('=')+1).TrimStart()
+              // TODO: we can defer reading of body until we need it
               let! rem = parse_multipart connection boundary request rem line_buffer
               return Some (request, rem)
             | Some _ | None ->
+              // TODO: we can defer reading of body until we need it
               let! (rawdata : ArraySegment<_>), rem = read_post_data connection content_length rem
               let raw_form = Array.zeroCreate rawdata.Count
               Array.blit rawdata.Array rawdata.Offset raw_form 0 rawdata.Count
