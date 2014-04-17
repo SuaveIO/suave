@@ -56,6 +56,7 @@ type HttpRequest =
   ; mutable trace        : Log.TraceHeader
   ; is_secure            : bool }
 
+/// TODO: see if we can't get nice perf without resorting to mutable state
 /// Clear the request dictionaries for to reuse the request object instance.
 let internal clear (request : HttpRequest) =
   request.query.Clear()
@@ -64,6 +65,7 @@ let internal clear (request : HttpRequest) =
   request.cookies.Clear()
   request.files.Clear()
   request.response.Headers.Clear()
+  request.trace <- Log.TraceHeader.Empty
 
 /// Delete all HttpRequest files that were uploaded
 let internal delete_files (request : HttpRequest) =
@@ -128,7 +130,6 @@ and HttpContext =
   { request    : HttpRequest
   ; runtime    : HttpRuntime
   ; connection : Connection }
-
 
 let request f (a : HttpContext) = f a.request a
 
