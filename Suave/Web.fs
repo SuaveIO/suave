@@ -353,9 +353,9 @@ module ParsingAndControl =
         Log.trace (fun () -> "parse_content -> read_until")
         let! a, b = read_until (bytes(eol + boundary)) (fun x y -> async { do! temp_file.AsyncWrite(x.Array, x.Offset, y) } ) connection rem
         Log.trace (fun () -> "parse_content <- read_until")
-        let file_leght = temp_file.Length
+        let file_length = temp_file.Length
         temp_file.Close()
-        if  file_leght > int64(0) then
+        if file_length > int64(0) then
           let filename =
             (header_params content_disposition) ? filename |> opt
           request.files.Add(new HttpUpload(fieldname,filename,content_type |> opt,temp_file_name))
