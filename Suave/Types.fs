@@ -161,19 +161,22 @@ type SuaveConfig =
   ; ct               : CancellationToken
 
   /// buffer size for socket operations
-  ; buffer_size    : int
+  ; buffer_size      : int
 
   /// max number of concurrent socket operations
-  ; max_ops        : int
+  ; max_ops          : int
 
   /// MIME types
-  ; mime_types_map : MimeTypesMap
+  ; mime_types_map   : MimeTypesMap
 
   /// Home or root directory
-  ; home_folder    : string option
+  ; home_folder      : string option
 
   /// Folder for temporary compressed files
-  ; compressed_files_folder : string option }
+  ; compressed_files_folder : string option
+  
+  /// A logger to log with
+  ; logger           : Log.Logger }
 
 /// An exception, raised e.g. if writing to the stream fails
 exception InternalFailure of string
