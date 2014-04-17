@@ -118,8 +118,8 @@ type TraceHeader =
     /// In ZipKin/Dapper-speak, this is the span parent id
   ; req_parent_id : uint64 option }
   static member Empty =
-    { trace_id = 0UL
-    ; req_id   = 0UL
+    { trace_id      = 0UL
+    ; req_id        = 0UL
     ; req_parent_id = None }
   static member Create(trace_id, span_parent_id) =
     let new_id = Globals.random.NextUInt64()
