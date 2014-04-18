@@ -16,11 +16,10 @@ type HttpCookie =
   ; domain    : string option
   ; secure    : bool
   ; http_only : bool
-  ; version   : string option
-  }
+  ; version   : string option }
  
 // A file's mime type and if compression is enabled or not
-type MimeType = 
+type MimeType =
   { name         : string
   ; compression  : bool }
 
@@ -43,20 +42,21 @@ type HttpRequest =
   { mutable http_version : string
   ; mutable url          : string
   ; mutable ``method``   : string
-  ; remote_address     : IPAddress
-  ; query              : Dictionary<string,string>
-  ; headers            : Dictionary<string,string>
-  ; form               : Dictionary<string,string>
-  ; mutable raw_form   : byte[]
-  ; mutable raw_query  : string
-  ; cookies            : Dictionary<string,(string*string)[]>
-  ; mutable user_name  : string
-  ; mutable password   : string
-  ; mutable session_id : string
-  ; response           : HttpResponse
-  ; files              : List<HttpUpload>
-  ; is_secure          : bool }
+  ; query                : Dictionary<string,string>
+  ; headers              : Dictionary<string,string>
+  ; form                 : Dictionary<string,string>
+  ; mutable raw_form     : byte[]
+  ; mutable raw_query    : string
+  ; cookies              : Dictionary<string,(string*string)[]>
+  ; mutable user_name    : string
+  ; mutable password     : string
+  ; mutable session_id   : string
+  ; response             : HttpResponse
+  ; files                : List<HttpUpload>
+  ; mutable trace        : Log.TraceHeader
+  ; is_secure            : bool }
 
+/// TODO: see if we can't get nice perf without resorting to mutable state
 /// Clear the request dictionaries for to reuse the request object instance.
 let internal clear (request : HttpRequest) =
   request.query.Clear()
@@ -65,15 +65,7 @@ let internal clear (request : HttpRequest) =
   request.cookies.Clear()
   request.files.Clear()
   request.response.Headers.Clear()
-
-/// Delete all HttpRequest files that were uploaded
-let internal delete_files (request : HttpRequest) =
-  for upload in request.files do
-    if File.Exists(upload.Path) then
-      try
-        File.Delete(upload.Path)
-      with
-      | _ as e -> Log.logf "%A" e // we tried
+  request.trace <- Log.TraceHeader.Empty
 
 open OpenSSL.X509
 
@@ -119,14 +111,14 @@ type ErrorHandler = Exception -> String -> HttpContext -> Async<unit>
 
 and HttpRuntime =
   { protocol           : Protocol
-  //; connection         : Connection
   ; web_part_timeout   : TimeSpan
   ; error_handler      : ErrorHandler
   ; mime_types_map     : MimeTypesMap
   ; home_directory     : string
-  ; compression_folder : string }
+  ; compression_folder : string
+  ; logger             : Log.Logger }
 
-and HttpContext = 
+and HttpContext =
   { request    : HttpRequest
   ; runtime    : HttpRuntime
   ; connection : Connection }
@@ -161,22 +153,25 @@ type SuaveConfig =
   ; ct               : CancellationToken
 
   /// buffer size for socket operations
-  ; buffer_size    : int
+  ; buffer_size      : int
 
   /// max number of concurrent socket operations
-  ; max_ops        : int
+  ; max_ops          : int
 
   /// MIME types
-  ; mime_types_map : MimeTypesMap
+  ; mime_types_map   : MimeTypesMap
 
   /// Home or root directory
-  ; home_folder    : string option
+  ; home_folder      : string option
 
   /// Folder for temporary compressed files
-  ; compressed_files_folder : string option }
+  ; compressed_files_folder : string option
+  
+  /// A logger to log with
+  ; logger           : Log.Logger }
 
 /// An exception, raised e.g. if writing to the stream fails
 exception InternalFailure of string
 
-// Supported HTTP compression encondings
+/// Supported HTTP compression encondings
 type ContentEncoding = GZip | Deflate | Identity

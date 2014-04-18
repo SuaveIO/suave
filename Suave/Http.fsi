@@ -1246,13 +1246,12 @@ module Http =
   /// <summary><para>
   /// Formats the HttpRequest as in the default manner
   /// </para></summary>
-  val log_format : ctx:HttpRequest -> string
+  val log_format : ctx:HttpContext -> string
 
   /// <summary><para>
-  /// HERE BE DRAGONS: Not thread-safe.
-  /// Log the HttpRequest to the given stream. For debugging purposes.
+  /// Log the HttpRequest to the given logger.
   /// </para></summary>
-  val log : s:System.IO.Stream -> ctx:HttpContext -> HttpContext option
+  val log : Log.Logger -> (HttpContext -> string) -> ctx:HttpContext -> HttpContext option
 
   /// <summary><para>
   /// Strongly typed route matching! Matching the uri can be used with the 'parsers'

@@ -450,13 +450,19 @@ module Http =
     else
       challenge ctx
 
-  let log_format (http_request : HttpRequest) =
-    sprintf "%A\n" (http_request.``method``, http_request.remote_address, http_request.url, http_request.query, http_request.form, http_request.headers)
+  let log_format (ctx : HttpContext) =
+    let r = ctx.request
+    sprintf "%A\n" (r.``method``, ctx.connection.ipaddr, r.url, r.query, r.form, r.headers)
 
-  let log (s : Stream) (ctx : HttpContext) =
-    let http_request = ctx.request
-    let bytes = bytes (log_format http_request)
-    s.Write(bytes, 0, bytes.Length)
+  let log (logger : Log.Logger) (formatter : HttpContext -> string) (ctx : HttpContext) =
+    logger.Log Log.LogLevel.Debug <| fun _ ->
+      { trace         = ctx.request.trace
+      ; message       = formatter ctx
+      ; level         = Log.LogLevel.Debug
+      ; path          = "suave/web-requests"
+      ; ``exception`` = None
+      ; ts_utc_ticks  = DateTime.UtcNow.Ticks }
+
     succeed ctx
 
   open Suave.Sscanf

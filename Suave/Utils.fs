@@ -83,6 +83,20 @@ let cond d f g a =
 //- theorem: identity = (cnst |> warbler)
 //(warbler cnst) x = cnst x x = fun _ -> x
 
+module RandomExtensions =
+  open System
+
+  type internal Random with
+    /// generate a new random ulong64 value
+    member x.NextUInt64() =
+      let buffer = Array.zeroCreate<byte> sizeof<UInt64>
+      x.NextBytes buffer
+      BitConverter.ToUInt64(buffer, 0)
+
+module Option =
+  let or_default value opt =
+    opt |> Option.fold (fun s t -> t) value
+
 open System.IO
 
 /// Fully transform the input stream to a byte array.

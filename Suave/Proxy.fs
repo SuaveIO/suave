@@ -17,13 +17,15 @@ let private copy_response_headers (headers1 : WebHeaderCollection) (headers2 : L
     headers2.Add(e, headers1.[e])
 
 /// Send the web response from HttpWebResponse to the HttpRequest 'p'
-let private send_web_response (data : HttpWebResponse) (ctx : HttpContext)  = async {
-  let p = ctx.request
-  copy_response_headers data.Headers (p.response.Headers)
-  //TODO: if downstream sends a Content-Length header copy from one stream to the other asynchronously
-  Log.trace (fun () -> "proxy:send_web_response:GetResponseStream -> read_fully")
+let private send_web_response (data : HttpWebResponse)
+                              ({ request = { response = resp; trace = t }
+                               ; runtime = { logger = logger }} as ctx : HttpContext) = async {
+  copy_response_headers data.Headers resp.Headers
+  // TODO: if downstream sends a Content-Length header copy from one stream
+  // to the other asynchronously
+  "-> read_fully" |> Log.verbose logger "proxy:send_web_response:GetResponseStream" t
   let bytes = data.GetResponseStream() |> read_fully
-  Log.trace (fun () -> "proxy:send_web_response:GetResponseStream <- read_fully")
+  "<- read_fully" |> Log.verbose logger "proxy:send_web_response:GetResponseStream" t
   do! response (int data.StatusCode) (data.StatusDescription) bytes ctx
 }
 
@@ -38,26 +40,30 @@ let forward (ip : IPAddress) (port : uint16) (ctx : HttpContext) =
     r
   let url = new UriBuilder("http", ip.ToString(), int port, p.url, p.raw_query)
   let q = WebRequest.Create(url.Uri) :?> HttpWebRequest
+
   q.AllowAutoRedirect         <- false
   q.AllowReadStreamBuffering  <- false
   q.AllowWriteStreamBuffering <- false
   q.Method  <- p.``method``
   q.Headers <- buildWebHeadersCollection p.headers
   q.Proxy   <- null
+
   //copy restricted headers
-  match p.headers ? accept with Some(v) -> q.Accept <- v | None -> ()
-  //match p.Headers ? connection with Some(v) -> q.Connection <- v | None -> ()
-  match p.headers ? date with Some(v) -> q.Date <- DateTime.Parse(v) | None -> ()
-  match p.headers ? expect with Some(v) -> q.Expect <- v | None -> ()
-  match p.headers ? host with Some(v) -> q.Host <- v | None -> ()
-  match p.headers ? range with Some(v) -> q.AddRange(Int64.Parse(v)) | None -> ()
-  match p.headers ? referer with Some(v) -> q.Referer <- v | None -> ()
-  match look_up p.headers "content-type" with Some(v) -> q.ContentType <- v | None -> ()
-  match look_up p.headers "content-length" with Some(v) -> q.ContentLength <- Int64.Parse(v) | None -> ()
-  match look_up p.headers "if-modified-since" with Some(v) -> q.IfModifiedSince <- DateTime.Parse(v) | None -> ()
-  match look_up p.headers "transfer-encoding" with Some(v) -> q.TransferEncoding <- v | None -> ()
-  match look_up p.headers "user-agent" with Some(v) -> q.UserAgent <- v | None -> ()
-  q.Headers.Add("X-Forwarded-For", p.remote_address .ToString())
+  let header = look_up p.headers
+  header "accept"            |> Option.iter (fun v -> q.Accept <- v)
+  header "date"              |> Option.iter (fun v -> q.Date <- DateTime.Parse v)
+  header "expect"            |> Option.iter (fun v -> q.Expect <- v)
+  header "host"              |> Option.iter (fun v -> q.Host <- v)
+  header "range"             |> Option.iter (fun v -> q.AddRange(Int64.Parse v))
+  header "referer"           |> Option.iter (fun v -> q.Referer <- v)
+  header "content-type"      |> Option.iter (fun v -> q.ContentType <- v)
+  header "content-length"    |> Option.iter (fun v -> q.ContentLength <- Int64.Parse(v))
+  header "if-modified-since" |> Option.iter (fun v -> q.IfModifiedSince <- DateTime.Parse v)
+  header "transfer-encoding" |> Option.iter (fun v -> q.TransferEncoding <- v)
+  header "user-agent"        |> Option.iter (fun v -> q.UserAgent <- v)
+
+  q.Headers.Add("X-Forwarded-For", ctx.connection.ipaddr.ToString())
+
   async {
     if p.``method`` = "POST" || p.``method`` = "PUT" then
       let content_length = Convert.ToInt32(p.headers.["content-length"])
@@ -79,19 +85,26 @@ let proxy proxy_resolver (r : HttpRequest) =
   | None            -> never
 
 open System.IO
- 
+
 /// Run a proxy server with the given configuration and given upstream/target
 /// resolver.
 let proxy_server_async (config : SuaveConfig) resolver =
-  let home_dir = resolve_directory config.home_folder
-  let compression_folder = Path.Combine(resolve_directory config.compressed_files_folder, "_temporary_compressed_files")
+  let home_dir = ParsingAndControl.resolve_directory config.home_folder
+  let compression_folder = Path.Combine(ParsingAndControl.resolve_directory config.compressed_files_folder, "_temporary_compressed_files")
+  let mk_runtime proto =
+    ParsingAndControl.mk_http_runtime
+      proto config.web_part_timeout config.error_handler config.mime_types_map
+      home_dir compression_folder config.logger
+
   let all =
     config.bindings
     |> List.map (fun { scheme = proto; ip = ip; port = port } ->
-        tcp_ip_server (ip, port, config.buffer_size, config.max_ops) 
-          (request_loop (process_request true) 
-          (mk_http_runtime proto config.web_part_timeout config.error_handler config.mime_types_map home_dir compression_folder) 
-          (warbler (fun http -> proxy resolver http.request))))
+        tcp_ip_server
+          (ip, port, config.buffer_size, config.max_ops)
+          config.logger
+          (ParsingAndControl.request_loop (ParsingAndControl.process_request true)
+            (mk_runtime proto)
+            (request (proxy resolver))))
   let listening = all |> Seq.map fst |> Async.Parallel |> Async.Ignore
   let server    = all |> Seq.map snd |> Async.Parallel |> Async.Ignore
   listening, server
