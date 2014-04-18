@@ -1,17 +1,23 @@
 Introduction.
 =============
 
-Suave is inspired in the simplicity of Happstack and born out of the necessity of embedding web server capabilities in my own applications. 
-Still in its early stages Suave supports HTTPS, multiple TCP/IP bindings, Basic Access Authentication, Keep-Alive and HTTP compression.
+Suave is inspired in the simplicity of Happstack and born out of the necessity
+of embedding web server capabilities in my own applications.  Still in its early
+stages Suave supports HTTPS, multiple TCP/IP bindings, Basic Access
+Authentication, Keep-Alive and HTTP compression.
 
-Suave also takes advantage of F# asynchronous workflows to perform non-blocking IO. In fact, Suave is written in a **completely non-blocking** fashion throughout. Suave **runs on Linux**, OS X and Windows flawlessly.
+Suave also takes advantage of F# asynchronous workflows to perform non-blocking
+IO. In fact, Suave is written in a **completely non-blocking** fashion
+throughout. Suave **runs on Linux**, OS X and Windows flawlessly.
 
-What follows is a tutorial on how to create Suave applications. Scroll past the tutorial to see detailed function documentation.
+What follows is a tutorial on how to create Suave applications. Scroll past the
+tutorial to see detailed function documentation.
 
 NuGet
 -----
 
-To install Suave, run the following command in the [Package Manager Console](http://docs.nuget.org/docs/start-here/using-the-package-manager-console)
+To install Suave, run the following command in the
+[Package Manager Console](http://docs.nuget.org/docs/start-here/using-the-package-manager-console)
 
 {% highlight dosbatch %}
 PM> Install-Package Suave
@@ -23,23 +29,32 @@ Tutorial: Hello World!
 The simplest Suave application is a simple HTTP server that greets all visitors with the string `"Hello World!"`
 
 {% highlight fsharp %}
+open Suave.Http
+open Suave.Web
 web_server default_config (OK "Hello World!")
 {% endhighlight %}
 
-The above statement will start a web server on default port 8083. `web_server` takes a configuration record and the webpart `(OK "Hello World")` 
+The above statement will start a web server on default port 8083 over HTTP. `web_server` takes a configuration record and the webpart `(OK "Hello World")` 
 
-Webparts are functions with the following type: `HttpContext -> Option<Async<unit>>`. For every request `web_server` will evaluate the webpart, if the evaluation succeeds it will execute the resulting asynchronous computation. `OK` is a combinator that always succeed and writes its argument to the underlying response stream.
+Webparts are functions with the following type: `HttpContext -> Option<Async<unit>>`.
+For every request `web_server` will evaluate the webpart, if the evaluation
+succeeds it will execute the resulting asynchronous computation. `OK` is a
+combinator that always succeed and writes its argument to the underlying
+response stream.
 
 Tutorial: Composing bigger programs.
 ------------------------------------
 
-Logic is expressed with the help of different combinators built around the `option<HttpContext>` type. We build webparts out of functions of type `HttpContext -> HttpContext option` and the operator `>>=` in the following way.
+Logic is expressed with the help of different combinators built around the
+`option<HttpContext>` type. We build webparts out of functions of type
+`HttpContext -> HttpContext option` and the operator `>>=` in the following way.
 
 {% highlight fsharp %}
 let simple_app _ = url "/hello" >>= OK "Hello World" ;
 {% endhighlight %}
 
-To select between different routes or options we use the function choose; for example:
+To select between different routes or options we use the function choose; for
+example:
 
 {% highlight fsharp %}
 let complex_app _ = 
@@ -49,7 +64,9 @@ let complex_app _ =
     ; url "/hello" >>= OK "Hello World" ]
 {% endhighlight %}
 
-The function `choose` accepts a list of webparts and execute each webpart in the list until one returns success. Since choose itself returns a webpart we can nest them for more complex logic.
+The function `choose` accepts a list of webparts and execute each webpart in the
+list until one returns success. Since choose itself returns a webpart we can
+nest them for more complex logic.
 
 {% highlight fsharp %}
 let nested_logic _ =
@@ -62,7 +79,8 @@ let nested_logic _ =
         ; url "/goodbye" >>= OK "Good bye POST" ] ]
 {% endhighlight %}
 
-To gain access to the underlying `HttpRequest` and read query and http form data we can use the `request` combinator.
+To gain access to the underlying `HttpRequest` and read query and http form data
+we can use the `request` combinator.
 
 {% highlight fsharp %}
 let http_form _ = 
@@ -72,7 +90,11 @@ let http_form _ =
     ; NOT_FOUND "Found no handlers" ]
 {% endhighlight %}
 
-To protect a route with HTTP Basic Authentication the combinator `authenticate_basic` is used like in the following example.
+You can similarly use `warbler` to gain access to the full `HttpContext` and
+connection.
+
+To protect a route with HTTP Basic Authentication the combinator
+`authenticate_basic` is used like in the following example.
 
 {% highlight fsharp %}
 let requires_authentication _ = 
@@ -96,7 +118,8 @@ let testapp : WebPart =
 Multiple bindings and SSL support
 ---------------------------------
 
-Suave supports binding the application to multiple TCP/IP addresses and ports combinations. It also supports HTTPS.
+Suave supports binding the application to multiple TCP/IP addresses and ports
+combinations. It also supports HTTPS.
 
 {% highlight fsharp %}
 let sslCert = new X509Certificate("suave.pfx","easy");
@@ -111,11 +134,19 @@ let cfg =
           ; port   = 443us } ]
     ; timeout = TimeSpan.FromMilliseconds 3000. }
 choose 
-  [ Console.OpenStandardOutput() |> log >>= never // log to standard output
-  ; url "/hello" >>= OK "Hello World"
-  ; NOT_FOUND "Found no handlers" ]
+  [ log default_config.logger format_log >>= never // log to the default logger
+    url "/hello" >>= OK "Hello World"
+    NOT_FOUND "Found no handlers" ]
 |> web_server cfg
 {% endhighlight %}
+
+At the moment Suave uses OpenSSL which comes with conditional bindings in
+App.config for the three operating systems: linux, OS X and Windows.
+
+**Note** -- currently the compiled versions are "gott och blandat" as we say in
+Swedish. It means some are compiled for x86 (Windows) and some x64 (Linux, OS
+X); check out https://github.com/SuaveIO/suave/issues/42 to see more about this
+issue.
 
 API
 ===
@@ -242,8 +273,6 @@ let mime_types x =
     >=> (function | ".avi" -> mk_mime_type "video/avi" false | _ -> None)
 {% endhighlight %}
 
-
-
 ## Overview
 
 A request life-cycle begins with the `HttpProcessor` that takes an `HttpRequest`
@@ -269,3 +298,20 @@ error.
 type ErrorHandler = Exception -> String -> HttpContext -> Async<unit>
 {% endhighlight %}
 
+
+Replacing Suave's logging
+-------------------------
+
+When you are using suave you will probably want to funnel all logs from the
+output to your own log sink. We provide the interface `Logger` to do that; just
+set the propery `logger` in the configuration to an instance of your thread-safe
+logger. An example:
+
+{% highlight fsharp %}
+type MyHackLogger(min_level) =
+  interface Logger with
+    member x.Log level f_line =
+      if min_level >= level then
+        // don't do this for real ;)
+        System.Windows.Forms.MessageBox.Show((f_line ()).message)
+{% endhighlight %}
