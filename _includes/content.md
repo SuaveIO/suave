@@ -134,7 +134,7 @@ let cfg =
           ; port   = 443us } ]
     ; timeout = TimeSpan.FromMilliseconds 3000. }
 choose 
-  [ log default_config.logger format_log >>= never // log to the default logger
+  [ log default_config.logger log_format >>= never // log to the default logger
     url "/hello" >>= OK "Hello World"
     NOT_FOUND "Found no handlers" ]
 |> web_server cfg
