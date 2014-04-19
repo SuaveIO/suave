@@ -1,0 +1,212 @@
+<?xml version="1.0" encoding="utf-8"?>
+<doc>
+<assembly><name>Fuchu.PerfUtil</name></assembly>
+<members>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="T:Fuchu.ExampleUsage.Types">
+
+</member>
+<member name="T:Fuchu.ExampleUsage">
+
+</member>
+<member name="F:Fuchu.FuchuPerfUtilModule.PerfHistoryConf.handleResults">
+<summary>
+ An optional function that is called when the perf tests have been completed
+ allowing you to extrace the results and save them or display them or show them
+ to your mom. It will be passed the path of the xml file with test results and
+ the list of TestSessions that comes from PerfUtil.
+</summary>
+</member>
+<member name="F:Fuchu.FuchuPerfUtilModule.PerfHistoryConf.overwrite">
+<summary>
+ Whether to overwrite previous tests. Defaults to true.
+</summary>
+</member>
+<member name="F:Fuchu.FuchuPerfUtilModule.PerfHistoryConf.throwOnError">
+<summary>
+ Whether to throw if the subject has gotten worse in comparison to previous runs, 
+ as decided by the &apos;comparer&apos;.
+</summary>
+</member>
+<member name="F:Fuchu.FuchuPerfUtilModule.PerfHistoryConf.verbose">
+<summary>
+ Whether to print results to stdout. Defaults to true.
+</summary>
+</member>
+<member name="">
+
+</member>
+<member name="F:Fuchu.FuchuPerfUtilModule.PerfHistoryConf.historyFile">
+<summary>
+ path to history file
+</summary>
+</member>
+<member name="M:Fuchu.FuchuPerfUtilModule.PerfHistoryConf.Defaults(System.String)">
+<summary>
+ Defaults to a xml file in the currently executing DLL&apos;s directory
+ named the same as the collection of perf tests.
+</summary>
+</member>
+<member name="T:Fuchu.FuchuPerfUtilModule.PerfHistoryConf">
+<summary>
+ A configuration for the historical performance development for a given implementation.
+</summary>
+</member>
+<member name="F:Fuchu.FuchuPerfUtilModule.PerfImplsConf.handleResults">
+<summary>
+ An optional function that is called when the perf tests have been completed
+ allowing you to extrace the results and save them or display them or show them
+ to your mom.
+</summary>
+</member>
+<member name="F:Fuchu.FuchuPerfUtilModule.PerfImplsConf.verbose">
+<summary>
+ Whether to print results to stdout. Defaults to true.
+</summary>
+</member>
+<member name="F:Fuchu.FuchuPerfUtilModule.PerfImplsConf.comparer">
+<summary>
+ The comparer for how much &apos;better&apos; you need the subject to be. Defaults to
+ &lt;see cref=&quot;PerfUtil.MeanComparer&quot; /&gt;.
+</summary>
+</member>
+<member name="F:Fuchu.FuchuPerfUtilModule.PerfImplsConf.throwOnError">
+<summary>
+ Whether to throw &lt;see cref=&quot;PerfUtil.PerformanceException&quot; /&gt;
+ if the subject is slower than the alternative that it is compared to.
+ Useful for making sure you don&apos;t accidentally write code that degrades
+ performance. Defaults to false.
+</summary>
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="M:Fuchu.FuchuPerfUtilModule.testPerfHistory``1(System.String,``0,System.String)">
+<summary>
+ Compares current implementation against a collection of past tests.
+ &lt;param name=&quot;name&quot;&gt;Name for the group of performance tests&lt;/param&gt;
+ &lt;param name=&quot;subject&quot;&gt;(Current) implementation under test.&lt;/param&gt;
+ &lt;param name=&quot;testRunId&quot;&gt;The id of the test run; this must be ticking upwards, so
+ a recommended value for this parameter is the current assembly version. You can use
+ for example https://github.com/Albacore/albacore/#docs-asmver together with
+ https://github.com/Albacore/albacore/#versionizer and
+ https://github.com/haf/semver to manage your versions in a CI-environment.&lt;/param&gt;
+ &lt;param name=&quot;tests&quot;&gt;The performance tests to run against the subject and the alternatives.&lt;/param&gt;
+</summary>
+</member>
+<member name="M:Fuchu.FuchuPerfUtilModule.testPerfHistoryWithConfig``1(Fuchu.FuchuPerfUtilModule.PerfHistoryConf,System.String,``0,System.String,Microsoft.FSharp.Collections.FSharpList{PerfUtil.PerfTest{``0}})">
+<summary>
+ Compares current implementation against a collection of past tests.
+ &lt;param name=&quot;conf&quot;&gt;Configuration for the historical performance test&lt;/param&gt;
+ &lt;param name=&quot;name&quot;&gt;Name for the group of performance tests&lt;/param&gt;
+ &lt;param name=&quot;subject&quot;&gt;(Current) implementation under test.&lt;/param&gt;
+ &lt;param name=&quot;testRunId&quot;&gt;The id of the test run; this must be ticking upwards, so
+ a recommended value for this parameter is the current assembly version. You can use
+ for example https://github.com/Albacore/albacore/#docs-asmver together with
+ https://github.com/Albacore/albacore/#versionizer and
+ https://github.com/haf/semver to manage your versions in a CI-environment.&lt;/param&gt;
+ &lt;param name=&quot;tests&quot;&gt;The performance tests to run against the subject and the alternatives.&lt;/param&gt;
+</summary>
+</member>
+<member name="M:Fuchu.FuchuPerfUtilModule.testPerfImpls``1(System.String,``0,Microsoft.FSharp.Collections.FSharpList{``0},Microsoft.FSharp.Collections.FSharpList{PerfUtil.PerfTest{``0}})">
+<summary>
+ Compares given implementation performance against a collection of other implementations.
+ Use the &apos;perfTest&apos; function to easily construct test cases. With this function, the configuration
+ will be the sane defaults; if you want to override them, please see &lt;see cref=&quot;testPerfImplsWithConfig&quot; /&gt;.
+
+ &lt;param name=&quot;name&quot;&gt;Name for the group of performance tests&lt;/param&gt;
+ &lt;param name=&quot;subject&quot;&gt;Implementation under test.&lt;/param&gt;
+ &lt;param name=&quot;alternatives&quot;&gt;Secondary implementations to be compared against.&lt;/param&gt;
+ &lt;param name=&quot;tests&quot;&gt;The performance tests to run against the subject and the alternatives.&lt;/param&gt;
+</summary>
+</member>
+<member name="M:Fuchu.FuchuPerfUtilModule.testPerfImplsWithConfig``1(Fuchu.FuchuPerfUtilModule.PerfImplsConf,System.String,``0,Microsoft.FSharp.Collections.FSharpList{``0},Microsoft.FSharp.Collections.FSharpList{PerfUtil.PerfTest{``0}})">
+<summary>
+ Compares given implementation performance against a collection of other implementations.
+ Use the &apos;perfTest&apos; function to easily construct test cases.
+
+ &lt;param name=&quot;conf&quot;&gt;The &lt;see cref=&quot;&quot; /&gt; configuration&lt;/param&gt;
+ &lt;param name=&quot;name&quot;&gt;Name for the group of performance tests&lt;/param&gt;
+ &lt;param name=&quot;subject&quot;&gt;Implementation under test.&lt;/param&gt;
+ &lt;param name=&quot;alternatives&quot;&gt;Secondary implementations to be compared against.&lt;/param&gt;
+ &lt;param name=&quot;tests&quot;&gt;The performance tests to run against the subject and the alternatives.&lt;/param&gt;
+</summary>
+</member>
+<member name="M:Fuchu.FuchuPerfUtilModule.perfTest``1(System.String,Microsoft.FSharp.Core.FSharpFunc{``0,Microsoft.FSharp.Core.Unit})">
+<summary>
+ Create a new performance test. The values given from this method are usable both
+ by PerfUtil as well as Fuchu&apos;s testPerfImplsWithConfig, testPerfImpls,
+ testPerfHistoryWithConfig and testPerfHistory. You can give the values from this
+ function to both Fuchu and PerfUtil.
+</summary>
+</member>
+<member name="T:Fuchu.FuchuPerfUtilModule">
+
+</member>
+</members>
+</doc>
