@@ -27,16 +27,14 @@ let session_support (ctx : HttpContext) =
     ; version = None } ctx |> ignore
   Some ctx
 
-open System.Collections.Generic
-open System.Collections.Concurrent
-
-/// Static dictionary of sessions
-let session_map = new ConcurrentDictionary<string, ConcurrentDictionary<string, obj>>()
-
-/// Get the session from the HttpRequest -- WARNING, here be dragons; just a reference implementation
+/// Get the session from the HttpRequest
+/// WARNING!! Here be dragons; just a reference implementation - usage will tie your
+/// code to a single server and if you load balance you will fail.
+/// Use similar code in production, but with a proper backing store, such as memcached
+/// or Riak to support stateless webs.
 let session (request : HttpRequest) =
   let sessionId = request.session_id
   if String.IsNullOrEmpty sessionId then failwith "session_support was not called"
   if not (session_map.ContainsKey sessionId) then
-    session_map.TryAdd(sessionId,new ConcurrentDictionary<string, obj>()) |> ignore
+    session_map.TryAdd(sessionId, new ConcurrentDictionary<string, obj>()) |> ignore
   session_map.[sessionId]

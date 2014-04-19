@@ -18,7 +18,7 @@ type HttpCookie =
   ; http_only : bool
   ; version   : string option }
  
-// A file's mime type and if compression is enabled or not
+/// A file's mime type and if compression is enabled or not
 type MimeType =
   { name         : string
   ; compression  : bool }
