@@ -91,6 +91,9 @@ module UTF8 =
   let inline to_string (b : byte []) (index : int) (count : int) =
     Encoding.UTF8.GetString(b, index, count)
 
+  let inline to_string' (b : byte []) =
+    Encoding.UTF8.GetString b
+
   /// Get the UTF-8 bytes for the string
   let inline bytes (s : string) =
     Encoding.UTF8.GetBytes s
@@ -117,6 +120,9 @@ module ASCII =
   /// (each character is necessarily one byte)
   let inline to_string (buff : byte[]) (index : int) (count : int) =
     Encoding.ASCII.GetString(buff, index, count)
+
+  let inline to_string' (b : byte []) =
+    Encoding.ASCII.GetString b
 
   /// Encode the string as ASCII encoded in Base64.
   let inline base64_encode (s : string) =

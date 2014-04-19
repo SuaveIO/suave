@@ -76,7 +76,7 @@ let posts =
 let cookies =
   let run_with' = run_with default_config
 
-  let basic_cookie = 
+  let basic_cookie =
     { name      = "mycookie"
     ; value     = "42"
     ; expires   = None
@@ -84,11 +84,9 @@ let cookies =
     ; path      = Some "/"
     ; http_only = false
     ; secure    = false
-    ; version   = None 
-    }
+    ; version   = None }
 
-  testList "Cookies basic tests"
-    [
+  testList "Cookies basic tests" [
       testCase "cookie data makes round trip" <| fun _ ->
         Assert.Equal("expecting cookie value"
         , "42"
