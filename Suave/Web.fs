@@ -187,7 +187,7 @@ module ParsingAndControl =
   let read_line (connection : Connection) ahead (buf : ArraySegment<byte>) = async {
     let offset = ref 0
     let! count, rem = read_till_EOL connection (fun a count -> Array.blit a.Array a.Offset buf.Array (buf.Offset + !offset) count; offset := !offset + count) ahead
-    let result = to_string buf.Array buf.Offset count
+    let result = ASCII.to_string buf.Array buf.Offset count
     return result , rem
   }
 
@@ -202,7 +202,7 @@ module ParsingAndControl =
                           offset := !offset + count)
           rem
       if count <> 0 then
-        let line = to_string buf.Array buf.Offset count
+        let line = ASCII.to_string buf.Array buf.Offset count
         let indexOfColon = line.IndexOf(':')
         headers.Add (line.Substring(0, indexOfColon).ToLower(), line.Substring(indexOfColon+1).TrimStart())
         return! loop new_rem
@@ -278,7 +278,7 @@ module ParsingAndControl =
       | Some(x) ->
         let temp_file_name = Path.GetTempFileName()
         use temp_file = new FileStream(temp_file_name, FileMode.Truncate)
-        let! a, b = read_until (bytes(eol + boundary)) (fun x y -> async { do! temp_file.AsyncWrite(x.Array, x.Offset, y) } ) connection rem
+        let! a, b = read_until (ASCII.bytes(eol + boundary)) (fun x y -> async { do! temp_file.AsyncWrite(x.Array, x.Offset, y) } ) connection rem
         let file_length = temp_file.Length
         temp_file.Close()
         if file_length > int64(0) then
@@ -290,9 +290,9 @@ module ParsingAndControl =
         return! loop boundary b
       | None ->
         use mem = new MemoryStream()
-        let! a, b = read_until (bytes(eol + boundary)) (fun x y -> async { do! mem.AsyncWrite(x.Array, x.Offset, y) } ) connection rem
+        let! a, b = read_until (ASCII.bytes(eol + boundary)) (fun x y -> async { do! mem.AsyncWrite(x.Array, x.Offset, y) } ) connection rem
         let byts = mem.ToArray()
-        request.form.Add(fieldname, (to_string byts 0 byts.Length))
+        request.form.Add(fieldname, (ASCII.to_string byts 0 byts.Length))
 
         return! loop boundary b
       }
@@ -353,7 +353,7 @@ module ParsingAndControl =
             match content_encoding with
             | Some ce when ce.StartsWith("application/x-www-form-urlencoded") ->
               let! (rawdata : ArraySegment<_>), rem = read_post_data connection content_length rem
-              let str = to_string rawdata.Array rawdata.Offset rawdata.Count
+              let str = ASCII.to_string rawdata.Array rawdata.Offset rawdata.Count
               let _  = parse_data str request.form
               // TODO: we can defer reading of body until we need it
               let raw_form = Array.zeroCreate rawdata.Count
@@ -542,8 +542,8 @@ let default_error_handler (ex : Exception) msg (ctx : HttpContext) = async {
   let request = ctx.request
   msg |> Log.verbosee ctx.runtime.logger "Web.default_error_handler" ctx.request.trace ex
   if IPAddress.IsLoopback ctx.connection.ipaddr then
-    do! (Http.response 500 "Internal Error" (bytes_utf8 (sprintf "<h1>%s</h1><br/>%A" ex.Message ex)) ctx)
-  else do! (Http.response 500 "Internal Error" (bytes_utf8 ("Internal Error")) ctx)
+    do! (Http.response 500 "Internal Error" (UTF8.bytes (sprintf "<h1>%s</h1><br/>%A" ex.Message ex)) ctx)
+  else do! (Http.response 500 "Internal Error" (UTF8.bytes ("Internal Error")) ctx)
 }
 
 /// Returns the webserver as a tuple of 1) an async computation the yields unit when

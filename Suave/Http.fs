@@ -156,15 +156,15 @@ module Http =
 
   let ok s = response 200 "OK" s >> succeed
 
-  let OK a = ok (bytes_utf8 a)
+  let OK a = ok (UTF8.bytes a)
 
   let created s = response 201 "Created" s >> succeed
 
-  let CREATED s = created (bytes_utf8 s)
+  let CREATED s = created (UTF8.bytes s)
 
   let accepted s = response 202 "Accepted" s >> succeed
 
-  let ACCEPTED s = accepted (bytes_utf8 s)
+  let ACCEPTED s = accepted (UTF8.bytes s)
 
   let no_content : WebPart =
     response 204 "No Content" (Array.zeroCreate 0) >> succeed
@@ -190,7 +190,7 @@ module Http =
   let redirect url =
     set_header "Location" url
     >> set_header "Content-Type" "text/html; charset=utf-8"
-    >> response 302 "Found" (bytes_utf8(sprintf "<html>
+    >> response 302 "Found" (UTF8.bytes(sprintf "<html>
   <body>
     <a href=\"%s\">Content Moved</a>
   </body>
@@ -206,7 +206,7 @@ module Http =
 
   let bad_request s = response 400 "Bad Request" s >> succeed
 
-  let BAD_REQUEST s = bad_request (bytes_utf8 s)
+  let BAD_REQUEST s = bad_request (UTF8.bytes s)
 
   // 401: see http://stackoverflow.com/questions/3297048/403-forbidden-vs-401-unauthorized-http-responses/12675357
 
@@ -215,56 +215,56 @@ module Http =
     >> response 401 "Unauthorized" s
     >> succeed
 
-  let UNAUTHORIZED s = unauthorized (bytes_utf8 s)
+  let UNAUTHORIZED s = unauthorized (UTF8.bytes s)
 
   let challenge = UNAUTHORIZED "401 Unauthorized."
 
   let forbidden s = response 403 "Forbidden" s >> succeed
 
-  let FORBIDDEN s = forbidden (bytes_utf8 s)
+  let FORBIDDEN s = forbidden (UTF8.bytes s)
 
   let not_found s = response 404 "Not Found" s >> succeed
 
-  let NOT_FOUND message = not_found (bytes_utf8 message)
+  let NOT_FOUND message = not_found (UTF8.bytes message)
 
   let method_not_allowed s = response 405 "Method Not Allowed" s >> succeed
 
-  let METHOD_NOT_ALLOWED s = method_not_allowed (bytes_utf8 s)
+  let METHOD_NOT_ALLOWED s = method_not_allowed (UTF8.bytes s)
 
   let not_acceptable s = response 406 "Not Acceptable" s >> succeed
 
-  let NOT_ACCEPTABLE message = not_acceptable (bytes_utf8 message)
+  let NOT_ACCEPTABLE message = not_acceptable (UTF8.bytes message)
 
   let request_timeout = response 408 "Request Timeout" (Array.zeroCreate 0) >> succeed
   // all-caps req.timeout elided intentionally
 
   let conflict s = response 409 "Conflict" s >> succeed
 
-  let CONFLICT message = conflict (bytes_utf8 message)
+  let CONFLICT message = conflict (UTF8.bytes message)
 
   let gone s = response 410 "Gone" s >> succeed
 
-  let GONE s = gone (bytes_utf8 s)
+  let GONE s = gone (UTF8.bytes s)
 
   let unsupported_media_type s = response 415 "Unsupported Media Type" s >> succeed
 
-  let UNSUPPORTED_MEDIA_TYPE s = unsupported_media_type (bytes_utf8 s)
+  let UNSUPPORTED_MEDIA_TYPE s = unsupported_media_type (UTF8.bytes s)
 
   let unprocessable_entity s = response 422 "Unprocessable Entity" s >> succeed
 
-  let UNPROCESSABLE_ENTITY s = unprocessable_entity (bytes_utf8 s)
+  let UNPROCESSABLE_ENTITY s = unprocessable_entity (UTF8.bytes s)
 
   let precondition_required body = response 428 "Precondition Required" body >> succeed
 
-  let PRECONDITION_REQUIRED body = precondition_required (bytes_utf8 body)
+  let PRECONDITION_REQUIRED body = precondition_required (UTF8.bytes body)
 
   let too_many_requests s = response 429 "Too Many Requests" s >> succeed
 
-  let TOO_MANY_REQUESTS s = too_many_requests (bytes_utf8 s)
+  let TOO_MANY_REQUESTS s = too_many_requests (UTF8.bytes s)
 
   let internal_error message = response 500 "Internal Error" message >> succeed
 
-  let INTERNAL_ERROR a = internal_error (bytes_utf8 a)
+  let INTERNAL_ERROR a = internal_error (UTF8.bytes a)
 
   let mk_mime_type a b = 
     { name = a
@@ -425,13 +425,13 @@ module Http =
     if Directory.Exists dirname then
       let di = new DirectoryInfo(dirname)
       (di.GetFileSystemInfos()) |> Array.sortBy (fun x -> x.Name) |> Array.iter buildLine
-      ok (bytes (result.ToString())) ctx
+      OK (result.ToString()) ctx
     else fail
 
   let parse_authentication_token (token : string) =
     let parts = token.Split (' ')
     let enc = parts.[1].Trim()
-    let decoded = decode_base64 enc
+    let decoded = ASCII.base64_decode enc
     let indexOfColon = decoded.IndexOf(':')
     (parts.[0].ToLower(), decoded.Substring(0,indexOfColon), decoded.Substring(indexOfColon+1))
 

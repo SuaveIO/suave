@@ -83,29 +83,50 @@ let cond d f g a =
 //- theorem: identity = (cnst |> warbler)
 //(warbler cnst) x = cnst x x = fun _ -> x
 
-/// Encode the string as ASCII encoded in Base64.
-let inline encode_base64 (s : string) =
-  let bytes = System.Text.Encoding.ASCII.GetBytes s
-  System.Convert.ToBase64String bytes
+[<RequireQualifiedAccess>]
+module UTF8 =
+  open System
+  open System.Text
 
-/// Decode the string containing Base64-encoded ASCII string data to
-/// a .Net string
-let inline decode_base64 (s : string) =
-  let bytes = System.Convert.FromBase64String s
-  System.Text.Encoding.ASCII.GetString bytes
+  let inline to_string (b : byte []) (index : int) (count : int) =
+    Encoding.UTF8.GetString(b, index, count)
 
-/// Get the ASCII bytes for the string
-let inline bytes (s : string) =
-  System.Text.Encoding.ASCII.GetBytes s
+  /// Get the UTF-8 bytes for the string
+  let inline bytes (s : string) =
+    Encoding.UTF8.GetBytes s
 
-/// Convert the byte array of ASCII-encoded chars to a string, starting at 'index' for 'count' characters
-/// (each character is necessarily one byte)
-let inline to_string (buff : byte[]) (index : int) (count : int) =
-  System.Text.Encoding.ASCII.GetString(buff, index, count)
+  /// Encode the string as UTF8 encoded in Base64.
+  let inline base64_encode (s : string) =
+    let bytes = Encoding.UTF8.GetBytes s
+    Convert.ToBase64String bytes
 
-/// Get the UTF-8 bytes for the string
-let inline bytes_utf8 (s : string) =
-  System.Text.Encoding.UTF8.GetBytes s
+  let inline base64_decode s =
+    let bytes = Convert.FromBase64String s
+    Encoding.UTF8.GetString bytes
+
+[<RequireQualifiedAccess>]
+module ASCII =
+  open System
+  open System.Text
+
+  /// Get the ASCII bytes for the string
+  let inline bytes (s : string) =
+    Encoding.ASCII.GetBytes s
+
+  /// Convert the byte array of ASCII-encoded chars to a string, starting at 'index' for 'count' characters
+  /// (each character is necessarily one byte)
+  let inline to_string (buff : byte[]) (index : int) (count : int) =
+    Encoding.ASCII.GetString(buff, index, count)
+
+  /// Encode the string as ASCII encoded in Base64.
+  let inline base64_encode (s : string) =
+    let bytes = Encoding.ASCII.GetBytes s
+    Convert.ToBase64String bytes
+
+  /// Decode the string containing Base64-encoded ASCII string data to a string
+  let inline base64_decode (s : string) =
+    let bytes = Convert.FromBase64String s
+    Encoding.ASCII.GetString bytes
 
 module Option =
   let or_default value opt =
@@ -138,7 +159,7 @@ module Bytes =
   let [<Literal>] eol = "\r\n"
 
   /// The end-of-line 'literal' as bytes, the \r\n (CRLF) byte pair
-  let EOL = bytes eol
+  let EOL = ASCII.bytes eol
 
   /// The corresponding EOL array segment
   let eol_array_segment = new ArraySegment<_>(EOL, 0, 2)
