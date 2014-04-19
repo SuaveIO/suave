@@ -15,17 +15,6 @@ open Suave.Log
 
 open Fuchu
 
-type Method =
-  | GET
-  | POST
-  | DELETE
-  | PUT
-  | HEAD
-  | CONNECT
-  | PATCH
-  | TRACE
-  | OPTIONS
-
 let current_path = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location)
 let default_config = { default_config with logger = Loggers.sane_defaults_for Log.LogLevel.Warn }
 

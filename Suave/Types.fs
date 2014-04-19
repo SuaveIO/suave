@@ -130,10 +130,6 @@ and HttpContext =
 
 let request f (a : HttpContext) = f a.request a
 
-/// A web part is a thing that executes on a HttpRequest, asynchronously, maybe executing
-/// on the request.
-type WebPart = HttpContext -> Async<unit> option
-
 open System.Threading
 
 /// The core configuration of suave. See also Suave.Web.default_config which
@@ -177,6 +173,3 @@ type SuaveConfig =
 
 /// An exception, raised e.g. if writing to the stream fails
 exception InternalFailure of string
-
-/// Supported HTTP compression encondings
-type ContentEncoding = GZip | Deflate | Identity

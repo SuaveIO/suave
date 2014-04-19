@@ -16,6 +16,8 @@ Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Experimental", "Experimenta
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Pong", "Pong\Pong.fsproj", "{68D30567-3281-41FB-BD69-30FB32196B79}"
 EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "suave.WebMachine", "suave.WebMachine\suave.WebMachine.fsproj", "{301FC093-FD75-495C-AA2F-C8B3697B7114}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -42,6 +44,10 @@ Global
 		{68D30567-3281-41FB-BD69-30FB32196B79}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{68D30567-3281-41FB-BD69-30FB32196B79}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{68D30567-3281-41FB-BD69-30FB32196B79}.Release|Any CPU.Build.0 = Release|Any CPU
+		{301FC093-FD75-495C-AA2F-C8B3697B7114}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{301FC093-FD75-495C-AA2F-C8B3697B7114}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{301FC093-FD75-495C-AA2F-C8B3697B7114}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{301FC093-FD75-495C-AA2F-C8B3697B7114}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -1,36 +1,64 @@
 ﻿namespace Suave
+
+/// The HTTP module has these main sub-modules:
+/// <list>
+///   <item></item>
+///   <item></item>
+///   <item></item>
+///   <item></item>
+///   <item></item>
+/// <list>
 module Http =
+
   open Types
 
-  // generic 'response' and 'response_f' f-ns
+  type WebResult = Async<unit> option
 
-  /// Respond with a given status code, http message, content in the body to a http request.
-  val response_f : status_code:int -> reason_phrase:string -> f_content:(HttpRequest -> Async<unit>) -> request:HttpContext -> Async<unit>
+  /// A web part is a thing that executes on a HttpRequest, asynchronously, maybe executing
+  /// on the request.
+  type WebPart = HttpContext -> WebResult
 
-  /// Respond with a given status code, http reason phrase, content in the body to a http request.
-  val response : status_code:int -> reason_phrase:string -> content:byte [] -> request:HttpContext -> Async<unit>
+  type HttpMethod =
+    | GET
+    | POST
+    | DELETE
+    | PUT
+    | HEAD
+    | CONNECT
+    | PATCH
+    | TRACE
+    | OPTIONS
 
-// Suave response modifiers/applicatives follow
+  /// general response functions
+  module Response =
 
-  /// Sets a header with the key and value specified
-  val set_header : key:string -> value:string -> ctx:HttpContext -> HttpContext
+    /// Respond with a given status code, http message, content in the body to a http request.
+    val response_f : status_code:int -> reason_phrase:string -> f_content:(HttpRequest -> Async<unit>) -> request:HttpContext -> Async<unit>
 
-  /// Sets a cookie with the passed value in the 'cookie' parameter
-  val set_cookie : cookie:HttpCookie -> (HttpContext -> HttpContext)
+    /// Respond with a given status code, http reason phrase, content in the body to a http request.
+    val response : status_code:int -> reason_phrase:string -> content:byte [] -> request:HttpContext -> Async<unit>
 
-// Suave filters/applicatives follow
+  /// Module that allows changing the output response in different ways.
+  /// Functions have signature f :: params... -> HttpContext -> HttpContext.
+  module Writers =
 
-  /// Match on the url
-  val url : s:string -> x:HttpContext -> HttpContext option
+    /// Sets a header with the key and value specified
+    val set_header : key:string -> value:string -> ctx:HttpContext -> HttpContext
 
-  /// Match on the method
-  val meth0d : s:string -> x:HttpContext -> HttpContext option
-  
-  /// Match on the protocol
-  val is_secure : x:HttpContext -> HttpContext option
+    /// Sets a cookie with the passed value in the 'cookie' parameter
+    val set_cookie : cookie:HttpCookie -> (HttpContext -> HttpContext)
 
-  /// Applies the regex to the url and matchs on the result
-  val url_regex : s:string -> x:HttpContext -> HttpContext option
+    val mk_mime_type : name:string -> compression:bool -> MimeType option
+
+    val default_mime_types_map : ext:string -> MimeType option
+
+    val set_mime_type : mime_type:string ->  (HttpContext -> HttpContext)
+
+  module Intermediate =
+    val CONTINUE : unit -> x:HttpContext -> HttpContext option
+    val SWITCHING_PROTO : unit -> x:HttpContext -> HttpContext option
+
+  module Successful =
 
   /// <summary>
   /// Match on GET requests.
@@ -1128,6 +1156,20 @@ module Http =
   /// <remarks>
   /// </remarks>
   val redirect : url:string -> WebPart
+
+  module Applicatives =
+
+    /// Match on the url
+    val url : s:string -> x:HttpContext -> HttpContext option
+
+    /// Match on the method
+    val ``method`` : method:HttpMethod -> x:HttpContext -> HttpContext option
+
+    /// Match on the protocol
+    val is_secure : x:HttpContext -> HttpContext option
+
+    /// Applies the regex to the url and matches on the result
+    val url_regex : s:string -> x:HttpContext -> HttpContext option
 
   /// <summary>
   /// Creates a MIME type record

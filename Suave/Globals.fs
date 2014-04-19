@@ -24,3 +24,8 @@ open System.Collections.Concurrent
 
 /// Static dictionary of sessions - here be dragons, see Session.fs
 let internal session_map = new ConcurrentDictionary<string, ConcurrentDictionary<string, obj>>()
+
+/// A map of compressed files:
+/// TODO - evaluate if we can't service requests
+/// by writing these to disk instead
+let internal compressed_files_map = new ConcurrentDictionary<string,string>()
