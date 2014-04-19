@@ -5,10 +5,13 @@ open System
 open System.Net
 open System.Collections.Generic
 
+open Suave.Utils.Bytes
+
 open Suave.Types
 open Suave.Http
 open Suave.Web
 open Suave.Tcp
+
 open Socket
 
 /// Copies the headers from 'headers1' to 'headers2'
@@ -75,7 +78,7 @@ let forward (ip : IPAddress) (port : uint16) (ctx : HttpContext) =
     | :? WebException as ex when ex.Response <> null ->
       do! send_web_response (ex.Response :?> HttpWebResponse) ctx
     | :? WebException as ex when ex.Response = null ->
-      do! response 502 "Bad Gateway" (bytes_utf8 "suave proxy: Could not connect to upstream") ctx
+      do! response 502 "Bad Gateway" (UTF8.bytes "suave proxy: Could not connect to upstream") ctx
   } |> succeed
 
 /// Proxy the HttpRequest 'r' with the proxy found with 'proxy_resolver'

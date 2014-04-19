@@ -18,31 +18,8 @@ module ParsingAndControl =
   open Http
   open Socket
 
-  /// Returns the index of the first CRLF in the buffer
-  let inline scan_crlf (b : ArraySegment<byte>) =
-    let a = b.Array
-    let rec loop i =
-      if i > b.Offset + b.Count - 1 then None
-      elif i > 0 && a.[i - 1] = EOL.[0] && a.[i] = EOL.[1] then Some (i - 1)
-      else loop (i + 1)
-    loop b.Offset
-
-  /// Returns the index of the first CRLF in the union of two ArraySegment
-  let inline scan_crlf_x (c : ArraySegment<byte>) (d : ArraySegment<byte>) =
-    let a = unite c d
-    let rec loop i =
-      if i > c.Count + d.Count - 1 then None
-      elif i > 0 && a (i - 1) = EOL.[0] && a i = EOL.[1] then Some (i - 1)
-      else loop (i + 1)
-    loop 0
-
-  type BufferSegment =
-    { buffer : ArraySegment<byte>
-    ; offset : int
-    ; length : int }
-
-  let inline mk_buffer_segment buffer offset length =
-    Some { buffer = buffer; offset = offset; length = length }
+  open Suave.Utils.Bytes
+  open Suave.Utils.Parsing
 
   /// Read the passed stream into buff until the EOL (CRLF) has been reached 
   /// and returns an array containing excess data read past the marker
@@ -69,7 +46,7 @@ module ParsingAndControl =
       | None ->
         return! read_data count (Some pair)
       }
-    and scan_data_x  count (left : BufferSegment) (right: BufferSegment) = async  {
+    and scan_data_x  count (left : BufferSegment) (right : BufferSegment) = async  {
 
       let cn = left.length
       let dn = right.length
@@ -203,19 +180,14 @@ module ParsingAndControl =
     | None -> read_data 0 preread
 
   /// Alternative read_till_EOL
-  let _read_till_EOL(connection : Connection) (buff : byte[]) (preread : BufferSegment option) =
+  let _read_till_EOL (connection : Connection) (buff : byte[]) (preread : BufferSegment option) =
     read_until EOL (fun b c -> async { do Array.blit b.Array b.Offset buff 0 c }) connection preread
-
-  /// Convert the byte array of ASCII-encoded chars to a string, starting at 'index' for 'count' characters
-  /// (each character is necessarily one byte)
-  let inline to_string (buff : byte[]) (index : int) (count : int) =
-    Encoding.ASCII.GetString(buff, index, count)
 
   /// Read a line from the stream, calling to_string on the bytes before the EOL marker
   let read_line (connection : Connection) ahead (buf : ArraySegment<byte>) = async {
     let offset = ref 0
     let! count, rem = read_till_EOL connection (fun a count -> Array.blit a.Array a.Offset buf.Array (buf.Offset + !offset) count; offset := !offset + count) ahead
-    let result = to_string buf.Array buf.Offset count
+    let result = ASCII.to_string buf.Array buf.Offset count
     return result , rem
   }
 
@@ -230,7 +202,7 @@ module ParsingAndControl =
                           offset := !offset + count)
           rem
       if count <> 0 then
-        let line = to_string buf.Array buf.Offset count
+        let line = ASCII.to_string buf.Array buf.Offset count
         let indexOfColon = line.IndexOf(':')
         headers.Add (line.Substring(0, indexOfColon).ToLower(), line.Substring(indexOfColon+1).TrimStart())
         return! loop new_rem
@@ -242,34 +214,6 @@ module ParsingAndControl =
 
   /// Gets the empty query string dictionary
   let empty_query_string () = new Dictionary<string,string>()
-
-  /// Gets the query from the HttpRequest // TODO: Move to a module for HttpRequest
-  let query (x : HttpRequest) = x.query
-  /// Gets the form from the HttpRequest // TODO: Move to a module for HttpRequest
-  let form  (x : HttpRequest) = x.form
-
-  /// Parse the data in the string to a dictionary, assuming k/v pairs are separated
-  /// by the ampersand character.
-  let parse_data (s : string) (param : Dictionary<string,string>) =
-    s.Split('&')
-    |> Array.iter (fun (k : string) ->
-         k.Split('=')
-         |> (fun d -> if d.Length = 2 then param.Add(d.[0], System.Web.HttpUtility.UrlDecode(d.[1]))))
-    param
-
-  /// parse the url into its constituents and fill out the passed dictionary with
-  /// query string key-value pairs
-  let inline parse_url (line : string) (dict : Dictionary<string,string>) =
-    let parts = line.Split(' ')
-    if parts.Length < 2 || parts.Length > 3 then failwith (sprintf "invalid url: '%s'" line)
-    let indexOfMark = parts.[1].IndexOf('?')
-
-    if indexOfMark > 0 then
-      let raw_query = parts.[1].Substring(indexOfMark + 1)
-      parse_data raw_query dict |> ignore
-      (parts.[0], parts.[1].Substring(0,indexOfMark), "?" + raw_query, parts.[2])
-    else
-      (parts.[0], parts.[1], String.Empty, parts.[2])
 
   /// Read the post data from the stream, given the number of bytes that makes up the post data.
   let read_post_data (connection : Connection) (bytes : int) (read : BufferSegment option) =
@@ -301,33 +245,6 @@ module ParsingAndControl =
         let missing = Array.zeroCreate bytes
         return! read_bytes bytes missing 0
     }
-
-  /// Parse the cookie data in the string into a dictionary
-  let parse_cookie (s : string) =
-    s.Split(';')
-    |> Array.map (fun (x : string) ->
-                  let parts = x.Split('=')
-                  (parts.[0], parts.[1]))
-
-  /// Parse a string array of key-value-pairs, combined using the equality character '='
-  /// into a dictionary
-  let parse_key_value_pairs arr =
-    let dict = new Dictionary<string,string>()
-    arr
-    |> Array.iter (fun (x : String) ->
-                   let parts = x.Split('=')
-                   dict.Add(parts.[0], parts.[1]))
-    dict
-
-  /// Parse the header parameters into key-value pairs, as a dictionary.
-  /// Fails if the header is a None.
-  let header_params (header : string option) =
-    match header with
-    | Some x ->
-      let parts = x.Split(';') |> Array.map (fun x -> x.TrimStart())
-      parse_key_value_pairs (Array.sub parts 1 (parts.Length - 1))
-    | None ->
-      failwith "did not find header, because header_params received None"
 
   /// Parses multipart data from the stream, feeding it into the HttpRequest's property Files.
   let parse_multipart (connection : Connection)
@@ -361,7 +278,7 @@ module ParsingAndControl =
       | Some(x) ->
         let temp_file_name = Path.GetTempFileName()
         use temp_file = new FileStream(temp_file_name, FileMode.Truncate)
-        let! a, b = read_until (bytes(eol + boundary)) (fun x y -> async { do! temp_file.AsyncWrite(x.Array, x.Offset, y) } ) connection rem
+        let! a, b = read_until (ASCII.bytes(eol + boundary)) (fun x y -> async { do! temp_file.AsyncWrite(x.Array, x.Offset, y) } ) connection rem
         let file_length = temp_file.Length
         temp_file.Close()
         if file_length > int64(0) then
@@ -373,9 +290,9 @@ module ParsingAndControl =
         return! loop boundary b
       | None ->
         use mem = new MemoryStream()
-        let! a, b = read_until (bytes(eol + boundary)) (fun x y -> async { do! mem.AsyncWrite(x.Array, x.Offset, y) } ) connection rem
+        let! a, b = read_until (ASCII.bytes(eol + boundary)) (fun x y -> async { do! mem.AsyncWrite(x.Array, x.Offset, y) } ) connection rem
         let byts = mem.ToArray()
-        request.form.Add(fieldname, (to_string byts 0 byts.Length))
+        request.form.Add(fieldname, (ASCII.to_string byts 0 byts.Length))
 
         return! loop boundary b
       }
@@ -436,7 +353,7 @@ module ParsingAndControl =
             match content_encoding with
             | Some ce when ce.StartsWith("application/x-www-form-urlencoded") ->
               let! (rawdata : ArraySegment<_>), rem = read_post_data connection content_length rem
-              let str = to_string rawdata.Array rawdata.Offset rawdata.Count
+              let str = ASCII.to_string rawdata.Array rawdata.Offset rawdata.Count
               let _  = parse_data str request.form
               // TODO: we can defer reading of body until we need it
               let raw_form = Array.zeroCreate rawdata.Count
@@ -484,7 +401,7 @@ module ParsingAndControl =
   type HttpProcessor = HttpRequest -> Connection -> BufferSegment option -> Async<(HttpRequest * (BufferSegment option)) option>
   type RequestResult = Done
 
-  let mk_request connection proto =
+  let internal mk_request connection proto =
     { http_version   = null
     ; url            = null
     ; ``method``     = null
@@ -502,14 +419,14 @@ module ParsingAndControl =
     ; is_secure      = match proto with HTTP -> false | HTTPS _ -> true
     ; trace          = Log.TraceHeader.Empty }
 
-  let free connection (s : BufferSegment option) =
+  let internal free connection (s : BufferSegment option) =
     match s with
     | None -> ()
     | Some x -> connection.free_buffer x.buffer
 
   /// Check if the web part can perform its work on the current request. If it can't
   /// it will return None and the run method will return.
-  let run ctx web_part = async {
+  let internal run ctx web_part = async {
     match web_part ctx with // run the web part
     | Some x -> do! x
     | None -> return ()
@@ -593,18 +510,7 @@ module ParsingAndControl =
         return ()
     }
 
-  /// Parallelise the map of 'f' onto all items in the 'input' seq.
-  let parallelize input f = input |> Seq.map f |> Async.Parallel
-
   open Suave.Tcp
-
-  /// Gets whether the passed ip is a local IPv4 or IPv6 address.
-  /// Example: 127.0.0.1, ::1 return true. If the IP cannot be parsed,
-  /// returns false.
-  let is_local_address (ip : string) =
-    match IPAddress.TryParse ip with
-    | false, _   -> false
-    | true,  ip' -> IPAddress.IsLoopback ip'
 
   let mk_http_runtime proto timeout error_handler mime_types home_directory compression_folder logger =
     { protocol           = proto
@@ -636,8 +542,8 @@ let default_error_handler (ex : Exception) msg (ctx : HttpContext) = async {
   let request = ctx.request
   msg |> Log.verbosee ctx.runtime.logger "Web.default_error_handler" ctx.request.trace ex
   if IPAddress.IsLoopback ctx.connection.ipaddr then
-    do! (Http.response 500 "Internal Error" (bytes_utf8 (sprintf "<h1>%s</h1><br/>%A" ex.Message ex)) ctx)
-  else do! (Http.response 500 "Internal Error" (bytes_utf8 ("Internal Error")) ctx)
+    do! (Http.response 500 "Internal Error" (UTF8.bytes (sprintf "<h1>%s</h1><br/>%A" ex.Message ex)) ctx)
+  else do! (Http.response 500 "Internal Error" (UTF8.bytes ("Internal Error")) ctx)
 }
 
 /// Returns the webserver as a tuple of 1) an async computation the yields unit when
@@ -647,6 +553,8 @@ let default_error_handler (ex : Exception) msg (ctx : HttpContext) = async {
 /// start the 'server' (second item in tuple), as this starts the TcpListener.
 /// Have a look at the example and the unit tests for more documentation.
 /// In other words: don't block on 'listening' unless you have started the server.
+/// The return value from 'listening' (first item in tuple) gives you some metrics on
+/// how quickly suave started.
 let web_server_async (config : SuaveConfig) (webpart : WebPart) =
   let content_folder = ParsingAndControl.resolve_directory config.home_folder
   let compression_folder = System.IO.Path.Combine(ParsingAndControl.resolve_directory config.compressed_files_folder, "_temporary_compressed_files")
@@ -658,7 +566,7 @@ let web_server_async (config : SuaveConfig) (webpart : WebPart) =
           proto config.web_part_timeout config.error_handler
           config.mime_types_map content_folder compression_folder config.logger
       ParsingAndControl.web_worker (ip, port, config.buffer_size, config.max_ops, http_runtime) webpart)
-  let listening = all |> Seq.map fst |> Async.Parallel |> Async.Ignore
+  let listening = all |> Seq.map fst |> Async.Parallel
   let server    = all |> Seq.map snd |> Async.Parallel |> Async.Ignore
   listening, server
 

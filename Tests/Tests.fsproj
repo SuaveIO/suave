@@ -39,7 +39,15 @@
   <Import Project="$(MSBuildExtensionsPath32)\..\Microsoft F#\v4.0\Microsoft.FSharp.Targets" Condition="(!Exists('$(MSBuildExtensionsPath32)\..\Microsoft SDKs\F#\3.0\Framework\v4.0\Microsoft.FSharp.Targets')) And (Exists('$(MSBuildExtensionsPath32)\..\Microsoft F#\v4.0\Microsoft.FSharp.Targets'))" />
   <Import Project="$(MSBuildExtensionsPath32)\FSharp\1.0\Microsoft.FSharp.Targets" Condition="(!Exists('$(MSBuildExtensionsPath32)\..\Microsoft SDKs\F#\3.0\Framework\v4.0\Microsoft.FSharp.Targets')) And (!Exists('$(MSBuildExtensionsPath32)\..\Microsoft F#\v4.0\Microsoft.FSharp.Targets')) And (Exists('$(MSBuildExtensionsPath32)\FSharp\1.0\Microsoft.FSharp.Targets'))" />
   <ItemGroup>
+    <None Include="PerfLab.fsx" />
+    <Compile Include="AssemblyInfo.fs" />
+    <Compile Include="TestUtilities.fs" />
+    <Compile Include="Smoke.fs" />
+    <Compile Include="Utils.fs" />
     <Compile Include="Web.fs" />
+    <Compile Include="Proxy.fs" />
+    <Compile Include="Common.fs" />
+    <Compile Include="Perf.fs" />
     <Compile Include="Program.fs" />
     <None Include="packages.config" />
     <None Include="suave.p12">
@@ -61,11 +69,18 @@
     <Reference Include="FsCheck">
       <HintPath>..\packages\FsCheck.0.9.1.0\lib\net40-Client\FsCheck.dll</HintPath>
     </Reference>
+    <Reference Include="FSharp.Charting">
+      <HintPath>..\packages\FSharp.Charting.0.90.6\lib\net40\FSharp.Charting.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
     <Reference Include="Fuchu">
-      <HintPath>..\packages\Fuchu.0.3.0.1\lib\net40-client\Fuchu.dll</HintPath>
+      <HintPath>..\libs\Fuchu-9db7222\net40\Fuchu.dll</HintPath>
     </Reference>
     <Reference Include="Fuchu.FsCheck">
-      <HintPath>..\packages\Fuchu.FsCheck.0.3.0.1\lib\net40-client\Fuchu.FsCheck.dll</HintPath>
+      <HintPath>..\libs\Fuchu-9db7222\net40\Fuchu.FsCheck.dll</HintPath>
+    </Reference>
+    <Reference Include="Fuchu.PerfUtil">
+      <HintPath>..\libs\Fuchu-9db7222\net40\Fuchu.PerfUtil.dll</HintPath>
     </Reference>
     <Reference Include="ManagedOpenSsl">
       <HintPath>..\libs\ManagedOpenSsl.dll</HintPath>
@@ -76,7 +91,7 @@
       <HintPath>..\packages\NUnit.2.6.3\lib\nunit.framework.dll</HintPath>
     </Reference>
     <Reference Include="PerfUtil">
-      <HintPath>..\packages\PerfUtil.0.1.4\lib\net45\PerfUtil.dll</HintPath>
+      <HintPath>..\libs\PerfUtil-28e08aa\net40\PerfUtil.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />

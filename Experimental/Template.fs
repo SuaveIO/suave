@@ -117,6 +117,6 @@ let process_template (data : Map<string,Binder>) ({ request = http_request; runt
     let str = new StringWriter(sb)
     xml_to_string1 xml str
     let output = sb.ToString()
-    ok (bytes_utf8 output) ctx
+    OK output ctx
   with
   | x -> INTERNAL_ERROR (x.ToString()) ctx

@@ -1,10 +1,16 @@
 ﻿module Suave.Socket
 
+open Suave.Utils.Bytes
+open Suave.Async
+
 open System
 open System.Collections.Generic
 open System.Collections.Concurrent
+open System.IO
+open System.Net
 open System.Net.Sockets
- 
+open System.Threading.Tasks
+
 /// This class creates a single large buffer which can be divided up
 /// and assigned to SocketAsyncEventArgs objects for use with each
 /// socket I/O operation.
@@ -86,32 +92,26 @@ let inline async_do (op : A -> bool) (prepare : A -> unit) (select: A -> 'T) (ar
 
 /// Prepares the arguments by setting the buffer.
 let inline set_buffer (buf : B) (args: A) =
-    args.SetBuffer(buf.Array, buf.Offset, buf.Count)
+  args.SetBuffer(buf.Array, buf.Offset, buf.Count)
 
 let inline accept (socket : Socket) =
-    async_do socket.AcceptAsync ignore (fun a -> a.AcceptSocket)
+  async_do socket.AcceptAsync ignore (fun a -> a.AcceptSocket)
 
 let inline trans (a : SocketAsyncEventArgs) = 
-    new ArraySegment<_>(a.Buffer,a.Offset,a.BytesTransferred)
-
-open System.Net
+  new ArraySegment<_>(a.Buffer,a.Offset,a.BytesTransferred)
 
 /// A connection (TCP implied) is a thing that can read and write from a socket
 /// and that can be closed.
-type Connection = { 
-  ipaddr       : IPAddress;
-  read         : ArraySegment<byte> -> Async<int>;
-  write        : ArraySegment<byte> -> Async<unit>;
-  get_buffer   : unit -> ArraySegment<byte>;
-  free_buffer  : ArraySegment<byte> -> unit;
-  is_connected : unit -> bool ;
-  line_buffer  : ArraySegment<byte>
-  }
+type Connection =
+  { ipaddr       : IPAddress
+  ; read         : ArraySegment<byte> -> Async<int>
+  ; write        : ArraySegment<byte> -> Async<unit>
+  ; get_buffer   : unit -> ArraySegment<byte>
+  ; free_buffer  : ArraySegment<byte> -> unit
+  ; is_connected : unit -> bool
+  ; line_buffer  : ArraySegment<byte> }
 
-let eol_array_segment = new ArraySegment<_>(EOL, 0, 2)
-
-/// Write the string s to the stream asynchronously
-/// as ASCII encoded text
+/// Write the string s to the stream asynchronously as ASCII encoded text
 let inline async_writeln (connection : Connection) (s : string) = async {
   if s.Length > 0 then
     let buff = connection.line_buffer
@@ -120,17 +120,12 @@ let inline async_writeln (connection : Connection) (s : string) = async {
   do! connection.write eol_array_segment
 }
 
-/// Write the string s to the stream asynchronously
-/// from a byte array
+/// Write the string s to the stream asynchronously from a byte array
 let inline async_writebytes (connection : Connection) (b : byte[]) = async {
   if b.Length > 0 then do! connection.write (new ArraySegment<_>(b, 0, b.Length))
 }
 
-open System.IO
-open System.Threading.Tasks
-open Async
-
-/// Asynchronouslyo write from the 'from' stream to the 'to' stream.
+/// Asynchronously write from the 'from' stream to the 'to' stream.
 let transfer_x (to_stream : Connection) (from : Stream) =
   let buf = Array.zeroCreate<byte> 0x2000
   let rec do_block () = async {

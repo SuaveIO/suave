@@ -1,0 +1,523 @@
+<?xml version="1.0" encoding="utf-8"?>
+<doc>
+<assembly><name>PerfUtil</name></assembly>
+<members>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="M:PerfUtil.Benchmark.Run``1(PerfUtil.PerfTest{``0},``0,Microsoft.FSharp.Core.FSharpOption{System.Int32},Microsoft.FSharp.Core.FSharpOption{System.Boolean})">
+ <summary>Runs a given performance test.</summary>
+ <param name="testF">Performance test.</param>
+ <param name="impl">Implementation to run the performance test on.</param>
+ <param name="repetitions">Number of times to repeat the benchmark. Defaults to 1.</param>
+ <param name="catchExceptions">Catches exceptions raised by the test function. Defaults to false.</param>
+</member>
+<member name="M:PerfUtil.Benchmark.Run(Microsoft.FSharp.Core.FSharpFunc{Microsoft.FSharp.Core.Unit,Microsoft.FSharp.Core.Unit},Microsoft.FSharp.Core.FSharpOption{System.Int32},Microsoft.FSharp.Core.FSharpOption{System.String},Microsoft.FSharp.Core.FSharpOption{System.String},Microsoft.FSharp.Core.FSharpOption{System.Boolean})">
+ <summary>Benchmarks a given computation.</summary>
+ <param name="testF">Test function.</param>
+ <param name="repetitions">Number of times to repeat the benchmark. Defaults to 1.</param>
+ <param name="sessionId">Test session identifier given to benchmark. Defaults to empty string.</param>
+ <param name="testId">Test identifier given to benchmark. Defaults to empty string.</param>
+ <param name="catchExceptions">Catches exceptions raised by the test function. Defaults to false.</param>
+</member>
+<member name="M:PerfUtil.Benchmark.Run``1(Microsoft.FSharp.Core.FSharpFunc{``0,Microsoft.FSharp.Core.Unit},``0,Microsoft.FSharp.Core.FSharpOption{System.Int32},Microsoft.FSharp.Core.FSharpOption{System.String},Microsoft.FSharp.Core.FSharpOption{System.String},Microsoft.FSharp.Core.FSharpOption{System.Boolean})">
+ <summary>Benchmarks a given computation.</summary>
+ <param name="testF">Test function.</param>
+ <param name="state">Input state to the test function.</param>
+ <param name="repetitions">Number of times to repeat the benchmark. Defaults to 1.</param>
+ <param name="sessionId">Test session identifier given to benchmark. Defaults to empty string.</param>
+ <param name="testId">Test identifier given to benchmark. Defaults to empty string.</param>
+ <param name="catchExceptions">Catches exceptions raised by the test function. Defaults to false.</param>
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="M:PerfUtil.IPerformanceComparer.IsBetterOrEquivalent(PerfUtil.PerfResult,PerfUtil.PerfResult)">
+<summary>
+ Decides if current performance is better or equivalent to the other/older performance.
+</summary>
+</member>
+<member name="M:PerfUtil.IPerformanceComparer.GetComparisonMessage(PerfUtil.PerfResult,PerfUtil.PerfResult)">
+<summary>
+ Returns a message based on comparison of the two benchmarks.
+</summary>
+</member>
+<member name="T:PerfUtil.IPerformanceComparer">
+<summary>
+ compares between two performance results
+</summary>
+</member>
+<member name="P:PerfUtil.ITestable.Name">
+<summary>
+ Implementation name.
+</summary>
+</member>
+<member name="T:PerfUtil.ITestable">
+<summary>
+ An abstract implementation interface
+</summary>
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="T:PerfUtil.ImplemantationComparer`1">
+ <summary>Compares given implementation performance against a collection of other implementations.</summary>
+ <param name="testedImpl">Implementation under test.</param>
+ <param name="otherImpls">Secondary implementations to be compared against.</param>
+ <param name="comparer">Specifies a custom performance comparer. Default to the TimeComparer.</param>
+ <param name="verbose">Print performance results to stdout.</param>
+ <param name="throwOnError">Raise an exception if performance comparison fails. Defaults to false.</param>
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="M:PerfUtil.PastImplementationComparer`1.PersistCurrentResults(Microsoft.FSharp.Core.FSharpOption{System.String})">
+ <summary>append current test results to persistence file.</summary>
+ <param name="file">Optionally, specifies a file path to persist to.</param>
+</member>
+<member name="">
+
+</member>
+<member name="M:PerfUtil.PastImplementationComparer`1.#ctor(`0,System.Version,Microsoft.FSharp.Core.FSharpOption{System.String},Microsoft.FSharp.Core.FSharpOption{PerfUtil.IPerformanceComparer},Microsoft.FSharp.Core.FSharpOption{System.Boolean},Microsoft.FSharp.Core.FSharpOption{System.Boolean},Microsoft.FSharp.Core.FSharpOption{System.Boolean})">
+ <summary>Compares current implementation against a collection of past tests.</summary>
+ <param name="currentImpl">Implementation under test.</param>
+ <param name="version">Version number of current implementation.</param>
+ <param name="historyFile">Specifies path to persisted past test results. Defaults to 'PerfUtil.DefaultPersistenceFile'.</param>
+ <param name="verbose">Print performance results to stdout.</param>
+ <param name="throwOnError">Raise an exception if performance comparison fails. Defaults to false.</param>
+ <param name="overwrite">Overwrite sessions with identical run id, if such session exists. Defaults to false.</param>
+</member>
+<member name="">
+
+</member>
+<member name="T:PerfUtil.PastImplementationComparer`1">
+ <summary>Compares current implementation against a collection of past tests.</summary>
+ <param name="currentImpl">Implementation under test.</param>
+ <param name="testRunId">Unique identifier of current implementation.</param>
+ <param name="historyFile">Specifies path to persisted past test results. Defaults to 'PerfUtil.DefaultPersistenceFile'.</param>
+ <param name="verbose">Print performance results to stdout.</param>
+ <param name="throwOnError">Raise an exception if performance comparison fails. Defaults to false.</param>
+ <param name="overwrite">Overwrite sessions with identical run id, if such session exists. Defaults to true.</param>
+</member>
+<member name="F:PerfUtil.PerfUtil.PerfResult.GcDelta">
+<summary>
+ Garbage collect differential per generation
+</summary>
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="F:PerfUtil.PerfUtil.PerfResult.Error">
+<summary>
+ Catch potential error message
+</summary>
+</member>
+<member name="F:PerfUtil.PerfUtil.PerfResult.Date">
+<summary>
+ Execution date
+</summary>
+</member>
+<member name="F:PerfUtil.PerfUtil.PerfResult.SessionId">
+<summary>
+ Test session identifier
+</summary>
+</member>
+<member name="F:PerfUtil.PerfUtil.PerfResult.TestId">
+<summary>
+ Test identifier
+</summary>
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="T:PerfUtil.PerfResult">
+<summary>
+ Contains performance information
+</summary>
+</member>
+<member name="">
+
+</member>
+<member name="T:PerfUtil.PerfTestAttribute">
+<summary>
+ indicates that given method is a performance test
+</summary>
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="T:PerfUtil.PerfTest`1">
+<summary>
+ Represents a performance test for a given class of implementations.
+</summary>
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="P:PerfUtil.PerfUtil.DefaultPersistenceFile(System.String)">
+<summary>
+ gets or sets the default persistence file used by the PastSessionComparer
+</summary>
+</member>
+<member name="P:PerfUtil.PerfUtil.DefaultPersistenceFile">
+<summary>
+ gets or sets the default persistence file used by the PastSessionComparer
+</summary>
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="P:PerfUtil.PerformanceTester`1.TestedImplementation">
+<summary>
+ The implementation under test.
+</summary>
+</member>
+<member name="M:PerfUtil.PerformanceTester`1.RunTest(PerfUtil.PerfTest{`0})">
+<summary>
+ Run a performance test.
+</summary>
+</member>
+<member name="M:PerfUtil.PerformanceTester`1.Run(System.String,Microsoft.FSharp.Core.FSharpFunc{`0,Microsoft.FSharp.Core.Unit})">
+<summary>
+ Benchmarks given function.
+</summary>
+</member>
+<member name="M:PerfUtil.PerformanceTester`1.GetTestResults">
+<summary>
+ Get accumulated test results.
+</summary>
+</member>
+<member name="">
+
+</member>
+<member name="T:PerfUtil.PerformanceTester`1">
+<summary>
+ abstract performance tester
+</summary>
+</member>
+<member name="F:PerfUtil.PerfUtil.TestSession.Results">
+<summary>
+ results indexed by test id
+</summary>
+</member>
+<member name="F:PerfUtil.PerfUtil.TestSession.Hostname">
+<summary>
+ host id that performed given test.
+</summary>
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="T:PerfUtil.TestSession">
+<summary>
+ Represents a collection of tests performed in a given run.
+</summary>
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="M:PerfUtil.Extensions.PerfTest`1.OfAssembly.Static``1(System.Reflection.Assembly,Microsoft.FSharp.Core.FSharpOption{System.Reflection.BindingFlags})">
+<summary>
+ load all methods containing the [&lt;PerfTest&gt;] attribute from assembly.
+</summary>
+</member>
+<member name="M:PerfUtil.Extensions.PerfTest`1.OfModuleMarker.Static``2(Microsoft.FSharp.Core.FSharpOption{System.Reflection.BindingFlags})">
+<summary>
+ load all methods containing the [&lt;PerfTest&gt;] attribute from module marker.
+</summary>
+</member>
+<member name="M:PerfUtil.Extensions.PerfTest`1.OfType.Static``2(Microsoft.FSharp.Core.FSharpOption{System.Reflection.BindingFlags})">
+<summary>
+ load all methods containing the [&lt;PerfTest&gt;] attribute from given type.
+</summary>
+</member>
+<member name="M:PerfUtil.Extensions.PerfTest`1.OfType.Static``1(System.Type,Microsoft.FSharp.Core.FSharpOption{System.Reflection.BindingFlags})">
+<summary>
+ load all methods containing the [&lt;PerfTest&gt;] attribute from given type.
+</summary>
+</member>
+<member name="">
+
+</member>
+<member name="M:PerfUtil.Extensions.TestSession.ofFile(System.String)">
+<summary>
+ load a collection of test sessions from xml file.
+</summary>
+</member>
+<member name="M:PerfUtil.Extensions.TestSession.toFile(System.String,Microsoft.FSharp.Collections.FSharpList{PerfUtil.TestSession})">
+<summary>
+ persist a collection of test sessions to a given file path.
+</summary>
+</member>
+<member name="M:PerfUtil.Extensions.TestSession.groupByTest(Microsoft.FSharp.Collections.FSharpList{PerfUtil.TestSession})">
+<summary>
+ takes a collection of test sessions and groups them by matching test Id&apos;s.
+</summary>
+</member>
+<member name="T:PerfUtil.Extensions.TestSession">
+
+</member>
+<member name="M:PerfUtil.Extensions.PerfTest.run``1(Microsoft.FSharp.Core.FSharpFunc{Microsoft.FSharp.Core.Unit,PerfUtil.PerformanceTester{``0}},Microsoft.FSharp.Collections.FSharpList{PerfUtil.PerfTest{``0}})">
+<summary>
+ initializes a new performance tester and executes given tests
+</summary>
+</member>
+<member name="T:PerfUtil.Extensions.PerfTest">
+
+</member>
+<member name="T:PerfUtil.Extensions">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="T:PerfUtil.Persist">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="M:PerfUtil.Utils.getDuplicates``1(System.Collections.Generic.IEnumerable{``0})">
+<summary>
+ only returns items in enumeration that appear as duplicates
+</summary>
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="T:PerfUtil.Utils">
+
+</member>
+</members>
+</doc>

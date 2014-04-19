@@ -15,9 +15,8 @@ type StartedData =
   ; source_ip        : IPAddress
   ; source_port      : uint16 }
   override x.ToString() =
-    sprintf "started %s <-> %s : %O:%d"
-      (x.start_called_utc.ToString("o"))
-      (x.socket_bound_utc |> Option.fold (fun _ t -> t.ToString("o")) "x")
+    sprintf "started in %f ms: %O:%d"
+      ((x.socket_bound_utc |> Option.fold (fun _ t -> t) x.start_called_utc) - x.start_called_utc).TotalMilliseconds
       x.source_ip x.source_port
 
 /// Asynchronous extension methods to TcpListener to make
@@ -186,9 +185,13 @@ let tcp_ip_server (source_ip : IPAddress,
       let start_data = { start_data with socket_bound_utc = Some(DateTime.UtcNow) }
       accepting_connections.Complete start_data |> ignore
 
-      Log.internf logger "Tcp.tcp_ip_server"
-        (fun fmt -> fmt "started listener in: %O%s" start_data
-                      (if token.IsCancellationRequested then ", cancellation requested" else ""))
+      logger.Log Log.LogLevel.Info <| fun _ ->
+        { path          = "Tcp.tcp_ip_server"
+        ; trace         = Log.TraceHeader.Empty
+        ; message       = sprintf "started listener in: %O%s" start_data (if token.IsCancellationRequested then ", cancellation requested" else "")
+        ; level         = Log.LogLevel.Info
+        ; ``exception`` = None
+        ; ts_utc_ticks  = DateTime.UtcNow.Ticks }
 
       while not (token.IsCancellationRequested) do
         try
