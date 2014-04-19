@@ -31,7 +31,7 @@ let execute cmd args =
   proc.StartInfo.CreateNoWindow   <- true
 
   let r = proc.Start()
-  proc.WaitForExit()   
+  proc.WaitForExit()
   proc.StandardOutput.ReadToEnd()
 
 open System.Text.RegularExpressions
@@ -43,7 +43,7 @@ let main _ =
   Async.Start(server, cts.Token)
 
   // wait for the server to start listening
-  listening |> Async.RunSynchronously
+  listening |> Async.RunSynchronously |> printfn "start stats: %A"
 
   // launch httpref
   let output = execute "/usr/bin/httperf" "--hog --server=localhost --port=3000 --uri=/ --rate=1000 --num-conns=1000 --num-calls=1000 --burst-length=20"

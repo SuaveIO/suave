@@ -16,8 +16,11 @@ web_server default_config (OK "Hello World!")
 
 Now that you've discovered how to do "Hello World!", go read the "rest of the documentation":http://suave.io/!
 
-
 h1. Coding Guidelines
+
+Suave.X where X is a module is where we expect users to look. We don't expect users
+of the library to have to look at Y in Suave.X.Y, so for server-specific code, please
+stick to the Y module/namespace. That way we make the API discoverable.
 
 h2. Style Guide
 

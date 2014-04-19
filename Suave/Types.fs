@@ -56,6 +56,11 @@ type HttpRequest =
   ; mutable trace        : Log.TraceHeader
   ; is_secure            : bool }
 
+/// Gets the query from the HttpRequest
+let query (x : HttpRequest) = x.query
+/// Gets the form from the HttpRequest
+let form  (x : HttpRequest) = x.form
+
 /// TODO: see if we can't get nice perf without resorting to mutable state
 /// Clear the request dictionaries for to reuse the request object instance.
 let internal clear (request : HttpRequest) =

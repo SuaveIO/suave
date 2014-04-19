@@ -5,10 +5,13 @@ open System
 open System.Net
 open System.Collections.Generic
 
+open Suave.Utils.Bytes
+
 open Suave.Types
 open Suave.Http
 open Suave.Web
 open Suave.Tcp
+
 open Socket
 
 /// Copies the headers from 'headers1' to 'headers2'

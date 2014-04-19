@@ -45,8 +45,8 @@ module Http =
 
   let load_encoder s =
     match s with
-    | "gzip"    -> Some (s, gzip_encode)
-    | "deflate" -> Some (s, deflate_encode)
+    | "gzip"    -> Some (s, Compression.gzip_encode)
+    | "deflate" -> Some (s, Compression.deflate_encode)
     | _         -> None
 
   let get_encoder request =
