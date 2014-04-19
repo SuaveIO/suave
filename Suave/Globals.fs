@@ -20,7 +20,6 @@ let internal number_of_clients = ref 0L
 
 // TODO: provide proper session storage
 
-open System.Collections.Generic
 open System.Collections.Concurrent
 
 /// Static dictionary of sessions - here be dragons, see Session.fs

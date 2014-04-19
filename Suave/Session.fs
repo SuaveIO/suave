@@ -27,6 +27,8 @@ let session_support (ctx : HttpContext) =
     ; version = None } ctx |> ignore
   Some ctx
 
+open System.Collections.Concurrent
+
 /// Get the session from the HttpRequest
 /// WARNING!! Here be dragons; just a reference implementation - usage will tie your
 /// code to a single server and if you load balance you will fail.
@@ -35,6 +37,6 @@ let session_support (ctx : HttpContext) =
 let session (request : HttpRequest) =
   let sessionId = request.session_id
   if String.IsNullOrEmpty sessionId then failwith "session_support was not called"
-  if not (session_map.ContainsKey sessionId) then
-    session_map.TryAdd(sessionId, new ConcurrentDictionary<string, obj>()) |> ignore
-  session_map.[sessionId]
+  if not (Globals.session_map.ContainsKey sessionId) then
+    Globals.session_map.TryAdd(sessionId, new ConcurrentDictionary<string, obj>()) |> ignore
+  Globals.session_map.[sessionId]
