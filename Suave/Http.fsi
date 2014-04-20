@@ -1065,7 +1065,7 @@ module Http =
     /// The server encountered an unexpected condition which prevented it
     /// from fulfilling the request.
     /// </para></summary>
-    val internal_error : message:byte [] -> WebPart
+    val internal_error : arr:byte [] -> WebPart
 
     /// <summary><para>
     /// 500
@@ -1073,9 +1073,30 @@ module Http =
     /// The server encountered an unexpected condition which prevented it
     /// from fulfilling the request.
     /// </para></summary>
-    val INTERNAL_ERROR : a:string -> WebPart
+    val INTERNAL_ERROR : message:string -> WebPart
 
+    /// An upstream server that suave communicated with did not respond in a timely fashion
+    val bad_gateway : arr:byte [] -> WebPart
+    /// An upstream server that suave communicated with did not respond in a timely fashion
+    val BAD_GATEWAY : message:string -> WebPart
 
+    /// The service is currently under too much load and cannot service the request
+    val service_unavailable : arr:byte [] -> WebPart
+
+    /// The service is currently under too much load and cannot service the request
+    val SERVICE_UNAVAILABLE : message:string -> WebPart
+
+    /// An upstream server that suave communicated with did not respond in a timely fashion
+    val gateway_timeout : arr:byte [] -> WebPart
+
+    /// An upstream server that suave communicated with did not respond in a timely fashion
+    val GATEWAY_TIMEOUT : message:string -> WebPart
+
+    /// Only used internally in Suave.
+    val invalid_http_version : arr:byte [] -> WebPart
+
+    /// Only used internally in Suave.
+    val INVALID_HTTP_VERSION : WebPart
 
   /// Module that deals with the applicatives of suave - use functions from this module
   /// to filter what requests a given route responds to.
