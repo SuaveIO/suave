@@ -582,9 +582,6 @@ module Http =
 
     let INVALID_HTTP_VERSION = invalid_http_version (UTF8.bytes (http_message HTTP_505))
 
-  /// Module that deals with the applicatives of suave - use functions from this module
-  /// to filter what requests a given route responds to.
-  /// Functions have signature f :: params... -> HttpContext -> HttpContext option.
   module Applicatives =
 
     open System

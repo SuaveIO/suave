@@ -1066,7 +1066,7 @@ module Http =
     /// from fulfilling the request.
     /// </para></summary>
     val internal_error : message:byte [] -> WebPart
-  
+
     /// <summary><para>
     /// 500
     /// </para><para>
@@ -1075,6 +1075,11 @@ module Http =
     /// </para></summary>
     val INTERNAL_ERROR : a:string -> WebPart
 
+
+
+  /// Module that deals with the applicatives of suave - use functions from this module
+  /// to filter what requests a given route responds to.
+  /// Functions have signature f :: params... -> HttpContext -> HttpContext option.
   module Applicatives =
 
     /// Match on the url
