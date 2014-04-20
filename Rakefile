@@ -60,8 +60,7 @@ end
 
 directory 'build/pkg'
 
-desc 'create suave nuget'
-task :create_nuget => [ 'build/pkg', :versioning, :build] do |p|
+task :create_nuget_quick do
   p = Albacore::NugetModel::Package.new.with_metadata do |m|
     m.id            = "Suave"
     m.version       = ENV['NUGET_VERSION']
@@ -96,8 +95,11 @@ task :create_nuget => [ 'build/pkg', :versioning, :build] do |p|
   )
 end
 
+desc 'create suave nuget'
+task :create_nuget => ['build/pkg', :versioning, :build, :create_nuget_quick]
+
 desc 'build, gen versions, test and create nuget'
-task :default => [:build, :'tests:unit', :create_nuget]
+task :default => [:build, :'tests:unit']
 
 task :increase_version_number do
   # inc patch version in .semver
