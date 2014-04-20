@@ -62,3 +62,7 @@ h2. Chat Room
 We have a chat room in case you feel like chatting a bit a bit. 
 
 !https://badges.gitter.im/SuaveIO/suave.png!:https://gitter.im/SuaveIO/suave 
+
+h2. Integrations
+
+ * https://github.com/rayokota/generator-angular-suave
