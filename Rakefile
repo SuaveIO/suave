@@ -20,9 +20,22 @@ nugets_restore :restore do |p|
   p.exe = 'buildsupport/NuGet.exe'
 end
 
-desc 'Perform full build'
-task :build => [:versioning, :restore, :build_quick]
+desc 'create assembly infos'
+asmver_files :asmver => :versioning do |a|
+  a.files = FileList['{Suave,Tests,Pong,Example,Experimental,Load,Suave.*}/*proj']
+  a.attributes assembly_description: suave_description,
+               assembly_configuration: 'RELEASE',
+               assembly_company: 'Suave.IO',
+               assembly_copyright: "(c) #{Time.now.year} by Ademar Gonzalez, Henrik Feldt",
+               assembly_version: ENV['LONG_VERSION'],
+               assembly_file_version: ENV['LONG_VERSION'],
+               assembly_informational_version: ENV['BUILD_VERSION']
+end
 
+desc 'Perform full build'
+task :build => [:versioning, :restore, :asmver, :build_quick]
+
+desc 'clean the project'
 build :clean do |b|
   b.file = 'suave.sln'
   b.prop 'Configuration', 'Release'
@@ -34,15 +47,20 @@ build :build_quick do |b|
   b.prop 'Configuration', 'Release'
 end
 
-task :tests_quick do
-  system 'Tests/bin/Release/Tests.exe', clr_command: true
-end
+namespace :tests do
+  desc 'run a stress test'
+  task :stress do
+    system 'Pong/bin/Release/Pong.exe', clr_command: true
+  end
 
-task :tests => [:build, :tests_quick]
+  task :unit do
+    system 'Tests/bin/Release/Tests.exe', clr_command: true
+  end
+end
 
 directory 'build/pkg'
 
-desc 'Create a nuget for Suave'
+desc 'create suave nuget'
 task :create_nuget => [ 'build/pkg', :versioning, :build] do |p|
   p = Albacore::NugetModel::Package.new.with_metadata do |m|
     m.id            = "Suave"
@@ -78,17 +96,8 @@ task :create_nuget => [ 'build/pkg', :versioning, :build] do |p|
   )
 end
 
-desc 'create assembly infos'
-asmver_files :assembly_info => :versioning do |a|
-  a.files = FileList['{Suave,Tests,Pong,Example,Experimental,Load,Suave.*}/*proj']
-  a.attributes assembly_description: suave_description,
-               assembly_configuration: 'RELEASE',
-               assembly_company: 'Suave.IO',
-               assembly_copyright: "(c) #{Time.now.year} by Ademar Gonzalez, Henrik Feldt",
-               assembly_version: ENV['LONG_VERSION'],
-               assembly_file_version: ENV['LONG_VERSION'],
-               assembly_informational_version: ENV['BUILD_VERSION']
-end
+desc 'build, gen versions, test and create nuget'
+task :default => [:build, :'tests:unit', :create_nuget]
 
 task :increase_version_number do
   # inc patch version in .semver
@@ -99,7 +108,7 @@ task :increase_version_number do
 end
 
 desc 'release the next version'
-task :release_next => [ :increase_version_number, :assembly_info , :create_nuget ] do
+task :release_next => [ :increase_version_number, :asmver , :create_nuget ] do
   s = SemVer.find.format("%M.%m.%p%s")
   # commit and tag
   system %q[git add .semver]
@@ -133,18 +142,3 @@ namespace :docs do
       work_dir: 'gh-pages'
   end
 end
-
-namespace :tests do
-  desc 'run a stress test'
-  task :stress do
-    system 'Pong/bin/Release/Pong.exe', clr_command: true
-  end
-
-  desc 'run the unit-tests'
-  task :unit do
-    system 'Tests/bin/Release/Tests.exe', clr_command: true
-  end
-end
-
-task :default => [:build, :'tests:unit', :create_nuget]
-
