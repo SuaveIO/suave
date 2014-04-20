@@ -54,15 +54,15 @@ module RequestFactory =
 
   let run_with = run_with_factory web_server_async
 
-  let req_resp (methd : Method) (resource : string) data (cookies : Net.CookieContainer option) (decompressionMethod : Net.DecompressionMethods) ctx =
+  let req_resp (methd : HttpMethod) (resource : string) data (cookies : Net.CookieContainer option) (decompressionMethod : Net.DecompressionMethods) ctx =
     let to_http_method = function
-      | Method.GET -> HttpMethod.Get
-      | Method.POST -> HttpMethod.Post
-      | Method.DELETE -> HttpMethod.Delete
-      | Method.PUT-> HttpMethod.Put
-      | Method.HEAD -> HttpMethod.Head
-      | Method.TRACE -> HttpMethod.Trace
-      | Method.OPTIONS -> HttpMethod.Options
+      | GET -> HttpMethod.Get
+      | POST -> HttpMethod.Post
+      | DELETE -> HttpMethod.Delete
+      | PUT-> HttpMethod.Put
+      | HEAD -> HttpMethod.Head
+      | TRACE -> HttpMethod.Trace
+      | OPTIONS -> HttpMethod.Options
       | _ -> failwithf "unsupported method %A by HttpClient" methd
 
     let server = ctx.suave_config.bindings.Head.ToString()

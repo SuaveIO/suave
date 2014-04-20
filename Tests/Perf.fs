@@ -3,6 +3,7 @@
 open Suave.Utils
 open Suave.Types
 open Suave.Http
+open Suave.Http.Successful
 open Suave.Tests.TestUtilities
 
 open Fuchu

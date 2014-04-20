@@ -10,6 +10,9 @@ open System.Net
 
 open Suave.Types
 open Suave.Http
+open Suave.Http.Successful
+open Suave.Http.Redirection
+open Suave.Http.ServerErrors
 open Suave.Proxy
 
 open Suave.Tests.TestUtilities
@@ -34,13 +37,13 @@ let proxy =
 
   testList "creating proxy" [
     testProperty "GET / returns 200 OK with passed string" <| fun str ->
-      run_in_context (run_target (OK str)) dispose_context <| fun _ ->
+      run_in_context (run_target (Successful.OK str)) dispose_context <| fun _ ->
         Assert.Equal("target's WebPart should return its value", str,
 //          verbose_logging(fun () -> proxy to_target |> req GET "/"))
           proxy to_target |> req GET "/" None)
 
     testCase "GET /redirect returns 'redirect'" <| fun _ ->
-      run_in_context (run_target (url "/secret" >>= redirect "https://sts.example.se")) dispose_context <| fun _ ->
+      run_in_context (run_target (Applicatives.url "/secret" >>= redirect "https://sts.example.se")) dispose_context <| fun _ ->
         let res = proxy to_target |> req_resp GET "/secret" None None DecompressionMethods.None
         Assert.Equal("should proxy redirect", HttpStatusCode.Found, res.StatusCode)
         Assert.Equal("should give Location-header together with redirect",

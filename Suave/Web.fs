@@ -60,7 +60,7 @@ module ParsingAndControl =
           return (count + index, None) // asumes d is empty
         else 
           return (count + index, mk_buffer_segment left.buffer (left.offset + index + 2) number_of_bytes_to_select) // asumes d is empty
-      | Some index -> 
+      | Some index ->
         select (ArraySegment(left.buffer.Array, left.offset, left.length)) left.length // here we can free c's original buffer --
         connection.free_buffer  left.buffer
         select (ArraySegment(right.buffer.Array, right.offset, index - left.length)) (index - left.length)
@@ -535,6 +535,7 @@ module ParsingAndControl =
 open System
 open System.Net
 open Suave.Types
+open Suave.Http
 
 /// The default error handler returns a 500 Internal Error in response to
 /// thrown exceptions.
@@ -542,8 +543,8 @@ let default_error_handler (ex : Exception) msg (ctx : HttpContext) = async {
   let request = ctx.request
   msg |> Log.verbosee ctx.runtime.logger "Web.default_error_handler" ctx.request.trace ex
   if IPAddress.IsLoopback ctx.connection.ipaddr then
-    do! (Http.response 500 "Internal Error" (UTF8.bytes (sprintf "<h1>%s</h1><br/>%A" ex.Message ex)) ctx)
-  else do! (Http.response 500 "Internal Error" (UTF8.bytes ("Internal Error")) ctx)
+    do! (Response.response Codes.HTTP_500 (UTF8.bytes (sprintf "<h1>%s</h1><br/>%A" ex.Message ex)) ctx)
+  else do! (Response.response Codes.HTTP_500 (UTF8.bytes (Codes.http_message Codes.HTTP_500)) ctx)
 }
 
 /// Returns the webserver as a tuple of 1) an async computation the yields unit when
@@ -586,7 +587,7 @@ let default_config : SuaveConfig =
   ; ct               = Async.DefaultCancellationToken
   ; buffer_size      = 8192 // 8 KiB
   ; max_ops          = 100
-  ; mime_types_map   = Http.default_mime_types_map
+  ; mime_types_map   = Http.Writers.default_mime_types_map
   ; home_folder      = None
   ; compressed_files_folder = None
   ; logger           = Log.Loggers.sane_defaults_for Log.LogLevel.Info }
