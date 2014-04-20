@@ -121,7 +121,7 @@ let tcp_ip_server (source_ip : IPAddress,
   let intern  = Log.intern logger "Tcp.tcp_ip_server"
 
   let start_data =
-    { start_called_utc = Globals.utc_now
+    { start_called_utc = Globals.utc_now ()
     ; socket_bound_utc = None
     ; source_ip        = source_ip
     ; source_port      = source_port }
