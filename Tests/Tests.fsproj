@@ -74,13 +74,13 @@
       <Private>True</Private>
     </Reference>
     <Reference Include="Fuchu">
-      <HintPath>..\libs\Fuchu-9db7222\net40\Fuchu.dll</HintPath>
+      <HintPath>..\libs\Fuchu-1570d5d\net40\Fuchu.dll</HintPath>
     </Reference>
     <Reference Include="Fuchu.FsCheck">
-      <HintPath>..\libs\Fuchu-9db7222\net40\Fuchu.FsCheck.dll</HintPath>
+      <HintPath>..\libs\Fuchu-1570d5d\net40\Fuchu.FsCheck.dll</HintPath>
     </Reference>
     <Reference Include="Fuchu.PerfUtil">
-      <HintPath>..\libs\Fuchu-9db7222\net40\Fuchu.PerfUtil.dll</HintPath>
+      <HintPath>..\libs\Fuchu-1570d5d\net40\Fuchu.PerfUtil.dll</HintPath>
     </Reference>
     <Reference Include="ManagedOpenSsl">
       <HintPath>..\libs\ManagedOpenSsl.dll</HintPath>
