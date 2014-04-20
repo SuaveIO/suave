@@ -25,7 +25,7 @@ type Microsoft.FSharp.Control.Async with
         try
           let! result = computation
           success result
-        with ex -> 
+        with ex ->
           error ex }
       let timeoutExpired = async {
         do! Async.Sleep (int timeout.TotalMilliseconds)
