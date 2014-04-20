@@ -65,7 +65,7 @@ choose [
   GET >>= url "/query" >>= OK "Hello beautiful" ;
   url "/redirect" >>= Redirection.redirect "/redirected"
   url "/redirected" >>=  OK "You have been redirected." ;
-  url "/date" >>= warbler (fun _ -> OK (DateTime.UtcNow.ToString("o")))
+  url "/date" >>= warbler (fun _ -> OK (DateTimeOffset.UtcNow.ToString("o")))
   url "/timeout" >>= timeout
   url "/session"
     >>= session_support

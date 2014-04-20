@@ -14,12 +14,14 @@ let crypt_random = System.Security.Cryptography.RandomNumberGenerator.Create()
 // creates random number generators that produce identical sequences of random numbers."
 // - MSDN.
 
+/// Get the current DateTimeOffset in UTC format.
+let mutable utc_now = fun () -> System.DateTimeOffset.UtcNow
+
 /// From the TCP module, keeps track of the number of clients
 let internal number_of_clients = ref 0L
 
 
 // TODO: provide proper session storage
-
 open System.Collections.Concurrent
 
 /// Static dictionary of sessions - here be dragons, see Session.fs

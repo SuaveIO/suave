@@ -78,7 +78,7 @@ task :assembly_info do
     assembly_product: "Suave.IO",
     assembly_title: "Suave.IO Framework",
     assembly_description: "Suave is an F# library providing a lightweight web server and a set of combinators to manipulate route flow and task composition.",
-    assembly_copyright: "(c) 2013 by Ademar Gonzalez",
+    assembly_copyright: "(c) 2013 by Ademar Gonzalez, Henrik Feldt",
     auto_open: "Suave.Utils"
 
   x.file_path = "Suave/AssemblyInfo.fs"

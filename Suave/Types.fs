@@ -11,7 +11,7 @@ open System.Net
 type HttpCookie =
   { name      : string
   ; value     : string
-  ; expires   : DateTime option
+  ; expires   : DateTimeOffset option
   ; path      : string option
   ; domain    : string option
   ; secure    : bool

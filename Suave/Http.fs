@@ -304,7 +304,7 @@ module Http =
                                                         ; (http_code status_code).ToString()
                                                         ; http_reason status_code ])
         do! async_writeln connection Internals.server_header
-        do! async_writeln connection (String.Concat( [|  "Date: "; DateTime.UtcNow.ToString("R") |]))
+        do! async_writeln connection (String.Concat( [|  "Date: "; Globals.utc_now().ToString("R") |]))
 
         for (x,y) in request.response.Headers do
           if not (List.exists (fun y -> x.ToLower().Equals(y)) ["server";"date";"content-length"]) then
@@ -587,7 +587,7 @@ module Http =
         ; level         = Log.LogLevel.Debug
         ; path          = "suave/web-requests"
         ; ``exception`` = None
-        ; ts_utc_ticks  = DateTime.UtcNow.Ticks }
+        ; ts_utc_ticks  = Globals.utc_now().Ticks }
 
       succeed ctx
 
