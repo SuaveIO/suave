@@ -263,7 +263,7 @@ module ParsingAndControl =
 
         let content_disposition = look_up part_headers "content-disposition"
 
-        let fieldname = (header_params content_disposition) ? name |> opt
+        let fieldname = (header_params content_disposition) ? name |> Option.get
 
         let content_type = look_up part_headers "content-type"
 
@@ -283,8 +283,8 @@ module ParsingAndControl =
         temp_file.Close()
         if file_length > int64(0) then
           let filename =
-            (header_params content_disposition) ? filename |> opt
-          request.files.Add(new HttpUpload(fieldname,filename,content_type |> opt,temp_file_name))
+            (header_params content_disposition) ? filename |> Option.get
+          request.files.Add(new HttpUpload(fieldname, filename, content_type |> Option.get, temp_file_name))
         else
           File.Delete temp_file_name
         return! loop boundary b

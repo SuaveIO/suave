@@ -41,6 +41,7 @@
     <Reference Include="System.Numerics" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="AssemblyVersionInfo.fs" />
     <Compile Include="WebMachine.fs" />
     <None Include="Script.fsx" />
   </ItemGroup>

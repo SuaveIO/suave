@@ -4,6 +4,7 @@ open System
 open System.Text
 open System.Net.Http
 
+open Suave
 open Suave.Types
 open Suave.Web
 open Suave.Http
