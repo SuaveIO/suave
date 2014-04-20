@@ -13,6 +13,8 @@ Albacore::Tasks::Versionizer.new :versioning
 
 include ::Albacore::NugetsPack
 
+suave_description = 'Suave is a simple web development F# library providing a lightweight web server and a set of combinators to manipulate route flow and task composition.'
+
 nugets_restore :restore do |p|
   p.out = 'packages'
   p.exe = 'buildsupport/NuGet.exe'
@@ -45,8 +47,8 @@ task :create_nuget => [ 'build/pkg', :versioning, :build] do |p|
   p = Albacore::NugetModel::Package.new.with_metadata do |m|
     m.id            = "Suave"
     m.version       = ENV['NUGET_VERSION']
-    m.authors       = 'Ademar Gonzalez'
-    m.description   = 'Suave is a simple web development F# library providing a lightweight web server and a set of combinators to manipulate route flow and task composition.'
+    m.authors       = 'Ademar Gonzalez, Henrik Feldt'
+    m.description   = 
     m.language      = 'en-GB'
     m.copyright     = 'Ademar Gonzalez'
     m.release_notes = "Full version: #{ENV['BUILD_VERSION']}."
@@ -76,22 +78,16 @@ task :create_nuget => [ 'build/pkg', :versioning, :build] do |p|
   )
 end
 
-desc 'Create the assembly info file'
-task :assembly_info do 
-  x = Albacore::Asmver::Config.new()
-
-  x.attributes assembly_version: SemVer.find.to_s,
-    assembly_product: "Suave.IO",
-    assembly_title: "Suave.IO Framework",
-    assembly_description: "Suave is an F# library providing a lightweight web server and a set of combinators to manipulate route flow and task composition.",
-    assembly_copyright: "(c) 2013 by Ademar Gonzalez, Henrik Feldt",
-    auto_open: "Suave.Utils"
-
-  x.file_path = "Suave/AssemblyInfo.fs"
-  x.namespace = "Suave"
-
-  @task = ::Albacore::Asmver::Task.new(x.opts)
-  @task.execute
+desc 'create assembly infos'
+asmver_files :assembly_info => :versioning do |a|
+  a.files = FileList['{Suave,Tests,Pong,Example,Experimental,Load,Suave.*}/*proj']
+  a.attributes assembly_description: suave_description,
+               assembly_configuration: 'RELEASE',
+               assembly_company: 'Suave.IO',
+               assembly_copyright: "(c) #{Time.now.year} by Ademar Gonzalez, Henrik Feldt",
+               assembly_version: ENV['LONG_VERSION'],
+               assembly_file_version: ENV['LONG_VERSION'],
+               assembly_informational_version: ENV['BUILD_VERSION']
 end
 
 task :increase_version_number do

@@ -3,26 +3,24 @@ GEM
   specs:
     ProcessPilot (2.0.0.20120301)
       rUtilAnts (>= 1.0)
-    albacore (2.0.0.rc.6)
+    albacore (2.0.0.rc.13)
       ProcessPilot (~> 2.0)
       facter (~> 1.7)
       highline (~> 1.6)
       map (~> 6.5)
       nokogiri (~> 1.5)
       rake (> 10)
-      rubyzip (= 0.9.9)
       semver2 (~> 3.3)
-    facter (1.7.4)
-    highline (1.6.20)
-    map (6.5.1)
-    mini_portile (0.5.2)
+    facter (1.7.5)
+    highline (1.6.21)
+    map (6.5.3)
+    mini_portile (0.5.3)
     nokogiri (1.6.1)
       mini_portile (~> 0.5.0)
     nokogiri (1.6.1-x86-mingw32)
       mini_portile (~> 0.5.0)
     rUtilAnts (2.0.0.20130827)
-    rake (10.1.1)
-    rubyzip (0.9.9)
+    rake (10.3.1)
     semver2 (3.3.3)
 
 PLATFORMS
@@ -30,4 +28,4 @@ PLATFORMS
   x86-mingw32
 
 DEPENDENCIES
-  albacore (~> 2.0.0.rc.5)
+  albacore (~> 2.0.0.rc.13)
