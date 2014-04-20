@@ -32,6 +32,12 @@ build :build_quick do |b|
   b.prop 'Configuration', 'Release'
 end
 
+task :tests_quick do
+  system 'Tests/bin/Release/Tests.exe', clr_command: true
+end
+
+task :tests => [:build, :tests_quick]
+
 directory 'build/pkg'
 
 desc 'Create a nuget for Suave'
