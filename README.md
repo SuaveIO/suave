@@ -1,8 +1,7 @@
-h1. Introduction.
+# Introduction
 
-!https://raw.githubusercontent.com/SuaveIO/suave/master/media/suave1.png!
+![Suave Logo](https://raw.githubusercontent.com/SuaveIO/suave/master/media/suave1.png)
 
-p. 
 Suave is a simple web development F# library providing a lightweight web server
 and a set of combinators to manipulate route flow and task composition. Suave
 is inspired in the simplicity of Happstack and born out of the necessity of
@@ -15,77 +14,71 @@ non-blocking fashion throughout.
 What follows is a tutorial on how to create applications. Scroll past the
 tutorial to see detailed function documentation.
 
-h1. Tutorial: Hello World!
+# Tutorial: Hello World!
 
-p. 
 The simplest Suave application is a simple HTTP server that greets all visitors
-with the string @"Hello World!"@
+with the string `"Hello World!"`
 
-pre. 
-open Suave // always open suave
-open Suave.Http.Successful // for OK-result
-open Suave.Web // for config
-web_server default_config (OK "Hello World!")
+    open Suave // always open suave
+    open Suave.Http.Successful // for OK-result
+    open Suave.Web // for config
+    web_server default_config (OK "Hello World!")
 
-Now that you've discovered how to do "Hello World!", go read the "rest of the
-documentation":http://suave.io/!
+Now that you've discovered how to do "Hello World!", go read the
+[rest of the documentation](http://suave.io/)
 
-h1. Coding Guidelines
+# Coding Guidelines
 
-p. 
 Suave.X where X is a module is where we expect users to look. We don't expect users
 of the library to have to look at Y in Suave.X.Y, so for server-specific code, please
 stick to the Y module/namespace. That way we make the API discoverable.
 
-p. 
-We have a "TeamCity CI server":https://tc-oss.intelliplan.net/overview.html! set
+We have a [TeamCity CI server](https://tc-oss.intelliplan.net/overview.html) set
 up to provide continuous integration for Suave. You can pull nugets from this
 server, by adding
-"https://tc-oss.intelliplan.net/guestAuth/app/nuget/v1/FeedService.svc/":https://tc-oss.intelliplan.net/guestAuth/app/nuget/v1/FeedService.svc/!
+https://tc-oss.intelliplan.net/guestAuth/app/nuget/v1/FeedService.svc/
 to your list of nuget sources; this allows you to get pre-release nugets of
 suave directly into your development environment.
 
-h2. Style Guide
+## Style Guide
 
-p. Two space indentation.
+Two space indentation.
 
-pre. 
-match x with // '|' characters at base of 'match'
-| A     -> ()
-| Bcdef -> "aligned arrows" // space after '|' character
+    match x with // '|' characters at base of 'match'
+    | A     -> ()
+    | Bcdef -> "aligned arrows" // space after '|' character
 
-p. Parameters
+Parameters
 
-p. 
 Let type annotations be specified with spaces after the argument symbol and before
 the type.
 
-pre. static member FromString(scheme : string, ?cert) =
+    static member FromString(scheme : string, ?cert) =
 
-p. Method formatting with no spaces after/before normal parenthesis
+Method formatting with no spaces after/before normal parenthesis
 
-pre. 
-let my_method_name first_arg (second : WithType) = async { // and monad builder
-  return! f first_arg second
-  } // at base of 'let' + 2 spaces
+    let my_method_name first_arg (second : WithType) = async { // and monad builder
+      return! f first_arg second
+      } // at base of 'let' + 2 spaces
 
-p. 
 You need to document your methods with '///' to create XML-doc. A XML
 documentation file is generated together with the compilation and is distributed
 with the NuGet so that others can read your code's intentions easily.
 
-p. Don't put unnecessary parenthesis unless it makes the code more clear.
+Don't put unnecessary parenthesis unless it makes the code more clear.
 
-h2. Testing
+## Testing
 
 Run Tests as a console app. Return status code = 0 means success.
 
-h2. Chat Room
+# Community
+
+## Chat Room
 
 We have a chat room in case you feel like chatting a bit a bit. 
 
-!https://badges.gitter.im/SuaveIO/suave.png!:https://gitter.im/SuaveIO/suave 
+![https://badges.gitter.im/SuaveIO/suave.png](https://gitter.im/SuaveIO/suave)
 
-h2. Integrations
+## Integrations
 
  * https://github.com/rayokota/generator-angular-suave
