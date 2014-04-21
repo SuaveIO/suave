@@ -19,10 +19,12 @@ tutorial to see detailed function documentation.
 The simplest Suave application is a simple HTTP server that greets all visitors
 with the string `"Hello World!"`
 
-    open Suave // always open suave
-    open Suave.Http.Successful // for OK-result
-    open Suave.Web // for config
-    web_server default_config (OK "Hello World!")
+``` fsharp
+open Suave // always open suave
+open Suave.Http.Successful // for OK-result
+open Suave.Web // for config
+web_server default_config (OK "Hello World!")
+```
 
 Now that you've discovered how to do "Hello World!", go read the
 [rest of the documentation](http://suave.io/)
@@ -44,22 +46,28 @@ suave directly into your development environment.
 
 Two space indentation.
 
-    match x with // '|' characters at base of 'match'
-    | A     -> ()
-    | Bcdef -> "aligned arrows" // space after '|' character
+``` fsharp
+match x with // '|' characters at base of 'match'
+| A     -> ()
+| Bcdef -> "aligned arrows" // space after '|' character
+```
 
 Parameters
 
 Let type annotations be specified with spaces after the argument symbol and before
 the type.
 
-    static member FromString(scheme : string, ?cert) =
+``` fsharp
+static member FromString(scheme : string, ?cert) =
+```
 
 Method formatting with no spaces after/before normal parenthesis
 
-    let my_method_name first_arg (second : WithType) = async { // and monad builder
-      return! f first_arg second
-      } // at base of 'let' + 2 spaces
+``` fsharp
+let my_method_name first_arg (second : WithType) = async { // and monad builder
+  return! f first_arg second
+  } // at base of 'let' + 2 spaces
+```
 
 You need to document your methods with '///' to create XML-doc. A XML
 documentation file is generated together with the compilation and is distributed
