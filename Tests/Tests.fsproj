@@ -40,7 +40,7 @@
   <Import Project="$(MSBuildExtensionsPath32)\FSharp\1.0\Microsoft.FSharp.Targets" Condition="(!Exists('$(MSBuildExtensionsPath32)\..\Microsoft SDKs\F#\3.0\Framework\v4.0\Microsoft.FSharp.Targets')) And (!Exists('$(MSBuildExtensionsPath32)\..\Microsoft F#\v4.0\Microsoft.FSharp.Targets')) And (Exists('$(MSBuildExtensionsPath32)\FSharp\1.0\Microsoft.FSharp.Targets'))" />
   <ItemGroup>
     <None Include="PerfLab.fsx" />
-    <Compile Include="AssemblyInfo.fs" />
+    <Compile Include="AssemblyVersionInfo.fs" />
     <Compile Include="TestUtilities.fs" />
     <Compile Include="Smoke.fs" />
     <Compile Include="Utils.fs" />
@@ -74,13 +74,13 @@
       <Private>True</Private>
     </Reference>
     <Reference Include="Fuchu">
-      <HintPath>..\libs\Fuchu-9db7222\net40\Fuchu.dll</HintPath>
+      <HintPath>..\libs\Fuchu-1570d5d\net40\Fuchu.dll</HintPath>
     </Reference>
     <Reference Include="Fuchu.FsCheck">
-      <HintPath>..\libs\Fuchu-9db7222\net40\Fuchu.FsCheck.dll</HintPath>
+      <HintPath>..\libs\Fuchu-1570d5d\net40\Fuchu.FsCheck.dll</HintPath>
     </Reference>
     <Reference Include="Fuchu.PerfUtil">
-      <HintPath>..\libs\Fuchu-9db7222\net40\Fuchu.PerfUtil.dll</HintPath>
+      <HintPath>..\libs\Fuchu-1570d5d\net40\Fuchu.PerfUtil.dll</HintPath>
     </Reference>
     <Reference Include="ManagedOpenSsl">
       <HintPath>..\libs\ManagedOpenSsl.dll</HintPath>

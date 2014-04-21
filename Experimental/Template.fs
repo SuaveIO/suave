@@ -107,7 +107,7 @@ open Types
 /// write the exception as a string to a 500 Internal Error response.
 let process_template (data : Map<string,Binder>) ({ request = http_request; runtime = runtime; connection = _} as ctx : HttpContext) =
   try
-    let xmlReader = new XmlTextReader(local_file http_request.url runtime.home_directory)
+    let xmlReader = new XmlTextReader(Files.local_file http_request.url runtime.home_directory)
     xmlReader.Namespaces <- false
 
     let transform = parser xmlReader (Xml [])
@@ -117,6 +117,6 @@ let process_template (data : Map<string,Binder>) ({ request = http_request; runt
     let str = new StringWriter(sb)
     xml_to_string1 xml str
     let output = sb.ToString()
-    OK output ctx
+    Successful.OK output ctx
   with
-  | x -> INTERNAL_ERROR (x.ToString()) ctx
+  | x -> ServerErrors.INTERNAL_ERROR (x.ToString()) ctx

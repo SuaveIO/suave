@@ -1,5 +1,7 @@
 ﻿module Susave.Tests.Proxy
 
+#nowarn "25"
+
 open Fuchu
 
 open OpenSSL.X509
@@ -8,7 +10,12 @@ open OpenSSL.Core
 open System
 open System.Net
 
+open Suave
 open Suave.Types
+open Suave.Http.Successful
+open Suave.Http.Redirection
+open Suave.Http.ServerErrors
+open Suave.Http.Applicatives
 open Suave.Http
 open Suave.Proxy
 
@@ -34,7 +41,7 @@ let proxy =
 
   testList "creating proxy" [
     testProperty "GET / returns 200 OK with passed string" <| fun str ->
-      run_in_context (run_target (OK str)) dispose_context <| fun _ ->
+      run_in_context (run_target (Successful.OK str)) dispose_context <| fun _ ->
         Assert.Equal("target's WebPart should return its value", str,
 //          verbose_logging(fun () -> proxy to_target |> req GET "/"))
           proxy to_target |> req GET "/" None)

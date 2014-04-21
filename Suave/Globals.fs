@@ -14,13 +14,24 @@ let crypt_random = System.Security.Cryptography.RandomNumberGenerator.Create()
 // creates random number generators that produce identical sequences of random numbers."
 // - MSDN.
 
+/// Get the current DateTimeOffset in UTC format.
+///
+/// If you are unit-testing
+/// you can set this, but as with all globals, you need to set it back afterwards
+/// or you will break subsequent unit tests.
+let mutable utc_now = fun () -> System.DateTimeOffset.UtcNow
+
 /// From the TCP module, keeps track of the number of clients
 let internal number_of_clients = ref 0L
 
 
 // TODO: provide proper session storage
-
 open System.Collections.Concurrent
 
 /// Static dictionary of sessions - here be dragons, see Session.fs
 let internal session_map = new ConcurrentDictionary<string, ConcurrentDictionary<string, obj>>()
+
+/// A map of compressed files:
+/// TODO - evaluate if we can't service requests
+/// by writing these to disk instead
+let internal compressed_files_map = new ConcurrentDictionary<string,string>()

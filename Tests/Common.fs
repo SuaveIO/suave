@@ -4,6 +4,7 @@ open System
 open System.Text
 open System.Net.Http
 
+open Suave
 open Suave.Types
 open Suave.Web
 open Suave.Http
@@ -16,13 +17,17 @@ open Fuchu
 let ``canonicalization attacks`` =
   testList "canonicalization attacks" [
     testCase "should throw" <| fun _ ->
-      Assert.Raise("'../../passwd' is not a valid path", typeof<Exception>, fun _ -> local_file "../../passwd" current_path |> ignore)
+      Assert.Raise("'../../passwd' is not a valid path",
+        typeof<Exception>,
+        fun _ -> Files.local_file "../../passwd" current_path |> ignore)
 
 //    testCase "should throw" <| fun _ ->
 //      Assert.Raise("'..\..\passwd' is not a valid path", typeof<Exception>, fun _ -> local_file "..\..\passwd" current_path |> ignore)
   ]
 
 open RequestFactory
+
+open Successful
 
 [<Tests>]
 let gets =
@@ -40,7 +45,7 @@ let gets =
 
       testCase "302 FOUND sends content-length header" <| fun _ ->
         Assert.Equal("302 FOUND sends content-length header",
-                     true, (req_headers GET "/" None (run_with' (FOUND "/url"))).Contains("Content-Length"))
+                     true, (req_headers GET "/" None (run_with' (Redirection.FOUND "/url"))).Contains("Content-Length"))
     ]
 
 [<Tests>]
@@ -71,6 +76,8 @@ let posts =
         use data = new FormUrlEncodedContent(dict [ "assertion", assertion])
         Assert.Equal("expecting form data to be returned", assertion, run_with' (getFormValue "assertion") |> req POST "/" (Some data))
     ]
+
+open Writers
 
 [<Tests>]
 let cookies =
@@ -128,12 +135,12 @@ let compression =
       testCase "verifiying we get the same size uncompressed" <| fun _ ->
         Assert.Equal("length should match"
         , test_file_size
-        , (run_with' (browse_file "test-text-file.txt") |> req_bytes GET "/" None).Length |> int64)
+        , (run_with' (Files.browse_file "test-text-file.txt") |> req_bytes GET "/" None).Length |> int64)
 
       testCase "gzip static file" <| fun _ ->
         Assert.Equal("length should match"
         , test_file_size
-        , (run_with' (browse_file "test-text-file.txt") |> req_gzip_bytes GET "/" None).Length |> int64 )
+        , (run_with' (Files.browse_file "test-text-file.txt") |> req_gzip_bytes GET "/" None).Length |> int64 )
 
       // this one is not running
       (*

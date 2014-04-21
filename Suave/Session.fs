@@ -17,13 +17,13 @@ let session_support (ctx : HttpContext) =
     | None -> Guid.NewGuid().ToString()
 
   request.session_id <- sessionId
-  set_cookie { name = "suave_session_id"
+  Writers.set_cookie { name = "suave_session_id"
     ; value = sessionId
     ; path = Some "/"
     ; domain = None
     ; secure = true
     ; http_only = false
-    ; expires = Some (DateTime.UtcNow.AddMinutes(30.0)) //cookie expires in 30 minutes
+    ; expires = Some (Globals.utc_now().AddMinutes(30.0)) //cookie expires in 30 minutes
     ; version = None } ctx |> ignore
   Some ctx
 

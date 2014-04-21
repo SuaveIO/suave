@@ -4,51 +4,6 @@ module Suave.Utils
 
 open System.Collections.Generic
 
-/// Return success with some value
-let inline succeed x = Some x
-
-/// Return failure without any value
-let fail = None
-
-/// Return failure with a value that is ignored
-let inline never _ = None
-
-/// bind f inp evaluates to match inp with None -> None | Some x -> f x
-/// The same as Option.bind.
-let bind = Option.bind
-
-/// Delay the computation of f
-let delay f = f()
-
-/// Compose (bind) two arguments, 'a' and 'b', so that the result of
-/// the composition can be applied to an argument of 'a' and then passed
-/// to 'b', if 'a' yields a value.
-let inline (>>=) a b = fun x -> Option.bind b (a x)
-
-/// Left-to-right Kleisli composition of monads.
-let (>=>) a b = fun x -> 
-  match a x with
-  | None   -> b x
-  | r      -> r
-
-/// Entry-point for composing the applicative routes of the http application,
-/// by iterating the options, applying the context, arg, to the predicate
-/// from the list of options, until there's a match/a Some(x) which can be
-/// run.
-let rec choose options arg =
-  match options with
-  | []        -> None
-  | p :: tail ->
-    match p arg with
-    | Some x -> Some x
-    | None   -> choose tail arg
-
-/// Pipe the request through a bird that can peck at it.
-let inline warbler f a = f a a //which bird? A Warbler!
-
-/// Pipe the request through a bird that can peck at it.
-let inline (>>==) a b = a >>= warbler (fun r -> b r)
-
 /// Try find a value by key in a dictionary
 let look_up (target : IDictionary<'b,'a>) key =
   match target.TryGetValue(key) with
@@ -62,26 +17,6 @@ let (?) (target : IDictionary<'b,'a>) key =
 /// Assign a value to the key in the dictionary
 let (?<-) (target : IDictionary<string, 'a>) key value =
   target.[key] <- value
-
-/// Force the evaluation of the option, so that if there is no value,
-/// an InvalidOperationException is raised.
-let opt = function
-  | Some x -> x
-  | None   -> invalidArg "arg1" "The argument was required but was not present"
-
-/// The constant function, which returns its constant, no matter
-/// its input.
-let cnst x = fun _ -> x
-
-/// The conditional function that applies f x a if there's a value in d,
-/// or otherwise, applies g a, if there is no value in d.
-let cond d f g a =
-  match d with
-  | Some x -> f x a
-  | None   -> g a
-
-//- theorem: identity = (cnst |> warbler)
-//(warbler cnst) x = cnst x x = fun _ -> x
 
 [<RequireQualifiedAccess>]
 module UTF8 =

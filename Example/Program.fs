@@ -2,8 +2,12 @@
 open System
 open System.Net
 
+open Suave
 open Suave.Web
 open Suave.Http
+open Suave.Http.Applicatives
+open Suave.Http.Files
+open Suave.Http.Successful
 open Suave.Types
 open Suave.Session
 open Suave.Log
@@ -12,7 +16,7 @@ open OpenSSL.X509
 open OpenSSL.Core
 
 let basic_auth  : WebPart =
-  authenticate_basic ( fun x -> x.user_name.Equals("foo") && x.password.Equals("bar"))
+  Authentication.authenticate_basic ( fun x -> x.user_name.Equals("foo") && x.password.Equals("bar"))
 
 let sslCert = X509Certificate.FromPKCS12(BIO.File("suave.p12","r"), "easy")
 
@@ -36,7 +40,7 @@ let testapp : WebPart =
     log logger log_format >>= never
     url_scan "/add/%d/%d"   (fun (a,b) -> OK((a + b).ToString()))
     url_scan "/minus/%d/%d" (fun (a,b) -> OK((a - b).ToString()))
-    NOT_FOUND "Found no handlers"
+    RequestErrors.NOT_FOUND "Found no handlers"
   ]
 
 System.Net.ServicePointManager.DefaultConnectionLimit <- Int32.MaxValue
@@ -47,22 +51,22 @@ let timeout r =
   } |> succeed
 
 // Adds a new mime type to the default map
-let mime_types x =
-  default_mime_types_map 
-    >=> (function | ".avi" -> mk_mime_type "video/avi" false | _ -> None)
+let mime_types () =
+  Writers.default_mime_types_map
+    >=> (function | ".avi" -> Writers.mk_mime_type "video/avi" false | _ -> None)
 
 choose [
   log logger log_format >>= never
   GET >>= url "/hello" >>= never
-  url_regex "(.*?)\.(dll|mdb|log)$" >>= FORBIDDEN "Access denied."
+  url_regex "(.*?)\.(dll|mdb|log)$" >>= RequestErrors.FORBIDDEN "Access denied."
   url "/neverme" >>= never >>= OK (Guid.NewGuid().ToString()) ;
   url "/guid" >>= OK (Guid.NewGuid().ToString()) ;
   url "/hello" >>= OK "Hello World" ;
   GET >>= url "/query" >>= request( fun x -> cond (x.query) ? name (fun y -> OK ("Hello " + y)) never) ;
   GET >>= url "/query" >>= OK "Hello beautiful" ;
-  url "/redirect" >>= redirect "/redirected"
+  url "/redirect" >>= Redirection.redirect "/redirected"
   url "/redirected" >>=  OK "You have been redirected." ;
-  url "/date" >>= warbler (fun _ -> OK (DateTime.UtcNow.ToString("o")))
+  url "/date" >>= warbler (fun _ -> OK (DateTimeOffset.UtcNow.ToString("o")))
   url "/timeout" >>= timeout
   url "/session"
     >>= session_support
@@ -81,7 +85,7 @@ choose [
                     let files = x.files |> Seq.fold (fun x y -> x + "<br>" + (sprintf "(%s,%s,%s)" y.FileName y.MimeType y.Path)) "" ;
                     OK (sprintf "Upload successful.<br>POST data: %A<br>Uploaded files (%d): %s" (x.form)(x.files.Count) files)) ;
   POST >>= request( fun x -> OK (sprintf "POST data: %A" (x.raw_form)));
-  NOT_FOUND "Found no handlers"
+  RequestErrors.NOT_FOUND "Found no handlers"
   ]
   |> web_server
       { bindings =
@@ -94,7 +98,7 @@ choose [
       ; ct               = Async.DefaultCancellationToken
       ; buffer_size      = 2048
       ; max_ops          = 100
-      ; mime_types_map   = default_mime_types_map
+      ; mime_types_map   = mime_types ()
       ; home_folder      = None
       ; compressed_files_folder = None
       ; logger           = logger }

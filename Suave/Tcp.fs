@@ -10,8 +10,8 @@ open System.Net.Sockets
 let MAX_BACK_LOG = Int32.MaxValue
 
 type StartedData =
-  { start_called_utc : DateTime
-  ; socket_bound_utc : DateTime option
+  { start_called_utc : DateTimeOffset
+  ; socket_bound_utc : DateTimeOffset option
   ; source_ip        : IPAddress
   ; source_port      : uint16 }
   override x.ToString() =
@@ -121,7 +121,7 @@ let tcp_ip_server (source_ip : IPAddress,
   let intern  = Log.intern logger "Tcp.tcp_ip_server"
 
   let start_data =
-    { start_called_utc = DateTime.UtcNow
+    { start_called_utc = Globals.utc_now ()
     ; socket_bound_utc = None
     ; source_ip        = source_ip
     ; source_port      = source_port }
@@ -182,7 +182,7 @@ let tcp_ip_server (source_ip : IPAddress,
       use! dd = Async.OnCancel(fun () -> stop_tcp logger "tcp_ip_server async cancelled" listenSocket)
       let! (token : Threading.CancellationToken) = Async.CancellationToken
 
-      let start_data = { start_data with socket_bound_utc = Some(DateTime.UtcNow) }
+      let start_data = { start_data with socket_bound_utc = Some(Globals.utc_now()) }
       accepting_connections.Complete start_data |> ignore
 
       logger.Log Log.LogLevel.Info <| fun _ ->
@@ -191,7 +191,7 @@ let tcp_ip_server (source_ip : IPAddress,
         ; message       = sprintf "started listener in: %O%s" start_data (if token.IsCancellationRequested then ", cancellation requested" else "")
         ; level         = Log.LogLevel.Info
         ; ``exception`` = None
-        ; ts_utc_ticks  = DateTime.UtcNow.Ticks }
+        ; ts_utc_ticks  = Globals.utc_now().Ticks }
 
       while not (token.IsCancellationRequested) do
         try

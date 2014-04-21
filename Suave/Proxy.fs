@@ -8,9 +8,12 @@ open System.Collections.Generic
 open Suave.Utils.Bytes
 
 open Suave.Types
-open Suave.Http
 open Suave.Web
 open Suave.Tcp
+
+open Suave.Http
+open Suave.Http.Response
+open Suave.Http.Codes
 
 open Socket
 
@@ -29,7 +32,7 @@ let private send_web_response (data : HttpWebResponse)
   "-> read_fully" |> Log.verbose logger "proxy:send_web_response:GetResponseStream" t
   let bytes = data.GetResponseStream() |> read_fully
   "<- read_fully" |> Log.verbose logger "proxy:send_web_response:GetResponseStream" t
-  do! response (int data.StatusCode) (data.StatusDescription) bytes ctx
+  do! response (HttpCode.TryParse(int data.StatusCode) |> Option.get) bytes ctx
 }
 
 /// Forward the HttpRequest 'p' to the 'ip':'port'
@@ -78,7 +81,7 @@ let forward (ip : IPAddress) (port : uint16) (ctx : HttpContext) =
     | :? WebException as ex when ex.Response <> null ->
       do! send_web_response (ex.Response :?> HttpWebResponse) ctx
     | :? WebException as ex when ex.Response = null ->
-      do! response 502 "Bad Gateway" (UTF8.bytes "suave proxy: Could not connect to upstream") ctx
+      do! response HTTP_502 (UTF8.bytes "suave proxy: Could not connect to upstream") ctx
   } |> succeed
 
 /// Proxy the HttpRequest 'r' with the proxy found with 'proxy_resolver'

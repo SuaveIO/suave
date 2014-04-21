@@ -25,7 +25,7 @@
         <String>Template.fs</String>
         <String>Data.fs</String>
         <String>Json.fs</String>
-        <String>AssemblyInfo.fs</String>
+        <String>AssemblyVersionInfo.fs</String>
       </BuildOrder>
     </BuildOrder>
   </PropertyGroup>
@@ -68,7 +68,7 @@
     <Compile Include="Web.fs" />
     <Compile Include="Session.fs" />
     <Compile Include="Proxy.fs" />
-    <Compile Include="AssemblyInfo.fs" />
+    <Compile Include="AssemblyVersionInfo.fs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="mscorlib" />

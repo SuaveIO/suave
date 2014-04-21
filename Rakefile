@@ -13,14 +13,29 @@ Albacore::Tasks::Versionizer.new :versioning
 
 include ::Albacore::NugetsPack
 
+suave_description = 'Suave is a simple web development F# library providing a lightweight web server and a set of combinators to manipulate route flow and task composition.'
+
 nugets_restore :restore do |p|
   p.out = 'packages'
   p.exe = 'buildsupport/NuGet.exe'
 end
 
-desc 'Perform full build'
-task :build => [:versioning, :restore, :build_quick]
+desc 'create assembly infos'
+asmver_files :asmver => :versioning do |a|
+  a.files = FileList['{Suave,Tests,Pong,Example,Experimental,Load,Suave.*}/*proj']
+  a.attributes assembly_description: suave_description,
+               assembly_configuration: 'RELEASE',
+               assembly_company: 'Suave.IO',
+               assembly_copyright: "(c) #{Time.now.year} by Ademar Gonzalez, Henrik Feldt",
+               assembly_version: ENV['LONG_VERSION'],
+               assembly_file_version: ENV['LONG_VERSION'],
+               assembly_informational_version: ENV['BUILD_VERSION']
+end
 
+desc 'Perform full build'
+task :build => [:versioning, :restore, :asmver, :build_quick]
+
+desc 'clean the project'
 build :clean do |b|
   b.file = 'suave.sln'
   b.prop 'Configuration', 'Release'
@@ -32,15 +47,25 @@ build :build_quick do |b|
   b.prop 'Configuration', 'Release'
 end
 
+namespace :tests do
+  desc 'run a stress test'
+  task :stress do
+    system 'Pong/bin/Release/Pong.exe', clr_command: true
+  end
+
+  task :unit do
+    system 'Tests/bin/Release/Tests.exe', clr_command: true
+  end
+end
+
 directory 'build/pkg'
 
-desc 'Create a nuget for Suave'
-task :create_nuget => [ 'build/pkg', :versioning, :build] do |p|
+task :create_nuget_quick do
   p = Albacore::NugetModel::Package.new.with_metadata do |m|
     m.id            = "Suave"
     m.version       = ENV['NUGET_VERSION']
-    m.authors       = 'Ademar Gonzalez'
-    m.description   = 'Suave is a simple web development F# library providing a lightweight web server and a set of combinators to manipulate route flow and task composition.'
+    m.authors       = 'Ademar Gonzalez, Henrik Feldt'
+    m.description   = 
     m.language      = 'en-GB'
     m.copyright     = 'Ademar Gonzalez'
     m.release_notes = "Full version: #{ENV['BUILD_VERSION']}."
@@ -70,23 +95,11 @@ task :create_nuget => [ 'build/pkg', :versioning, :build] do |p|
   )
 end
 
-desc 'Create the assembly info file'
-task :assembly_info do 
-  x = Albacore::Asmver::Config.new()
+desc 'create suave nuget'
+task :create_nuget => ['build/pkg', :versioning, :build, :create_nuget_quick]
 
-  x.attributes assembly_version: SemVer.find.to_s,
-    assembly_product: "Suave.IO",
-    assembly_title: "Suave.IO Framework",
-    assembly_description: "Suave is an F# library providing a lightweight web server and a set of combinators to manipulate route flow and task composition.",
-    assembly_copyright: "(c) 2013 by Ademar Gonzalez",
-    auto_open: "Suave.Utils"
-
-  x.file_path = "Suave/AssemblyInfo.fs"
-  x.namespace = "Suave"
-
-  @task = ::Albacore::Asmver::Task.new(x.opts)
-  @task.execute
-end
+desc 'build, gen versions, test and create nuget'
+task :default => [:build, :'tests:unit']
 
 task :increase_version_number do
   # inc patch version in .semver
@@ -97,7 +110,7 @@ task :increase_version_number do
 end
 
 desc 'release the next version'
-task :release_next => [ :increase_version_number, :assembly_info , :create_nuget ] do
+task :release_next => [ :increase_version_number, :asmver , :create_nuget ] do
   s = SemVer.find.format("%M.%m.%p%s")
   # commit and tag
   system %q[git add .semver]
@@ -131,18 +144,3 @@ namespace :docs do
       work_dir: 'gh-pages'
   end
 end
-
-namespace :tests do
-  desc 'run a stress test'
-  task :stress do
-    system 'Pong/bin/Release/Pong.exe', clr_command: true
-  end
-
-  desc 'run the unit-tests'
-  task :unit do
-    system 'Tests/bin/Release/Tests.exe', clr_command: true
-  end
-end
-
-task :default => [:build, :'tests:unit', :create_nuget]
-

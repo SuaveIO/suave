@@ -26,4 +26,4 @@ let from_json<'a> (bytes:byte []) =
 ///   url "/path"  >>= request (map_json some_function);
 ///
 let map_json f ( r : Types.HttpRequest) =
-  f  (from_json(r.raw_form)) |> to_json |> Http.ok
+  f (from_json(r.raw_form)) |> to_json |> Http.Successful.ok

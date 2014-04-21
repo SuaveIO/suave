@@ -217,7 +217,7 @@ let internal mk_line path trace ex message =
   ; path          = path
   ; ``exception`` = ex
   ; trace         = trace
-  ; ts_utc_ticks  = DateTime.UtcNow.Ticks }
+  ; ts_utc_ticks  = Globals.utc_now().Ticks }
 
 let verbose (logger : Logger) path trace message =
   logger.Log Verbose (fun _ -> mk_line path trace None message)

@@ -49,6 +49,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="AssemblyVersionInfo.fs" />
     <Compile Include="Html.fs" />
     <Compile Include="Template.fs" />
     <Compile Include="Data.fs" />
