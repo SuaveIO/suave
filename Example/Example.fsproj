@@ -57,6 +57,7 @@
     <None Include="suave.p12">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Include="Play.fsx" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="mscorlib" />

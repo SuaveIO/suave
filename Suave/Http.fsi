@@ -1128,6 +1128,23 @@ module Http =
     /// <summary><para>
     /// Strongly typed route matching! Matching the uri can be used with the 'parsers'
     /// characters specified in Sscanf.
+    /// </para><para>The supported characters for the formatter:</para><para>
+    /// 'b', Boolean.Parse</para><para>
+    /// 'd', int</para><para>
+    /// 'i', int</para><para>
+    /// 's', box</para><para>
+    /// 'u', uint32</para><para>
+    /// 'x', check (String.forall Char.IsLower) &gt;&gt; ((+) "0x") &gt;&gt; int</para><para>
+    /// 'X', check (String.forall Char.IsUpper) &gt;&gt; ((+) "0x") &gt;&gt; int</para><para>
+    /// 'o', ((+) "0o") &gt;&gt; int</para><para>
+    /// 'e', float// no check for correct format for floats</para><para>
+    /// 'E', float</para><para>
+    /// 'f', float</para><para>
+    /// 'F', float</para><para>
+    /// 'g', float</para><para>
+    /// 'G', float</para><para>
+    /// 'M', parse_decimal</para><para>
+    /// 'c', char
     /// </para></summary>
     val url_scan : pf:PrintfFormat<'a,'b,'c,'d,'t> -> h:('t -> WebPart) -> WebPart
 
