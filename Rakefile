@@ -60,7 +60,7 @@ end
 
 directory 'build/pkg'
 
-task :create_nuget_quick => :versioning do
+task :create_nuget_quick => ['build/pkg', :versioning] do
   p = Albacore::NugetModel::Package.new.with_metadata do |m|
     m.id            = "Suave"
     m.version       = ENV['NUGET_VERSION']
