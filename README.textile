@@ -14,6 +14,9 @@ p.
 The simplest Suave application is a simple HTTP server that greets all visitors with the string @"Hello World!"@
 
 pre. 
+open Suave // always open suave
+open Suave.Http.Applicatives // for combinators
+open Suave.Web // for config
 web_server default_config (OK "Hello World!")
 
 Now that you've discovered how to do "Hello World!", go read the "rest of the documentation":http://suave.io/!
