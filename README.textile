@@ -15,7 +15,7 @@ The simplest Suave application is a simple HTTP server that greets all visitors 
 
 pre. 
 open Suave // always open suave
-open Suave.Http.Applicatives // for combinators
+open Suave.Http.Successful // for OK-result
 open Suave.Web // for config
 web_server default_config (OK "Hello World!")
 
