@@ -85,7 +85,7 @@ Run Tests as a console app. Return status code = 0 means success.
 
 We have a chat room in case you feel like chatting a bit a bit. 
 
-![https://badges.gitter.im/SuaveIO/suave.png](https://gitter.im/SuaveIO/suave)
+[![Chat Room](https://badges.gitter.im/SuaveIO/suave.png)](https://gitter.im/SuaveIO/suave)
 
 ## Integrations
 
