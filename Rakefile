@@ -60,12 +60,12 @@ end
 
 directory 'build/pkg'
 
-task :create_nuget_quick do
+task :create_nuget_quick => :versioning do
   p = Albacore::NugetModel::Package.new.with_metadata do |m|
     m.id            = "Suave"
     m.version       = ENV['NUGET_VERSION']
     m.authors       = 'Ademar Gonzalez, Henrik Feldt'
-    m.description   = 
+    m.description   = suave_description
     m.language      = 'en-GB'
     m.copyright     = 'Ademar Gonzalez'
     m.release_notes = "Full version: #{ENV['BUILD_VERSION']}."
