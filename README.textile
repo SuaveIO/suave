@@ -3,15 +3,23 @@ h1. Introduction.
 !https://raw.githubusercontent.com/SuaveIO/suave/master/media/suave1.png!
 
 p. 
-Suave is a simple web development F# library providing a lightweight web server and a set of combinators to manipulate route flow and task composition. Suave is inspired in the simplicity of Happstack and born out of the necessity of embedding web server capabilities in my own applications. 
-Still in its early stages Suave supports HTTPS, multiple TCP/IP bindings, Basic Access Authentication, Keep-Alive. Suave also takes advantage of F# asynchronous workflows to perform non-blocking IO. In fact, Suave is written in a completely non-blocking fashion throughout.
+Suave is a simple web development F# library providing a lightweight web server
+and a set of combinators to manipulate route flow and task composition. Suave
+is inspired in the simplicity of Happstack and born out of the necessity of
+embedding web server capabilities in my own applications.  Still in its early
+stages Suave supports HTTPS, multiple TCP/IP bindings, Basic Access
+Authentication, Keep-Alive. Suave also takes advantage of F# asynchronous
+workflows to perform non-blocking IO. In fact, Suave is written in a completely
+non-blocking fashion throughout.
 
-What follows is a tutorial on how to create applications. Scroll past the tutorial to see detailed function documentation.
+What follows is a tutorial on how to create applications. Scroll past the
+tutorial to see detailed function documentation.
 
 h1. Tutorial: Hello World!
 
 p. 
-The simplest Suave application is a simple HTTP server that greets all visitors with the string @"Hello World!"@
+The simplest Suave application is a simple HTTP server that greets all visitors
+with the string @"Hello World!"@
 
 pre. 
 open Suave // always open suave
@@ -19,13 +27,23 @@ open Suave.Http.Successful // for OK-result
 open Suave.Web // for config
 web_server default_config (OK "Hello World!")
 
-Now that you've discovered how to do "Hello World!", go read the "rest of the documentation":http://suave.io/!
+Now that you've discovered how to do "Hello World!", go read the "rest of the
+documentation":http://suave.io/!
 
 h1. Coding Guidelines
 
+p. 
 Suave.X where X is a module is where we expect users to look. We don't expect users
 of the library to have to look at Y in Suave.X.Y, so for server-specific code, please
 stick to the Y module/namespace. That way we make the API discoverable.
+
+p. 
+We have a "TeamCity CI server":https://tc-oss.intelliplan.net/overview.html! set
+up to provide continuous integration for Suave. You can pull nugets from this
+server, by adding
+"https://tc-oss.intelliplan.net/guestAuth/app/nuget/v1/FeedService.svc/":https://tc-oss.intelliplan.net/guestAuth/app/nuget/v1/FeedService.svc/!
+to your list of nuget sources; this allows you to get pre-release nugets of
+suave directly into your development environment.
 
 h2. Style Guide
 
