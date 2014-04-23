@@ -276,7 +276,7 @@ module Http =
           return content
       }
 
-    let compress encoding path (fs : FileStream) = async {
+    let compress encoding path (fs : Stream) = async {
       use new_fs = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.Write)
       match encoding with
       | GZIP ->
@@ -292,35 +292,35 @@ module Http =
       new_fs.Close()
     }
 
-    let transform_x (path : string) compression compression_folder ({ request = q; runtime = r; connection = connection } as ctx) : Async<FileStream> =
-      let fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read)
+    let transform_x (key : string) (get_data : string -> Stream) (get_last : string -> DateTime) compression compression_folder ({ request = q; runtime = r; connection = connection } as ctx) : Async<Stream> =
+      use stream = get_data key
       let compress_file n = async {
         let temp_file_name = Path.GetRandomFileName()
         if not (Directory.Exists compression_folder) then Directory.CreateDirectory compression_folder |> ignore
         let new_path = Path.Combine(compression_folder,temp_file_name)
-        do! compress n new_path fs
+        do! compress n new_path stream
         return new_path
       }
       async {
-        if compression && fs.Length > int64(MIN_BYTES_TO_COMPRESS) && fs.Length < int64(MAX_BYTES_TO_COMPRESS) then
+        if compression && stream.Length > int64(MIN_BYTES_TO_COMPRESS) && stream.Length < int64(MAX_BYTES_TO_COMPRESS) then
           let enconding = parse_encoder q
           match enconding with
           | Some (n) ->
             do! async_writeln connection (String.Concat [| "Content-Encoding: "; n.ToString() |])
-            if Globals.compressed_files_map.ContainsKey path then
-              let file_info = new FileInfo(path)
-              let cmpr_info = new FileInfo(Globals.compressed_files_map.[path])
-              if file_info.LastWriteTime > cmpr_info.CreationTime then
+            if Globals.compressed_files_map.ContainsKey key then
+              let last_modified = get_last key
+              let cmpr_info = new FileInfo(Globals.compressed_files_map.[key])
+              if last_modified > cmpr_info.CreationTime then
                 let! new_path =  compress_file n
-                Globals.compressed_files_map.[path] <- new_path
+                Globals.compressed_files_map.[key] <- new_path
             else
               let! new_path =  compress_file n
-              Globals.compressed_files_map.TryAdd(path,new_path) |> ignore
-            return new FileStream(Globals.compressed_files_map.[path] , FileMode.Open, FileAccess.Read, FileShare.Read)
+              Globals.compressed_files_map.TryAdd(key,new_path) |> ignore
+            return new FileStream(Globals.compressed_files_map.[key] , FileMode.Open, FileAccess.Read, FileShare.Read) :> Stream
           | None ->
-            return fs
+            return stream
         else
-          return fs
+          return stream
      }
 
   module Response =
@@ -637,6 +637,37 @@ module Http =
         with _ -> fail
       F
 
+  module ServeResource =
+    open System
+
+    open Writers
+    open Redirection
+
+    // If a response includes both an Expires header and a max-age directive,
+    // the max-age directive overrides the Expires header, even if the Expires header is more restrictive
+    // 'Cache-Control' and 'Expires' headers should be left up to the user
+    
+    let resource key exists get_last get_extension send =
+      fun ({request = r; runtime = q} as ctx) ->
+        if exists key then
+          let mimes = q.mime_types_map <| get_extension key
+          match mimes with
+          | Some value ->
+            let send_it _ =
+              set_header "Last-Modified" ((get_last key : DateTime).ToString("R"))
+              >> set_mime_type value.name
+              >> send key value.compression
+
+            let modified_since = (r.headers ? ``if-modified-since`` )
+            match modified_since with
+            | Some v -> let date = DateTime.Parse v
+                        if get_last key > date then send_it () ctx
+                        else NOT_MODIFIED ctx
+            | None   -> send_it () ctx
+          | None -> None
+        else
+          None
+
   module Files =
 
     open System
@@ -649,12 +680,15 @@ module Http =
     open Writers
     open Successful
     open Redirection
+    open ServeResource
 
     let send_file file_name (compression : bool) ({ connection = conn; runtime = runtime } as ctx : HttpContext) =
       let write_file file (q : HttpRequest) = async {
-        use! fs = Compression.transform_x file compression runtime.compression_folder ctx
+        let get_fs = fun path -> new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read) :> Stream
+        let get_lm = fun path -> FileInfo(path).LastWriteTime
+        use! fs = Compression.transform_x file get_fs get_lm compression runtime.compression_folder ctx
 
-        do! async_writeln conn (sprintf "Content-Length: %d" (fs : FileStream).Length)
+        do! async_writeln conn (sprintf "Content-Length: %d" (fs: Stream).Length)
         do! async_writeln conn ""
 
         if fs.Length > 0L then
@@ -662,31 +696,13 @@ module Http =
       }
       async { do! response_f HTTP_200 (write_file file_name) ctx } |> succeed
 
-    // If a response includes both an Expires header and a max-age directive,
-    // the max-age directive overrides the Expires header, even if the Expires header is more restrictive
-    // 'Cache-Control' and 'Expires' headers should be left up to the user
-
     let file file_name =
-      fun ({request = r; runtime = q} as ctx) ->
-        if File.Exists file_name then
-          let file_info = new FileInfo(file_name)
-          let mimes = q.mime_types_map (file_info.Extension)
-          match mimes with
-          | Some value ->
-            let send_it _ =
-              set_header "Last-Modified" (file_info.LastAccessTimeUtc.ToString("R"))
-              >> set_mime_type value.name
-              >> send_file file_name value.compression
-
-            let modified_since = (r.headers ? ``if-modified-since`` )
-            match modified_since with
-            | Some v -> let date = DateTime.Parse v
-                        if file_info.LastWriteTime > date then send_it () ctx
-                        else NOT_MODIFIED ctx
-            | None   -> send_it () ctx
-          | None -> None
-        else
-          None
+      resource
+        file_name
+        (File.Exists)
+        (fun name -> FileInfo(name).LastAccessTime)
+        (Path.GetExtension)
+        send_file
 
     let local_file (file_name : string) (root_path : string) =
       let file_name =
@@ -732,6 +748,47 @@ module Http =
         (di.GetFileSystemInfos()) |> Array.sortBy (fun x -> x.Name) |> Array.iter buildLine
         OK (result.ToString()) ctx
       else fail
+
+  module Embedded =
+    
+    open System
+    open System.IO
+    open System.Reflection
+
+    open Suave.Socket
+
+    open Response
+    open ServeResource
+    
+    let assembly = Assembly.GetExecutingAssembly()
+    let resources = assembly.GetManifestResourceNames()
+    let last_modified = FileInfo(Assembly.GetExecutingAssembly().Location).CreationTime
+    
+    let send_resource resource_name (compression : bool) ({ connection = conn; runtime = runtime } as ctx : HttpContext) =
+      let write_resource name (q : HttpRequest) = async {
+        let get_fs = fun name -> assembly.GetManifestResourceStream(name)
+        let get_lm = fun _ -> last_modified
+        use! fs = Compression.transform_x name get_fs get_lm compression runtime.compression_folder ctx
+
+        do! async_writeln conn (sprintf "Content-Length: %d" (fs: Stream).Length)
+        do! async_writeln conn ""
+
+        if fs.Length > 0L then
+          do! transfer_x conn fs
+      }
+      async { do! response_f HTTP_200 (write_resource resource_name) ctx } |> succeed
+
+    let resource name =
+      resource
+        name
+        (fun name -> resources |> Array.exists ((=) name))
+        (fun _ -> last_modified)
+        (Path.GetExtension)
+        send_resource
+
+    let browse : WebPart =
+      warbler (fun ctx -> resource (ctx.request.url.TrimStart [|'/'|]))
+      
 
   module Authentication =
 
