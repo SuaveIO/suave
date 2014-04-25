@@ -1422,6 +1422,37 @@ module Http =
     /// </remarks>
     val dir : req:HttpContext -> WebResult
 
+  module Embedded =
+
+    /// <summary><para>
+    /// Send an embedded resource as a response to the request
+    /// </para><para>
+    /// </para><para>
+    /// </para></summary>
+    /// <remarks>
+    /// </remarks>
+    val send_resource : resource_name:string -> compression:bool -> WebPart
+
+    /// <summary><para>
+    /// Send the resource by the name given.
+    /// Will also set the MIME type based on the file extension.
+    /// </para><para>
+    /// </para><para>
+    /// </para></summary>
+    /// <remarks>
+    /// </remarks>
+    val resource : name:string -> WebPart
+
+    /// <summary><para>
+    /// 'browse' the file in the sense that the contents of the file are sent based on the
+    /// request's Url property. Will serve from the executing assemblies resources.
+    /// </para><para>
+    /// </para><para>
+    /// </para></summary>
+    /// <remarks>
+    /// </remarks>
+    val browse : WebPart
+
   module Authentication =
 
     /// <summary><para>
