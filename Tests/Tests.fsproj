@@ -64,6 +64,7 @@
     <None Include="test-text-file.txt">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <EmbeddedResource Include="embedded-resource.txt" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="FsCheck">
