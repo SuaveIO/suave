@@ -40,6 +40,7 @@ let testapp : WebPart =
     log logger log_format >>= never
     url_scan "/add/%d/%d"   (fun (a,b) -> OK((a + b).ToString()))
     url_scan "/minus/%d/%d" (fun (a,b) -> OK((a - b).ToString()))
+    url_scan "/divide/%d/%d" (fun (a,b) -> OK((a / b).ToString()))
     RequestErrors.NOT_FOUND "Found no handlers"
   ]
 

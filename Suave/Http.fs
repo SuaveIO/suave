@@ -628,13 +628,20 @@ module Http =
     open ServerErrors
 
     let url_scan (pf : PrintfFormat<_,_,_,_,'t>) (h : 't ->  WebPart) : WebPart =
-      let t url = sscanf pf url
+      
+      let scan url =
+        try 
+          let r = sscanf pf url
+          Some r
+        with _ -> None
 
       let F (r:HttpContext) =
-        try
-          let y = r.request.url |> t |> h
-          try y r with ex -> r |> INTERNAL_ERROR (ex.ToString())
-        with _ -> fail
+        match scan r.request.url with
+        | Some p ->
+          let part = h p
+          part r 
+        | None -> 
+          fail
       F
 
   module ServeResource =
