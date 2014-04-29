@@ -52,7 +52,7 @@ let timeout r =
   } |> succeed
 
 // Adds a new mime type to the default map
-let mime_types () =
+let mime_types =
   Writers.default_mime_types_map
     >=> (function | ".avi" -> Writers.mk_mime_type "video/avi" false | _ -> None)
 
@@ -99,7 +99,7 @@ choose [
       ; ct               = Async.DefaultCancellationToken
       ; buffer_size      = 2048
       ; max_ops          = 100
-      ; mime_types_map   = mime_types ()
+      ; mime_types_map   = mime_types
       ; home_folder      = None
       ; compressed_files_folder = None
       ; logger           = logger }
