@@ -31,7 +31,7 @@ module ParsingAndControl =
       | Some x when x = pair.offset ->
         if pair.length = 2 then
           //there is only a '\r','\n' left
-          connection.free_buffer pair.buffer
+          connection.free_buffer "scan_data (Some x = pair.offset)" pair.buffer
           return (count, None)
         else 
           return (count, mk_buffer_segment pair.buffer (pair.offset + 2) (pair.length - 2))
@@ -39,7 +39,7 @@ module ParsingAndControl =
         select (ArraySegment(pair.buffer.Array, pair.offset, index - pair.offset)) (index - pair.offset)
         let number_of_bytes_to_select = pair.length - index + pair.offset - 2
         if number_of_bytes_to_select = 0 then
-          connection.free_buffer pair.buffer
+          connection.free_buffer "scan_data (Some index)" pair.buffer
           return (count + (index - pair.offset ), None)
         else
           return (count + (index - pair.offset ), mk_buffer_segment pair.buffer (index  + 2) number_of_bytes_to_select)
@@ -51,18 +51,19 @@ module ParsingAndControl =
       let cn = left.length
       let dn = right.length
 
+      // TODO: cleanup -- repeated code!
       match scan_crlf_x (ArraySegment(left.buffer.Array, left.offset, cn)) (ArraySegment(right.buffer.Array, right.offset, dn)) with
       | Some index when index < cn ->
         select (ArraySegment(left.buffer.Array,left.offset,index)) index
         let number_of_bytes_to_select = cn - index - 2
         if number_of_bytes_to_select = 0 then
-          connection.free_buffer left.buffer
+          connection.free_buffer "scan_crlf_x (Some index < cn)" left.buffer
           return (count + index, None) // asumes d is empty
         else 
           return (count + index, mk_buffer_segment left.buffer (left.offset + index + 2) number_of_bytes_to_select) // asumes d is empty
       | Some index ->
-        select (ArraySegment(left.buffer.Array, left.offset, left.length)) left.length // here we can free c's original buffer --
-        connection.free_buffer  left.buffer
+        select (ArraySegment(left.buffer.Array, left.offset, left.length)) left.length // here we can free c's original buffer
+        connection.free_buffer "scan_crlf_x (Some index)" left.buffer
         select (ArraySegment(right.buffer.Array, right.offset, index - left.length)) (index - left.length)
         let number_of_bytes_to_select = dn - (index - cn) - 2
         if number_of_bytes_to_select = 0 then
@@ -71,7 +72,7 @@ module ParsingAndControl =
           return (count + index, mk_buffer_segment right.buffer (right.offset + (index - cn) + 2) number_of_bytes_to_select)
       | None ->
         select (ArraySegment(left.buffer.Array, left.offset, left.length)) left.length // free c's original buffer
-        connection.free_buffer left.buffer
+        connection.free_buffer "scan_crlf_x (None) " left.buffer
         let count' = count + cn + dn - 2
         let number_of_bytes_to_select  = right.length - 1
         if number_of_bytes_to_select > 0 then
@@ -94,7 +95,7 @@ module ParsingAndControl =
           // TODO: why not free the buffer on client closing?
           return failwith "client closed"
       with ex ->
-        connection.free_buffer buff
+        connection.free_buffer "read_till_EOL.read_data (exception case)" buff
         return raise ex
       }
     match preread with
@@ -416,10 +417,10 @@ module ParsingAndControl =
     ; is_secure      = match proto with HTTP -> false | HTTPS _ -> true
     ; trace          = Log.TraceHeader.Empty }
 
-  let internal free connection (s : BufferSegment option) =
+  let internal free context connection (s : BufferSegment option) =
     match s with
     | None -> ()
-    | Some x -> connection.free_buffer x.buffer
+    | Some x -> connection.free_buffer context x.buffer
 
   /// Check if the web part can perform its work on the current request. If it can't
   /// it will return None and the run method will return.
@@ -446,9 +447,9 @@ module ParsingAndControl =
           do! Async.WithTimeout (runtime.web_part_timeout, run ctx web_part)
           verbose "<- unblock"
         with
-          | InternalFailure(_) as ex  -> free cn rem; raise ex
-          | :? TimeoutException as ex -> free cn rem; raise ex
-          | :? SocketIssue as ex      -> free cn rem; raise ex
+          | InternalFailure(_) as ex  -> free "http_loop.loop" cn rem; raise ex
+          | :? TimeoutException as ex -> free "http_loop.loop" cn rem; raise ex
+          | :? SocketIssue as ex      -> free "http_loop.loop" cn rem; raise ex
           | ex -> do! runtime.error_handler ex "Routing request failed" ctx
         if cn.is_connected () then
           match request.headers?connection with
@@ -457,7 +458,7 @@ module ParsingAndControl =
             verbosef (fun fmt -> fmt "'Connection: keep-alive' recurse (!), rem: %A" rem)
             return! loop rem request
           | Some _ ->
-            free cn rem;
+            free "http_loop.loop (case Some _)" cn rem;
             verbose "'Connection: close', exiting"
             return ()
           | None ->
@@ -466,11 +467,11 @@ module ParsingAndControl =
               verbose "'Connection: keep-alive' recurse (!)"
               return! loop rem request
             else
-              free cn rem;
+              free "http_loop.loop (case None, else branch)" cn rem;
               verbose "'Connection: close', exiting"
               return ()
         else
-          free cn rem;
+          free "http_loop.loop (not connected)" cn rem;
           verbose "'is_connected = false', exiting"
           return ()
       | None ->

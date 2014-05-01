@@ -84,8 +84,8 @@ module Client =
   let ad = Path.Combine(__SOURCE_DIRECTORY__, "large_xml.xml") |> File.ReadAllBytes
 
   let run () =
-    for i in 1 .. (SystemUnderTest.conf.max_ops - 1) do
-      if i % 1000 = 0 then printfn "at %i" i
+    for i in 1 ..  3 do
+//    for i in 1 ..  (SystemUnderTest.conf.max_ops - 1) do
       try
         post_and_assert ad
       with :? System.AggregateException as e when e.ToString().Contains("The underlying connection was closed") ->

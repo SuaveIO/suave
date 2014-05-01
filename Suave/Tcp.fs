@@ -151,7 +151,7 @@ let tcp_ip_server (source_ip : IPAddress,
           read         = receive socket read_args
           write        = send socket write_args
           get_buffer   = fun context -> bufferManager.PopBuffer(context)
-          free_buffer  = bufferManager.FreeBuffer
+          free_buffer  = fun context buf -> bufferManager.FreeBuffer(buf, context)
           is_connected = fun _ -> is_good read_args && is_good write_args
           line_buffer  = bufferManager.PopBuffer("Tcp.tcp_ip_server.job") // buf allocate
       }

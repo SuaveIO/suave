@@ -107,7 +107,7 @@ type Connection =
   ; read         : ArraySegment<byte> -> Async<int>
   ; write        : ArraySegment<byte> -> Async<unit>
   ; get_buffer   : string -> ArraySegment<byte>
-  ; free_buffer  : ArraySegment<byte> -> unit
+  ; free_buffer  : string -> ArraySegment<byte> -> unit
   ; is_connected : unit -> bool
   ; line_buffer  : ArraySegment<byte> }
 
