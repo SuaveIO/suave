@@ -116,7 +116,7 @@ open Microsoft.FSharp.NativeInterop
 let read_to_bio  (con : Connection) read_bio ssl = async {
   let bytes_pending = BIO_ctrl_pending read_bio
   if bytes_pending = 0u then 
-    let a = con.get_buffer ()
+    let a = con.get_buffer "read_to_bio"
     let! bytes_read = con.read a
     let buff = Array.zeroCreate bytes_read
     Array.blit a.Array a.Offset buff 0 bytes_read
@@ -163,7 +163,7 @@ let ssl_receive (con : Connection) (context, read_bio, write_bio) (bu: B) = asyn
   //we need to check if there is data in the read bio before asking for more to the socket
   let bytes_pending = BIO_ctrl_pending read_bio
   if bytes_pending = 0u then 
-    let a = con.get_buffer ()
+    let a = con.get_buffer "ssl_receive"
     let! bytes_read = con.read a
 
     let buff = Array.zeroCreate bytes_read

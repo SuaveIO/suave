@@ -21,18 +21,18 @@ module ParsingAndControl =
   open Suave.Utils.Bytes
   open Suave.Utils.Parsing
 
-  /// Read the passed stream into buff until the EOL (CRLF) has been reached 
+  /// Read the passed stream into buff until the EOL (CRLF) has been reached
   /// and returns an array containing excess data read past the marker
-  let read_till_EOL (connection : Connection) (select) (preread : BufferSegment option) =
+  let read_till_EOL (connection : Connection) select (preread : BufferSegment option) =
 
     let rec scan_data count (pair : BufferSegment) = async {
       match scan_crlf (ArraySegment(pair.buffer.Array, pair.offset, pair.length)) with
-      //returns index relating to the original array
+      // returns index relating to the original array
       | Some x when x = pair.offset ->
         if pair.length = 2 then
           //there is only a '\r','\n' left
           connection.free_buffer pair.buffer
-          return (count, None )
+          return (count, None)
         else 
           return (count, mk_buffer_segment pair.buffer (pair.offset + 2) (pair.length - 2))
       | Some index ->
@@ -46,8 +46,8 @@ module ParsingAndControl =
       | None ->
         return! read_data count (Some pair)
       }
-    and scan_data_x  count (left : BufferSegment) (right : BufferSegment) = async  {
 
+    and scan_data_x count (left : BufferSegment) (right : BufferSegment) = async  {
       let cn = left.length
       let dn = right.length
 
@@ -66,12 +66,12 @@ module ParsingAndControl =
         select (ArraySegment(right.buffer.Array, right.offset, index - left.length)) (index - left.length)
         let number_of_bytes_to_select = dn - (index - cn) - 2
         if number_of_bytes_to_select = 0 then
-          return (count + index, None )
-        else 
+          return (count + index, None)
+        else
           return (count + index, mk_buffer_segment right.buffer (right.offset + (index - cn) + 2) number_of_bytes_to_select)
-      | None -> 
+      | None ->
         select (ArraySegment(left.buffer.Array, left.offset, left.length)) left.length // free c's original buffer
-        connection.free_buffer  left.buffer
+        connection.free_buffer left.buffer
         let count' = count + cn + dn - 2
         let number_of_bytes_to_select  = right.length - 1
         if number_of_bytes_to_select > 0 then
@@ -80,8 +80,8 @@ module ParsingAndControl =
         else
           return! read_data count' (Some right)
       }
-    and read_data count (ahead :BufferSegment option)  = async {
-      let buff = connection.get_buffer ()
+    and read_data count (ahead : BufferSegment option) = async {
+      let buff = connection.get_buffer "read_till_EOL.read_data"
       try
         let! b = connection.read buff
         if b > 0 then
@@ -90,7 +90,8 @@ module ParsingAndControl =
             return! scan_data_x count data { buffer = buff; offset = buff.Offset; length = b }
           | None ->
             return! scan_data count { buffer = buff; offset = buff.Offset; length = b }
-        else 
+        else
+          // TODO: why not free the buffer on client closing?
           return failwith "client closed"
       with ex ->
         connection.free_buffer buff
@@ -98,7 +99,7 @@ module ParsingAndControl =
       }
     match preread with
     | Some data ->
-      if data.length > 1 then scan_data 0  data
+      if data.length > 1 then scan_data 0 data
       else read_data 0 preread
     | None ->
       read_data 0 preread
@@ -113,15 +114,15 @@ module ParsingAndControl =
       | Some 0 ->
         if segment.length = marker_length then
           connection.free_buffer segment.buffer
-          return (count, None )
+          return count, None
         else
-          return (count, mk_buffer_segment segment.buffer (segment.offset + marker_length) (segment.length - marker_length))
+          return count, mk_buffer_segment segment.buffer (segment.offset + marker_length) (segment.length - marker_length)
       | Some index ->
         do! f (ArraySegment(segment.buffer.Array, segment.offset, index)) index
         // discard the marker
         if index = segment.length - marker_length then
           connection.free_buffer segment.buffer
-          return (count, None )
+          return (count, None)
         else
           return (count + index, mk_buffer_segment segment.buffer (segment.offset + index + marker_length) (segment.length - index - marker_length))
       | None ->
@@ -140,19 +141,19 @@ module ParsingAndControl =
           connection.free_buffer left.buffer
           return (count + index, None)
         else
-          return (count + index, mk_buffer_segment  left.buffer (left.offset + index + marker_length) number_of_bytes_to_select) // asumes d is empty
-      | Some index -> 
+          return (count + index, mk_buffer_segment left.buffer (left.offset + index + marker_length) number_of_bytes_to_select) // assumes d is empty
+      | Some index ->
         do! f (ArraySegment(left.buffer.Array, left.offset, left.length)) left.length //here we can free c's original buffer --
-        connection.free_buffer  left.buffer
+        connection.free_buffer left.buffer
         do! f (ArraySegment(right.buffer.Array, right.offset, index)) index
         let number_of_bytes_to_select = dn - (index - cn) - marker_length
         if number_of_bytes_to_select = 0 then
           return (count + index, None)
         else
           return (count + index, mk_buffer_segment right.buffer (right.offset + (index - cn) + marker_length) number_of_bytes_to_select)
-      | None -> 
+      | None ->
         do! f  (ArraySegment(left.buffer.Array, left.offset, left.length)) left.length //free c's original buffer
-        connection.free_buffer  left.buffer
+        connection.free_buffer left.buffer
         let number_of_bytes_to_select  = right.length - marker_length + 1
         if number_of_bytes_to_select > 0 then 
           do! f (ArraySegment(right.buffer.Array, right.offset, right.length-1)) number_of_bytes_to_select
@@ -161,15 +162,14 @@ module ParsingAndControl =
           return! read_data (count + cn) (Some right)
       } 
     and read_data count (ahead : BufferSegment option) = async {
-
-      let a = connection.get_buffer ()
+      let a = connection.get_buffer "read_util.read_data"
       let! bytes_read = connection.read a
-      if bytes_read > 0 then 
-        match ahead with 
+      if bytes_read > 0 then
+        match ahead with
         | Some data ->
-          return! scan_data_x count data {buffer = a; offset = a.Offset ; length = bytes_read}
-        | None -> 
-          return! scan_data count {buffer = a; offset = a.Offset ; length = bytes_read}
+          return! scan_data_x count data { buffer = a; offset = a.Offset ; length = bytes_read }
+        | None ->
+          return! scan_data count { buffer = a; offset = a.Offset ; length = bytes_read }
       else
         return failwith "client disconnected."
       }
@@ -179,16 +179,12 @@ module ParsingAndControl =
       else read_data 0 preread
     | None -> read_data 0 preread
 
-  /// Alternative read_till_EOL
-  let _read_till_EOL (connection : Connection) (buff : byte[]) (preread : BufferSegment option) =
-    read_until EOL (fun b c -> async { do Array.blit b.Array b.Offset buff 0 c }) connection preread
-
   /// Read a line from the stream, calling to_string on the bytes before the EOL marker
   let read_line (connection : Connection) ahead (buf : ArraySegment<byte>) = async {
     let offset = ref 0
     let! count, rem = read_till_EOL connection (fun a count -> Array.blit a.Array a.Offset buf.Array (buf.Offset + !offset) count; offset := !offset + count) ahead
     let result = ASCII.to_string buf.Array buf.Offset count
-    return result , rem
+    return result, rem
   }
 
   /// Read all headers from the stream, returning a dictionary of the headers found
@@ -217,10 +213,10 @@ module ParsingAndControl =
 
   /// Read the post data from the stream, given the number of bytes that makes up the post data.
   let read_post_data (connection : Connection) (bytes : int) (read : BufferSegment option) =
-    let read_bytes bytes_needed  missing read_offset = async {
+    let read_bytes bytes_needed missing read_offset = async {
       let counter = ref 0
       let rem = ref None
-      let a = connection.get_buffer ()
+      let a = connection.get_buffer "read_post_data"
       while !counter < bytes_needed do
         let! bytes_transmited = connection.read a
         if bytes_transmited > bytes_needed - !counter

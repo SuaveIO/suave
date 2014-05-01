@@ -181,7 +181,7 @@ module Bytes =
       if !j >= m then Some(!i - m) else None
 
   let inline unite (a : ArraySegment<_>) (b : ArraySegment<_>) =
-    fun (i : int) -> 
+    fun (i : int) ->
       if   i < 0       then failwith "invalid args"
       elif i < a.Count then a.Array.[a.Offset + i]
       elif i < a.Count + b.Count then b.Array.[b.Offset + (i - a.Count)]

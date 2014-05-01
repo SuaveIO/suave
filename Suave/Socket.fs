@@ -24,11 +24,11 @@ type BufferManager(total_bytes, buffer_size, logger) =
   let free_offsets = new Stack<int>()
 
   /// Pops a buffer from the buffer pool
-  member x.PopBuffer() : ArraySegment<byte> =
+  member x.PopBuffer(?context : string) : ArraySegment<byte> =
     let offset, free_count = lock free_offsets (fun _ ->
       free_offsets.Pop(), free_offsets.Count)
     Log.internf logger "Socket.BufferManager" (fun fmt ->
-      fmt "reserving buffer: %d, free count: %d" offset free_count)
+      fmt "reserving buffer: %d, free count: %d [%s]" offset free_count (defaultArg context "no-ctx"))
     ArraySegment(buffer, offset, buffer_size)
 
   /// Initialise the memory required to use this BufferManager
@@ -42,12 +42,12 @@ type BufferManager(total_bytes, buffer_size, logger) =
   /// Frees the buffer back to the buffer pool
   /// WARNING: there is nothing preventing you from freeing the same offset
   /// more than once with nasty consequences
-  member x.FreeBuffer(args : ArraySegment<_>) =
+  member x.FreeBuffer(args : ArraySegment<_>, ?context : string) =
     let free_count = lock free_offsets (fun _ ->
       free_offsets.Push args.Offset
       free_offsets.Count)
     Log.internf logger "Socket.BufferManager" (fun fmt ->
-      fmt "freeing buffer: %d, free count: %d" args.Offset free_count)
+      fmt "freeing buffer: %d, free count: %d [%s]" args.Offset free_count (defaultArg context "no-ctx"))
 
 type SocketAsyncEventArgsPool() =
 
@@ -106,7 +106,7 @@ type Connection =
   { ipaddr       : IPAddress
   ; read         : ArraySegment<byte> -> Async<int>
   ; write        : ArraySegment<byte> -> Async<unit>
-  ; get_buffer   : unit -> ArraySegment<byte>
+  ; get_buffer   : string -> ArraySegment<byte>
   ; free_buffer  : ArraySegment<byte> -> unit
   ; is_connected : unit -> bool
   ; line_buffer  : ArraySegment<byte> }

@@ -116,7 +116,6 @@ let tcp_ip_server (source_ip : IPAddress,
                    max_concurrent_ops : int)
                   (logger : Log.Logger)
                   (serve_client : TcpWorker<unit>) =
-  let intern  = Log.intern logger "Tcp.tcp_ip_server"
 
   let start_data =
     { start_called_utc = Globals.utc_now ()
@@ -137,11 +136,12 @@ let tcp_ip_server (source_ip : IPAddress,
   // echo 1 > /proc/sys/net/ipv4/tcp_tw_recycle
   // custom kernel with shorter TCP_TIMEWAIT_LEN in include/net/tcp.h
   let inline job (accept_args : A) = async {
+    let intern  = Log.intern logger "Tcp.tcp_ip_server.job"
     let socket = accept_args.AcceptSocket
     let ip_address = (socket.RemoteEndPoint :?> IPEndPoint).Address
     Interlocked.Increment Globals.number_of_clients |> ignore
 
-    Log.internf logger "Tcp.tcp_ip_server" (fun fmt -> fmt "%O connected, total: %d clients" ip_address !Globals.number_of_clients)
+    Log.internf logger "Tcp.tcp_ip_server.job" (fun fmt -> fmt "%O connected, total: %d clients" ip_address !Globals.number_of_clients)
 
     try
       let read_args = b.Pop()
@@ -150,10 +150,10 @@ let tcp_ip_server (source_ip : IPAddress,
         { ipaddr       = ip_address
           read         = receive socket read_args
           write        = send socket write_args
-          get_buffer   = bufferManager.PopBuffer
+          get_buffer   = fun context -> bufferManager.PopBuffer(context)
           free_buffer  = bufferManager.FreeBuffer
-          is_connected = fun _ -> is_good read_args && is_good write_args;
-          line_buffer  = bufferManager.PopBuffer()
+          is_connected = fun _ -> is_good read_args && is_good write_args
+          line_buffer  = bufferManager.PopBuffer("Tcp.tcp_ip_server.job") // buf allocate
       }
       use! oo = Async.OnCancel (fun () -> intern "disconnected client (async cancel)"
                                           shutdown_socket socket)
@@ -165,13 +165,13 @@ let tcp_ip_server (source_ip : IPAddress,
         a.Push accept_args
         b.Push read_args
         c.Push write_args
-        bufferManager.FreeBuffer connection.line_buffer
+        bufferManager.FreeBuffer(connection.line_buffer, "Tcp.tcp_ip_server.job") // buf free OK
         Interlocked.Decrement(Globals.number_of_clients) |> ignore
-        Log.internf logger "Tcp.tcp_ip_server" (fun fmt -> fmt "%O disconnected, total: %d clients" ip_address !Globals.number_of_clients)
+        Log.internf logger "Tcp.tcp_ip_server.job" (fun fmt -> fmt "%O disconnected, total: %d clients" ip_address !Globals.number_of_clients)
     with 
     | :? System.IO.EndOfStreamException ->
       intern "disconnected client (end of stream)"
-    | ex -> "tcp request processing failed" |> Log.interne logger "Tcp.tcp_ip_server" ex
+    | ex -> "tcp request processing failed" |> Log.interne logger "Tcp.tcp_ip_server.job" ex
   }
 
   // start a new async worker for each accepted TCP client
