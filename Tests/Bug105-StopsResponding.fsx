@@ -81,11 +81,10 @@ module Client =
           m.EnsureSuccessStatusCode() |> ignore
           printf "%s" res
 
-  // TODO: set correct path
-  let ad = @"W:\_vendor\suave\Tests\large_xml.xml" |> File.ReadAllBytes
+  let ad = Path.Combine(__SOURCE_DIRECTORY__, "large_xml.xml") |> File.ReadAllBytes
 
   let run () =
-    for i in 1 .. 500000 do
+    for i in 1 .. 99 do
       if i % 1000 = 0 then printfn "at %i" i
       try
         post_and_assert ad
