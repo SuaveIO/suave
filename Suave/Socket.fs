@@ -5,7 +5,6 @@ open Suave.Async
 
 open System
 open System.Collections.Generic
-open System.Collections.Concurrent
 open System.IO
 open System.Net
 open System.Net.Sockets
@@ -22,49 +21,38 @@ type BufferManager(totalBytes, bufferSize, logger) =
 
   let mutable m_numBytes = totalBytes // the total number of bytes controlled by the buffer pool 
   let m_buffer = Array.zeroCreate totalBytes // the underlying byte array maintained by the Buffer Manager
-  let m_freeIndexPool = new ConcurrentStack<int>()
+  let m_freeIndexPool = new Stack<int>()
 
   /// Pops a buffer from the buffer pool
   member x.PopBuffer() : ArraySegment<byte> =
-    let offset = ref -1
-    if m_freeIndexPool.TryPop offset then
-      Log.internf logger "Socket.BufferManager" (fun fmt -> fmt "reserving buffer: %d" !offset )
-      ArraySegment(m_buffer, !offset, bufferSize)
-    else
-      System.Diagnostics.Debugger.Break()
-      failwith "failed to obtain a buffer"
+    let offset = lock m_freeIndexPool (fun _ -> m_freeIndexPool.Pop())
+    Log.internf logger "Socket.BufferManager" (fun fmt -> fmt "reserving buffer: %d" offset)
+    ArraySegment(m_buffer, offset, bufferSize)
 
   /// Initialise the memory required to use this BufferManager
   member x.Init() =
-    let mutable counter = 0
-    while counter < totalBytes - bufferSize do
-      m_freeIndexPool.Push counter
-      counter <- counter + bufferSize
+    lock m_freeIndexPool (fun _ ->
+      let mutable counter = 0
+      while counter < totalBytes - bufferSize do
+        m_freeIndexPool.Push counter
+        counter <- counter + bufferSize)
 
   /// Frees the buffer back to the buffer pool
   /// WARNING: there is nothing preventing you from freeing the same offset more than once with nasty consequences
   member x.FreeBuffer(args : ArraySegment<_>) =
     Log.internf logger "Socket.BufferManager" (fun fmt -> fmt "freeing buffer: %d" args.Offset)
-    m_freeIndexPool.Push args.Offset
+    lock m_freeIndexPool (fun _ -> m_freeIndexPool.Push args.Offset)
 
 type SocketAsyncEventArgsPool() =
 
-  let m_pool = new ConcurrentStack<SocketAsyncEventArgs>()
+  let m_pool = new Stack<SocketAsyncEventArgs>()
 
   member x.Push(item : SocketAsyncEventArgs) =
-    m_pool.Push item
+    lock m_pool (fun _ -> m_pool.Push item)
 
   member x.Pop() =
-   let arg = ref null
-   if m_pool.TryPop(arg) then
-    !arg
-   else
-    System.Diagnostics.Debugger.Break()
-    failwith "failed to obtain socket args."
+    lock m_pool (fun _ -> m_pool.Pop())
 
-  /// The number of SocketAsyncEventArgs instances in the pool 
-  member x.Count with get() = m_pool.Count
- 
 exception SocketIssue of SocketError with
   override this.ToString() =
     string this.Data0

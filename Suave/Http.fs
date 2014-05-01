@@ -210,7 +210,6 @@ module Http =
     open System
     open System.IO
     open System.IO.Compression
-    open System.Collections.Concurrent
 
     type Algorithm =
       /// No compression
