@@ -66,7 +66,7 @@ let create_pools logger max_ops buffer_size =
   let bufferManager = new BufferManager(buffer_size * (max_ops + 1), buffer_size, logger)
   bufferManager.Init()
 
-  [| 0 .. max_ops - 1|] 
+  [| 0 .. max_ops - 1|]
   |> Array.iter (fun x ->
     //Pre-allocate a set of reusable SocketAsyncEventArgs
     let readEventArg = new SocketAsyncEventArgs()

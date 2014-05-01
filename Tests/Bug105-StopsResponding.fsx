@@ -22,6 +22,7 @@ module SystemUnderTest =
   open Suave.Http.Applicatives
   open Suave.Types
   open Suave.Web
+  open Suave.Log
 
   let app =
     choose [
@@ -32,6 +33,7 @@ module SystemUnderTest =
 
   let conf =
     { Web.default_config with
+        logger = Loggers.sane_defaults_for Verbose
         error_handler =
           (fun ex reason ->
             printfn "error: %O" ex
@@ -63,7 +65,10 @@ module Client =
     use client = new Net.Http.HttpClient(handler)
     f cts handler client
 
+  let posts = ref 0
+
   let post data =
+    printfn "#%d" <| Interlocked.Increment(posts)
     with_client <| fun cts handler client ->
       new ByteArrayContent(data)
       |> client_post (uri "http://localhost:8083/deserialise_xml") (cts.Token) client
@@ -76,7 +81,8 @@ module Client =
           m.EnsureSuccessStatusCode() |> ignore
           printf "%s" res
 
-  let ad = @"large_xml.xml" |> File.ReadAllBytes
+  // TODO: set correct path
+  let ad = @"W:\_vendor\suave\Tests\large_xml.xml" |> File.ReadAllBytes
 
   let run () =
     for i in 1 .. 500000 do
@@ -87,7 +93,8 @@ module Client =
         printfn "%O" e
 
 // run test
-SystemUnderTest.run (); Client.run()
+SystemUnderTest.run ()
+Client.run()
 
 // now if the test stopped, try:
 Client.post_and_assert Client.ad
