@@ -74,7 +74,6 @@ let create_pools logger max_ops buffer_size =
     readEventArg.UserToken <- userToken
     readEventArg.add_Completed(fun a b -> userToken.Continuation b)
 
-    //bufferManager.SetBuffer(readEventArg) |> ignore
     readAsyncArgsPool.Push(readEventArg)
 
     let writeEventArg = new SocketAsyncEventArgs()
@@ -88,9 +87,8 @@ let create_pools logger max_ops buffer_size =
     let userToken =  new AsyncUserToken()
     acceptEventArg.UserToken <- userToken
     acceptEventArg.add_Completed(fun a b -> userToken.Continuation b)
-            
-    acceptAsyncArgsPool.Push(acceptEventArg)
 
+    acceptAsyncArgsPool.Push(acceptEventArg)
     )
   (acceptAsyncArgsPool, readAsyncArgsPool, writeAsyncArgsPool, bufferManager)
 

@@ -84,7 +84,7 @@ module Client =
   let ad = Path.Combine(__SOURCE_DIRECTORY__, "large_xml.xml") |> File.ReadAllBytes
 
   let run () =
-    for i in 1 .. 99 do
+    for i in 1 .. (SystemUnderTest.conf.max_ops - 1) do
       if i % 1000 = 0 then printfn "at %i" i
       try
         post_and_assert ad
@@ -94,6 +94,9 @@ module Client =
 // run test
 SystemUnderTest.run ()
 Client.run()
+
+// wait for all fsi evaluations to complete
+System.Threading.Thread.Sleep 5000
 
 // now if the test stopped, try:
 Client.post_and_assert Client.ad
