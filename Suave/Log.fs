@@ -164,7 +164,8 @@ module Loggers =
     // [I] 2014-04-05T12:34:56Z: Hello World! [my.sample.app]
     "[" + Char.ToUpperInvariant(line.level.ToString().[0]).ToString() + "] " +
     (DateTime(line.ts_utc_ticks, DateTimeKind.Utc).ToString("o")) + ": " +
-    line.message + " [" + line.path + "]"
+    line.message + " [" + line.path + "]" +
+    (match line.``exception`` with | Some e -> " exn:\n" + e.ToString() | None -> "")
 
   /// Log a line with the given format, printing the current time in UTC ISO-8601 format
   /// and then the string, like such:
