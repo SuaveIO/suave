@@ -17,31 +17,37 @@ open System.Threading.Tasks
 /// fragmenting heap memory.
 ///
 /// The operations exposed on the BufferManager class are not thread safe.
-type BufferManager(totalBytes, bufferSize, logger) =
+type BufferManager(total_bytes, buffer_size, logger) =
 
-  let mutable m_numBytes = totalBytes // the total number of bytes controlled by the buffer pool 
-  let m_buffer = Array.zeroCreate totalBytes // the underlying byte array maintained by the Buffer Manager
-  let m_freeIndexPool = new Stack<int>()
+  /// the underlying byte array maintained by the Buffer Manager
+  let buffer = Array.zeroCreate total_bytes
+  let free_offsets = new Stack<int>()
 
   /// Pops a buffer from the buffer pool
   member x.PopBuffer() : ArraySegment<byte> =
-    let offset = lock m_freeIndexPool (fun _ -> m_freeIndexPool.Pop())
-    Log.internf logger "Socket.BufferManager" (fun fmt -> fmt "reserving buffer: %d" offset)
-    ArraySegment(m_buffer, offset, bufferSize)
+    let offset, free_count = lock free_offsets (fun _ ->
+      free_offsets.Pop(), free_offsets.Count)
+    Log.internf logger "Socket.BufferManager" (fun fmt ->
+      fmt "reserving buffer: %d, free count: %d" offset free_count)
+    ArraySegment(buffer, offset, buffer_size)
 
   /// Initialise the memory required to use this BufferManager
   member x.Init() =
-    lock m_freeIndexPool (fun _ ->
-      let mutable counter = 0
-      while counter < totalBytes - bufferSize do
-        m_freeIndexPool.Push counter
-        counter <- counter + bufferSize)
+    lock free_offsets (fun _ ->
+      let mutable running_offset = 0
+      while running_offset < total_bytes - buffer_size do
+        free_offsets.Push running_offset
+        running_offset <- running_offset + buffer_size)
 
   /// Frees the buffer back to the buffer pool
-  /// WARNING: there is nothing preventing you from freeing the same offset more than once with nasty consequences
+  /// WARNING: there is nothing preventing you from freeing the same offset
+  /// more than once with nasty consequences
   member x.FreeBuffer(args : ArraySegment<_>) =
-    Log.internf logger "Socket.BufferManager" (fun fmt -> fmt "freeing buffer: %d" args.Offset)
-    lock m_freeIndexPool (fun _ -> m_freeIndexPool.Push args.Offset)
+    let free_count = lock free_offsets (fun _ ->
+      free_offsets.Push args.Offset
+      free_offsets.Count)
+    Log.internf logger "Socket.BufferManager" (fun fmt ->
+      fmt "freeing buffer: %d, free count: %d" args.Offset free_count)
 
 type SocketAsyncEventArgsPool() =
 

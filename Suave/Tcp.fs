@@ -74,21 +74,21 @@ let create_pools logger max_ops buffer_size =
     readEventArg.UserToken <- userToken
     readEventArg.add_Completed(fun a b -> userToken.Continuation b)
 
-    readAsyncArgsPool.Push(readEventArg)
+    readAsyncArgsPool.Push readEventArg
 
     let writeEventArg = new SocketAsyncEventArgs()
     let userToken =  new AsyncUserToken()
     writeEventArg.UserToken <- userToken
     writeEventArg.add_Completed(fun a b -> userToken.Continuation b)
 
-    writeAsyncArgsPool.Push(writeEventArg)
+    writeAsyncArgsPool.Push writeEventArg
 
-    let acceptEventArg = new SocketAsyncEventArgs()
+    let accept_arg = new SocketAsyncEventArgs()
     let userToken =  new AsyncUserToken()
-    acceptEventArg.UserToken <- userToken
-    acceptEventArg.add_Completed(fun a b -> userToken.Continuation b)
+    accept_arg.UserToken <- userToken
+    accept_arg.add_Completed(fun a b -> userToken.Continuation b)
 
-    acceptAsyncArgsPool.Push(acceptEventArg)
+    acceptAsyncArgsPool.Push(accept_arg)
     )
   (acceptAsyncArgsPool, readAsyncArgsPool, writeAsyncArgsPool, bufferManager)
 
@@ -98,12 +98,12 @@ let create_pools logger max_ops buffer_size =
 
 let inline receive (socket: Socket) (args : A)  (buf: B) = 
   async_do socket.ReceiveAsync (set_buffer buf)  (fun a -> a.BytesTransferred) args
- 
+
 let inline send (socket: Socket) (args : A) (buf: B) =
   async_do socket.SendAsync (set_buffer buf) ignore args
 
-let inline is_good (args : A) = 
-    args.SocketError = SocketError.Success
+let inline is_good (args : A) =
+  args.SocketError = SocketError.Success
 
 /// Start a new TCP server with a specific IP, Port and with a serve_client worker
 /// returning an async workflow whose result can be awaited (for when the tcp server has started
@@ -139,21 +139,21 @@ let tcp_ip_server (source_ip : IPAddress,
   let inline job (accept_args : A) = async {
     let socket = accept_args.AcceptSocket
     let ip_address = (socket.RemoteEndPoint :?> IPEndPoint).Address
-    Interlocked.Increment(Globals.number_of_clients) |> ignore
+    Interlocked.Increment Globals.number_of_clients |> ignore
 
     Log.internf logger "Tcp.tcp_ip_server" (fun fmt -> fmt "%O connected, total: %d clients" ip_address !Globals.number_of_clients)
 
     try
       let read_args = b.Pop()
       let write_args = c.Pop()
-      let connection = { 
-        ipaddr = ip_address;
-        read  = receive socket read_args;
-        write = send socket write_args;
-        get_buffer = bufferManager.PopBuffer;
-        free_buffer = bufferManager.FreeBuffer;
-        is_connected = fun _ -> is_good read_args && is_good write_args;
-        line_buffer    = bufferManager.PopBuffer()
+      let connection =
+        { ipaddr       = ip_address
+          read         = receive socket read_args
+          write        = send socket write_args
+          get_buffer   = bufferManager.PopBuffer
+          free_buffer  = bufferManager.FreeBuffer
+          is_connected = fun _ -> is_good read_args && is_good write_args;
+          line_buffer  = bufferManager.PopBuffer()
       }
       use! oo = Async.OnCancel (fun () -> intern "disconnected client (async cancel)"
                                           shutdown_socket socket)
@@ -162,9 +162,9 @@ let tcp_ip_server (source_ip : IPAddress,
       finally
         shutdown_socket socket
         accept_args.AcceptSocket <- null
-        a.Push(accept_args)
-        b.Push(read_args)
-        c.Push(write_args)
+        a.Push accept_args
+        b.Push read_args
+        c.Push write_args
         bufferManager.FreeBuffer connection.line_buffer
         Interlocked.Decrement(Globals.number_of_clients) |> ignore
         Log.internf logger "Tcp.tcp_ip_server" (fun fmt -> fmt "%O disconnected, total: %d clients" ip_address !Globals.number_of_clients)
