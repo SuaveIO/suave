@@ -157,5 +157,5 @@ let embedded_resources =
 
   testList "test Embedded.browse" [
       testCase "200 OK returns embedded file" <| fun _ ->
-        Assert.Equal("expecting 'Hello World!'", "Hello World!", run_with' Embedded.browse |> req_gzip GET "/embedded-resource.txt" None)
+        Assert.Equal("expecting 'Hello World!'", "Hello World!", run_with' Embedded.browse |> req GET "/embedded-resource.txt" None)
     ]
