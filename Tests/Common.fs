@@ -156,6 +156,6 @@ let embedded_resources =
   let run_with' = run_with default_config
 
   testList "test Embedded.browse" [
-      testCase "200 OK returns embedded file " <| fun _ ->
-        Assert.Equal("expecting 'Hello World'", "Hello World", run_with' Embedded.browse |> req_gzip GET "/embedded-resource.txt" None)
+      testCase "200 OK returns embedded file" <| fun _ ->
+        Assert.Equal("expecting 'Hello World!'", "Hello World!", run_with' Embedded.browse |> req_gzip GET "/embedded-resource.txt" None)
     ]
