@@ -238,7 +238,7 @@ module ParsingAndControl =
         else
           Array.blit a.Array a.Offset missing (read_offset + !counter) bytes_transmited
         counter := !counter + bytes_transmited
-      connection.free_buffer "read_post_data" a
+      match !rem with None -> connection.free_buffer "read_post_data" a | _ -> ()
       return (ArraySegment missing, !rem)
     }
     async {
