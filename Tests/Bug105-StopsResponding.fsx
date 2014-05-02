@@ -68,8 +68,8 @@ module Client =
 
   let posts = ref 0
 
-  let post data =
-    printfn "#%d" <| Interlocked.Increment(posts)
+  let post (data : byte[]) =
+    printfn "#%d|%d" (Interlocked.Increment(posts)) (data.Length)
     with_client <| fun cts handler client ->
       new ByteArrayContent(data)
       |> client_post (uri "http://localhost:8083/deserialise_xml") (cts.Token) client
@@ -84,17 +84,25 @@ module Client =
 
   let ad = Path.Combine(__SOURCE_DIRECTORY__, "large_xml.xml") |> File.ReadAllBytes
 
-  let run () =
-//    for i in 1 ..  3 do
-    for i in 1 .. 100 * (SystemUnderTest.conf.max_ops - 1) do
+  let gen len =
+    String.Concat [| """<?xml version="1.0" encoding="utf-8"?>
+<data>"""; (String.replicate len "#"); "</data>" |]
+    |> Suave.Utils.UTF8.bytes
+
+  let run rnd =
+    let seed = DateTime.UtcNow.Ticks |> int
+    let r = rnd |> Suave.Utils.Option.or_default (Random seed)
+    printfn "client running with seed: %d" seed
+    for i in 1 .. 10 * (SystemUnderTest.conf.max_ops - 1) do
       try
-        post_and_assert ad
+        // from 0 to 20 MiB sent
+        post_and_assert (gen (20 * r.Next(2. ** 20. |> int)))
       with :? System.AggregateException as e when e.ToString().Contains("The underlying connection was closed") ->
         printfn "%O" e
 
 // run test
 SystemUnderTest.run ()
-Client.run()
+Client.run None
 
 // wait for all fsi evaluations to complete
 System.Threading.Thread.Sleep 5000
