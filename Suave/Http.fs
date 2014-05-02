@@ -292,16 +292,18 @@ module Http =
       new_fs.Close()
     }
 
+    let compress_file n stream compression_folder= async {
+      let temp_file_name = Path.GetRandomFileName()
+      if not (Directory.Exists compression_folder) then Directory.CreateDirectory compression_folder |> ignore
+      let new_path = Path.Combine(compression_folder,temp_file_name)
+      do! compress n new_path stream
+      stream.Dispose()
+      return new_path
+    }
+
     let transform_x (key : string) (get_data : string -> Stream) (get_last : string -> DateTime) compression compression_folder ({ request = q; runtime = r; connection = connection } as ctx) : Async<Stream> =
-      let stream = get_data key
-      let compress_file n = async {
-        let temp_file_name = Path.GetRandomFileName()
-        if not (Directory.Exists compression_folder) then Directory.CreateDirectory compression_folder |> ignore
-        let new_path = Path.Combine(compression_folder,temp_file_name)
-        do! compress n new_path stream
-        return new_path
-      }
       async {
+        let stream = get_data key
         if compression && stream.Length > int64(MIN_BYTES_TO_COMPRESS) && stream.Length < int64(MAX_BYTES_TO_COMPRESS) then
           let enconding = parse_encoder q
           match enconding with
@@ -311,10 +313,10 @@ module Http =
               let last_modified = get_last key
               let cmpr_info = new FileInfo(Globals.compressed_files_map.[key])
               if last_modified > cmpr_info.CreationTime then
-                let! new_path =  compress_file n
+                let! new_path =  compress_file n stream compression_folder
                 Globals.compressed_files_map.[key] <- new_path
             else
-              let! new_path =  compress_file n
+              let! new_path =  compress_file n stream compression_folder
               Globals.compressed_files_map.TryAdd(key,new_path) |> ignore
             return new FileStream(Globals.compressed_files_map.[key] , FileMode.Open, FileAccess.Read, FileShare.Read) :> Stream
           | None ->
