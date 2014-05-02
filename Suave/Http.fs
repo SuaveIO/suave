@@ -293,7 +293,7 @@ module Http =
     }
 
     let transform_x (key : string) (get_data : string -> Stream) (get_last : string -> DateTime) compression compression_folder ({ request = q; runtime = r; connection = connection } as ctx) : Async<Stream> =
-      use stream = get_data key
+      let stream = get_data key
       let compress_file n = async {
         let temp_file_name = Path.GetRandomFileName()
         if not (Directory.Exists compression_folder) then Directory.CreateDirectory compression_folder |> ignore
