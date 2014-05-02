@@ -8,6 +8,7 @@ module XD =
   open System.IO
   open System.Xml
   open System.Xml.Linq
+
   let mk_xdoc raw_bytes =
     use xml_stream = new MemoryStream(raw_bytes : byte [])
     use rdr = new XmlTextReader(xml_stream)

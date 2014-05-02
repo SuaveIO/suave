@@ -29,8 +29,10 @@ let gets =
                      "", (run_with' NO_CONTENT |> req GET "/" None))
 
       testCase "302 FOUND sends content-length header" <| fun _ ->
+        let headers = req_content_headers GET "/" None (run_with' (Redirection.FOUND "/url"))
         Assert.Equal("302 FOUND sends content-length header",
-                     true, (req_headers GET "/" None (run_with' (Redirection.FOUND "/url"))).Contains("Content-Length"))
+                     true,
+                     headers.Contains("Content-Length"))
     ]
 
 [<Tests>]

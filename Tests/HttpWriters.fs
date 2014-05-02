@@ -38,7 +38,7 @@ let cookies =
         Assert.Equal("expecting cookie name"
         , "mycookie"
         , (req_cookies GET "/" None
-          (run_with' (set_cookie basic_cookie >> succeed >>= OK "test")))
+            (run_with' (set_cookie basic_cookie >> succeed >>= OK "test")))
             .GetCookies(Uri("http://127.0.0.1")).[0].Name)
 
       testCase "http_only cookie is http_only" <| fun _ ->
