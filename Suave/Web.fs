@@ -224,16 +224,17 @@ module ParsingAndControl =
 
   /// Read the post data from the stream, given the number of bytes that makes up the post data.
   let read_post_data (connection : Connection) (bytes : int) (read : BufferSegment option) =
-    let read_bytes bytes_needed missing read_offset = async {
+    let read_bytes bytes_needed (missing : byte[]) read_offset = async {
       let counter = ref 0
       let rem = ref None
       let a = connection.get_buffer "read_post_data"
       while !counter < bytes_needed do
         let! bytes_transmited = connection.read a
-        if bytes_transmited > bytes_needed - !counter
+        let need_to_read = bytes_needed - !counter
+        if bytes_transmited > need_to_read
         then
-          Array.blit a.Array a.Offset missing (read_offset + !counter) (bytes_needed - !counter)
-          rem := Some { buffer = a; offset =  a.Offset + bytes_needed - !counter; length = bytes_needed - !counter }
+          Array.blit a.Array a.Offset missing (read_offset + !counter) need_to_read
+          rem := Some { buffer = a; offset =  a.Offset + need_to_read; length = bytes_transmited - need_to_read }
         else
           Array.blit a.Array a.Offset missing (read_offset + !counter) bytes_transmited
         counter := !counter + bytes_transmited
@@ -248,7 +249,7 @@ module ParsingAndControl =
         else 
           let missing = Array.zeroCreate bytes
           Array.blit segment.buffer.Array segment.offset missing 0 segment.length
-          return! read_bytes (bytes - segment.length) missing segment.offset
+          return! read_bytes (bytes - segment.length) missing segment.length
       | None ->
         let missing = Array.zeroCreate bytes
         return! read_bytes bytes missing 0
