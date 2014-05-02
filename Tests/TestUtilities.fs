@@ -28,26 +28,15 @@ module RequestFactory =
     ctx.cts.Cancel()
     ctx.cts.Dispose()
 
-  let verbose_logging f =
-    //Log.enable_trace <- true // TODO!
-    try
-      f ()
-    finally
-      //Log.enable_trace <- false // TODO!
-      ()
-
   let run_with_factory factory config web_parts : SuaveTestCtx =
     let binding = config.bindings.Head
     let base_uri = binding.ToString()
     let cts = new CancellationTokenSource()
-    // cts.Token.Register(fun () -> Log.trace(fun () -> "tests:run_with - cancelled")) |> ignore
     let config' = { config with ct = cts.Token; buffer_size = 128; max_ops = 10 }
 
     let listening, server = factory config web_parts
     Async.Start(server, cts.Token)
-    // Log.trace(fun () -> "tests:run_with_factory -> listening")
     listening |> Async.RunSynchronously |> ignore // wait for the server to start listening
-    // Log.trace(fun () -> "tests:run_with_factory <- listening")
 
     { cts = cts
     ; suave_config = config' }
@@ -74,7 +63,6 @@ module RequestFactory =
     use client = new Net.Http.HttpClient(handler)
     let r = new HttpRequestMessage(to_http_method methd, uri_builder.Uri)
     r.Headers.ConnectionClose <- Nullable(true)
-    // Log.tracef(fun fmt -> fmt "tests:req %A %O -> execute" methd uri_builder.Uri)
     let get = 
       match data with
       | Some data ->
@@ -84,8 +72,6 @@ module RequestFactory =
     let completed = get.Wait(5000)
     if not completed && System.Diagnostics.Debugger.IsAttached then System.Diagnostics.Debugger.Break()
     else Assert.Equal("should finish request in 5000ms", true, completed)
-
-    // Log.tracef(fun fmt -> fmt "tests:req %A %O <- execute" methd uri_builder.Uri)
 
     dispose_context ctx
     get.Result

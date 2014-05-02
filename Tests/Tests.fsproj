@@ -48,7 +48,10 @@
     <Compile Include="Utils.fs" />
     <Compile Include="Web.fs" />
     <Compile Include="Proxy.fs" />
-    <Compile Include="Common.fs" />
+    <Compile Include="HttpWriters.fs" />
+    <Compile Include="HttpFile.fs" />
+    <Compile Include="HttpEmbedded.fs" />
+    <Compile Include="HttpVerbs.fs" />
     <Compile Include="Perf.fs" />
     <Compile Include="Program.fs" />
     <None Include="packages.config" />
