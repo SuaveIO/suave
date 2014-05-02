@@ -767,7 +767,7 @@ module Http =
     open Response
     open ServeResource
     
-    let assembly = Assembly.GetExecutingAssembly()
+    let assembly = Assembly.GetEntryAssembly()
     let resources = assembly.GetManifestResourceNames()
     let last_modified = FileInfo(Assembly.GetExecutingAssembly().Location).CreationTime
     
