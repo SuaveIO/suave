@@ -85,7 +85,7 @@ module Client =
 
   let run () =
 //    for i in 1 ..  3 do
-    for i in 1 .. 1000 * (SystemUnderTest.conf.max_ops - 1) do
+    for i in 1 .. 100 * (SystemUnderTest.conf.max_ops - 1) do
       try
         post_and_assert ad
       with :? System.AggregateException as e when e.ToString().Contains("The underlying connection was closed") ->
