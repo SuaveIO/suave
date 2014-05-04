@@ -44,6 +44,7 @@ type BufferManager(total_bytes, buffer_size, logger) =
   /// more than once with nasty consequences
   member x.FreeBuffer(args : ArraySegment<_>, ?context : string) =
     let free_count = lock free_offsets (fun _ ->
+      if free_offsets.Contains args.Offset then failwith "double free"
       free_offsets.Push args.Offset
       free_offsets.Count)
     Log.internf logger "Socket.BufferManager" (fun fmt ->
