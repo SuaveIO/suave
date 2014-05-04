@@ -94,8 +94,12 @@ module ParsingAndControl =
       | Found a ->
         return a
       | NeedMore b ->
-        let! data = read_data ()
-        return! loop (b @ [data])
+        try
+          let! data = read_data ()
+          return! loop (b @ [data])
+        with ex ->
+          b |> List.iter ( fun b -> connection.free_buffer "Web.read_till_pattern.loop" b.buffer)
+          return raise ex
     }
 
     match preread with
