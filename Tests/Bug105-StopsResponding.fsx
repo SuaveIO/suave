@@ -96,14 +96,14 @@ module Client =
     for i in 1 .. 10 * (SystemUnderTest.conf.max_ops - 1) do
       try
         // from 0 to 20 MiB sent
-        post_and_assert (gen (20 * r.Next(2. ** 20. |> int)))
+        post_and_assert (gen (1 * r.Next(2. ** 20. |> int)))
       with :? System.AggregateException as e when e.ToString().Contains("The underlying connection was closed") ->
         printfn "%O" e
 
 // run test
 SystemUnderTest.run ()
 Client.run None
-
+// System.GC.Collect()
 // wait for all fsi evaluations to complete
 System.Threading.Thread.Sleep 5000
 
