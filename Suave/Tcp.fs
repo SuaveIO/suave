@@ -66,8 +66,7 @@ let create_pools logger max_ops buffer_size =
   let bufferManager = new BufferManager(buffer_size * (max_ops + 1), buffer_size, logger)
   bufferManager.Init()
 
-  [| 0 .. max_ops - 1|]
-  |> Array.iter (fun x ->
+  for x = 0 to max_ops - 1 do
     //Pre-allocate a set of reusable SocketAsyncEventArgs
     let readEventArg = new SocketAsyncEventArgs()
     let userToken =  new AsyncUserToken()
@@ -89,7 +88,7 @@ let create_pools logger max_ops buffer_size =
     accept_arg.add_Completed(fun a b -> userToken.Continuation b)
 
     acceptAsyncArgsPool.Push(accept_arg)
-    )
+
   (acceptAsyncArgsPool, readAsyncArgsPool, writeAsyncArgsPool, bufferManager)
 
 // NOTE: performance tip, on mono set nursery-size with a value larger than MAX_CONCURRENT_OPS * BUFFER_SIZE
