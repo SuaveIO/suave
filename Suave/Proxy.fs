@@ -108,7 +108,7 @@ let proxy_server_async (config : SuaveConfig) resolver =
         tcp_ip_server
           (ip, port, config.buffer_size, config.max_ops)
           config.logger
-          (ParsingAndControl.request_loop (ParsingAndControl.process_request true)
+          (ParsingAndControl.request_loop true
             (mk_runtime proto)
             (request (proxy resolver))))
   let listening = all |> Seq.map fst |> Async.Parallel |> Async.Ignore

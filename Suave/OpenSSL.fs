@@ -113,14 +113,14 @@ let authenticate_as_server (cert : X509Certificate) =
 
 open Microsoft.FSharp.NativeInterop
 
-let read_to_bio  (con : Connection) read_bio ssl = async {
+let read_to_bio (con : Connection) read_bio ssl = async {
   let bytes_pending = BIO_ctrl_pending read_bio
   if bytes_pending = 0u then 
-    let a = con.get_buffer ()
+    let a = con.get_buffer "read_to_bio"
     let! bytes_read = con.read a
     let buff = Array.zeroCreate bytes_read
     Array.blit a.Array a.Offset buff 0 bytes_read
-    con.free_buffer a
+    con.free_buffer "read_to_bio" a
     BIO_write(read_bio, buff, bytes_read) |> ignore
   }
 
@@ -163,14 +163,14 @@ let ssl_receive (con : Connection) (context, read_bio, write_bio) (bu: B) = asyn
   //we need to check if there is data in the read bio before asking for more to the socket
   let bytes_pending = BIO_ctrl_pending read_bio
   if bytes_pending = 0u then 
-    let a = con.get_buffer ()
+    let a = con.get_buffer "ssl_receive"
     let! bytes_read = con.read a
 
     let buff = Array.zeroCreate bytes_read
     Array.blit a.Array a.Offset buff 0 bytes_read
     
     //Copy encrypted data into the SSL read_bio
-    con.free_buffer a
+    con.free_buffer "ssl_receive" a
     BIO_write(read_bio, buff, bytes_read) |> ignore
 
   let decrypted_bytes_read = 

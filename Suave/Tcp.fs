@@ -66,32 +66,29 @@ let create_pools logger max_ops buffer_size =
   let bufferManager = new BufferManager(buffer_size * (max_ops + 1), buffer_size, logger)
   bufferManager.Init()
 
-  [| 0 .. max_ops - 1|] 
-  |> Array.iter (fun x ->
+  for x = 0 to max_ops - 1 do
     //Pre-allocate a set of reusable SocketAsyncEventArgs
     let readEventArg = new SocketAsyncEventArgs()
     let userToken =  new AsyncUserToken()
     readEventArg.UserToken <- userToken
     readEventArg.add_Completed(fun a b -> userToken.Continuation b)
 
-    //bufferManager.SetBuffer(readEventArg) |> ignore
-    readAsyncArgsPool.Push(readEventArg)
+    readAsyncArgsPool.Push readEventArg
 
     let writeEventArg = new SocketAsyncEventArgs()
     let userToken =  new AsyncUserToken()
     writeEventArg.UserToken <- userToken
     writeEventArg.add_Completed(fun a b -> userToken.Continuation b)
 
-    writeAsyncArgsPool.Push(writeEventArg)
+    writeAsyncArgsPool.Push writeEventArg
 
-    let acceptEventArg = new SocketAsyncEventArgs()
+    let accept_arg = new SocketAsyncEventArgs()
     let userToken =  new AsyncUserToken()
-    acceptEventArg.UserToken <- userToken
-    acceptEventArg.add_Completed(fun a b -> userToken.Continuation b)
-            
-    acceptAsyncArgsPool.Push(acceptEventArg)
+    accept_arg.UserToken <- userToken
+    accept_arg.add_Completed(fun a b -> userToken.Continuation b)
 
-    )
+    acceptAsyncArgsPool.Push(accept_arg)
+
   (acceptAsyncArgsPool, readAsyncArgsPool, writeAsyncArgsPool, bufferManager)
 
 // NOTE: performance tip, on mono set nursery-size with a value larger than MAX_CONCURRENT_OPS * BUFFER_SIZE
@@ -100,12 +97,12 @@ let create_pools logger max_ops buffer_size =
 
 let inline receive (socket: Socket) (args : A)  (buf: B) = 
   async_do socket.ReceiveAsync (set_buffer buf)  (fun a -> a.BytesTransferred) args
- 
+
 let inline send (socket: Socket) (args : A) (buf: B) =
   async_do socket.SendAsync (set_buffer buf) ignore args
 
-let inline is_good (args : A) = 
-    args.SocketError = SocketError.Success
+let inline is_good (args : A) =
+  args.SocketError = SocketError.Success
 
 /// Start a new TCP server with a specific IP, Port and with a serve_client worker
 /// returning an async workflow whose result can be awaited (for when the tcp server has started
@@ -118,7 +115,6 @@ let tcp_ip_server (source_ip : IPAddress,
                    max_concurrent_ops : int)
                   (logger : Log.Logger)
                   (serve_client : TcpWorker<unit>) =
-  let intern  = Log.intern logger "Tcp.tcp_ip_server"
 
   let start_data =
     { start_called_utc = Globals.utc_now ()
@@ -139,23 +135,24 @@ let tcp_ip_server (source_ip : IPAddress,
   // echo 1 > /proc/sys/net/ipv4/tcp_tw_recycle
   // custom kernel with shorter TCP_TIMEWAIT_LEN in include/net/tcp.h
   let inline job (accept_args : A) = async {
+    let intern  = Log.intern logger "Tcp.tcp_ip_server.job"
     let socket = accept_args.AcceptSocket
     let ip_address = (socket.RemoteEndPoint :?> IPEndPoint).Address
-    Interlocked.Increment(Globals.number_of_clients) |> ignore
+    Interlocked.Increment Globals.number_of_clients |> ignore
 
-    Log.internf logger "Tcp.tcp_ip_server" (fun fmt -> fmt "%O connected, total: %d clients" ip_address !Globals.number_of_clients)
+    Log.internf logger "Tcp.tcp_ip_server.job" (fun fmt -> fmt "%O connected, total: %d clients" ip_address !Globals.number_of_clients)
 
     try
       let read_args = b.Pop()
       let write_args = c.Pop()
-      let connection = { 
-        ipaddr = ip_address;
-        read  = receive socket read_args;
-        write = send socket write_args;
-        get_buffer = bufferManager.PopBuffer;
-        free_buffer = bufferManager.FreeBuffer;
-        is_connected = fun _ -> is_good read_args && is_good write_args;
-        line_buffer    = bufferManager.PopBuffer()
+      let connection =
+        { ipaddr       = ip_address
+          read         = receive socket read_args
+          write        = send socket write_args
+          get_buffer   = fun context -> bufferManager.PopBuffer(context)
+          free_buffer  = fun context buf -> bufferManager.FreeBuffer(buf, context)
+          is_connected = fun _ -> is_good read_args && is_good write_args
+          line_buffer  = bufferManager.PopBuffer("Tcp.tcp_ip_server.job") // buf allocate
       }
       use! oo = Async.OnCancel (fun () -> intern "disconnected client (async cancel)"
                                           shutdown_socket socket)
@@ -164,16 +161,16 @@ let tcp_ip_server (source_ip : IPAddress,
       finally
         shutdown_socket socket
         accept_args.AcceptSocket <- null
-        a.Push(accept_args)
-        b.Push(read_args)
-        c.Push(write_args)
-        bufferManager.FreeBuffer connection.line_buffer
+        a.Push accept_args
+        b.Push read_args
+        c.Push write_args
+        bufferManager.FreeBuffer(connection.line_buffer, "Tcp.tcp_ip_server.job") // buf free OK
         Interlocked.Decrement(Globals.number_of_clients) |> ignore
-        Log.internf logger "Tcp.tcp_ip_server" (fun fmt -> fmt "%O disconnected, total: %d clients" ip_address !Globals.number_of_clients)
+        Log.internf logger "Tcp.tcp_ip_server.job" (fun fmt -> fmt "%O disconnected, total: %d clients" ip_address !Globals.number_of_clients)
     with 
     | :? System.IO.EndOfStreamException ->
       intern "disconnected client (end of stream)"
-    | ex -> "tcp request processing failed" |> Log.interne logger "Tcp.tcp_ip_server" ex
+    | ex -> "tcp request processing failed" |> Log.interne logger "Tcp.tcp_ip_server.job" ex
   }
 
   // start a new async worker for each accepted TCP client

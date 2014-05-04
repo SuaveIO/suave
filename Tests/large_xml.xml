@@ -1,0 +1,130 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Envelope xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="Envelope" version="0.52" xmlns="http://arbetsformedlingen.se/LedigtArbete">
+  <Sender id="3256783" email="user.name@corp.com" />
+  <TransactInfo timeStamp="">
+    <TransactId />
+  </TransactInfo>
+  <Packet>
+    <PacketInfo>
+      <PacketId>1</PacketId>
+    </PacketInfo>
+    <Payload>
+      <JobPositionPosting status="active">
+        <JobPositionPostingId>xx-xxxx-xxxx-xxxxx</JobPositionPostingId>
+        <HiringOrg type="unspecified">
+          <HiringOrgName>Some organisation</HiringOrgName>
+          <HiringOrgId idOwner="36777744422">46-325777722-3566644</HiringOrgId>
+          <WebSite>http://example.com</WebSite>
+          <Contact />
+          <OrganizationalUnit>
+            <Description />
+          </OrganizationalUnit>
+        </HiringOrg>
+        <PostDetail>
+          <StartDate>
+            <Date>2014-04-08</Date>
+          </StartDate>
+          <EndDate>
+            <Date>2014-05-01</Date>
+          </EndDate>
+          <PostedBy>
+            <Contact>
+              <PersonName>
+                <FormattedName> </FormattedName>
+                <GivenName />
+                <FamilyName />
+              </PersonName>
+              <VoiceNumber>
+                <TelNumber />
+              </VoiceNumber>
+              <E-mail>user.name@corp.com</E-mail>
+            </Contact>
+          </PostedBy>
+        </PostDetail>
+        <JobPositionInformation>
+          <JobPositionTitle>Test annons 4 FRÅN</JobPositionTitle>
+          <JobPositionDescription>
+            <JobPositionPurpose>Företagspresentation
+
+Lorem ipsum dolor sit amet, consectetur adipiscing elit. Duis dignissim, erat et elementum sagittis, quam orci facilisis dolor, id volutpat lacus dolor ac tellus. Sed mauris metus, aliquet eu dictum sit amet, pretium non sem. Phasellus non libero lacus. Duis pellentesque lorem at ligula blandit vestibulum placerat diam bibendum. Quisque vel sapien lorem, venenatis iaculis ligula. Nulla facilisi. In posuere volutpat commodo. Sed diam ipsum, vehicula vitae fermentum et, mollis ut quam. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. Nulla vel est ut arcu volutpat hendrerit id ut ante. In sollicitudin tristique blandit. Duis vehicula volutpat rutrum. Aliquam egestas scelerisque nulla, ac volutpat justo sollicitudin nec. Etiam in nibh nulla.
+
+Tjänstebeskrivning
+
+In semper odio ut justo posuere scelerisque. Proin sit amet ante sed risus rhoncus vestibulum quis a leo. Pellentesque dignissim elit sed orci laoreet vitae posuere nisl commodo. Vivamus porta posuere urna, et dignissim orci volutpat ut. Vivamus gravida pulvinar laoreet. Maecenas quis urna sed felis fermentum commodo nec non erat. Sed enim ligula, faucibus varius dictum a, interdum nec erat. Phasellus commodo tortor odio. Ut a eros libero, quis blandit elit. Praesent mattis lacinia ultricies. Vestibulum placerat tellus vel metus tempor malesuada. Cras condimentum imperdiet tellus nec suscipit.
+
+Krav
+
+Maecenas aliquet, metus ac fringilla cursus, sapien eros elementum nisl, quis elementum lectus eros eget justo. Vestibulum augue enim, gravida porta semper in, pretium quis odio. Pellentesque fermentum, nulla id varius adipiscing, neque mauris faucibus justo, vel gravida ante nulla a diam. Sed a ullamcorper mauris. Etiam in viverra tellus. Etiam porta varius metus id rhoncus. Nullam bibendum quam quis lacus malesuada egestas. Aliquam vitae ante non quam auctor faucibus tristique sed orci. Etiam venenatis massa euismod leo pretium pharetra. Praesent ac ante tellus, sed hendrerit nulla. Donec pharetra massa vel nulla bibendum eget consequat sem pretium. Suspendisse vel risus enim. Pellentesque mattis porttitor dictum. Sed a felis risus. Cras in ipsum porta eros vehicula viverra. Praesent pharetra tellus a justo imperdiet volutpat.</JobPositionPurpose>
+            <JobPositionLocation>
+              <PostalAddress>
+                <CountryCode>SE</CountryCode>
+                <PostalCode>12345</PostalCode>
+                <Municipality>Shaty Town</Municipality>
+                <DeliveryAddress>
+                  <AddressLine>An address</AddressLine>
+                  <StreetName>An address</StreetName>
+                  <PostOfficeBox />
+                </DeliveryAddress>
+              </PostalAddress>
+              <LocationSummary>
+                <Municipality>1080</Municipality>
+                <CountryCode>SE</CountryCode>
+              </LocationSummary>
+            </JobPositionLocation>
+            <Classification distribute="external">
+              <Schedule>
+                <FullTime />
+                <SummaryText>Heltid</SummaryText>
+              </Schedule>
+              <Duration>
+                <Regular />
+                <SummaryText>tillsvidareanställning</SummaryText>
+              </Duration>
+            </Classification>
+            <CompensationDescription>
+              <Pay>
+                <SalaryMonthly currency="unspecified">1</SalaryMonthly>
+              </Pay>
+              <BenefitsDescription>
+                <P />
+              </BenefitsDescription>
+              <SummaryText>Enligt överenskommelse</SummaryText>
+            </CompensationDescription>
+            <SummaryText />
+          </JobPositionDescription>
+        </JobPositionInformation>
+        <HowToApply distribute="external">
+          <ApplicationMethods>
+            <ByWeb>
+              <URL>http://example.com/url/comes/here/after/domain?with_ja=2</URL>
+            </ByWeb>
+          </ApplicationMethods>
+          <SummaryText>Vi föredrar ansökningar via webben</SummaryText>
+        </HowToApply>
+        <NumberToFill>1</NumberToFill>
+        <JPPExtension>
+          <HiringOrgDescription />
+          <InformationContact>
+            <Contact>
+              <PersonName>
+                <FormattedName />
+                <GivenName>En</GivenName>
+                <FamilyName>Gubbe</FamilyName>
+              </PersonName>
+              <VoiceNumber>
+                <TelNumber />
+              </VoiceNumber>
+              <E-mail />
+            </Contact>
+          </InformationContact>
+          <JobPositionTasks />
+          <OccupationGroup codename="OccupationNameID" code="4896">OccupationGroup1</OccupationGroup>
+          <LastDateApplication>
+            <Date />
+          </LastDateApplication>
+          <ApplicationReferenceId>16</ApplicationReferenceId>
+        </JPPExtension>
+      </JobPositionPosting>
+    </Payload>
+  </Packet>
+</Envelope>

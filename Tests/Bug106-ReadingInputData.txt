@@ -1,0 +1,361 @@
+﻿
+Microsoft (R) F# Interactive version 11.0.60610.1
+Copyright (c) Microsoft Corporation. All Rights Reserved.
+
+For help type #help;;
+
+> 
+
+--> Referenced 'W:\_vendor\suave\Tests\bin/Release/suave.dll'
+
+
+--> Referenced 'C:\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.5\System.Net.dll'
+
+
+--> Referenced 'C:\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.5\System.Net.Http.dll'
+
+
+--> Referenced 'C:\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.5\System.Xml.dll'
+
+
+--> Referenced 'C:\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.5\System.Xml.Linq.dll'
+
+[I] 2014-05-02T11:49:50.2538491Z: started listener in: started in 15.545100 ms: 127.0.0.1:8083 [Tcp.tcp_ip_server]
+
+module XD = begin
+  val mk_xdoc : raw_bytes:byte [] -> System.Xml.Linq.XDocument
+end
+module SystemUnderTest = begin
+  val app : (Suave.Types.HttpContext -> Async<unit> option)
+  val conf : Suave.Types.SuaveConfig =
+    {bindings = [{scheme = HTTP;
+                  ip = 127.0.0.1;
+                  port = 8083us;}];
+     error_handler = <fun:conf@39>;
+     web_part_timeout = 05:00:00;
+     listen_timeout = 00:00:02;
+     ct = System.Threading.CancellationToken;
+     buffer_size = 8192;
+     max_ops = 100;
+     mime_types_map = <fun:default_config@594-1>;
+     home_folder = null;
+     compressed_files_folder = null;
+     logger = Suave.Log+Loggers+CombiningLogger;}
+  val run : unit -> unit
+end
+module Client = begin
+  val client_post :
+    uri:System.Uri ->
+      ct:System.Threading.CancellationToken ->
+        client:System.Net.Http.HttpClient ->
+          data:#System.Net.Http.HttpContent ->
+            Async<System.Net.Http.HttpResponseMessage>
+  val uri : str:string -> System.Uri
+  val with_client :
+    f:(System.Threading.CancellationTokenSource ->
+         System.Net.Http.HttpClientHandler -> System.Net.Http.HttpClient -> 'a) ->
+      'a
+  val posts : int ref = {contents = 0;}
+  val post : data:byte [] -> System.Net.Http.HttpResponseMessage
+  val post_and_assert : (byte [] -> unit)
+  val ad : byte [] =
+    [|239uy; 187uy; 191uy; 60uy; 63uy; 120uy; 109uy; 108uy; 32uy; 118uy; 101uy;
+      114uy; 115uy; 105uy; 111uy; 110uy; 61uy; 34uy; 49uy; 46uy; 48uy; 34uy;
+      32uy; 101uy; 110uy; 99uy; 111uy; 100uy; 105uy; 110uy; 103uy; 61uy; 34uy;
+      117uy; 116uy; 102uy; 45uy; 56uy; 34uy; 63uy; 62uy; 13uy; 10uy; 60uy;
+      69uy; 110uy; 118uy; 101uy; 108uy; 111uy; 112uy; 101uy; 32uy; 120uy;
+      109uy; 108uy; 110uy; 115uy; 58uy; 120uy; 115uy; 100uy; 61uy; 34uy; 104uy;
+      116uy; 116uy; 112uy; 58uy; 47uy; 47uy; 119uy; 119uy; 119uy; 46uy; 119uy;
+      51uy; 46uy; 111uy; 114uy; 103uy; 47uy; 50uy; 48uy; 48uy; 49uy; 47uy;
+      88uy; 77uy; 76uy; 83uy; 99uy; 104uy; 101uy; 109uy; 97uy; 34uy; 32uy;
+      120uy; 109uy; ...|]
+  val gen : len:int -> byte []
+  val run : rnd:System.Random option -> unit
+end
+val it : unit = ()
+
+> 
+client running with seed: -993255645
+#1|2841652
+[V] 2014-05-02T11:49:55.7916668Z: 127.0.0.1 connected, total: 1 clients [Tcp.tcp_ip_server.job]
+[V] 2014-05-02T11:49:55.7916668Z: reserving buffer: 811008, free count: 99 [Tcp.tcp_ip_server.job] [Socket.BufferManager]
+[V] 2014-05-02T11:49:55.8072847Z: -> processor [Web.request_loop.loop]
+[V] 2014-05-02T11:49:55.8072847Z: reserving buffer: 802816, free count: 98 [read_till_EOL.read_data] [Socket.BufferManager]
+[V] 2014-05-02T11:49:55.8228401Z: freeing buffer: 802816, free count: 99 [read_till_EOL.scan_data (Some x = pair.offset (if1))] [Socket.BufferManager]
+[V] 2014-05-02T11:49:55.8384392Z: reserving buffer: 802816, free count: 98 [read_post_data] [Socket.BufferManager]
+[V] 2014-05-02T11:49:56.1816458Z: freeing buffer: 802816, free count: 99 [read_post_data] [Socket.BufferManager]
+[V] 2014-05-02T11:49:56.1972253Z: <- processor [Web.request_loop.loop]
+.[V] 2014-05-02T11:49:56.2440440Z: 'Connection: keep-alive' recurse, rem: <null> [Web.request_loop.loop]
+[V] 2014-05-02T11:49:56.2440440Z: -> processor [Web.request_loop.loop]
+[V] 2014-05-02T11:49:56.2440440Z: reserving buffer: 802816, free count: 98 [read_till_EOL.read_data] [Socket.BufferManager]
+[V] 2014-05-02T11:49:56.2440440Z: freeing buffer: 802816, free count: 99 [read_till_EOL.read_data (exception case)] [Socket.BufferManager]
+[V] 2014-05-02T11:49:56.2440440Z: <- processor [Web.request_loop.loop]
+[V] 2014-05-02T11:49:56.2440440Z: 'result = None', exiting [Web.request_loop.loop]
+[V] 2014-05-02T11:49:56.2596271Z: freeing buffer: 811008, free count: 100 [Tcp.tcp_ip_server.job] [Socket.BufferManager]
+[V] 2014-05-02T11:49:56.2596271Z: 127.0.0.1 disconnected, total: 0 clients [Tcp.tcp_ip_server.job]
+#2|1819292
+[V] 2014-05-02T11:49:56.2752226Z: 127.0.0.1 connected, total: 1 clients [Tcp.tcp_ip_server.job]
+[V] 2014-05-02T11:49:56.2752226Z: reserving buffer: 811008, free count: 99 [Tcp.tcp_ip_server.job] [Socket.BufferManager]
+[V] 2014-05-02T11:49:56.2752226Z: -> processor [Web.request_loop.loop]
+[V] 2014-05-02T11:49:56.2752226Z: reserving buffer: 802816, free count: 98 [read_till_EOL.read_data] [Socket.BufferManager]
+[V] 2014-05-02T11:49:56.2752226Z: freeing buffer: 802816, free count: 99 [read_till_EOL.scan_data (Some x = pair.offset (if1))] [Socket.BufferManager]
+[V] 2014-05-02T11:49:56.2752226Z: reserving buffer: 802816, free count: 98 [read_post_data] [Socket.BufferManager]
+[V] 2014-05-02T11:49:56.2908271Z: freeing buffer: 802816, free count: 99 [read_post_data] [Socket.BufferManager]
+[V] 2014-05-02T11:49:56.2908271Z: <- processor [Web.request_loop.loop]
+[V] 2014-05-02T11:49:56.3064614Z: 'Connection: keep-alive' recurse (!) [Web.request_loop.loop]
+[V] 2014-05-02T11:49:56.3064614Z: -> processor [Web.request_loop.loop]
+[V] 2014-05-02T11:49:56.3064614Z: reserving buffer: 802816, free count: 98 [read_till_EOL.read_data] [Socket.BufferManager]
+.[V] 2014-05-02T11:49:56.3064614Z: freeing buffer: 802816, free count: 99 [read_till_EOL.read_data (exception case)] [Socket.BufferManager]
+[V] 2014-05-02T11:49:56.3064614Z: <- processor [Web.request_loop.loop]
+[V] 2014-05-02T11:49:56.3064614Z: 'result = None', exiting [Web.request_loop.loop]
+[V] 2014-05-02T11:49:56.3064614Z: freeing buffer: 811008, free count: 100 [Tcp.tcp_ip_server.job] [Socket.BufferManager]
+[V] 2014-05-02T11:49:56.3064614Z: 127.0.0.1 disconnected, total: 0 clients [Tcp.tcp_ip_server.job]
+#3|2036112
+[V] 2014-05-02T11:49:56.3221092Z: 127.0.0.1 connected, total: 1 clients [Tcp.tcp_ip_server.job]
+[V] 2014-05-02T11:49:56.3221092Z: reserving buffer: 811008, free count: 99 [Tcp.tcp_ip_server.job] [Socket.BufferManager]
+[V] 2014-05-02T11:49:56.3221092Z: -> processor [Web.request_loop.loop]
+[V] 2014-05-02T11:49:56.3221092Z: reserving buffer: 802816, free count: 98 [read_till_EOL.read_data] [Socket.BufferManager]
+[V] 2014-05-02T11:49:56.3221092Z: freeing buffer: 802816, free count: 99 [read_till_EOL.scan_data (Some x = pair.offset (if2))] [Socket.BufferManager]
+[V] 2014-05-02T11:49:56.3221092Z: reserving buffer: 802816, free count: 98 [read_post_data] [Socket.BufferManager]
+[V] 2014-05-02T11:49:56.3376150Z: <- processor [Web.request_loop.loop]
+[V] 2014-05-02T11:49:56.3376150Z: 'result = None', exiting [Web.request_loop.loop]
+[V] 2014-05-02T11:49:56.3376150Z: freeing buffer: 811008, free count: 99 [Tcp.tcp_ip_server.job] [Socket.BufferManager]
+[V] 2014-05-02T11:49:56.3376150Z: 127.0.0.1 disconnected, total: 0 clients [Tcp.tcp_ip_server.job]
+System.AggregateException: One or more errors occurred. ---> System.Net.Http.HttpRequestException: An error occurred while sending the request. ---> System.Net.WebException: The underlying connection was closed: An unexpected error occurred on a receive. ---> System.IO.IOException: Unable to read data from the transport connection: An existing connection was forcibly closed by the remote host. ---> System.Net.Sockets.SocketException: An existing connection was forcibly closed by the remote host
+   at System.Net.Sockets.Socket.EndReceive(IAsyncResult asyncResult)
+   at System.Net.Sockets.NetworkStream.EndRead(IAsyncResult asyncResult)
+   --- End of inner exception stack trace ---
+   at System.Net.Sockets.NetworkStream.EndRead(IAsyncResult asyncResult)
+   at System.Net.PooledStream.EndRead(IAsyncResult asyncResult)
+   at System.Net.Connection.ReadCallback(IAsyncResult asyncResult)
+   --- End of inner exception stack trace ---
+   at System.Net.HttpWebRequest.EndGetResponse(IAsyncResult asyncResult)
+   at System.Net.Http.HttpClientHandler.GetResponseCallback(IAsyncResult ar)
+   --- End of inner exception stack trace ---
+   --- End of inner exception stack trace ---
+   at Microsoft.FSharp.Control.AsyncBuilderImpl.commit[a](Result`1 res)
+   at Microsoft.FSharp.Control.CancellationTokenOps.RunSynchronously[a](CancellationToken token, FSharpAsync`1 computation, FSharpOption`1 timeout)
+   at Microsoft.FSharp.Control.FSharpAsync.RunSynchronously[T](FSharpAsync`1 computation, FSharpOption`1 timeout, FSharpOption`1 cancellationToken)
+   at FSI_0002.Client.with_client[a](FSharpFunc`2 f) in W:\_vendor\suave\Tests\Bug105-StopsResponding.fsx:line 67
+   at FSI_0002.Client.post(Byte[] data) in W:\_vendor\suave\Tests\Bug105-StopsResponding.fsx:line 73
+   at FSI_0002.Client.post_and_assert@79.Invoke(Byte[] x) in W:\_vendor\suave\Tests\Bug105-StopsResponding.fsx:line 79
+   at FSI_0002.Client.run(FSharpOption`1 rnd) in W:\_vendor\suave\Tests\Bug105-StopsResponding.fsx:line 96
+---> (Inner Exception #0) System.Net.Http.HttpRequestException: An error occurred while sending the request. ---> System.Net.WebException: The underlying connection was closed: An unexpected error occurred on a receive. ---> System.IO.IOException: Unable to read data from the transport connection: An existing connection was forcibly closed by the remote host. ---> System.Net.Sockets.SocketException: An existing connection was forcibly closed by the remote host
+   at System.Net.Sockets.Socket.EndReceive(IAsyncResult asyncResult)
+   at System.Net.Sockets.NetworkStream.EndRead(IAsyncResult asyncResult)
+   --- End of inner exception stack trace ---
+   at System.Net.Sockets.NetworkStream.EndRead(IAsyncResult asyncResult)
+   at System.Net.PooledStream.EndRead(IAsyncResult asyncResult)
+   at System.Net.Connection.ReadCallback(IAsyncResult asyncResult)
+   --- End of inner exception stack trace ---
+   at System.Net.HttpWebRequest.EndGetResponse(IAsyncResult asyncResult)
+   at System.Net.Http.HttpClientHandler.GetResponseCallback(IAsyncResult ar)
+   --- End of inner exception stack trace ---<---
+
+#4|5190452
+[V] 2014-05-02T11:49:57.5232309Z: 127.0.0.1 connected, total: 1 clients [Tcp.tcp_ip_server.job]
+[V] 2014-05-02T11:49:57.5232309Z: reserving buffer: 811008, free count: 98 [Tcp.tcp_ip_server.job] [Socket.BufferManager]
+[V] 2014-05-02T11:49:57.5232309Z: -> processor [Web.request_loop.loop]
+[V] 2014-05-02T11:49:57.5232309Z: reserving buffer: 794624, free count: 97 [read_till_EOL.read_data] [Socket.BufferManager]
+[V] 2014-05-02T11:49:57.5232309Z: freeing buffer: 794624, free count: 98 [read_till_EOL.scan_data (Some x = pair.offset (if1))] [Socket.BufferManager]
+[V] 2014-05-02T11:49:57.5232309Z: reserving buffer: 794624, free count: 97 [read_post_data] [Socket.BufferManager]
+[V] 2014-05-02T11:49:57.9287613Z: freeing buffer: 794624, free count: 98 [read_post_data] [Socket.BufferManager]
+[V] 2014-05-02T11:49:57.9443796Z: <- processor [Web.request_loop.loop]
+[V] 2014-05-02T11:49:57.9755800Z: 'Connection: keep-alive' recurse, rem: <null> [Web.request_loop.loop]
+[V] 2014-05-02T11:49:57.9755800Z: -> processor [Web.request_loop.loop]
+[V] 2014-05-02T11:49:57.9755800Z: reserving buffer: 794624, free count: 97 [read_till_EOL.read_data] [Socket.BufferManager]
+.[V] 2014-05-02T11:49:57.9755800Z: freeing buffer: 794624, free count: 98 [read_till_EOL.read_data (exception case)] [Socket.BufferManager]
+[V] 2014-05-02T11:49:57.9755800Z: <- processor [Web.request_loop.loop]
+[V] 2014-05-02T11:49:57.9755800Z: 'result = None', exiting [Web.request_loop.loop]
+[V] 2014-05-02T11:49:57.9755800Z: freeing buffer: 811008, free count: 99 [Tcp.tcp_ip_server.job] [Socket.BufferManager]
+[V] 2014-05-02T11:49:57.9755800Z: 127.0.0.1 disconnected, total: 0 clients [Tcp.tcp_ip_server.job]
+#5|18141812
+[V] 2014-05-02T11:49:58.2407572Z: 127.0.0.1 connected, total: 1 clients [Tcp.tcp_ip_server.job]
+[V] 2014-05-02T11:49:58.2407572Z: reserving buffer: 811008, free count: 98 [Tcp.tcp_ip_server.job] [Socket.BufferManager]
+[V] 2014-05-02T11:49:58.2407572Z: -> processor [Web.request_loop.loop]
+[V] 2014-05-02T11:49:58.2407572Z: reserving buffer: 794624, free count: 97 [read_till_EOL.read_data] [Socket.BufferManager]
+[V] 2014-05-02T11:49:58.2407572Z: freeing buffer: 794624, free count: 98 [read_till_EOL.scan_data (Some x = pair.offset (if1))] [Socket.BufferManager]
+[V] 2014-05-02T11:49:58.2407572Z: reserving buffer: 794624, free count: 97 [read_post_data] [Socket.BufferManager]
+[V] 2014-05-02T11:49:58.3655371Z: freeing buffer: 794624, free count: 98 [read_post_data] [Socket.BufferManager]
+[V] 2014-05-02T11:49:58.3655371Z: <- processor [Web.request_loop.loop]
+[V] 2014-05-02T11:49:58.5371465Z: 'Connection: keep-alive' recurse (!) [Web.request_loop.loop]
+[V] 2014-05-02T11:49:58.5371465Z: -> processor [Web.request_loop.loop]
+[V] 2014-05-02T11:49:58.5371465Z: reserving buffer: 794624, free count: 97 [read_till_EOL.read_data] [Socket.BufferManager]
+[V] 2014-05-02T11:49:58.5371465Z: freeing buffer: 794624, free count: 98 [read_till_EOL.read_data (exception case)] [Socket.BufferManager]
+.[V] 2014-05-02T11:49:58.5371465Z: <- processor [Web.request_loop.loop]
+[V] 2014-05-02T11:49:58.5371465Z: 'result = None', exiting [Web.request_loop.loop]
+[V] 2014-05-02T11:49:58.5371465Z: freeing buffer: 811008, free count: 99 [Tcp.tcp_ip_server.job] [Socket.BufferManager]
+[V] 2014-05-02T11:49:58.5371465Z: 127.0.0.1 disconnected, total: 0 clients [Tcp.tcp_ip_server.job]
+#6|4183292
+[V] 2014-05-02T11:49:58.5839443Z: 127.0.0.1 connected, total: 1 clients [Tcp.tcp_ip_server.job]
+[V] 2014-05-02T11:49:58.5839443Z: reserving buffer: 811008, free count: 98 [Tcp.tcp_ip_server.job] [Socket.BufferManager]
+[V] 2014-05-02T11:49:58.5839443Z: -> processor [Web.request_loop.loop]
+[V] 2014-05-02T11:49:58.5839443Z: reserving buffer: 794624, free count: 97 [read_till_EOL.read_data] [Socket.BufferManager]
+[V] 2014-05-02T11:49:58.5839443Z: freeing buffer: 794624, free count: 98 [read_till_EOL.scan_data (Some x = pair.offset (if1))] [Socket.BufferManager]
+[V] 2014-05-02T11:49:58.5839443Z: reserving buffer: 794624, free count: 97 [read_post_data] [Socket.BufferManager]
+[V] 2014-05-02T11:49:58.6151380Z: freeing buffer: 794624, free count: 98 [read_post_data] [Socket.BufferManager]
+[V] 2014-05-02T11:49:58.6619300Z: <- processor [Web.request_loop.loop]
+.[V] 2014-05-02T11:49:58.6931273Z: 'Connection: keep-alive' recurse (!) [Web.request_loop.loop]
+[V] 2014-05-02T11:49:58.6931273Z: -> processor [Web.request_loop.loop]
+[V] 2014-05-02T11:49:58.6931273Z: reserving buffer: 794624, free count: 97 [read_till_EOL.read_data] [Socket.BufferManager]
+[V] 2014-05-02T11:49:58.6931273Z: freeing buffer: 794624, free count: 98 [read_till_EOL.read_data (exception case)] [Socket.BufferManager]
+[V] 2014-05-02T11:49:58.6931273Z: <- processor [Web.request_loop.loop]
+[V] 2014-05-02T11:49:58.6931273Z: 'result = None', exiting [Web.request_loop.loop]
+[V] 2014-05-02T11:49:58.6931273Z: freeing buffer: 811008, free count: 99 [Tcp.tcp_ip_server.job] [Socket.BufferManager]
+[V] 2014-05-02T11:49:58.6931273Z: 127.0.0.1 disconnected, total: 0 clients [Tcp.tcp_ip_server.job]
+#7|1380032
+[V] 2014-05-02T11:49:58.7087541Z: 127.0.0.1 connected, total: 1 clients [Tcp.tcp_ip_server.job]
+[V] 2014-05-02T11:49:58.7087541Z: reserving buffer: 811008, free count: 98 [Tcp.tcp_ip_server.job] [Socket.BufferManager]
+[V] 2014-05-02T11:49:58.7087541Z: -> processor [Web.request_loop.loop]
+[V] 2014-05-02T11:49:58.7087541Z: reserving buffer: 794624, free count: 97 [read_till_EOL.read_data] [Socket.BufferManager]
+[V] 2014-05-02T11:49:58.7243853Z: freeing buffer: 794624, free count: 98 [read_till_EOL.scan_data (Some x = pair.offset (if1))] [Socket.BufferManager]
+[V] 2014-05-02T11:49:58.7243853Z: reserving buffer: 794624, free count: 97 [read_post_data] [Socket.BufferManager]
+[V] 2014-05-02T11:49:58.7243853Z: freeing buffer: 794624, free count: 98 [read_post_data] [Socket.BufferManager]
+[V] 2014-05-02T11:49:58.7399625Z: <- processor [Web.request_loop.loop]
+[V] 2014-05-02T11:49:58.7399625Z: 'Connection: keep-alive' recurse (!) [Web.request_loop.loop]
+[V] 2014-05-02T11:49:58.7399625Z: -> processor [Web.request_loop.loop]
+[V] 2014-05-02T11:49:58.7399625Z: reserving buffer: 794624, free count: 97 [read_till_EOL.read_data] [Socket.BufferManager]
+[V] 2014-05-02T11:49:58.7399625Z: freeing buffer: 794624, free count: 98 [read_till_EOL.read_data (exception case)] [Socket.BufferManager]
+[V] 2014-05-02T11:49:58.7399625Z: <- processor [Web.request_loop.loop]
+[V] 2014-05-02T11:49:58.7399625Z: 'result = None', exiting [Web.request_loop.loop]
+.[V] 2014-05-02T11:49:58.7555344Z: freeing buffer: 811008, free count: 99 [Tcp.tcp_ip_server.job] [Socket.BufferManager]
+[V] 2014-05-02T11:49:58.7555344Z: 127.0.0.1 disconnected, total: 0 clients [Tcp.tcp_ip_server.job]
+#8|11462032
+[V] 2014-05-02T11:49:58.8803366Z: 127.0.0.1 connected, total: 1 clients [Tcp.tcp_ip_server.job]
+[V] 2014-05-02T11:49:58.8803366Z: reserving buffer: 811008, free count: 98 [Tcp.tcp_ip_server.job] [Socket.BufferManager]
+[V] 2014-05-02T11:49:58.8803366Z: -> processor [Web.request_loop.loop]
+[V] 2014-05-02T11:49:58.8803366Z: reserving buffer: 794624, free count: 97 [read_till_EOL.read_data] [Socket.BufferManager]
+[V] 2014-05-02T11:49:58.8803366Z: freeing buffer: 794624, free count: 98 [read_till_EOL.scan_data (Some x = pair.offset (if1))] [Socket.BufferManager]
+[V] 2014-05-02T11:49:58.8803366Z: reserving buffer: 794624, free count: 97 [read_post_data] [Socket.BufferManager]
+[V] 2014-05-02T11:49:58.9739188Z: freeing buffer: 794624, free count: 98 [read_post_data] [Socket.BufferManager]
+[V] 2014-05-02T11:49:58.9739188Z: <- processor [Web.request_loop.loop]
+[V] 2014-05-02T11:49:59.1143380Z: 'Connection: keep-alive' recurse (!) [Web.request_loop.loop]
+[V] 2014-05-02T11:49:59.1143380Z: -> processor [Web.request_loop.loop]
+[V] 2014-05-02T11:49:59.1143380Z: reserving buffer: 794624, free count: 97 [read_till_EOL.read_data] [Socket.BufferManager]
+.[V] 2014-05-02T11:49:59.1143380Z: freeing buffer: 794624, free count: 98 [read_till_EOL.read_data (exception case)] [Socket.BufferManager]
+[V] 2014-05-02T11:49:59.1143380Z: <- processor [Web.request_loop.loop]
+[V] 2014-05-02T11:49:59.1143380Z: 'result = None', exiting [Web.request_loop.loop]
+[V] 2014-05-02T11:49:59.1143380Z: freeing buffer: 811008, free count: 99 [Tcp.tcp_ip_server.job] [Socket.BufferManager]
+[V] 2014-05-02T11:49:59.1143380Z: 127.0.0.1 disconnected, total: 0 clients [Tcp.tcp_ip_server.job]
+#9|935212
+[V] 2014-05-02T11:49:59.1299411Z: 127.0.0.1 connected, total: 1 clients [Tcp.tcp_ip_server.job]
+[V] 2014-05-02T11:49:59.1299411Z: reserving buffer: 811008, free count: 98 [Tcp.tcp_ip_server.job] [Socket.BufferManager]
+[V] 2014-05-02T11:49:59.1299411Z: -> processor [Web.request_loop.loop]
+[V] 2014-05-02T11:49:59.1299411Z: reserving buffer: 794624, free count: 97 [read_till_EOL.read_data] [Socket.BufferManager]
+[V] 2014-05-02T11:49:59.1299411Z: freeing buffer: 794624, free count: 98 [read_till_EOL.scan_data (Some x = pair.offset (if2))] [Socket.BufferManager]
+[V] 2014-05-02T11:49:59.1299411Z: reserving buffer: 794624, free count: 97 [read_post_data] [Socket.BufferManager]
+[V] 2014-05-02T11:49:59.1299411Z: <- processor [Web.request_loop.loop]
+[V] 2014-05-02T11:49:59.1299411Z: 'result = None', exiting [Web.request_loop.loop]
+[V] 2014-05-02T11:49:59.1299411Z: freeing buffer: 811008, free count: 98 [Tcp.tcp_ip_server.job] [Socket.BufferManager]
+[V] 2014-05-02T11:49:59.1299411Z: 127.0.0.1 disconnected, total: 0 clients [Tcp.tcp_ip_server.job]
+System.AggregateException: One or more errors occurred. ---> System.Net.Http.HttpRequestException: An error occurred while sending the request. ---> System.Net.WebException: The underlying connection was closed: An unexpected error occurred on a receive. ---> System.IO.IOException: Unable to read data from the transport connection: An existing connection was forcibly closed by the remote host. ---> System.Net.Sockets.SocketException: An existing connection was forcibly closed by the remote host
+   at System.Net.Sockets.Socket.EndReceive(IAsyncResult asyncResult)
+   at System.Net.Sockets.NetworkStream.EndRead(IAsyncResult asyncResult)
+   --- End of inner exception stack trace ---
+   at System.Net.Sockets.NetworkStream.EndRead(IAsyncResult asyncResult)
+   at System.Net.PooledStream.EndRead(IAsyncResult asyncResult)
+   at System.Net.Connection.ReadCallback(IAsyncResult asyncResult)
+   --- End of inner exception stack trace ---
+   at System.Net.HttpWebRequest.EndGetResponse(IAsyncResult asyncResult)
+   at System.Net.Http.HttpClientHandler.GetResponseCallback(IAsyncResult ar)
+   --- End of inner exception stack trace ---
+   --- End of inner exception stack trace ---
+   at Microsoft.FSharp.Control.AsyncBuilderImpl.commit[a](Result`1 res)
+   at Microsoft.FSharp.Control.CancellationTokenOps.RunSynchronously[a](CancellationToken token, FSharpAsync`1 computation, FSharpOption`1 timeout)
+   at Microsoft.FSharp.Control.FSharpAsync.RunSynchronously[T](FSharpAsync`1 computation, FSharpOption`1 timeout, FSharpOption`1 cancellationToken)
+   at FSI_0002.Client.with_client[a](FSharpFunc`2 f) in W:\_vendor\suave\Tests\Bug105-StopsResponding.fsx:line 67
+   at FSI_0002.Client.post(Byte[] data) in W:\_vendor\suave\Tests\Bug105-StopsResponding.fsx:line 73
+   at FSI_0002.Client.post_and_assert@79.Invoke(Byte[] x) in W:\_vendor\suave\Tests\Bug105-StopsResponding.fsx:line 79
+   at FSI_0002.Client.run(FSharpOption`1 rnd) in W:\_vendor\suave\Tests\Bug105-StopsResponding.fsx:line 96
+---> (Inner Exception #0) System.Net.Http.HttpRequestException: An error occurred while sending the request. ---> System.Net.WebException: The underlying connection was closed: An unexpected error occurred on a receive. ---> System.IO.IOException: Unable to read data from the transport connection: An existing connection was forcibly closed by the remote host. ---> System.Net.Sockets.SocketException: An existing connection was forcibly closed by the remote host
+   at System.Net.Sockets.Socket.EndReceive(IAsyncResult asyncResult)
+   at System.Net.Sockets.NetworkStream.EndRead(IAsyncResult asyncResult)
+   --- End of inner exception stack trace ---
+   at System.Net.Sockets.NetworkStream.EndRead(IAsyncResult asyncResult)
+   at System.Net.PooledStream.EndRead(IAsyncResult asyncResult)
+   at System.Net.Connection.ReadCallback(IAsyncResult asyncResult)
+   --- End of inner exception stack trace ---
+   at System.Net.HttpWebRequest.EndGetResponse(IAsyncResult asyncResult)
+   at System.Net.Http.HttpClientHandler.GetResponseCallback(IAsyncResult ar)
+   --- End of inner exception stack trace ---<---
+
+#10|12725572
+[V] 2014-05-02T11:50:00.2998771Z: 127.0.0.1 connected, total: 1 clients [Tcp.tcp_ip_server.job]
+[V] 2014-05-02T11:50:00.2998771Z: reserving buffer: 811008, free count: 97 [Tcp.tcp_ip_server.job] [Socket.BufferManager]
+[V] 2014-05-02T11:50:00.2998771Z: -> processor [Web.request_loop.loop]
+[V] 2014-05-02T11:50:00.2998771Z: reserving buffer: 786432, free count: 96 [read_till_EOL.read_data] [Socket.BufferManager]
+[V] 2014-05-02T11:50:00.2998771Z: freeing buffer: 786432, free count: 97 [read_till_EOL.scan_data (Some x = pair.offset (if1))] [Socket.BufferManager]
+[V] 2014-05-02T11:50:00.2998771Z: reserving buffer: 786432, free count: 96 [read_post_data] [Socket.BufferManager]
+[V] 2014-05-02T11:50:00.7522686Z: freeing buffer: 786432, free count: 97 [read_post_data] [Socket.BufferManager]
+[V] 2014-05-02T11:50:00.7522686Z: <- processor [Web.request_loop.loop]
+[V] 2014-05-02T11:50:00.8302525Z: 'Connection: keep-alive' recurse, rem: <null> [Web.request_loop.loop]
+[V] 2014-05-02T11:50:00.8302525Z: -> processor [Web.request_loop.loop]
+[V] 2014-05-02T11:50:00.8302525Z: reserving buffer: 786432, free count: 96 [read_till_EOL.read_data] [Socket.BufferManager]
+.[V] 2014-05-02T11:50:00.8302525Z: freeing buffer: 786432, free count: 97 [read_till_EOL.read_data (exception case)] [Socket.BufferManager]
+[V] 2014-05-02T11:50:00.8302525Z: <- processor [Web.request_loop.loop]
+[V] 2014-05-02T11:50:00.8302525Z: 'result = None', exiting [Web.request_loop.loop]
+[V] 2014-05-02T11:50:00.8302525Z: freeing buffer: 811008, free count: 98 [Tcp.tcp_ip_server.job] [Socket.BufferManager]
+[V] 2014-05-02T11:50:00.8302525Z: 127.0.0.1 disconnected, total: 0 clients [Tcp.tcp_ip_server.job]
+#11|285452
+[V] 2014-05-02T11:50:00.8458463Z: 127.0.0.1 connected, total: 1 clients [Tcp.tcp_ip_server.job]
+[V] 2014-05-02T11:50:00.8458463Z: reserving buffer: 811008, free count: 97 [Tcp.tcp_ip_server.job] [Socket.BufferManager]
+[V] 2014-05-02T11:50:00.8458463Z: -> processor [Web.request_loop.loop]
+[V] 2014-05-02T11:50:00.8458463Z: reserving buffer: 786432, free count: 96 [read_till_EOL.read_data] [Socket.BufferManager]
+[V] 2014-05-02T11:50:00.8458463Z: freeing buffer: 786432, free count: 97 [read_till_EOL.scan_data (Some x = pair.offset (if2))] [Socket.BufferManager]
+[V] 2014-05-02T11:50:00.8458463Z: reserving buffer: 786432, free count: 96 [read_post_data] [Socket.BufferManager]
+[V] 2014-05-02T11:50:00.8458463Z: <- processor [Web.request_loop.loop]
+[V] 2014-05-02T11:50:00.8458463Z: 'result = None', exiting [Web.request_loop.loop]
+[V] 2014-05-02T11:50:00.8458463Z: freeing buffer: 811008, free count: 97 [Tcp.tcp_ip_server.job] [Socket.BufferManager]
+[V] 2014-05-02T11:50:00.8458463Z: 127.0.0.1 disconnected, total: 0 clients [Tcp.tcp_ip_server.job]
+System.AggregateException: One or more errors occurred. ---> System.Net.Http.HttpRequestException: An error occurred while sending the request. ---> System.Net.WebException: The underlying connection was closed: An unexpected error occurred on a receive. ---> System.IO.IOException: Unable to read data from the transport connection: An existing connection was forcibly closed by the remote host. ---> System.Net.Sockets.SocketException: An existing connection was forcibly closed by the remote host
+   at System.Net.Sockets.Socket.EndReceive(IAsyncResult asyncResult)
+   at System.Net.Sockets.NetworkStream.EndRead(IAsyncResult asyncResult)
+   --- End of inner exception stack trace ---
+   at System.Net.Sockets.NetworkStream.EndRead(IAsyncResult asyncResult)
+   at System.Net.PooledStream.EndRead(IAsyncResult asyncResult)
+   at System.Net.Connection.ReadCallback(IAsyncResult asyncResult)
+   --- End of inner exception stack trace ---
+   at System.Net.HttpWebRequest.EndGetResponse(IAsyncResult asyncResult)
+   at System.Net.Http.HttpClientHandler.GetResponseCallback(IAsyncResult ar)
+   --- End of inner exception stack trace ---
+   --- End of inner exception stack trace ---
+   at Microsoft.FSharp.Control.AsyncBuilderImpl.commit[a](Result`1 res)
+   at Microsoft.FSharp.Control.CancellationTokenOps.RunSynchronously[a](CancellationToken token, FSharpAsync`1 computation, FSharpOption`1 timeout)
+   at Microsoft.FSharp.Control.FSharpAsync.RunSynchronously[T](FSharpAsync`1 computation, FSharpOption`1 timeout, FSharpOption`1 cancellationToken)
+   at FSI_0002.Client.with_client[a](FSharpFunc`2 f) in W:\_vendor\suave\Tests\Bug105-StopsResponding.fsx:line 67
+   at FSI_0002.Client.post(Byte[] data) in W:\_vendor\suave\Tests\Bug105-StopsResponding.fsx:line 73
+   at FSI_0002.Client.post_and_assert@79.Invoke(Byte[] x) in W:\_vendor\suave\Tests\Bug105-StopsResponding.fsx:line 79
+   at FSI_0002.Client.run(FSharpOption`1 rnd) in W:\_vendor\suave\Tests\Bug105-StopsResponding.fsx:line 96
+---> (Inner Exception #0) System.Net.Http.HttpRequestException: An error occurred while sending the request. ---> System.Net.WebException: The underlying connection was closed: An unexpected error occurred on a receive. ---> System.IO.IOException: Unable to read data from the transport connection: An existing connection was forcibly closed by the remote host. ---> System.Net.Sockets.SocketException: An existing connection was forcibly closed by the remote host
+   at System.Net.Sockets.Socket.EndReceive(IAsyncResult asyncResult)
+   at System.Net.Sockets.NetworkStream.EndRead(IAsyncResult asyncResult)
+   --- End of inner exception stack trace ---
+   at System.Net.Sockets.NetworkStream.EndRead(IAsyncResult asyncResult)
+   at System.Net.PooledStream.EndRead(IAsyncResult asyncResult)
+   at System.Net.Connection.ReadCallback(IAsyncResult asyncResult)
+   --- End of inner exception stack trace ---
+   at System.Net.HttpWebRequest.EndGetResponse(IAsyncResult asyncResult)
+   at System.Net.Http.HttpClientHandler.GetResponseCallback(IAsyncResult ar)
+   --- End of inner exception stack trace ---<---
+
+#12|5768392
+[V] 2014-05-02T11:50:00.9083217Z: 127.0.0.1 connected, total: 1 clients [Tcp.tcp_ip_server.job]
+[V] 2014-05-02T11:50:00.9083217Z: reserving buffer: 811008, free count: 96 [Tcp.tcp_ip_server.job] [Socket.BufferManager]
+[V] 2014-05-02T11:50:00.9083217Z: -> processor [Web.request_loop.loop]
+[V] 2014-05-02T11:50:00.9083217Z: reserving buffer: 778240, free count: 95 [read_till_EOL.read_data] [Socket.BufferManager]
+[V] 2014-05-02T11:50:00.9083217Z: freeing buffer: 778240, free count: 96 [read_till_EOL.scan_data (Some x = pair.offset (if1))] [Socket.BufferManager]
+[V] 2014-05-02T11:50:00.9083217Z: reserving buffer: 778240, free count: 95 [read_post_data] [Socket.BufferManager]
+[V] 2014-05-02T11:50:00.9394409Z: freeing buffer: 778240, free count: 96 [read_post_data] [Socket.BufferManager]
+[V] 2014-05-02T11:50:00.9394409Z: <- processor [Web.request_loop.loop]
+[V] 2014-05-02T11:50:01.0174427Z: 'Connection: keep-alive' recurse (!) [Web.request_loop.loop]
+[V] 2014-05-02T11:50:01.0174427Z: -> processor [Web.request_loop.loop]
+[V] 2014-05-02T11:50:01.0174427Z: reserving buffer: 778240, free count: 95 [read_till_EOL.read_data] [Socket.BufferManager]
+.[V] 2014-05-02T11:50:01.0174427Z: freeing buffer: 778240, free count: 96 [read_till_EOL.read_data (exception case)] [Socket.BufferManager]
+[V] 2014-05-02T11:50:01.0174427Z: <- processor [Web.request_loop.loop]
+[V] 2014-05-02T11:50:01.0174427Z: 'result = None', exiting [Web.request_loop.loop]
+[V] 2014-05-02T11:50:01.0330436Z: freeing buffer: 811008, free count: 97 [Tcp.tcp_ip_server.job] [Socket.BufferManager]
+[V] 2014-05-02T11:50:01.0330436Z: 127.0.0.1 disconnected, total: 0 clients [Tcp.tcp_ip_server.job]
+#13|10481392
+
+- Interrupt
+> 

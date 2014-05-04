@@ -180,8 +180,32 @@ module Bytes =
       done;
       if !j >= m then Some(!i - m) else None
 
+  let inline unite_array_segment (aas : ArraySegment<byte> list) =
+    fun (i : int) ->
+      if   i < 0 then failwith "invalid args"
+      let rec loop k acc =
+        let a = aas.[k]
+        if i < acc + a.Count then 
+          a.Array.[a.Offset + (i - acc)]
+        else loop (k + 1) (acc + a.Count)
+      loop 0 0
+
+  let kmp_y p =
+    let next = init_next p
+    let m = Array.length p
+    fun (xs : ArraySegment<byte> list) ->
+      let a = unite_array_segment xs
+      let n = List.fold (fun acc (x :  ArraySegment<byte>) -> acc + x.Count) 0 xs
+      let  i = ref 0
+      let j = ref 0 in
+      while !j < m && !i < n do
+        if a(!i) = p.[!j] then begin incr i; incr j end else
+        if !j = 0 then incr i else j := next.[!j]
+      done;
+      if !j >= m then Some(!i - m) else None
+
   let inline unite (a : ArraySegment<_>) (b : ArraySegment<_>) =
-    fun (i : int) -> 
+    fun (i : int) ->
       if   i < 0       then failwith "invalid args"
       elif i < a.Count then a.Array.[a.Offset + i]
       elif i < a.Count + b.Count then b.Array.[b.Offset + (i - a.Count)]

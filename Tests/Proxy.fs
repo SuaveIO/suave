@@ -43,24 +43,25 @@ let proxy =
     testProperty "GET / returns 200 OK with passed string" <| fun str ->
       run_in_context (run_target (Successful.OK str)) dispose_context <| fun _ ->
         Assert.Equal("target's WebPart should return its value", str,
-//          verbose_logging(fun () -> proxy to_target |> req GET "/"))
           proxy to_target |> req GET "/" None)
 
     testCase "GET /redirect returns 'redirect'" <| fun _ ->
       run_in_context (run_target (url "/secret" >>= redirect "https://sts.example.se")) dispose_context <| fun _ ->
-        let res = proxy to_target |> req_resp GET "/secret" None None DecompressionMethods.None
-        Assert.Equal("should proxy redirect", HttpStatusCode.Found, res.StatusCode)
+        let headers, stat =
+          proxy to_target |> req_resp GET "/secret" None None DecompressionMethods.None
+            (fun r -> r.Headers, r.StatusCode)
+        Assert.Equal("should proxy redirect", HttpStatusCode.Found, stat)
         Assert.Equal("should give Location-header together with redirect",
-          Uri("https://sts.example.se"), res.Headers.Location)
+          Uri("https://sts.example.se"), headers.Location)
 
     testCase "Should proxy 500 Internal Server Error too" <| fun _ ->
       run_in_context (run_target (INTERNAL_ERROR "Oh noes")) dispose_context <| fun _ ->
         Assert.Equal("should have correct status code",
-          Net.HttpStatusCode.InternalServerError,
-          (proxy to_target |> req_resp GET "/" None None DecompressionMethods.None).StatusCode)
+          HttpStatusCode.InternalServerError,
+          proxy to_target |> req_resp GET "/" None None DecompressionMethods.None status_code)
         Assert.Equal("should have correct content",
           "Oh noes",
-          (proxy to_target |> req_resp GET "/" None None DecompressionMethods.None).Content.ReadAsStringAsync().Result)
+          proxy to_target |> req_resp GET "/" None None DecompressionMethods.None content_string)
 
     testCase "Proxy decides to return directly" <| fun _ ->
       run_in_context (run_target (OK "upstream reply")) dispose_context <| fun _ ->

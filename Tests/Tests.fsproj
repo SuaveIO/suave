@@ -39,6 +39,10 @@
   <Import Project="$(MSBuildExtensionsPath32)\..\Microsoft F#\v4.0\Microsoft.FSharp.Targets" Condition="(!Exists('$(MSBuildExtensionsPath32)\..\Microsoft SDKs\F#\3.0\Framework\v4.0\Microsoft.FSharp.Targets')) And (Exists('$(MSBuildExtensionsPath32)\..\Microsoft F#\v4.0\Microsoft.FSharp.Targets'))" />
   <Import Project="$(MSBuildExtensionsPath32)\FSharp\1.0\Microsoft.FSharp.Targets" Condition="(!Exists('$(MSBuildExtensionsPath32)\..\Microsoft SDKs\F#\3.0\Framework\v4.0\Microsoft.FSharp.Targets')) And (!Exists('$(MSBuildExtensionsPath32)\..\Microsoft F#\v4.0\Microsoft.FSharp.Targets')) And (Exists('$(MSBuildExtensionsPath32)\FSharp\1.0\Microsoft.FSharp.Targets'))" />
   <ItemGroup>
+    <Content Include="large_xml.xml" />
+    <Content Include="Bug106-ReadingInputData.txt" />
+    <Content Include="Bug105-StopsResponding.verbose.txt" />
+    <None Include="Bug105-StopsResponding.fsx" />
     <None Include="PerfLab.fsx" />
     <Compile Include="AssemblyVersionInfo.fs" />
     <Compile Include="TestUtilities.fs" />
@@ -46,7 +50,10 @@
     <Compile Include="Utils.fs" />
     <Compile Include="Web.fs" />
     <Compile Include="Proxy.fs" />
-    <Compile Include="Common.fs" />
+    <Compile Include="HttpWriters.fs" />
+    <Compile Include="HttpFile.fs" />
+    <Compile Include="HttpEmbedded.fs" />
+    <Compile Include="HttpVerbs.fs" />
     <Compile Include="Perf.fs" />
     <Compile Include="Program.fs" />
     <None Include="packages.config" />
