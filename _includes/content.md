@@ -311,7 +311,7 @@ logger. An example:
 type MyHackLogger(min_level) =
   interface Logger with
     member x.Log level f_line =
-      if min_level >= level then
+      if level >= min_level then
         // don't do this for real ;)
         System.Windows.Forms.MessageBox.Show((f_line ()).message)
 {% endhighlight %}
