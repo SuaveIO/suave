@@ -113,7 +113,7 @@ let authenticate_as_server (cert : X509Certificate) =
 
 open Microsoft.FSharp.NativeInterop
 
-let read_to_bio (con : Connection) read_bio ssl = async {
+let read_to_bio (con : Connection) read_bio ssl = socket {
   let bytes_pending = BIO_ctrl_pending read_bio
   if bytes_pending = 0u then 
     let a = con.get_buffer "read_to_bio"
@@ -124,7 +124,7 @@ let read_to_bio (con : Connection) read_bio ssl = async {
     BIO_write(read_bio, buff, bytes_read) |> ignore
   }
 
-let write_from_bio  (con : Connection) write_bio = async {
+let write_from_bio  (con : Connection) write_bio = socket {
   let bytes_pending = BIO_ctrl_pending write_bio
 
   if bytes_pending > 0u  then 
@@ -134,7 +134,7 @@ let write_from_bio  (con : Connection) write_bio = async {
   return ()
   }
 
-let rec accept (logger : Log.Logger) conn (ssl, read_bio, write_bio) = async{
+let rec accept (logger : Log.Logger) conn (ssl, read_bio, write_bio) = socket{
   let ret = SSL_accept ssl
   if(ret < 0) then 
 
@@ -155,10 +155,11 @@ let rec accept (logger : Log.Logger) conn (ssl, read_bio, write_bio) = async{
   return ()
   }
 
-let ssl_receive (con : Connection) (context, read_bio, write_bio) (bu: B) = async {
+let ssl_receive (con : Connection) (context, read_bio, write_bio) (bu: B) = socket {
 
   let write_bytes_pending = BIO_ctrl_pending write_bio
-  if write_bytes_pending > 0u  then do! write_from_bio con write_bio
+  if write_bytes_pending > 0u  then 
+    do! write_from_bio con write_bio
 
   //we need to check if there is data in the read bio before asking for more to the socket
   let bytes_pending = BIO_ctrl_pending read_bio

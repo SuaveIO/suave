@@ -25,7 +25,7 @@ let private copy_response_headers (headers1 : WebHeaderCollection) (headers2 : L
 /// Send the web response from HttpWebResponse to the HttpRequest 'p'
 let private send_web_response (data : HttpWebResponse)
                               ({ request = { response = resp; trace = t }
-                               ; runtime = { logger = logger }} as ctx : HttpContext) = async {
+                               ; runtime = { logger = logger }} as ctx : HttpContext) = socket {
   copy_response_headers data.Headers resp.Headers
   // TODO: if downstream sends a Content-Length header copy from one stream
   // to the other asynchronously
@@ -70,12 +70,12 @@ let forward (ip : IPAddress) (port : uint16) (ctx : HttpContext) =
 
   q.Headers.Add("X-Forwarded-For", ctx.connection.ipaddr.ToString())
 
-  async {
+  socket {
     if p.``method`` = "POST" || p.``method`` = "PUT" then
       let content_length = Convert.ToInt32(p.headers.["content-length"])
       do! transfer_len_x ctx.connection (q.GetRequestStream()) content_length
     try
-      let! data = q.AsyncGetResponse()
+      let! data = lift_async <| q.AsyncGetResponse()
       do! send_web_response ((data : WebResponse) :?> HttpWebResponse) ctx
     with
     | :? WebException as ex when ex.Response <> null ->

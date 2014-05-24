@@ -45,10 +45,11 @@ let testapp : WebPart =
   ]
 
 System.Net.ServicePointManager.DefaultConnectionLimit <- Int32.MaxValue
+open Socket
 
 let timeout r =
-  async {
-    do! Async.Sleep 1500
+  socket {
+    do! lift_async <| Async.Sleep 1500
   } |> succeed
 
 // Adds a new mime type to the default map

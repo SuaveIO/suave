@@ -27,11 +27,12 @@
 /// </summary>
 module Http =
 
+  open Socket
   open Types
 
   /// A web result is something that writes to the output stream that the client
   /// as to the web server.
-  type WebResult = Async<unit> option
+  type WebResult = SocketOp<unit> option
 
   /// A web part is a thing that executes on a HttpRequest, asynchronously, maybe executing
   /// on the request.
@@ -129,10 +130,10 @@ module Http =
   module Response =
 
     /// Respond with a given status code, http message, content in the body to a http request.
-    val response_f : status_code:HttpCode -> f_content:(HttpRequest -> Async<unit>) -> request:HttpContext -> Async<unit>
+    val response_f : status_code:HttpCode -> f_content:(HttpRequest -> SocketOp<unit>) -> request:HttpContext -> SocketOp<unit>
 
     /// Respond with a given status code, http reason phrase, content in the body to a http request.
-    val response : status_code:HttpCode -> content:byte [] -> request:HttpContext -> Async<unit>
+    val response : status_code:HttpCode -> content:byte [] -> request:HttpContext -> SocketOp<unit>
 
   /// Module that allows changing the output response in different ways.
   /// Functions have signature f :: params... -> HttpContext -> HttpContext.
@@ -1474,4 +1475,4 @@ module Http =
     /// </para></summary>
     /// <remarks>
     /// </remarks>
-    val authenticate_basic : f:(HttpRequest -> bool) -> p:HttpContext -> Async<unit> option
+    val authenticate_basic : f:(HttpRequest -> bool) -> p:HttpContext -> WebResult

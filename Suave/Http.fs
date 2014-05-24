@@ -2,9 +2,10 @@
 
 module Http =
 
+  open Socket
   open Types
 
-  type WebResult = Async<unit> option
+  type WebResult = SocketOp<unit> option
 
   type WebPart = HttpContext -> WebResult
 
@@ -260,8 +261,8 @@ module Http =
             | _         -> None)
       | _ -> None
 
-    let transform (content : byte []) (ctx : HttpContext) : Async<byte []> =
-      async {
+    let transform (content : byte []) (ctx : HttpContext) : SocketOp<byte []> =
+      socket {
         if content.Length > MIN_BYTES_TO_COMPRESS && content.Length < MAX_BYTES_TO_COMPRESS then
           let request = ctx.request
           let enconding = get_encoder request
@@ -275,23 +276,23 @@ module Http =
           return content
       }
 
-    let compress encoding path (fs : Stream) = async {
+    let compress encoding path (fs : Stream) = socket {
       use new_fs = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.Write)
       match encoding with
       | GZIP ->
         use gzip = new GZipStream(new_fs, CompressionMode.Compress)
-        do! fs.CopyToAsync gzip
+        do! lift_task (fs.CopyToAsync gzip)
         gzip.Close()
       | Deflate ->
         use deflate = new DeflateStream(new_fs, CompressionMode.Compress)
-        do! fs.CopyToAsync deflate
+        do! lift_task (fs.CopyToAsync deflate)
         deflate.Close()
       | _ ->
         return failwith "invalid case."
       new_fs.Close()
     }
 
-    let compress_file n stream compression_folder= async {
+    let compress_file n (stream : Stream) compression_folder = socket {
       let temp_file_name = Path.GetRandomFileName()
       if not (Directory.Exists compression_folder) then Directory.CreateDirectory compression_folder |> ignore
       let new_path = Path.Combine(compression_folder,temp_file_name)
@@ -300,8 +301,8 @@ module Http =
       return new_path
     }
 
-    let transform_x (key : string) (get_data : string -> Stream) (get_last : string -> DateTime) compression compression_folder ({ request = q; runtime = r; connection = connection } as ctx) : Async<Stream> =
-      async {
+    let transform_x (key : string) (get_data : string -> Stream) (get_last : string -> DateTime) compression compression_folder ({ request = q; runtime = r; connection = connection } as ctx) =
+      socket {
         let stream = get_data key
         if compression && stream.Length > int64(MIN_BYTES_TO_COMPRESS) && stream.Length < int64(MAX_BYTES_TO_COMPRESS) then
           let enconding = parse_encoder q
@@ -331,37 +332,41 @@ module Http =
     open System
     open System.IO
 
-    let response_f (status_code : HttpCode)
-                   (f_content : HttpRequest -> Async<unit>)
-                   ({request = request; runtime = runtime; connection = connection } as context : HttpContext)
-                   = async {
-      try
-        //let connection:Connection = runtime.connection
-        do! async_writeln connection (String.concat " " [ "HTTP/1.1"
-                                                        ; (http_code status_code).ToString()
-                                                        ; http_reason status_code ])
-        do! async_writeln connection Internals.server_header
-        do! async_writeln connection (String.Concat( [|  "Date: "; Globals.utc_now().ToString("R") |]))
+    let internal write_content_type request connection = socket {
+      if not(request.response.Headers.Exists(new Predicate<_>(fun (x,_) -> x.ToLower().Equals("content-type")))) then
+        do! async_writeln connection "Content-Type: text/html"
+    }
 
-        for (x,y) in request.response.Headers do
-          if not (List.exists (fun y -> x.ToLower().Equals(y)) ["server";"date";"content-length"]) then
-            do! async_writeln connection (String.Concat [| x; ": "; y |])
+    let internal write_headers (headers : (string*string) seq) connection = socket {
+      for (x,y) in headers do
+        if not (List.exists (fun y -> x.ToLower().Equals(y)) ["server";"date";"content-length"]) then
+          do! async_writeln connection (String.Concat [| x; ": "; y |])
+      } 
 
-        if not(request.response.Headers.Exists(new Predicate<_>(fun (x,_) -> x.ToLower().Equals("content-type")))) then
-          do! async_writeln connection "Content-Type: text/html"
+    let response_f 
+      (status_code : HttpCode)
+      (f_content : HttpRequest ->  SocketOp<unit>)
+      ({request = request; runtime = runtime; connection = connection } as context : HttpContext)
+      =
+      socket {
+        
+      do! async_writeln connection (String.concat " " [ "HTTP/1.1"
+                                                      ; (http_code status_code).ToString()
+                                                      ; http_reason status_code ])
+      do! async_writeln connection Internals.server_header
+      do! async_writeln connection (String.Concat( [|  "Date: "; Globals.utc_now().ToString("R") |]))
 
-        do! f_content request
+      do! write_headers (request.response.Headers) connection
+      do!  write_content_type request connection
 
-      with //the connection might drop while we are sending the response
-      | :? ObjectDisposedException -> () // this happens without it being a problem
-      | :? IOException as ex  -> raise (InternalFailure "Failure while writing to client stream")
+      return! f_content request
       }
-
+     
     let response status_code
                  (cnt : byte [])
                  ({request = request; runtime = runtime; connection = connection } as context : HttpContext) =
       response_f status_code (
-        fun r -> async {
+        fun r -> socket {
 
           let! (content : byte []) = Compression.transform cnt context
 
@@ -373,8 +378,8 @@ module Http =
           if content.Length > 0 then
             do! connection.write (new ArraySegment<_>(content, 0, content.Length))
         })
-        context
-
+        {request = { request with status = http_code status_code |> Some }; runtime = runtime; connection = connection }
+    
   module Writers =
 
     open System
@@ -609,10 +614,34 @@ module Http =
     let TRACE   (x : HttpContext) = ``method`` TRACE x
     let OPTIONS (x : HttpContext) = ``method`` OPTIONS x
 
-    /// The default log format for <see cref="log" />.
+    /// The default log format for <see cref="log" />.  NCSA Common log format
+    /// 
+    /// 127.0.0.1 user-identifier frank [10/Oct/2000:13:55:36 -0700] "GET /apache_pb.gif HTTP/1.0" 200 2326
+    /// 
+    /// A "-" in a field indicates missing data.
+    /// 
+    /// 127.0.0.1 is the IP address of the client (remote host) which made the request to the server.
+    /// user-identifier is the RFC 1413 identity of the client.
+    /// frank is the userid of the person requesting the document.
+    /// [10/Oct/2000:13:55:36 -0700] is the date, time, and time zone when the server finished processing the request, by default in strftime format %d/%b/%Y:%H:%M:%S %z.
+    /// "GET /apache_pb.gif HTTP/1.0" is the request line from the client. The method GET, /apache_pb.gif the resource requested, and HTTP/1.0 the HTTP protocol.
+    /// 200 is the HTTP status code returned to the client. 2xx is a successful response, 3xx a redirection, 4xx a client error, and 5xx a server error.
+    /// 2326 is the size of the object returned to the client, measured in bytes.
     let log_format (ctx : HttpContext) =
-      let r = ctx.request
-      sprintf "%A\n" (r.``method``, ctx.connection.ipaddr, r.url, r.query, r.form, r.headers)
+      
+      let dash = function | "" | null -> "-" | x -> x
+      let ci = Globalization.CultureInfo("en-US")
+      let process_id = System.Diagnostics.Process.GetCurrentProcess().Id.ToString()
+      sprintf "%O %s %s [%s] \"%s %s %s\" %s %s"
+        ctx.connection.ipaddr
+        process_id //TODO: obtain connection owner via Ident protocol
+        (dash ctx.request.user_name)
+        (DateTime.UtcNow.ToString("dd/MMM/yyyy:hh:mm:ss %K", ci))
+        ctx.request.``method``
+        ctx.request.url
+        ctx.request.http_version
+        (match ctx.request.status with | None -> "-" | Some x -> x.ToString())
+        "0"
 
     let log (logger : Log.Logger) (formatter : HttpContext -> string) (ctx : HttpContext) =
       logger.Log Log.LogLevel.Debug <| fun _ ->
@@ -691,7 +720,7 @@ module Http =
     open ServeResource
 
     let send_file file_name (compression : bool) ({ connection = conn; runtime = runtime } as ctx : HttpContext) =
-      let write_file file (q : HttpRequest) = async {
+      let write_file file (q : HttpRequest) = socket {
         let get_fs = fun path -> new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read) :> Stream
         let get_lm = fun path -> FileInfo(path).LastWriteTime
         use! fs = Compression.transform_x file get_fs get_lm compression runtime.compression_folder ctx
@@ -702,7 +731,7 @@ module Http =
         if fs.Length > 0L then
           do! transfer_x conn fs
       }
-      async { do! response_f HTTP_200 (write_file file_name) ctx } |> succeed
+      socket { do! response_f HTTP_200 (write_file file_name) ctx } |> succeed
 
     let file file_name =
       resource
@@ -777,7 +806,7 @@ module Http =
     let last_modified = FileInfo(Assembly.GetExecutingAssembly().Location).CreationTime
     
     let send_resource resource_name (compression : bool) ({ connection = conn; runtime = runtime } as ctx : HttpContext) =
-      let write_resource name (q : HttpRequest) = async {
+      let write_resource name (q : HttpRequest) = socket {
         let get_fs = fun name -> assembly.GetManifestResourceStream(name)
         let get_lm = fun _ -> last_modified
         use! fs = Compression.transform_x name get_fs get_lm compression runtime.compression_folder ctx
@@ -788,7 +817,7 @@ module Http =
         if fs.Length > 0L then
           do! transfer_x conn fs
       }
-      async { do! response_f HTTP_200 (write_resource resource_name) ctx } |> succeed
+      socket { do! response_f HTTP_200 (write_resource resource_name) ctx } |> succeed
 
     let resource name =
       resource

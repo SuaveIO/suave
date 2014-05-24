@@ -28,7 +28,7 @@ type TcpListener with
 open Socket 
 
 /// A TCP Worker is a thing that takes a TCP client and returns an asynchronous workflow thereof
-type TcpWorker<'a> = Connection -> Async<'a>
+type TcpWorker<'a> = Connection -> SocketOp<'a>
 
 /// Disconnect a socket for reuse
 let close_socket (s : Socket) =
@@ -156,17 +156,16 @@ let tcp_ip_server (source_ip : IPAddress,
       }
       use! oo = Async.OnCancel (fun () -> intern "disconnected client (async cancel)"
                                           shutdown_socket socket)
-      try
-        do! serve_client connection
-      finally
-        shutdown_socket socket
-        accept_args.AcceptSocket <- null
-        a.Push accept_args
-        b.Push read_args
-        c.Push write_args
-        bufferManager.FreeBuffer(connection.line_buffer, "Tcp.tcp_ip_server.job") // buf free OK
-        Interlocked.Decrement(Globals.number_of_clients) |> ignore
-        Log.internf logger "Tcp.tcp_ip_server.job" (fun fmt -> fmt "%O disconnected, total: %d clients" ip_address !Globals.number_of_clients)
+
+      let! _ = serve_client connection
+      shutdown_socket socket
+      accept_args.AcceptSocket <- null
+      a.Push accept_args
+      b.Push read_args
+      c.Push write_args
+      bufferManager.FreeBuffer(connection.line_buffer, "Tcp.tcp_ip_server.job") // buf free OK
+      Interlocked.Decrement(Globals.number_of_clients) |> ignore
+      Log.internf logger "Tcp.tcp_ip_server.job" (fun fmt -> fmt "%O disconnected, total: %d clients" ip_address !Globals.number_of_clients)
     with 
     | :? System.IO.EndOfStreamException ->
       intern "disconnected client (end of stream)"

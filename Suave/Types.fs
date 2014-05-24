@@ -54,7 +54,8 @@ type HttpRequest =
   ; response             : HttpResponse
   ; files                : List<HttpUpload>
   ; mutable trace        : Log.TraceHeader
-  ; is_secure            : bool }
+  ; is_secure            : bool
+  ; status               : int option }
 
 /// Gets the query from the HttpRequest
 let query (x : HttpRequest) = x.query
@@ -112,7 +113,7 @@ with
 
 /// An error handler takes the exception, a programmer-provided message, a request (that failed) and returns
 /// an asynchronous workflow for the handling of the error.
-type ErrorHandler = Exception -> String -> HttpContext -> Async<unit>
+type ErrorHandler = Exception -> String -> HttpContext -> SocketOp<unit>
 
 and HttpRuntime =
   { protocol           : Protocol
