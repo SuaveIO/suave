@@ -71,13 +71,16 @@ choose [
   url "/date" >>= warbler (fun _ -> OK (DateTimeOffset.UtcNow.ToString("o")))
   url "/timeout" >>= timeout
   url "/session"
-    >>= session_support
-    >>= request (fun x ->
-        cond (session x) ? counter
-          (fun y ->
-              (session x) ? counter <- (y :?> int) + 1 :> obj ;
-              OK (sprintf "Hello %A time(s)"  y ))
-          ((session x) ? counter <- 1 :> obj ; OK "First time" ))
+    >>= session_support (TimeSpan(0,0,60))
+    >>= context (fun x ->
+        let get,set = session x
+        match get "counter" with
+        | Some y ->
+          set "counter" (y + 1 )
+          OK (sprintf "Hello %d time(s)"  y )
+        | None ->
+          set "counter" 1
+          OK "First time" )
   basic_auth // from here on it will require authentication
   GET >>= browse //serves file if exists
   GET >>= dir //show directory listing
@@ -103,4 +106,5 @@ choose [
       ; mime_types_map   = mime_types
       ; home_folder      = None
       ; compressed_files_folder = None
-      ; logger           = logger }
+      ; logger           = logger
+      ; session_provider = new DefaultSessionProvider() }

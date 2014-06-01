@@ -100,7 +100,7 @@ let proxy_server_async (config : SuaveConfig) resolver =
   let mk_runtime proto =
     ParsingAndControl.mk_http_runtime
       proto config.web_part_timeout config.error_handler config.mime_types_map
-      home_dir compression_folder config.logger
+      home_dir compression_folder config.logger config.session_provider
 
   let all =
     config.bindings

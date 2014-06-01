@@ -111,6 +111,8 @@ with
   override x.ToString() =
     sprintf "%O://%O:%d/" x.scheme x.ip x.port
 
+type SessionStore<'a>     = (string -> 'a option)*(string -> 'a -> unit)
+
 /// An error handler takes the exception, a programmer-provided message, a request (that failed) and returns
 /// an asynchronous workflow for the handling of the error.
 type ErrorHandler = Exception -> String -> HttpContext -> SocketOp<unit>
@@ -122,14 +124,21 @@ and HttpRuntime =
   ; mime_types_map     : MimeTypesMap
   ; home_directory     : string
   ; compression_folder : string
-  ; logger             : Log.Logger }
+  ; logger             : Log.Logger
+  ; session_provider   : ISessionProvider }
 
 and HttpContext =
   { request    : HttpRequest
   ; runtime    : HttpRuntime
   ; connection : Connection }
 
+and ISessionProvider =
+  abstract member Generate : TimeSpan * HttpContext -> string
+  abstract member Validate : string * HttpContext -> bool
+  abstract member Session<'a>  : string -> SessionStore<'a>
+
 let request f (a : HttpContext) = f a.request a
+let context f (a : HttpContext) = f a a
 
 open System.Threading
 
@@ -168,9 +177,12 @@ type SuaveConfig =
 
   /// Folder for temporary compressed files
   ; compressed_files_folder : string option
-  
+
   /// A logger to log with
-  ; logger           : Log.Logger }
+  ; logger           : Log.Logger
+
+  /// A http session provider
+  ; session_provider : ISessionProvider }
 
 /// An exception, raised e.g. if writing to the stream fails
 exception InternalFailure of string

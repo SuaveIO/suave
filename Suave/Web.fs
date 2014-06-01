@@ -425,14 +425,15 @@ module ParsingAndControl =
 
   open Suave.Tcp
 
-  let mk_http_runtime proto timeout error_handler mime_types home_directory compression_folder logger =
+  let mk_http_runtime proto timeout error_handler mime_types home_directory compression_folder logger session_provider =
     { protocol           = proto
     ; web_part_timeout   = timeout
     ; error_handler      = error_handler
     ; mime_types_map     = mime_types
     ; home_directory     = home_directory
     ; compression_folder = compression_folder
-    ; logger             = logger }
+    ; logger             = logger
+    ; session_provider   = session_provider }
 
   /// Starts a new web worker, given the configuration and a web part to serve.
   let web_worker (ip, port, buffer_size, max_ops, runtime : HttpRuntime) (webpart : WebPart) =
@@ -450,6 +451,7 @@ open System.Net
 open Suave.Types
 open Suave.Http
 open Suave.Socket
+open Suave.Session
 
 /// The default error handler returns a 500 Internal Error in response to
 /// thrown exceptions.
@@ -479,7 +481,7 @@ let web_server_async (config : SuaveConfig) (webpart : WebPart) =
       let http_runtime =
         ParsingAndControl.mk_http_runtime
           proto config.web_part_timeout config.error_handler
-          config.mime_types_map content_folder compression_folder config.logger
+          config.mime_types_map content_folder compression_folder config.logger config.session_provider
       ParsingAndControl.web_worker (ip, port, config.buffer_size, config.max_ops, http_runtime) webpart)
   let listening = all |> Seq.map fst |> Async.Parallel
   let server    = all |> Seq.map snd |> Async.Parallel |> Async.Ignore
@@ -504,4 +506,5 @@ let default_config : SuaveConfig =
   ; mime_types_map   = Http.Writers.default_mime_types_map
   ; home_folder      = None
   ; compressed_files_folder = None
-  ; logger           = Log.Loggers.sane_defaults_for Log.LogLevel.Info }
+  ; logger           = Log.Loggers.sane_defaults_for Log.LogLevel.Info
+  ; session_provider = new DefaultSessionProvider() }
