@@ -74,7 +74,6 @@ module Session =
       member this.Generate(expiration : TimeSpan, ctx : HttpContext) =
         let session_id = strong_new_id session_id_lenght 
         let dict = new ConcurrentDictionary<string, obj> ()
-        dict.TryAdd ("_suave_session_time_stamp", DateTime.UtcNow) |> ignore
         lock session_map (fun _ -> session_map.Add(session_id, dict :> obj, Globals.utc_now().Add expiration) |> ignore)
         let id = session_id + hmac session_id (Option.get ctx.request.headers?``user-agent``) (ctx.connection.ipaddr.ToString()) key
         id
