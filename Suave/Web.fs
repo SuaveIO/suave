@@ -425,9 +425,8 @@ module ParsingAndControl =
 
   open Suave.Tcp
 
-  let mk_http_runtime proto timeout error_handler mime_types home_directory compression_folder logger session_provider =
+  let mk_http_runtime proto error_handler mime_types home_directory compression_folder logger session_provider =
     { protocol           = proto
-    ; web_part_timeout   = timeout
     ; error_handler      = error_handler
     ; mime_types_map     = mime_types
     ; home_directory     = home_directory
@@ -480,7 +479,7 @@ let web_server_async (config : SuaveConfig) (webpart : WebPart) =
     |> List.map (fun { scheme = proto; ip = ip; port = port } ->
       let http_runtime =
         ParsingAndControl.mk_http_runtime
-          proto config.web_part_timeout config.error_handler
+          proto config.error_handler
           config.mime_types_map content_folder compression_folder config.logger config.session_provider
       ParsingAndControl.web_worker (ip, port, config.buffer_size, config.max_ops, http_runtime) webpart)
   let listening = all |> Seq.map fst |> Async.Parallel
@@ -498,7 +497,6 @@ let web_server (config : SuaveConfig) (webpart : WebPart) =
 let default_config : SuaveConfig =
   { bindings         = [ { scheme = HTTP; ip = IPAddress.Loopback; port = 8083us } ]
   ; error_handler    = default_error_handler
-  ; web_part_timeout = TimeSpan.FromHours(5.)
   ; listen_timeout   = TimeSpan.FromSeconds(2.)
   ; ct               = Async.DefaultCancellationToken
   ; buffer_size      = 8192 // 8 KiB

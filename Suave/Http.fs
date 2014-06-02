@@ -674,6 +674,18 @@ module Http =
           fail
       F
 
+    let resolve (part: WebPart) = fun (ctx: HttpContext) ->
+      async {
+        return part ctx
+      }
+
+    let timeout_webpart (time_span : TimeSpan) (web_part : WebPart) : WebPart =
+      fun (ctx : HttpContext) ->
+        try
+          Async.RunSynchronously (resolve web_part ctx, int time_span.TotalMilliseconds)
+        with
+          | :? TimeoutException -> Some <| (Response.response HTTP_408 (UTF8.bytes "Request Timeout") ctx)
+
   module ServeResource =
     open System
 

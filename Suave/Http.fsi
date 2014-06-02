@@ -37,7 +37,6 @@ module Http =
   /// A web part is a thing that executes on a HttpRequest, asynchronously, maybe executing
   /// on the request.
   ///
-  /// Note: WebResult = Async<unit> option
   type WebPart = HttpContext -> WebResult
 
   /// Return success with some value
@@ -1148,6 +1147,9 @@ module Http =
     /// 'c', char
     /// </para></summary>
     val url_scan : pf:PrintfFormat<'a,'b,'c,'d,'t> -> h:('t -> WebPart) -> WebPart
+
+    /// <summary> Fails the WebPart after x seconds</summary>
+    val timeout_webpart : x:System.TimeSpan -> WebPart -> WebPart
 
     /// <summary>
     /// Match on GET requests.

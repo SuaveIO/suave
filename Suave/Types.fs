@@ -119,7 +119,6 @@ type ErrorHandler = Exception -> String -> HttpContext -> SocketOp<unit>
 
 and HttpRuntime =
   { protocol           : Protocol
-  ; web_part_timeout   : TimeSpan
   ; error_handler      : ErrorHandler
   ; mime_types_map     : MimeTypesMap
   ; home_directory     : string
@@ -152,9 +151,6 @@ type SuaveConfig =
   /// An error handler to use for handling exceptions that are
   /// are thrown from the web parts
   ; error_handler    : ErrorHandler
-
-  /// Timeout for responses to be generated from the web part/user code.
-  ; web_part_timeout : TimeSpan
 
   /// Timeout to wait for the socket bind to finish
   ; listen_timeout   : TimeSpan

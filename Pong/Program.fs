@@ -13,7 +13,6 @@ let app : WebPart = OK "PONG"
 let config =
   { default_config with
      bindings = [ { scheme = HTTP ; ip = IPAddress.Parse "127.0.0.1" ; port   = 3000us } ]
-     web_part_timeout = TimeSpan.FromMilliseconds 3000.
      buffer_size = 8192
      max_ops = 10000
   }
