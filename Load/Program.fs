@@ -1,23 +1,29 @@
 ﻿open System
 open System.Net
 
+open Suave
 open Suave.Web
 open Suave.Http
 open Suave.Types
-open Suave.Session
+open Suave.Http.Applicatives
+open Suave.Http.Files
+open Suave.Log
 
-async {
-          (Console.OpenStandardOutput() |> log) >>= GET >>= browse
-          |> web_server
-              { bindings =
-                [ HttpBinding.Create(HTTP, "127.0.0.1", 8082)]
-              ; error_handler    = default_error_handler
-              ; web_part_timeout = TimeSpan.FromMilliseconds 1000.
-              ; listen_timeout   = TimeSpan.FromMilliseconds 2000.
-              ; ct               = Async.DefaultCancellationToken
-              ; buffer_size = 2048
-              ; max_ops = 10000 }
-} |> Async.Start
+let logger = Loggers.sane_defaults_for Verbose
+
+let config : SuaveConfig = 
+  { default_config with 
+      bindings = [ HttpBinding.Create(HTTP, "127.0.0.1", 8082) ]
+      ; buffer_size = 2048
+      ; max_ops = 10000
+      ; logger = logger }
+
+let listening, server = web_server_async config (choose [ GET >>= browse ])
+Async.Start server
+
+// wait for the server to start listening
+listening |> Async.RunSynchronously |> ignore
+
 async {
     while true do
       for _ in [1 .. 20] do
