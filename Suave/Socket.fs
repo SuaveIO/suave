@@ -77,18 +77,25 @@ type AsyncUserToken(?socket : Socket) =
 type A = System.Net.Sockets.SocketAsyncEventArgs
 type B = System.ArraySegment<byte>
 
+type Error = 
+  | SocketError of SocketError
+  | OtherError of string
+
+// Async is already a delayed type
+type SocketOp<'a> = Async<Choice<'a,Error>>
+
+let abort x = async { return Choice2Of2 x }
+
 /// Wraps the Socket.xxxAsync logic into F# async logic.
 let inline async_do (op : A -> bool) (prepare : A -> unit) (select: A -> 'T) (args : A) =
   Async.FromContinuations <| fun (ok, error, _) ->
     prepare args
     let k (args : A) =
-      try
         match args.SocketError with
         | System.Net.Sockets.SocketError.Success ->
           let result = select args
-          ok result
-        | e -> error (SocketIssue e)
-      with ex -> error ex
+          ok <| Choice1Of2 result
+        | e -> ok <|  Choice2Of2 (SocketError e)
     (args.UserToken :?> AsyncUserToken).Continuation <- k
     if not (op args) then
       k args
@@ -107,32 +114,111 @@ let inline trans (a : SocketAsyncEventArgs) =
 /// and that can be closed.
 type Connection =
   { ipaddr       : IPAddress
-  ; read         : ArraySegment<byte> -> Async<int>
-  ; write        : ArraySegment<byte> -> Async<unit>
+  ; read         : ArraySegment<byte> -> SocketOp<int>
+  ; write        : ArraySegment<byte> -> SocketOp<unit>
   ; get_buffer   : string -> ArraySegment<byte>
   ; free_buffer  : string -> ArraySegment<byte> -> unit
   ; is_connected : unit -> bool
   ; line_buffer  : ArraySegment<byte> }
 
+/// Workflow builder to read/write to async sockets with fail/success semantics
+type SocketMonad() =
+  member this.Return(x:'a) : SocketOp<'a>= async{ return Choice1Of2 x }
+  member this.Zero() : SocketOp<unit> = this.Return()
+  member this.ReturnFrom(x : SocketOp<'a>) : SocketOp<'a> = x
+  member this.Delay(f: unit ->  SocketOp<'a>) = async { return! f () }
+
+  member this.Bind(x : SocketOp<'a>,f : 'a -> SocketOp<'b>) : SocketOp<'b> = async{
+    let! result = x
+    match result with
+    | Choice1Of2 a -> return! f a
+    | Choice2Of2 b -> return Choice2Of2 b
+    }
+
+  member this.Combine(v, f) = this.Bind(v, fun () -> f)
+
+  member this.While(guard, body : SocketOp<'a>) : SocketOp<'a> = async {
+    if guard() then
+      let! result = body
+      match result with
+      | Choice1Of2 a ->
+        return! this.While(guard, body)
+      | Choice2Of2 _ ->
+        return result
+    else
+      return! this.Zero()
+      }
+
+  member this.TryWith(body, handler) = async {
+    try
+      return! body
+    with e ->
+      return! handler e
+    }
+
+  member this.TryFinally(body, compensation) = async {
+     try
+       return! body
+     finally
+       compensation()
+    }
+
+  member this.Using(disposable:#System.IDisposable, body) = async {
+    use _ = disposable
+    return! body disposable
+    }
+
+  member this.For(sequence:seq<_>, body : 'a -> SocketOp<unit>) = 
+    this.Using(sequence.GetEnumerator(), fun (enum : IEnumerator<'a>) ->
+    this.While(enum.MoveNext,this.Delay(fun _-> body enum.Current)))
+ 
+/// The socket monad   
+let socket = SocketMonad()
+
+/// lift a Async<'a> type to the Socket monad
+let lift_async (a : Async<'a>) = 
+  async { 
+    let! s = a
+    return Choice1Of2 s 
+  }
+
+/// lift a Task type to the Socket monad
+let lift_task (a : Task)   = 
+  async {
+    let! s = a 
+    return Choice1Of2 s 
+  }
+
 /// Write the string s to the stream asynchronously as ASCII encoded text
-let inline async_writeln (connection : Connection) (s : string) = async {
-  if s.Length > 0 then
-    let buff = connection.line_buffer
-    let c = bytes_to_buffer s buff.Array buff.Offset
-    do! connection.write (new ArraySegment<_>(buff.Array, buff.Offset, c))
-  do! connection.write eol_array_segment
-}
+let inline async_write (connection : Connection) (s : string)  : SocketOp<unit> = 
+  async {
+    if s.Length > 0 then
+      let buff = connection.line_buffer
+      let c = bytes_to_buffer s buff.Array buff.Offset
+      return! connection.write (new ArraySegment<_>(buff.Array, buff.Offset, c))
+    else return Choice1Of2 ()
+  }
+
+let inline async_write_nl (connection : Connection) = 
+  connection.write eol_array_segment
+
+let inline async_writeln (connection : Connection) (s : string) : SocketOp<unit> = 
+  socket {
+    do! async_write connection s
+    do! async_write_nl connection
+  }
 
 /// Write the string s to the stream asynchronously from a byte array
 let inline async_writebytes (connection : Connection) (b : byte[]) = async {
-  if b.Length > 0 then do! connection.write (new ArraySegment<_>(b, 0, b.Length))
+  if b.Length > 0 then return! connection.write (new ArraySegment<_>(b, 0, b.Length))
+  else return Choice1Of2 ()
 }
 
 /// Asynchronously write from the 'from' stream to the 'to' stream.
 let transfer_x (to_stream : Connection) (from : Stream) =
   let buf = Array.zeroCreate<byte> 0x2000
-  let rec do_block () = async {
-    let! read = from.AsyncRead buf
+  let rec do_block () = socket {
+    let! read = lift_async <| from.AsyncRead buf
     if read <= 0 then
       return ()
     else
@@ -145,8 +231,8 @@ let transfer_x (to_stream : Connection) (from : Stream) =
 let transfer_len_x (to_stream : Connection) (from : Stream) len =
   let buf_size = 0x2000
   let buf = Array.zeroCreate<byte> 0x2000
-  let rec do_block left = async {
-    let! read = from.AsyncRead(buf, 0, Math.Min(buf_size, left))
+  let rec do_block left = socket {
+    let! read = lift_async <| from.AsyncRead(buf, 0, Math.Min(buf_size, left))
     if read <= 0 || left - read = 0 then
       return ()
     else

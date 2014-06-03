@@ -45,11 +45,13 @@ let testapp : WebPart =
   ]
 
 System.Net.ServicePointManager.DefaultConnectionLimit <- Int32.MaxValue
+open Socket
 
-let timeout r =
-  async {
-    do! Async.Sleep 1500
-  } |> succeed
+let timeout =
+  fun r ->
+  // blocking time consuming task
+  Async.RunSynchronously <| async { do! Async.Sleep 10000 }
+  OK "Did not timed out." r
 
 // Adds a new mime type to the default map
 let mime_types =
@@ -68,15 +70,18 @@ choose [
   url "/redirect" >>= Redirection.redirect "/redirected"
   url "/redirected" >>=  OK "You have been redirected." ;
   url "/date" >>= warbler (fun _ -> OK (DateTimeOffset.UtcNow.ToString("o")))
-  url "/timeout" >>= timeout
+  url "/timeout" >>= timeout_webpart (TimeSpan.FromSeconds 1.) timeout
   url "/session"
-    >>= session_support
-    >>= request (fun x ->
-        cond (session x) ? counter
-          (fun y ->
-              (session x) ? counter <- (y :?> int) + 1 :> obj ;
-              OK (sprintf "Hello %A time(s)"  y ))
-          ((session x) ? counter <- 1 :> obj ; OK "First time" ))
+    >>= session_support (TimeSpan(0,30,0))
+    >>= context (fun x ->
+        let get,set = session x
+        match get "counter" with
+        | Some y ->
+          set "counter" (y + 1 )
+          OK (sprintf "Hello %d time(s)"  y )
+        | None ->
+          set "counter" 1
+          OK "First time" )
   basic_auth // from here on it will require authentication
   GET >>= browse //serves file if exists
   GET >>= dir //show directory listing
@@ -93,8 +98,6 @@ choose [
         [ HttpBinding.Create(HTTP, "127.0.0.1", 8082)
         ; { scheme = HTTPS(sslCert); ip = IPAddress.Parse "127.0.0.1"; port = 8083us } ]
       ; error_handler    = default_error_handler
-      // most of the time we should leave it up to the WebPart to time out internally
-      ; web_part_timeout = TimeSpan.FromHours 5.
       ; listen_timeout   = TimeSpan.FromMilliseconds 2000.
       ; ct               = Async.DefaultCancellationToken
       ; buffer_size      = 2048
@@ -102,4 +105,5 @@ choose [
       ; mime_types_map   = mime_types
       ; home_folder      = None
       ; compressed_files_folder = None
-      ; logger           = logger }
+      ; logger           = logger
+      ; session_provider = new DefaultSessionProvider() }

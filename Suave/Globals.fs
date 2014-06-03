@@ -24,11 +24,7 @@ let mutable utc_now = fun () -> System.DateTimeOffset.UtcNow
 /// From the TCP module, keeps track of the number of clients
 let internal number_of_clients = ref 0L
 
-// TODO: provide proper session storage
 open System.Collections.Concurrent
-
-/// Static dictionary of sessions - here be dragons, see Session.fs
-let internal session_map = new ConcurrentDictionary<string, ConcurrentDictionary<string, obj>>()
 
 /// A map of compressed files:
 /// TODO - evaluate if we can't service requests
