@@ -31,18 +31,18 @@ module ParsingAndControl =
       let pair = pairs.[i]
       if acc + pair.length < x then
         do! select (ArraySegment(pair.buffer.Array, pair.offset, pair.length)) pair.length
-        connection.free_buffer "Web.split_gen_async" pair.buffer
+        connection.free_buffer "Web.split" pair.buffer
         return! loop (i+1) (acc + pair.length) (count + acc)
       elif acc + pair.length >= x then
         let bytes_read = x - acc
         do! select (ArraySegment(pair.buffer.Array, pair.offset, bytes_read)) bytes_read
         let remaining = pair.length - bytes_read
         if remaining = marker_lenght then
-          connection.free_buffer "Web.split_gen_async" pair.buffer
+          connection.free_buffer "Web.split" pair.buffer
           return count + bytes_read, None
         else
           return count + bytes_read, mk_buffer_segment pair.buffer (pair.offset  + bytes_read  + marker_lenght) (remaining - marker_lenght)
-      else return failwith "should not get here"
+      else return failwith "Web.split: invalid case"
       }
     loop 0 0 c
 
@@ -73,13 +73,12 @@ module ParsingAndControl =
 
   open System.Net.Sockets
 
-  let read_data (connection : Connection) = socket {
-      let buff = connection.get_buffer "read_till_pattern.read_data"
+  let read_data (connection : Connection) buff = socket {
+
       let! b = connection.read buff
       if b > 0 then
         return { buffer = buff; offset = buff.Offset; length = b }
       else
-        connection.free_buffer "read_till_pattern.read_data (exception case)" buff
         return! abort (Error.SocketError (SocketError.Shutdown))
       }
 
@@ -87,17 +86,22 @@ module ParsingAndControl =
   /// and returns an array containing excess data read past the marker
   let read_till_pattern (connection : Connection) select (preread : BufferSegment option) scan_data =
 
-    let rec loop state  (*: Async<int * BufferSegment option>*)= async {
+    let rec loop state = async {
       let! res = scan_data 0 state connection select
       match res with
       | Found a ->
         return Choice1Of2 a
-      | NeedMore b ->
-          let! result = read_data connection
+      | NeedMore buffer_segment_list ->
+          let buff = connection.get_buffer "read_till_pattern.loop"
+          let! result = read_data connection buff
           match result with
           | Choice1Of2 data ->
-            return! loop (b @ [data])
-          | Choice2Of2 error -> return Choice2Of2 error
+            return! loop (buffer_segment_list @ [data])
+          | Choice2Of2 error ->
+            for b in buffer_segment_list do
+              do connection.free_buffer "read_till_pattern.loop" b.buffer
+            connection.free_buffer "read_till_pattern.loop" buff
+            return Choice2Of2 error
     }
 
     match preread with
