@@ -55,7 +55,8 @@ type HttpRequest =
   ; files                : List<HttpUpload>
   ; mutable trace        : Log.TraceHeader
   ; is_secure            : bool
-  ; status               : int option }
+  ; status               : int option
+  ; ipaddr               : IPAddress }
 
 /// Gets the query from the HttpRequest
 let query (x : HttpRequest) = x.query
@@ -115,7 +116,7 @@ type SessionStore<'a>     = (string -> 'a option)*(string -> 'a -> unit)
 
 /// An error handler takes the exception, a programmer-provided message, a request (that failed) and returns
 /// an asynchronous workflow for the handling of the error.
-type ErrorHandler = Exception -> String -> HttpContext -> SocketOp<unit>
+type ErrorHandler = Exception -> String -> HttpContext -> Connection -> SocketOp<unit>
 
 and HttpRuntime =
   { protocol           : Protocol
@@ -129,7 +130,7 @@ and HttpRuntime =
 and HttpContext =
   { request    : HttpRequest
   ; runtime    : HttpRuntime
-  ; connection : Connection }
+  ; user_state : Map<string, obj> }
 
 and ISessionProvider =
   abstract member Generate : TimeSpan * HttpContext -> string

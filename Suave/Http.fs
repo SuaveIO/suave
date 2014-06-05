@@ -5,7 +5,7 @@ module Http =
   open Socket
   open Types
 
-  type WebResult = SocketOp<unit> option
+  type WebResult = (Connection -> SocketOp<unit>) option
 
   type WebPart = HttpContext -> WebResult
 
@@ -261,14 +261,14 @@ module Http =
             | _         -> None)
       | _ -> None
 
-    let transform (content : byte []) (ctx : HttpContext) : SocketOp<byte []> =
+    let transform (content : byte []) (ctx : HttpContext) connection : SocketOp<byte []> =
       socket {
         if content.Length > MIN_BYTES_TO_COMPRESS && content.Length < MAX_BYTES_TO_COMPRESS then
           let request = ctx.request
           let enconding = get_encoder request
           match enconding with
           | Some (n,encoder) ->
-            do! async_writeln ctx.connection (String.Concat [| "Content-Encoding: "; n.ToString() |])
+            do! async_writeln connection (String.Concat [| "Content-Encoding: "; n.ToString() |])
             return encoder content
           | None ->
             return content
@@ -301,7 +301,7 @@ module Http =
       return new_path
     }
 
-    let transform_x (key : string) (get_data : string -> Stream) (get_last : string -> DateTime) compression compression_folder ({ request = q; runtime = r; connection = connection } as ctx) =
+    let transform_x (key : string) (get_data : string -> Stream) (get_last : string -> DateTime) compression compression_folder ({ request = q } as ctx) connection =
       socket {
         let stream = get_data key
         if compression && stream.Length > int64(MIN_BYTES_TO_COMPRESS) && stream.Length < int64(MAX_BYTES_TO_COMPRESS) then
@@ -332,12 +332,12 @@ module Http =
     open System
     open System.IO
 
-    let internal write_content_type request connection = socket {
-      if not(request.response.Headers.Exists(new Predicate<_>(fun (x,_) -> x.ToLower().Equals("content-type")))) then
+    let internal write_content_type connection (headers : System.Collections.Generic.List<string*string>)  = socket {
+      if not(headers.Exists(new Predicate<_>(fun (x,_) -> x.ToLower().Equals("content-type")))) then
         do! async_writeln connection "Content-Type: text/html"
     }
 
-    let internal write_headers (headers : (string*string) seq) connection = socket {
+    let internal write_headers connection (headers : (string*string) seq)  = socket {
       for (x,y) in headers do
         if not (List.exists (fun y -> x.ToLower().Equals(y)) ["server";"date";"content-length"]) then
           do! async_writeln connection (String.Concat [| x; ": "; y |])
@@ -345,9 +345,9 @@ module Http =
 
     let response_f 
       (status_code : HttpCode)
-      (f_content : HttpRequest ->  SocketOp<unit>)
-      ({request = request; runtime = runtime; connection = connection } as context : HttpContext)
-      =
+      (f_content : Connection -> SocketOp<unit>)
+      ({request = request } as context : HttpContext)
+      = fun connection ->
       socket {
         
       do! async_writeln connection (String.concat " " [ "HTTP/1.1"
@@ -356,35 +356,33 @@ module Http =
       do! async_writeln connection Internals.server_header
       do! async_writeln connection (String.Concat( [|  "Date: "; Globals.utc_now().ToString("R") |]))
 
-      do! write_headers (request.response.Headers) connection
-      do!  write_content_type request connection
+      do! write_headers connection request.response.Headers
+      do!  write_content_type connection request.response.Headers 
 
-      return! f_content request
+      return! f_content connection
       }
-     
-    let response status_code
-                 (cnt : byte [])
-                 ({request = request; runtime = runtime; connection = connection } as context : HttpContext) =
-      response_f status_code (
-        fun r -> socket {
 
-          let! (content : byte []) = Compression.transform cnt context
+    let response status_code (cnt : byte []) ({ request = request } as context : HttpContext)  =
 
-          // http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.13
-          do! async_writeln connection (String.Concat [|  "Content-Length: "; content.Length.ToString() |])
+      let op connection = socket {
 
-          do! async_writeln connection ""
+        let! (content : byte []) = Compression.transform cnt context connection
 
-          if content.Length > 0 then
-            do! connection.write (new ArraySegment<_>(content, 0, content.Length))
-        })
-        {request = { request with status = http_code status_code |> Some }; runtime = runtime; connection = connection }
+        // http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.13
+        do! async_writeln connection (String.Concat [|  "Content-Length: "; content.Length.ToString() |])
+
+        do! async_writeln connection ""
+
+        if content.Length > 0 then
+          do! connection.write (new ArraySegment<_>(content, 0, content.Length))
+      }
+      response_f status_code op { context with request = { request with status = http_code status_code |> Some }}
     
   module Writers =
 
     open System
 
-    let set_header key value ({request = http_request; runtime = _ } as ctx : HttpContext) =
+    let set_header key value ({request = http_request } as ctx : HttpContext) =
       http_request.response.Headers.Add(key, value)
       ctx
 
@@ -633,7 +631,7 @@ module Http =
       let ci = Globalization.CultureInfo("en-US")
       let process_id = System.Diagnostics.Process.GetCurrentProcess().Id.ToString()
       sprintf "%O %s %s [%s] \"%s %s %s\" %s %s"
-        ctx.connection.ipaddr
+        ctx.request.ipaddr
         process_id //TODO: obtain connection owner via Ident protocol
         (dash ctx.request.user_name)
         (DateTime.UtcNow.ToString("dd/MMM/yyyy:hh:mm:ss %K", ci))
@@ -684,7 +682,7 @@ module Http =
         try
           Async.RunSynchronously (resolve web_part ctx, int time_span.TotalMilliseconds)
         with
-          | :? TimeoutException -> Some <| (Response.response HTTP_408 (UTF8.bytes "Request Timeout") ctx)
+          | :? TimeoutException -> Some (fun cn ->Response.response HTTP_408 (UTF8.bytes "Request Timeout") ctx cn)
 
   module ServeResource =
     open System
@@ -696,26 +694,26 @@ module Http =
     // the max-age directive overrides the Expires header, even if the Expires header is more restrictive
     // 'Cache-Control' and 'Expires' headers should be left up to the user
     
-    let resource key exists get_last get_extension send =
-      fun ({request = r; runtime = q} as ctx) ->
-        if exists key then
-          let mimes = q.mime_types_map <| get_extension key
+    let resource key exists get_last get_extension (send : string -> bool -> HttpContext -> WebResult) ({request = r } as ctx) : WebResult =
+
+      let send_it name compression =
+        set_header "Last-Modified" ((get_last key : DateTime).ToString("R"))
+        >> set_mime_type name
+        >> send key compression
+
+      if exists key then
+          let mimes = ctx.runtime.mime_types_map <| get_extension key
           match mimes with
           | Some value ->
-            let send_it _ =
-              set_header "Last-Modified" ((get_last key : DateTime).ToString("R"))
-              >> set_mime_type value.name
-              >> send key value.compression
-
             let modified_since = (r.headers ? ``if-modified-since`` )
             match modified_since with
             | Some v -> let date = DateTime.Parse v
-                        if get_last key > date then send_it () ctx
+                        if get_last key > date then send_it value.name value.compression ctx
                         else NOT_MODIFIED ctx
-            | None   -> send_it () ctx
+            | None   -> send_it  value.name value.compression ctx
           | None -> None
-        else
-          None
+      else
+        None
 
   module Files =
 
@@ -731,11 +729,11 @@ module Http =
     open Redirection
     open ServeResource
 
-    let send_file file_name (compression : bool) ({ connection = conn; runtime = runtime } as ctx : HttpContext) =
-      let write_file file (q : HttpRequest) = socket {
+    let send_file file_name (compression : bool) (ctx : HttpContext)  =
+      let write_file file conn = socket {
         let get_fs = fun path -> new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read) :> Stream
         let get_lm = fun path -> FileInfo(path).LastWriteTime
-        use! fs = Compression.transform_x file get_fs get_lm compression runtime.compression_folder ctx
+        use! fs = Compression.transform_x file get_fs get_lm compression ctx.runtime.compression_folder ctx conn
 
         do! async_writeln conn (sprintf "Content-Length: %d" (fs: Stream).Length)
         do! async_writeln conn ""
@@ -743,15 +741,18 @@ module Http =
         if fs.Length > 0L then
           do! transfer_x conn fs
       }
-      socket { do! response_f HTTP_200 (write_file file_name) ctx } |> succeed
+      succeed <| fun s -> socket { do! response_f HTTP_200 (write_file file_name) ctx s } 
 
-    let file file_name =
-      resource
-        file_name
-        (File.Exists)
-        (fun name -> FileInfo(name).LastAccessTime)
-        (Path.GetExtension)
-        send_file
+    let file file_name (ctx : HttpContext) : WebResult =
+      succeed 
+      <| fun s ->
+          let task = resource file_name (File.Exists) (fun name -> FileInfo(name).LastAccessTime) (Path.GetExtension) send_file  ctx
+          match task with 
+          | Some res ->
+            socket {
+              do! res s
+            }
+          | None -> socket  { return () }
 
     let local_file (file_name : string) (root_path : string) =
       let file_name =
@@ -770,13 +771,11 @@ module Http =
     let browse : WebPart = warbler (fun {request = r; runtime = q } -> file (local_file r.url q.home_directory))
 
     let dir (ctx : HttpContext) : WebResult =
-
       let req = ctx.request
-      let runtime = ctx.runtime
 
       let url = req.url
 
-      let dirname = local_file url runtime.home_directory
+      let dirname = local_file url (ctx.runtime.home_directory)
       let result = new StringBuilder()
 
       let filesize  (x : FileSystemInfo) =
@@ -817,11 +816,11 @@ module Http =
     let resources = assembly.GetManifestResourceNames()
     let last_modified = FileInfo(Assembly.GetExecutingAssembly().Location).CreationTime
     
-    let send_resource resource_name (compression : bool) ({ connection = conn; runtime = runtime } as ctx : HttpContext) =
-      let write_resource name (q : HttpRequest) = socket {
+    let send_resource resource_name (compression : bool) (ctx : HttpContext) =
+      let write_resource name conn = socket {
         let get_fs = fun name -> assembly.GetManifestResourceStream(name)
         let get_lm = fun _ -> last_modified
-        use! fs = Compression.transform_x name get_fs get_lm compression runtime.compression_folder ctx
+        use! fs = Compression.transform_x name get_fs get_lm compression ctx.runtime.compression_folder ctx conn
 
         do! async_writeln conn (sprintf "Content-Length: %d" (fs: Stream).Length)
         do! async_writeln conn ""
@@ -829,7 +828,7 @@ module Http =
         if fs.Length > 0L then
           do! transfer_x conn fs
       }
-      socket { do! response_f HTTP_200 (write_resource resource_name) ctx } |> succeed
+      succeed <| fun s -> socket { do! response_f HTTP_200 (write_resource resource_name) ctx s }
 
     let resource name =
       resource

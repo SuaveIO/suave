@@ -23,17 +23,17 @@ let private copy_response_headers (headers1 : WebHeaderCollection) (headers2 : L
     headers2.Add(e, headers1.[e])
 
 /// Send the web response from HttpWebResponse to the HttpRequest 'p'
-let private send_web_response (data : HttpWebResponse)
-                              ({ request = { response = resp; trace = t }
-                               ; runtime = { logger = logger }} as ctx : HttpContext) = socket {
-  copy_response_headers data.Headers resp.Headers
-  // TODO: if downstream sends a Content-Length header copy from one stream
-  // to the other asynchronously
-  "-> read_fully" |> Log.verbose logger "proxy:send_web_response:GetResponseStream" t
-  let bytes = data.GetResponseStream() |> read_fully
-  "<- read_fully" |> Log.verbose logger "proxy:send_web_response:GetResponseStream" t
-  do! response (HttpCode.TryParse(int data.StatusCode) |> Option.get) bytes ctx
-}
+let private send_web_response (data : HttpWebResponse) ({ request = { response = resp; trace = t }} as ctx : HttpContext) =
+  fun (cn : Connection) ->
+  socket {
+    copy_response_headers data.Headers resp.Headers
+    // TODO: if downstream sends a Content-Length header copy from one stream
+    // to the other asynchronously
+    "-> read_fully" |> Log.verbose ctx.runtime.logger "proxy:send_web_response:GetResponseStream" t
+    let bytes = data.GetResponseStream() |> read_fully
+    "<- read_fully" |> Log.verbose ctx.runtime.logger "proxy:send_web_response:GetResponseStream" t
+    do! response (HttpCode.TryParse(int data.StatusCode) |> Option.get) bytes ctx cn
+  }
 
 /// Forward the HttpRequest 'p' to the 'ip':'port'
 let forward (ip : IPAddress) (port : uint16) (ctx : HttpContext) =
@@ -68,21 +68,22 @@ let forward (ip : IPAddress) (port : uint16) (ctx : HttpContext) =
   header "transfer-encoding" |> Option.iter (fun v -> q.TransferEncoding <- v)
   header "user-agent"        |> Option.iter (fun v -> q.UserAgent <- v)
 
-  q.Headers.Add("X-Forwarded-For", ctx.connection.ipaddr.ToString())
+  q.Headers.Add("X-Forwarded-For", p.ipaddr.ToString())
 
-  socket {
-    if p.``method`` = "POST" || p.``method`` = "PUT" then
-      let content_length = Convert.ToInt32(p.headers.["content-length"])
-      do! transfer_len_x ctx.connection (q.GetRequestStream()) content_length
-    try
-      let! data = lift_async <| q.AsyncGetResponse()
-      do! send_web_response ((data : WebResponse) :?> HttpWebResponse) ctx
-    with
-    | :? WebException as ex when ex.Response <> null ->
-      do! send_web_response (ex.Response :?> HttpWebResponse) ctx
-    | :? WebException as ex when ex.Response = null ->
-      do! response HTTP_502 (UTF8.bytes "suave proxy: Could not connect to upstream") ctx
-  } |> succeed
+  succeed <| fun cn -> 
+    socket {
+      if p.``method`` = "POST" || p.``method`` = "PUT" then
+        let content_length = Convert.ToInt32(p.headers.["content-length"])
+        do! transfer_len_x cn (q.GetRequestStream()) content_length
+      try
+        let! data = lift_async <| q.AsyncGetResponse()
+        do! send_web_response ((data : WebResponse) :?> HttpWebResponse) ctx cn
+      with
+      | :? WebException as ex when ex.Response <> null ->
+        do! send_web_response (ex.Response :?> HttpWebResponse) ctx cn
+      | :? WebException as ex when ex.Response = null ->
+        do! response HTTP_502 (UTF8.bytes "suave proxy: Could not connect to upstream") ctx cn
+    }
 
 /// Proxy the HttpRequest 'r' with the proxy found with 'proxy_resolver'
 let proxy proxy_resolver (r : HttpRequest) =
