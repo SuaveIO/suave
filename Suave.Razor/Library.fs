@@ -41,9 +41,7 @@ module Razor =
   let razor<'a> path (model : 'a) =
     let load_template = async_memoize load_template
     fun r ->
-    async {
       let template_path = local_file path r.runtime.home_directory
-      let! razorTemplate = load_template template_path
+      let razorTemplate = Async.RunSynchronously <| load_template template_path
       let content = Razor.Parse(razorTemplate, model, template_path)
-      do! response 200 "OK" (bytes content) r 
-      } |> succeed
+      response 200 "OK" (bytes content) r |> succeed
