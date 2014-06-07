@@ -6,8 +6,8 @@ open System.Runtime.InteropServices
 [<assembly: AssemblyConfiguration("RELEASE")>]
 [<assembly: AssemblyCompany("Suave.IO")>]
 [<assembly: AssemblyCopyright("(c) 2014 by Ademar Gonzalez, Henrik Feldt")>]
-[<assembly: AssemblyVersion("0.7.0.0")>]
-[<assembly: AssemblyFileVersion("0.7.0.0")>]
-[<assembly: AssemblyInformationalVersion("0.7.0.cb26d1")>]
+[<assembly: AssemblyVersion("0.8.0.0")>]
+[<assembly: AssemblyFileVersion("0.8.0.0")>]
+[<assembly: AssemblyInformationalVersion("0.8.0.b32d2a")>]
 [<assembly: AssemblyTitle("Tests")>]
 ()
