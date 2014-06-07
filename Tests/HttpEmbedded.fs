@@ -3,6 +3,7 @@
 open Fuchu
 
 open Suave
+open Suave.Types.Methods
 open Suave.Http
 open Suave.Http.Successful
 open Suave.Http.Embedded

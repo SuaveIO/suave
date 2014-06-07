@@ -10,6 +10,7 @@ open System.Net.Http.Headers
 
 open Suave
 open Suave.Types
+open Suave.Types.Methods
 open Suave.Web
 open Suave.Http
 open Suave.Log

@@ -9,6 +9,7 @@ open Suave.Http
 open Suave.Http.Successful
 open Suave.Http.Writers
 open Suave.Types
+open Suave.Types.Methods
 
 open Suave.Tests.TestUtilities
 
