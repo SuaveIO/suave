@@ -77,26 +77,6 @@ module Http =
   /// or otherwise, applies g a, if there is no value in d.
   val cond : item:'a option -> f:('a -> 'b -> 'c) -> g:('b -> 'c) -> 'b -> 'c
 
-  /// <summary>
-  /// <para>These are the known HTTP methods.</para><para>
-  /// If you are getting compile-errors
-  /// on this; make sure you don't mean the similarly named functions from the
-  /// Applicatives module, e.g. by opening Applicatives after opening Http.
-  /// </para></summary>
-  (*type HttpMethod =
-    | GET
-    | POST
-    | DELETE
-    | PUT
-    | HEAD
-    | CONNECT
-    | PATCH
-    | TRACE
-    | OPTIONS*)
-
-  // module Internals elided
-  // module Internals Compression
-
   /// general response functions
   module Response =
 
