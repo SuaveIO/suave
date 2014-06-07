@@ -175,15 +175,18 @@ type SocketMonad() =
 /// The socket monad   
 let socket = SocketMonad()
 
+/// A TCP Worker is a thing that takes a TCP client and returns an asynchronous workflow thereof
+type TcpWorker<'a> = Connection -> SocketOp<'a>
+
 /// lift a Async<'a> type to the Socket monad
-let lift_async (a : Async<'a>) = 
+let lift_async (a : Async<'a>) : SocketOp<'a> = 
   async { 
     let! s = a
     return Choice1Of2 s 
   }
 
 /// lift a Task type to the Socket monad
-let lift_task (a : Task)   = 
+let lift_task (a : Task) : SocketOp<'a>  = 
   async {
     let! s = a 
     return Choice1Of2 s 

@@ -6,6 +6,7 @@ open System
 open System.IO
 open System.Text
 
+open Suave.Types.Methods
 open Suave.Http
 open Suave.Http.Successful
 open Suave.Tests.TestUtilities

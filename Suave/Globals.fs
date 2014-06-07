@@ -30,3 +30,12 @@ open System.Collections.Concurrent
 /// TODO - evaluate if we can't service requests
 /// by writing these to disk instead
 let internal compressed_files_map = new ConcurrentDictionary<string,string>()
+
+module Internals =
+
+  open System
+  open System.Reflection
+
+  let SUAVE_VERSION = Assembly.GetExecutingAssembly().GetName().Version.ToString()
+
+  let server_header = String.Concat [| "Server: Suave/"; SUAVE_VERSION; " (http://suave.io)" |]

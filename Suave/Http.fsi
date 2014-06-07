@@ -30,15 +30,6 @@ module Http =
   open Socket
   open Types
 
-  /// A web result is something that writes to the output stream that the client
-  /// as to the web server.
-  type WebResult = SocketOp<unit> option
-
-  /// A web part is a thing that executes on a HttpRequest, asynchronously, maybe executing
-  /// on the request.
-  ///
-  type WebPart = HttpContext -> WebResult
-
   /// Return success with some value
   val inline succeed : item:'a -> 'a option
 
@@ -86,53 +77,16 @@ module Http =
   /// or otherwise, applies g a, if there is no value in d.
   val cond : item:'a option -> f:('a -> 'b -> 'c) -> g:('b -> 'c) -> 'b -> 'c
 
-  /// <summary>
-  /// <para>These are the known HTTP methods.</para><para>
-  /// If you are getting compile-errors
-  /// on this; make sure you don't mean the similarly named functions from the
-  /// Applicatives module, e.g. by opening Applicatives after opening Http.
-  /// </para></summary>
-  type HttpMethod =
-    | GET
-    | POST
-    | DELETE
-    | PUT
-    | HEAD
-    | CONNECT
-    | PATCH
-    | TRACE
-    | OPTIONS
-
-  module Codes =
-    type HttpCode =
-      | HTTP_100 | HTTP_101
-      | HTTP_200 | HTTP_201 | HTTP_202 | HTTP_203 | HTTP_204 | HTTP_205 | HTTP_206
-      | HTTP_300 | HTTP_301 | HTTP_302 | HTTP_303 | HTTP_304 | HTTP_305 | HTTP_307
-      | HTTP_400 | HTTP_401 | HTTP_402 | HTTP_403 | HTTP_404 | HTTP_405 | HTTP_406
-      | HTTP_407 | HTTP_408 | HTTP_409 | HTTP_410 | HTTP_411 | HTTP_412 | HTTP_413
-      | HTTP_422 | HTTP_428 | HTTP_429 | HTTP_414 | HTTP_415 | HTTP_416 | HTTP_417
-      | HTTP_500 | HTTP_501 | HTTP_502 | HTTP_503 | HTTP_504 | HTTP_505
-      static member TryParse : int -> HttpCode option
-
-    val http_code : code:HttpCode -> int
-
-    val http_reason : code:HttpCode -> string
-
-    val http_message : code:HttpCode -> string
-
-  // module Internals elided
-  // module Internals Compression
-
-  open Codes
-
   /// general response functions
   module Response =
 
+    open Types.Codes
+
     /// Respond with a given status code, http message, content in the body to a http request.
-    val response_f : status_code:HttpCode -> f_content:(HttpRequest -> SocketOp<unit>) -> request:HttpContext -> SocketOp<unit>
+    // val response_f : status_code:HttpCode -> ( Connection -> SocketOp<unit>) -> request:HttpContext -> (Connection -> SocketOp<unit>)
 
     /// Respond with a given status code, http reason phrase, content in the body to a http request.
-    val response : status_code:HttpCode -> content:byte [] -> request:HttpContext -> SocketOp<unit>
+    val response : status_code:HttpCode -> content:byte [] -> request:HttpContext -> HttpContext
 
   /// Module that allows changing the output response in different ways.
   /// Functions have signature f :: params... -> HttpContext -> HttpContext.
@@ -1103,6 +1057,8 @@ module Http =
   /// Functions have signature f :: params... -> HttpContext -> HttpContext option.
   module Applicatives =
 
+    open Types.Methods
+
     /// Match on the url
     val url : s:string -> x:HttpContext -> HttpContext option
 
@@ -1423,7 +1379,7 @@ module Http =
     /// </para></summary>
     /// <remarks>
     /// </remarks>
-    val dir : req:HttpContext -> WebResult
+    val dir : WebPart
 
   module Embedded =
 
@@ -1477,4 +1433,4 @@ module Http =
     /// </para></summary>
     /// <remarks>
     /// </remarks>
-    val authenticate_basic : f:(HttpRequest -> bool) -> p:HttpContext -> WebResult
+    val authenticate_basic : f:(HttpRequest -> bool) -> p:HttpContext -> HttpContext option

@@ -249,14 +249,11 @@ module ParsingAndControl =
 
   /// Process the request, reading as it goes from the incoming 'stream', yielding a HttpRequest
   /// when done
-  let process_request proxy_mode
-                      (request : HttpRequest)
-                      (connection : Connection)
-                      (runtime : HttpRuntime)
-                      (bytes : BufferSegment option)
-                      : SocketOp<(HttpRequest * BufferSegment option) option> = socket {
+  let process_request proxy_mode (ctx : HttpContext)(bytes : BufferSegment option) connection : SocketOp<(HttpRequest * BufferSegment option) option> = socket {
 
-    let verbose = Log.verbose runtime.logger "Web.process_request" request.trace
+    let request : HttpRequest = ctx.request
+
+    let verbose = Log.verbose ctx.runtime.logger "Web.process_request" request.trace
     let line_buffer = connection.line_buffer
 
     let! (first_line : string), rem = read_line connection bytes line_buffer
@@ -339,7 +336,7 @@ module ParsingAndControl =
   type HttpProcessor = HttpRequest -> Connection -> BufferSegment option -> Async<(HttpRequest * (BufferSegment option)) option>
   type RequestResult = Done
 
-  let internal mk_request connection proto =
+  let internal mk_request connection proto ipaddr : HttpRequest =
     { http_version   = null
     ; url            = null
     ; ``method``     = null
@@ -352,45 +349,96 @@ module ParsingAndControl =
     ; user_name      = null
     ; password       = null
     ; session_id     = null
-    ; response       = new HttpResponse()
     ; files          = new List<HttpUpload>()
     ; is_secure      = match proto with HTTP -> false | HTTPS _ -> true
     ; trace          = Log.TraceHeader.Empty
-    ; status         = None }
+    ; ipaddr = ipaddr }
+  
+  let internal write_content_type connection (headers : (string*string) list)  = socket {
+    if not(List.exists(fun (x : string,_) -> x.ToLower().Equals("content-type")) headers )then
+      do! async_writeln connection "Content-Type: text/html"
+  }
+
+  let internal write_headers connection (headers : (string*string) seq)  = socket {
+    for (x,y) in headers do
+      if not (List.exists (fun y -> x.ToLower().Equals(y)) ["server";"date";"content-length"]) then
+        do! async_writeln connection (String.Concat [| x; ": "; y |])
+    } 
+
+  open Types.Codes
+  open Globals
+  open Suave.Compression
+
+  //let response_f (status_code : HttpCode) (f_content : Connection -> SocketOp<unit>) ({request = request } as context : HttpContext)  = 
+  let response_f ({ response = r } as context : HttpContext)  =
+
+    let write_content connection = function
+      | Bytes b -> socket {
+        let! (content : byte []) = Compression.transform b context connection
+        // http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.13
+        do! async_writeln connection (String.Concat [|  "Content-Length: "; content.Length.ToString() |])
+        do! async_writeln connection ""
+        if content.Length > 0 then
+          do! connection.write (new ArraySegment<_>(content, 0, content.Length))
+        }
+      | SocketTask f -> f connection
+
+    fun connection ->
+      socket {
+        
+      do! async_writeln connection (String.concat " " [ "HTTP/1.1"
+                                                      ; (http_code r.status).ToString()
+                                                      ; http_reason r.status ])
+      do! async_writeln connection Internals.server_header
+      do! async_writeln connection (String.Concat( [|  "Date: "; Globals.utc_now().ToString("R") |]))
+
+      do! write_headers connection r.headers
+      do! write_content_type connection r.headers 
+
+      return! write_content connection r.content
+      }
 
   /// Check if the web part can perform its work on the current request. If it can't
   /// it will return None and the run method will return.
-  let internal run ctx (web_part : WebPart) = socket {
-      let task = web_part ctx
-      match task with 
-      | Some x -> return! x 
+  let internal run ctx (web_part : WebPart) s = socket {
+      match web_part ctx with 
+      | Some x ->
+        return! response_f x s
       | None -> return ()
   }
 
-  let http_loop (proxy_mode : bool) (runtime : HttpRuntime) req cn (web_part : WebPart) =
+  type HttpConsumer =
+    | WebPart of WebPart
+    | SocketPart of (HttpContext -> Connection -> SocketOp<unit>)
+
+  let http_loop (proxy_mode : bool) (ctx : HttpContext) (consumer : HttpConsumer) (connection : Connection) =
 
     let rec loop (bytes : BufferSegment option) request = socket {
 
-      let verbose  = Log.verbose runtime.logger "Web.request_loop.loop" request.trace
-      let verbosef = Log.verbosef runtime.logger "Web.request_loop.loop" request.trace
+      let verbose  = Log.verbose ctx.runtime.logger "Web.request_loop.loop" request.trace
+      let verbosef = Log.verbosef ctx.runtime.logger "Web.request_loop.loop" request.trace
 
       verbose "-> processor"
-      let! result = process_request proxy_mode request cn runtime bytes
+      let! result = process_request proxy_mode ctx bytes connection
       verbose "<- processor"
 
       match result with
       | None -> verbose "'result = None', exiting"
       | Some (request : HttpRequest, rem) ->
-        let ctx = { request = request; runtime = runtime; connection = cn }
-        do! run ctx web_part
-        if cn.is_connected () then
+        let ctx = { ctx with request = request }
+        match consumer with
+        | WebPart web_part ->
+          do! run ctx web_part connection
+        | SocketPart writer ->
+          do! writer ctx connection
+        if connection.is_connected () then
           match request.headers?connection with
           | Some (x : string) when x.ToLower().Equals("keep-alive") ->
             clear request
             verbosef (fun fmt -> fmt "'Connection: keep-alive' recurse, rem: %A" rem)
             return! loop rem request
           | Some _ ->
-            free "http_loop.loop (case Some _)" cn rem;
+            free "http_loop.loop (case Some _)" connection rem;
             verbose "'Connection: close', exiting"
             return ()
           | None ->
@@ -399,31 +447,30 @@ module ParsingAndControl =
               verbose "'Connection: keep-alive' recurse (!)"
               return! loop rem request
             else
-              free "http_loop.loop (case None, else branch)" cn rem;
+              free "http_loop.loop (case None, else branch)" connection rem;
               verbose "'Connection: close', exiting"
               return ()
         else
-          free "http_loop.loop (not connected)" cn rem;
+          free "http_loop.loop (not connected)" connection rem;
           verbose "'is_connected = false', exiting"
           return ()
     }
-    loop None req
+    loop None ctx.request
 
   /// The request loop initialises a request with a processor to handle the
   /// incoming stream and possibly pass the request to the web parts, a protocol,
-  /// a web part, an error handler, a timeout value for executing the web part
-  /// in milliseconds and a Connection to use for read-write
+  /// a web part, an error handler and a Connection to use for read-write
   /// communication -- getting the initial request stream.
   let request_loop
     (proxy_mode  : bool)
     (runtime    : HttpRuntime)
-    (web_part   : WebPart)
+    (consumer   : HttpConsumer)
     (connection : Connection) =
 
     socket {
       let! connection = load_connection runtime.logger runtime.protocol connection
-      let request     = mk_request connection runtime.protocol
-      do! http_loop proxy_mode runtime request connection web_part
+      let request     = mk_request connection runtime.protocol connection.ipaddr
+      do! http_loop proxy_mode { request = request; user_state = Map.empty; runtime = runtime; response = { status = HTTP_404; headers = []; content = NullContent }} consumer connection
       return ()
     }
 
@@ -440,7 +487,7 @@ module ParsingAndControl =
 
   /// Starts a new web worker, given the configuration and a web part to serve.
   let web_worker (ip, port, buffer_size, max_ops, runtime : HttpRuntime) (webpart : WebPart) =
-    tcp_ip_server (ip, port, buffer_size, max_ops) runtime.logger (request_loop false runtime webpart)
+    tcp_ip_server (ip, port, buffer_size, max_ops) runtime.logger (request_loop false runtime (WebPart webpart))
 
   let resolve_directory home_directory =
     match home_directory with
@@ -458,13 +505,23 @@ open Suave.Session
 
 /// The default error handler returns a 500 Internal Error in response to
 /// thrown exceptions.
-let default_error_handler (ex : Exception) msg (ctx : HttpContext) = socket {
+let default_error_handler (ex : Exception) msg (ctx : HttpContext) = 
   let request = ctx.request
   msg |> Log.verbosee ctx.runtime.logger "Web.default_error_handler" ctx.request.trace ex
-  if IPAddress.IsLoopback ctx.connection.ipaddr then
-    do! (Response.response Codes.HTTP_500 (UTF8.bytes (sprintf "<h1>%s</h1><br/>%A" ex.Message ex)) ctx)
-  else do! (Response.response Codes.HTTP_500 (UTF8.bytes (Codes.http_message Codes.HTTP_500)) ctx)
+  if IPAddress.IsLoopback ctx.request.ipaddr then
+    Response.response Codes.HTTP_500 (UTF8.bytes (sprintf "<h1>%s</h1><br/>%A" ex.Message ex)) ctx
+  else 
+    Response.response Codes.HTTP_500 (UTF8.bytes (Codes.http_message Codes.HTTP_500)) ctx
+
+(*
+let default_error_handler (ex : Exception) msg (ctx : HttpContext) connection = socket {
+  let request = ctx.request
+  msg |> Log.verbosee ctx.runtime.logger "Web.default_error_handler" ctx.request.trace ex
+  if IPAddress.IsLoopback connection.ipaddr then
+    do! (Response.response Codes.HTTP_500 (UTF8.bytes (sprintf "<h1>%s</h1><br/>%A" ex.Message ex)) ctx connection)
+  else do! (Response.response Codes.HTTP_500 (UTF8.bytes (Codes.http_message Codes.HTTP_500)) ctx connection)
 }
+*)
 
 /// Returns the webserver as a tuple of 1) an async computation the yields unit when
 /// the web server is ready to serve quests, and 2) an async computation that yields

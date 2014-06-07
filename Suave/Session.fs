@@ -47,7 +47,7 @@ module Session =
       let id  = sessionId.Substring( 0, session_id_lenght)
       let mac = sessionId.Substring( session_id_lenght)
 
-      let mac1 = hmac id  (Option.get ctx.request.headers?``user-agent``) (ctx.connection.ipaddr.ToString()) key
+      let mac1 = hmac id  (Option.get ctx.request.headers?``user-agent``) (ctx.request.ipaddr.ToString()) key
 
       String.CompareOrdinal(mac, mac1) = 0 && session_map.Contains id
 
@@ -75,7 +75,7 @@ module Session =
         let session_id = strong_new_id session_id_lenght 
         let dict = new ConcurrentDictionary<string, obj> ()
         lock session_map (fun _ -> session_map.Add(session_id, dict :> obj, Globals.utc_now().Add expiration) |> ignore)
-        let id = session_id + hmac session_id (Option.get ctx.request.headers?``user-agent``) (ctx.connection.ipaddr.ToString()) key
+        let id = session_id + hmac session_id (Option.get ctx.request.headers?``user-agent``) (ctx.request.ipaddr.ToString()) key
         id
 
       member this.Validate(s : string, ctx : HttpContext) =
@@ -113,4 +113,4 @@ module Session =
     let sessionId = ctx.request.session_id
     if String.IsNullOrEmpty sessionId then failwith "session_support was not called"
     else ctx.runtime.session_provider.Session sessionId
-    
+

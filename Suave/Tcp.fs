@@ -27,9 +27,6 @@ type TcpListener with
 
 open Socket 
 
-/// A TCP Worker is a thing that takes a TCP client and returns an asynchronous workflow thereof
-type TcpWorker<'a> = Connection -> SocketOp<'a>
-
 /// Disconnect a socket for reuse
 let close_socket (s : Socket) =
   try
