@@ -63,6 +63,7 @@
     <Compile Include="Native.fs" />
     <Compile Include="OpenSSL.fs" />
     <Compile Include="Types.fs" />
+    <Compile Include="Compression.fs" />
     <Compile Include="Http.fsi" />
     <Compile Include="Http.fs" />
     <Compile Include="Session.fs" />

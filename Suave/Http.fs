@@ -5,10 +5,6 @@ module Http =
   open Socket
   open Types
 
-  type WebResult = (Connection -> SocketOp<unit>) option
-
-  type WebPart = HttpContext -> WebResult
-
   let inline succeed x = Some x
 
   let fail = None
@@ -45,346 +41,29 @@ module Http =
     | Some x -> f x a
     | None   -> g a
 
-  type HttpMethod =
-    | GET
-    | POST
-    | DELETE
-    | PUT
-    | HEAD
-    | CONNECT
-    | PATCH
-    | TRACE
-    | OPTIONS
-    override x.ToString() =
-      match x with
-      | GET     -> "GET"
-      | POST    -> "POST"
-      | DELETE  -> "DELETE"
-      | PUT     -> "PUT"
-      | HEAD    -> "HEAD"
-      | CONNECT -> "CONNECT"
-      | PATCH   -> "PATCH"
-      | TRACE   -> "TRACE"
-      | OPTIONS -> "OPTIONS"
-
-  module Codes =
-
-    type HttpCode =
-      | HTTP_100 | HTTP_101
-      | HTTP_200 | HTTP_201 | HTTP_202 | HTTP_203 | HTTP_204 | HTTP_205 | HTTP_206
-      | HTTP_300 | HTTP_301 | HTTP_302 | HTTP_303 | HTTP_304 | HTTP_305 | HTTP_307
-      | HTTP_400 | HTTP_401 | HTTP_402 | HTTP_403 | HTTP_404 | HTTP_405 | HTTP_406
-      | HTTP_407 | HTTP_408 | HTTP_409 | HTTP_410 | HTTP_411 | HTTP_412 | HTTP_413
-      | HTTP_422 | HTTP_428 | HTTP_429 | HTTP_414 | HTTP_415 | HTTP_416 | HTTP_417
-      | HTTP_500 | HTTP_501 | HTTP_502 | HTTP_503 | HTTP_504 | HTTP_505
-      static member TryParse (code : int) =
-        // TODO: replace with match code with | 100 -> HTTP_100 | ... when API is more set
-        let cases = Microsoft.FSharp.Reflection.FSharpType.GetUnionCases(typeof<HttpCode>)
-        let map_cases =
-          cases
-          |> Array.map (fun case -> case.Name, Microsoft.FSharp.Reflection.FSharpValue.MakeUnion(case, [||]) :?> HttpCode)
-          |> Map.ofArray
-        map_cases |> Map.tryFind ("HTTP_" + code.ToString())
-
-    let http_code = function
-      | HTTP_100 -> 100 | HTTP_101 -> 101 | HTTP_200 -> 200 | HTTP_201 -> 201
-      | HTTP_202 -> 202 | HTTP_203 -> 203 | HTTP_204 -> 204 | HTTP_205 -> 205
-      | HTTP_206 -> 206 | HTTP_300 -> 300 | HTTP_301 -> 301 | HTTP_302 -> 302
-      | HTTP_303 -> 303 | HTTP_304 -> 304 | HTTP_305 -> 305 | HTTP_307 -> 307
-      | HTTP_400 -> 400 | HTTP_401 -> 401 | HTTP_402 -> 402 | HTTP_403 -> 403
-      | HTTP_404 -> 404 | HTTP_405 -> 405 | HTTP_406 -> 406 | HTTP_407 -> 407
-      | HTTP_408 -> 408 | HTTP_409 -> 409 | HTTP_410 -> 410 | HTTP_411 -> 411
-      | HTTP_412 -> 412 | HTTP_413 -> 413 | HTTP_414 -> 414 | HTTP_415 -> 415
-      | HTTP_416 -> 416 | HTTP_417 -> 417 | HTTP_422 -> 422 | HTTP_428 -> 428
-      | HTTP_429 -> 429 | HTTP_500 -> 500 | HTTP_501 -> 501 | HTTP_502 -> 502
-      | HTTP_503 -> 503 | HTTP_504 -> 504 | HTTP_505 -> 505
-
-    let http_reason = function
-      | HTTP_100 -> "Continue"
-      | HTTP_101 -> "Switching Protocols"
-      | HTTP_200 -> "OK"
-      | HTTP_201 -> "Created"
-      | HTTP_202 -> "Accepted"
-      | HTTP_203 -> "Non-Authoritative Information"
-      | HTTP_204 -> "No Content"
-      | HTTP_205 -> "Reset Content"
-      | HTTP_206 -> "Partial Content"
-      | HTTP_300 -> "Multiple Choices"
-      | HTTP_301 -> "Moved Permanently"
-      | HTTP_302 -> "Found"
-      | HTTP_303 -> "See Other"
-      | HTTP_304 -> "Not Modified"
-      | HTTP_305 -> "Use Proxy"
-      | HTTP_307 -> "Temporary Redirect"
-      | HTTP_400 -> "Bad Request"
-      | HTTP_401 -> "Unauthorized"
-      | HTTP_402 -> "Payment Required"
-      | HTTP_403 -> "Forbidden"
-      | HTTP_404 -> "Not Found"
-      | HTTP_405 -> "Method Not Allowed"
-      | HTTP_406 -> "Not Acceptable"
-      | HTTP_407 -> "Proxy Authentication Required"
-      | HTTP_408 -> "Request Timeout"
-      | HTTP_409 -> "Conflict"
-      | HTTP_410 -> "Gone"
-      | HTTP_411 -> "Length Required"
-      | HTTP_412 -> "Precondition Failed"
-      | HTTP_413 -> "Request Entity Too Large"
-      | HTTP_414 -> "Request-URI Too Long"
-      | HTTP_415 -> "Unsupported Media Type"
-      | HTTP_416 -> "Requested Range Not Satisfiable"
-      | HTTP_417 -> "Expectation Failed"
-      | HTTP_422 -> "Unprocessable Entity"
-      | HTTP_428 -> "Precondition Required"
-      | HTTP_429 -> "Too Many Requests"
-      | HTTP_500 -> "Internal Server Error"
-      | HTTP_501 -> "Not Implemented"
-      | HTTP_502 -> "Bad Gateway"
-      | HTTP_503 -> "Service Unavailable"
-      | HTTP_504 -> "Gateway Timeout"
-      | HTTP_505 -> "HTTP Version Not Supported"
-
-    let http_message = function
-      | HTTP_100 -> "Request received, please continue"
-      | HTTP_101 -> "Switching to new protocol; obey Upgrade header"
-      | HTTP_200 -> "Request fulfilled, document follows"
-      | HTTP_201 -> "Document created, URL follows"
-      | HTTP_202 -> "Request accepted, processing continues off-line"
-      | HTTP_203 -> "Request fulfilled from cache"
-      | HTTP_204 -> "Request fulfilled, nothing follows"
-      | HTTP_205 -> "Clear input form for further input."
-      | HTTP_206 -> "Partial content follows."
-      | HTTP_300 -> "Object has several resources -- see URI list"
-      | HTTP_301 -> "Object moved permanently -- see URI list"
-      | HTTP_302 -> "Object moved temporarily -- see URI list"
-      | HTTP_303 -> "Object moved -- see Method and URL list"
-      | HTTP_304 -> "Document has not changed since given time"
-      | HTTP_305 -> "You must use proxy specified in Location to access this resource."
-      | HTTP_307 -> "Object moved temporarily -- see URI list"
-      | HTTP_400 -> "Bad request syntax or unsupported method"
-      | HTTP_401 -> "No permission -- see authorization schemes"
-      | HTTP_402 -> "No payment -- see charging schemes"
-      | HTTP_403 -> "Request forbidden -- authorization will not help"
-      | HTTP_404 -> "Nothing matches the given URI"
-      | HTTP_405 -> "Specified method is invalid for this resource."
-      | HTTP_406 -> "URI not available in preferred format."
-      | HTTP_407 -> "You must authenticate with this proxy before proceeding."
-      | HTTP_408 -> "Request timed out; try again later."
-      | HTTP_409 -> "Request conflict."
-      | HTTP_410 -> "URI no longer exists and has been permanently removed."
-      | HTTP_411 -> "Client must specify Content-Length."
-      | HTTP_412 -> "Precondition in headers is false."
-      | HTTP_413 -> "Entity is too large."
-      | HTTP_414 -> "URI is too long."
-      | HTTP_415 -> "Entity body in unsupported format."
-      | HTTP_416 -> "Cannot satisfy request range."
-      | HTTP_417 -> "Expect condition could not be satisfied."
-      | HTTP_422 -> "The entity sent to the server was invalid."
-      | HTTP_428 -> "You should verify the server accepts the request before sending it."
-      | HTTP_429 -> "Request rate too high, chill out please."
-      | HTTP_500 -> "Server got itself in trouble"
-      | HTTP_501 -> "Server does not support this operation"
-      | HTTP_502 -> "Invalid responses from another server/proxy."
-      | HTTP_503 -> "The server cannot process the request due to a high load"
-      | HTTP_504 -> "The gateway server did not receive a timely response"
-      | HTTP_505 -> "Cannot fulfill request."
-
-    type HttpCode with
-      member x.Describe () =
-        sprintf "%d %s: %s" (http_code x) (http_reason x) (http_message x)
-
-  open Codes
-
-  module Internals =
-
-    open System
-    open System.Reflection
-
-    let SUAVE_VERSION = Assembly.GetExecutingAssembly().GetName().Version.ToString()
-
-    let server_header = String.Concat [| "Server: Suave/"; SUAVE_VERSION; " (http://suave.io)" |]
-
-  module Compression =
-
-    open Socket
-
-    open System
-    open System.IO
-    open System.IO.Compression
-
-    type Algorithm =
-      /// No compression
-      | Plain
-      /// GZIP compression
-      | GZIP
-      /// Deflate compression
-      | Deflate
-      /// Prints the algorithm as a string that can be put in a HTTP header
-      override x.ToString() =
-        match x with
-        | Plain   -> "plain"
-        | GZIP    -> "gzip"
-        | Deflate -> "deflate"
-
-    // You should only gzip files above a certain size threshold; we recommend a minimum range
-    // between 150 and 1000 bytes. Gzipping files below 150 bytes can actually make them larger
-
-    let MIN_BYTES_TO_COMPRESS =       500 // 500 bytes
-    let MAX_BYTES_TO_COMPRESS = 524288000 // 500 megabytes
-
-    let load_encoder s =
-      match s with
-      | "gzip"    -> Some (GZIP, Compression.gzip_encode)
-      | "deflate" -> Some (Deflate, Compression.deflate_encode)
-      | _         -> None
-
-    let get_encoder request =
-      let encondings = request.headers?``accept-encoding``
-      match encondings with
-      | Some (value : string) ->
-        value.Split ','
-        |> Array.map (fun s -> s.Trim())
-        |> Array.tryPick (fun s -> load_encoder s)
-      | _ -> None
-
-    let parse_encoder request =
-      let encondings = request.headers?``accept-encoding``
-      match encondings with
-      | Some (value : string) ->
-        value.Split ','
-        |> Array.map (fun s -> s.Trim())
-        |> Array.tryPick
-          (fun s ->
-            match s with
-            | "gzip"    -> Some GZIP
-            | "deflate" -> Some Deflate
-            | _         -> None)
-      | _ -> None
-
-    let transform (content : byte []) (ctx : HttpContext) connection : SocketOp<byte []> =
-      socket {
-        if content.Length > MIN_BYTES_TO_COMPRESS && content.Length < MAX_BYTES_TO_COMPRESS then
-          let request = ctx.request
-          let enconding = get_encoder request
-          match enconding with
-          | Some (n,encoder) ->
-            do! async_writeln connection (String.Concat [| "Content-Encoding: "; n.ToString() |])
-            return encoder content
-          | None ->
-            return content
-        else
-          return content
-      }
-
-    let compress encoding path (fs : Stream) = socket {
-      use new_fs = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.Write)
-      match encoding with
-      | GZIP ->
-        use gzip = new GZipStream(new_fs, CompressionMode.Compress)
-        do! lift_task (fs.CopyToAsync gzip)
-        gzip.Close()
-      | Deflate ->
-        use deflate = new DeflateStream(new_fs, CompressionMode.Compress)
-        do! lift_task (fs.CopyToAsync deflate)
-        deflate.Close()
-      | _ ->
-        return failwith "invalid case."
-      new_fs.Close()
-    }
-
-    let compress_file n (stream : Stream) compression_folder = socket {
-      let temp_file_name = Path.GetRandomFileName()
-      if not (Directory.Exists compression_folder) then Directory.CreateDirectory compression_folder |> ignore
-      let new_path = Path.Combine(compression_folder,temp_file_name)
-      do! compress n new_path stream
-      stream.Dispose()
-      return new_path
-    }
-
-    let transform_x (key : string) (get_data : string -> Stream) (get_last : string -> DateTime) compression compression_folder ({ request = q } as ctx) connection =
-      socket {
-        let stream = get_data key
-        if compression && stream.Length > int64(MIN_BYTES_TO_COMPRESS) && stream.Length < int64(MAX_BYTES_TO_COMPRESS) then
-          let enconding = parse_encoder q
-          match enconding with
-          | Some (n) ->
-            do! async_writeln connection (String.Concat [| "Content-Encoding: "; n.ToString() |])
-            if Globals.compressed_files_map.ContainsKey key then
-              let last_modified = get_last key
-              let cmpr_info = new FileInfo(Globals.compressed_files_map.[key])
-              if last_modified > cmpr_info.CreationTime then
-                let! new_path =  compress_file n stream compression_folder
-                Globals.compressed_files_map.[key] <- new_path
-            else
-              let! new_path =  compress_file n stream compression_folder
-              Globals.compressed_files_map.TryAdd(key,new_path) |> ignore
-            return new FileStream(Globals.compressed_files_map.[key] , FileMode.Open, FileAccess.Read, FileShare.Read) :> Stream
-          | None ->
-            return stream
-        else
-          return stream
-     }
-
   module Response =
 
     open Socket
+    open Types
+    open Types.Codes
 
     open System
     open System.IO
 
-    let internal write_content_type connection (headers : System.Collections.Generic.List<string*string>)  = socket {
-      if not(headers.Exists(new Predicate<_>(fun (x,_) -> x.ToLower().Equals("content-type")))) then
-        do! async_writeln connection "Content-Type: text/html"
-    }
+    let response status_code (cnt : byte []) =
+      fun (ctx : HttpContext) -> 
+        let response = 
+          { ctx.response with status = status_code; content = Bytes cnt }
+        { ctx with response = response }
 
-    let internal write_headers connection (headers : (string*string) seq)  = socket {
-      for (x,y) in headers do
-        if not (List.exists (fun y -> x.ToLower().Equals(y)) ["server";"date";"content-length"]) then
-          do! async_writeln connection (String.Concat [| x; ": "; y |])
-      } 
-
-    let response_f 
-      (status_code : HttpCode)
-      (f_content : Connection -> SocketOp<unit>)
-      ({request = request } as context : HttpContext)
-      = fun connection ->
-      socket {
-        
-      do! async_writeln connection (String.concat " " [ "HTTP/1.1"
-                                                      ; (http_code status_code).ToString()
-                                                      ; http_reason status_code ])
-      do! async_writeln connection Internals.server_header
-      do! async_writeln connection (String.Concat( [|  "Date: "; Globals.utc_now().ToString("R") |]))
-
-      do! write_headers connection request.response.Headers
-      do!  write_content_type connection request.response.Headers 
-
-      return! f_content connection
-      }
-
-    let response status_code (cnt : byte []) ({ request = request } as context : HttpContext)  =
-
-      let op connection = socket {
-
-        let! (content : byte []) = Compression.transform cnt context connection
-
-        // http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.13
-        do! async_writeln connection (String.Concat [|  "Content-Length: "; content.Length.ToString() |])
-
-        do! async_writeln connection ""
-
-        if content.Length > 0 then
-          do! connection.write (new ArraySegment<_>(content, 0, content.Length))
-      }
-      response_f status_code op { context with request = { request with status = http_code status_code |> Some }}
-    
   module Writers =
 
     open System
 
-    let set_header key value ({request = http_request } as ctx : HttpContext) =
-      http_request.response.Headers.Add(key, value)
-      ctx
+    let set_header key value (ctx : HttpContext) =
+      let new_response =
+          { ctx.response with headers = (key,value) :: ctx.response.headers }
+      { ctx with response = new_response }
 
     let private cookie_to_string (x : HttpCookie) =
       let attributes = new System.Collections.Generic.List<string>()
@@ -437,8 +116,10 @@ module Http =
   module Successful =
 
     open Response
+    open Types.Codes
 
-    let ok s = response HTTP_200 s >> succeed
+    let ok s : WebPart = 
+      fun ctx -> { ctx with response = { ctx.response with status = HTTP_200; content = Bytes s }} |> succeed
 
     let OK a = ok (UTF8.bytes a)
 
@@ -451,7 +132,7 @@ module Http =
     let ACCEPTED s = accepted (UTF8.bytes s)
 
     let no_content : WebPart =
-      response HTTP_204 [||] >> succeed
+      fun ctx -> { ctx with response = { status = HTTP_204; headers = ctx.response.headers; content = Bytes [||] }} |> succeed
 
     let NO_CONTENT = no_content
 
@@ -460,6 +141,7 @@ module Http =
 
     open Response
     open Writers
+    open Types.Codes
 
     let moved_permanently location =
       set_header "Location" location
@@ -488,7 +170,7 @@ module Http =
       >> succeed
 
     let not_modified : WebPart =
-      response HTTP_304 [||] >> succeed
+      fun ctx -> { ctx with response = {status = HTTP_304; headers = []; content = Bytes [||] }} |> succeed
 
     let NOT_MODIFIED : WebPart =
       not_modified
@@ -498,6 +180,7 @@ module Http =
 
     open Response
     open Writers
+    open Types.Codes
 
     let bad_request s = response HTTP_400 s >> succeed
 
@@ -561,6 +244,7 @@ module Http =
   module ServerErrors =
 
     open Response
+    open Types.Codes
 
     let internal_error arr = response HTTP_500 arr >> succeed
 
@@ -590,6 +274,8 @@ module Http =
 
     open System
     open System.Text.RegularExpressions
+
+    open Types.Methods
 
     let url s (x : HttpContext) = if s = x.request.url then Some x else None
 
@@ -630,7 +316,7 @@ module Http =
       let dash = function | "" | null -> "-" | x -> x
       let ci = Globalization.CultureInfo("en-US")
       let process_id = System.Diagnostics.Process.GetCurrentProcess().Id.ToString()
-      sprintf "%O %s %s [%s] \"%s %s %s\" %s %s"
+      sprintf "%O %s %s [%s] \"%s %s %s\" %d %s"
         ctx.request.ipaddr
         process_id //TODO: obtain connection owner via Ident protocol
         (dash ctx.request.user_name)
@@ -638,7 +324,7 @@ module Http =
         ctx.request.``method``
         ctx.request.url
         ctx.request.http_version
-        (match ctx.request.status with | None -> "-" | Some x -> x.ToString())
+        (Codes.http_code ctx.response.status)
         "0"
 
     let log (logger : Log.Logger) (formatter : HttpContext -> string) (ctx : HttpContext) =
@@ -676,13 +362,14 @@ module Http =
       async {
         return part ctx
       }
-
+    
     let timeout_webpart (time_span : TimeSpan) (web_part : WebPart) : WebPart =
       fun (ctx : HttpContext) ->
         try
           Async.RunSynchronously (resolve web_part ctx, int time_span.TotalMilliseconds)
         with
-          | :? TimeoutException -> Some (fun cn ->Response.response HTTP_408 (UTF8.bytes "Request Timeout") ctx cn)
+          | :? TimeoutException ->
+            Response.response Codes.HTTP_408 (UTF8.bytes "Request Timeout") ctx |> Some
 
   module ServeResource =
     open System
@@ -693,8 +380,7 @@ module Http =
     // If a response includes both an Expires header and a max-age directive,
     // the max-age directive overrides the Expires header, even if the Expires header is more restrictive
     // 'Cache-Control' and 'Expires' headers should be left up to the user
-    
-    let resource key exists get_last get_extension (send : string -> bool -> HttpContext -> WebResult) ({request = r } as ctx) : WebResult =
+    let resource key exists get_last get_extension (send : string -> bool -> HttpContext -> HttpContext option) ({request = r } as ctx) =
 
       let send_it name compression =
         set_header "Last-Modified" ((get_last key : DateTime).ToString("R"))
@@ -709,7 +395,7 @@ module Http =
             match modified_since with
             | Some v -> let date = DateTime.Parse v
                         if get_last key > date then send_it value.name value.compression ctx
-                        else NOT_MODIFIED ctx
+                        else NOT_MODIFIED ctx 
             | None   -> send_it  value.name value.compression ctx
           | None -> None
       else
@@ -722,6 +408,7 @@ module Http =
     open System.Text
 
     open Suave.Socket
+    open Types.Codes
 
     open Response
     open Writers
@@ -729,7 +416,7 @@ module Http =
     open Redirection
     open ServeResource
 
-    let send_file file_name (compression : bool) (ctx : HttpContext)  =
+    let send_file file_name (compression : bool) (ctx : HttpContext) =
       let write_file file conn = socket {
         let get_fs = fun path -> new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read) :> Stream
         let get_lm = fun path -> FileInfo(path).LastWriteTime
@@ -741,18 +428,15 @@ module Http =
         if fs.Length > 0L then
           do! transfer_x conn fs
       }
-      succeed <| fun s -> socket { do! response_f HTTP_200 (write_file file_name) ctx s } 
+      { ctx with response = { ctx.response with status = HTTP_200; content = SocketTask (write_file file_name)}} |> Some
 
-    let file file_name (ctx : HttpContext) : WebResult =
-      succeed 
-      <| fun s ->
-          let task = resource file_name (File.Exists) (fun name -> FileInfo(name).LastAccessTime) (Path.GetExtension) send_file  ctx
-          match task with 
-          | Some res ->
-            socket {
-              do! res s
-            }
-          | None -> socket  { return () }
+    let file file_name =
+      resource
+        file_name
+        (File.Exists)
+        (fun name -> FileInfo(name).LastAccessTime)
+        (Path.GetExtension)
+        send_file
 
     let local_file (file_name : string) (root_path : string) =
       let file_name =
@@ -770,7 +454,7 @@ module Http =
 
     let browse : WebPart = warbler (fun {request = r; runtime = q } -> file (local_file r.url q.home_directory))
 
-    let dir (ctx : HttpContext) : WebResult =
+    let dir (ctx : HttpContext) =
       let req = ctx.request
 
       let url = req.url
@@ -804,6 +488,7 @@ module Http =
     open System.Reflection
 
     open Suave.Socket
+    open Types.Codes
 
     open Response
     open ServeResource
@@ -828,7 +513,7 @@ module Http =
         if fs.Length > 0L then
           do! transfer_x conn fs
       }
-      succeed <| fun s -> socket { do! response_f HTTP_200 (write_resource resource_name) ctx s }
+      { ctx with response = { ctx.response with status = HTTP_200; content = SocketTask (write_resource resource_name)}} |> Some
 
     let resource name =
       resource
