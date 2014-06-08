@@ -47,7 +47,7 @@ type HttpRequest =
   ; form                 : Dictionary<string,string>
   ; mutable raw_form     : byte[]
   ; mutable raw_query    : string
-  ; cookies              : Dictionary<string,(string*string)[]>
+  ; cookies              : Dictionary<string,string>
   ; mutable user_name    : string
   ; mutable password     : string
   ; mutable session_id   : string

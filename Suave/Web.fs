@@ -275,8 +275,8 @@ module ParsingAndControl =
       request.headers
       |> Seq.filter (fun x -> x.Key.Equals("cookie"))
       |> Seq.iter (fun x ->
-                    let cookie = parse_cookie x.Value
-                    request.cookies.Add (fst(cookie.[0]),cookie))
+                    parse_cookie x.Value
+                    |> Array.iter (fun y -> request.cookies.Add (fst y,snd y)))
 
       if meth.Equals("POST") || meth.Equals("PUT") then
 
@@ -345,7 +345,7 @@ module ParsingAndControl =
     ; form           = new Dictionary<string,string>()
     ; raw_form       = null
     ; raw_query      = null
-    ; cookies        = new Dictionary<string,(string*string)[]>()
+    ; cookies        = new Dictionary<string,string>()
     ; user_name      = null
     ; password       = null
     ; session_id     = null

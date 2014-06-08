@@ -90,10 +90,9 @@ module Session =
 
     let sessionId =
       match request.cookies ? suave_session_id with
-      | Some(attr) ->
-        let v = snd(attr.[0])
-        if ctx.runtime.session_provider.Validate (v, ctx) then
-          v
+      | Some attr ->
+        if ctx.runtime.session_provider.Validate (attr, ctx) then
+          attr
         else
           ctx.runtime.session_provider.Generate (time_span, ctx)
       | None ->
