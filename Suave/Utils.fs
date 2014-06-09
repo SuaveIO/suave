@@ -318,7 +318,7 @@ module Parsing =
     s.Split(';')
     |> Array.map (fun (x : string) ->
                   let parts = x.Split('=')
-                  (parts.[0], parts.[1]))
+                  (parts.[0].Trim(), parts.[1].Trim()))
 
   /// Parse a string array of key-value-pairs, combined using the equality character '='
   /// into a dictionary
