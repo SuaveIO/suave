@@ -25,11 +25,6 @@ type MimeType =
 
 type MimeTypesMap = string -> MimeType option
 
-/// A holder for headers for the http response
-type HttpResponse() =
-  let mutable headers : List<string*string> = new List<string * string>()
-  member h.Headers with get()               = headers and set x = headers <- x
-
 /// A holder for uploaded file meta-data
 type HttpUpload(fieldname : string, filename : string, mime_type : string, temp_file_name : string) =
   member x.FieldName = fieldname
