@@ -1,22 +1,24 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 2012
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "suave", "Suave\suave.fsproj", "{3DC9193E-BD0C-4486-9C58-56B630C36623}"
+Project("{4925A630-B079-445d-BCD4-3A9C94FE9307}") = "suave", "Suave\suave.fsproj", "{3DC9193E-BD0C-4486-9C58-56B630C36623}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Example", "Example\Example.fsproj", "{6BACAAA2-C717-4B6E-93FC-1B54126F91B0}"
+Project("{4925A630-B079-445d-BCD4-3A9C94FE9307}") = "Example", "Example\Example.fsproj", "{6BACAAA2-C717-4B6E-93FC-1B54126F91B0}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Tests", "Tests\Tests.fsproj", "{3BE234C3-2BD4-4E53-9D11-7C134374500D}"
+Project("{4925A630-B079-445d-BCD4-3A9C94FE9307}") = "Tests", "Tests\Tests.fsproj", "{3BE234C3-2BD4-4E53-9D11-7C134374500D}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "docs", "docs", "{C7760769-4E33-4A06-BB7C-39B477B4FF1B}"
 	ProjectSection(SolutionItems) = preProject
 		README.textile = README.textile
 	EndProjectSection
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Experimental", "Experimental\Experimental.fsproj", "{488FC139-5013-46A2-9982-2C40A6F1F777}"
+Project("{4925A630-B079-445d-BCD4-3A9C94FE9307}") = "Experimental", "Experimental\Experimental.fsproj", "488FC139-5013-46A2-9982-2C40A6F1F777"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Pong", "Pong\Pong.fsproj", "{68D30567-3281-41FB-BD69-30FB32196B79}"
+Project("{4925A630-B079-445d-BCD4-3A9C94FE9307}") = "Pong", "Pong\Pong.fsproj", "68D30567-3281-41FB-BD69-30FB32196B79"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "suave.WebMachine", "suave.WebMachine\suave.WebMachine.fsproj", "{301FC093-FD75-495C-AA2F-C8B3697B7114}"
+Project("{4925A630-B079-445d-BCD4-3A9C94FE9307}") = "suave.WebMachine", "suave.WebMachine\suave.WebMachine.fsproj", "301FC093-FD75-495C-AA2F-C8B3697B7114"
+EndProject
+Project("{4925A630-B079-445d-BCD4-3A9C94FE9307}") = "suave.OpenSsl", "suave.OpenSsl\suave.OpenSsl.fsproj", "{EF9A327A-4265-4DB4-ACA4-368790CC7483}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -24,18 +26,18 @@ Global
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{3DC9193E-BD0C-4486-9C58-56B630C36623}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{3DC9193E-BD0C-4486-9C58-56B630C36623}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{3DC9193E-BD0C-4486-9C58-56B630C36623}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{3DC9193E-BD0C-4486-9C58-56B630C36623}.Release|Any CPU.Build.0 = Release|Any CPU
-		{6BACAAA2-C717-4B6E-93FC-1B54126F91B0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{6BACAAA2-C717-4B6E-93FC-1B54126F91B0}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{6BACAAA2-C717-4B6E-93FC-1B54126F91B0}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{6BACAAA2-C717-4B6E-93FC-1B54126F91B0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{301FC093-FD75-495C-AA2F-C8B3697B7114}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{301FC093-FD75-495C-AA2F-C8B3697B7114}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{301FC093-FD75-495C-AA2F-C8B3697B7114}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{301FC093-FD75-495C-AA2F-C8B3697B7114}.Release|Any CPU.Build.0 = Release|Any CPU
 		{3BE234C3-2BD4-4E53-9D11-7C134374500D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{3BE234C3-2BD4-4E53-9D11-7C134374500D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{3BE234C3-2BD4-4E53-9D11-7C134374500D}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{3BE234C3-2BD4-4E53-9D11-7C134374500D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3DC9193E-BD0C-4486-9C58-56B630C36623}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3DC9193E-BD0C-4486-9C58-56B630C36623}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3DC9193E-BD0C-4486-9C58-56B630C36623}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3DC9193E-BD0C-4486-9C58-56B630C36623}.Release|Any CPU.Build.0 = Release|Any CPU
 		{488FC139-5013-46A2-9982-2C40A6F1F777}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{488FC139-5013-46A2-9982-2C40A6F1F777}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{488FC139-5013-46A2-9982-2C40A6F1F777}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -44,15 +46,21 @@ Global
 		{68D30567-3281-41FB-BD69-30FB32196B79}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{68D30567-3281-41FB-BD69-30FB32196B79}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{68D30567-3281-41FB-BD69-30FB32196B79}.Release|Any CPU.Build.0 = Release|Any CPU
-		{301FC093-FD75-495C-AA2F-C8B3697B7114}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{301FC093-FD75-495C-AA2F-C8B3697B7114}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{301FC093-FD75-495C-AA2F-C8B3697B7114}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{301FC093-FD75-495C-AA2F-C8B3697B7114}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6BACAAA2-C717-4B6E-93FC-1B54126F91B0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6BACAAA2-C717-4B6E-93FC-1B54126F91B0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6BACAAA2-C717-4B6E-93FC-1B54126F91B0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6BACAAA2-C717-4B6E-93FC-1B54126F91B0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{EF9A327A-4265-4DB4-ACA4-368790CC7483}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EF9A327A-4265-4DB4-ACA4-368790CC7483}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{EF9A327A-4265-4DB4-ACA4-368790CC7483}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{EF9A327A-4265-4DB4-ACA4-368790CC7483}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
-	GlobalSection(SolutionProperties) = preSolution
-		HideSolutionNode = FALSE
+	GlobalSection(NestedProjects) = preSolution
 	EndGlobalSection
 	GlobalSection(MonoDevelopProperties) = preSolution
 		StartupItem = Example\Example.fsproj
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
 	EndGlobalSection
 EndGlobal

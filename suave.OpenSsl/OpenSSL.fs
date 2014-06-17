@@ -1,4 +1,4 @@
-﻿module Suave.OpenSSL
+﻿module Suave.OpenSSL.Functions
 
 open System
 open System.IO
@@ -10,8 +10,8 @@ open OpenSSL.X509
 open OpenSSL.Core
 open OpenSSL.SSL
 
-open Native
-open Socket
+open Suave.OpenSsl.Native
+open Suave.Socket
 
 let SSL_CTX_set_mode( ctx : IntPtr,  op : int) = SSL_CTX_ctrl(ctx, SSL_CTRL_MODE, op, IntPtr.Zero)
 let SSL_CTX_set_options( ctx : IntPtr, op : int) = SSL_CTX_ctrl(ctx, SSL_CTRL_OPTIONS, op, IntPtr.Zero)
@@ -75,6 +75,8 @@ let BIO_set_close bp arg =
 
 open System.Security.Cryptography
 
+let crypt_random = System.Security.Cryptography.RandomNumberGenerator.Create()
+
 let init_open_ssl _ =
   SSL_library_init() |> ignore
   ERR_load_crypto_strings()
@@ -82,7 +84,7 @@ let init_open_ssl _ =
   OPENSSL_add_all_algorithms_noconf()
 
   let seed = Array.zeroCreate 128
-  Globals.crypt_random.GetBytes(seed)
+  crypt_random.GetBytes(seed)
   RAND_seed(seed, seed.Length)
 
 open System.Runtime.InteropServices
@@ -134,7 +136,7 @@ let write_from_bio  (con : Connection) write_bio = socket {
   return ()
   }
 
-let rec accept (logger : Log.Logger) conn (ssl, read_bio, write_bio) = socket{
+let rec accept conn (ssl, read_bio, write_bio) = socket{
   let ret = SSL_accept ssl
   if(ret < 0) then 
 
@@ -146,11 +148,11 @@ let rec accept (logger : Log.Logger) conn (ssl, read_bio, write_bio) = socket{
     match error with 
     | x when x = SSL_ERROR_WANT_READ -> 
       do! read_to_bio conn read_bio ssl
-      return! accept logger conn (ssl, read_bio, write_bio)
+      return! accept conn (ssl, read_bio, write_bio)
     | x when x = SSL_ERROR_WANT_WRITE -> 
       do! read_to_bio conn read_bio ssl
-      return! accept logger conn (ssl, read_bio, write_bio)
-    | d -> "OpenSSL error accepting socket" |> Log.interne logger "OpenSSL.accept" (new Exception(sprintf "error code %d" d))
+      return! accept conn (ssl, read_bio, write_bio)
+    | d -> failwith "OpenSSL error accepting socket" 
   
   return ()
   }

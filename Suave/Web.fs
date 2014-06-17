@@ -313,21 +313,17 @@ module ParsingAndControl =
   }
 
   open System.Net
-  open OpenSSL.SSL
-  open OpenSSL.X509
   open Types
-  open OpenSSL
 
   /// Load a readable plain-text stream, based on the protocol in use. If plain HTTP
   /// is being used, the stream is returned as it, otherwise a new SslStream is created
   /// to decipher the stream, without client certificates.
   let inline load_connection (logger : Log.Logger) proto (connection : Connection) = socket{
     match proto with
-    | HTTP       -> return connection
-    | HTTPS cert ->
-      let ssl = authenticate_as_server cert
-      do! accept logger connection ssl
-      return { connection with read = ssl_receive connection ssl; write = ssl_send connection ssl }
+    | HTTP       ->
+      return connection
+    | HTTPS ssl_provider -> 
+      return! ssl_provider.Wrap connection
     }
 
   open System.Net.Sockets
@@ -512,16 +508,6 @@ let default_error_handler (ex : Exception) msg (ctx : HttpContext) =
     Response.response Codes.HTTP_500 (UTF8.bytes (sprintf "<h1>%s</h1><br/>%A" ex.Message ex)) ctx
   else 
     Response.response Codes.HTTP_500 (UTF8.bytes (Codes.http_message Codes.HTTP_500)) ctx
-
-(*
-let default_error_handler (ex : Exception) msg (ctx : HttpContext) connection = socket {
-  let request = ctx.request
-  msg |> Log.verbosee ctx.runtime.logger "Web.default_error_handler" ctx.request.trace ex
-  if IPAddress.IsLoopback connection.ipaddr then
-    do! (Response.response Codes.HTTP_500 (UTF8.bytes (sprintf "<h1>%s</h1><br/>%A" ex.Message ex)) ctx connection)
-  else do! (Response.response Codes.HTTP_500 (UTF8.bytes (Codes.http_message Codes.HTTP_500)) ctx connection)
-}
-*)
 
 /// Returns the webserver as a tuple of 1) an async computation the yields unit when
 /// the web server is ready to serve quests, and 2) an async computation that yields

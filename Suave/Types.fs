@@ -66,14 +66,15 @@ let internal clear (request : HttpRequest) =
   request.files.Clear()
   request.trace <- Log.TraceHeader.Empty
 
-open OpenSSL.X509
+type ITlsProvider =
+  abstract member Wrap  : Connection -> SocketOp<Connection>
 
 /// Gets the supported protocols, HTTP and HTTPS with a certificate
 type Protocol =
   /// The HTTP protocol is the core protocol
   | HTTP
   /// The HTTP protocol tunneled in a TLS tunnel
-  | HTTPS of X509Certificate
+  | HTTPS of ITlsProvider
 with
   override x.ToString() =
     match x with

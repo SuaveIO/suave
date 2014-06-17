@@ -15,6 +15,8 @@ open Suave.Log
 open OpenSSL.X509
 open OpenSSL.Core
 
+open Suave.OpenSsl.Provider
+
 let basic_auth  : WebPart =
   Authentication.authenticate_basic ( fun x -> x.user_name.Equals("foo") && x.password.Equals("bar"))
 
@@ -96,7 +98,7 @@ choose [
   |> web_server
       { bindings =
         [ HttpBinding.Create(HTTP, "127.0.0.1", 8082)
-        ; { scheme = HTTPS(sslCert); ip = IPAddress.Parse "127.0.0.1"; port = 8083us } ]
+        ; { scheme = HTTPS (open_ssl sslCert); ip = IPAddress.Parse "127.0.0.1"; port = 8083us } ]
       ; error_handler    = default_error_handler
       ; listen_timeout   = TimeSpan.FromMilliseconds 2000.
       ; ct               = Async.DefaultCancellationToken
