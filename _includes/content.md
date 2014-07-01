@@ -36,9 +36,13 @@ web_server default_config (OK "Hello World!")
 
 The above statement will start a web server on default port 8083 over HTTP. `web_server` takes a configuration record and the webpart `(OK "Hello World")` 
 
-Webparts are functions with the following type: `HttpContext -> Option<Async<unit>>`.
+Webparts are functions with the following type: `HttpContext -> HttpContext option`.
+
+
 For every request `web_server` will evaluate the webpart, if the evaluation
-succeeds it will execute the resulting asynchronous computation. `OK` is a
+succeeds it will send the calculated response back to the http client. 
+
+`OK` is a
 combinator that always succeed and writes its argument to the underlying
 response stream.
 
@@ -46,7 +50,7 @@ Tutorial: Composing bigger programs.
 ------------------------------------
 
 Logic is expressed with the help of different combinators built around the
-`option<HttpContext>` type. We build webparts out of functions of type
+`HttpContext option` type. We build webparts out of functions of type
 `HttpContext -> HttpContext option` and the operator `>>=` in the following way.
 
 {% highlight fsharp %}
@@ -119,9 +123,14 @@ Multiple bindings and SSL support
 ---------------------------------
 
 Suave supports binding the application to multiple TCP/IP addresses and ports
-combinations. It also supports HTTPS.
+combinations. It also supports HTTPS via the interface `ITlsProvider`.
+
+There is an OpenSSL implementation at [https://github.com/SuaveIO/suave/tree/master/suave.OpenSsl](https://github.com/SuaveIO/suave/tree/master/suave.OpenSsl)
 
 {% highlight fsharp %}
+
+open Suave.OpenSsl.Provider
+
 let sslCert = new X509Certificate("suave.pfx","easy");
 let cfg = 
   { default_config with
@@ -129,7 +138,7 @@ let cfg =
         [ { scheme = HTTP
           ; ip     = IPAddress.Parse "127.0.0.1"
           ; port   = 80us }
-        ; { scheme = HTTPS sslCert
+        ; { scheme = HTTPS <| open_ssl sslCert
           ; ip     = IPAddress.Parse "192.168.13.138"
           ; port   = 443us } ]
     ; timeout = TimeSpan.FromMilliseconds 3000. }
@@ -140,7 +149,7 @@ choose
 |> web_server cfg
 {% endhighlight %}
 
-At the moment Suave uses OpenSSL which comes with conditional bindings in
+The OpenSSL implementation comes with conditional bindings in
 App.config for the three operating systems: linux, OS X and Windows.
 
 **Note** -- currently the compiled versions are "gott och blandat" as we say in
@@ -151,6 +160,34 @@ issue.
 API
 ===
 
+HttpContext
+-----------
+
+{% highlight fsharp %}
+type ErrorHandler = Exception -> String -> HttpContext -> HttpContext
+
+and HttpRuntime =
+  { protocol           : Protocol
+  ; error_handler      : ErrorHandler
+  ; mime_types_map     : MimeTypesMap
+  ; home_directory     : string
+  ; compression_folder : string
+  ; logger             : Log.Logger
+  ; session_provider   : ISessionProvider }
+
+and HttpContext =
+  { request    : HttpRequest
+  ; runtime    : HttpRuntime
+  ; user_state : Map<string, obj>
+  ; response   : HttpResult }
+
+and ISessionProvider =
+  abstract member Generate : TimeSpan * HttpContext -> string
+  abstract member Validate : string * HttpContext -> bool
+  abstract member Session<'a>  : string -> SessionStore<'a>
+
+{% endhighlight %}
+
 Default-supported HTTP Verbs
 ----------------------------
 
@@ -159,15 +196,15 @@ See "RFC 2616":http://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html.
 These applicatives match on HTTP verbs.
 
 {% highlight fsharp %}
-let GET     (x : HttpRequest) = meth0d "GET" x
-let POST    (x : HttpRequest) = meth0d "POST" x
-let DELETE  (x : HttpRequest) = meth0d "DELETE" x
-let PUT     (x : HttpRequest) = meth0d "PUT" x
-let HEAD    (x : HttpRequest) = meth0d "HEAD" x
-let CONNECT (x : HttpRequest) = meth0d "CONNECT" x
-let PATCH   (x : HttpRequest) = meth0d "PATCH" x
-let TRACE   (x : HttpRequest) = meth0d "TRACE" x
-let OPTIONS (x : HttpRequest) = meth0d "OPTIONS" x
+let GET     (x : HttpRequest) = ``method`` "GET" x
+let POST    (x : HttpRequest) = ``method`` "POST" x
+let DELETE  (x : HttpRequest) = ``method`` "DELETE" x
+let PUT     (x : HttpRequest) = ``method`` "PUT" x
+let HEAD    (x : HttpRequest) = ``method`` "HEAD" x
+let CONNECT (x : HttpRequest) = ``method`` "CONNECT" x
+let PATCH   (x : HttpRequest) = ``method`` "PATCH" x
+let TRACE   (x : HttpRequest) = ``method`` "TRACE" x
+let OPTIONS (x : HttpRequest) = ``method`` "OPTIONS" x
 {% endhighlight %}
 
 Server configuration
@@ -213,18 +250,25 @@ type SuaveConfig =
 
   /// Folder for temporary compressed files, directory where to cache compressed static files
   /// if no directory is specified the directory where suave.dll lives is assumed
-  ; compressed_files_folder : string option }
+  ; compressed_files_folder : string option
+
+  /// Http session provider
+  ; session_provider : ISessionProvider }
 {% endhighlight %}
 
 With `Protocol` , `HttpBinding` and `MimeType` defined like follows:
 
 {% highlight fsharp %}
+
+type ITlsProvider =
+  abstract member Wrap  : Connection -> SocketOp<Connection>
+
 /// Gets the supported protocols, HTTP and HTTPS with a certificate
 type Protocol =
   /// The HTTP protocol is the core protocol
   | HTTP
   /// The HTTP protocol tunneled in a TLS tunnel
-  | HTTPS of X509Certificate
+  | HTTPS of ITlsProvider
 
 /// A HTTP binding is a protocol is the product of HTTP or HTTP, a DNS or IP binding 
 /// and a port number
@@ -281,21 +325,20 @@ option` that, if Some, gets run against the WebParts passed.
 
 ### The WebPart
 
-A web part is a thing that executes on a HttpContext, asynchronously, maybe executing
-on the request.
+A web part is a thing that acts on a HttpContext, the web part could fail by returning `None` or succeed and produce a new HttpContext
 
 {% highlight fsharp %}
-type WebPart = HttpContext -> Async<unit> option
+type WebPart = HttpContext -> HttpContext option
 {% endhighlight %}
 
 ### The ErrorHandler
 
 An error handler takes the exception, a programmer-provided message, a request
-(that failed) and returns an asynchronous workflow for the handling of the
+(that failed) and returns a web part for the handling of the
 error.
 
 {% highlight fsharp %}
-type ErrorHandler = Exception -> String -> HttpContext -> Async<unit>
+type ErrorHandler = Exception -> String -> HttpContext -> HttpContext
 {% endhighlight %}
 
 
