@@ -105,7 +105,7 @@ module Bytes =
   /// The corresponding EOL array segment
   let eol_array_segment = new ArraySegment<_>(EOL, 0, 2)
 
-  let inline bytes_to_buffer (s : string) (buff : byte array) (offset : int) =
+  let inline bytes_to_buffer (s : string) (buff : byte []) (offset : int) =
     Encoding.ASCII.GetBytes (s, 0, s.Length, buff, offset)
 
   /// Fully transform the input stream to a byte array.

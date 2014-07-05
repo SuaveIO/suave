@@ -51,7 +51,7 @@ module Http =
     open System.IO
 
     let response status_code (cnt : byte []) =
-      fun (ctx : HttpContext) -> 
+      fun (ctx : HttpContext) ->
         let response = 
           { ctx.response with status = status_code; content = Bytes cnt }
         { ctx with response = response }
@@ -62,7 +62,7 @@ module Http =
 
     let set_header key value (ctx : HttpContext) =
       let new_response =
-          { ctx.response with headers = (key,value) :: ctx.response.headers }
+        { ctx.response with headers = (key,value) :: ctx.response.headers }
       { ctx with response = new_response }
 
     let private cookie_to_string (x : HttpCookie) =
@@ -422,7 +422,7 @@ module Http =
         let get_lm = fun path -> FileInfo(path).LastWriteTime
         use! fs = Compression.transform_x file get_fs get_lm compression ctx.runtime.compression_folder ctx conn
 
-        do! async_writeln conn (sprintf "Content-Length: %d" (fs: Stream).Length)
+        do! async_writeln conn (sprintf "Content-Length: %d" (fs : Stream).Length)
         do! async_writeln conn ""
 
         if fs.Length > 0L then

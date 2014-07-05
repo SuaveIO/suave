@@ -1,6 +1,6 @@
 module Suave.Web
 
-/// Parsing and control flow handling for webr requests
+/// Parsing and control flow handling for web requests
 module ParsingAndControl =
   open Utils
 
@@ -74,12 +74,11 @@ module ParsingAndControl =
   open System.Net.Sockets
 
   let read_data (connection : Connection) buff = socket {
-
       let! b = connection.read buff
       if b > 0 then
         return { buffer = buff; offset = buff.Offset; length = b }
       else
-        return! abort (Error.SocketError (SocketError.Shutdown))
+        return! abort (Error.SocketError SocketError.Shutdown)
       }
 
   /// Read the passed stream into buff until the EOL (CRLF) has been reached
@@ -105,14 +104,14 @@ module ParsingAndControl =
     }
 
     match preread with
-    | Some data -> loop [data]
+    | Some data -> loop [ data ]
     | None      -> loop []
 
   let read_till_EOL (connection : Connection) select (preread : BufferSegment option) =
     read_till_pattern connection select preread (scan_marker EOL)
 
   /// Read the stream until the marker appears.
-  let read_until (marker : byte array) (select : ArraySegment<_> -> int -> Async<unit>) (connection : Connection) (preread : BufferSegment option) =
+  let read_until (marker : byte []) (select : ArraySegment<_> -> int -> Async<unit>) (connection : Connection) (preread : BufferSegment option) =
     read_till_pattern connection select preread (scan_marker marker)
 
   /// Read a line from the stream, calling to_string on the bytes before the EOL marker

@@ -123,7 +123,7 @@ type Connection =
 
 /// Workflow builder to read/write to async sockets with fail/success semantics
 type SocketMonad() =
-  member this.Return(x:'a) : SocketOp<'a>= async{ return Choice1Of2 x }
+  member this.Return(x:'a) : SocketOp<'a> = async{ return Choice1Of2 x }
   member this.Zero() : SocketOp<unit> = this.Return()
   member this.ReturnFrom(x : SocketOp<'a>) : SocketOp<'a> = x
   member this.Delay(f: unit ->  SocketOp<'a>) = async { return! f () }
@@ -163,14 +163,14 @@ type SocketMonad() =
        compensation()
     }
 
-  member this.Using(disposable:#System.IDisposable, body) = async {
+  member this.Using(disposable : #System.IDisposable, body) = async {
     use _ = disposable
     return! body disposable
     }
 
-  member this.For(sequence:seq<_>, body : 'a -> SocketOp<unit>) = 
+  member this.For(sequence : seq<_>, body : 'a -> SocketOp<unit>) =
     this.Using(sequence.GetEnumerator(), fun (enum : IEnumerator<'a>) ->
-    this.While(enum.MoveNext,this.Delay(fun _-> body enum.Current)))
+    this.While(enum.MoveNext, this.Delay(fun _-> body enum.Current)))
  
 /// The socket monad   
 let socket = SocketMonad()
@@ -188,7 +188,7 @@ let lift_async (a : Async<'a>) : SocketOp<'a> =
 /// lift a Task type to the Socket monad
 let lift_task (a : Task) : SocketOp<'a>  = 
   async {
-    let! s = a 
+    let! s = a
     return Choice1Of2 s 
   }
 
@@ -212,13 +212,13 @@ let inline async_writeln (connection : Connection) (s : string) : SocketOp<unit>
   }
 
 /// Write the string s to the stream asynchronously from a byte array
-let inline async_writebytes (connection : Connection) (b : byte[]) = async {
+let inline async_writebytes (connection : Connection) (b : byte[]) : SocketOp<unit> = async {
   if b.Length > 0 then return! connection.write (new ArraySegment<_>(b, 0, b.Length))
   else return Choice1Of2 ()
 }
 
 /// Asynchronously write from the 'from' stream to the 'to' stream.
-let transfer_x (to_stream : Connection) (from : Stream) =
+let transfer_x (to_stream : Connection) (from : Stream) : SocketOp<unit> =
   let buf = Array.zeroCreate<byte> 0x2000
   let rec do_block () = socket {
     let! read = lift_async <| from.AsyncRead buf

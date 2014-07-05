@@ -105,11 +105,12 @@ with
   override x.ToString() =
     sprintf "%O://%O:%d/" x.scheme x.ip x.port
 
-type SessionStore<'a>     = (string -> 'a option)*(string -> 'a -> unit)
+/// A session store is a reader and a writer function pair keyed on strings.
+type SessionStore<'a> = (string -> 'a option) * (string -> 'a -> unit)
 
 type HttpContent =
   | NullContent
-  | Bytes of byte array
+  | Bytes of byte []
   | SocketTask of (Connection -> SocketOp<unit>)
 
 /// <summary>
@@ -120,26 +121,26 @@ type HttpContent =
 /// </para></summary>
 module Methods =
   type HttpMethod =
-      | GET
-      | POST
-      | DELETE
-      | PUT
-      | HEAD
-      | CONNECT
-      | PATCH
-      | TRACE
-      | OPTIONS
-      override x.ToString() =
-        match x with
-        | GET     -> "GET"
-        | POST    -> "POST"
-        | DELETE  -> "DELETE"
-        | PUT     -> "PUT"
-        | HEAD    -> "HEAD"
-        | CONNECT -> "CONNECT"
-        | PATCH   -> "PATCH"
-        | TRACE   -> "TRACE"
-        | OPTIONS -> "OPTIONS"
+    | GET
+    | POST
+    | DELETE
+    | PUT
+    | HEAD
+    | CONNECT
+    | PATCH
+    | TRACE
+    | OPTIONS
+    override x.ToString() =
+      match x with
+      | GET     -> "GET"
+      | POST    -> "POST"
+      | DELETE  -> "DELETE"
+      | PUT     -> "PUT"
+      | HEAD    -> "HEAD"
+      | CONNECT -> "CONNECT"
+      | PATCH   -> "PATCH"
+      | TRACE   -> "TRACE"
+      | OPTIONS -> "OPTIONS"
 
 module Codes =
   type HttpCode =
@@ -270,9 +271,8 @@ open Codes
 
 type HttpResult = 
   { status    : HttpCode
-  ; headers   : (string*string) list
-  ; content   : HttpContent
-  }
+  ; headers   : (string * string) list
+  ; content   : HttpContent }
 
 /// An error handler takes the exception, a programmer-provided message, a request (that failed) and returns
 /// an asynchronous workflow for the handling of the error.
