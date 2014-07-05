@@ -349,57 +349,54 @@ module ParsingAndControl =
     ; trace          = Log.TraceHeader.Empty
     ; ipaddr = ipaddr }
   
-  let internal write_content_type connection (headers : (string*string) list)  = socket {
+  let internal write_content_type connection (headers : (string*string) list) = socket {
     if not(List.exists(fun (x : string,_) -> x.ToLower().Equals("content-type")) headers )then
       do! async_writeln connection "Content-Type: text/html"
   }
 
-  let internal write_headers connection (headers : (string*string) seq)  = socket {
+  let internal write_headers connection (headers : (string*string) seq) = socket {
     for (x,y) in headers do
       if not (List.exists (fun y -> x.ToLower().Equals(y)) ["server";"date";"content-length"]) then
         do! async_writeln connection (String.Concat [| x; ": "; y |])
-    } 
+    }
 
   open Types.Codes
   open Globals
   open Suave.Compression
 
-  //let response_f (status_code : HttpCode) (f_content : Connection -> SocketOp<unit>) ({request = request } as context : HttpContext)  = 
-  let response_f ({ response = r } as context : HttpContext)  =
-
-    let write_content connection = function
-      | Bytes b -> socket {
-        let! (content : byte []) = Compression.transform b context connection
-        // http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.13
-        do! async_writeln connection (String.Concat [|  "Content-Length: "; content.Length.ToString() |])
-        do! async_writeln connection ""
-        if content.Length > 0 then
-          do! connection.write (new ArraySegment<_>(content, 0, content.Length))
-        }
-      | SocketTask f -> f connection
-
-    fun connection ->
-      socket {
-        
-      do! async_writeln connection (String.concat " " [ "HTTP/1.1"
-                                                      ; (http_code r.status).ToString()
-                                                      ; http_reason r.status ])
-      do! async_writeln connection Internals.server_header
-      do! async_writeln connection (String.Concat( [|  "Date: "; Globals.utc_now().ToString("R") |]))
-
-      do! write_headers connection r.headers
-      do! write_content_type connection r.headers 
-
-      return! write_content connection r.content
+  // TODO: make function continuous
+  let write_content context connection = function
+    | Bytes b -> socket {
+      let! (content : byte []) = Compression.transform b context connection
+      // http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.13
+      do! async_writeln connection (String.Concat [| "Content-Length: "; content.Length.ToString() |])
+      do! async_writeln connection ""
+      if content.Length > 0 then
+        do! connection.write (new ArraySegment<_>(content, 0, content.Length))
       }
+    | SocketTask f -> f connection
 
-  /// Check if the web part can perform its work on the current request. If it can't
-  /// it will return None and the run method will return.
-  let internal run ctx (web_part : WebPart) s = socket {
-      match web_part ctx with 
-      | Some x ->
-        return! response_f x s
-      | None -> return ()
+  //let response_f (status_code : HttpCode) (f_content : Connection -> SocketOp<unit>) ({request = request } as context : HttpContext)  = 
+  let response_f ({ response = r } as context : HttpContext) connection = socket {
+    do! async_writeln connection (String.concat " " [ "HTTP/1.1"
+                                                    ; (http_code r.status).ToString()
+                                                    ; http_reason r.status ])
+    do! async_writeln connection Internals.server_header
+    do! async_writeln connection (String.Concat( [| "Date: "; Globals.utc_now().ToString("R") |]))
+
+    do! write_headers connection r.headers
+    do! write_content_type connection r.headers
+
+    return! write_content context connection r.content
+  }
+
+  /// Check if the web part can perform its work on the current request. If it
+  /// can't it will return None and the run method will return.
+  let internal run ctx (web_part : WebPart) connection = socket {
+    match web_part ctx with 
+    | Some executed_part ->
+      return! response_f executed_part connection
+    | None -> return ()
   }
 
   type HttpConsumer =
@@ -457,7 +454,7 @@ module ParsingAndControl =
   /// a web part, an error handler and a Connection to use for read-write
   /// communication -- getting the initial request stream.
   let request_loop
-    (proxy_mode  : bool)
+    (proxy_mode : bool)
     (runtime    : HttpRuntime)
     (consumer   : HttpConsumer)
     (connection : Connection) =

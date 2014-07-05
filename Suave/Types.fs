@@ -67,7 +67,7 @@ let internal clear (request : HttpRequest) =
   request.trace <- Log.TraceHeader.Empty
 
 type ITlsProvider =
-  abstract member Wrap  : Connection -> SocketOp<Connection>
+  abstract member Wrap : Connection -> SocketOp<Connection>
 
 /// Gets the supported protocols, HTTP and HTTPS with a certificate
 type Protocol =
@@ -270,9 +270,9 @@ module Codes =
 open Codes
 
 type HttpResult = 
-  { status    : HttpCode
-  ; headers   : (string * string) list
-  ; content   : HttpContent }
+  { status  : HttpCode
+  ; headers : (string * string) list
+  ; content : HttpContent }
 
 /// An error handler takes the exception, a programmer-provided message, a request (that failed) and returns
 /// an asynchronous workflow for the handling of the error.
@@ -302,10 +302,6 @@ let request f (a : HttpContext) = f a.request a
 let context f (a : HttpContext) = f a a
 
 type WebPart = HttpContext -> HttpContext option
-
-/// A web result is something that writes to the output stream that the client
-/// as to the web server.
-type WebResult = (Connection -> SocketOp<unit>) option
 
 open System.Threading
 

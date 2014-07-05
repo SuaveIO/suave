@@ -525,7 +525,87 @@ module Http =
 
     let browse : WebPart =
       warbler (fun ctx -> resource (ctx.request.url.TrimStart [|'/'|]))
-      
+
+  // See www.w3.org/TR/eventsource/#event-stream-interpretation
+  module EventSource =
+    open System
+
+    open Suave
+    open Suave.Socket
+    open Suave.Types
+
+    [<Literal>]
+    let private ES_EOL = "\n"
+
+    let private ES_EOL_S = ArraySegment<_>(UTF8.bytes ES_EOL, 0, 1)
+
+    let async_write (out : Connection) (data : string) =
+      async_writebytes out (UTF8.bytes data)
+
+    let (<<.) (out : Connection) (data : string) =
+      async_writebytes out (UTF8.bytes data)
+
+    let dispatch (out : Connection) =
+      out.write ES_EOL_S
+
+    let comment (out : Connection) (cmt : string) =
+      out <<. ": " + cmt + ES_EOL
+
+    let event_type (out : Connection) (event_type : string) =
+      out <<. "event: " + event_type + ES_EOL
+
+    let data (out : Connection) (data : string) =
+      out <<. "data: " + data + ES_EOL
+
+    let es_id (out : Connection) (last_event_id : string) =
+      out <<. "id: " + last_event_id + ES_EOL
+
+    let retry (out : Connection) (retry : uint32) =
+      out <<. "retry: " + (string retry) + ES_EOL
+
+    type Message =
+      { id       : string
+      ; data     : string
+      ; ``type`` : string option }
+
+    let mk_message id data =
+      { id = id; data = data; ``type`` = None }
+
+    let mk_message' id data typ =
+      { id = id; data = data; ``type`` = Some typ }
+
+    let send (out : Connection) (msg : Message) =
+      socket {
+        do! msg.id |> es_id out
+        match msg.``type`` with
+        | Some x -> do! x |> event_type out
+        | None   -> ()
+        do! msg.data |> data out
+        return! dispatch out }
+
+    let private hand_shake' f (out : Connection) =
+      socket {
+        // resp.SendChunked       <- false
+        // Buggy Internet Explorer; 2kB of comment padding for IE
+        do! String.replicate 2000 " " |> comment out
+        do! 2000u |> retry out
+        return! f out }
+
+    let hand_shake f ({ request = req } as ctx : HttpContext) =
+      { ctx with
+          response =
+            { ctx.response with
+                status = Codes.HTTP_200
+                headers =
+                     ("Content-Type",                "text/event-stream; charset=utf-8")
+                  :: ("Cache-Control",               "no-cache")
+                  :: ("Access-Control-Allow-Origin", "*")
+                  :: []
+                content = SocketTask (hand_shake' f)
+                //chunked = false
+            }
+      }
+      |> succeed
 
   module Authentication =
 

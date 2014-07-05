@@ -157,7 +157,7 @@ let rec accept conn (ssl, read_bio, write_bio) = socket{
   return ()
   }
 
-let ssl_receive (con : Connection) (context, read_bio, write_bio) (bu: B) = socket {
+let ssl_receive (con : Connection) (context, read_bio, write_bio) (bu : B) = socket {
 
   let write_bytes_pending = BIO_ctrl_pending write_bio
   if write_bytes_pending > 0u  then 
