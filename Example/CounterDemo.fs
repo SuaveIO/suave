@@ -29,7 +29,7 @@ let counter_demo (req : HttpRequest) (out : Connection) =
 
   let write i =
     socket {
-      let msg = Message.Create(id = i, data = string i)
+      let msg = { id = i; data = string i; ``type`` = None }
       do! msg |> send out
       return! async {
         do! Async.Sleep 100

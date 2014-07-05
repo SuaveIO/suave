@@ -1412,22 +1412,62 @@ module Http =
     /// </remarks>
     val browse : WebPart
 
+  /// A module that implements the Server-Sent Event specification, which can be
+  /// read at www.w3.org/TR/eventsource.
   module EventSource =
-    let async_write (out : Connection) (data : string) =
-    let (<<.) = async_write
-    let dispatch (out : Connection) =
-    let comment (out : Connection) (cmt : string) =
-    let event_type (out : Connection) (event_type : string) =
-    let data (out : Connection) (data : string) =
-    let es_id (out : Connection) (last_event_id : string) =
-    let retry (out : Connection) (retry : uint32) =
+    /// Helper function that writes a string of data. Most often you are better
+    /// off using the `send` function and give it a message, as this will ensure
+    /// the proper framing is used. However, if you have a desire to write raw
+    /// data, this function overrides the Socket.async_write function so that
+    /// you will be writing UTF8 data only, as per the specification.
+    val async_write : out:Connection -> data:string -> SocketOp<unit>
+
+    /// Same as `async_write`; convenience function.
+    val (<<.) : out:Connection -> data:string -> SocketOp<unit>
     
+    /// "If the line is empty (a blank line) - dispatch the event."
+    /// Dispatches the event properly to the browser.
+    val dispatch : out:Connection -> SocketOp<unit>
+    
+    /// "If the line starts with a U+003A COLON character (:) - Ignore the line."
+    /// Writes a comment to the stream
+    val comment : out:Connection -> cmt:string -> SocketOp<unit>
+
+    /// "If the field name is 'event' - Set the event type buffer to field value."
+    /// Writes the event type to the stream
+    val event_type : out:Connection -> event_type:string -> SocketOp<unit>
+
+    /// "If the field name is 'data' -
+    /// Append the field value to the data buffer, then append a single
+    /// U+000A LINE FEED (LF) character to the data buffer."
+    /// Write a piece of data as part of the event
+    val data : out:Connection -> data:string -> SocketOp<unit>
+
+    /// "If the field name is 'id' - Set the last event ID buffer to the field value."
+    /// Sets the last event id in the stream.
+    val es_id : out:Connection -> last_event_id:string -> SocketOp<unit>
+
+    /// Sets the option for the EventSource instance, of how long to wait in ms
+    /// until a new connection is spawned as a retry.
+    val retry : out:Connection -> retry:uint32 -> SocketOp<unit>
+    
+    /// A container data type for the output events
     type Message =
       { id       : string
       ; data     : string
       ; ``type`` : string option }
-    let send (out : Connection) (msg : Message) =
-    let hand_shake : f ({ request = req } as ctx : HttpContext) : HttpContext option
+
+    ///
+    val mk_message : id:string -> data:string -> Message
+
+    val mk_message' : id:string -> data:string -> typ:string -> Message
+
+    /// send a message containing data to the output stream
+    val send : out:Connection -> msg:Message -> SocketOp<unit>
+
+    /// This function composes the passed function f with the hand-shake required
+    /// to start a new event-stream protocol session with the browser.
+    val hand_shake : f_cont:(Connection -> SocketOp<unit>) -> ctx:HttpContext -> HttpContext option
 
   module Authentication =
 
