@@ -1,5 +1,5 @@
-Introduction.
-=============
+Introduction
+============
 
 Suave is inspired in the simplicity of Happstack and born out of the necessity
 of embedding web server capabilities in my own applications.  Still in its early
@@ -26,28 +26,35 @@ PM> Install-Package Suave
 Tutorial: Hello World!
 ----------------------
 
-The simplest Suave application is a simple HTTP server that greets all visitors with the string `"Hello World!"`
+The simplest Suave application is a simple HTTP server that greets all visitors
+with the string `"Hello World!"`
 
 {% highlight fsharp %}
 open Suave.Http
 open Suave.Web
+
 web_server default_config (OK "Hello World!")
 {% endhighlight %}
 
-The above statement will start a web server on default port 8083 over HTTP. `web_server` takes a configuration record and the webpart `(OK "Hello World")` 
+The above statement will start a web server on default port 8083 over HTTP.
+`web_server` takes a configuration record and the webpart `(OK "Hello World")` 
 
-Webparts are functions with the following type: `HttpContext -> HttpContext option`.
+Webparts are functions with the following type:
+`HttpContext -> HttpContext option`.
 
-
-For every request `web_server` will evaluate the webpart, if the evaluation
+For every request `web_server` will evaluate the WebPart, if the evaluation
 succeeds it will send the calculated response back to the http client. 
 
-`OK` is a
-combinator that always succeed and writes its argument to the underlying
-response stream.
+`OK` is a combinator that always succeed and writes its argument to the
+underlying response stream.
 
-Tutorial: Composing bigger programs.
-------------------------------------
+Something that may trick beginners up is that your web parts are "values" in the
+sense that they evaluate once, e.g. when constructing `choose [ OK "hi" ]`, `OK
+"hi"` is evauated once, not every request. You need to wrap your web part in a
+closure if you want to re-evaluated every request, with e.g. `warbler`.
+
+Tutorial: Composing bigger programs
+-----------------------------------
 
 Logic is expressed with the help of different combinators built around the
 `HttpContext option` type. We build webparts out of functions of type
@@ -185,7 +192,6 @@ and ISessionProvider =
   abstract member Generate : TimeSpan * HttpContext -> string
   abstract member Validate : string * HttpContext -> bool
   abstract member Session<'a>  : string -> SessionStore<'a>
-
 {% endhighlight %}
 
 Default-supported HTTP Verbs
@@ -259,7 +265,6 @@ type SuaveConfig =
 With `Protocol` , `HttpBinding` and `MimeType` defined like follows:
 
 {% highlight fsharp %}
-
 type ITlsProvider =
   abstract member Wrap  : Connection -> SocketOp<Connection>
 
@@ -358,3 +363,11 @@ type MyHackLogger(min_level) =
         // don't do this for real ;)
         System.Windows.Forms.MessageBox.Show((f_line ()).message)
 {% endhighlight %}
+
+You can use Logary for integrated logging:
+
+{% highlight dosbatch %}
+PM> Install-Package Intelliplan.Logary.Suave
+{% endhighlight %}
+
+Use the `SuaveAdapter` type to set the Logger in Suave's configuration.
