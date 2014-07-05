@@ -22,7 +22,7 @@ end
 
 desc 'create assembly infos'
 asmver_files :asmver => :versioning do |a|
-  a.files = FileList['{Suave,Tests,Pong,Example,Experimental,Load,Suave.*}/*proj']
+  a.files = FileList['{Suave,Tests,Pong,WebMachine,Example,Experimental,Load,Suave.*,suave.*}/*proj']
   a.attributes assembly_description: suave_description,
                assembly_configuration: 'RELEASE',
                assembly_company: 'Suave.IO',
