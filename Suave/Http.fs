@@ -525,7 +525,108 @@ module Http =
 
     let browse : WebPart =
       warbler (fun ctx -> resource (ctx.request.url.TrimStart [|'/'|]))
-      
+
+  /// See www.w3.org/TR/eventsource/#event-stream-interpretation
+  module EventSource =
+    open System
+
+    open Suave
+    open Suave.Socket
+    open Suave.Types
+
+    [<Literal>]
+    let private ES_EOL = "\n"
+
+    let private ES_EOL_S = ArraySegment<_>(UTF8.bytes ES_EOL, 0, 1)
+
+    /// overrides Socket.async_writebytes with a function that only writes UTF8
+    /// encoded data.
+    let async_write (out : Connection) (data : string) =
+      async_writebytes out (UTF8.bytes data)
+
+    /// overrides Socket.async_writebytes with a function that only writes UTF8
+    /// encoded data.
+    let (<<.) = async_write
+
+    /// "If the line is empty (a blank line) - dispatch the event."
+    /// Dispatches the event properly to the browser.
+    let dispatch (out : Connection) =
+      out.write ES_EOL_S
+
+    /// "If the line starts with a U+003A COLON character (:) - Ignore the line."
+    /// Writes a comment to the stream
+    let comment (out : Connection) (cmt : string) =
+      out <<. ": " + cmt + ES_EOL
+
+    /// "If the field name is 'event' - Set the event type buffer to field value."
+    /// Writes the event type to the stream
+    let event_type (out : Connection) (event_type : string) =
+      out <<. "event: " + event_type + ES_EOL
+
+    /// "If the field name is 'data' -
+    /// Append the field value to the data buffer, then append a single
+    /// U+000A LINE FEED (LF) character to the data buffer."
+    /// Write a piece of data as part of the event
+    let data (out : Connection) (data : string) =
+      out <<. "data: " + data + ES_EOL
+
+    /// "If the field name is 'id' - Set the last event ID buffer to the field value."
+    /// Sets the last event id in the stream.
+    let es_id (out : Connection) (last_event_id : string) =
+      out <<. "id: " + last_event_id + ES_EOL
+
+    /// "If the field name is 'retry' - If the field value consists of only ASCII digits, then interpret the field value as an integer in base ten, and set the event stream's reconnection time to that integer. Otherwise, ignore the field."
+    /// Writes a control line to the EventSource listener, that changes
+    /// how quickly reconnects happen. A reconnection time, in milliseconds.
+    /// This must initially be a user-agent-defined value, probably in the region of
+    /// a few seconds.
+    let retry (out : Connection) (retry : uint32) =
+      out <<. "retry: " + (string retry) + ES_EOL
+
+    /// A container data type for the output events
+    type Message =
+      { id       : string
+      ; data     : string
+      ; ``type`` : string option }
+      static member Create(id, data, ?typ) =
+        let typ = defaultArg typ None
+        { id = id; data = data; ``type`` = typ }
+
+    /// send a message containing data to the output stream
+    let send (out : Connection) (msg : Message) =
+      socket {
+        do! msg.id |> es_id out
+        match msg.``type`` with
+        | Some x -> do! x |> event_type out
+        | None   -> ()
+        do! msg.data |> data out
+        return! dispatch out }
+
+    let private hand_shake' f (out : Connection) =
+      socket {
+        // resp.SendChunked       <- false
+        // Buggy Internet Explorer; 2kB of comment padding for IE
+        do! String.replicate 2000 " " |> comment out
+        do! 2000u |> retry out
+        return! f out }
+
+    /// This function composes the passed function f with the hand-shake required
+    /// to start a new event-stream protocol session with the browser.
+    let hand_shake f ({ request = req } as ctx : HttpContext) =
+      { ctx with
+          response =
+            { ctx.response with
+                status = Codes.HTTP_200
+                headers =
+                     ("Content-Type",                "text/event-stream; charset=utf-8")
+                  :: ("Cache-Control",               "no-cache")
+                  :: ("Access-Control-Allow-Origin", "*")
+                  :: []
+                content = SocketTask (hand_shake' f)
+                //chunked = false
+            }
+      }
+      |> succeed
 
   module Authentication =
 

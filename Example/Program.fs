@@ -17,7 +17,7 @@ open OpenSSL.Core
 
 open Suave.OpenSsl.Provider
 
-let basic_auth  : WebPart =
+let basic_auth : WebPart =
   Authentication.authenticate_basic ( fun x -> x.user_name.Equals("foo") && x.password.Equals("bar"))
 
 let sslCert = X509Certificate.FromPKCS12(BIO.File("suave.p12","r"), "easy")
@@ -64,13 +64,13 @@ choose [
   log logger log_format >>= never
   GET >>= url "/hello" >>= never
   url_regex "(.*?)\.(dll|mdb|log)$" >>= RequestErrors.FORBIDDEN "Access denied."
-  url "/neverme" >>= never >>= OK (Guid.NewGuid().ToString()) ;
-  url "/guid" >>= OK (Guid.NewGuid().ToString()) ;
-  url "/hello" >>= OK "Hello World" ;
-  GET >>= url "/query" >>= request( fun x -> cond (x.query) ? name (fun y -> OK ("Hello " + y)) never) ;
-  GET >>= url "/query" >>= OK "Hello beautiful" ;
+  url "/neverme" >>= never >>= OK (Guid.NewGuid().ToString())
+  url "/guid" >>= OK (Guid.NewGuid().ToString())
+  url "/hello" >>= OK "Hello World"
+  GET >>= url "/query" >>= request( fun x -> cond (x.query) ? name (fun y -> OK ("Hello " + y)) never)
+  GET >>= url "/query" >>= OK "Hello beautiful"
   url "/redirect" >>= Redirection.redirect "/redirected"
-  url "/redirected" >>=  OK "You have been redirected." ;
+  url "/redirected" >>=  OK "You have been redirected."
   url "/date" >>= warbler (fun _ -> OK (DateTimeOffset.UtcNow.ToString("o")))
   url "/timeout" >>= timeout_webpart (TimeSpan.FromSeconds 1.) timeout
   url "/session"
@@ -79,20 +79,21 @@ choose [
         let get,set = session x
         match get "counter" with
         | Some y ->
-          set "counter" (y + 1 )
-          OK (sprintf "Hello %d time(s)"  y )
+          set "counter" (y + 1)
+          OK (sprintf "Hello %d time(s)" y )
         | None ->
           set "counter" 1
-          OK "First time" )
+          OK "First time")
   basic_auth // from here on it will require authentication
+  GET >>= url "/events" >>= request (fun r -> EventSource.hand_shake (CounterDemo.counter_demo r))
   GET >>= browse //serves file if exists
   GET >>= dir //show directory listing
   POST >>= url "/upload" >>= OK "Upload successful."
   POST >>= url "/upload2"
-      >>= request(fun x ->
-                    let files = x.files |> Seq.fold (fun x y -> x + "<br>" + (sprintf "(%s,%s,%s)" y.FileName y.MimeType y.Path)) "" ;
-                    OK (sprintf "Upload successful.<br>POST data: %A<br>Uploaded files (%d): %s" (x.form)(x.files.Count) files)) ;
-  POST >>= request( fun x -> OK (sprintf "POST data: %A" (x.raw_form)));
+    >>= request (fun x ->
+                   let files = x.files |> Seq.fold (fun x y -> x + "<br/>" + (sprintf "(%s, %s, %s)" y.FileName y.MimeType y.Path)) ""
+                   OK (sprintf "Upload successful.<br>POST data: %A<br>Uploaded files (%d): %s" (x.form)(x.files.Count) files))
+  POST >>= request (fun x -> OK (sprintf "POST data: %A" (x.raw_form)))
   RequestErrors.NOT_FOUND "Found no handlers"
   ]
   |> web_server

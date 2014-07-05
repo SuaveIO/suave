@@ -1412,6 +1412,23 @@ module Http =
     /// </remarks>
     val browse : WebPart
 
+  module EventSource =
+    let async_write (out : Connection) (data : string) =
+    let (<<.) = async_write
+    let dispatch (out : Connection) =
+    let comment (out : Connection) (cmt : string) =
+    let event_type (out : Connection) (event_type : string) =
+    let data (out : Connection) (data : string) =
+    let es_id (out : Connection) (last_event_id : string) =
+    let retry (out : Connection) (retry : uint32) =
+    
+    type Message =
+      { id       : string
+      ; data     : string
+      ; ``type`` : string option }
+    let send (out : Connection) (msg : Message) =
+    let hand_shake : f ({ request = req } as ctx : HttpContext) : HttpContext option
+
   module Authentication =
 
     /// <summary><para>

@@ -48,6 +48,13 @@
     <Content Include="lift.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <None Include="es.html">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <Content Include="eventsource.js">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Compile Include="CounterDemo.fs" />
     <Compile Include="Program.fs" />
     <None Include="examples.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
@@ -79,13 +86,15 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\suave.OpenSsl\suave.OpenSsl.fsproj">
+      <Name>suave.OpenSsl</Name>
+      <Project>{ef9a327a-4265-4db4-aca4-368790cc7483}</Project>
+      <Private>True</Private>
+    </ProjectReference>
     <ProjectReference Include="..\Suave\suave.fsproj">
       <Name>suave</Name>
-      <Project>{3DC9193E-BD0C-4486-9C58-56B630C36623}</Project>
-    </ProjectReference>
-    <ProjectReference Include="..\suave.OpenSsl\suave.OpenSsl.fsproj">
-      <Project>{EF9A327A-4265-4DB4-ACA4-368790CC7483}</Project>
-      <Name>suave.OpenSsl</Name>
+      <Project>{3dc9193e-bd0c-4486-9c58-56b630c36623}</Project>
+      <Private>True</Private>
     </ProjectReference>
   </ItemGroup>
   <PropertyGroup>

@@ -193,7 +193,7 @@ let lift_task (a : Task) : SocketOp<'a>  =
   }
 
 /// Write the string s to the stream asynchronously as ASCII encoded text
-let inline async_write (connection : Connection) (s : string)  : SocketOp<unit> = 
+let inline async_write (connection : Connection) (s : string) : SocketOp<unit> = 
   async {
     if s.Length > 0 then
       let buff = connection.line_buffer
