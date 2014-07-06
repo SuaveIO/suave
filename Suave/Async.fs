@@ -18,7 +18,7 @@ let internal invoke_once funcs =
 type Microsoft.FSharp.Control.Async with
   /// Spawn an async with a timeout, throwing <see cref="System.TimeoutException" /> after
   /// the timeout.
-  static member WithTimeout(timeout : TimeSpan, computation : 'a Async) : 'a Async =
+  static member WithTimeout(computation : 'a Async, timeout : TimeSpan) : 'a Async =
     let callback (success, error, cancellation) =
       let (success, error, cancellation) = invoke_once (success, error, cancellation)
       let fetchResult = async {
@@ -29,7 +29,7 @@ type Microsoft.FSharp.Control.Async with
           error ex }
       let timeoutExpired = async {
         do! Async.Sleep (int timeout.TotalMilliseconds)
-        let ex = new TimeoutException ("Timeout expired") :> Exception
+        let ex = new TimeoutException ("Async timeout expired") :> Exception
         error ex }
 
       Async.StartImmediate fetchResult
