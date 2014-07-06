@@ -56,6 +56,12 @@ module Http =
           { ctx.response with status = status_code; content = Bytes cnt }
         { ctx with response = response }
 
+    let async_succeed (computation : Async<HttpContext>) : Choice<HttpContext, Async<HttpContext>> option=
+      Choice2Of2 computation |> succeed
+
+    let succeed ctx : Choice<HttpContext, Async<HttpContext>> option =
+      Choice1Of2 ctx |> succeed
+
   module Writers =
 
     open System
@@ -106,11 +112,11 @@ module Http =
 
     open System
 
-    let CONTINUE (ctx : HttpContext) : HttpContext option =
-      raise <| NotImplementedException("TODO")
+    let CONTINUE : WebPart =
+      fun _ -> raise <| NotImplementedException("TODO")
 
-    let SWITCHING_PROTO (ctx : HttpContext) : HttpContext option =
-      raise <| NotImplementedException("TODO")
+    let SWITCHING_PROTO : WebPart =
+      fun _ -> raise <| NotImplementedException("TODO")
 
   // 2xx
   module Successful =
@@ -118,7 +124,7 @@ module Http =
     open Response
     open Types.Codes
 
-    let ok s : WebPart = 
+    let ok s : WebPart =
       fun ctx -> { ctx with response = { ctx.response with status = HTTP_200; content = Bytes s }} |> succeed
 
     let OK a = ok (UTF8.bytes a)
@@ -178,9 +184,9 @@ module Http =
   // 4xx
   module RequestErrors =
 
-    open Response
     open Writers
     open Types.Codes
+    open Response
 
     let bad_request s = response HTTP_400 s >> succeed
 
@@ -353,23 +359,31 @@ module Http =
         match scan r.request.url with
         | Some p ->
           let part = h p
-          part r 
-        | None -> 
+          part r
+        | None ->
           fail
       F
 
-    let resolve (part: WebPart) = fun (ctx: HttpContext) ->
-      async {
-        return part ctx
-      }
-    
-    let timeout_webpart (time_span : TimeSpan) (web_part : WebPart) : WebPart =
+    let private resolve (part : WebPart) ctx = async {
+      match part ctx with
+      | Some(Choice1Of2 syncCtx)  -> return Some syncCtx
+      | Some(Choice2Of2 asyncCtx) ->
+        let! res = asyncCtx
+        return Some res
+      | None -> return None
+    }
+
+    // TODO: this blocks the server thread
+    let timeout_webpart (ts_timeout : TimeSpan) (web_part : WebPart) : WebPart =
       fun (ctx : HttpContext) ->
         try
-          Async.RunSynchronously (resolve web_part ctx, int time_span.TotalMilliseconds)
+          match Async.WithTimeout (resolve web_part ctx, ts_timeout) |> Async.RunSynchronously with
+          | Some ctx' -> Some(Choice1Of2 ctx')
+          | None      -> None
         with
-          | :? TimeoutException ->
-            Response.response Codes.HTTP_408 (UTF8.bytes "Request Timeout") ctx |> Some
+        | :? TimeoutException ->
+          Response.response Codes.HTTP_408 (UTF8.bytes "Request Timeout") ctx
+          |> Response.succeed
 
   module ServeResource =
     open System
@@ -380,7 +394,7 @@ module Http =
     // If a response includes both an Expires header and a max-age directive,
     // the max-age directive overrides the Expires header, even if the Expires header is more restrictive
     // 'Cache-Control' and 'Expires' headers should be left up to the user
-    let resource key exists get_last get_extension (send : string -> bool -> HttpContext -> HttpContext option) ({request = r } as ctx) =
+    let resource key exists get_last get_extension (send : string -> bool -> WebPart) ({request = r } as ctx) =
 
       let send_it name compression =
         set_header "Last-Modified" ((get_last key : DateTime).ToString("R"))
@@ -388,16 +402,16 @@ module Http =
         >> send key compression
 
       if exists key then
-          let mimes = ctx.runtime.mime_types_map <| get_extension key
-          match mimes with
-          | Some value ->
-            let modified_since = (r.headers ? ``if-modified-since`` )
-            match modified_since with
-            | Some v -> let date = DateTime.Parse v
-                        if get_last key > date then send_it value.name value.compression ctx
-                        else NOT_MODIFIED ctx 
-            | None   -> send_it  value.name value.compression ctx
-          | None -> None
+        let mimes = ctx.runtime.mime_types_map <| get_extension key
+        match mimes with
+        | Some value ->
+          let modified_since = (r.headers ? ``if-modified-since`` )
+          match modified_since with
+          | Some v -> let date = DateTime.Parse v
+                      if get_last key > date then send_it value.name value.compression ctx
+                      else NOT_MODIFIED ctx 
+          | None   -> send_it  value.name value.compression ctx
+        | None -> None
       else
         None
 
@@ -428,7 +442,7 @@ module Http =
         if fs.Length > 0L then
           do! transfer_x conn fs
       }
-      { ctx with response = { ctx.response with status = HTTP_200; content = SocketTask (write_file file_name)}} |> Some
+      { ctx with response = { ctx.response with status = HTTP_200; content = SocketTask (write_file file_name)}} |> succeed
 
     let file file_name =
       resource
@@ -513,7 +527,7 @@ module Http =
         if fs.Length > 0L then
           do! transfer_x conn fs
       }
-      { ctx with response = { ctx.response with status = HTTP_200; content = SocketTask (write_resource resource_name)}} |> Some
+      { ctx with response = { ctx.response with status = HTTP_200; content = SocketTask (write_resource resource_name)}} |> succeed
 
     let resource name =
       resource
@@ -605,7 +619,7 @@ module Http =
                 //chunked = false
             }
       }
-      |> succeed
+      |> Response.succeed
 
   module Authentication =
 

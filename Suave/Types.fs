@@ -301,7 +301,7 @@ and ISessionProvider =
 let request f (a : HttpContext) = f a.request a
 let context f (a : HttpContext) = f a a
 
-type WebPart = HttpContext -> HttpContext option
+type WebPart = HttpContext -> Choice<HttpContext, Async<HttpContext>> option
 
 open System.Threading
 

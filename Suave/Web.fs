@@ -364,8 +364,7 @@ module ParsingAndControl =
   open Globals
   open Suave.Compression
 
-  // TODO: make function continuous
-  let write_content context connection = function
+  let rec write_content context connection = function
     | Bytes b -> socket {
       let! (content : byte []) = Compression.transform b context connection
       // http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.13
@@ -375,8 +374,8 @@ module ParsingAndControl =
         do! connection.write (new ArraySegment<_>(content, 0, content.Length))
       }
     | SocketTask f -> f connection
+    | NullContent -> write_content context connection (Bytes [||])
 
-  //let response_f (status_code : HttpCode) (f_content : Connection -> SocketOp<unit>) ({request = request } as context : HttpContext)  = 
   let response_f ({ response = r } as context : HttpContext) connection = socket {
     do! async_writeln connection (String.concat " " [ "HTTP/1.1"
                                                     ; (http_code r.status).ToString()
@@ -393,9 +392,13 @@ module ParsingAndControl =
   /// Check if the web part can perform its work on the current request. If it
   /// can't it will return None and the run method will return.
   let internal run ctx (web_part : WebPart) connection = socket {
-    match web_part ctx with 
-    | Some executed_part ->
+    match web_part ctx with
+    | Some(Choice1Of2 executed_part) ->
       return! response_f executed_part connection
+    | Some(Choice2Of2(async_part)) ->
+      let! res = async { let! res = async_part
+                         return Choice1Of2 res }
+      return! response_f res connection
     | None -> return ()
   }
 
