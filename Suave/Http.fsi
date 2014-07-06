@@ -88,6 +88,10 @@ module Http =
     /// Respond with a given status code, http reason phrase, content in the body to a http request.
     val response : status_code:HttpCode -> content:byte [] -> request:HttpContext -> HttpContext
 
+    val async_succeed : computation:Async<HttpContext> -> Choice<HttpContext, Async<HttpContext>> option
+
+    val succeed : HttpContext -> Choice<HttpContext, Async<HttpContext>> option
+
   /// Module that allows changing the output response in different ways.
   /// Functions have signature f :: params... -> HttpContext -> HttpContext.
   module Writers =
@@ -128,10 +132,10 @@ module Http =
   /// Functions have signature f :: TODO
   module Intermediate =
     /// TODO
-    val CONTINUE : x:HttpContext -> HttpContext option
+    val CONTINUE : WebPart
 
     /// TODO
-    val SWITCHING_PROTO : x:HttpContext -> HttpContext option
+    val SWITCHING_PROTO : WebPart
 
   /// <summary><para>
   /// 2xx successful responses
@@ -1467,7 +1471,7 @@ module Http =
 
     /// This function composes the passed function f with the hand-shake required
     /// to start a new event-stream protocol session with the browser.
-    val hand_shake : f_cont:(Connection -> SocketOp<unit>) -> ctx:HttpContext -> HttpContext option
+    val hand_shake : f_cont:(Connection -> SocketOp<unit>) -> WebPart
 
   module Authentication =
 
@@ -1490,4 +1494,4 @@ module Http =
     /// </para></summary>
     /// <remarks>
     /// </remarks>
-    val authenticate_basic : f:(HttpRequest -> bool) -> p:HttpContext -> HttpContext option
+    val authenticate_basic : f:(HttpRequest -> bool) -> WebPart

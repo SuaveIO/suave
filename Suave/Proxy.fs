@@ -13,7 +13,6 @@ open Suave.Web
 open Suave.Tcp
 
 open Suave.Http
-open Suave.Http.Response
 open Suave.Web.ParsingAndControl
 
 open Socket
@@ -33,7 +32,7 @@ let private send_web_response (data : HttpWebResponse) ({ request = { trace = t 
   "-> read_fully" |> Log.verbose ctx.runtime.logger "proxy:send_web_response:GetResponseStream" t
   let bytes = data.GetResponseStream() |> read_fully
   "<- read_fully" |> Log.verbose ctx.runtime.logger "proxy:send_web_response:GetResponseStream" t
-  response (HttpCode.TryParse(int data.StatusCode) |> Option.get) bytes { ctx with response = { resp with headers = resp.headers @ headers } }
+  Response.response (HttpCode.TryParse(int data.StatusCode) |> Option.get) bytes { ctx with response = { resp with headers = resp.headers @ headers } }
 
 /// Forward the HttpRequest 'p' to the 'ip':'port'
 let forward (ip : IPAddress) (port : uint16) (ctx : HttpContext) =
@@ -83,7 +82,7 @@ let forward (ip : IPAddress) (port : uint16) (ctx : HttpContext) =
       let new_ctx = send_web_response (ex.Response :?> HttpWebResponse) ctx
       do! response_f new_ctx cn
     | :? WebException as ex when ex.Response = null ->
-      let new_ctx = response HTTP_502 (UTF8.bytes "suave proxy: Could not connect to upstream") ctx
+      let new_ctx = Response.response HTTP_502 (UTF8.bytes "suave proxy: Could not connect to upstream") ctx
       do! response_f new_ctx cn
   } |> succeed
 

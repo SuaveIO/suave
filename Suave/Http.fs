@@ -56,10 +56,11 @@ module Http =
           { ctx.response with status = status_code; content = Bytes cnt }
         { ctx with response = response }
 
-    let asyncSucceed (computation : Async<HttpContext>) =
+    let async_succeed (computation : Async<HttpContext>) : Choice<HttpContext, Async<HttpContext>> option=
       Choice2Of2 computation |> succeed
 
-    let succeed = Choice1Of2 >> succeed
+    let succeed ctx : Choice<HttpContext, Async<HttpContext>> option =
+      Choice1Of2 ctx |> succeed
 
   module Writers =
 
@@ -112,10 +113,10 @@ module Http =
     open System
 
     let CONTINUE : WebPart =
-      raise <| NotImplementedException("TODO")
+      fun _ -> raise <| NotImplementedException("TODO")
 
     let SWITCHING_PROTO : WebPart =
-      raise <| NotImplementedException("TODO")
+      fun _ -> raise <| NotImplementedException("TODO")
 
   // 2xx
   module Successful =
@@ -183,9 +184,9 @@ module Http =
   // 4xx
   module RequestErrors =
 
-    open Response
     open Writers
     open Types.Codes
+    open Response
 
     let bad_request s = response HTTP_400 s >> succeed
 
@@ -363,7 +364,7 @@ module Http =
           fail
       F
 
-    let private liftM (part : WebPart) ctx = async {
+    let private resolve (part : WebPart) ctx = async {
       match part ctx with
       | Some(Choice1Of2 syncCtx)  -> return Some syncCtx
       | Some(Choice2Of2 asyncCtx) ->
@@ -372,14 +373,17 @@ module Http =
       | None -> return None
     }
 
+    // TODO: this blocks the server thread
     let timeout_webpart (ts_timeout : TimeSpan) (web_part : WebPart) : WebPart =
-      fun (ctx : HttpContext) -> async {
+      fun (ctx : HttpContext) ->
         try
-          return! Async.WithTimeout (liftM web_part ctx, ts_timeout)
+          match Async.WithTimeout (resolve web_part ctx, ts_timeout) |> Async.RunSynchronously with
+          | Some ctx' -> Some(Choice1Of2 ctx')
+          | None      -> None
         with
         | :? TimeoutException ->
-          return Response.response Codes.HTTP_408 (UTF8.bytes "Request Timeout") ctx >> succeed
-      }
+          Response.response Codes.HTTP_408 (UTF8.bytes "Request Timeout") ctx
+          |> Response.succeed
 
   module ServeResource =
     open System

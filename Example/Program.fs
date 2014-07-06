@@ -88,6 +88,13 @@ choose [
   GET >>= url "/events" >>= request (fun r -> EventSource.hand_shake (CounterDemo.counter_demo r))
   GET >>= browse //serves file if exists
   GET >>= dir //show directory listing
+  HEAD >>= url "/head" >>= fun ctx ->
+      Response.async_succeed(async {
+        do! Async.Sleep 1000
+        // if the web parts didn't return XXX Option all the time, this row
+        // could use them:
+        return Response.response Codes.HTTP_200 (UTF8.bytes "Nice sleep...") ctx
+      })
   POST >>= url "/upload" >>= OK "Upload successful."
   POST >>= url "/upload2"
     >>= request (fun x ->

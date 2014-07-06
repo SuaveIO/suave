@@ -79,7 +79,7 @@ type AsyncResultCell<'a>() =
       return Some res
     | Some time ->
       try
-        let! res = Async.WithTimeout(time, Async.AwaitTask(source.Task))
+        let! res = Async.WithTimeout(Async.AwaitTask(source.Task), time)
         return Some res
       with
       | :? TimeoutException as e ->
