@@ -111,7 +111,7 @@ To protect a route with HTTP Basic Authentication the combinator
 let requires_authentication _ = 
   choose
     [ GET >>= url "/public" >>= OK "Hello anonymous"
-    //access to handlers bellow this one will require authentication
+    //access to handlers after this one will require authentication
     ; authenticate_basic (fun x -> x.Username.Equals("foo") && x.Password.Equals("bar"))
     ; GET >>= url "/protected" >>= request(fun x -> OK ("Hello " + x.Username)) ]
 {% endhighlight %}
