@@ -18,11 +18,11 @@ open OpenSSL.Core
 open Suave.OpenSsl.Provider
 
 let basic_auth : WebPart =
-  Authentication.authenticate_basic ( fun x -> x.user_name.Equals("foo") && x.password.Equals("bar"))
+  Authentication.authenticate_basic ( fun (user_name,password) -> user_name.Equals("foo") && password.Equals("bar"))
 
 let sslCert = X509Certificate.FromPKCS12(BIO.File("suave.p12","r"), "easy")
 
-let logger = Loggers.sane_defaults_for Debug
+let logger = Loggers.sane_defaults_for Verbose
 
 let myapp : WebPart =
   choose [
@@ -67,7 +67,7 @@ choose [
   url "/neverme" >>= never >>= OK (Guid.NewGuid().ToString())
   url "/guid" >>= OK (Guid.NewGuid().ToString())
   url "/hello" >>= OK "Hello World"
-  GET >>= url "/query" >>= request( fun x -> cond (x.query) ? name (fun y -> OK ("Hello " + y)) never)
+  GET >>= url "/query" >>= request( fun x -> cond ((query x) ^^ "name") (fun y -> OK ("Hello " + y)) never)
   GET >>= url "/query" >>= OK "Hello beautiful"
   url "/redirect" >>= Redirection.redirect "/redirected"
   url "/redirected" >>=  OK "You have been redirected."
@@ -92,8 +92,8 @@ choose [
   POST >>= url "/upload2"
     >>= request (fun x ->
                    let files = x.files |> Seq.fold (fun x y -> x + "<br/>" + (sprintf "(%s, %s, %s)" y.FileName y.MimeType y.Path)) ""
-                   OK (sprintf "Upload successful.<br>POST data: %A<br>Uploaded files (%d): %s" (x.form)(x.files.Count) files))
-  POST >>= request (fun x -> OK (sprintf "POST data: %A" (x.raw_form)))
+                   OK (sprintf "Upload successful.<br>POST data: %s<br>Uploaded files (%d): %s" (ASCII.to_string' x.raw_form)(List.length x.files) files))
+  POST >>= request (fun x -> OK (sprintf "POST data: %s" (ASCII.to_string' x.raw_form)))
   RequestErrors.NOT_FOUND "Found no handlers"
   ]
   |> web_server
