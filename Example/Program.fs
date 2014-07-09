@@ -22,7 +22,7 @@ let basic_auth : WebPart =
 
 let sslCert = X509Certificate.FromPKCS12(BIO.File("suave.p12","r"), "easy")
 
-let logger = Loggers.sane_defaults_for Verbose
+let logger = Loggers.sane_defaults_for Debug
 
 let myapp : WebPart =
   choose [
@@ -92,7 +92,7 @@ choose [
   POST >>= url "/upload2"
     >>= request (fun x ->
                    let files = x.files |> Seq.fold (fun x y -> x + "<br/>" + (sprintf "(%s, %s, %s)" y.FileName y.MimeType y.Path)) ""
-                   OK (sprintf "Upload successful.<br>POST data: %s<br>Uploaded files (%d): %s" (ASCII.to_string' x.raw_form)(List.length x.files) files))
+                   OK (sprintf "Upload successful.<br>POST data: %A<br>Uploaded files (%d): %s" x.multipart_fields (List.length x.files) files))
   POST >>= request (fun x -> OK (sprintf "POST data: %s" (ASCII.to_string' x.raw_form)))
   RequestErrors.NOT_FOUND "Found no handlers"
   ]

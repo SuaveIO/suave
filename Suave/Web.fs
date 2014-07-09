@@ -21,39 +21,57 @@ module ParsingAndControl =
   open Suave.Utils.Bytes
   open Suave.Utils.Parsing
 
-  let internal free context connection (s : BufferSegment option) =
-    match s with
-    | None -> ()
-    | Some x -> connection.free_buffer context x.buffer
+  let internal free context connection (s : BufferSegment list) =
+    List.iter (fun x -> connection.free_buffer context x.buffer) s
 
-  let split x (c,pairs : BufferSegment list) connection select marker_lenght =
-    let rec loop i acc count =  async {
-      let pair = pairs.[i]
-      if acc + pair.length < x then
-        do! select (ArraySegment(pair.buffer.Array, pair.offset, pair.length)) pair.length
-        connection.free_buffer "Web.split" pair.buffer
-        return! loop (i+1) (acc + pair.length) (count + acc)
-      elif acc + pair.length >= x then
-        let bytes_read = x - acc
-        do! select (ArraySegment(pair.buffer.Array, pair.offset, bytes_read)) bytes_read
-        let remaining = pair.length - bytes_read
-        if remaining = marker_lenght then
+  let skip_buffers (pairs : BufferSegment list) (number : int) :  BufferSegment list =
+    let rec loop xxs acc = 
+      match xxs with
+      | [] -> []
+      | x :: tail ->
+        if x.length + acc >= number then 
+          let segment = mk_buffer_segment x.buffer (x.offset  + (number - acc)) (x.length - number + acc)
+          segment :: tail
+        else loop tail (acc + x.length)
+    loop pairs 0
+         
+
+  let split index (c,pairs : BufferSegment list) connection select marker_lenght : Async<int * BufferSegment list>=
+    let rec loop xxs acc count =  async {
+      match xxs with
+      | [] -> return count, []
+      | pair :: tail ->
+        if acc + pair.length < index then
+          do! select (ArraySegment(pair.buffer.Array, pair.offset, pair.length)) pair.length
           connection.free_buffer "Web.split" pair.buffer
-          return count + bytes_read, None
-        else
-          return count + bytes_read, mk_buffer_segment pair.buffer (pair.offset  + bytes_read  + marker_lenght) (remaining - marker_lenght)
-      else return failwith "Web.split: invalid case"
+          return! loop tail (acc + pair.length) (count + acc)
+        elif acc + pair.length >= index then
+          let bytes_read = index - acc
+          do! select (ArraySegment(pair.buffer.Array, pair.offset, bytes_read)) bytes_read
+          let remaining = pair.length - bytes_read
+          if remaining = marker_lenght then
+            connection.free_buffer "Web.split" pair.buffer
+            return count + bytes_read, tail
+          else
+            
+            if remaining - marker_lenght >= 0 then
+              return count + bytes_read,  mk_buffer_segment pair.buffer (pair.offset  + bytes_read  + marker_lenght) (remaining - marker_lenght) :: tail
+            else
+              let new_tail = skip_buffers tail (marker_lenght - remaining) 
+              return count + bytes_read,  new_tail
+        else return failwith "Web.split: invalid case"
       }
-    loop 0 0 c
+    loop pairs 0 c
 
-  type ScanResult = NeedMore of (BufferSegment list) | Found of (int * BufferSegment option)
+  type ScanResult = NeedMore of (BufferSegment list) | Found of (int * BufferSegment list)
 
   /// Iterates over a BufferSegment list looking for a marker, data before the marker 
   /// is sent to the function select and the corresponding buffers are released
   let scan_marker marker count (pairs : BufferSegment list) connection select = async {
+
     match kmp_y marker (pairs |> List.map ( fun x -> ArraySegment(x.buffer.Array, x.offset, x.length))) with
     | Some x -> 
-      let! res = split x (count,pairs) connection select  marker.Length
+      let! res = split x (count,pairs) connection select marker.Length
       return res |> Found
     | None   ->
       let rec loop (xs : BufferSegment list) (acc,n) =
@@ -66,6 +84,7 @@ module ParsingAndControl =
       let rev = List.rev pairs
       let ret,free = loop rev ([],0)
       for b in free do
+        assert (b.length >= 0)
         do! select (ArraySegment(b.buffer.Array, b.offset, b.length)) b.length
         do connection.free_buffer "Web.scan_marker" b.buffer
       return NeedMore ret
@@ -83,7 +102,7 @@ module ParsingAndControl =
 
   /// Read the passed stream into buff until the EOL (CRLF) has been reached
   /// and returns an array containing excess data read past the marker
-  let read_till_pattern (connection : Connection) select (preread : BufferSegment option) scan_data =
+  let read_till_pattern (connection : Connection) select (preread : BufferSegment list) scan_data =
 
     let rec loop state = async {
       let! res = scan_data 0 state connection select
@@ -102,16 +121,13 @@ module ParsingAndControl =
             connection.free_buffer "read_till_pattern.loop" buff
             return Choice2Of2 error
     }
+    loop preread
 
-    match preread with
-    | Some data -> loop [ data ]
-    | None      -> loop []
-
-  let read_till_EOL (connection : Connection) select (preread : BufferSegment option) =
+  let read_till_EOL (connection : Connection) select (preread : BufferSegment list) =
     read_till_pattern connection select preread (scan_marker EOL)
 
   /// Read the stream until the marker appears.
-  let read_until (marker : byte []) (select : ArraySegment<_> -> int -> Async<unit>) (connection : Connection) (preread : BufferSegment option) =
+  let read_until (marker : byte []) (select : ArraySegment<_> -> int -> Async<unit>) (connection : Connection) (preread : BufferSegment list) =
     read_till_pattern connection select preread (scan_marker marker)
 
   /// Read a line from the stream, calling to_string on the bytes before the EOL marker
@@ -124,7 +140,7 @@ module ParsingAndControl =
 
   /// Read all headers from the stream, returning a dictionary of the headers found
   let read_headers connection read (buf : ArraySegment<byte>) =
-    let rec loop (rem : BufferSegment option) headers = socket {
+    let rec loop (rem : BufferSegment list) headers = socket {
       let offset = ref 0
       let! count, new_rem =
         read_till_EOL
@@ -146,7 +162,7 @@ module ParsingAndControl =
   let empty_query_string () = new Dictionary<string,string>()
 
   /// Read the post data from the stream, given the number of bytes that makes up the post data.
-  let read_post_data (connection : Connection) (bytes : int) (read : BufferSegment option) =
+  let read_post_data (connection : Connection) (bytes : int) (read : BufferSegment list) : SocketOp<ArraySegment<byte> * BufferSegment list> =
 
     let free_buffer buff a =
       match buff with
@@ -155,7 +171,7 @@ module ParsingAndControl =
     
     let read_bytes bytes_needed (missing : byte[]) read_offset = socket {
       let counter = ref 0
-      let rem = ref None
+      let rem = ref []
       let a = connection.get_buffer "read_post_data"
       while !counter < bytes_needed do
         let! bytes_transmited = connection.read a
@@ -163,78 +179,76 @@ module ParsingAndControl =
         if bytes_transmited > need_to_read
         then
           Array.blit a.Array a.Offset missing (read_offset + !counter) need_to_read
-          rem := Some { buffer = a; offset =  a.Offset + need_to_read; length = bytes_transmited - need_to_read }
+          rem := [ { buffer = a; offset =  a.Offset + need_to_read; length = bytes_transmited - need_to_read } ]
         else
           Array.blit a.Array a.Offset missing (read_offset + !counter) bytes_transmited
         counter := !counter + bytes_transmited
-      do free_buffer !rem a
+      List.iter (fun x -> free_buffer (Some x) a) !rem
       return (ArraySegment missing, !rem)
     }
 
-    socket {
-      match read with
-      | Some segment ->
-        if segment.length >= bytes then
-          return (ArraySegment(segment.buffer.Array, segment.offset, bytes), Some { buffer = segment.buffer; offset = segment.offset + bytes; length = segment.length - bytes })
-        else 
-          let missing = Array.zeroCreate bytes
-          Array.blit segment.buffer.Array segment.offset missing 0 segment.length
-          connection.free_buffer "read_post_data" segment.buffer
-          return! read_bytes (bytes - segment.length) missing segment.length
-      | None ->
-        let missing = Array.zeroCreate bytes
-        return! read_bytes bytes missing 0
-    }
+    let rec loop xxs n : SocketOp<ArraySegment<byte> * BufferSegment list> =
+      socket {
+        match xxs with
+        | segment :: tail ->
+          if segment.length >= n then
+            return ArraySegment(segment.buffer.Array, segment.offset, n), { buffer = segment.buffer; offset = segment.offset + n; length = segment.length - n } :: tail
+          else 
+            let missing = Array.zeroCreate n
+            Array.blit segment.buffer.Array segment.offset missing 0 segment.length
+            connection.free_buffer "read_post_data" segment.buffer
+            return! loop tail (n - segment.length)
+        | [] ->
+          let missing = Array.zeroCreate n
+          return! read_bytes bytes missing 0
+      }
+    loop read bytes
 
   /// Parses multipart data from the stream, feeding it into the HttpRequest's property Files.
   let parse_multipart (connection : Connection)
                       boundary
                       (request : HttpRequest)
-                      (ahead : BufferSegment option)
-                      line_buffer : SocketOp<HttpRequest * BufferSegment option> =
-    let rec loop boundary read (r : HttpRequest) = socket {
+                      (ahead : BufferSegment list)
+                      line_buffer : SocketOp<HttpRequest * BufferSegment list> =
 
-      let! firstline, read = read_line connection read line_buffer
+    let rec loop boundary rem (r : HttpRequest) = socket {
+
+      let! firstline, read = read_line connection rem line_buffer
 
       if not(firstline.Equals("--")) then
 
-        
         let! part_headers, rem = read_headers connection read line_buffer
 
         let content_disposition =  part_headers %% "content-disposition"
-
         let fieldname = (header_params content_disposition) ? name |> Option.get
-
         let content_type = part_headers %% "content-type"
 
-        return! parse_content content_type content_disposition fieldname rem r
-      else return (r, None)
-      }
-    and parse_content content_type content_disposition fieldname rem (r : HttpRequest) = socket {
-      match content_type with
-      | Some(x) when x.StartsWith("multipart/mixed") ->
-        let subboundary = "--" + x.Substring(x.IndexOf('=') + 1).TrimStart()
-        return! loop subboundary rem r
-      | Some(x) ->
-        let temp_file_name = Path.GetTempFileName()
-        use temp_file = new FileStream(temp_file_name, FileMode.Truncate)
-        let! a, b = read_until (ASCII.bytes(eol + boundary)) (fun x y -> async { do! temp_file.AsyncWrite(x.Array, x.Offset, y) } ) connection rem
-        let file_length = temp_file.Length
-        temp_file.Close()
-        if file_length > int64(0) then
-          let filename =
-            (header_params content_disposition) ? filename |> Option.get
-          let upload = new HttpUpload(fieldname, filename, content_type |> Option.get, temp_file_name)
-          return! loop boundary b { r with files = upload :: r.files }
-        else
-          File.Delete temp_file_name
-          return! loop boundary b r
-        
-      | None ->
-        use mem = new MemoryStream()
-        let! a, b = read_until (ASCII.bytes(eol + boundary)) (fun x y -> async { do! mem.AsyncWrite(x.Array, x.Offset, y) } ) connection rem
-        let byts = mem.ToArray()
-        return! loop boundary b { r with multipart_fields = (fieldname,ASCII.to_string byts 0 byts.Length)::(r.multipart_fields) }
+        match content_type with
+        | Some(x) when x.StartsWith("multipart/mixed") ->
+          let subboundary = "--" + x.Substring(x.IndexOf('=') + 1).TrimStart()
+          return! loop subboundary rem r
+        | Some(x) ->
+          let temp_file_name = Path.GetTempFileName()
+          use temp_file = new FileStream(temp_file_name, FileMode.Truncate)
+          let! a, b = read_until (ASCII.bytes(eol + boundary)) (fun x y -> async { do! temp_file.AsyncWrite(x.Array, x.Offset, y) } ) connection rem
+          let file_length = temp_file.Length
+          temp_file.Close()
+          if file_length > int64(0) then
+            let filename =
+              (header_params content_disposition) ? filename |> Option.get
+            let upload = new HttpUpload(fieldname, filename, content_type |> Option.get, temp_file_name)
+            return! loop boundary b { r with files = upload :: r.files }
+          else
+            File.Delete temp_file_name
+            return! loop boundary b r
+          
+        | None ->
+          use mem = new MemoryStream()
+          let! a, b = read_until (ASCII.bytes(eol + boundary)) (fun x y -> async { do! mem.AsyncWrite(x.Array, x.Offset, y) } ) connection rem
+          let byts = mem.ToArray()
+          return! loop boundary b { r with multipart_fields = (fieldname,ASCII.to_string byts 0 byts.Length)::(r.multipart_fields) }
+      else 
+        return (r,read)
       }
     loop boundary ahead request
 
@@ -248,7 +262,7 @@ module ParsingAndControl =
 
   /// Process the request, reading as it goes from the incoming 'stream', yielding a HttpRequest
   /// when done
-  let process_request proxy_mode is_secure (bytes : BufferSegment option) connection : SocketOp<(HttpRequest * BufferSegment option) option> = socket {
+  let process_request proxy_mode is_secure (bytes : BufferSegment list) connection : SocketOp<(HttpRequest * BufferSegment list) option> = socket {
 
     let line_buffer = connection.line_buffer
 
@@ -258,16 +272,16 @@ module ParsingAndControl =
     let! headers, rem = read_headers connection rem line_buffer
 
     let request = { http_version = http_version
-      ; url = url
+      ; url         = url
       ; ``method``  = meth
-      ; headers = headers
-      ; raw_form = Array.empty
+      ; headers     = headers
+      ; raw_form    = Array.empty
       ; raw_query   = raw_query
-      ; files = []
+      ; files       = []
       ; multipart_fields = []
-      ; trace = parse_trace_headers headers
-      ; is_secure = is_secure
-      ; ipaddr = connection.ipaddr
+      ; trace       = parse_trace_headers headers
+      ; is_secure   = is_secure
+      ; ipaddr      = connection.ipaddr
       }
 
     // won't continue parsing if on proxyMode with the intention of forwarding the stream as it is
@@ -391,7 +405,7 @@ module ParsingAndControl =
 
   let http_loop (proxy_mode : bool) (runtime : HttpRuntime) (consumer : HttpConsumer) (connection : Connection) =
 
-    let rec loop (bytes : BufferSegment option) = socket {
+    let rec loop (bytes : BufferSegment list) = socket {
 
       let verbose  = Log.verbose runtime.logger "Web.request_loop.loop" Log.TraceHeader.Empty
       let verbosef = Log.verbosef runtime.logger "Web.request_loop.loop" Log.TraceHeader.Empty
@@ -415,7 +429,7 @@ module ParsingAndControl =
             verbosef (fun fmt -> fmt "'Connection: keep-alive' recurse, rem: %A" rem)
             return! loop rem
           | Some _ ->
-            free "http_loop.loop (case Some _)" connection rem;
+            free "http_loop.loop (case Some _)" connection rem
             verbose "'Connection: close', exiting"
             return ()
           | None ->
@@ -423,15 +437,15 @@ module ParsingAndControl =
               verbose "'Connection: keep-alive' recurse (!)"
               return! loop rem
             else
-              free "http_loop.loop (case None, else branch)" connection rem;
+              free "http_loop.loop (case None, else branch)" connection rem
               verbose "'Connection: close', exiting"
               return ()
         else
-          free "http_loop.loop (not connected)" connection rem;
+          free "http_loop.loop (not connected)" connection rem
           verbose "'is_connected = false', exiting"
           return ()
     }
-    loop None
+    loop []
 
   /// The request loop initialises a request with a processor to handle the
   /// incoming stream and possibly pass the request to the web parts, a protocol,

@@ -111,7 +111,8 @@ module Bytes =
     ; length : int }
 
   let inline mk_buffer_segment buffer offset length =
-    Some { buffer = buffer; offset = offset; length = length }
+    if length < 0 then failwith (sprintf "mk_buffer_segment: length = %d < 0" length)
+    { buffer = buffer; offset = offset; length = length }
 
   /// The end-of-line literal, \r\n (CRLF)
   let [<Literal>] eol = "\r\n"
