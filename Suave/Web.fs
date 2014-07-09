@@ -248,7 +248,7 @@ module ParsingAndControl =
 
   /// Process the request, reading as it goes from the incoming 'stream', yielding a HttpRequest
   /// when done
-  let process_request proxy_mode (bytes : BufferSegment option) connection : SocketOp<(HttpRequest * BufferSegment option) option> = socket {
+  let process_request proxy_mode is_secure (bytes : BufferSegment option) connection : SocketOp<(HttpRequest * BufferSegment option) option> = socket {
 
     let line_buffer = connection.line_buffer
 
@@ -266,7 +266,7 @@ module ParsingAndControl =
       ; files = []
       ; multipart_fields = []
       ; trace = parse_trace_headers headers
-      ; is_secure = true
+      ; is_secure = is_secure
       ; ipaddr = connection.ipaddr
       }
 
@@ -397,7 +397,7 @@ module ParsingAndControl =
       let verbosef = Log.verbosef runtime.logger "Web.request_loop.loop" Log.TraceHeader.Empty
 
       verbose "-> processor"
-      let! result = process_request proxy_mode bytes connection
+      let! result = process_request proxy_mode (match runtime.protocol with HTTP -> false | HTTPS _ -> true) bytes connection
       verbose "<- processor"
 
       match result with
@@ -445,7 +445,6 @@ module ParsingAndControl =
 
     socket {
       let! connection = load_connection runtime.logger runtime.protocol connection
-      let request     = mk_request connection runtime.protocol connection.ipaddr
       do! http_loop proxy_mode runtime consumer connection
       return ()
     }
