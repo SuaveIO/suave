@@ -74,16 +74,6 @@ task :create_nuget_quick => ['build/pkg', :versioning] do
   end
   p.add_file  "Suave/bin/Release/suave.dll", "lib"
   p.add_file  "Suave/bin/Release/suave.xml", "lib"
-  p.add_file  "libs/ManagedOpenSsl.dll", "lib"
-  p.add_file  "libs/ManagedOpenSsl.xml", "lib"
-  p.add_file  "libs/ManagedOpenSsl.dll.config", "build/native"
-  p.add_file  "libs/libeay32.dll", "build/native"
-  p.add_file  "libs/ssleay32.dll", "build/native"
-  p.add_file  "libs/libcrypto.so.1.0.0", "build/native"
-  p.add_file  "libs/libssl.so.1.0.0", "build/native"
-  p.add_file  "libs/libcrypto.1.0.0.dylib", "build/native"
-  p.add_file  "libs/libssl.1.0.0.dylib", "build/native"
-  p.add_file  "buildsupport/suave.targets", "build"
   nuspec_path = 'suave.nuspec'
   File.write(nuspec_path,p.to_xml)
   cmd = Albacore::NugetsPack::Cmd.new "buildsupport/NuGet.exe", out: "build/pkg"
