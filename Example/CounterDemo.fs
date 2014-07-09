@@ -34,11 +34,11 @@ let counter_demo (req : HttpRequest) (out : Connection) =
       return! async {
         do! Async.Sleep 100
         return Choice1Of2 () } }
-
+  let q = query req 
   socket {
     let last_evt_id =
-      (look_up req.headers "last-event-id" |> bind muint32) <!>
-      (look_up req.query "lastEventId" |> bind muint32) <.>
+      (req.headers %% "last-event-id" |> bind muint32) <!>
+      ((q ^^ "lastEventId") |> bind muint32) <.>
       100u
 
     let actions =

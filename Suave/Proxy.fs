@@ -38,11 +38,12 @@ let private send_web_response (data : HttpWebResponse) ({ request = { trace = t 
 /// Forward the HttpRequest 'p' to the 'ip':'port'
 let forward (ip : IPAddress) (port : uint16) (ctx : HttpContext) =
   let p = ctx.request
-  let buildWebHeadersCollection (h : Dictionary<string,string>) =
+  let buildWebHeadersCollection (h : NameValueList) =
     let r = new WebHeaderCollection()
     for e in h do
-      if not (WebHeaderCollection.IsRestricted e.Key) then
-        r.Add(e.Key, e.Value)
+      let key = fst e
+      if not (WebHeaderCollection.IsRestricted key) then
+        r.Add(key, snd e)
     r
   let url = new UriBuilder("http", ip.ToString(), int port, p.url, p.raw_query)
   let q = WebRequest.Create(url.Uri) :?> HttpWebRequest
@@ -55,7 +56,7 @@ let forward (ip : IPAddress) (port : uint16) (ctx : HttpContext) =
   q.Proxy   <- null
 
   //copy restricted headers
-  let header = look_up p.headers
+  let header s = get_first p.headers s
   header "accept"            |> Option.iter (fun v -> q.Accept <- v)
   header "date"              |> Option.iter (fun v -> q.Date <- DateTime.Parse v)
   header "expect"            |> Option.iter (fun v -> q.Expect <- v)
@@ -72,7 +73,7 @@ let forward (ip : IPAddress) (port : uint16) (ctx : HttpContext) =
 
   fun cn -> socket {
     if p.``method`` = "POST" || p.``method`` = "PUT" then
-      let content_length = Convert.ToInt32(p.headers.["content-length"])
+      let content_length = Convert.ToInt32(p.headers %% "content-length")
       do! transfer_len_x cn (q.GetRequestStream()) content_length
     try
       let! data = lift_async <| q.AsyncGetResponse()

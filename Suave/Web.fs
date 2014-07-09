@@ -123,8 +123,8 @@ module ParsingAndControl =
   }
 
   /// Read all headers from the stream, returning a dictionary of the headers found
-  let read_headers connection read (headers : Dictionary<string,string>) (buf : ArraySegment<byte>) =
-    let rec loop (rem : BufferSegment option) = socket {
+  let read_headers connection read (buf : ArraySegment<byte>) =
+    let rec loop (rem : BufferSegment option) headers = socket {
       let offset = ref 0
       let! count, new_rem =
         read_till_EOL
@@ -134,11 +134,11 @@ module ParsingAndControl =
       if count <> 0 then
         let line = ASCII.to_string buf.Array buf.Offset count
         let indexOfColon = line.IndexOf(':')
-        headers.Add (line.Substring(0, indexOfColon).ToLower(), line.Substring(indexOfColon+1).TrimStart())
-        return! loop new_rem
-      else return new_rem
+        let header = (line.Substring(0, indexOfColon).ToLower(), line.Substring(indexOfColon+1).TrimStart())
+        return! loop new_rem (header :: headers)
+      else return (headers, new_rem)
     }
-    loop read
+    loop read []
 
   open Suave.Types
 
@@ -191,30 +191,30 @@ module ParsingAndControl =
                       boundary
                       (request : HttpRequest)
                       (ahead : BufferSegment option)
-                      line_buffer : SocketOp<BufferSegment option> =
-    let rec loop boundary read = socket {
+                      line_buffer : SocketOp<HttpRequest * BufferSegment option> =
+    let rec loop boundary read (r : HttpRequest) = socket {
 
       let! firstline, read = read_line connection read line_buffer
 
       if not(firstline.Equals("--")) then
 
-        let part_headers = new Dictionary<string,string>()
-        let! rem = read_headers connection read part_headers line_buffer
+        
+        let! part_headers, rem = read_headers connection read line_buffer
 
-        let content_disposition = look_up part_headers "content-disposition"
+        let content_disposition =  part_headers %% "content-disposition"
 
         let fieldname = (header_params content_disposition) ? name |> Option.get
 
-        let content_type = look_up part_headers "content-type"
+        let content_type = part_headers %% "content-type"
 
-        return! parse_content content_type content_disposition fieldname rem
-      else return None
+        return! parse_content content_type content_disposition fieldname rem r
+      else return (r, None)
       }
-    and parse_content content_type content_disposition fieldname rem = socket {
+    and parse_content content_type content_disposition fieldname rem (r : HttpRequest) = socket {
       match content_type with
       | Some(x) when x.StartsWith("multipart/mixed") ->
         let subboundary = "--" + x.Substring(x.IndexOf('=') + 1).TrimStart()
-        return! loop subboundary rem
+        return! loop subboundary rem r
       | Some(x) ->
         let temp_file_name = Path.GetTempFileName()
         use temp_file = new FileStream(temp_file_name, FileMode.Truncate)
@@ -224,93 +224,81 @@ module ParsingAndControl =
         if file_length > int64(0) then
           let filename =
             (header_params content_disposition) ? filename |> Option.get
-          request.files.Add(new HttpUpload(fieldname, filename, content_type |> Option.get, temp_file_name))
+          let upload = new HttpUpload(fieldname, filename, content_type |> Option.get, temp_file_name)
+          return! loop boundary b { r with files = upload :: r.files }
         else
           File.Delete temp_file_name
-        return! loop boundary b
+          return! loop boundary b r
+        
       | None ->
         use mem = new MemoryStream()
         let! a, b = read_until (ASCII.bytes(eol + boundary)) (fun x y -> async { do! mem.AsyncWrite(x.Array, x.Offset, y) } ) connection rem
         let byts = mem.ToArray()
-        request.form.Add(fieldname, (ASCII.to_string byts 0 byts.Length))
-
-        return! loop boundary b
+        return! loop boundary b { r with multipart_fields = (fieldname,ASCII.to_string byts 0 byts.Length)::(r.multipart_fields) }
       }
-    loop boundary ahead
+    loop boundary ahead request
 
-  let parse_trace_headers (headers : IDictionary<string, string>) =
+  let parse_trace_headers (headers : NameValueList) =
     let parse_uint64 = (function | true, value -> Some value
                                  | false, _    -> None
                        ) << UInt64.TryParse
-    let parent = "x-b3-spanid"  |> look_up headers |> Option.bind parse_uint64
-    let trace  = "x-b3-traceid" |> look_up headers |> Option.bind parse_uint64
+    let parent = "x-b3-spanid"  |> get_first headers |> Option.bind parse_uint64
+    let trace  = "x-b3-traceid" |> get_first headers |> Option.bind parse_uint64
     Log.TraceHeader.Create(trace, parent)
 
   /// Process the request, reading as it goes from the incoming 'stream', yielding a HttpRequest
   /// when done
-  let process_request proxy_mode (ctx : HttpContext)(bytes : BufferSegment option) connection : SocketOp<(HttpRequest * BufferSegment option) option> = socket {
+  let process_request proxy_mode (bytes : BufferSegment option) connection : SocketOp<(HttpRequest * BufferSegment option) option> = socket {
 
-    let request : HttpRequest = ctx.request
-
-    let verbose = Log.verbose ctx.runtime.logger "Web.process_request" request.trace
     let line_buffer = connection.line_buffer
 
     let! (first_line : string), rem = read_line connection bytes line_buffer
 
-    let meth, url, raw_query, http_version = parse_url first_line request.query
+    let meth, url, raw_query, http_version = parse_url first_line
+    let! headers, rem = read_headers connection rem line_buffer
 
-    request.url          <- url
-    request.``method``   <- meth
-    request.raw_query    <- raw_query
-    request.http_version <- http_version
-
-    let! rem = read_headers connection rem request.headers line_buffer
-    request.trace <- parse_trace_headers request.headers
+    let request = { http_version = http_version
+      ; url = url
+      ; ``method``  = meth
+      ; headers = headers
+      ; raw_form = Array.empty
+      ; raw_query   = raw_query
+      ; files = []
+      ; multipart_fields = []
+      ; trace = parse_trace_headers headers
+      ; is_secure = true
+      ; ipaddr = connection.ipaddr
+      }
 
     // won't continue parsing if on proxyMode with the intention of forwarding the stream as it is
     // TODO: proxy mode might need headers and contents of request, but won't get it through this impl
     if proxy_mode then return Some (request, rem)
     else
-      request.headers
-      |> Seq.filter (fun x -> x.Key.Equals("cookie"))
-      |> Seq.iter (fun x ->
-                    parse_cookie x.Value
-                    |> Array.iter (fun y -> request.cookies.Add (fst y,snd y)))
 
       if meth.Equals("POST") || meth.Equals("PUT") then
 
-        let content_encoding =
-          match request.headers.TryGetValue("content-type") with
-          | true, encoding -> Some encoding
-          | false, _ -> None
+        let content_encoding = request.headers %% "content-type"
 
-        match request.headers.TryGetValue("content-length") with 
-        | true, content_length_string ->
+        match request.headers %% "content-length" with 
+        | Some content_length_string ->
           let content_length = Convert.ToInt32(content_length_string)
 
           match content_encoding with
           | Some ce when ce.StartsWith("application/x-www-form-urlencoded") ->
             let! (rawdata : ArraySegment<_>), rem = read_post_data connection content_length rem
-            let str = ASCII.to_string rawdata.Array rawdata.Offset rawdata.Count
-            let _  = parse_data str request.form
-            // TODO: we can defer reading of body until we need it
             let raw_form = Array.zeroCreate rawdata.Count
             Array.blit rawdata.Array rawdata.Offset raw_form 0 rawdata.Count
-            request.raw_form <- raw_form
-            return Some (request, rem)
+            return Some ({ request with raw_form = raw_form} , rem)
           | Some ce when ce.StartsWith("multipart/form-data") ->
             let boundary = "--" + ce.Substring(ce.IndexOf('=')+1).TrimStart()
-            // TODO: we can defer reading of body until we need it
-            let! rem = parse_multipart connection boundary request rem line_buffer
-            return Some (request, rem)
+            let! r,rem = parse_multipart connection boundary request rem line_buffer
+            return Some (r, rem)
           | Some _ | None ->
-            // TODO: we can defer reading of body until we need it
             let! (rawdata : ArraySegment<_>), rem = read_post_data connection content_length rem
             let raw_form = Array.zeroCreate rawdata.Count
             Array.blit rawdata.Array rawdata.Offset raw_form 0 rawdata.Count
-            request.raw_form <- raw_form
-            return Some (request, rem)
-        | false, _ ->  return Some (request, rem)
+            return Some ({ request with raw_form = raw_form}, rem)
+        | None ->  return Some (request, rem)
       else return Some (request, rem)
   }
 
@@ -335,19 +323,14 @@ module ParsingAndControl =
   type RequestResult = Done
 
   let internal mk_request connection proto ipaddr : HttpRequest =
-    { http_version   = null
-    ; url            = null
-    ; ``method``     = null
-    ; query          = new Dictionary<string,string>()
-    ; headers        = new Dictionary<string,string>()
-    ; form           = new Dictionary<string,string>()
-    ; raw_form       = null
-    ; raw_query      = null
-    ; cookies        = new Dictionary<string,string>()
-    ; user_name      = null
-    ; password       = null
-    ; session_id     = null
-    ; files          = new List<HttpUpload>()
+    { http_version   = ""
+    ; url            = ""
+    ; ``method``     = ""
+    ; headers        = []
+    ; raw_form       = Array.empty
+    ; raw_query      = ""
+    ; files          = []
+    ; multipart_fields = []
     ; is_secure      = match proto with HTTP -> false | HTTPS _ -> true
     ; trace          = Log.TraceHeader.Empty
     ; ipaddr = ipaddr }
@@ -406,41 +389,39 @@ module ParsingAndControl =
     | WebPart of WebPart
     | SocketPart of (HttpContext -> Connection -> SocketOp<unit>)
 
-  let http_loop (proxy_mode : bool) (ctx : HttpContext) (consumer : HttpConsumer) (connection : Connection) =
+  let http_loop (proxy_mode : bool) (runtime : HttpRuntime) (consumer : HttpConsumer) (connection : Connection) =
 
-    let rec loop (bytes : BufferSegment option) request = socket {
+    let rec loop (bytes : BufferSegment option) = socket {
 
-      let verbose  = Log.verbose ctx.runtime.logger "Web.request_loop.loop" request.trace
-      let verbosef = Log.verbosef ctx.runtime.logger "Web.request_loop.loop" request.trace
+      let verbose  = Log.verbose runtime.logger "Web.request_loop.loop" Log.TraceHeader.Empty
+      let verbosef = Log.verbosef runtime.logger "Web.request_loop.loop" Log.TraceHeader.Empty
 
       verbose "-> processor"
-      let! result = process_request proxy_mode ctx bytes connection
+      let! result = process_request proxy_mode bytes connection
       verbose "<- processor"
 
       match result with
       | None -> verbose "'result = None', exiting"
       | Some (request : HttpRequest, rem) ->
-        let ctx = { ctx with request = request }
+        let ctx = { request = request; user_state = Map.empty; runtime = runtime; response = { status = HTTP_404; headers = []; content = NullContent }}
         match consumer with
         | WebPart web_part ->
           do! run ctx web_part connection
         | SocketPart writer ->
           do! writer ctx connection
         if connection.is_connected () then
-          match request.headers?connection with
+          match request.headers %% "connection" with
           | Some (x : string) when x.ToLower().Equals("keep-alive") ->
-            clear request
             verbosef (fun fmt -> fmt "'Connection: keep-alive' recurse, rem: %A" rem)
-            return! loop rem request
+            return! loop rem
           | Some _ ->
             free "http_loop.loop (case Some _)" connection rem;
             verbose "'Connection: close', exiting"
             return ()
           | None ->
             if request.http_version.Equals("HTTP/1.1") then
-              clear request
               verbose "'Connection: keep-alive' recurse (!)"
-              return! loop rem request
+              return! loop rem
             else
               free "http_loop.loop (case None, else branch)" connection rem;
               verbose "'Connection: close', exiting"
@@ -450,7 +431,7 @@ module ParsingAndControl =
           verbose "'is_connected = false', exiting"
           return ()
     }
-    loop None ctx.request
+    loop None
 
   /// The request loop initialises a request with a processor to handle the
   /// incoming stream and possibly pass the request to the web parts, a protocol,
@@ -465,7 +446,7 @@ module ParsingAndControl =
     socket {
       let! connection = load_connection runtime.logger runtime.protocol connection
       let request     = mk_request connection runtime.protocol connection.ipaddr
-      do! http_loop proxy_mode { request = request; user_state = Map.empty; runtime = runtime; response = { status = HTTP_404; headers = []; content = NullContent }} consumer connection
+      do! http_loop proxy_mode runtime consumer connection
       return ()
     }
 

@@ -1490,4 +1490,4 @@ module Http =
     /// </para></summary>
     /// <remarks>
     /// </remarks>
-    val authenticate_basic : f:(HttpRequest -> bool) -> p:HttpContext -> HttpContext option
+    val authenticate_basic : f:(string * string -> bool) -> p:HttpContext -> HttpContext option

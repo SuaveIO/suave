@@ -319,7 +319,7 @@ module Http =
       sprintf "%O %s %s [%s] \"%s %s %s\" %d %s"
         ctx.request.ipaddr
         process_id //TODO: obtain connection owner via Ident protocol
-        (dash ctx.request.user_name)
+        (match Map.tryFind "user_name" ctx.user_state with Some x -> x :?> string | None -> "-")
         (DateTime.UtcNow.ToString("dd/MMM/yyyy:hh:mm:ss %K", ci))
         ctx.request.``method``
         ctx.request.url
@@ -391,7 +391,7 @@ module Http =
           let mimes = ctx.runtime.mime_types_map <| get_extension key
           match mimes with
           | Some value ->
-            let modified_since = (r.headers ? ``if-modified-since`` )
+            let modified_since = r.headers %% "if-modified-since"
             match modified_since with
             | Some v -> let date = DateTime.Parse v
                         if get_last key > date then send_it value.name value.compression ctx
@@ -621,14 +621,12 @@ module Http =
     let authenticate_basic f (ctx : HttpContext) =
       let p = ctx.request
       let headers = p.headers
-      if headers.ContainsKey("authorization") then
-        let header = headers.["authorization"]
+      match headers %% "authorization" with
+      | Some header ->
         let (typ, username, password) = parse_authentication_token header
-        p.user_name <- username
-        p.password <- password
-        if (typ.Equals("basic")) && f p then
+        if (typ.Equals("basic")) && f (username, password) then
           fail
         else
-          challenge ctx
-      else
+          challenge { ctx with user_state = ctx.user_state.Add("user_name",username) }
+      | None ->
         challenge ctx

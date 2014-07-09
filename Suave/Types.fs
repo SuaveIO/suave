@@ -34,37 +34,23 @@ type HttpUpload(fieldname : string, filename : string, mime_type : string, temp_
 
 /// A holder for the data extracted from the request.
 type HttpRequest =
-  { mutable http_version : string
-  ; mutable url          : string
-  ; mutable ``method``   : string
-  ; query                : Dictionary<string,string>
-  ; headers              : Dictionary<string,string>
-  ; form                 : Dictionary<string,string>
-  ; mutable raw_form     : byte[]
-  ; mutable raw_query    : string
-  ; cookies              : Dictionary<string,string>
-  ; mutable user_name    : string
-  ; mutable password     : string
-  ; mutable session_id   : string
-  ; files                : List<HttpUpload>
-  ; mutable trace        : Log.TraceHeader
+  { http_version : string
+  ; url          : string
+  ; ``method``   : string
+  ; headers              : (string * string) list
+  ; raw_form     : byte[]
+  ; raw_query    : string
+  ; files                : HttpUpload list
+  ; multipart_fields     : (string * string) list
+  ; trace        : Log.TraceHeader
   ; is_secure            : bool
   ; ipaddr               : IPAddress }
 
-/// Gets the query from the HttpRequest
-let query (x : HttpRequest) = x.query
-/// Gets the form from the HttpRequest
-let form  (x : HttpRequest) = x.form
-
-/// TODO: see if we can't get nice perf without resorting to mutable state
-/// Clear the request dictionaries for to reuse the request object instance.
-let internal clear (request : HttpRequest) =
-  request.query.Clear()
-  request.headers.Clear()
-  request.form.Clear()
-  request.cookies.Clear()
-  request.files.Clear()
-  request.trace <- Log.TraceHeader.Empty
+open Suave.Utils
+///// Gets the query from the HttpRequest
+let query (x : HttpRequest) = Parsing.parse_data x.raw_query |> List.ofArray
+///// Gets the form from the HttpRequest
+let form  (x : HttpRequest) = Parsing.parse_data (ASCII.to_string' x.raw_form) |> List.ofArray
 
 type ITlsProvider =
   abstract member Wrap : Connection -> SocketOp<Connection>

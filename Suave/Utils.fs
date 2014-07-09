@@ -4,15 +4,32 @@ module Suave.Utils
 
 open System.Collections.Generic
 
+type NameValueList = (string * string) list
+type NameOptionValueList = (string * string option) list
+
 /// Try find a value by key in a dictionary
 let look_up (target : IDictionary<'b,'a>) key =
   match target.TryGetValue(key) with
   | true, v  -> Some v
   | false, _ -> None
 
+let get_first (target : NameValueList) key =
+  match List.tryFind (fun (a,b) -> a.Equals(key)) target with
+  | Some value -> snd value |> Some
+  | None -> None
+
 /// Try find a value by key in a dictionary
 let (?) (target : IDictionary<'b,'a>) key =
   look_up target key
+
+let (%%) (target : NameValueList) key =
+  get_first target key
+
+let (^^) (target : NameOptionValueList) key =
+  match List.tryFind (fun (a,b) -> a.Equals(key)) target with
+  | Some value ->
+    snd value
+  | None -> None
 
 /// Assign a value to the key in the dictionary
 let (?<-) (target : IDictionary<string, 'a>) key value =
@@ -292,24 +309,23 @@ module Parsing =
 
   /// Parse the data in the string to a dictionary, assuming k/v pairs are separated
   /// by the ampersand character.
-  let parse_data (s : string) (param : Dictionary<string,string>) =
+  let parse_data (s : string) =
+    let parse_arr (d : string array) =
+      if d.Length = 2 then (d.[0], Some <| System.Web.HttpUtility.UrlDecode(d.[1]))
+      else d.[0],None
     s.Split('&')
-    |> Array.iter (fun (k : string) ->
-         k.Split('=')
-         |> (fun d -> if d.Length = 2 then param.Add(d.[0], System.Web.HttpUtility.UrlDecode(d.[1]))))
-    param
+    |> Array.map (fun (k : string) -> k.Split('=') |> parse_arr)
 
   /// parse the url into its constituents and fill out the passed dictionary with
   /// query string key-value pairs
-  let inline parse_url (line : string) (dict : Dictionary<string,string>) =
+  let inline parse_url (line : string) =
     let parts = line.Split(' ')
     if parts.Length < 2 || parts.Length > 3 then failwith (sprintf "invalid url: '%s'" line)
     let indexOfMark = parts.[1].IndexOf('?')
 
     if indexOfMark > 0 then
       let raw_query = parts.[1].Substring(indexOfMark + 1)
-      parse_data raw_query dict |> ignore
-      (parts.[0], parts.[1].Substring(0,indexOfMark), "?" + raw_query, parts.[2])
+      (parts.[0], parts.[1].Substring(0,indexOfMark), raw_query, parts.[2])
     else
       (parts.[0], parts.[1], String.Empty, parts.[2])
 
@@ -339,3 +355,12 @@ module Parsing =
       parse_key_value_pairs (Array.sub parts 1 (parts.Length - 1))
     | None ->
       failwith "did not find header, because header_params received None"
+
+  let get_cookies (headers : NameValueList) =
+    let cookies = new Dictionary<string,string>()
+    headers
+    |> Seq.filter (fun x -> (fst x).Equals("cookie"))
+    |> Seq.iter (fun x ->  snd x 
+                           |> parse_cookie
+                           |> Array.iter (fun y -> cookies.Add (fst y,snd y)))
+    cookies

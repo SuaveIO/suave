@@ -26,7 +26,6 @@ let parsing_tests =
           // these are not supported:
           //"X-B3-Flags"        => ""
           //"X-B3-Sampled"      => "true" ]
-        |> Map.ofList
 
       // the server generates a new one with the client's as the parent?
       // is the semantics that client sends its SpanId and that

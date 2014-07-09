@@ -47,7 +47,7 @@ module Session =
       let id  = sessionId.Substring( 0, session_id_lenght)
       let mac = sessionId.Substring( session_id_lenght)
 
-      let mac1 = hmac id  (Option.get ctx.request.headers?``user-agent``) (ctx.request.ipaddr.ToString()) key
+      let mac1 = hmac id  (Option.get <| ctx.request.headers %% "user-agent") (ctx.request.ipaddr.ToString()) key
 
       String.CompareOrdinal(mac, mac1) = 0 && session_map.Contains id
 
@@ -75,7 +75,7 @@ module Session =
         let session_id = strong_new_id session_id_lenght 
         let dict = new ConcurrentDictionary<string, obj> ()
         lock session_map (fun _ -> session_map.Add(session_id, dict :> obj, Globals.utc_now().Add expiration) |> ignore)
-        let id = session_id + hmac session_id (Option.get ctx.request.headers?``user-agent``) (ctx.request.ipaddr.ToString()) key
+        let id = session_id + hmac session_id (Option.get <| ctx.request.headers %% "user-agent") (ctx.request.ipaddr.ToString()) key
         id
 
       member this.Validate(s : string, ctx : HttpContext) =
@@ -87,9 +87,10 @@ module Session =
   let session_support (time_span : TimeSpan) = fun (ctx : HttpContext) ->
 
     let request = ctx.request
-
+    let cookies = Parsing.get_cookies request.headers
     let sessionId =
-      match request.cookies ? suave_session_id with
+      
+      match cookies ? suave_session_id with
       | Some attr ->
         if ctx.runtime.session_provider.Validate (attr, ctx) then
           attr
@@ -98,7 +99,6 @@ module Session =
       | None ->
         ctx.runtime.session_provider.Generate (time_span, ctx)
 
-    request.session_id <- sessionId
     Writers.set_cookie { name = "suave_session_id"
       ; value = sessionId
       ; path = Some "/"
@@ -106,10 +106,10 @@ module Session =
       ; secure = false
       ; http_only = false
       ; expires = Some (Globals.utc_now().Add time_span)
-      ; version = None } ctx |> Some
+      ; version = None } { ctx with user_state = ctx.user_state.Add("session_id", sessionId)}|> Some
 
   let session (ctx : HttpContext) : SessionStore<'a> =
-    let sessionId = ctx.request.session_id
+    let sessionId = ctx.user_state.["session_id"] :?> string
     if String.IsNullOrEmpty sessionId then failwith "session_support was not called"
     else ctx.runtime.session_provider.Session sessionId
 

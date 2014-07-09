@@ -36,7 +36,7 @@ module Compression =
     | _         -> None
 
   let get_encoder (request : HttpRequest) =
-    let encondings = request.headers?``accept-encoding``
+    let encondings = request.headers %% "accept-encoding"
     match encondings with
     | Some (value : string) ->
       value.Split ','
@@ -45,7 +45,7 @@ module Compression =
     | _ -> None
 
   let parse_encoder (request : HttpRequest) =
-    let encondings = request.headers?``accept-encoding``
+    let encondings = request.headers %% "accept-encoding"
     match encondings with
     | Some (value : string) ->
       value.Split ','
