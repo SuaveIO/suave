@@ -12,7 +12,7 @@ open Suave.Http.Successful
 open Suave.Tests.TestUtilities
 
 [<Tests>]
-let compression =
+let parsing_multipart =
   let run_with' = run_with default_config
 
   let post_data = File.ReadAllBytes(Path.Combine(current_path,"request.txt"))
