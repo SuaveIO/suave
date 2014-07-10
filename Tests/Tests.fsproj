@@ -79,7 +79,7 @@
   </ItemGroup>
   <ItemGroup>
     <Reference Include="FsCheck">
-      <HintPath>..\packages\FsCheck.0.9.4.0\lib\net40-Client\FsCheck.dll</HintPath>
+      <HintPath>..\packages\FsCheck.0.9.1.0\lib\net40-Client\FsCheck.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="FSharp.Charting">
