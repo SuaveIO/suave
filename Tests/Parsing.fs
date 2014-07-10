@@ -20,6 +20,6 @@ let compression =
 
   testList "parsing a large multipart form" [
       testCase "200 OK returns 'Pass'" <| fun _ ->
-        Assert.Equal("expecting 'Havana'", "Pass", run_with' (OK "Pass") |> req_gzip GET "/" (Some http_content))
+        Assert.Equal("expecting 'Pass'", "Pass", run_with' (OK "Pass") |> req_gzip GET "/" (Some http_content))
 
     ]
