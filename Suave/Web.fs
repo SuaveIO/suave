@@ -220,7 +220,12 @@ module ParsingAndControl =
         let! part_headers, rem = read_headers connection read line_buffer
 
         let content_disposition =  part_headers %% "content-disposition"
-        let fieldname = (header_params content_disposition) ? name |> Option.get
+
+        let fieldname = 
+          (header_params content_disposition) ? name 
+          |> Option.get
+          |> (fun x -> x.Trim('"'))
+
         let content_type = part_headers %% "content-type"
 
         match content_type with
