@@ -44,7 +44,6 @@
     <Content Include="Bug105-StopsResponding.verbose.txt" />
     <None Include="Bug105-StopsResponding.fsx" />
     <None Include="PerfLab.fsx" />
-    <Compile Include="AssemblyVersionInfo.fs" />
     <Compile Include="TestUtilities.fs" />
     <Compile Include="Smoke.fs" />
     <Compile Include="Utils.fs" />
@@ -54,6 +53,7 @@
     <Compile Include="HttpFile.fs" />
     <Compile Include="HttpEmbedded.fs" />
     <Compile Include="HttpVerbs.fs" />
+    <Compile Include="Parsing.fs" />
     <Compile Include="Perf.fs" />
     <Compile Include="Program.fs" />
     <None Include="packages.config" />
@@ -72,10 +72,15 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <EmbeddedResource Include="embedded-resource.txt" />
+    <None Include="app.config" />
+    <Content Include="request.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
   <ItemGroup>
     <Reference Include="FsCheck">
-      <HintPath>..\packages\FsCheck.0.9.1.0\lib\net40-Client\FsCheck.dll</HintPath>
+      <HintPath>..\packages\FsCheck.0.9.4.0\lib\net40-Client\FsCheck.dll</HintPath>
+      <Private>True</Private>
     </Reference>
     <Reference Include="FSharp.Charting">
       <HintPath>..\packages\FSharp.Charting.0.90.6\lib\net40\FSharp.Charting.dll</HintPath>

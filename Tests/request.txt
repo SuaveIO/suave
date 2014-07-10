@@ -1,0 +1,309 @@
+--99233d57-854a-4b17-905b-ae37970e8a39
+Content-Disposition: form-data; name="Content-Type"
+
+multipart/mixed; boundary="------------020601070403020003080006"
+--99233d57-854a-4b17-905b-ae37970e8a39
+Content-Disposition: form-data; name="Date"
+
+Fri, 26 Apr 2013 11:50:29 -0700
+--99233d57-854a-4b17-905b-ae37970e8a39
+Content-Disposition: form-data; name="From"
+
+Bob <bob@wishfulcoding.mailgun.org>
+--99233d57-854a-4b17-905b-ae37970e8a39
+Content-Disposition: form-data; name="In-Reply-To"
+
+<517AC78B.5060404@wishfulcoding.mailgun.org>
+--99233d57-854a-4b17-905b-ae37970e8a39
+Content-Disposition: form-data; name="Message-Id"
+
+<517ACC75.5010709@wishfulcoding.mailgun.org>
+--99233d57-854a-4b17-905b-ae37970e8a39
+Content-Disposition: form-data; name="Mime-Version"
+
+1.0
+--99233d57-854a-4b17-905b-ae37970e8a39
+Content-Disposition: form-data; name="Received"
+
+by luna.mailgun.net with SMTP mgrt 8788212249833; Fri, 26 Apr 2013 18:50:30 +0000
+--99233d57-854a-4b17-905b-ae37970e8a39
+Content-Disposition: form-data; name="Received"
+
+from [10.20.76.69] (Unknown [50.56.129.169]) by mxa.mailgun.org with ESMTP id 517acc75.4b341f0-worker2; Fri, 26 Apr 2013 18:50:29 -0000 (UTC)
+--99233d57-854a-4b17-905b-ae37970e8a39
+Content-Disposition: form-data; name="References"
+
+<517AC78B.5060404@wishfulcoding.mailgun.org>
+--99233d57-854a-4b17-905b-ae37970e8a39
+Content-Disposition: form-data; name="Sender"
+
+bob@wishfulcoding.mailgun.org
+--99233d57-854a-4b17-905b-ae37970e8a39
+Content-Disposition: form-data; name="Subject"
+
+Re: Sample POST request
+--99233d57-854a-4b17-905b-ae37970e8a39
+Content-Disposition: form-data; name="To"
+
+Alice <alice@wishfulcoding.mailgun.org>
+--99233d57-854a-4b17-905b-ae37970e8a39
+Content-Disposition: form-data; name="User-Agent"
+
+Mozilla/5.0 (X11; Linux x86_64; rv:17.0) Gecko/20130308 Thunderbird/17.0.4
+--99233d57-854a-4b17-905b-ae37970e8a39
+Content-Disposition: form-data; name="X-Mailgun-Variables"
+
+{"my_var_1": "Mailgun Variable #1", "my-var-2": "awesome"}
+--99233d57-854a-4b17-905b-ae37970e8a39
+Content-Disposition: form-data; name="attachment-count"
+
+2
+--99233d57-854a-4b17-905b-ae37970e8a39
+Content-Disposition: form-data; name="body-html"
+
+<html>
+  <head>
+    <meta content="text/html; charset=ISO-8859-1"
+      http-equiv="Content-Type">
+  </head>
+  <body text="#000000" bgcolor="#FFFFFF">
+    <div class="moz-cite-prefix">
+      <div style="color: rgb(34, 34, 34); font-family: arial,
+        sans-serif; font-size: 12.666666984558105px; font-style: normal;
+        font-variant: normal; font-weight: normal; letter-spacing:
+        normal; line-height: normal; orphans: auto; text-align: start;
+        text-indent: 0px; text-transform: none; white-space: normal;
+        widows: auto; word-spacing: 0px; -webkit-text-size-adjust: auto;
+        -webkit-text-stroke-width: 0px; background-color: rgb(255, 255,
+        255);">Hi Alice,</div>
+      <div style="color: rgb(34, 34, 34); font-family: arial,
+        sans-serif; font-size: 12.666666984558105px; font-style: normal;
+        font-variant: normal; font-weight: normal; letter-spacing:
+        normal; line-height: normal; orphans: auto; text-align: start;
+        text-indent: 0px; text-transform: none; white-space: normal;
+        widows: auto; word-spacing: 0px; -webkit-text-size-adjust: auto;
+        -webkit-text-stroke-width: 0px; background-color: rgb(255, 255,
+        255);"><br>
+      </div>
+      <div style="color: rgb(34, 34, 34); font-family: arial,
+        sans-serif; font-size: 12.666666984558105px; font-style: normal;
+        font-variant: normal; font-weight: normal; letter-spacing:
+        normal; line-height: normal; orphans: auto; text-align: start;
+        text-indent: 0px; text-transform: none; white-space: normal;
+        widows: auto; word-spacing: 0px; -webkit-text-size-adjust: auto;
+        -webkit-text-stroke-width: 0px; background-color: rgb(255, 255,
+        255);">This is Bob.<span class="Apple-converted-space">&nbsp;<img
+            alt="" src="cid:part1.04060802.06030207@wishfulcoding.mailgun.org"
+            height="15" width="33"></span></div>
+      <div style="color: rgb(34, 34, 34); font-family: arial,
+        sans-serif; font-size: 12.666666984558105px; font-style: normal;
+        font-variant: normal; font-weight: normal; letter-spacing:
+        normal; line-height: normal; orphans: auto; text-align: start;
+        text-indent: 0px; text-transform: none; white-space: normal;
+        widows: auto; word-spacing: 0px; -webkit-text-size-adjust: auto;
+        -webkit-text-stroke-width: 0px; background-color: rgb(255, 255,
+        255);"><br>
+        I also attached a file.<br>
+        <br>
+      </div>
+      <div style="color: rgb(34, 34, 34); font-family: arial,
+        sans-serif; font-size: 12.666666984558105px; font-style: normal;
+        font-variant: normal; font-weight: normal; letter-spacing:
+        normal; line-height: normal; orphans: auto; text-align: start;
+        text-indent: 0px; text-transform: none; white-space: normal;
+        widows: auto; word-spacing: 0px; -webkit-text-size-adjust: auto;
+        -webkit-text-stroke-width: 0px; background-color: rgb(255, 255,
+        255);">Thanks,</div>
+      <div style="color: rgb(34, 34, 34); font-family: arial,
+        sans-serif; font-size: 12.666666984558105px; font-style: normal;
+        font-variant: normal; font-weight: normal; letter-spacing:
+        normal; line-height: normal; orphans: auto; text-align: start;
+        text-indent: 0px; text-transform: none; white-space: normal;
+        widows: auto; word-spacing: 0px; -webkit-text-size-adjust: auto;
+        -webkit-text-stroke-width: 0px; background-color: rgb(255, 255,
+        255);">Bob</div>
+      <br>
+      On 04/26/2013 11:29 AM, Alice wrote:<br>
+    </div>
+    <blockquote cite="mid:517AC78B.5060404@wishfulcoding.mailgun.org" type="cite">Hi
+      Bob,
+      <br>
+      <br>
+      This is Alice. How are you doing?
+      <br>
+      <br>
+      Thanks,
+      <br>
+      Alice
+      <br>
+    </blockquote>
+    <br>
+  </body>
+</html>
+
+--99233d57-854a-4b17-905b-ae37970e8a39
+Content-Disposition: form-data; name="body-plain"
+
+Hi Alice,
+
+This is Bob.
+
+I also attached a file.
+
+Thanks,
+Bob
+
+On 04/26/2013 11:29 AM, Alice wrote:
+> Hi Bob,
+>
+> This is Alice. How are you doing?
+>
+> Thanks,
+> Alice
+
+
+--99233d57-854a-4b17-905b-ae37970e8a39
+Content-Disposition: form-data; name="content-id-map"
+
+{"<part1.04060802.06030207@wishfulcoding.mailgun.org>": "attachment-1"}
+--99233d57-854a-4b17-905b-ae37970e8a39
+Content-Disposition: form-data; name="from"
+
+Bob <bob@wishfulcoding.mailgun.org>
+--99233d57-854a-4b17-905b-ae37970e8a39
+Content-Disposition: form-data; name="message-headers"
+
+[["Received", "by luna.mailgun.net with SMTP mgrt 8788212249833; Fri, 26 Apr 2013 18:50:30 +0000"], ["Received", "from [10.20.76.69] (Unknown [50.56.129.169]) by mxa.mailgun.org with ESMTP id 517acc75.4b341f0-worker2; Fri, 26 Apr 2013 18:50:29 -0000 (UTC)"], ["Message-Id", "<517ACC75.5010709@wishfulcoding.mailgun.org>"], ["Date", "Fri, 26 Apr 2013 11:50:29 -0700"], ["From", "Bob <bob@wishfulcoding.mailgun.org>"], ["User-Agent", "Mozilla/5.0 (X11; Linux x86_64; rv:17.0) Gecko/20130308 Thunderbird/17.0.4"], ["Mime-Version", "1.0"], ["To", "Alice <alice@wishfulcoding.mailgun.org>"], ["Subject", "Re: Sample POST request"], ["References", "<517AC78B.5060404@wishfulcoding.mailgun.org>"], ["In-Reply-To", "<517AC78B.5060404@wishfulcoding.mailgun.org>"], ["X-Mailgun-Variables", "{\"my_var_1\": \"Mailgun Variable #1\", \"my-var-2\": \"awesome\"}"], ["Content-Type", "multipart/mixed; boundary=\"------------020601070403020003080006\""], ["Sender", "bob@wishfulcoding.mailgun.org"]]
+--99233d57-854a-4b17-905b-ae37970e8a39
+Content-Disposition: form-data; name="recipient"
+
+alice@wishfulcoding.mailgun.org
+--99233d57-854a-4b17-905b-ae37970e8a39
+Content-Disposition: form-data; name="sender"
+
+bob@wishfulcoding.mailgun.org
+--99233d57-854a-4b17-905b-ae37970e8a39
+Content-Disposition: form-data; name="signature"
+
+fd53d2bf1e611409f7b755f05087d8b3e2b8e327db42e33f5e8c0d1bc4225c83
+--99233d57-854a-4b17-905b-ae37970e8a39
+Content-Disposition: form-data; name="stripped-html"
+
+<html><head><meta content="text/html; charset=ISO-8859-1" http-equiv="Content-Type"></head><body text="#000000" bgcolor="#FFFFFF">
+    <div class="moz-cite-prefix">
+      <div style="color: rgb(34, 34, 34); font-family: arial,
+        sans-serif; font-size: 12.666666984558105px; font-style: normal;
+        font-variant: normal; font-weight: normal; letter-spacing:
+        normal; line-height: normal; orphans: auto; text-align: start;
+        text-indent: 0px; text-transform: none; white-space: normal;
+        widows: auto; word-spacing: 0px; -webkit-text-size-adjust: auto;
+        -webkit-text-stroke-width: 0px; background-color: rgb(255, 255,
+        255);">Hi Alice,</div>
+      <div style="color: rgb(34, 34, 34); font-family: arial,
+        sans-serif; font-size: 12.666666984558105px; font-style: normal;
+        font-variant: normal; font-weight: normal; letter-spacing:
+        normal; line-height: normal; orphans: auto; text-align: start;
+        text-indent: 0px; text-transform: none; white-space: normal;
+        widows: auto; word-spacing: 0px; -webkit-text-size-adjust: auto;
+        -webkit-text-stroke-width: 0px; background-color: rgb(255, 255,
+        255);"><br></div>
+      <div style="color: rgb(34, 34, 34); font-family: arial,
+        sans-serif; font-size: 12.666666984558105px; font-style: normal;
+        font-variant: normal; font-weight: normal; letter-spacing:
+        normal; line-height: normal; orphans: auto; text-align: start;
+        text-indent: 0px; text-transform: none; white-space: normal;
+        widows: auto; word-spacing: 0px; -webkit-text-size-adjust: auto;
+        -webkit-text-stroke-width: 0px; background-color: rgb(255, 255,
+        255);">This is Bob.<span class="Apple-converted-space">&#160;<img alt="" src="cid:part1.04060802.06030207@wishfulcoding.mailgun.org" height="15" width="33"></span></div>
+      <div style="color: rgb(34, 34, 34); font-family: arial,
+        sans-serif; font-size: 12.666666984558105px; font-style: normal;
+        font-variant: normal; font-weight: normal; letter-spacing:
+        normal; line-height: normal; orphans: auto; text-align: start;
+        text-indent: 0px; text-transform: none; white-space: normal;
+        widows: auto; word-spacing: 0px; -webkit-text-size-adjust: auto;
+        -webkit-text-stroke-width: 0px; background-color: rgb(255, 255,
+        255);"><br>
+        I also attached a file.<br><br></div>
+      <div style="color: rgb(34, 34, 34); font-family: arial,
+        sans-serif; font-size: 12.666666984558105px; font-style: normal;
+        font-variant: normal; font-weight: normal; letter-spacing:
+        normal; line-height: normal; orphans: auto; text-align: start;
+        text-indent: 0px; text-transform: none; white-space: normal;
+        widows: auto; word-spacing: 0px; -webkit-text-size-adjust: auto;
+        -webkit-text-stroke-width: 0px; background-color: rgb(255, 255,
+        255);">Thanks,</div>
+      <div style="color: rgb(34, 34, 34); font-family: arial,
+        sans-serif; font-size: 12.666666984558105px; font-style: normal;
+        font-variant: normal; font-weight: normal; letter-spacing:
+        normal; line-height: normal; orphans: auto; text-align: start;
+        text-indent: 0px; text-transform: none; white-space: normal;
+        widows: auto; word-spacing: 0px; -webkit-text-size-adjust: auto;
+        -webkit-text-stroke-width: 0px; background-color: rgb(255, 255,
+        255);">Bob</div>
+      <br>
+     <br></div>
+    <br></body></html>
+--99233d57-854a-4b17-905b-ae37970e8a39
+Content-Disposition: form-data; name="stripped-signature"
+
+Thanks,
+Bob
+--99233d57-854a-4b17-905b-ae37970e8a39
+Content-Disposition: form-data; name="stripped-text"
+
+Hi Alice,
+
+This is Bob.
+
+I also attached a file.
+--99233d57-854a-4b17-905b-ae37970e8a39
+Content-Disposition: form-data; name="subject"
+
+Re: Sample POST request
+--99233d57-854a-4b17-905b-ae37970e8a39
+Content-Disposition: form-data; name="timestamp"
+
+1404925500
+--99233d57-854a-4b17-905b-ae37970e8a39
+Content-Disposition: form-data; name="token"
+
+5yfgsi4doax9zs841w3cri1z5vcqxx-innycjwudt8ahgyqhv9
+--99233d57-854a-4b17-905b-ae37970e8a39
+Content-Disposition: form-data; name="attachment-1"; filename="crabby.gif"
+Content-Type: image/gif
+Content-Length: 2785
+
+GIF89a!  ¢ ÿÈÈÿ     êÿÿÿ         !ÿNETSCAPE2.0   !ù	
+  ,    !   hHºÜşP6£¤nÔ¥mgŸ Û 5–'‹r-!ÊL˜¯˜ßç‹¿6í7!Â¾^¥ÄC• $
+z©¤Æ¨{Óx—[.åê|Î$	•»Â)¯%óÛ†æå÷ÓÆsn€E~yƒ‚‚	 !ù
+  ,    !   dHºÜşP6£¤nÔ¥mgŸ Û 5–'‹r-d¾"MÌ/>	‚Âß§\Ğ%ĞJ@ãD2¢†œèÍÉl:©7¶2¸b)]årD^IÂ¨˜xMi-\[Çd·ÜºìÆ_öõ~‚	 !ù	È  ,     HJ"Ú+ÊI«½8ëÍ{ !ù	   ,    !   GHºÜş0ÊI«½ø0ˆÊG@¶œªcih7.ùÂò¬Èy–À ïV€qƒj*M@f“ó¼ğ„ÀİkX›u¡Şğ’  !ù	   ,    !   gHºÜşŒ6£ªg-9åƒ6  6ŞEš šµ¬+Ê,Á¯«î)Ó›o2ÌõZ:ÓGDŠx(gf*¨–êV²Z¦#dm’Î¥•RÇÂ¢eìÛ¶ç·7%€ws‚†	 !ù	   ,    !   gHºÜşŒ6£ªg-9åƒ6  6ŞEš šµ¬+Ê,Á¯«î)Ó›o2ÌõZ:ÓGDŠx(gf*¨–êV²Z¦#dm’Î¥•RÇÂ¢eìÛ¶ç·7ç‰w€…‚s	 !ù	   ,    !   hHºÜşp4	µn\¥+éÈÀ5 Á’&Ú¦–K‚BòëğÀ·YÍ×Cíp?	‘bB“¡_ÊØäp¤Ë‰t«Ôx™[lf€U’Î,9©
+‰ˆ\wÛ£1rçúËÌW”€x~ƒ‚‡	 !ù	   ,    !   hHºÜşp4	µn\¥+éÈÀ5 Á’&Ú¦–K‚BòëğÀ·YÍ×Cíp?	‘bB“¡_ÊØäp¤Ë‰t«Ôx™[lf€U’Î,9©
+‰ˆ\wÛ£1rçúËÌG¬J‚xy†ƒ~	 !ù	2  ,    !   hHºÜşo4	µn\¥+éÈÀ5 Á’&Ú¦–K‚BòëğÀ·YÍ×Cíp?	‘bB“¡_ÊØäp¤Ë‰t«Ôx™[lf€U’Î,9©
+‰ˆ\wÛ£1rçúËÌW”€x~ƒ‚‡y	 !ù	
+  ,    !   `Hª³ş°Á7ê¼¤Ê;@ßãyÁŠg
+.]«*‚@Û,:;±<×7–ïÕÓí6’bj'4"aÍå+³t14X•	s6:€°8éÅd…UĞyÕ5m-lÎ›ŒO¾™<~jßëÿ+	 !ù	
+  ,    !   gHºÜşp,	%×Ş‘ãîÊ H"è”ØxÉR‚ Äá›¶–-âİË7oÂj7“ZÀ¸ìì˜Cäê,.›–ò¼'ƒ+'(›¹á¦)4Vz¿ÚÊƒc¯åÉì–‹¯0€wx‚†x	 !ù	
+  ,    !   hHºÜşo4	µn\¥+éÈÀ5 Á’&Ú¦–K‚BòëğÀ·YÍ×Cíp?	‘bB“¡_ÊØäp¤Ë‰t«Ôx™[lf€U’Î,9©
+‰ˆ\wÛ£1rçúËÌW”€x~ƒ‚‡y	 !ù	   ,    !   hHºÜşo4	µn\¥+éÈÀ5 Á’&Ú¦–K‚BòëğÀ·YÍ×Cíp?	‘bB“¡_ÊØäp¤Ë‰t«Ôx™[lf€U’Î,9©
+‰ˆ\wÛ£1rçúËÌW”€x~‚†ƒy	 !ù	   ,    !   hHºÜşp4	µn\¥+éÈÀ5 Á’&Ú¦–K‚BòëğÀ·YÍ×Cíp?	‘bB“¡_ÊØäp¤Ë‰t«Ôx™[lf€U’Î,9©
+‰ˆ\wÛ£1rçúËÌW”€x~ƒ‚‡	 !ù	   ,    !   hHºÜşp4	µn\¥+éÈÀ5 Á’&Ú¦–K‚BòëğÀ·YÍ×Cíp?	‘bB“¡_ÊØäp¤Ë‰t«Ôx™[lf€U’Î,9©
+‰ˆ\wÛ£1rçúËÌW”€x~‚†ƒ	 !ù	   ,    !   gHºÜşŒ6£ªg-9åƒ6  6ŞEš šµ¬+Ê,Á¯«î)Ó›o2ÌõZ:ÓGDŠx(gf*¨–êV²Z¦#dm’Î¥•RÇÂ¢eìÛ¶ç·7%€ws‚†	 !ù	d  ,    !   hHºÜşP6£¤nÔ¥mgŸ Û 5–'‹r-!ÊL˜¯˜ßç‹¿6í7!Â¾^¥ÄC• $
+z©¤Æ¨{Óx—[.åê|Î$	•»Â)¯%óÛ†æå÷ÓÆsn€E~yƒ‚‚	 !ù
+  ,    !   dHºÜşP6£¤nÔ¥mgŸ Û 5–'‹r-d¾"MÌ/>	‚Âß§\Ğ%ĞJ@ãD2¢†œèÍÉl:©7¶2¸b)]årD^IÂ¨˜xMi-\[Çd·ÜºìÆ_öõ~‚	 !ù	2  ,     HºÜş0ÊIëBaË»ÿ`X% !ù	
+  ,    !   JHº:üp¹È†¥ÔÎFÇ'rÁ”`”çV­&ªÂ\«¬ü¶§LÛ¸œ.Óm&^+´%Ä«Ñ[4XIu˜êz¿à°xL.›Ë	 !ù	
+  ,    !   hHºÜşP6£¤nÔ¥mgŸ Û 5–'‹r-!ÊL˜¯˜ßç‹¿6í7!Â¾^¥ÄC• $
+z©¤Æ¨{Óx—[.åê|Î$	•»Â)¯%óÛ†æå÷ÓÆsn€E~yƒ‚‚	 !ù	
+  ,    !   bHº:üp¹È†¥ÔÎFÇ'rÁ”`”çV­&ªÂ\«¬ü¶§LÛ¸œ.Óm&^+´%Ä«Ñ[4XIu()^<€°éV.ÁªK“
+%·èv„ŒEÊç×¼cŸ¿‡ô€|	 !ù	
+  ,    !   hHºÜşP6£¤nÔ¥mgŸ Û 5–'‹r-!ÊL˜¯˜ßç‹¿6í7!Â¾^¥ÄC• $
+z©¤Æ¨{Óx—[.åê|Î$	•»Â)¯%óÛ†æå÷ÓÆsn€E~yƒ‚‚	 !ù
+  ,    !   bHº:üp¹È†¥ÔÎFÇ'rÁ”`”çV­&ªÂ\«¬ü¶§LÛ¸œ.Óm&^+´%Ä«Ñ[4XIu()^<€°éV.ÁªK“
+%·èv„ŒEÊç×¼cŸ¿‡ô€|	 ;
+--99233d57-854a-4b17-905b-ae37970e8a39
+Content-Disposition: form-data; name="attachment-2"; filename="attached_Ñ„Ğ°Ğ¹Ğ».txt"
+Content-Type: text/plain
+Content-Length: 32
+
+This is the content of the file
+
+--99233d57-854a-4b17-905b-ae37970e8a39--
