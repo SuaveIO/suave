@@ -240,7 +240,7 @@ module ParsingAndControl =
           temp_file.Close()
           if file_length > int64(0) then
             let filename =
-              (header_params content_disposition) ? filename |> Option.get
+              (header_params content_disposition) ? filename |> Option.get |> (fun x -> x.Trim('"'))
             let upload = new HttpUpload(fieldname, filename, content_type |> Option.get, temp_file_name)
             return! loop boundary b { r with files = upload :: r.files }
           else
