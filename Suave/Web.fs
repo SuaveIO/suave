@@ -44,7 +44,7 @@ module ParsingAndControl =
         if acc + pair.length < index then
           do! select (ArraySegment(pair.buffer.Array, pair.offset, pair.length)) pair.length
           connection.free_buffer "Web.split" pair.buffer
-          return! loop tail (acc + pair.length) (count + acc)
+          return! loop tail (acc + pair.length) (count + acc + pair.length)
         elif acc + pair.length >= index then
           let bytes_read = index - acc
           do! select (ArraySegment(pair.buffer.Array, pair.offset, bytes_read)) bytes_read
