@@ -50,7 +50,7 @@ underlying response stream.
 
 Something that may trick beginners up is that your web parts are "values" in the
 sense that they evaluate once, e.g. when constructing `choose [ OK "hi" ]`, `OK
-"hi"` is evauated once, not every request. You need to wrap your web part in a
+"hi"` is evaluated once, not every request. You need to wrap your web part in a
 closure if you want to re-evaluated every request, with e.g. `warbler`.
 
 Tutorial: Composing bigger programs
