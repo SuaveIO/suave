@@ -128,8 +128,41 @@ namespace :docs do
     end
   end
 
+  desc 'build api documentation'
+  task :build_api => :build do
+	sourceDirectory =  ENV['SOURCE_DIRECTORY'] + '/'
+    # ensure that the desired dll file is built
+	dllFile = sourceDirectory + 'bin/Release/suave.dll'
+	outputDir = sourceDirectory + 'gh-pages/api'
+	# use templates e.g of Fake project at 'https://github.com/fsharp/FAKE/tree/master/help/templates'
+	templatesDir = '"' + sourceDirectory + 'templates/' + ' ' + sourceDirectory + 'templates/reference/' + '"'
+	repoLink = 'https://github.com/SuaveIO/suave/tree/master/Suave' # verify this
+	sourceFolder = sourceDirectory # verify this
+	parameter = [ 'page-description', 'F# Suave',
+                  'page-author', 'Ademar Gonzalez, Henrik Feldt',
+				  'project-author', 'Ademar Gonzalez, Henrik Feldt',
+				  'github-link', 'https://github.com/SuaveIO/suave',
+				  'project-github', 'https://github.com/SuaveIO/suave',
+				  'project-nuget', 'https://www.nuget.org/packages/Suave',
+				  'root', 'http://suave.io',
+                  'project-name', 'F# Suave' ]
+	# transform parameter into one string, separated by blanks, embedded into double quotes
+	cmd = [ sourceDirectory,
+	        'buildsupport/FSharp.Formatting.CommandTool.2.4.11/tools/fsformatting.exe',
+			'metadataFormat',
+			'--generate',
+			'--dllFiles', dllFile,
+			'--outDir', outputDir,
+            '--layoutRoots', templatesDir,
+			'--sourceRepo', repoLink,
+			'--sourceFolder', sourceFolder,
+			'--parameter', parameter ]
+	# transform cmd into one string, separated by blanks
+	system 'cmd'
+  end  
+  
   desc 'build and push docs'
-  task :push => :'docs:build' do
+  task :push => :'docs:build_api' do
     system "sshpass -p #{ENV['SUAVE_SERVER_PASS']} scp -P #{ENV['SUAVE_SERVER_PORT']} -r _site/* suave@northpole.cloudapp.net:/home/suave/site",
       work_dir: 'gh-pages'
   end
