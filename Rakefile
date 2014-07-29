@@ -155,9 +155,9 @@ namespace :docs do
     # transform parameter into one string, separated by blanks, embedded into double quotes
     # transform cmd into one string, separated by blanks
     system 'buildsupport/FSharp.Formatting.CommandTool/tools/fsformatting.exe',
-%w|metadataFormat
+%W|metadataFormat
   --generate
-  --dllFiles Suave/bin/Release/suave.dll
+  --dllFiles #{File.join(FileUtils.pwd, 'Suave/bin/Release/suave.dll')}
   --outDir gh-pages/api
   --layoutRoots gh-pages/_fs_formatting/reference
   --sourceRepo https://github.com/SuaveIO/suave/tree/master/Suave
