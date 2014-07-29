@@ -145,8 +145,7 @@ namespace :docs do
             project-github   https://github.com/SuaveIO/suave
             project-nuget    https://www.nuget.org/packages/Suave
             root             http://suave.io
-            project-name     Suave|.
-          collect { |item| '"' + item + '"' }
+            project-name     Suave|
 
     # transform parameter into one string, separated by blanks, embedded into double quotes
     # transform cmd into one string, separated by blanks
