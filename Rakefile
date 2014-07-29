@@ -86,12 +86,6 @@ task :create_nuget_quick => ['build/pkg', :versioning] do
   )
 end
 
-desc 'create suave nuget'
-task :create_nuget => ['build/pkg', :versioning, :build, :create_nuget_quick]
-
-desc 'build, gen versions, test and create nuget'
-task :default => [:build, :'tests:unit']
-
 task :increase_version_number do
   # inc patch version in .semver
   s = SemVer.find
@@ -143,7 +137,8 @@ namespace :docs do
   task :fsformatting do
     nuget_install 'FSharp.Core.Open.FS31'
     nuget_install 'FSharp.Formatting.CommandTool'
-    FileUtils.cp_r 'buildsupport/FSharp.Core.Open.FS31/lib/net40/.', 'buildsupport/FSharp.Formatting.CommandTool/tools/'
+    FileUtils.cp_r 'buildsupport/FSharp.Core.Open.FS31/lib/net40/.', 'buildsupport/FSharp.Formatting.CommandTool/tools/' unless
+      ENV['DO_NOT_OVERWRITE']
   end
 
   task :api_quick do
@@ -179,3 +174,9 @@ namespace :docs do
       work_dir: 'gh-pages'
   end
 end
+
+desc 'create suave nuget'
+task :create_nuget => ['build/pkg', :versioning, :build, :create_nuget_quick]
+
+desc 'build, gen versions, test and create nuget'
+task :default => [:build, :'tests:unit', :'docs:api']
