@@ -140,7 +140,7 @@ namespace :docs do
     # use templates e.g of Fake project at 'https://github.com/fsharp/FAKE/tree/master/help/templates'
     md = %w|page-description F#\ Suave
             page-author      Ademar\ Gonzalez,\ Henrik\ Feldt
-            project-author   Ademar\ Gonzalez\ Henrik\ Feldt
+            project-author   Ademar\ Gonzalez,\ Henrik\ Feldt
             github-link      https://github.com/SuaveIO/suave
             project-github   https://github.com/SuaveIO/suave
             project-nuget    https://www.nuget.org/packages/Suave
