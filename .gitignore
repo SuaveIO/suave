@@ -15,3 +15,4 @@ gh-pages/
 AssemblyVersionInfo.fs
 miTLS/
 buildsupport/FSharp.Formatting.CommandTool/
+buildsupport/FSharp.Core.Open.FS31/

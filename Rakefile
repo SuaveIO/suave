@@ -118,9 +118,12 @@ namespace :docs do
     FileUtils.rm_rf 'gh-pages' if Dir.exists? 'gh-pages'
   end
 
-  desc 'build documentation'
-  task :text => :clean do
+  task :clone_gh_pages do
     system 'git clone https://github.com/SuaveIO/suave.git -b gh-pages gh-pages' unless Dir.exists? 'gh-pages'
+  end
+
+  desc 'build documentation'
+  task :text => [:clean, :clone_gh_pages] do
     Dir.chdir 'gh-pages' do
       Bundler.with_clean_env do
         system 'bundle'
@@ -129,11 +132,18 @@ namespace :docs do
     end
   end
 
-  task :fsformatting do
+  def nuget_install package
     system 'buildsupport/NuGet.exe',
-%w|install FSharp.Formatting.CommandTool
+%W|install #{package}
       -OutputDirectory buildsupport/
-      -ExcludeVersion|, clr_command: true
+      -ExcludeVersion|,
+        clr_command: true
+  end
+
+  task :fsformatting do
+    nuget_install 'FSharp.Core.Open.FS31'
+    nuget_install 'FSharp.Formatting.CommandTool'
+    FileUtils.cp_r 'buildsupport/FSharp.Core.Open.FS31/lib/net40/.', 'buildsupport/FSharp.Formatting.CommandTool/tools/'
   end
 
   task :api_quick do
@@ -152,16 +162,16 @@ namespace :docs do
     system 'buildsupport/FSharp.Formatting.CommandTool/tools/fsformatting.exe',
 %w|metadataFormat
   --generate
-  --dllFiles Suave/bin/Release
+  --dllFiles Suave/bin/Release/suave.dll
   --outDir gh-pages/api
-  --layoutRoots gh-pages/_fs_formatting
+  --layoutRoots gh-pages/_fs_formatting/reference
   --sourceRepo https://github.com/SuaveIO/suave/tree/master/Suave
   --sourceFolder Suave
-  --parameter|.concat(md).flatten, clr_command: true
+  --parameters|.concat(md).flatten, clr_command: true
   end
 
   desc 'build API docs'
-  task :api => [:build, :fsformatting, :api_quick]
+  task :api => [:build, :fsformatting, :clone_gh_pages, :api_quick]
 
   desc 'build and push docs'
   task :push => :'docs:text' do
