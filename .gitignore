@@ -14,3 +14,4 @@ suave.sln.DotSettings.user
 gh-pages/
 AssemblyVersionInfo.fs
 miTLS/
+buildsupport/FSharp.Formatting.CommandTool/

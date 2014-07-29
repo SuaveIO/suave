@@ -69,17 +69,18 @@ task :create_nuget_quick => ['build/pkg', :versioning] do
     m.language      = 'en-GB'
     m.copyright     = 'Ademar Gonzalez'
     m.release_notes = "Full version: #{ENV['BUILD_VERSION']}."
-    m.license_url       = "https://github.com/ademar/suave/blob/master/COPYING"
-    m.project_url    = "http://suave.io"
+    m.license_url   = "https://github.com/ademar/suave/blob/master/COPYING"
+    m.project_url   = "http://suave.io"
   end
   p.add_file  "Suave/bin/Release/suave.dll", "lib"
   p.add_file  "Suave/bin/Release/suave.xml", "lib"
-  nuspec_path = 'suave.nuspec'
-  File.write(nuspec_path,p.to_xml)
-  cmd = Albacore::NugetsPack::Cmd.new "buildsupport/NuGet.exe", out: "build/pkg"
-  pkg, spkg = cmd.execute nuspec_path
+
+  File.write('suave.nuspec', p.to_xml)
+  cmd = Albacore::NugetsPack::Cmd.new 'buildsupport/NuGet.exe', out: 'build/pkg'
+  pkg, _ = cmd.execute 'suave.nuspec'
+
   Albacore.publish :artifact, OpenStruct.new(
-    :nuspec   => nuspec_path,
+    :nuspec   => 'suave.nuspec',
     :nupkg    => pkg,
     :location => pkg
   )
@@ -118,7 +119,7 @@ namespace :docs do
   end
 
   desc 'build documentation'
-  task :build => :clean do
+  task :text => :clean do
     system 'git clone https://github.com/SuaveIO/suave.git -b gh-pages gh-pages' unless Dir.exists? 'gh-pages'
     Dir.chdir 'gh-pages' do
       Bundler.with_clean_env do
@@ -128,8 +129,43 @@ namespace :docs do
     end
   end
 
+  task :fsformatting do
+    system 'buildsupport/NuGet.exe',
+%w|install FSharp.Formatting.CommandTool
+      -OutputDirectory buildsupport/
+      -ExcludeVersion|, clr_command: true
+  end
+
+  task :api_quick do
+    # use templates e.g of Fake project at 'https://github.com/fsharp/FAKE/tree/master/help/templates'
+    md = %w|page-description F#\ Suave
+            page-author      Ademar\ Gonzalez,\ Henrik\ Feldt
+            project-author   Ademar\ Gonzalez\ Henrik\ Feldt
+            github-link      https://github.com/SuaveIO/suave
+            project-github   https://github.com/SuaveIO/suave
+            project-nuget    https://www.nuget.org/packages/Suave
+            root             http://suave.io
+            project-name     Suave|.
+          collect { |item| '"' + item + '"' }
+
+    # transform parameter into one string, separated by blanks, embedded into double quotes
+    # transform cmd into one string, separated by blanks
+    system 'buildsupport/FSharp.Formatting.CommandTool/tools/fsformatting.exe',
+%w|metadataFormat
+  --generate
+  --dllFiles Suave/bin/Release
+  --outDir gh-pages/api
+  --layoutRoots gh-pages/_fs_formatting
+  --sourceRepo https://github.com/SuaveIO/suave/tree/master/Suave
+  --sourceFolder Suave
+  --parameter|.concat(md).flatten, clr_command: true
+  end
+
+  desc 'build API docs'
+  task :api => [:build, :fsformatting, :api_quick]
+
   desc 'build and push docs'
-  task :push => :'docs:build' do
+  task :push => :'docs:text' do
     system "sshpass -p #{ENV['SUAVE_SERVER_PASS']} scp -P #{ENV['SUAVE_SERVER_PORT']} -r _site/* suave@northpole.cloudapp.net:/home/suave/site",
       work_dir: 'gh-pages'
   end
