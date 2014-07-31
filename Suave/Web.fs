@@ -200,7 +200,7 @@ module ParsingAndControl =
             return! loop tail (n - segment.length)
         | [] ->
           let missing = Array.zeroCreate n
-          return! read_bytes bytes missing 0
+          return! read_bytes n missing 0
       }
     loop read bytes
 
