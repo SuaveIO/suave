@@ -381,7 +381,6 @@ module ParsingAndControl =
       }
     | SocketTask f -> f connection
 
-  //let response_f (status_code : HttpCode) (f_content : Connection -> SocketOp<unit>) ({request = request } as context : HttpContext)  = 
   let response_f ({ response = r } as context : HttpContext) connection = socket {
     do! async_writeln connection (String.concat " " [ "HTTP/1.1"
                                                     ; (http_code r.status).ToString()
@@ -397,11 +396,19 @@ module ParsingAndControl =
 
   /// Check if the web part can perform its work on the current request. If it
   /// can't it will return None and the run method will return.
-  let internal run ctx (web_part : WebPart) connection = socket {
-    match web_part ctx with 
-    | Some executed_part ->
-      return! response_f executed_part connection
-    | None -> return ()
+  let internal run ctx (web_part : WebPart) connection = 
+    let execute _ =
+      try  
+          web_part ctx
+        with ex ->
+          ctx.runtime.error_handler ex "request failed" ctx
+          |> succeed
+    socket {
+      let result = execute ()
+      match result with 
+      | Some executed_part ->
+        return! response_f executed_part connection
+      | None -> return ()
   }
 
   type HttpConsumer =
