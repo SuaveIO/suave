@@ -21,18 +21,19 @@ let parsing_multipart =
 
   let post_data1 = File.ReadAllBytes(Path.Combine(current_path,"request.txt"))
   let post_data2 = File.ReadAllText(Path.Combine(current_path,"request-1.txt"))
+  let post_data3 = File.ReadAllText(Path.Combine(current_path,"request-2.txt"))
 
-  let test_url_encoded_form = 
+  let test_url_encoded_form field_name = 
     request(fun r -> 
-      match (form r) ^^ "stripped-text" with
+      match (form r) ^^ field_name  with
       | Some str -> OK str
-      | None -> OK "FAILED")
+      | None -> OK "field-does-not-exists")
 
   let test_multipart_form = 
     request(fun r -> 
       match get_first r.multipart_fields "From" with
       | Some str -> OK str
-      | None -> OK "FAILED")
+      | None -> OK "field-does-not-exists")
 
   let byte_array_content = new ByteArrayContent(post_data1)
   byte_array_content.Headers.TryAddWithoutValidation("Content-Type","multipart/form-data; boundary=99233d57-854a-4b17-905b-ae37970e8a39") |> ignore
@@ -43,6 +44,21 @@ let parsing_multipart =
 
       testCase "parsing a large urlencoded form data" <| fun _ ->
         Assert.Equal("", "hallo wereld", 
-          run_with' test_url_encoded_form |> req_gzip POST "/" (Some <| new StringContent(post_data2, Encoding.UTF8, "application/x-www-form-urlencoded")))
+          run_with' (test_url_encoded_form "stripped-text") |> req_gzip POST "/" (Some <| new StringContent(post_data2, Encoding.UTF8, "application/x-www-form-urlencoded")))
 
+      testCase "parsing a large urlencoded form data" <| fun _ ->
+        Assert.Equal("", "Pepijn de Vos <pepijndevos@gmail.com>", 
+          run_with' (test_url_encoded_form "from") |> req_gzip POST "/" (Some <| new StringContent(post_data3, Encoding.UTF8, "application/x-www-form-urlencoded")))
+
+      testCase "parsing a large urlencoded form data" <| fun _ ->
+        Assert.Equal("", "no attachment 2", 
+          run_with' (test_url_encoded_form "subject") |> req_gzip POST "/" (Some <| new StringContent(post_data3, Encoding.UTF8, "application/x-www-form-urlencoded")))
+
+      testCase "parsing a large urlencoded form data" <| fun _ ->
+        Assert.Equal("", "identifier 123abc", 
+          run_with' (test_url_encoded_form "body-plain") |> req_gzip POST "/" (Some <| new StringContent(post_data3, Encoding.UTF8, "application/x-www-form-urlencoded")))
+
+      testCase "parsing a large urlencoded form data" <| fun _ ->
+        Assert.Equal("", "field-does-not-exists", 
+          run_with' (test_url_encoded_form "body-html") |> req_gzip POST "/" (Some <| new StringContent(post_data3, Encoding.UTF8, "application/x-www-form-urlencoded")))
   ]
