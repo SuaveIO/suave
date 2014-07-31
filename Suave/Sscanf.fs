@@ -51,10 +51,14 @@ let rec get_formatters xs =
 /// Parse the format in 'pf' from the string 's', failing and raising an exception
 /// otherwise
 let sscanf (pf:PrintfFormat<_,_,_,_,'t>) s : 't =
-  let formatStr  = pf.Value.Replace("%%", "%")
-  let constants  = formatStr.Split(separators, StringSplitOptions.None)
-  let regex      = Regex("^" + String.Join("(.*?)", constants |> Array.map Regex.Escape) + "$")
-  let formatters = pf.Value.ToCharArray() // need original string here (possibly with "%%"s)
+  let formatStr  = pf.Value
+  let constants  = formatStr.Split([|"%%"|], StringSplitOptions.None) 
+                   |> Array.map (fun x -> x.Split(separators, StringSplitOptions.None))
+  let regexStr   = constants 
+                   |> Array.map (fun c -> c |> Array.map Regex.Escape |> String.concat "(.*?)")
+                   |> String.concat "%"
+  let regex      = Regex("^" + regexStr + "$")
+  let formatters = formatStr.ToCharArray() // need original string here (possibly with "%%"s)
                    |> Array.toList |> get_formatters
   let groups =
     regex.Match(s).Groups
