@@ -49,11 +49,12 @@ let testapp : WebPart =
 System.Net.ServicePointManager.DefaultConnectionLimit <- Int32.MaxValue
 open Socket
 
-let timeout =
-  fun r ->
-  // blocking time consuming task
-  Async.RunSynchronously <| async { do! Async.Sleep 10000 }
-  OK "Did not timed out." r
+let sleep milliseconds message: WebPart = 
+  fun (x : HttpContext) -> 
+    async {
+      do! Async.Sleep milliseconds
+      return! OK message x
+      }
 
 // Adds a new mime type to the default map
 let mime_types =
@@ -72,7 +73,7 @@ choose [
   url "/redirect" >>= Redirection.redirect "/redirected"
   url "/redirected" >>=  OK "You have been redirected."
   url "/date" >>= warbler (fun _ -> OK (DateTimeOffset.UtcNow.ToString("o")))
-  url "/timeout" >>= timeout_webpart (TimeSpan.FromSeconds 1.) timeout
+  url "/timeout" >>= timeout_webpart (TimeSpan.FromSeconds 1.) (sleep 10000 "Did not timed out")
   url "/session"
     >>= session_support (TimeSpan(0,30,0))
     >>= context (fun x ->
@@ -88,6 +89,7 @@ choose [
   GET >>= url "/events" >>= request (fun r -> EventSource.hand_shake (CounterDemo.counter_demo r))
   GET >>= browse //serves file if exists
   GET >>= dir //show directory listing
+  HEAD >>= url "/head" >>= sleep 100 "Nice sleep .."
   POST >>= url "/upload" >>= OK "Upload successful."
   POST >>= url "/upload2"
     >>= request (fun x ->
