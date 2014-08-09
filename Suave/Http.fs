@@ -5,34 +5,39 @@ module Http =
   open Socket
   open Types
 
-  let inline succeed x = Some x
+  let inline succeed x = async{ return Some x }
 
-  let fail = None
+  let fail = async{ return None }
 
-  let inline never _ = None
+  let never : WebPart = fun x -> fail
 
-  let bind = Option.bind
-
-  let inline delay f = f()
-
-  let inline (>>=) a b = fun x -> Option.bind b (a x)
+  let inline (>>=) (a : 'a -> Async<'b option>)  (b : 'b -> Async<'c option>) : 'a -> Async<'c option> = 
+    fun x -> 
+      async{
+        let! e = a x
+        match e with
+        | None ->
+          return None
+        | Some t ->
+          return! b t }
 
   let inline (>=>) a b = fun x ->
     match a x with
     | None   -> b x
     | r      -> r
 
-  let rec choose options arg =
+  let rec choose (options : WebPart list): WebPart =
+    fun arg -> async {
     match options with
-    | []        -> None
+    | []        -> return None
     | p :: tail ->
-      match p arg with
-      | Some x -> Some x
-      | None   -> choose tail arg
+      let! res = p arg 
+      match res with
+      | Some x -> return Some x
+      | None   -> return! choose tail arg
+    }
 
   let inline warbler f a = f a a //which bird? A Warbler!
-
-  let inline (>>==) a b = a >>= warbler (fun r -> b r)
 
   let inline cnst x = fun _ -> x
 
@@ -54,7 +59,7 @@ module Http =
       fun (ctx : HttpContext) ->
         let response = 
           { ctx.response with status = status_code; content = Bytes cnt }
-        { ctx with response = response }
+        { ctx with response = response } |> succeed
 
   module Writers =
 
@@ -63,7 +68,7 @@ module Http =
     let set_header key value (ctx : HttpContext) =
       let new_response =
         { ctx.response with headers = (key,value) :: ctx.response.headers }
-      { ctx with response = new_response }
+      { ctx with response = new_response } |> succeed
 
     let private cookie_to_string (x : HttpCookie) =
       let attributes = new System.Collections.Generic.List<string>()
@@ -123,11 +128,11 @@ module Http =
 
     let OK a = ok (UTF8.bytes a)
 
-    let created s = response HTTP_201 s >> succeed
+    let created s = response HTTP_201 s
 
     let CREATED s = created (UTF8.bytes s)
 
-    let accepted s = response HTTP_202 s >> succeed
+    let accepted s = response HTTP_202 s
 
     let ACCEPTED s = accepted (UTF8.bytes s)
 
@@ -145,29 +150,27 @@ module Http =
 
     let moved_permanently location =
       set_header "Location" location
-      >> response HTTP_301 [||]
-      >> succeed
+      >>= response HTTP_301 [||]
 
     let MOVED_PERMANENTLY location = moved_permanently location
 
     let found location =
       set_header "Location" location
-      >> response HTTP_302 [||]
-      >> succeed
+      >>= response HTTP_302 [||]
 
     let FOUND location = found location
 
     let redirect url =
       set_header "Location" url
-      >> set_header "Content-Type" "text/html; charset=utf-8"
-      >> response HTTP_302 (
+      >>= set_header "Content-Type" "text/html; charset=utf-8"
+      >>= response HTTP_302 (
         UTF8.bytes(sprintf "<html>
     <body>
       <a href=\"%s\">%s</a>
     </body>
   </html>"
         url (http_message HTTP_302)))
-      >> succeed
+     
 
     let not_modified : WebPart =
       fun ctx -> { ctx with response = {status = HTTP_304; headers = []; content = Bytes [||] }} |> succeed
@@ -182,62 +185,61 @@ module Http =
     open Writers
     open Types.Codes
 
-    let bad_request s = response HTTP_400 s >> succeed
+    let bad_request s = response HTTP_400 s
 
     let BAD_REQUEST s = bad_request (UTF8.bytes s)
 
     /// 401: see http://stackoverflow.com/questions/3297048/403-forbidden-vs-401-unauthorized-http-responses/12675357
     let unauthorized s =
       set_header "WWW-Authenticate" "Basic realm=\"protected\""
-      >> response HTTP_401 s
-      >> succeed
+      >>= response HTTP_401 s
 
     let UNAUTHORIZED s = unauthorized (UTF8.bytes s)
 
     let challenge = UNAUTHORIZED (http_message HTTP_401)
 
-    let forbidden s = response HTTP_403 s >> succeed
+    let forbidden s = response HTTP_403 s
 
     let FORBIDDEN s = forbidden (UTF8.bytes s)
 
-    let not_found s = response HTTP_404 s >> succeed
+    let not_found s = response HTTP_404 s
 
     let NOT_FOUND message = not_found (UTF8.bytes message)
 
-    let method_not_allowed s = response HTTP_405 s >> succeed
+    let method_not_allowed s = response HTTP_405 s
 
     let METHOD_NOT_ALLOWED s = method_not_allowed (UTF8.bytes s)
 
-    let not_acceptable s = response HTTP_406 s >> succeed
+    let not_acceptable s = response HTTP_406 s
 
     let NOT_ACCEPTABLE message = not_acceptable (UTF8.bytes message)
 
-    let request_timeout = response HTTP_408 [||] >> succeed
+    let request_timeout = response HTTP_408 [||]
 
     // all-caps req.timeout elided intentionally, as nothing can be passed to
     // a writing client
 
-    let conflict s = response HTTP_409 s >> succeed
+    let conflict s = response HTTP_409 s
 
     let CONFLICT message = conflict (UTF8.bytes message)
 
-    let gone s = response HTTP_410 s >> succeed
+    let gone s = response HTTP_410 s
 
     let GONE s = gone (UTF8.bytes s)
 
-    let unsupported_media_type s = response HTTP_415 s >> succeed
+    let unsupported_media_type s = response HTTP_415 s
 
     let UNSUPPORTED_MEDIA_TYPE s = unsupported_media_type (UTF8.bytes s)
 
-    let unprocessable_entity s = response HTTP_422 s >> succeed
+    let unprocessable_entity s = response HTTP_422 s
 
     let UNPROCESSABLE_ENTITY s = unprocessable_entity (UTF8.bytes s)
 
-    let precondition_required body = response HTTP_428 body >> succeed
+    let precondition_required body = response HTTP_428 body
 
     let PRECONDITION_REQUIRED body = precondition_required (UTF8.bytes body)
 
-    let too_many_requests s = response HTTP_429 s >> succeed
+    let too_many_requests s = response HTTP_429 s
 
     let TOO_MANY_REQUESTS s = too_many_requests (UTF8.bytes s)
 
@@ -246,27 +248,27 @@ module Http =
     open Response
     open Types.Codes
 
-    let internal_error arr = response HTTP_500 arr >> succeed
+    let internal_error arr = response HTTP_500 arr
 
     let INTERNAL_ERROR message = internal_error (UTF8.bytes message)
 
-    let not_implemented arr = response HTTP_501 arr >> succeed
+    let not_implemented arr = response HTTP_501 arr
 
     let NOT_IMPLEMENTED message = not_implemented (UTF8.bytes message)
 
-    let bad_gateway arr = response HTTP_502 arr >> succeed
+    let bad_gateway arr = response HTTP_502 arr
 
     let BAD_GATEWAY message = bad_gateway (UTF8.bytes message)
 
-    let service_unavailable arr = response HTTP_503 arr >> succeed
+    let service_unavailable arr = response HTTP_503 arr
 
     let SERVICE_UNAVAILABLE message = service_unavailable (UTF8.bytes message)
 
-    let gateway_timeout arr = response HTTP_504 arr >> succeed
+    let gateway_timeout arr = response HTTP_504 arr
 
     let GATEWAY_TIMEOUT message = gateway_timeout (UTF8.bytes message)
 
-    let invalid_http_version arr = response HTTP_505 arr >> succeed
+    let invalid_http_version arr = response HTTP_505 arr
 
     let INVALID_HTTP_VERSION = invalid_http_version (UTF8.bytes (http_message HTTP_505))
 
@@ -277,14 +279,19 @@ module Http =
 
     open Types.Methods
 
-    let url s (x : HttpContext) = if s = x.request.url then Some x else None
+    let url s (x : HttpContext) = async { if s = x.request.url then return Some x else return None }
 
-    let ``method`` (s : HttpMethod) (x : HttpContext) =
-      if s.ToString() = x.request.``method`` then Some x else None
+    let ``method`` (s : HttpMethod) (x : HttpContext) = async {
+      if s.ToString() = x.request.``method`` then return Some x else return None
+      }
 
-    let is_secure (x : HttpContext) = if x.request.is_secure then Some x else None
+    let is_secure (x : HttpContext) = async {
+      if x.request.is_secure then return Some x else return None
+      }
 
-    let url_regex s (x : HttpContext) = if Regex.IsMatch(x.request.url,s) then Some x else None
+    let url_regex s (x : HttpContext) = async {
+      if Regex.IsMatch(x.request.url,s) then return Some x else return None
+      }
 
     // see http://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html
 
@@ -369,7 +376,7 @@ module Http =
           Async.RunSynchronously (resolve web_part ctx, int time_span.TotalMilliseconds)
         with
           | :? TimeoutException ->
-            Response.response Codes.HTTP_408 (UTF8.bytes "Request Timeout") ctx |> Some
+            Response.response Codes.HTTP_408 (UTF8.bytes "Request Timeout") ctx
 
   module ServeResource =
     open System
@@ -380,12 +387,12 @@ module Http =
     // If a response includes both an Expires header and a max-age directive,
     // the max-age directive overrides the Expires header, even if the Expires header is more restrictive
     // 'Cache-Control' and 'Expires' headers should be left up to the user
-    let resource key exists get_last get_extension (send : string -> bool -> HttpContext -> HttpContext option) ({request = r } as ctx) =
+    let resource key exists get_last get_extension (send : string -> bool -> WebPart) ({request = r } as ctx) =
 
       let send_it name compression =
         set_header "Last-Modified" ((get_last key : DateTime).ToString("R"))
-        >> set_mime_type name
-        >> send key compression
+        >>= set_mime_type name
+        >>= send key compression
 
       if exists key then
           let mimes = ctx.runtime.mime_types_map <| get_extension key
@@ -397,9 +404,9 @@ module Http =
                         if get_last key > date then send_it value.name value.compression ctx
                         else NOT_MODIFIED ctx 
             | None   -> send_it  value.name value.compression ctx
-          | None -> None
+          | None -> fail
       else
-        None
+        fail
 
   module Files =
 
@@ -428,7 +435,7 @@ module Http =
         if fs.Length > 0L then
           do! transfer_x conn fs
       }
-      { ctx with response = { ctx.response with status = HTTP_200; content = SocketTask (write_file file_name)}} |> Some
+      { ctx with response = { ctx.response with status = HTTP_200; content = SocketTask (write_file file_name)}} |> succeed
 
     let file file_name =
       resource
@@ -513,7 +520,7 @@ module Http =
         if fs.Length > 0L then
           do! transfer_x conn fs
       }
-      { ctx with response = { ctx.response with status = HTTP_200; content = SocketTask (write_resource resource_name)}} |> Some
+      { ctx with response = { ctx.response with status = HTTP_200; content = SocketTask (write_resource resource_name)}} |> succeed
 
     let resource name =
       resource

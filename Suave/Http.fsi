@@ -31,25 +31,18 @@ module Http =
   open Types
 
   /// Return success with some value
-  val inline succeed : item:'a -> 'a option
+  val inline succeed : item:'a -> Async<'a option>
 
   /// Return failure without any value
-  val fail : 'a option
+  val fail : Async<HttpContext option> 
 
   /// Return failure with a value that is ignored
-  val inline never : x:'a -> 'b option
-
-  /// bind f inp evaluates to match inp with None -> None | Some x -> f x
-  /// The same as Option.bind.
-  val bind : (('a -> 'b option) -> 'a option -> 'b option)
-
-  /// Delay the computation of f
-  val inline delay : f:(unit -> 'a) -> 'a
+  val never : WebPart
 
   /// Compose (bind) two arguments, 'a' and 'b', so that the result of
   /// the composition can be applied to an argument of 'a' and then passed
   /// to 'b', if 'a' yields a value.
-  val inline (>>=) : first:('a -> 'b option) -> second:('b -> 'c option) -> input:'a -> 'c option
+  val inline (>>=) : first:('a -> Async<'b option>) -> second:('b -> Async<'c option>) -> input:'a -> Async<'c option>
 
   /// Left-to-right Kleisli composition of monads.
   val inline (>=>) : first:('a -> 'b option) -> second:('a -> 'b option) -> input:'a -> 'b option
@@ -58,14 +51,10 @@ module Http =
   /// by iterating the options, applying the context, arg, to the predicate
   /// from the list of options, until there's a match/a Some(x) which can be
   /// run.
-  val choose : options:('a -> 'b option) list -> input:'a -> 'b option
+  val choose : options : WebPart list -> WebPart
 
   /// Pipe the request through to a bird that can peck at it.
   val inline warbler : f:('a -> 'a -> 'b) -> 'a -> 'b
-
-  /// Compose an applicative value with a 'warble' function and then returns
-  /// a new function that is the composition of 'app' and 'warble'.
-  val inline (>>==) : app:('a -> 'b option) -> warble:('b -> 'b -> 'c option) -> ('a -> 'c option)
 
   /// The constant function, which returns its constant, no matter
   /// its input.
@@ -86,17 +75,17 @@ module Http =
     // val response_f : status_code:HttpCode -> ( Connection -> SocketOp<unit>) -> request:HttpContext -> (Connection -> SocketOp<unit>)
 
     /// Respond with a given status code, http reason phrase, content in the body to a http request.
-    val response : status_code:HttpCode -> content:byte [] -> request:HttpContext -> HttpContext
+    val response : status_code:HttpCode -> content:byte [] -> WebPart
 
   /// Module that allows changing the output response in different ways.
   /// Functions have signature f :: params... -> HttpContext -> HttpContext.
   module Writers =
 
     /// Sets a header with the key and value specified
-    val set_header : key:string -> value:string -> ctx:HttpContext -> HttpContext
+    val set_header : key:string -> value:string -> WebPart
 
     /// Sets a cookie with the passed value in the 'cookie' parameter
-    val set_cookie : cookie:HttpCookie -> (HttpContext -> HttpContext)
+    val set_cookie : cookie:HttpCookie -> WebPart
 
     /// <summary>
     /// Creates a MIME type record
@@ -119,7 +108,7 @@ module Http =
     /// </para></summary>
     /// <remarks>
     /// </remarks>
-    val set_mime_type : mime_type:string ->  (HttpContext -> HttpContext)
+    val set_mime_type : mime_type:string -> WebPart
 
 
   // http://www.web-cache.com/Writings/http-status-codes.html
@@ -1060,16 +1049,16 @@ module Http =
     open Types.Methods
 
     /// Match on the url
-    val url : s:string -> x:HttpContext -> HttpContext option
+    val url : s:string -> WebPart
 
     /// Match on the method
-    val ``method`` : ``method``:HttpMethod -> x:HttpContext -> HttpContext option
+    val ``method`` : ``method``:HttpMethod -> WebPart
 
     /// Match on the protocol
-    val is_secure : x:HttpContext -> HttpContext option
+    val is_secure : WebPart
 
     /// Applies the regex to the url and matches on the result
-    val url_regex : s:string -> x:HttpContext -> HttpContext option
+    val url_regex : s:string -> WebPart
 
     /// <summary><para>
     /// Formats the HttpRequest as in the default manner
@@ -1079,7 +1068,7 @@ module Http =
     /// <summary><para>
     /// Log the HttpRequest to the given logger.
     /// </para></summary>
-    val log : Log.Logger -> (HttpContext -> string) -> ctx:HttpContext -> HttpContext option
+    val log : Log.Logger -> (HttpContext -> string) -> WebPart
 
     /// <summary><para>
     /// Strongly typed route matching! Matching the uri can be used with the 'parsers'
@@ -1123,7 +1112,7 @@ module Http =
     /// allowing cached entities to be refreshed without requiring multiple requests
     /// or transferring data already held by the client.
     /// </para></summary>
-    val GET : x:HttpContext -> HttpContext option
+    val GET : WebPart
 
     /// <summary>
     /// <para>Match on POST requests.</para>
@@ -1162,7 +1151,7 @@ module Http =
     /// used to direct the user agent to retrieve a cacheable resource.
     /// </para>
     /// </summary>
-    val POST : x:HttpContext -> HttpContext option
+    val POST : WebPart
 
     /// <summary><para>
     /// Match on DELETE requests.
@@ -1184,7 +1173,7 @@ module Http =
     /// method are not cacheable.
     /// </para>
     /// </summary>
-    val DELETE : x:HttpContext -> HttpContext option
+    val DELETE : WebPart
 
     /// <summary><para>
     /// Match on PUT requests
@@ -1230,7 +1219,7 @@ module Http =
     /// Unless otherwise specified for a particular entity-header, the entity-headers in the
     /// PUT request SHOULD be applied to the resource created or modified by the PUT.
     /// </para></summary>
-    val PUT : x:HttpContext -> HttpContext option
+    val PUT : WebPart
 
     /// <summary><para>
     /// Match on HEAD requests.
@@ -1248,7 +1237,7 @@ module Http =
     /// current entity (as would be indicated by a change in Content-Length, Content-MD5,
     /// ETag or Last-Modified), then the cache MUST treat the cache entry as stale.
     /// </para></summary>
-    val HEAD : x:HttpContext -> HttpContext option
+    val HEAD : WebPart
 
     /// <summary><para>
     /// Match on CONNECT requests.
@@ -1256,7 +1245,7 @@ module Http =
     /// This specification (RFC 2616) reserves the method name CONNECT for use with a
     /// proxy that can dynamically switch to being a tunnel (e.g. SSL tunneling [44]).
     /// </para></summary>
-    val CONNECT : x:HttpContext -> HttpContext option
+    val CONNECT : WebPart
 
     /// <summary><para>
     /// Match on PATCH requests.
@@ -1283,7 +1272,7 @@ module Http =
     /// PATCH.
     /// </para></summary>
     /// <remarks>From http://tools.ietf.org/html/rfc5789#page-2</remarks>
-    val PATCH : x:HttpContext -> HttpContext option
+    val PATCH : WebPart
 
     /// <summary><para>
     /// Match on TRACE requests.
@@ -1306,7 +1295,7 @@ module Http =
     /// the entity-body, with a Content-Type of "message/http". Responses to this method
     /// MUST NOT be cached.
     /// </para></summary>
-    val TRACE : x:HttpContext -> HttpContext option
+    val TRACE : WebPart
 
     /// Match on OPTIONS requests
     /// The OPTIONS method represents a request for information about the communication
@@ -1315,7 +1304,7 @@ module Http =
     /// with a resource, or the capabilities of a server, without implying a resource
     /// action or initiating a resource retrieval.
     /// Responses to this method are not cacheable.
-    val OPTIONS : x:HttpContext -> HttpContext option
+    val OPTIONS : WebPart
 
   module Files =
 
@@ -1467,7 +1456,7 @@ module Http =
 
     /// This function composes the passed function f with the hand-shake required
     /// to start a new event-stream protocol session with the browser.
-    val hand_shake : f_cont:(Connection -> SocketOp<unit>) -> ctx:HttpContext -> HttpContext option
+    val hand_shake : f_cont:(Connection -> SocketOp<unit>) -> WebPart
 
   module Authentication =
 
@@ -1490,4 +1479,4 @@ module Http =
     /// </para></summary>
     /// <remarks>
     /// </remarks>
-    val authenticate_basic : f:(string * string -> bool) -> p:HttpContext -> HttpContext option
+    val authenticate_basic : f:(string * string -> bool) -> WebPart

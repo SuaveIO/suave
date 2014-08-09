@@ -77,21 +77,30 @@ let forward (ip : IPAddress) (port : uint16) (ctx : HttpContext) =
       do! transfer_len_x cn (q.GetRequestStream()) content_length
     try
       let! data = lift_async <| q.AsyncGetResponse()
-      let new_ctx = send_web_response ((data : WebResponse) :?> HttpWebResponse) ctx
-      do! response_f new_ctx cn
+      let! res = lift_async <| send_web_response ((data : WebResponse) :?> HttpWebResponse) ctx
+      match res with
+      | Some new_ctx ->
+        do! response_f new_ctx cn
+      | None -> ()
     with
     | :? WebException as ex when ex.Response <> null ->
-      let new_ctx = send_web_response (ex.Response :?> HttpWebResponse) ctx
-      do! response_f new_ctx cn
+      let! res = lift_async <| send_web_response (ex.Response :?> HttpWebResponse) ctx
+      match res with
+      | Some new_ctx ->
+        do! response_f new_ctx cn
+      | _ -> ()
     | :? WebException as ex when ex.Response = null ->
-      let new_ctx = response HTTP_502 (UTF8.bytes "suave proxy: Could not connect to upstream") ctx
-      do! response_f new_ctx cn
+      let! res = lift_async <|response HTTP_502 (UTF8.bytes "suave proxy: Could not connect to upstream") ctx
+      match res with
+      | Some new_ctx ->
+        do! response_f new_ctx cn
+      | _ -> ()
   } |> succeed
 
 /// Proxy the HttpRequest 'r' with the proxy found with 'proxy_resolver'
 let proxy proxy_resolver (r : HttpContext) =
   match proxy_resolver r.request with
-  | Some (ip, port) -> Option.get <| forward ip port r
+  | Some (ip, port) -> forward ip port r
   | None            -> failwith "invalid request."
 
 open System.IO
