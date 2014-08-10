@@ -73,7 +73,7 @@ choose [
   url "/redirect" >>= Redirection.redirect "/redirected"
   url "/redirected" >>=  OK "You have been redirected."
   url "/date" >>= warbler (fun _ -> OK (DateTimeOffset.UtcNow.ToString("o")))
-  url "/timeout" >>= timeout_webpart (TimeSpan.FromSeconds 1.) (sleep 10000 "Did not timed out")
+  url "/timeout" >>= timeout_webpart (TimeSpan.FromSeconds 1.) (sleep 120000 "Did not timed out")
   url "/session"
     >>= session_support (TimeSpan(0,30,0))
     >>= context (fun x ->
