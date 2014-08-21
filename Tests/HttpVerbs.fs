@@ -80,6 +80,8 @@ let posts =
 
   let longData = String.replicate 1815 "A"
 
+  let unicodeString =  "Testing «ταБЬℓσ»: 1<2 & 4+1>3, now 20% off!;"
+
   testList "posting basic data" [
       testCase "POST data round trips with no content-type" <| fun _ ->
         use data = new StringContent("bob")
@@ -93,4 +95,7 @@ let posts =
       testCase "POST persona assertion" <| fun _ ->
         use data = new FormUrlEncodedContent(dict [ "assertion", assertion])
         Assert.Equal("expecting form data to be returned", assertion, run_with' (getFormValue "assertion") |> req POST "/" (Some data))
+      testCase "POST unicode data" <| fun _ ->
+        use data = new FormUrlEncodedContent(dict [ "name", unicodeString ])
+        Assert.Equal("expecting form data to be returned", unicodeString, run_with' (getFormValue "name") |> req POST "/" (Some data))
     ]
