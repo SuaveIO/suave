@@ -104,7 +104,7 @@ task :release_next => [ :increase_version_number, :asmver , :create_nuget ] do
   s = SemVer.find.format("%M.%m.%p%s")
   # commit and tag
   system %q[git add .semver]
-  system %q[git add Suave/AssemblyInfo.fs]
+  system %q[git add Suave/AssemblyVersionInfo.fs]
   system "git commit -m \"released v#{s.to_s}\""
 #  Rake::Tasks['build'].invoke
   system "buildsupport/NuGet.exe setApiKey #{ENV['NUGET_KEY']}", clr_command: true
