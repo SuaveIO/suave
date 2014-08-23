@@ -260,9 +260,11 @@ type HttpResult =
   ; headers : (string * string) list
   ; content : HttpContent }
 
+type SuaveTask<'a> = Async<'a option> 
+
 /// An error handler takes the exception, a programmer-provided message, a request (that failed) and returns
 /// an asynchronous workflow for the handling of the error.
-type ErrorHandler = Exception -> String -> HttpContext -> HttpContext
+type ErrorHandler = Exception -> String -> WebPart
 
 and HttpRuntime =
   { protocol           : Protocol
@@ -284,10 +286,10 @@ and ISessionProvider =
   abstract member Validate : string * HttpContext -> bool
   abstract member Session<'a>  : string -> SessionStore<'a>
 
+and WebPart = HttpContext -> SuaveTask<HttpContext>
+
 let request f (a : HttpContext) = f a.request a
 let context f (a : HttpContext) = f a a
-
-type WebPart = HttpContext -> HttpContext option
 
 open System.Threading
 

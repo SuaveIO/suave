@@ -402,9 +402,9 @@ module ParsingAndControl =
           web_part ctx
         with ex ->
           ctx.runtime.error_handler ex "request failed" ctx
-          |> succeed
+          //|> succeed
     socket {
-      let result = execute ()
+      let! result = lift_async <| execute ()
       match result with 
       | Some executed_part ->
         return! response_f executed_part connection
@@ -413,7 +413,7 @@ module ParsingAndControl =
 
   type HttpConsumer =
     | WebPart of WebPart
-    | SocketPart of (HttpContext -> Connection -> SocketOp<unit>)
+    | SocketPart of (HttpContext -> Async<(Connection -> SocketOp<unit>) option >)
 
   let http_loop (proxy_mode : bool) (runtime : HttpRuntime) (consumer : HttpConsumer) (connection : Connection) =
 
@@ -434,7 +434,11 @@ module ParsingAndControl =
         | WebPart web_part ->
           do! run ctx web_part connection
         | SocketPart writer ->
-          do! writer ctx connection
+          let! intermediate = lift_async <| writer ctx
+          match intermediate with
+          | Some task ->
+            do! task connection
+          | None -> () // do nothing
         if connection.is_connected () then
           match request.headers %% "connection" with
           | Some (x : string) when x.ToLower().Equals("keep-alive") ->

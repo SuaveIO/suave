@@ -37,8 +37,8 @@ let counter_demo (req : HttpRequest) (out : Connection) =
   let q = query req 
   socket {
     let last_evt_id =
-      (req.headers %% "last-event-id" |> bind muint32) <!>
-      ((q ^^ "lastEventId") |> bind muint32) <.>
+      (req.headers %% "last-event-id" |> Option.bind muint32) <!>
+      ((q ^^ "lastEventId") |> Option.bind muint32) <.>
       100u
 
     let actions =

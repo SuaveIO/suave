@@ -84,7 +84,7 @@ module Session =
       member this.Session(s : string)  = get_session session_map  (s.Substring(0, session_id_lenght))
 
   /// Cookie-based session support
-  let session_support (time_span : TimeSpan) = fun (ctx : HttpContext) ->
+  let session_support (time_span : TimeSpan) = fun (ctx : HttpContext) -> async {
 
     let request = ctx.request
     let cookies = Parsing.get_cookies request.headers
@@ -99,14 +99,15 @@ module Session =
       | None ->
         ctx.runtime.session_provider.Generate (time_span, ctx)
 
-    Writers.set_cookie { name = "suave_session_id"
+    return! Writers.set_cookie { name = "suave_session_id"
       ; value = sessionId
       ; path = Some "/"
       ; domain = None
       ; secure = false
       ; http_only = false
       ; expires = Some (Globals.utc_now().Add time_span)
-      ; version = None } { ctx with user_state = ctx.user_state.Add("session_id", sessionId)}|> Some
+      ; version = None } { ctx with user_state = ctx.user_state.Add("session_id", sessionId)}
+      }
 
   let session (ctx : HttpContext) : SessionStore<'a> =
     let sessionId = ctx.user_state.["session_id"] :?> string
