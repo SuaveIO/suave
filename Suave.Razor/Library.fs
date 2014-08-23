@@ -3,7 +3,9 @@
 open System
 open System.IO
 open Suave.Types
+open Suave.Types.Codes
 open Suave.Http
+open Suave.Http.Files
 
 open RazorEngine
 
@@ -39,9 +41,17 @@ module Razor =
   ///   url "/home" >>= razor "/home.chtml" { foo = "Bar" }
   ///
   let razor<'a> path (model : 'a) =
+
     let load_template = async_memoize load_template
+
     fun r ->
-      let template_path = local_file path r.runtime.home_directory
-      let razorTemplate = Async.RunSynchronously <| load_template template_path
-      let content = Razor.Parse(razorTemplate, model, template_path)
-      response 200 "OK" (bytes content) r |> succeed
+      async {
+        try
+          let template_path = local_file path r.runtime.home_directory
+          let! razorTemplate = load_template template_path
+          let content = Razor.Parse(razorTemplate, model, template_path)
+          return! Response.response HTTP_200 (UTF8.bytes content) r
+        with 
+          ex ->
+          return! Response.response HTTP_500 (UTF8.bytes (ex.ToString())) r
+        }
