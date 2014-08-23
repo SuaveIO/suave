@@ -107,7 +107,7 @@ task :release_next => [ :increase_version_number, :asmver , :create_nuget ] do
   system %q[git add Suave/AssemblyVersionInfo.fs]
   system "git commit -m \"released v#{s.to_s}\""
 #  Rake::Tasks['build'].invoke
-  system "buildsupport/NuGet.exe setApiKey #{ENV['NUGET_KEY']}", clr_command: true
+  system "buildsupport/NuGet.exe setApiKey #{ENV['NUGET_KEY']}", clr_command: true, silent: true
   system "buildsupport/NuGet.exe push build/pkg/suave.#{s.to_s}.nupkg", clr_command: true
 end
 
@@ -131,6 +131,7 @@ namespace :docs do
   desc 'build and push docs'
   task :push => :'docs:build' do
     system "sshpass -p #{ENV['SUAVE_SERVER_PASS']} scp -P #{ENV['SUAVE_SERVER_PORT']} -r _site/* suave@northpole.cloudapp.net:/home/suave/site",
-      work_dir: 'gh-pages'
+      work_dir: 'gh-pages',
+      silent: true
   end
 end
