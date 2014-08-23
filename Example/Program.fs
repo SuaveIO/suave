@@ -61,6 +61,7 @@ choose [
   url "/neverme" >>= never >>= OK (Guid.NewGuid().ToString())
   url "/guid" >>= OK (Guid.NewGuid().ToString())
   url "/hello" >>= OK "Hello World"
+  (url "/apple" <|> url "/orange") >>= OK "Hello Fruit"
   GET >>= url "/query" >>= request( fun x -> cond ((query x) ^^ "name") (fun y -> OK ("Hello " + y)) never)
   GET >>= url "/query" >>= OK "Hello beautiful"
   url "/redirect" >>= Redirection.redirect "/redirected"

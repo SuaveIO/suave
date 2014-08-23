@@ -47,6 +47,9 @@ module Http =
   /// Left-to-right Kleisli composition of monads.
   val inline (>=>) : first:('a -> 'b option) -> second:('a -> 'b option) -> input:'a -> 'b option
 
+  /// Left-to-right Kleisli composition of web parts.
+  val inline (<|>) : first:WebPart -> second:WebPart -> WebPart
+
   /// Entry-point for composing the applicative routes of the http application,
   /// by iterating the options, applying the context, arg, to the predicate
   /// from the list of options, until there's a match/a Some(x) which can be
