@@ -12,15 +12,8 @@ open Suave.Types
 open Suave.Session
 open Suave.Log
 
-open OpenSSL.X509
-open OpenSSL.Core
-
-open Suave.OpenSsl.Provider
-
 let basic_auth : WebPart =
   Authentication.authenticate_basic ( fun (user_name,password) -> user_name.Equals("foo") && password.Equals("bar"))
-
-let sslCert = X509Certificate.FromPKCS12(BIO.File("suave.p12","r"), "easy")
 
 let logger = Loggers.sane_defaults_for Debug
 
@@ -100,8 +93,7 @@ choose [
   ]
   |> web_server
       { bindings =
-        [ HttpBinding.Create(HTTP, "127.0.0.1", 8082)
-        ; { scheme = HTTPS (open_ssl sslCert); ip = IPAddress.Parse "127.0.0.1"; port = 8083us } ]
+        [ HttpBinding.Create(HTTP, "127.0.0.1", 8082) ]
       ; error_handler    = default_error_handler
       ; listen_timeout   = TimeSpan.FromMilliseconds 2000.
       ; ct               = Async.DefaultCancellationToken
