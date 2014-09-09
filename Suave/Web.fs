@@ -162,47 +162,25 @@ module ParsingAndControl =
   let empty_query_string () = new Dictionary<string,string>()
 
   /// Read the post data from the stream, given the number of bytes that makes up the post data.
-  let read_post_data (connection : Connection) (bytes : int) (read : BufferSegment list) : SocketOp<ArraySegment<byte> * BufferSegment list> =
+  let read_post_data (connection : Connection) (bytes : int) (read : BufferSegment list) : SocketOp<BufferSegment list * BufferSegment list> =
 
-    let free_buffer buff a =
-      match buff with
-      | None -> connection.free_buffer "read_post_data" a 
-      | _ -> ()
-    
-    let read_bytes bytes_needed (missing : byte[]) read_offset = socket {
-      let counter = ref 0
-      let rem = ref []
-      let a = connection.get_buffer "read_post_data"
-      while !counter < bytes_needed do
-        let! bytes_transmited = connection.read a
-        let need_to_read = bytes_needed - !counter
-        if bytes_transmited > need_to_read
-        then
-          Array.blit a.Array a.Offset missing (read_offset + !counter) need_to_read
-          rem := [ { buffer = a; offset =  a.Offset + need_to_read; length = bytes_transmited - need_to_read } ]
-        else
-          Array.blit a.Array a.Offset missing (read_offset + !counter) bytes_transmited
-        counter := !counter + bytes_transmited
-      List.iter (fun x -> free_buffer (Some x) a) !rem
-      return (ArraySegment missing, !rem)
-    }
-
-    let rec loop xxs n : SocketOp<ArraySegment<byte> * BufferSegment list> =
+    let rec loop xxs (acc : BufferSegment list) n : SocketOp<BufferSegment list * BufferSegment list> =
       socket {
         match xxs with
         | segment :: tail ->
-          if segment.length >= n then
-            return ArraySegment(segment.buffer.Array, segment.offset, n), { buffer = segment.buffer; offset = segment.offset + n; length = segment.length - n } :: tail
+          if segment.length > n then
+            return acc @ [ { segment with offset = n } ], { buffer = segment.buffer; offset = segment.offset + n; length = segment.length - n } :: tail
           else 
-            let missing = Array.zeroCreate n
-            Array.blit segment.buffer.Array segment.offset missing 0 segment.length
-            connection.free_buffer "read_post_data" segment.buffer
-            return! loop tail (n - segment.length)
+            return! loop tail (acc @ [ segment ]) (n - segment.length)
         | [] ->
-          let missing = Array.zeroCreate n
-          return! read_bytes n missing 0
+          if n = 0 then
+            return acc, []
+          else
+            let a = connection.get_buffer "read_post_data:loop"
+            let! bytes_transmited = connection.read a
+            return! loop [ { buffer = a; offset = a.Offset; length = bytes_transmited }] acc n
       }
-    loop read bytes
+    loop read [] bytes
 
   /// Parses multipart data from the stream, feeding it into the HttpRequest's property Files.
   let parse_multipart (connection : Connection)
@@ -265,6 +243,31 @@ module ParsingAndControl =
     let trace  = "x-b3-traceid" |> get_first headers |> Option.bind parse_uint64
     Log.TraceHeader.Create(trace, parent)
 
+  /// Copy a list of buffer segments into a single array
+  let copy_buffer_list (buffer_list : BufferSegment list) (raw_form : byte []) =
+    let c = ref 0
+    buffer_list
+    |> List.iter ( fun b -> Array.blit b.buffer.Array b.offset raw_form !c b.length; c := !c + b.length)
+
+  /// Free up a list of buffers
+  let free_buffer_list (buffer_list : BufferSegment list) (connection : Connection) =
+    List.iter (fun b -> connection.free_buffer "free_buffer_list" b.buffer) buffer_list
+
+  /// Free up a list of buffers except perhaps the last one
+  let free_buffers (buffer_list : BufferSegment list) (connection : Connection) (rem : BufferSegment list) =
+    match rem with
+    | a :: _ ->
+      match buffer_list |> List.rev with
+      | b :: tail ->
+        if b.buffer.Offset = a.buffer.Offset then
+          free_buffer_list tail connection
+        else
+          free_buffer_list buffer_list connection
+      | _ ->
+        free_buffer_list buffer_list connection
+    | _ ->
+      free_buffer_list buffer_list connection
+
   /// Process the request, reading as it goes from the incoming 'stream', yielding a HttpRequest
   /// when done
   let process_request proxy_mode is_secure (bytes : BufferSegment list) connection : SocketOp<(HttpRequest * BufferSegment list) option> = socket {
@@ -304,18 +307,20 @@ module ParsingAndControl =
 
           match content_encoding with
           | Some ce when ce.StartsWith("application/x-www-form-urlencoded") ->
-            let! (rawdata : ArraySegment<_>), rem = read_post_data connection content_length rem
-            let raw_form = Array.zeroCreate rawdata.Count
-            Array.blit rawdata.Array rawdata.Offset raw_form 0 rawdata.Count
-            return Some ({ request with raw_form = raw_form} , rem)
+            let! (rawdata : BufferSegment list), rem = read_post_data connection content_length rem
+            let raw_form = Array.zeroCreate content_length
+            copy_buffer_list rawdata raw_form
+            free_buffers rawdata connection rem
+            return Some ({ request with raw_form = raw_form }, rem)
           | Some ce when ce.StartsWith("multipart/form-data") ->
             let boundary = "--" + ce.Substring(ce.IndexOf('=')+1).TrimStart()
-            let! r,rem = parse_multipart connection boundary request rem line_buffer
+            let! r, rem = parse_multipart connection boundary request rem line_buffer
             return Some (r, rem)
           | Some _ | None ->
-            let! (rawdata : ArraySegment<_>), rem = read_post_data connection content_length rem
-            let raw_form = Array.zeroCreate rawdata.Count
-            Array.blit rawdata.Array rawdata.Offset raw_form 0 rawdata.Count
+            let! (rawdata : BufferSegment list), rem = read_post_data connection content_length rem
+            let raw_form = Array.zeroCreate content_length
+            copy_buffer_list rawdata raw_form
+            free_buffers rawdata connection rem
             return Some ({ request with raw_form = raw_form}, rem)
         | None ->  return Some (request, rem)
       else return Some (request, rem)
