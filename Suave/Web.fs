@@ -158,9 +158,6 @@ module ParsingAndControl =
 
   open Suave.Types
 
-  /// Gets the empty query string dictionary
-  let empty_query_string () = new Dictionary<string,string>()
-
   /// Read the post data from the stream, given the number of bytes that makes up the post data.
   let read_post_data (connection : Connection) (bytes : int) (read : BufferSegment list) : SocketOp<BufferSegment list * BufferSegment list> =
 
