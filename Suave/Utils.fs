@@ -290,32 +290,44 @@ module Compression =
   open System.IO.Compression
 
   let gzip_encode (bytes : byte []) =
-    use memory =  new MemoryStream()
-    use gzip = new GZipStream(memory, CompressionMode.Compress)
-    do gzip.Write(bytes, 0, bytes.Length)
-    gzip.Close()
-    memory.ToArray()
+    if bytes.Length > 0 then
+      use memory =  new MemoryStream()
+      use gzip = new GZipStream(memory, CompressionMode.Compress)
+      do gzip.Write(bytes, 0, bytes.Length)
+      gzip.Close()
+      memory.ToArray()
+    else
+      [||]
 
   let gzip_decode (bytes : byte []) =
-    use compressed =  new MemoryStream(bytes)
-    use gzip = new GZipStream(compressed, CompressionMode.Decompress)
-    use result = new MemoryStream()
-    gzip.CopyTo(result)
-    result.ToArray()
+    if bytes.Length > 0 then
+      use compressed =  new MemoryStream(bytes)
+      use gzip = new GZipStream(compressed, CompressionMode.Decompress)
+      use result = new MemoryStream()
+      gzip.CopyTo(result)
+      result.ToArray()
+    else
+      [||]
 
   let deflate_encode (bytes : byte []) =
-    use memory =  new MemoryStream()
-    use gzip = new DeflateStream(memory, CompressionMode.Compress)
-    do gzip.Write(bytes, 0, bytes.Length)
-    gzip.Close()
-    memory.ToArray()
+    if bytes.Length > 0 then
+      use memory =  new MemoryStream()
+      use gzip = new DeflateStream(memory, CompressionMode.Compress)
+      do gzip.Write(bytes, 0, bytes.Length)
+      gzip.Close()
+      memory.ToArray()
+    else
+      [||]
 
   let deflate_decode (bytes : byte []) =
-    use compressed =  new MemoryStream(bytes)
-    use gzip = new DeflateStream(compressed, CompressionMode.Decompress)
-    use result = new MemoryStream()
-    gzip.CopyTo(result)
-    result.ToArray()
+    if bytes.Length > 0 then
+      use compressed =  new MemoryStream(bytes)
+      use gzip = new DeflateStream(compressed, CompressionMode.Decompress)
+      use result = new MemoryStream()
+      gzip.CopyTo(result)
+      result.ToArray()
+    else
+      [||]
 
 module Parsing =
   open Bytes
