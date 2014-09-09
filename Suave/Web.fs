@@ -69,7 +69,7 @@ module ParsingAndControl =
   /// is sent to the function select and the corresponding buffers are released
   let scan_marker marker count (pairs : BufferSegment list) connection select = async {
 
-    match kmp_y marker (pairs |> List.map ( fun x -> ArraySegment(x.buffer.Array, x.offset, x.length))) with
+    match kmp_z marker pairs with
     | Some x -> 
       let! res = split x (count,pairs) connection select marker.Length
       return res |> Found
