@@ -6,8 +6,8 @@ open System.Runtime.InteropServices
 [<assembly: AssemblyConfiguration("RELEASE")>]
 [<assembly: AssemblyCompany("Suave.IO")>]
 [<assembly: AssemblyCopyright("(c) 2014 by Ademar Gonzalez, Henrik Feldt")>]
-[<assembly: AssemblyVersion("0.13.0.0")>]
-[<assembly: AssemblyFileVersion("0.13.0.0")>]
-[<assembly: AssemblyInformationalVersion("0.13.0.a2008f")>]
+[<assembly: AssemblyVersion("0.15.0.0")>]
+[<assembly: AssemblyFileVersion("0.15.0.0")>]
+[<assembly: AssemblyInformationalVersion("0.15.0.11e033")>]
 [<assembly: AssemblyTitle("suave")>]
 ()
