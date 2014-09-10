@@ -36,7 +36,7 @@ module ParsingAndControl =
     loop pairs 0
          
 
-  let split index (c,pairs : BufferSegment list) connection select marker_lenght : Async<int * BufferSegment list>=
+  let split index (pairs : BufferSegment list) connection select marker_lenght : Async<int * BufferSegment list>=
     let rec loop xxs acc count =  async {
       match xxs with
       | [] -> return count, []
@@ -61,17 +61,17 @@ module ParsingAndControl =
               return count + bytes_read,  new_tail
         else return failwith "Web.split: invalid case"
       }
-    loop pairs 0 c
+    loop pairs 0 0
 
   type ScanResult = NeedMore of (BufferSegment list) | Found of (int * BufferSegment list)
 
   /// Iterates over a BufferSegment list looking for a marker, data before the marker 
   /// is sent to the function select and the corresponding buffers are released
-  let scan_marker marker count (pairs : BufferSegment list) connection select = async {
+  let scan_marker marker select connection (pairs : BufferSegment list) = async {
 
     match kmp_z marker pairs with
     | Some x -> 
-      let! res = split x (count,pairs) connection select marker.Length
+      let! res = split x pairs connection select marker.Length
       return res |> Found
     | None   ->
       let rec loop (xs : BufferSegment list) (acc,n) =
@@ -102,10 +102,10 @@ module ParsingAndControl =
 
   /// Read the passed stream into buff until the EOL (CRLF) has been reached
   /// and returns an array containing excess data read past the marker
-  let read_till_pattern (connection : Connection) select (preread : BufferSegment list) scan_data =
+  let read_till_pattern (connection : Connection) (preread : BufferSegment list) scan_data =
 
     let rec loop state = async {
-      let! res = scan_data 0 state connection select
+      let! res = scan_data connection state
       match res with
       | Found a ->
         return Choice1Of2 a
@@ -124,11 +124,11 @@ module ParsingAndControl =
     loop preread
 
   let read_till_EOL (connection : Connection) select (preread : BufferSegment list) =
-    read_till_pattern connection select preread (scan_marker EOL)
+    read_till_pattern connection preread (scan_marker EOL select)
 
   /// Read the stream until the marker appears.
   let read_until (marker : byte []) (select : ArraySegment<_> -> int -> Async<unit>) (connection : Connection) (preread : BufferSegment list) =
-    read_till_pattern connection select preread (scan_marker marker)
+    read_till_pattern connection preread (scan_marker marker select)
 
   /// Read a line from the stream, calling to_string on the bytes before the EOL marker
   let read_line (connection : Connection) ahead (buf : ArraySegment<byte>) = socket {
