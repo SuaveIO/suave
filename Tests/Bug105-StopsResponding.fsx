@@ -38,7 +38,7 @@ module SystemUnderTest =
         error_handler =
           (fun ex reason ->
             printfn "error: %O" ex
-            INTERNAL_ERROR "Failed test" >> (fun opt -> opt |> Option.get)) }
+            INTERNAL_ERROR "Failed test" ) }
 
   let run () =
     let ready, listens =
