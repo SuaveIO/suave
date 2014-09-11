@@ -35,7 +35,6 @@ module ParsingAndControl =
           segment :: tail
         else loop tail (acc + x.length)
     loop pairs 0
-         
 
   let split index (pairs : BufferSegment list) connection select marker_lenght : Async<int * BufferSegment list>=
     let rec loop xxs acc count =  async {
@@ -94,12 +93,25 @@ module ParsingAndControl =
   open System.Net.Sockets
 
   let read_data (connection : Connection) buff = socket {
-      let! b = connection.read buff
-      if b > 0 then
-        return { buffer = buff; offset = buff.Offset; length = b }
-      else
-        return! abort (Error.SocketError SocketError.Shutdown)
-      }
+    let! b = connection.read buff
+    if b > 0 then
+      return { buffer = buff; offset = buff.Offset; length = b }
+    else
+      return! abort (Error.SocketError SocketError.Shutdown)
+    }
+
+  let read_more_data connection continuation buffer_segment_list = async {
+    let buff = connection.get_buffer "read_till_pattern.loop"
+    let! result = read_data connection buff
+    match result with
+    | Choice1Of2 data ->
+      return! continuation (buffer_segment_list @ [data])
+    | Choice2Of2 error ->
+      for b in buffer_segment_list do
+        do connection.free_buffer "read_till_pattern.loop" b.buffer
+      do connection.free_buffer "read_till_pattern.loop" buff
+      return Choice2Of2 error
+    }
 
   /// Read the passed stream into buff until the EOL (CRLF) has been reached
   /// and returns an array containing excess data read past the marker
@@ -111,16 +123,7 @@ module ParsingAndControl =
       | Found a ->
         return Choice1Of2 a
       | NeedMore buffer_segment_list ->
-          let buff = connection.get_buffer "read_till_pattern.loop"
-          let! result = read_data connection buff
-          match result with
-          | Choice1Of2 data ->
-            return! loop (buffer_segment_list @ [data])
-          | Choice2Of2 error ->
-            for b in buffer_segment_list do
-              do connection.free_buffer "read_till_pattern.loop" b.buffer
-            connection.free_buffer "read_till_pattern.loop" buff
-            return Choice2Of2 error
+        return! read_more_data connection loop buffer_segment_list
     }
     loop preread
 
@@ -159,26 +162,30 @@ module ParsingAndControl =
 
   open Suave.Types
 
-  /// Read the post data from the stream, given the number of bytes that makes up the post data.
-  let read_post_data (connection : Connection) (bytes : int) (read : BufferSegment list) : SocketOp<BufferSegment list * BufferSegment list> =
+  let inline array_segment_from_buffer_segment b =
+    ArraySegment(b.buffer.Array, b.offset, b.length)
 
-    let rec loop xxs (acc : BufferSegment list) n : SocketOp<BufferSegment list * BufferSegment list> =
+  /// Read the post data from the stream, given the number of bytes that makes up the post data.
+  let read_post_data (connection : Connection) (bytes : int) select (read : BufferSegment list) : SocketOp<BufferSegment list> =
+
+    let rec loop n xxs : SocketOp<BufferSegment list> =
       socket {
         match xxs with
         | segment :: tail ->
           if segment.length > n then
-            return acc @ [ { segment with offset = n } ], { buffer = segment.buffer; offset = segment.offset + n; length = segment.length - n } :: tail
-          else 
-            return! loop tail (acc @ [ segment ]) (n - segment.length)
+            do! lift_async <| select (array_segment_from_buffer_segment { segment with offset = n }) n
+            return { buffer = segment.buffer; offset = segment.offset + n; length = segment.length - n } :: tail
+          else
+            do! lift_async <| select (array_segment_from_buffer_segment segment) segment.length
+            do connection.free_buffer "read_post_data:loop" segment.buffer
+            return! loop (n - segment.length) tail
         | [] ->
           if n = 0 then
-            return acc, []
+            return []
           else
-            let a = connection.get_buffer "read_post_data:loop"
-            let! bytes_transmited = connection.read a
-            return! loop [ { buffer = a; offset = a.Offset; length = bytes_transmited }] acc n
+            return! read_more_data connection (loop n) []
       }
-    loop read [] bytes
+    loop bytes read
 
   /// Parses multipart data from the stream, feeding it into the HttpRequest's property Files.
   let parse_multipart (connection : Connection)
@@ -241,26 +248,14 @@ module ParsingAndControl =
     let trace  = "x-b3-traceid" |> get_first headers |> Option.bind parse_uint64
     Log.TraceHeader.Create(trace, parent)
 
-  /// Copy a list of buffer segments into a single array
-  let copy_buffer_list (buffer_list : BufferSegment list) (raw_form : byte []) =
-    let c = ref 0
-    buffer_list
-    |> List.iter ( fun b -> Array.blit b.buffer.Array b.offset raw_form !c b.length; c := !c + b.length)
-
-  /// Free up a list of buffers except perhaps the last one
-  let free_buffers context (buffer_list : BufferSegment list) (connection : Connection) (rem : BufferSegment list) =
-    match rem with
-    | a :: _ ->
-      match buffer_list |> List.rev with
-      | b :: tail ->
-        if b.buffer.Offset = a.buffer.Offset then
-          free context connection tail
-        else
-          free context connection buffer_list
-      | _ ->
-        free context connection buffer_list
-    | _ ->
-      free context connection buffer_list
+  /// Reads raw POST data
+  let get_raw_post_data connection content_length rem =
+    socket {
+      let offset = ref 0
+      let raw_form = Array.zeroCreate content_length
+      let! (rem : BufferSegment list) = read_post_data connection content_length (fun a count -> async { Array.blit a.Array a.Offset raw_form !offset count; offset := !offset + count }) rem
+      return raw_form , rem
+    }
 
   /// Process the request, reading as it goes from the incoming 'stream', yielding a HttpRequest
   /// when done
@@ -301,20 +296,14 @@ module ParsingAndControl =
 
           match content_encoding with
           | Some ce when ce.StartsWith("application/x-www-form-urlencoded") ->
-            let! (rawdata : BufferSegment list), rem = read_post_data connection content_length rem
-            let raw_form = Array.zeroCreate content_length
-            copy_buffer_list rawdata raw_form
-            free_buffers "process_request" rawdata connection rem
-            return Some ({ request with raw_form = raw_form }, rem)
+            let! raw_form, rem = get_raw_post_data connection content_length rem
+            return Some ({ request with raw_form = raw_form}, rem)
           | Some ce when ce.StartsWith("multipart/form-data") ->
             let boundary = "--" + ce.Substring(ce.IndexOf('=')+1).TrimStart()
             let! r, rem = parse_multipart connection boundary request rem line_buffer
             return Some (r, rem)
           | Some _ | None ->
-            let! (rawdata : BufferSegment list), rem = read_post_data connection content_length rem
-            let raw_form = Array.zeroCreate content_length
-            copy_buffer_list rawdata raw_form
-            free_buffers "process_request" rawdata connection rem
+            let! raw_form, rem = get_raw_post_data connection content_length rem
             return Some ({ request with raw_form = raw_form}, rem)
         | None ->  return Some (request, rem)
       else return Some (request, rem)
