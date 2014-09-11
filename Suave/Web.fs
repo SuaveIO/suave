@@ -21,6 +21,7 @@ module ParsingAndControl =
   open Suave.Utils.Bytes
   open Suave.Utils.Parsing
 
+  /// Free up a list of buffers
   let internal free context connection (s : BufferSegment list) =
     List.iter (fun x -> connection.free_buffer context x.buffer) s
 
@@ -246,24 +247,20 @@ module ParsingAndControl =
     buffer_list
     |> List.iter ( fun b -> Array.blit b.buffer.Array b.offset raw_form !c b.length; c := !c + b.length)
 
-  /// Free up a list of buffers
-  let free_buffer_list (buffer_list : BufferSegment list) (connection : Connection) =
-    List.iter (fun b -> connection.free_buffer "free_buffer_list" b.buffer) buffer_list
-
   /// Free up a list of buffers except perhaps the last one
-  let free_buffers (buffer_list : BufferSegment list) (connection : Connection) (rem : BufferSegment list) =
+  let free_buffers context (buffer_list : BufferSegment list) (connection : Connection) (rem : BufferSegment list) =
     match rem with
     | a :: _ ->
       match buffer_list |> List.rev with
       | b :: tail ->
         if b.buffer.Offset = a.buffer.Offset then
-          free_buffer_list tail connection
+          free context connection tail
         else
-          free_buffer_list buffer_list connection
+          free context connection buffer_list
       | _ ->
-        free_buffer_list buffer_list connection
+        free context connection buffer_list
     | _ ->
-      free_buffer_list buffer_list connection
+      free context connection buffer_list
 
   /// Process the request, reading as it goes from the incoming 'stream', yielding a HttpRequest
   /// when done
@@ -307,7 +304,7 @@ module ParsingAndControl =
             let! (rawdata : BufferSegment list), rem = read_post_data connection content_length rem
             let raw_form = Array.zeroCreate content_length
             copy_buffer_list rawdata raw_form
-            free_buffers rawdata connection rem
+            free_buffers "process_request" rawdata connection rem
             return Some ({ request with raw_form = raw_form }, rem)
           | Some ce when ce.StartsWith("multipart/form-data") ->
             let boundary = "--" + ce.Substring(ce.IndexOf('=')+1).TrimStart()
@@ -317,7 +314,7 @@ module ParsingAndControl =
             let! (rawdata : BufferSegment list), rem = read_post_data connection content_length rem
             let raw_form = Array.zeroCreate content_length
             copy_buffer_list rawdata raw_form
-            free_buffers rawdata connection rem
+            free_buffers "process_request" rawdata connection rem
             return Some ({ request with raw_form = raw_form}, rem)
         | None ->  return Some (request, rem)
       else return Some (request, rem)
