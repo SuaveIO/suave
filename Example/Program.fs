@@ -6,6 +6,7 @@ open Suave
 open Suave.Web
 open Suave.Http
 open Suave.Http.Applicatives
+open Suave.Http.Writers
 open Suave.Http.Files
 open Suave.Http.Successful
 open Suave.Types
@@ -42,8 +43,8 @@ let testapp : WebPart =
 System.Net.ServicePointManager.DefaultConnectionLimit <- Int32.MaxValue
 open Socket
 
-let sleep milliseconds message: WebPart = 
-  fun (x : HttpContext) -> 
+let sleep milliseconds message: WebPart =
+  fun (x : HttpContext) ->
     async {
       do! Async.Sleep milliseconds
       return! OK message x
@@ -90,6 +91,10 @@ choose [
                    let files = x.files |> Seq.fold (fun x y -> x + "<br/>" + (sprintf "(%s, %s, %s)" y.FileName y.MimeType y.Path)) ""
                    OK (sprintf "Upload successful.<br>POST data: %A<br>Uploaded files (%d): %s" x.multipart_fields (List.length x.files) files))
   POST >>= request (fun x -> OK (sprintf "POST data: %s" (ASCII.to_string' x.raw_form)))
+  GET
+    >>= url "/custom_header"
+    >>= set_header "X-Doge-Location" "http://www.elregalista.com/wp-content/uploads/2014/02/46263312.jpg"
+    >>= OK "Doooooge"
   RequestErrors.NOT_FOUND "Found no handlers"
   ]
   |> web_server
