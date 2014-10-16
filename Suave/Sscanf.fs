@@ -34,7 +34,7 @@ let parsers =
 // array of all possible formatters, i.e. [|"%b"; "%d"; ...|]
 let separators =
   parsers.Keys
-  |> Seq.map (fun c -> sprintf "%%%c" c)
+  |> Seq.map (fun c -> "%" + c.ToString())
   |> Seq.toArray
 
 // Creates a list of formatter characters from a format string,
