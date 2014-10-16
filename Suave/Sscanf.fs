@@ -70,7 +70,6 @@ let sscanf (pf:PrintfFormat<_,_,_,_,'t>) s : 't =
     ||> Seq.map2 (fun g f -> g.Value |> parsers.[f])
     |> Seq.toArray
 
-  //FSharpValue.MakeTuple(matches, typeof<'t>) :?> 't
   if matches.Length = 1 then matches.[0] :?> 't else FSharpValue.MakeTuple(matches, typeof<'t>) :?> 't
 
 module private BasicTesting =
