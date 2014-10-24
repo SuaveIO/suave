@@ -385,12 +385,13 @@ module ParsingAndControl =
   /// Check if the web part can perform its work on the current request. If it
   /// can't it will return None and the run method will return.
   let internal run ctx (web_part : WebPart) connection = 
-    let execute _ =
+    let execute _ = async {
       try  
-          web_part ctx
+          let! q  = web_part ctx
+          return q
         with ex ->
-          ctx.runtime.error_handler ex "request failed" ctx
-          //|> succeed
+          return! ctx.runtime.error_handler ex "request failed" ctx
+    }
     socket {
       let! result = lift_async <| execute ()
       match result with 
