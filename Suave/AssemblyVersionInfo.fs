@@ -8,6 +8,6 @@ open System.Runtime.InteropServices
 [<assembly: AssemblyCopyright("(c) 2014 by Ademar Gonzalez, Henrik Feldt")>]
 [<assembly: AssemblyVersion("0.15.0.0")>]
 [<assembly: AssemblyFileVersion("0.15.0.0")>]
-[<assembly: AssemblyInformationalVersion("0.15.0.11e033")>]
+[<assembly: AssemblyInformationalVersion("0.15.0.ab2898")>]
 [<assembly: AssemblyTitle("suave")>]
 ()
