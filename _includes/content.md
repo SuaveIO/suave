@@ -40,9 +40,10 @@ The above statement will start a web server on default port 8083 over HTTP.
 `web_server` takes a configuration record and the webpart `(OK "Hello World")` 
 
 Webparts are functions with the following type:
-`HttpContext -> HttpContext option`.
 
-For every request `web_server` will evaluate the WebPart, if the evaluation
+`type WebPart = HttpContext -> Async<HttpContext option>`.
+
+For every request `web_server` will evaluate the 'WebPart', if the evaluation
 succeeds it will send the calculated response back to the http client. 
 
 `OK` is a combinator that always succeed and writes its argument to the
@@ -58,14 +59,19 @@ Tutorial: Composing bigger programs
 
 Logic is expressed with the help of different combinators built around the
 `HttpContext option` type. We build webparts out of functions of type
-`HttpContext -> HttpContext option` and the operator `>>=` in the following way.
+`WebPart` and the operator `>>=` in the following way.
 
 {% highlight fsharp %}
 let simple_app _ = url "/hello" >>= OK "Hello World" ;
 {% endhighlight %}
 
-To select between different routes or options we use the function choose; for
-example:
+To select between different routes or options we use the function `choose`.
+
+{% highlight fsharp %}
+val choose : (options : WebPart list) -> WebPart
+{% endhighlight %}
+
+For example:
 
 {% highlight fsharp %}
 let complex_app _ = 
@@ -76,7 +82,7 @@ let complex_app _ =
 {% endhighlight %}
 
 The function `choose` accepts a list of webparts and execute each webpart in the
-list until one returns success. Since choose itself returns a webpart we can
+list until one returns success. Since `choose` itself returns a webpart we can
 nest them for more complex logic.
 
 {% highlight fsharp %}
@@ -94,14 +100,17 @@ To gain access to the underlying `HttpRequest` and read query and http form data
 we can use the `request` combinator.
 
 {% highlight fsharp %}
-let http_form _ = 
-  choose
-    [ GET  >>= url "/query" >>= request(fun x -> OK ("Hello " + (opt <| x.query ? name)))
-    ; POST >>= url "/query" >>= request(fun x -> OK ("Hello " + (opt <| x.form  ? name)))
-    ; NOT_FOUND "Found no handlers" ]
+let greetings q =
+  defaultArg (q ^^ "name") "World" |> sprintf "Hello %s"
+
+let sample : WebPart = 
+    url "/hello" >>= choose [
+      GET  >>= request(fun r -> OK <| greetings (query r))
+      POST >>= request(fun r -> OK <| greetings (form r))
+      NOT_FOUND "Found no handlers" ]
 {% endhighlight %}
 
-You can similarly use `warbler` to gain access to the full `HttpContext` and
+You can similarly use `context` to gain access to the full `HttpContext` and
 connection.
 
 To protect a route with HTTP Basic Authentication the combinator
