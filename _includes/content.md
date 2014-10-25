@@ -41,9 +41,11 @@ The above statement will start a web server on default port 8083 over HTTP.
 
 Webparts are functions with the following type:
 
-`type WebPart = HttpContext -> Async<HttpContext option>`.
+{% highlight fsharp %}
+type WebPart = HttpContext -> Async<HttpContext option>`
+{% endhighlight %}
 
-For every request `web_server` will evaluate the 'WebPart', if the evaluation
+For every request `web_server` will evaluate the `WebPart`, if the evaluation
 succeeds it will send the calculated response back to the http client. 
 
 `OK` is a combinator that always succeed and writes its argument to the
