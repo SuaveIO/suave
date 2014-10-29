@@ -509,18 +509,24 @@ module Http =
     open Response
     open ServeResource
     
-    let assembly = 
+    let default_source_assembly =
       if Assembly.GetEntryAssembly() = null
       then Assembly.GetCallingAssembly()
       else Assembly.GetEntryAssembly()
 
-    let resources = assembly.GetManifestResourceNames()
-    let last_modified = FileInfo(Assembly.GetExecutingAssembly().Location).CreationTime
+    let resources (assembly : Assembly) =
+      assembly.GetManifestResourceNames()
+
+    let last_modified (assembly : Assembly) =
+      FileInfo(assembly.Location).CreationTime
     
-    let send_resource resource_name (compression : bool) (ctx : HttpContext) =
+    let send_resource (assembly : Assembly)
+                      resource_name
+                      (compression : bool)
+                      (ctx : HttpContext) =
       let write_resource name conn = socket {
         let get_fs = fun name -> assembly.GetManifestResourceStream(name)
-        let get_lm = fun _ -> last_modified
+        let get_lm = fun _ -> last_modified assembly
         use! fs = Compression.transform_x name get_fs get_lm compression ctx.runtime.compression_folder ctx conn
 
         do! async_writeln conn (sprintf "Content-Length: %d" (fs: Stream).Length)
@@ -529,18 +535,32 @@ module Http =
         if fs.Length > 0L then
           do! transfer_x conn fs
       }
-      { ctx with response = { ctx.response with status = HTTP_200; content = SocketTask (write_resource resource_name)}} |> succeed
+      { ctx with
+          response =
+            { ctx.response with
+                status = HTTP_200
+                content = SocketTask (write_resource resource_name) }}
+      |> succeed
 
-    let resource name =
+    let send_resource' resource_name compression =
+      send_resource default_source_assembly resource_name compression
+
+    let resource assembly name =
       resource
         name
-        (fun name -> resources |> Array.exists ((=) name))
-        (fun _ -> last_modified)
+        (fun name -> resources assembly |> Array.exists ((=) name))
+        (fun _ -> last_modified assembly)
         (Path.GetExtension)
-        send_resource
+        (send_resource assembly)
 
-    let browse : WebPart =
-      warbler (fun ctx -> resource (ctx.request.url.TrimStart [|'/'|]))
+    let resource' name =
+      resource default_source_assembly name
+
+    let browse assembly : WebPart =
+      warbler (fun ctx -> resource assembly (ctx.request.url.TrimStart [|'/'|]))
+
+    let browse' : WebPart =
+      browse default_source_assembly
 
   // See www.w3.org/TR/eventsource/#event-stream-interpretation
   module EventSource =

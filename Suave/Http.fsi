@@ -1375,6 +1375,16 @@ module Http =
 
   module Embedded =
 
+    open System.Reflection
+
+    /// <summary><para>
+    /// Send an embedded resource as a response to the request. Allows you to control
+    /// the source assembly to read from.
+    /// </para></summary>
+    /// <remarks>
+    /// </remarks>
+    val send_resource : source:Assembly -> resource_name:string -> compression:bool -> WebPart
+
     /// <summary><para>
     /// Send an embedded resource as a response to the request
     /// </para><para>
@@ -1382,27 +1392,39 @@ module Http =
     /// </para></summary>
     /// <remarks>
     /// </remarks>
-    val send_resource : resource_name:string -> compression:bool -> WebPart
+    val send_resource' : resource_name:string -> compression:bool -> WebPart
 
     /// <summary><para>
     /// Send the resource by the name given.
     /// Will also set the MIME type based on the file extension.
-    /// </para><para>
-    /// </para><para>
     /// </para></summary>
     /// <remarks>
     /// </remarks>
-    val resource : name:string -> WebPart
+    val resource : source:Assembly -> name:string -> WebPart
+
+    /// <summary><para>
+    /// Send the resource by the name given.
+    /// Will also set the MIME type based on the file extension.
+    /// </para></summary>
+    /// <remarks>
+    /// </remarks>
+    val resource' : name:string -> WebPart
 
     /// <summary><para>
     /// 'browse' the file in the sense that the contents of the file are sent based on the
     /// request's Url property. Will serve from the executing assemblies resources.
-    /// </para><para>
-    /// </para><para>
     /// </para></summary>
     /// <remarks>
     /// </remarks>
-    val browse : WebPart
+    val browse : source:Assembly -> WebPart
+
+    /// <summary><para>
+    /// 'browse' the file in the sense that the contents of the file are sent based on the
+    /// request's Url property. Will serve from the executing assemblies resources.
+    /// </para></summary>
+    /// <remarks>
+    /// </remarks>
+    val browse' : WebPart
 
   /// A module that implements the Server-Sent Event specification, which can be
   /// read at www.w3.org/TR/eventsource.
