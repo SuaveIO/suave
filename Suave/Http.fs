@@ -396,7 +396,11 @@ module Http =
     // If a response includes both an Expires header and a max-age directive,
     // the max-age directive overrides the Expires header, even if the Expires header is more restrictive
     // 'Cache-Control' and 'Expires' headers should be left up to the user
-    let resource key exists get_last get_extension (send : string -> bool -> WebPart) ({request = r } as ctx) =
+    let resource key exists get_last get_extension
+                 (send : string -> bool -> WebPart)
+                 ({ request = r; runtime = rt } as ctx) =
+      let log =
+        Log.verbose rt.logger "Suave.Http.ServeResource.resource" Log.TraceHeader.Empty
 
       let send_it name compression =
         set_header "Last-Modified" ((get_last key : DateTime).ToString("R"))
@@ -404,17 +408,22 @@ module Http =
         >>= send key compression
 
       if exists key then
-          let mimes = ctx.runtime.mime_types_map <| get_extension key
-          match mimes with
-          | Some value ->
-            let modified_since = r.headers %% "if-modified-since"
-            match modified_since with
-            | Some v -> let date = DateTime.Parse v
-                        if get_last key > date then send_it value.name value.compression ctx
-                        else NOT_MODIFIED ctx 
-            | None   -> send_it  value.name value.compression ctx
-          | None -> fail
+        let mimes = ctx.runtime.mime_types_map <| get_extension key
+        match mimes with
+        | Some value ->
+          let modified_since = r.headers %% "if-modified-since"
+          match modified_since with
+          | Some v -> let date = DateTime.Parse v
+                      if get_last key > date then send_it value.name value.compression ctx
+                      else NOT_MODIFIED ctx
+          | None   ->
+            send_it value.name value.compression ctx
+        | None ->
+          let ext = get_extension key
+          log (sprintf "failed to find matching mime for ext '%s'" ext)
+          fail
       else
+        log (sprintf "failed to find resource by key '%s'" key)
         fail
 
   module Files =
