@@ -49,7 +49,7 @@
     <Compile Include="Session.fs" />
     <Compile Include="Web.fs" />
     <Compile Include="Proxy.fs" />
-    <Compile Include="AssemblyVersionInfo.fs" />
+    <Compile Include="AssemblyVersionInfo.fs" Condition="Exists('AssemblyVersionInfo.fs')" />
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
