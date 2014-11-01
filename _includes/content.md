@@ -38,13 +38,23 @@ web_server default_config (OK "Hello World!")
 {% endhighlight %}
 
 The above statement will start a web server on default port 8083 over HTTP.
-`web_server` takes a configuration record and the webpart `(OK "Hello World")` 
+`web_server` takes a configuration record and the WebPart `(OK "Hello World")`
+It's worth noting that with the above, your application will block on the
+function call, until you cancel the `Async.DefaultCancellationToken`. If you
+want to handle disposal of the async yourself, have a look at
+`web_server_async`.
+
+In suave, we have opted to write a lot of documentation inside the code; so just
+hover the function in your IDE or use an assembly browser to bring out the XML
+docs. For the above reference to `web_server_async`, our code looks like this:
+
+![web_server_async documentation][/images/web_server_async_code.png]
 
 WebParts are functions with the following type:
 
 {% highlight fsharp %}
 type WebPart = HttpContext -> Async<HttpContext option>
-{% endhighlight %}
+{% endhighlight }
 
 For every request `web_server` will evaluate the `WebPart`, if the evaluation
 succeeds it will send the calculated response back to the http client. 
