@@ -54,7 +54,7 @@ WebParts are functions with the following type:
 
 {% highlight fsharp %}
 type WebPart = HttpContext -> Async<HttpContext option>
-{% endhighlight }
+{% endhighlight %}
 
 For every request `web_server` will evaluate the `WebPart`, if the evaluation
 succeeds it will send the calculated response back to the http client. A newbie
@@ -65,7 +65,7 @@ evaluated at the time of launch of you application. E.g. given an app like this:
 
 {% highlight fsharp %}
 let app = OK (System.DateTimeOffset.UtcNow.ToString("o"))
-{% endhighlight }
+{% endhighlight %}
 
 you will always get the same result.
 
@@ -421,7 +421,7 @@ type MyHackLogger(min_level) =
 You can use Logary for integrated logging:
 
 {% highlight dosbatch %}
-PM> Install-Package Intelliplan.Logary.Suave
+Install-Package Intelliplan.Logary.Suave -Pre
 {% endhighlight %}
 
 Use the `SuaveAdapter` type to set the Logger in Suave's configuration:
