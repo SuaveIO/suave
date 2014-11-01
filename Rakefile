@@ -16,12 +16,12 @@ include ::Albacore::NugetsPack
 suave_description = 'Suave is a simple web development F# library providing a lightweight web server and a set of combinators to manipulate route flow and task composition.'
 
 desc "Restore paket.exe"
-task :restorepakettool do
+task :restore_paket do
   system 'tools/paket.bootstrapper.exe', clr_command: true
 end
 
 desc "Restore all packages"
-task :restore => [:restorepakettool] do
+task :restore => [:restore_paket] do
   system 'tools/paket.exe', 'restore', clr_command: true
 end
 
