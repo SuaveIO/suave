@@ -78,6 +78,20 @@ not every request. You need to wrap your web part in a closure if you want to
 re-evaluated every request, with `Suave.Http.warbler`, `Suave.Types.context` or
 `Suave.Types.request`.
 
+`warbler : (f : 'a -> 'a -> 'b) -> 'a -> 'b` - a piece of the applicatives
+puzzle, which allows you to act on the `'a` argument and return a function that
+'is the same' as after your acting on it. Using this is very useful for control
+flow, because you can then inspect `HttpContext` and choose what applicative
+function to return.
+
+`context`: basically the same as warbler.
+
+`request`: basically the same as context, but only looks at the request - allows
+you to cut down on the pattern matching of HttpContext a bit: but you have to
+return an applicative that is a WebPart (i.e. something that isn't from
+HttpRequest to something else, but from HttpContext to async http context
+option).
+
 Tutorial: Composing bigger programs
 -----------------------------------
 
