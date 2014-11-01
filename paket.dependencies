@@ -1,0 +1,9 @@
+source https://nuget.org/api/v2
+
+nuget FsCheck 0.9.1.0
+nuget FSharp.Charting 0.90.6
+nuget FSharp.Core.3 0.0.2
+nuget NUnit 2.6.3
+nuget RazorEngine 3.4.1
+nuget Suave 0.13.0
+nuget NuGet.CommandLine

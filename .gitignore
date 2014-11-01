@@ -16,3 +16,4 @@ AssemblyVersionInfo.fs
 miTLS/
 Backup/
 paket.exe
+!paket.lock
