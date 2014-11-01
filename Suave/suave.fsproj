@@ -33,7 +33,7 @@
     <WarningLevel>3</WarningLevel>
     <DocumentationFile>bin\Release\suave.xml</DocumentationFile>
   </PropertyGroup>
-  <Import Project="$(MSBuildExtensionsPath32)\..\Microsoft SDKs\F#\3.0\Framework\v4.0\Microsoft.FSharp.Targets" />
+  <Import Project="$(MSBuildExtensionsPath32)\..\Microsoft SDKs\F#\3.0\Framework\v4.0\Microsoft.FSharp.Targets" Condition="Exists('$(MSBuildExtensionsPath32)\..\Microsoft SDKs\F#\3.0\Framework\v4.0\Microsoft.FSharp.Targets')"/>
   <ItemGroup>
     <Compile Include="Async.fs" />
     <Compile Include="Utils.fs" />
