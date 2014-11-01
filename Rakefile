@@ -105,20 +105,11 @@ task :increase_version_number do
   ENV['NUGET_VERSION'] = s.format("%M.%m.%p%s")
 end
 
-Albacore::Tasks::Release.new :release, pkg_dir: 'build/pkg', depend_on: :create_nuget, nuget_exe: 'packages/NuGet.CommandLine/tools/NuGet.exe'
-
-desc 'release the next version'
-task :release_next => [:increase_version_number, :asmver , :create_nuget] do
-  s = SemVer.find.format("%M.%m.%p%s")
-  # commit and tag
-  system %q[git add .semver]
-  system %q[git add Suave/AssemblyVersionInfo.fs]
-  system "git commit -m \"released v#{s.to_s}\""
-#  Rake::Tasks['build'].invoke
-  system "packages/NuGet.CommandLine/tools/NuGet.exe setApiKey #{ENV['NUGET_KEY']}", clr_command: true, silent: true
-  system "packages/NuGet.CommandLine/tools/NuGet.exe push build/pkg/suave.#{s.to_s}.nupkg", clr_command: true
-end
-
+Albacore::Tasks::Release.new :release,
+                             pkg_dir: 'build/pkg',
+                             depend_on: :create_nuget,
+                             nuget_exe: 'packages/NuGet.CommandLine/tools/NuGet.exe',
+                             api_key: ENV['NUGET_KEY']
 
 namespace :docs do
   desc 'clean generated documentation'
