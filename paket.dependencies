@@ -7,3 +7,4 @@ nuget Microsoft.AspNet.Razor 3.2.0
 nuget NUnit 2.6.3
 nuget RazorEngine 3.4.1
 nuget Suave 0.13.0
+nuget NuGet.CommandLine
