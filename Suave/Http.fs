@@ -400,7 +400,7 @@ module Http =
                  (send : string -> bool -> WebPart)
                  ({ request = r; runtime = rt } as ctx) =
       let log =
-        Log.verbose rt.logger "Suave.Http.ServeResource.resource" Log.TraceHeader.Empty
+        Log.verbose rt.logger "Suave.Http.ServeResource.resource" Log.TraceHeader.empty
 
       let send_it name compression =
         set_header "Last-Modified" ((get_last key : DateTime).ToString("R"))
