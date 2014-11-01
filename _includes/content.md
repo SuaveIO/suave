@@ -57,15 +57,26 @@ type WebPart = HttpContext -> Async<HttpContext option>
 {% endhighlight }
 
 For every request `web_server` will evaluate the `WebPart`, if the evaluation
-succeeds it will send the calculated response back to the http client. 
+succeeds it will send the calculated response back to the http client. A newbie
+mistake is to confuse the evaluation of the web part with the evaluation of the
+data structure in which you declare them; suave is highly performant, because
+it's common to declare your applicatives in a static context -- and these are
+evaluated at the time of launch of you application. E.g. given an app like this:
+
+{% highlight fsharp %}
+let app = OK (System.DateTimeOffset.UtcNow.ToString("o"))
+{% endhighlight }
+
+you will always get the same result.
 
 `OK` is a combinator that always succeed and writes its argument to the
 underlying response stream.
 
-Something that may trick beginners up is that your web parts are "values" in the
-sense that they evaluate once, e.g. when constructing `choose [ OK "hi" ]`, `OK
-"hi"` is evaluated once, not every request. You need to wrap your web part in a
-closure if you want to re-evaluated every request, with e.g. `warbler`.
+Put another way, your web parts are "values" in the sense that they evaluate
+once, e.g. when constructing `choose [ OK "hi" ]`, `OK "hi"` is evaluated once,
+not every request. You need to wrap your web part in a closure if you want to
+re-evaluated every request, with `Suave.Http.warbler`, `Suave.Types.context` or
+`Suave.Types.request`.
 
 Tutorial: Composing bigger programs
 -----------------------------------
