@@ -1,5 +1,5 @@
 source 'https://rubygems.org'
 
-gem "albacore", '~> 2.0.14'
-# gem "albacore", path: '../albacore'
+gem 'albacore', '~> 2.2.0.pre.beta'
+# gem 'albacore', path: '../albacore'
 

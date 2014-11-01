@@ -3,6 +3,7 @@ require 'bundler/setup'
 require 'albacore'
 require 'albacore/nuget_model'
 require 'albacore/tasks/versionizer'
+require 'albacore/tasks/release'
 require 'albacore/task_types/nugets_pack'
 require 'albacore/task_types/asmver'
 require 'albacore/ext/teamcity'
@@ -29,7 +30,7 @@ desc 'create assembly infos'
 asmver_files :asmver => :versioning do |a|
   a.files = FileList['{Suave,Tests,Pong,WebMachine,Example,Experimental,Load,Suave.*,suave.*}/*proj']
   a.attributes assembly_description: suave_description,
-               assembly_configuration: 'RELEASE',
+               assembly_configuration: 'Release',
                assembly_company: 'Suave.IO',
                assembly_copyright: "(c) #{Time.now.year} by Ademar Gonzalez, Henrik Feldt",
                assembly_version: ENV['LONG_VERSION'],
@@ -104,6 +105,8 @@ task :increase_version_number do
   ENV['NUGET_VERSION'] = s.format("%M.%m.%p%s")
 end
 
+Albacore::Tasks::Release.new :release
+
 desc 'release the next version'
 task :release_next => [ :increase_version_number, :asmver , :create_nuget ] do
   s = SemVer.find.format("%M.%m.%p%s")
@@ -115,6 +118,7 @@ task :release_next => [ :increase_version_number, :asmver , :create_nuget ] do
   system "packages/NuGet.CommandLine/tools/NuGet.exe setApiKey #{ENV['NUGET_KEY']}", clr_command: true, silent: true
   system "packages/NuGet.CommandLine/tools/NuGet.exe push build/pkg/suave.#{s.to_s}.nupkg", clr_command: true
 end
+
 
 namespace :docs do
   desc 'clean generated documentation'
