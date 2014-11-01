@@ -17,12 +17,12 @@ suave_description = 'Suave is a simple web development F# library providing a li
 
 desc "Restore paket.exe"
 task :restorepakettool do
-  system 'tools/paket.bootstrapper.exe'
+  system 'tools/paket.bootstrapper.exe', clr_command: true
 end
 
 desc "Restore all packages"
 task :restore => [:restorepakettool] do
-  system 'tools/paket.exe', 'restore'
+  system 'tools/paket.exe', 'restore', clr_command: true
 end
 
 desc 'create assembly infos'
