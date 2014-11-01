@@ -1,7 +1,7 @@
 GEM
   remote: https://rubygems.org/
   specs:
-    albacore (2.2.0.pre.beta.2)
+    albacore (2.2.0.pre.beta.7)
       map (~> 6.5)
       nokogiri (~> 1.5)
       rake (~> 10)

@@ -105,7 +105,7 @@ task :increase_version_number do
   ENV['NUGET_VERSION'] = s.format("%M.%m.%p%s")
 end
 
-Albacore::Tasks::Release.new :release, pkg_dir: 'build/pkg', depend_on: :create_nuget
+Albacore::Tasks::Release.new :release, pkg_dir: 'build/pkg', depend_on: :create_nuget, nuget_exe: 'packages/NuGet.CommandLine/tools/NuGet.exe'
 
 desc 'release the next version'
 task :release_next => [:increase_version_number, :asmver , :create_nuget] do
