@@ -48,7 +48,8 @@ bundle
 bundle exec rake
 ```
 
-On linux and os x you'll have ruby out of the box. On Windows, you have to
+On linux and os x you'll have ruby <span title="you might need to run 'gem
+install bundler' first though">out of the box</span>. On Windows, you have to
 [install it](https://github.com/albacore/albacore/#installing-ruby-on-windows).
 
 You can also just delete the project referenced to all `AssemblyVersionInfo.fs`
