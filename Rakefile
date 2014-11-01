@@ -17,7 +17,7 @@ suave_description = 'Suave is a simple web development F# library providing a li
 
 nugets_restore :restore do |p|
   p.out = 'packages'
-  p.exe = 'buildsupport/NuGet.exe'
+  p.exe = 'tools/NuGet.exe'
 end
 
 desc 'create assembly infos'
@@ -76,7 +76,7 @@ task :create_nuget_quick => ['build/pkg', :versioning] do
   p.add_file  "Suave/bin/Release/suave.xml", "lib"
   nuspec_path = 'suave.nuspec'
   File.write(nuspec_path,p.to_xml)
-  cmd = Albacore::NugetsPack::Cmd.new "buildsupport/NuGet.exe", out: "build/pkg"
+  cmd = Albacore::NugetsPack::Cmd.new "tools/NuGet.exe", out: "build/pkg"
   pkg, spkg = cmd.execute nuspec_path
   Albacore.publish :artifact, OpenStruct.new(
     :nuspec   => nuspec_path,
@@ -107,8 +107,8 @@ task :release_next => [ :increase_version_number, :asmver , :create_nuget ] do
   system %q[git add Suave/AssemblyVersionInfo.fs]
   system "git commit -m \"released v#{s.to_s}\""
 #  Rake::Tasks['build'].invoke
-  system "buildsupport/NuGet.exe setApiKey #{ENV['NUGET_KEY']}", clr_command: true, silent: true
-  system "buildsupport/NuGet.exe push build/pkg/suave.#{s.to_s}.nupkg", clr_command: true
+  system "tools/NuGet.exe setApiKey #{ENV['NUGET_KEY']}", clr_command: true, silent: true
+  system "tools/NuGet.exe push build/pkg/suave.#{s.to_s}.nupkg", clr_command: true
 end
 
 namespace :docs do
