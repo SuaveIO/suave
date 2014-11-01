@@ -48,7 +48,7 @@ In suave, we have opted to write a lot of documentation inside the code; so just
 hover the function in your IDE or use an assembly browser to bring out the XML
 docs. For the above reference to `web_server_async`, our code looks like this:
 
-![web_server_async documentation][/images/web_server_async_code.png]
+![web_server_async documentation](/images/web_server_async_code.png)
 
 WebParts are functions with the following type:
 
