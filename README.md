@@ -27,7 +27,8 @@ web_server default_config (OK "Hello World!")
 ```
 
 Now that you've discovered how to do "Hello World!", go read the
-[rest of the documentation](http://suave.io/)
+[rest of the documentation](http://suave.io/) - editable on the
+[gh-pages branch](https://github.com/SuaveIO/suave/tree/gh-pages).
 
 # How to Build
 

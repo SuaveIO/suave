@@ -260,7 +260,7 @@ type HttpResult =
   ; headers : (string * string) list
   ; content : HttpContent }
 
-type SuaveTask<'a> = Async<'a option> 
+type SuaveTask<'a> = Async<'a option>
 
 /// An error handler takes the exception, a programmer-provided message, a request (that failed) and returns
 /// an asynchronous workflow for the handling of the error.
