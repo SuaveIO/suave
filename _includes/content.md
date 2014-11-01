@@ -23,7 +23,7 @@ To install Suave, run the following command in the
 PM> Install-Package Suave
 {% endhighlight %}
 
-Or with Paket in paket.dependencies:
+Or with [Paket](https://github.com/fsprojects/Paket) in paket.dependencies:
 
 {% highlight dosbatch %}
 source https://nuget.org/api/v2
