@@ -105,10 +105,10 @@ task :increase_version_number do
   ENV['NUGET_VERSION'] = s.format("%M.%m.%p%s")
 end
 
-Albacore::Tasks::Release.new :release
+Albacore::Tasks::Release.new :release, pkg_dir: 'build/pkg', depend_on: :create_nuget
 
 desc 'release the next version'
-task :release_next => [ :increase_version_number, :asmver , :create_nuget ] do
+task :release_next => [:increase_version_number, :asmver , :create_nuget] do
   s = SemVer.find.format("%M.%m.%p%s")
   # commit and tag
   system %q[git add .semver]
