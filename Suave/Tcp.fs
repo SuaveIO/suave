@@ -180,7 +180,7 @@ let tcp_ip_server (source_ip : IPAddress,
 
       logger.Log Log.LogLevel.Info <| fun _ ->
         { path          = "Tcp.tcp_ip_server"
-        ; trace         = Log.TraceHeader.Empty
+        ; trace         = Log.TraceHeader.empty
         ; message       = sprintf "started listener in: %O%s" start_data (if token.IsCancellationRequested then ", cancellation requested" else "")
         ; level         = Log.LogLevel.Info
         ; ``exception`` = None

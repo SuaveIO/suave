@@ -36,16 +36,16 @@ module Session =
     let hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(builder.ToString()))
     base64 hash
 
-  let session_id_lenght = 40
+  let session_id_length = 40
 
   /// Validates sessionId was not tampered
   let validate (session_map : MemoryCache) key (sessionId : string) (ctx : HttpContext) =
 
-    if sessionId.Length < session_id_lenght then 
+    if sessionId.Length < session_id_length then
       false
     else
-      let id  = sessionId.Substring( 0, session_id_lenght)
-      let mac = sessionId.Substring( session_id_lenght)
+      let id  = sessionId.Substring( 0, session_id_length)
+      let mac = sessionId.Substring( session_id_length)
 
       let mac1 = hmac id  (Option.get <| ctx.request.headers %% "user-agent") (ctx.request.ipaddr.ToString()) key
 
@@ -72,16 +72,20 @@ module Session =
     interface ISessionProvider with
 
       member this.Generate(expiration : TimeSpan, ctx : HttpContext) =
-        let session_id = strong_new_id session_id_lenght 
+        let session_id = strong_new_id session_id_length
         let dict = new ConcurrentDictionary<string, obj> ()
-        lock session_map (fun _ -> session_map.Add(session_id, dict :> obj, Globals.utc_now().Add expiration) |> ignore)
+        lock session_map (fun _ ->
+          session_map.Add(session_id, dict :> obj,
+                          Globals.utc_now().Add expiration)
+          |> ignore)
         let id = session_id + hmac session_id (Option.get <| ctx.request.headers %% "user-agent") (ctx.request.ipaddr.ToString()) key
         id
 
       member this.Validate(s : string, ctx : HttpContext) =
         validate session_map key s ctx
 
-      member this.Session(s : string)  = get_session session_map  (s.Substring(0, session_id_lenght))
+      member this.Session(s : string)  =
+        get_session session_map  (s.Substring(0, session_id_length))
 
   /// Cookie-based session support
   let session_support (time_span : TimeSpan) = fun (ctx : HttpContext) -> async {

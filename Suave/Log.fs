@@ -117,11 +117,21 @@ type TraceHeader =
     /// possibly a parent
     /// In ZipKin/Dapper-speak, this is the span parent id
   ; req_parent_id : uint64 option }
-  static member Empty =
+
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module TraceHeader =
+  /// The empty trace header has zeroes for trace and request id.
+  let empty =
     { trace_id      = 0UL
     ; req_id        = 0UL
     ; req_parent_id = None }
-  static member Create(trace_id, span_parent_id) =
+
+  /// Create a new `TraceHeader` with the given `trace_id` and `span_parent_id`.
+  /// This generates a new id and places it in `trace_id` AND `req_id` if no
+  /// `trace_id` parameter is supplied. Unless `span_parent_id` is given, that
+  /// field is defaulted to None, as suave cannot know the "origin span", so to
+  /// speak.
+  let mk trace_id span_parent_id =
     let new_id = Globals.random.NextUInt64()
     { trace_id      = trace_id |> Option.or_default new_id
     ; req_id        = new_id
@@ -230,10 +240,10 @@ let verbosee (logger : Logger) path trace ex message =
   logger.Log Verbose (fun _ -> mk_line path trace (Some ex) message)
 
 let intern (logger : Logger) path =
-  verbose logger path (TraceHeader.Empty)
+  verbose logger path (TraceHeader.empty)
 
 let interne (logger : Logger) path =
-  verbosee logger path (TraceHeader.Empty)
+  verbosee logger path (TraceHeader.empty)
 
 let internf (logger : Logger) path f_format =
-  f_format (Printf.kprintf (verbose logger path (TraceHeader.Empty)))
+  f_format (Printf.kprintf (verbose logger path (TraceHeader.empty)))

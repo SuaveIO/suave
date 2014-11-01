@@ -246,7 +246,7 @@ module ParsingAndControl =
                        ) << UInt64.TryParse
     let parent = "x-b3-spanid"  |> get_first headers |> Option.bind parse_uint64
     let trace  = "x-b3-traceid" |> get_first headers |> Option.bind parse_uint64
-    Log.TraceHeader.Create(trace, parent)
+    Log.TraceHeader.mk trace parent
 
   /// Reads raw POST data
   let get_raw_post_data connection content_length rem =
@@ -268,18 +268,9 @@ module ParsingAndControl =
     let meth, url, raw_query, http_version = parse_url first_line
     let! headers, rem = read_headers connection rem line_buffer
 
-    let request = { http_version = http_version
-      ; url         = url
-      ; ``method``  = meth
-      ; headers     = headers
-      ; raw_form    = Array.empty
-      ; raw_query   = raw_query
-      ; files       = []
-      ; multipart_fields = []
-      ; trace       = parse_trace_headers headers
-      ; is_secure   = is_secure
-      ; ipaddr      = connection.ipaddr
-      }
+    let request =
+      HttpRequest.mk http_version url meth headers raw_query
+        (parse_trace_headers headers) is_secure connection.ipaddr
 
     // won't continue parsing if on proxyMode with the intention of forwarding the stream as it is
     // TODO: proxy mode might need headers and contents of request, but won't get it through this impl
@@ -339,7 +330,7 @@ module ParsingAndControl =
     ; files          = []
     ; multipart_fields = []
     ; is_secure      = match proto with HTTP -> false | HTTPS _ -> true
-    ; trace          = Log.TraceHeader.Empty
+    ; trace          = Log.TraceHeader.empty
     ; ipaddr = ipaddr }
   
   let internal write_content_type connection (headers : (string*string) list) = socket {
@@ -357,7 +348,6 @@ module ParsingAndControl =
   open Globals
   open Suave.Compression
 
-  // TODO: make function continuous
   let write_content context connection = function
     | Bytes b -> socket {
       let! (content : byte []) = Compression.transform b context connection
@@ -368,6 +358,7 @@ module ParsingAndControl =
         do! connection.write (new ArraySegment<_>(content, 0, content.Length))
       }
     | SocketTask f -> f connection
+    | NullContent -> failwith "TODO: unexpected NullContent value for 'write_content'"
 
   let response_f ({ response = r } as context : HttpContext) connection = socket {
     do! async_writeln connection (String.concat " " [ "HTTP/1.1"
@@ -408,8 +399,8 @@ module ParsingAndControl =
 
     let rec loop (bytes : BufferSegment list) = socket {
 
-      let verbose  = Log.verbose runtime.logger "Web.request_loop.loop" Log.TraceHeader.Empty
-      let verbosef = Log.verbosef runtime.logger "Web.request_loop.loop" Log.TraceHeader.Empty
+      let verbose  = Log.verbose runtime.logger "Web.request_loop.loop" Log.TraceHeader.empty
+      let verbosef = Log.verbosef runtime.logger "Web.request_loop.loop" Log.TraceHeader.empty
 
       verbose "-> processor"
       let! result = process_request proxy_mode (match runtime.protocol with HTTP -> false | HTTPS _ -> true) bytes connection
@@ -418,7 +409,7 @@ module ParsingAndControl =
       match result with
       | None -> verbose "'result = None', exiting"
       | Some (request : HttpRequest, rem) ->
-        let ctx = { request = request; user_state = Map.empty; runtime = runtime; response = { status = HTTP_404; headers = []; content = NullContent }}
+        let ctx = HttpContext.mk request runtime
         match consumer with
         | WebPart web_part ->
           do! run ctx web_part connection
@@ -470,14 +461,6 @@ module ParsingAndControl =
 
   open Suave.Tcp
 
-  let mk_http_runtime proto error_handler mime_types home_directory compression_folder logger session_provider =
-    { protocol           = proto
-    ; error_handler      = error_handler
-    ; mime_types_map     = mime_types
-    ; home_directory     = home_directory
-    ; compression_folder = compression_folder
-    ; logger             = logger
-    ; session_provider   = session_provider }
 
   /// Starts a new web worker, given the configuration and a web part to serve.
   let web_worker (ip, port, buffer_size, max_ops, runtime : HttpRuntime) (webpart : WebPart) =
@@ -499,7 +482,7 @@ open Suave.Session
 
 /// The default error handler returns a 500 Internal Error in response to
 /// thrown exceptions.
-let default_error_handler (ex : Exception) msg (ctx : HttpContext) = 
+let default_error_handler (ex : Exception) msg (ctx : HttpContext) =
   let request = ctx.request
   msg |> Log.verbosee ctx.runtime.logger "Web.default_error_handler" ctx.request.trace ex
   if IPAddress.IsLoopback ctx.request.ipaddr then
@@ -523,9 +506,8 @@ let web_server_async (config : SuaveConfig) (webpart : WebPart) =
     config.bindings
     |> List.map (fun { scheme = proto; ip = ip; port = port } ->
       let http_runtime =
-        ParsingAndControl.mk_http_runtime
-          proto config.error_handler
-          config.mime_types_map content_folder compression_folder config.logger config.session_provider
+        HttpRuntime.mk proto config.error_handler config.mime_types_map
+          content_folder compression_folder config.logger config.session_provider
       ParsingAndControl.web_worker (ip, port, config.buffer_size, config.max_ops, http_runtime) webpart)
   let listening = all |> Seq.map fst |> Async.Parallel
   let server    = all |> Seq.map snd |> Async.Parallel |> Async.Ignore

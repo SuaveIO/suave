@@ -34,17 +34,45 @@ type HttpUpload(fieldname : string, filename : string, mime_type : string, temp_
 
 /// A holder for the data extracted from the request.
 type HttpRequest =
-  { http_version : string
-  ; url          : string
-  ; ``method``   : string
-  ; headers              : (string * string) list
-  ; raw_form     : byte[]
-  ; raw_query    : string
-  ; files                : HttpUpload list
-  ; multipart_fields     : (string * string) list
-  ; trace        : Log.TraceHeader
-  ; is_secure            : bool
-  ; ipaddr               : IPAddress }
+  { http_version     : string
+  ; url              : string
+  ; ``method``       : string
+  ; headers          : (string * string) list
+  ; raw_form         : byte []
+  ; raw_query        : string
+  ; files            : HttpUpload list
+  ; multipart_fields : (string * string) list
+  ; trace            : Log.TraceHeader
+  ; is_secure        : bool
+  ; ipaddr           : IPAddress }
+
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module HttpRequest =
+  let empty =
+    { http_version     = "1.1"
+    ; url              = "/"
+    ; ``method``       = ""
+    ; headers          = []
+    ; raw_form         = Array.empty
+    ; raw_query        = ""
+    ; files            = []
+    ; multipart_fields = []
+    ; trace            = Log.TraceHeader.empty
+    ; is_secure        = false
+    ; ipaddr           = IPAddress.Loopback }
+
+  let mk http_version url meth headers raw_query trace_headers is_secure ip_addr =
+    { http_version     = http_version
+    ; url              = url
+    ; ``method``       = meth
+    ; headers          = headers
+    ; raw_form         = Array.empty
+    ; raw_query        = raw_query
+    ; files            = []
+    ; multipart_fields = []
+    ; trace            = trace_headers //parse_trace_headers headers
+    ; is_secure        = is_secure
+    ; ipaddr           = ip_addr } //connection.ipaddr }
 
 open Suave.Utils
 ///// Gets the query from the HttpRequest
@@ -69,6 +97,7 @@ with
 
 open System.Net
 
+/// A port is an unsigned short (uint16) structure
 type Port = uint16
 
 /// A HTTP binding is a protocol is the product of HTTP or HTTP, a DNS or IP binding and a port number
@@ -255,17 +284,39 @@ module Codes =
 
 open Codes
 
-type HttpResult = 
+/// The HttpResult is the structure that you work with to tell Suave how to
+/// send the response. Have a look at the docs for HttpContent for further
+/// details on what is possible.
+type HttpResult =
   { status  : HttpCode
   ; headers : (string * string) list
   ; content : HttpContent }
 
+/// A small module that helps you create a HttpResults.
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module HttpResult =
+  /// The empty HttpResult, with a 404 and a HttpContent.NullContent content
+  let empty =
+    { status  = HTTP_404
+    ; headers = []
+    ; content = HttpContent.NullContent }
+
+  /// Create a new HttpResult from the status, headers and content.
+  let create status headers content =
+    { status  = status
+    ; headers = headers
+    ; content = content }
+
 type SuaveTask<'a> = Async<'a option>
 
-/// An error handler takes the exception, a programmer-provided message, a request (that failed) and returns
-/// an asynchronous workflow for the handling of the error.
+/// An error handler takes the exception, a programmer-provided message, a
+/// request (that failed) and returns an asynchronous workflow for the handling
+/// of the error.
 type ErrorHandler = Exception -> String -> WebPart
 
+/// The HttpRuntime is created from the SuaveConfig structure when the web
+/// server starts. You can also use the `HttpRuntime` module to create a new
+/// value yourself, or use the `empty` one.
 and HttpRuntime =
   { protocol           : Protocol
   ; error_handler      : ErrorHandler
@@ -275,18 +326,82 @@ and HttpRuntime =
   ; logger             : Log.Logger
   ; session_provider   : ISessionProvider }
 
+/// The HttpContext is the container of the request, runtime, user-state and
+/// response.
 and HttpContext =
   { request    : HttpRequest
   ; runtime    : HttpRuntime
   ; user_state : Map<string, obj>
   ; response   : HttpResult }
 
+/// The session provider is a convenience interface for storing user session
+/// data.
 and ISessionProvider =
   abstract member Generate : TimeSpan * HttpContext -> string
   abstract member Validate : string * HttpContext -> bool
   abstract member Session<'a>  : string -> SessionStore<'a>
 
 and WebPart = HttpContext -> SuaveTask<HttpContext>
+
+/// a module that gives you the `empty` (beware) and `mk` functions for creating
+/// a HttpRuntime
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module HttpRuntime =
+  /// an empty session provider that doesn't work, but can be nice to use as a
+  /// place-holder
+  let stub_session_provider =
+    { new ISessionProvider with
+        member x.Generate(expiration : TimeSpan, ctx : HttpContext) =
+          ""
+        member x.Validate(s : string, ctx : HttpContext) =
+          false
+        //  (string -> 'a option) * (string -> 'a -> unit)
+        member x.Session(s : string) =
+          (fun _ -> None), (fun _ _ -> ())
+    }
+
+  /// warn: this is not to be played around with; prefer using the config
+  /// defaults instead, from Web.fs, as they contain the logic for printing to
+  /// the output stream correctly.
+  let empty =
+    { protocol           = Protocol.HTTP
+    ; error_handler      = fun _ _ -> fun _ -> async.Return None
+    ; mime_types_map     = fun _ -> None
+    ; home_directory     = "."
+    ; compression_folder = "."
+    ; logger             = Log.Loggers.sane_defaults_for Log.Debug
+    ; session_provider   = stub_session_provider }
+
+  /// make a new HttpRuntime from the given parameters
+  let mk proto error_handler mime_types home_directory compression_folder logger session_provider =
+    { protocol           = proto
+    ; error_handler      = error_handler
+    ; mime_types_map     = mime_types
+    ; home_directory     = home_directory
+    ; compression_folder = compression_folder
+    ; logger             = logger
+    ; session_provider   = session_provider }
+
+/// A module that provides functions to create a new HttpContext.
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module HttpContext =
+  /// The empty HttpContext is fairly useless for doing real work; you'd be well
+  /// adviced to write some of the properties. However, it can be quite useful
+  /// in unit tests.
+  let empty =
+    { request    = HttpRequest.empty
+    ; user_state = Map.empty
+    ; runtime    = HttpRuntime.empty
+    ; response   = HttpResult.empty }
+
+  let mk request runtime =
+    { request    = request
+    ; user_state = Map.empty
+    ; runtime    = runtime
+    ; response   = { status = HTTP_404
+                   ; headers = []
+                   ; content = NullContent } }
+
 
 let request f (a : HttpContext) = f a.request a
 let context f (a : HttpContext) = f a a
