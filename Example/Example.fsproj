@@ -104,7 +104,7 @@
 	<Target Name="AfterBuild">
 	</Target>
 	-->
-  <Import Project="$(SolutionDir)\tools\paket.targets" />
+  <Import Project="..\tools\paket.targets" />
   <Choose>
     <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework'">
       <Choose>

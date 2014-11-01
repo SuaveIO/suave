@@ -121,7 +121,7 @@
       <Project>{3DC9193E-BD0C-4486-9C58-56B630C36623}</Project>
     </ProjectReference>
   </ItemGroup>
-  <Import Project="$(SolutionDir)\tools\paket.targets" />
+  <Import Project="..\tools\paket.targets" />
   <Choose>
     <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework'">
       <Choose>

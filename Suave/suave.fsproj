@@ -79,7 +79,7 @@
     <Reference Include="System.Web.Extensions" />
     <Reference Include="System.Xml" />
   </ItemGroup>
-  <Import Project="$(SolutionDir)\tools\paket.targets" />
+  <Import Project="..\tools\paket.targets" />
   <Choose>
     <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework'">
       <Choose>
