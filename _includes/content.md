@@ -40,10 +40,10 @@ web_server default_config (OK "Hello World!")
 The above statement will start a web server on default port 8083 over HTTP.
 `web_server` takes a configuration record and the webpart `(OK "Hello World")` 
 
-Webparts are functions with the following type:
+WebParts are functions with the following type:
 
 {% highlight fsharp %}
-type WebPart = HttpContext -> Async<HttpContext option>`
+type WebPart = HttpContext -> Async<HttpContext option>
 {% endhighlight %}
 
 For every request `web_server` will evaluate the `WebPart`, if the evaluation
