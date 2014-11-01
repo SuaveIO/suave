@@ -361,10 +361,11 @@ module HttpRuntime =
     }
 
   /// warn: this is not to be played around with; prefer using the config
-  /// defaults instead!
+  /// defaults instead, from Web.fs, as they contain the logic for printing to
+  /// the output stream correctly.
   let empty =
     { protocol           = Protocol.HTTP
-    ; error_handler      = fun _ _ -> id
+    ; error_handler      = fun _ _ -> fun _ -> async.Return None
     ; mime_types_map     = fun _ -> None
     ; home_directory     = "."
     ; compression_folder = "."
