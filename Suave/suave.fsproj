@@ -9,6 +9,7 @@
     <RootNamespace>suave</RootNamespace>
     <AssemblyName>suave</AssemblyName>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
+	<TargetFSharpCoreVersion>4.3.0.0</TargetFSharpCoreVersion>
     <Name>suave</Name>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
@@ -34,7 +35,22 @@
     <WarningLevel>3</WarningLevel>
     <DocumentationFile>bin\Release\suave.xml</DocumentationFile>
   </PropertyGroup>
-  <Import Project="$(MSBuildExtensionsPath32)\..\Microsoft SDKs\F#\3.0\Framework\v4.0\Microsoft.FSharp.Targets" Condition="Exists('$(MSBuildExtensionsPath32)\..\Microsoft SDKs\F#\3.0\Framework\v4.0\Microsoft.FSharp.Targets')"/>
+  <PropertyGroup>
+    <MinimumVisualStudioVersion Condition="'$(MinimumVisualStudioVersion)' == ''">11</MinimumVisualStudioVersion>
+  </PropertyGroup>
+  <Choose>
+  <When Condition="'$(VisualStudioVersion)' == '11.0'">
+    <PropertyGroup>
+      <FSharpTargetsPath>$(MSBuildExtensionsPath32)\..\Microsoft SDKs\F#\3.0\Framework\v4.0\Microsoft.FSharp.Targets</FSharpTargetsPath>
+    </PropertyGroup>
+  </When>
+  <Otherwise>
+    <PropertyGroup>
+      <FSharpTargetsPath>$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\FSharp\Microsoft.FSharp.Targets</FSharpTargetsPath>
+    </PropertyGroup>
+  </Otherwise>
+  </Choose>
+  <Import Project="$(FSharpTargetsPath)" Condition="Exists('$(FSharpTargetsPath)')" />
   <ItemGroup>
     <Compile Include="Async.fs" />
     <Compile Include="Utils.fs" />
