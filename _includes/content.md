@@ -37,9 +37,9 @@ The simplest Suave application is a simple HTTP server that greets all visitors
 with the string `"Hello World!"`
 
 {% highlight fsharp %}
-open Suave // always open suave
+open Suave                 // always open suave
 open Suave.Http.Successful // for OK-result
-open Suave.Web // for config
+open Suave.Web             // for config
 
 web_server default_config (OK "Hello World!")
 {% endhighlight %}
@@ -143,7 +143,9 @@ All-in-all, the Http module consists of these sub-modules:
 
 If you can get the FSFormatting project to work, we would appreciate a PR with
 generated documentation from the Http module as we've literally transcribed the
-RFC that documents all HTTP codes into this file.
+RFC that documents all HTTP result codes, into this file.
+
+The numeric/discriminated-union HTTP codes can be found in `Suave.Types.Codes`.
 
 Tutorial: Composing bigger programs
 -----------------------------------
