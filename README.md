@@ -1,6 +1,6 @@
 # Introduction
 
-![Suave Logo](https://raw.githubusercontent.com/SuaveIO/suave/master/media/suave1.png)
+![Suave Logo](https://raw.githubusercontent.com/SuaveIO/resources/master/images/suave1.png)
 
 Suave is a simple web development F# library providing a lightweight web server
 and a set of combinators to manipulate route flow and task composition. Suave
