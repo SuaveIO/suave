@@ -5,15 +5,15 @@ module Http =
   open Socket
   open Types
 
-  let inline succeed x = async{ return Some x }
+  let inline succeed x = async.Return (Some x)
 
-  let fail = async{ return None }
+  let fail = async.Return None
 
   let never : WebPart = fun x -> fail
 
   let inline (>>=) (a : 'a -> Async<'b option>)  (b : 'b -> Async<'c option>) : 'a -> Async<'c option> = 
     fun x -> 
-      async{
+      async {
         let! e = a x
         match e with
         | None ->
