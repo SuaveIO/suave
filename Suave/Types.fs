@@ -307,6 +307,8 @@ module HttpResult =
     ; headers = headers
     ; content = content }
 
+/// A SuaveTask is an Async{'a option} which shows that it may need to be
+/// evaluated asynchronously to decide whether a value is available.
 type SuaveTask<'a> = Async<'a option>
 
 /// An error handler takes the exception, a programmer-provided message, a
