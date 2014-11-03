@@ -11,7 +11,12 @@ Authentication, Keep-Alive. Suave also takes advantage of F# asynchronous
 workflows to perform non-blocking IO. In fact, Suave is written in a completely
 non-blocking fashion throughout.
 
-[![Build status](https://ci.appveyor.com/api/projects/status/g0lum9qndwb018sy?svg=true)](https://ci.appveyor.com/project/AdemarGonzalez/suave)
+## Build Status
+
+| Platform | Status         |
+| -------- | -------------- |
+| Windows  | [![Build status](https://ci.appveyor.com/api/projects/status/g0lum9qndwb018sy?svg=true)](https://ci.appveyor.com/project/AdemarGonzalez/suave) |
+| Mono     | [![Build status](https://tc-oss.intelliplan.net/app/rest/builds/buildType:(id:Suave_BuildIt)/statusIcon)](https://tc-oss.intelliplan.net/viewType.html?buildTypeId=Suave_BuildIt&guest=1) |
 
 What follows is a tutorial on how to create applications. Scroll past the
 tutorial to see detailed function documentation.
