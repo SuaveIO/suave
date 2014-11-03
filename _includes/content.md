@@ -217,6 +217,20 @@ let requires_authentication _ =
       GET >>= url "/protected" >>= context (fun x -> OK ("Hello " + x.user_state.["user_name"])) ]
 {% endhighlight %}
 
+Programming Async WebParts
+------------------------------
+
+Suave WebParts live in the Async monad. For example you could write:
+
+{% highlight fsharp %}
+let sleep milliseconds message: WebPart =
+  fun (x : HttpContext) ->
+    async {
+      do! Async.Sleep milliseconds
+      return! OK message x
+    }
+{% endhighlight %}
+
 Typed routes
 ------------
 
