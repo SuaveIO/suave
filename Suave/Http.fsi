@@ -1309,6 +1309,9 @@ module Http =
     /// Responses to this method are not cacheable.
     val OPTIONS : WebPart
 
+  /// The files module can be used to serve from the file system. It encapsulates
+  /// common patterns like verifying that back-symlinks or keywords aren't used
+  /// to gain access outside the intended folder.
   module Files =
 
     /// <summary><para>
@@ -1318,60 +1321,63 @@ module Http =
     /// </para></summary>
     /// <remarks>
     /// </remarks>
-    val send_file : filename:string -> compression:bool -> WebPart
+    val send_file : file_name:string -> compression:bool -> WebPart
 
     /// <summary><para>
     /// Send the file by the filename given. Will search relative to the current directory for
     /// the file path, unless you pass it a file with a slash at the start of its name, in which
     /// case it will search the root of the file system that is hosting the current directory.
     /// Will also set the MIME type based on the file extension.
-    /// </para><para>
-    /// </para><para>
     /// </para></summary>
     /// <remarks>
     /// </remarks>
-    val file : filename:string -> WebPart
+    val file : file_name:string -> WebPart
 
     /// <summary><para>
     /// Format a string with a local file path given a file name 'fileName'. You should
     /// use this helper method to find the current directory and concatenate that current
     /// directory to the filename which should be absolute and start with a path separator.
-    /// </para><para>
-    /// </para><para>
     /// </para></summary>
     /// <remarks>
+    /// The current implementation doesn't take kindly to relative paths.
     /// </remarks>
-    val local_file : fileName:string -> rootDir:string -> string
+    val local_file : file_name:string -> root_path:string -> string
 
     /// <summary><para>
     /// 'browse' the file given as the filename, by sending it to the browser with a
     /// MIME-type/Content-Type header based on its extension. Will service from the
     /// current directory.
-    /// </para><para>
-    /// </para><para>
     /// </para></summary>
-    /// <remarks>
-    /// </remarks>
-    val browse_file : filename:string -> WebPart
+    val browse_file : file_name:string -> WebPart
 
     /// <summary><para>
     /// 'browse' the file in the sense that the contents of the file are sent based on the
-    /// request's Url property. Will serve from the current directory.
-    /// </para><para>
-    /// </para><para>
+    /// request's Url property. Will serve from the passed root path/directory.
     /// </para></summary>
     /// <remarks>
+    /// The current implementation doesn't take kindly to relative paths.
     /// </remarks>
-    val browse : WebPart
+    val browse : root_path:string -> WebPart
 
     /// <summary><para>
-    /// Serve a 'file browser' for a directory
-    /// </para><para>
-    /// </para><para>
+    /// 'browse' the file in the sense that the contents of the file are sent based on the
+    /// request's Url property. Will serve from the current as configured in directory.
+    /// Suave's runtime.
+    /// </para></summary>
+    val browse' : WebPart
+
+    /// <summary><para>
+    /// Serve a 'file browser' for a root_path
     /// </para></summary>
     /// <remarks>
+    /// The current implementation doesn't take kindly to relative paths.
     /// </remarks>
-    val dir : WebPart
+    val dir : root_path:string -> WebPart
+
+    /// <summary><para>
+    /// Serve a 'file browser' for the current directory
+    /// </para></summary>
+    val dir' : WebPart
 
   module Embedded =
 

@@ -453,7 +453,12 @@ module Http =
         if fs.Length > 0L then
           do! transfer_x conn fs
       }
-      { ctx with response = { ctx.response with status = HTTP_200; content = SocketTask (write_file file_name)}} |> succeed
+      { ctx with
+          response =
+            { ctx.response with
+                status = HTTP_200
+                content = SocketTask (write_file file_name) } }
+      |> succeed
 
     let file file_name =
       resource
@@ -475,16 +480,27 @@ module Http =
       else raise <| Exception("File canonalization issue.")
 
     let browse_file file_name =
-      fun ({request = r; runtime = q} as h) -> file (local_file file_name q.home_directory) h
+      fun ({request = r; runtime = q} as h) ->
+        file (local_file file_name q.home_directory) h
 
-    let browse : WebPart = warbler (fun {request = r; runtime = q } -> file (local_file r.url q.home_directory))
+    let browse root_path : WebPart =
+      warbler (fun { request = r; runtime = { logger = l } } ->
+        Log.verbose l
+          "Suave.Http.Files.browse"
+          Log.TraceHeader.empty
+          (sprintf "Files.browse trying file (local_file url:'%s' root:'%s')"
+            r.url root_path)
+        file (local_file r.url root_path))
 
-    let dir (ctx : HttpContext) =
+    let browse' : WebPart =
+      warbler (fun { runtime = q } -> browse q.home_directory)
+
+    let dir root_path (ctx : HttpContext) =
       let req = ctx.request
 
       let url = req.url
 
-      let dirname = local_file url (ctx.runtime.home_directory)
+      let dirname = local_file url root_path
       let result = new StringBuilder()
 
       let filesize  (x : FileSystemInfo) =
@@ -505,6 +521,9 @@ module Http =
         (di.GetFileSystemInfos()) |> Array.sortBy (fun x -> x.Name) |> Array.iter buildLine
         OK (result.ToString()) ctx
       else fail
+
+    let dir' ctx =
+      dir ctx.runtime.home_directory ctx
 
   module Embedded =
     

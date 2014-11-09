@@ -108,6 +108,11 @@ with the NuGet so that others can read your code's intentions easily.
 
 Don't put unnecessary parenthesis unless it makes the code more clear.
 
+When writing functions that take some sort of 'configuration' or that you can
+imagine would like to be called with a parameter which is almost always the same
+value for another function body's call-site, put that parameter before
+more-often-varying parameters in the function signature.
+
 ## Testing
 
 Run Tests as a console app. Return status code = 0 means success.

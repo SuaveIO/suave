@@ -82,8 +82,8 @@ choose [
           OK "First time")
   basic_auth // from here on it will require authentication
   GET >>= url "/events" >>= request (fun r -> EventSource.hand_shake (CounterDemo.counter_demo r))
-  GET >>= browse //serves file if exists
-  GET >>= dir //show directory listing
+  GET >>= browse' //serves file if exists
+  GET >>= dir' //show directory listing
   HEAD >>= url "/head" >>= sleep 100 "Nice sleep .."
   POST >>= url "/upload" >>= OK "Upload successful."
   POST >>= url "/upload2"
