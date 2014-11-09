@@ -18,7 +18,7 @@ open System.Threading.Tasks
 ///
 /// The operations exposed on the BufferManager class are not thread safe.
 type BufferManager(total_bytes, buffer_size, logger) =
-  do Log.internf logger "Socket.BufferManager" (fun fmt ->
+  do Log.internf logger "Suave.Socket.BufferManager" (fun fmt ->
     fmt "initialising BufferManager with %d bytes" total_bytes)
 
   /// the underlying byte array maintained by the Buffer Manager
@@ -29,7 +29,7 @@ type BufferManager(total_bytes, buffer_size, logger) =
   member x.PopBuffer(?context : string) : ArraySegment<byte> =
     let offset, free_count = lock free_offsets (fun _ ->
       free_offsets.Pop(), free_offsets.Count)
-    Log.internf logger "Socket.BufferManager" (fun fmt ->
+    Log.internf logger "Suave.Socket.BufferManager" (fun fmt ->
       fmt "reserving buffer: %d, free count: %d [%s]" offset free_count (defaultArg context "no-ctx"))
     ArraySegment(buffer, offset, buffer_size)
 
@@ -49,7 +49,7 @@ type BufferManager(total_bytes, buffer_size, logger) =
       if free_offsets.Contains args.Offset then failwith "double free"
       free_offsets.Push args.Offset
       free_offsets.Count)
-    Log.internf logger "Socket.BufferManager" (fun fmt ->
+    Log.internf logger "Suave.Socket.BufferManager" (fun fmt ->
       fmt "freeing buffer: %d, free count: %d [%s]" args.Offset free_count (defaultArg context "no-ctx"))
 
 type SocketAsyncEventArgsPool() =
