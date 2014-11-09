@@ -453,7 +453,12 @@ module Http =
         if fs.Length > 0L then
           do! transfer_x conn fs
       }
-      { ctx with response = { ctx.response with status = HTTP_200; content = SocketTask (write_file file_name)}} |> succeed
+      { ctx with
+          response =
+            { ctx.response with
+                status = HTTP_200
+                content = SocketTask (write_file file_name) } }
+      |> succeed
 
     let file file_name =
       resource
