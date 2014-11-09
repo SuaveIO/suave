@@ -1328,8 +1328,6 @@ module Http =
     /// the file path, unless you pass it a file with a slash at the start of its name, in which
     /// case it will search the root of the file system that is hosting the current directory.
     /// Will also set the MIME type based on the file extension.
-    /// </para><para>
-    /// </para><para>
     /// </para></summary>
     /// <remarks>
     /// </remarks>
@@ -1339,10 +1337,9 @@ module Http =
     /// Format a string with a local file path given a file name 'fileName'. You should
     /// use this helper method to find the current directory and concatenate that current
     /// directory to the filename which should be absolute and start with a path separator.
-    /// </para><para>
-    /// </para><para>
     /// </para></summary>
     /// <remarks>
+    /// The current implementation doesn't take kindly to relative paths.
     /// </remarks>
     val local_file : file_name:string -> root_path:string -> string
 
@@ -1351,8 +1348,6 @@ module Http =
     /// MIME-type/Content-Type header based on its extension. Will service from the
     /// current directory.
     /// </para></summary>
-    /// <remarks>
-    /// </remarks>
     val browse_file : file_name:string -> WebPart
 
     /// <summary><para>
@@ -1360,6 +1355,7 @@ module Http =
     /// request's Url property. Will serve from the passed root path/directory.
     /// </para></summary>
     /// <remarks>
+    /// The current implementation doesn't take kindly to relative paths.
     /// </remarks>
     val browse : root_path:string -> WebPart
 
@@ -1368,22 +1364,19 @@ module Http =
     /// request's Url property. Will serve from the current as configured in directory.
     /// Suave's runtime.
     /// </para></summary>
-    /// <remarks>
-    /// </remarks>
     val browse' : WebPart
 
     /// <summary><para>
     /// Serve a 'file browser' for a root_path
     /// </para></summary>
     /// <remarks>
+    /// The current implementation doesn't take kindly to relative paths.
     /// </remarks>
     val dir : root_path:string -> WebPart
 
     /// <summary><para>
     /// Serve a 'file browser' for the current directory
     /// </para></summary>
-    /// <remarks>
-    /// </remarks>
     val dir' : WebPart
 
   module Embedded =
