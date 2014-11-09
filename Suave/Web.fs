@@ -101,15 +101,15 @@ module ParsingAndControl =
     }
 
   let read_more_data connection continuation buffer_segment_list = async {
-    let buff = connection.get_buffer "read_till_pattern.loop"
+    let buff = connection.get_buffer "Suave.Web.read_till_pattern.loop"
     let! result = read_data connection buff
     match result with
     | Choice1Of2 data ->
       return! continuation (buffer_segment_list @ [data])
     | Choice2Of2 error ->
       for b in buffer_segment_list do
-        do connection.free_buffer "read_till_pattern.loop" b.buffer
-      do connection.free_buffer "read_till_pattern.loop" buff
+        do connection.free_buffer "Suave.Web.read_till_pattern.loop" b.buffer
+      do connection.free_buffer "Suave.Web.read_till_pattern.loop" buff
       return Choice2Of2 error
     }
 
@@ -177,7 +177,7 @@ module ParsingAndControl =
             return { buffer = segment.buffer; offset = segment.offset + n; length = segment.length - n } :: tail
           else
             do! lift_async <| select (array_segment_from_buffer_segment segment) segment.length
-            do connection.free_buffer "read_post_data:loop" segment.buffer
+            do connection.free_buffer "Suave.Web.read_post_data:loop" segment.buffer
             return! loop (n - segment.length) tail
         | [] ->
           if n = 0 then
@@ -425,7 +425,7 @@ module ParsingAndControl =
             verbosef (fun fmt -> fmt "'Connection: keep-alive' recurse, rem: %A" rem)
             return! loop rem
           | Some _ ->
-            free "http_loop.loop (case Some _)" connection rem
+            free "Suave.Web.http_loop.loop (case Some _)" connection rem
             verbose "'Connection: close', exiting"
             return ()
           | None ->
@@ -433,7 +433,7 @@ module ParsingAndControl =
               verbose "'Connection: keep-alive' recurse (!)"
               return! loop rem
             else
-              free "http_loop.loop (case None, else branch)" connection rem
+              free "Suave.Web.http_loop.loop (case None, else branch)" connection rem
               verbose "'Connection: close', exiting"
               return ()
         else
