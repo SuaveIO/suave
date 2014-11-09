@@ -30,9 +30,9 @@ let private send_web_response (data : HttpWebResponse) ({ request = { trace = t 
   let headers = to_header_list data.Headers 
   // TODO: if downstream sends a Content-Length header copy from one stream
   // to the other asynchronously
-  "-> read_fully" |> Log.verbose ctx.runtime.logger "proxy:send_web_response:GetResponseStream" t
+  "-> read_fully" |> Log.verbose ctx.runtime.logger "Suave.Proxy.send_web_response:GetResponseStream" t
   let bytes = data.GetResponseStream() |> read_fully
-  "<- read_fully" |> Log.verbose ctx.runtime.logger "proxy:send_web_response:GetResponseStream" t
+  "<- read_fully" |> Log.verbose ctx.runtime.logger "Suave.Proxy.send_web_response:GetResponseStream" t
   response (HttpCode.TryParse(int data.StatusCode) |> Option.get) bytes { ctx with response = { resp with headers = resp.headers @ headers } }
 
 /// Forward the HttpRequest 'p' to the 'ip':'port'

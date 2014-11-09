@@ -43,14 +43,14 @@ module ParsingAndControl =
       | pair :: tail ->
         if acc + pair.length < index then
           do! select (ArraySegment(pair.buffer.Array, pair.offset, pair.length)) pair.length
-          connection.free_buffer "Web.split" pair.buffer
+          connection.free_buffer "Suave.Web.split" pair.buffer
           return! loop tail (acc + pair.length) (count + acc + pair.length)
         elif acc + pair.length >= index then
           let bytes_read = index - acc
           do! select (ArraySegment(pair.buffer.Array, pair.offset, bytes_read)) bytes_read
           let remaining = pair.length - bytes_read
           if remaining = marker_lenght then
-            connection.free_buffer "Web.split" pair.buffer
+            connection.free_buffer "Suave.Web.split" pair.buffer
             return count + bytes_read, tail
           else
             
@@ -59,7 +59,7 @@ module ParsingAndControl =
             else
               let new_tail = skip_buffers tail (marker_lenght - remaining) 
               return count + bytes_read,  new_tail
-        else return failwith "Web.split: invalid case"
+        else return failwith "Suave.Web.split: invalid case"
       }
     loop pairs 0 0
 
@@ -86,7 +86,7 @@ module ParsingAndControl =
       for b in free do
         assert (b.length >= 0)
         do! select (ArraySegment(b.buffer.Array, b.offset, b.length)) b.length
-        do connection.free_buffer "Web.scan_marker" b.buffer
+        do connection.free_buffer "Suave.Web.scan_marker" b.buffer
       return NeedMore ret
     }
 
@@ -399,8 +399,8 @@ module ParsingAndControl =
 
     let rec loop (bytes : BufferSegment list) = socket {
 
-      let verbose  = Log.verbose runtime.logger "Web.request_loop.loop" Log.TraceHeader.empty
-      let verbosef = Log.verbosef runtime.logger "Web.request_loop.loop" Log.TraceHeader.empty
+      let verbose  = Log.verbose runtime.logger "Suave.Web.request_loop.loop" Log.TraceHeader.empty
+      let verbosef = Log.verbosef runtime.logger "Suave.Web.request_loop.loop" Log.TraceHeader.empty
 
       verbose "-> processor"
       let! result = process_request proxy_mode (match runtime.protocol with HTTP -> false | HTTPS _ -> true) bytes connection
@@ -484,7 +484,7 @@ open Suave.Session
 /// thrown exceptions.
 let default_error_handler (ex : Exception) msg (ctx : HttpContext) =
   let request = ctx.request
-  msg |> Log.verbosee ctx.runtime.logger "Web.default_error_handler" ctx.request.trace ex
+  msg |> Log.verbosee ctx.runtime.logger "Suave.Web.default_error_handler" ctx.request.trace ex
   if IPAddress.IsLoopback ctx.request.ipaddr then
     Response.response Codes.HTTP_500 (UTF8.bytes (sprintf "<h1>%s</h1><br/>%A" ex.Message ex)) ctx
   else 
