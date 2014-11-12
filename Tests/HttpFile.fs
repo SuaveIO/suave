@@ -36,10 +36,10 @@ let compression =
       testCase "verifiying we get the same size uncompressed" <| fun _ ->
         Assert.Equal("length should match"
         , test_file_size
-        , (run_with' (Files.browse_file "test-text-file.txt") |> req_bytes GET "/" None).Length |> int64)
+        , (run_with' (Files.browse_file' "test-text-file.txt") |> req_bytes GET "/" None).Length |> int64)
 
       testCase "gzip static file" <| fun _ ->
         Assert.Equal("length should match"
         , test_file_size
-        , (run_with' (Files.browse_file "test-text-file.txt") |> req_gzip_bytes GET "/" None).Length |> int64)
+        , (run_with' (Files.browse_file' "test-text-file.txt") |> req_gzip_bytes GET "/" None).Length |> int64)
     ]

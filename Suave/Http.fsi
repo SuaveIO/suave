@@ -1346,9 +1346,16 @@ module Http =
     /// <summary><para>
     /// 'browse' the file given as the filename, by sending it to the browser with a
     /// MIME-type/Content-Type header based on its extension. Will service from the
+    /// root_path.
+    /// </para></summary>
+    val browse_file : root_path:string -> file_name:string -> WebPart
+
+    /// <summary><para>
+    /// 'browse' the file given as the filename, by sending it to the browser with a
+    /// MIME-type/Content-Type header based on its extension. Will service from the
     /// current directory.
     /// </para></summary>
-    val browse_file : file_name:string -> WebPart
+    val browse_file' : file_name:string -> WebPart
 
     /// <summary><para>
     /// 'browse' the file in the sense that the contents of the file are sent based on the
