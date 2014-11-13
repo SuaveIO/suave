@@ -1341,6 +1341,11 @@ module Http =
     /// <remarks>
     /// The current implementation doesn't take kindly to relative paths.
     /// </remarks>
+    val resolve_path : root_path:string -> file_name:string -> string
+
+    /// Deprecated: use `resolve_path` and swap the arguments' positions. It
+    /// has been deprecated so that you can curry the root_path in your function
+    /// scope, with the root path.
     val local_file : file_name:string -> root_path:string -> string
 
     /// <summary><para>

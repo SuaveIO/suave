@@ -17,7 +17,7 @@ let ``canonicalization attacks`` =
     testCase "should throw" <| fun _ ->
       Assert.Raise("'../../passwd' is not a valid path",
         typeof<Exception>,
-        fun _ -> Files.local_file "../../passwd" current_path |> ignore)
+        fun _ -> Files.resolve_path current_path "../../passwd" |> ignore)
   ]
 
 [<Tests>]

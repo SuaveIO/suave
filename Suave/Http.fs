@@ -468,7 +468,7 @@ module Http =
         (Path.GetExtension)
         send_file
 
-    let local_file (file_name : string) (root_path : string) =
+    let resolve_path (root_path : string) (file_name : string) =
       let file_name =
         if Path.DirectorySeparatorChar.Equals('/') then file_name
         else file_name.Replace('/', Path.DirectorySeparatorChar)
@@ -479,9 +479,12 @@ module Http =
         else raise <| Exception("File canonalization issue.")
       else raise <| Exception("File canonalization issue.")
 
+    [<Obsolete("Use resolve_path")>]
+    let local_file file_name root_path = resolve_path root_path file_name
+
     let browse_file root_path file_name =
       fun ({request = r; runtime = q} as h) ->
-        file (local_file file_name root_path) h
+        file (resolve_path root_path file_name) h
 
     let browse_file' file_name =
       fun ({request = r; runtime = q} as h) ->
@@ -494,7 +497,7 @@ module Http =
           Log.TraceHeader.empty
           (sprintf "Files.browse trying file (local_file url:'%s' root:'%s')"
             r.url root_path)
-        file (local_file r.url root_path))
+        file (resolve_path root_path r.url))
 
     let browse' : WebPart =
       warbler (fun { runtime = q } -> browse q.home_directory)
@@ -504,7 +507,7 @@ module Http =
 
       let url = req.url
 
-      let dirname = local_file url root_path
+      let dirname = resolve_path root_path url
       let result = new StringBuilder()
 
       let filesize  (x : FileSystemInfo) =
