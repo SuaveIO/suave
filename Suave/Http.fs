@@ -479,10 +479,14 @@ module Http =
         else raise <| Exception("File canonalization issue.")
       else raise <| Exception("File canonalization issue.")
 
-    let browse_file file_name =
+    let browse_file root_path file_name =
       fun ({request = r; runtime = q} as h) ->
-        file (local_file file_name q.home_directory) h
+        file (local_file file_name root_path) h
 
+    let browse_file' file_name =
+      fun ({request = r; runtime = q} as h) ->
+        browse_file q.home_directory file_name h
+    
     let browse root_path : WebPart =
       warbler (fun { request = r; runtime = { logger = l } } ->
         Log.verbose l
