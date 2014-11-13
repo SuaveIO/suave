@@ -16,7 +16,8 @@ non-blocking fashion throughout.
 | Platform | Status         |
 | -------- | -------------- |
 | Windows  | [![Build status](https://ci.appveyor.com/api/projects/status/g0lum9qndwb018sy?svg=true)](https://ci.appveyor.com/project/AdemarGonzalez/suave) |
-| Mono     | [![Build status](https://tc-oss.intelliplan.net/app/rest/builds/buildType:(id:Suave_BuildIt)/statusIcon)](https://tc-oss.intelliplan.net/viewType.html?buildTypeId=Suave_BuildIt&guest=1) |
+| Mono/Linux     | [![Build status](https://tc-oss.intelliplan.net/app/rest/builds/buildType:(id:Suave_BuildIt)/statusIcon)](https://tc-oss.intelliplan.net/viewType.html?buildTypeId=Suave_BuildIt&guest=1) |
+| Mono/OSX     | [![Build status](https://travis-ci.org/SuaveIO/suave.svg?branch=master)](https://travis-ci.org/SuaveIO/suave) |
 
 What follows is a tutorial on how to create applications. Scroll past the
 tutorial to see detailed function documentation.
