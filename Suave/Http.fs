@@ -106,6 +106,7 @@ module Http =
       | ".css" -> mk_mime_type "text/css" true
       | ".gif" -> mk_mime_type "image/gif" false
       | ".png" -> mk_mime_type "image/png" false
+      | ".svg" -> mk_mime_type "image/svg+xml" false
       | ".ico" -> mk_mime_type "image/x-icon" false
       | ".htm"
       | ".html" -> mk_mime_type "text/html" true
