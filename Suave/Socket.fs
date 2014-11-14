@@ -137,7 +137,7 @@ type SocketMonad() =
 
   member this.Combine(v, f) = this.Bind(v, fun () -> f)
 
-  member this.While(guard, body : SocketOp<'a>) : SocketOp<'a> = async {
+  member this.While(guard, body : SocketOp<unit>) : SocketOp<unit> = async {
     if guard() then
       let! result = body
       match result with
@@ -186,7 +186,7 @@ let lift_async (a : Async<'a>) : SocketOp<'a> =
   }
 
 /// lift a Task type to the Socket monad
-let lift_task (a : Task) : SocketOp<'a>  = 
+let lift_task (a : Task) : SocketOp<unit>  = 
   async {
     let! s = a
     return Choice1Of2 s 
