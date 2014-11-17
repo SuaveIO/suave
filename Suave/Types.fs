@@ -17,7 +17,49 @@ type HttpCookie =
   ; secure    : bool
   ; http_only : bool
   ; version   : string option }
- 
+
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module HttpCookie =
+
+  /// Create a new HttpCookie with all the given values.
+  let mk name value expires path domain secure http_only version =
+    { name      = name
+      value     = value
+      expires   = expires
+      path      = path
+      domain    = domain
+      secure    = secure
+      http_only = http_only
+      version   = version }
+
+  /// Create a new cookie with the given name, value, and defaults:
+  ///
+  /// - 5 days to expiry from the instant it's created
+  /// - path at "/", so that it's global to the domain that it's created under.
+  /// - no specific domain (defaults to the current domain plus its subdomains)
+  /// - secure = false (you can set it over plain text HTTP - change to true in SSL terminator)
+  /// - http_only = true - the cookie can be read from JS - change this to
+  ///   false if you want to only be able to read the cookie from JS, but
+  ///   Good default if you're implementing session handling.
+  /// - version: an optional version field
+  ///
+  /// More reading:
+  /// - http://www.nczonline.net/blog/2009/05/05/http-cookies-explained/
+  /// - https://developer.mozilla.org/en-US/docs/Web/API/document.cookie
+  ///
+  let mk' name value =
+    { name      = name
+      value     = value
+      expires   = (Globals.utc_now ()).AddDays 5. |> Some
+      path      = Some "/"
+      domain    = None
+      secure    = false
+      http_only = true
+      version   = None }
+
+  /// An empty cookie value
+  let empty = mk' "" ""
+
 /// A file's mime type and if compression is enabled or not
 type MimeType =
   { name         : string

@@ -92,8 +92,7 @@ module Session =
 
     let request = ctx.request
     let cookies = Parsing.get_cookies request.headers
-    let sessionId =
-      
+    let session_id =
       match cookies ? suave_session_id with
       | Some attr ->
         if ctx.runtime.session_provider.Validate (attr, ctx) then
@@ -103,18 +102,16 @@ module Session =
       | None ->
         ctx.runtime.session_provider.Generate (time_span, ctx)
 
-    return! Writers.set_cookie { name = "suave_session_id"
-      ; value = sessionId
-      ; path = Some "/"
-      ; domain = None
-      ; secure = false
-      ; http_only = false
-      ; expires = Some (Globals.utc_now().Add time_span)
-      ; version = None } { ctx with user_state = ctx.user_state.Add("session_id", sessionId)}
-      }
+    let cookie, ctx' =
+      { HttpCookie.mk' "suave_session_id" session_id
+        with http_only = false (* o'rly? *)
+             expires   = Some (Globals.utc_now().Add time_span) },
+      { ctx with user_state = ctx.user_state |> Map.add "session_id" (box session_id) }
+
+    return! Writers.set_cookie cookie ctx'
+    }
 
   let session (ctx : HttpContext) : SessionStore<'a> =
     let sessionId = ctx.user_state.["session_id"] :?> string
     if String.IsNullOrEmpty sessionId then failwith "session_support was not called"
     else ctx.runtime.session_provider.Session sessionId
-
