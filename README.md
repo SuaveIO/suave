@@ -129,3 +129,4 @@ We have a chat room in case you feel like chatting a bit.
 ## Integrations
 
  * https://github.com/rayokota/generator-angular-suave
+ * [FsReveal](https://github.com/fsprojects/FsReveal)
