@@ -93,6 +93,7 @@
     <Compile Include="State.fs" />
     <Compile Include="Auth.fs" />
     <Compile Include="Web.fs" />
+    <Compile Include="Owin.fs" />
     <Compile Include="WebSocket.fs" />
     <Compile Include="Json.fs" />
     <Compile Include="Proxy.fs" />
