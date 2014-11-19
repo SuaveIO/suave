@@ -1,4 +1,20 @@
-﻿namespace Suave
+﻿module Suave.Owin
+
+// Following the specification:
+// https://github.com/owin/owin/blob/master/spec/owin-1.1.0.md
+
+open System
+open System.Collections.Generic
+open System.Threading.Tasks
+
+type OwinEnvironment =
+  IDictionary<string, obj>
+
+type OwinApp =
+  OwinEnvironment -> Async<unit>
+
+type OwinAppFunc =
+  Func<OwinEnvironment, Task>
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module OwinConstants =
@@ -29,14 +45,15 @@ module OwinConstants =
   [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
   module CommonKeys =
     let [<Literal>] client_certificate = "ssl.ClientCertificate"
+    let [<Literal>] trace_output = "host.TraceOutput"
+    let [<Literal>] addresses = "host.Addresses"
     let [<Literal>] remote_ip_address = "server.RemoteIpAddress"
     let [<Literal>] remote_port = "server.RemotePort"
     let [<Literal>] local_ip_address = "server.LocalIpAddress"
     let [<Literal>] local_port = "server.LocalPort"
     let [<Literal>] is_local = "server.IsLocal"
-    let [<Literal>] trace_output = "host.TraceOutput"
-    let [<Literal>] addresses = "host.Addresses"
     let [<Literal>] capabilities = "server.Capabilities"
+    let [<Literal>] server_name = "server.Name"
     let [<Literal>] on_sending_headers = "server.OnSendingHeaders"
 
   (* http://owin.org/extensions/owin-SendFile-Extension-v0.3.0.htm *)
@@ -82,3 +99,27 @@ module OwinConstants =
     let [<Literal>] call_cancelled = "websocket.CallCancelled"
     let [<Literal>] client_close_status = "websocket.ClientCloseStatus"
     let [<Literal>] client_close_description = "websocket.ClientCloseDescription"
+
+module OwinServerFactory =
+
+  [<CompiledName "Initialize">]
+  let initialize (props : OwinEnvironment) =
+    if props = null then nullArg "props"
+
+    props.[OwinConstants.owin_version] <- "1.1"
+
+    let cap =
+      match props.TryGetValue OwinConstants.CommonKeys.capabilities with
+      | false, _  -> new Dictionary<string, obj>() :> OwinEnvironment
+      | true, dic -> dic :?> OwinEnvironment
+
+    cap.[OwinConstants.CommonKeys.server_name] <- Globals.Internals.server_name
+    props.[OwinConstants.CommonKeys.capabilities] <- cap
+
+
+  let create (app : OwinAppFunc, properties : OwinEnvironment) : IDisposable=
+
+
+    { new IDisposable with
+      member x.Dispose () =
+        () }
