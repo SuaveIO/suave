@@ -4,8 +4,15 @@
 // https://github.com/owin/owin/blob/master/spec/owin-1.1.0.md
 
 open System
+open System.Net
+open System.Threading
 open System.Collections.Generic
 open System.Threading.Tasks
+
+open Suave
+open Suave.Http
+open Suave.Types
+open Suave.Sockets
 
 type OwinEnvironment =
   IDictionary<string, obj>
@@ -100,26 +107,94 @@ module OwinConstants =
     let [<Literal>] client_close_status = "websocket.ClientCloseStatus"
     let [<Literal>] client_close_description = "websocket.ClientCloseDescription"
 
+[<RequireQualifiedAccess>]
+[<CompilationRepresentation (CompilationRepresentationFlags.ModuleSuffix)>]
+module OwinAppFunc =
+  [<CompiledName ("FromFreya")>]
+  let to_suave (owin : OwinAppFunc) : WebPart =
+    fun (ctx : HttpContext) ->
+
+      let impl conn : SocketOp<unit> = async {
+
+        return Choice1Of2 ()
+        }
+
+      { ctx with
+          response =
+            { ctx.response with
+                content = SocketTask impl
+            }
+      }
+      |> succeed
+
 module OwinServerFactory =
+
+  let private read (d : OwinEnvironment) k f =
+    match d.TryGetValue k with
+    | false, _ -> f ()
+    | true, value -> value :?> 'a
+
+  let private ``read_env!`` (e : OwinEnvironment) key =
+    let res = read e key (fun () -> new Dictionary<string, obj>() :> OwinEnvironment)
+    e.[key] <- res
+    res
+
+  let private ``read_dic!`` (e : OwinEnvironment) key =
+    let res = read e key (fun () -> new Dictionary<string, 'a>())
+    e.[key] <- res
+    res
+
+  let private ``read_list!`` (e : OwinEnvironment) key =
+    let res = read e key (fun () -> new List<'a>() :> IList<'a>)
+    e.[key] <- res
+    res
+
+  let private get (e : OwinEnvironment) key =
+    match e.TryGetValue key with
+    | false, _ -> failwithf "missing value for key '%s'" key
+    | true, value -> value :?> 'a
+
+  let private get_default (e : OwinEnvironment) key map defaults =
+    match e.TryGetValue key with
+    | false, _ -> defaults
+    | true, value -> map (value :?> 'a)
 
   [<CompiledName "Initialize">]
   let initialize (props : OwinEnvironment) =
     if props = null then nullArg "props"
-
     props.[OwinConstants.owin_version] <- "1.1"
-
-    let cap =
-      match props.TryGetValue OwinConstants.CommonKeys.capabilities with
-      | false, _  -> new Dictionary<string, obj>() :> OwinEnvironment
-      | true, dic -> dic :?> OwinEnvironment
-
+    let cap = ``read_env!`` props OwinConstants.CommonKeys.capabilities
     cap.[OwinConstants.CommonKeys.server_name] <- Globals.Internals.server_name
-    props.[OwinConstants.CommonKeys.capabilities] <- cap
 
+  let create (app : OwinAppFunc, props : OwinEnvironment) =
+    if app = null then nullArg "app"
+    if props = null then nullArg "props"
 
-  let create (app : OwinAppFunc, properties : OwinEnvironment) : IDisposable=
+    let cap = ``read_env!`` props OwinConstants.CommonKeys.capabilities
+    let bindings =
+      (``read_list!`` props OwinConstants.CommonKeys.addresses
+       : IList<OwinEnvironment>)
+      |> Seq.map (fun dic ->
+        let port   = get dic "port" : string
+        let ip     = read dic "ip" (fun () -> "127.0.0.1") : string
+        let scheme = get_default dic "certificate" (fun _ -> HTTP) HTTP
+        { scheme = scheme; socketBinding = { ip = IPAddress.Parse ip; port = uint16 port } })
+      |> List.ofSeq
 
+    let cts = new CancellationTokenSource()
+
+    let conf =
+      { Web.defaultConfig with
+          bindings          = bindings
+          cancellationToken = cts.Token }
+
+    let started, listening =
+      Web.startWebServerAsync conf (OwinAppFunc.to_suave app)
+
+    let _ = started |> Async.RunSynchronously
 
     { new IDisposable with
       member x.Dispose () =
+        cts.Cancel()
+        cts.Dispose()
         () }
