@@ -165,6 +165,8 @@ module OwinAppFunc =
 
       let impl conn : SocketOp<unit> = async {
         do! owin (wrap ctx)
+        // todo: on_sending_headers
+        // todo: http serving
         return Choice1Of2 ()
         }
 
@@ -248,6 +250,7 @@ module OwinServerFactory =
 
     { new IDisposable with
       member x.Dispose () =
+        // note: this won't let the web requests finish gently
         cts.Cancel()
         cts.Dispose()
       }
