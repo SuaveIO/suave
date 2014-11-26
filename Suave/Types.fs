@@ -65,6 +65,13 @@ type MimeType =
   { name         : string
     compression  : bool }
 
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module MimeType =
+
+  let mk name compression =
+    { name        = name
+      compression = compression }
+
 type MimeTypesMap = string -> MimeType option
 
 /// A holder for uploaded file meta-data
@@ -550,8 +557,8 @@ module HttpContext =
       user_state = Map.empty
       runtime    = runtime
       response   = { status = HTTP_404
-                   ; headers = []
-                   ; content = NullContent } }
+                     headers = []
+                     content = NullContent } }
 
   let request x = x.request
 

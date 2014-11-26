@@ -106,25 +106,25 @@ type LogLevel =
 /// of possible values, so you can be fairly certain a given request
 /// id is unique, given a good random number generator.
 type TraceHeader =
-    /// if this is the 'first' traced request, then trace_id equals
+  { /// if this is the 'first' traced request, then trace_id equals
     /// req_id. If it's the second, then trace_id = req_parent_id
     /// or otherwise third or later then trace_id, req_id and req_parent_id
     /// are all disjunct
-  { trace_id      : uint64
+    trace_id      : uint64
     /// the request id assigned when suave received the http request
     /// In ZipKin/Dapper-speak, this is the span id
-  ; req_id        : uint64
+    req_id        : uint64
     /// possibly a parent
     /// In ZipKin/Dapper-speak, this is the span parent id
-  ; req_parent_id : uint64 option }
+    req_parent_id : uint64 option }
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module TraceHeader =
   /// The empty trace header has zeroes for trace and request id.
   let empty =
     { trace_id      = 0UL
-    ; req_id        = 0UL
-    ; req_parent_id = None }
+      req_id        = 0UL
+      req_parent_id = None }
 
   /// Create a new `TraceHeader` with the given `trace_id` and `span_parent_id`.
   /// This generates a new id and places it in `trace_id` AND `req_id` if no
@@ -134,26 +134,36 @@ module TraceHeader =
   let mk trace_id span_parent_id =
     let new_id = Globals.random.NextUInt64()
     { trace_id      = trace_id |> Option.or_default new_id
-    ; req_id        = new_id
-    ; req_parent_id = span_parent_id }
+      req_id        = new_id
+      req_parent_id = span_parent_id }
 
 /// When logging, write a log line like this with the source of your
 /// log line as well as a message and an optional exception.
 type LogLine =
-    /// the trace id and span id
+  { /// the trace id and span id
     /// If using tracing, then this LogLine is an annotation to a
     /// span instead of a 'pure' log entry
-  { trace         : TraceHeader
+    trace         : TraceHeader
     /// the level that this log line has
-  ; level         : LogLevel
+    level         : LogLevel
     /// the source of the log line, e.g. 'ModuleName.FunctionName'
-  ; path          : string
+    path          : string
     /// the message that the application wants to log
-  ; message       : string
+    message       : string
     /// an optional exception
-  ; ``exception`` : exn option
+    ``exception`` : exn option
     /// timestamp when this log line was created
-  ; ts_utc_ticks  : int64 }
+    ts_utc_ticks  : int64 }
+
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module LogLine =
+  let mk path trace ex message =
+    { message       = message
+      level         = Verbose
+      path          = path
+      ``exception`` = ex
+      trace         = trace
+      ts_utc_ticks  = Globals.utc_now().Ticks }
 
 /// The primary Logger abstraction that you can log data into
 type Logger =
@@ -222,22 +232,23 @@ module Loggers =
         [ ConsoleWindowLogger(level)
           OutputWindowLogger(level) ]) :> Logger
 
-let internal mk_line path trace ex message =
-  { message       = message
-  ; level         = Verbose
-  ; path          = path
-  ; ``exception`` = ex
-  ; trace         = trace
-  ; ts_utc_ticks  = Globals.utc_now().Ticks }
-
 let verbose (logger : Logger) path trace message =
-  logger.Log Verbose (fun _ -> mk_line path trace None message)
+  logger.Log Verbose (fun _ -> LogLine.mk path trace None message)
 
 let verbosef logger path trace f_format =
   f_format (Printf.kprintf (verbose logger path trace))
 
 let verbosee (logger : Logger) path trace ex message =
-  logger.Log Verbose (fun _ -> mk_line path trace (Some ex) message)
+  logger.Log Verbose (fun _ -> LogLine.mk path trace (Some ex) message)
+
+let info (logger : Logger) path trace message =
+  logger.Log Info (fun _ -> LogLine.mk path trace None message)
+
+let infof logger path trace f_format =
+  f_format (Printf.kprintf (info logger path trace))
+
+let infoe (logger : Logger) path trace ex message =
+  logger.Log Info (fun _ -> LogLine.mk path trace (Some ex) message)
 
 let intern (logger : Logger) path =
   verbose logger path (TraceHeader.empty)

@@ -11,9 +11,10 @@ let MAX_BACK_LOG = Int32.MaxValue
 
 type StartedData =
   { start_called_utc : DateTimeOffset
-  ; socket_bound_utc : DateTimeOffset option
-  ; source_ip        : IPAddress
-  ; source_port      : uint16 }
+    socket_bound_utc : DateTimeOffset option
+    source_ip        : IPAddress
+    source_port      : uint16 }
+with
   override x.ToString() =
     sprintf "started in %f ms: %O:%d"
       ((x.socket_bound_utc |> Option.fold (fun _ t -> t) x.start_called_utc) - x.start_called_utc).TotalMilliseconds
