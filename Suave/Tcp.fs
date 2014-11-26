@@ -39,10 +39,11 @@ let close_socket (s : Socket) =
 let shutdown_socket (s : Socket) =
   try
     if s <> null then
-      try 
+      try
         s.Shutdown(SocketShutdown.Both)
       with _ -> ()
-      s.Close()
+      s.Close ()
+      s.Dispose ()
   with _ -> ()
 
 /// Stop the TCP listener server
@@ -101,6 +102,14 @@ let inline send (socket: Socket) (args : A) (buf: B) =
 let inline is_good (args : A) =
   args.SocketError = SocketError.Success
 
+/// Argh!! @ System.Net.Sockets.SocketException: Address already in use
+let private a_few_times f =
+  let s ms = System.Threading.Thread.Sleep (ms : int)
+  let rec run = function
+    | 0us | 1us -> f ()
+    | n -> try f () with e -> s 10; run (n - 1us)
+  run 3us
+
 /// Start a new TCP server with a specific IP, Port and with a serve_client worker
 /// returning an async workflow whose result can be awaited (for when the tcp server has started
 /// listening to its address/port combination), and an asynchronous workflow that
@@ -115,17 +124,17 @@ let tcp_ip_server (source_ip : IPAddress,
 
   let start_data =
     { start_called_utc = Globals.utc_now ()
-    ; socket_bound_utc = None
-    ; source_ip        = source_ip
-    ; source_port      = source_port }
+      socket_bound_utc = None
+      source_ip        = source_ip
+      source_port      = source_port }
 
   let accepting_connections = new AsyncResultCell<StartedData>()
   let a, b, c, bufferManager = create_pools logger max_concurrent_ops buffer_size
 
-  let localEndPoint = new IPEndPoint(source_ip, int source_port)
-  let listenSocket = new Socket(localEndPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp)
-  listenSocket.Bind(localEndPoint)
-  listenSocket.Listen(MAX_BACK_LOG)
+  let local_ep = new IPEndPoint(source_ip, int source_port)
+  let listen_socket = new Socket(local_ep.AddressFamily, SocketType.Stream, ProtocolType.Tcp)
+  a_few_times (fun () -> listen_socket.Bind local_ep)
+  listen_socket.Listen MAX_BACK_LOG
 
   // consider:
   // echo 5 > /proc/sys/net/ipv4/tcp_fin_timeout
@@ -146,11 +155,11 @@ let tcp_ip_server (source_ip : IPAddress,
         { ipaddr       = ip_address
           read         = receive socket read_args
           write        = send socket write_args
-          get_buffer   = fun context -> bufferManager.PopBuffer(context)
+          get_buffer   = fun context     -> bufferManager.PopBuffer(context)
           free_buffer  = fun context buf -> bufferManager.FreeBuffer(buf, context)
-          is_connected = fun _ -> is_good read_args && is_good write_args
-          line_buffer  = bufferManager.PopBuffer("Suave.Tcp.tcp_ip_server.job") // buf allocate
-      }
+          is_connected = fun _           -> is_good read_args && is_good write_args
+          line_buffer  = bufferManager.PopBuffer "Suave.Tcp.tcp_ip_server.job" // buf allocate
+        }
       use! oo = Async.OnCancel (fun () -> intern "disconnected client (async cancel)"
                                           shutdown_socket socket)
 
@@ -172,7 +181,7 @@ let tcp_ip_server (source_ip : IPAddress,
   // start a new async worker for each accepted TCP client
   accepting_connections.AwaitResult(), async {
     try
-      use! dd = Async.OnCancel(fun () -> stop_tcp logger "tcp_ip_server async cancelled" listenSocket)
+      use! dd = Async.OnCancel(fun () -> stop_tcp logger "tcp_ip_server async cancelled" listen_socket)
       let! (token : Threading.CancellationToken) = Async.CancellationToken
 
       let start_data = { start_data with socket_bound_utc = Some(Globals.utc_now()) }
@@ -180,16 +189,16 @@ let tcp_ip_server (source_ip : IPAddress,
 
       logger.Log Log.LogLevel.Info <| fun _ ->
         { path          = "Suave.Tcp.tcp_ip_server"
-        ; trace         = Log.TraceHeader.empty
-        ; message       = sprintf "started listener in: %O%s" start_data (if token.IsCancellationRequested then ", cancellation requested" else "")
-        ; level         = Log.LogLevel.Info
-        ; ``exception`` = None
-        ; ts_utc_ticks  = Globals.utc_now().Ticks }
+          trace         = Log.TraceHeader.empty
+          message       = sprintf "started listener in: %O%s" start_data (if token.IsCancellationRequested then ", cancellation requested" else "")
+          level         = Log.LogLevel.Info
+          ``exception`` = None
+          ts_utc_ticks  = Globals.utc_now().Ticks }
 
       while not (token.IsCancellationRequested) do
         try
           let accept_args = a.Pop()
-          let! _ = accept listenSocket accept_args
+          let! _ = accept listen_socket accept_args
           Async.Start (job accept_args, token)
         with ex -> "failed to accept a client" |> Log.interne logger "Suave.Tcp.tcp_ip_server" ex
       return ()

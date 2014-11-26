@@ -37,7 +37,7 @@ let proxy =
 
   // let sslCert = X509Certificate.FromPKCS12(BIO.File("suave.p12","r"), "easy")
   // let proxy_config = { default_config with bindings = [ HttpBinding.Create(Protocol.HTTPS(sslCert), "127.0.0.1", 8084) ] }
-  let proxy_config = { default_config with bindings = [ HttpBinding.Create(Protocol.HTTP, "127.0.0.1", 8084) ] }
+  let proxy_config = { default_config with bindings = [ { HttpBinding.defaults with port = 8084us } ] }
   let proxy = run_with_factory proxy_server_async proxy_config
 
   testList "creating proxy" [
@@ -49,7 +49,7 @@ let proxy =
     testCase "GET /redirect returns 'redirect'" <| fun _ ->
       run_in_context (run_target (url "/secret" >>= redirect "https://sts.example.se")) dispose_context <| fun _ ->
         let headers, stat =
-          proxy to_target |> req_resp HttpMethod.GET "/secret" None None DecompressionMethods.None
+          proxy to_target |> req_resp HttpMethod.GET "/secret" "" None None DecompressionMethods.None
             (fun r -> r.Headers, r.StatusCode)
         Assert.Equal("should proxy redirect", HttpStatusCode.Found, stat)
         Assert.Equal("should give Location-header together with redirect",
@@ -59,10 +59,10 @@ let proxy =
       run_in_context (run_target (INTERNAL_ERROR "Oh noes")) dispose_context <| fun _ ->
         Assert.Equal("should have correct status code",
           HttpStatusCode.InternalServerError,
-          proxy to_target |> req_resp HttpMethod.GET "/" None None DecompressionMethods.None status_code)
+          proxy to_target |> req_resp HttpMethod.GET "/" "" None None DecompressionMethods.None status_code)
         Assert.Equal("should have correct content",
           "Oh noes",
-          proxy to_target |> req_resp HttpMethod.GET "/" None None DecompressionMethods.None content_string)
+          proxy to_target |> req_resp HttpMethod.GET "/" "" None None DecompressionMethods.None content_string)
 
     testCase "Proxy decides to return directly" <| fun _ ->
       run_in_context (run_target (OK "upstream reply")) dispose_context <| fun _ ->

@@ -224,7 +224,7 @@ module ParsingAndControl =
           if file_length > int64(0) then
             let filename =
               (header_params content_disposition) ? filename |> Option.get |> (fun x -> x.Trim('"'))
-            let upload = new HttpUpload(fieldname, filename, content_type |> Option.get, temp_file_name)
+            let upload = HttpUpload.mk fieldname filename (content_type |> Option.get) temp_file_name
             return! loop boundary b { r with files = upload :: r.files }
           else
             File.Delete temp_file_name
@@ -522,7 +522,7 @@ let web_server (config : SuaveConfig) (webpart : WebPart) =
 /// with a timeout of one minute for computations to run. Waiting for 2 seconds for the socket bind
 /// to succeed.
 let default_config : SuaveConfig =
-  { bindings         = [ { scheme = HTTP; ip = IPAddress.Loopback; port = 8083us } ]
+  { bindings         = [ HttpBinding.defaults ]
   ; error_handler    = default_error_handler
   ; listen_timeout   = TimeSpan.FromSeconds(2.)
   ; ct               = Async.DefaultCancellationToken

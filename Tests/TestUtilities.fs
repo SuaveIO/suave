@@ -3,10 +3,12 @@
 #nowarn "25"
 
 open System
+open System.IO
 open System.Threading
 open System.Net
 open System.Net.Http
 open System.Net.Http.Headers
+open System.Reflection
 
 open Suave
 open Suave.Types
@@ -17,7 +19,15 @@ open Suave.Log
 
 open Fuchu
 
-let current_path = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location)
+let current_path =
+  Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location)
+
+let read_text relative_path =
+  File.ReadAllText(Path.Combine(current_path, relative_path))
+
+let read_bytes relative_path =
+  File.ReadAllBytes(Path.Combine(current_path, relative_path))
+
 let default_config = { default_config with logger = Loggers.sane_defaults_for Log.LogLevel.Warn }
 
 [<AutoOpen>]
@@ -81,6 +91,7 @@ module RequestFactory =
   let req_resp
     (methd : HttpMethod)
     (resource : string)
+    (query : string)
     data
     (cookies : Net.CookieContainer option)
     (decompressionMethod : Net.DecompressionMethods)
@@ -88,8 +99,9 @@ module RequestFactory =
 
     with_context <| fun ctx ->
       let server = ctx.suave_config.bindings.Head.ToString()
-      let uri_builder = UriBuilder server
-      uri_builder.Path <- resource
+      let uri_builder   = UriBuilder server
+      uri_builder.Path  <- resource
+      uri_builder.Query <- query
 
       use handler = new Net.Http.HttpClientHandler(AllowAutoRedirect = false)
       handler.AutomaticDecompression <- decompressionMethod
@@ -115,34 +127,37 @@ module RequestFactory =
       f_result r
 
   let req methd resource data =
-    req_resp methd resource data None DecompressionMethods.None content_string
+    req_resp methd resource "" data None DecompressionMethods.None content_string
+
+  let req_query methd resource query =
+    req_resp methd resource query None None DecompressionMethods.None content_string
 
   let req_bytes methd resource data =
-    req_resp methd resource data None DecompressionMethods.None content_byte_array
+    req_resp methd resource "" data None DecompressionMethods.None content_byte_array
 
   let req_gzip methd resource data =
-    req_resp methd resource data None DecompressionMethods.GZip content_string
+    req_resp methd resource "" data None DecompressionMethods.GZip content_string
 
   let req_deflate methd resource data =
-    req_resp methd resource data None DecompressionMethods.Deflate content_string
+    req_resp methd resource "" data None DecompressionMethods.Deflate content_string
 
   let req_gzip_bytes methd resource data =
-    req_resp methd resource data None DecompressionMethods.GZip content_byte_array
+    req_resp methd resource "" data None DecompressionMethods.GZip content_byte_array
 
   let req_deflate_bytes methd resource data =
-    req_resp methd resource data None DecompressionMethods.Deflate content_byte_array
+    req_resp methd resource "" data None DecompressionMethods.Deflate content_byte_array
 
   let req_headers methd resource data =
-    req_resp methd resource data None DecompressionMethods.None response_headers
+    req_resp methd resource "" data None DecompressionMethods.None response_headers
 
   let req_content_headers methd resource data =
-    req_resp methd resource data None DecompressionMethods.None content_headers
+    req_resp methd resource "" data None DecompressionMethods.None content_headers
 
   let req_cookies methd resource data ctx =
     let cookies = new CookieContainer()
     req_resp
-      methd resource data
-      (Some cookies) 
+      methd resource "" data
+      (Some cookies)
       DecompressionMethods.None
       id ctx
     |> ignore // places stuff in the cookie container
