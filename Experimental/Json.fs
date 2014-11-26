@@ -23,7 +23,14 @@ let from_json<'a> (bytes:byte []) =
 /// Expose function f through a json call; lets you write like
 ///
 /// let app =
-///   url "/path"  >>= request (map_json some_function);
+///   url "/path"  >>= map_json some_function;
 ///
-let map_json f ( r : Types.HttpRequest) =
-  f (from_json(r.raw_form)) |> to_json |> Http.Successful.ok
+open Suave.Http
+
+let map_json f  =
+  Types.request(fun r ->
+    try
+      let output = f (from_json(r.raw_form)) to_json 
+      Successful.ok output >>= Writers.set_mime_type "application/json"
+    with e ->
+      ServerErrors.INTERNAL_ERROR (e.Message.ToString()))
