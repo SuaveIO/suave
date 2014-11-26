@@ -10,13 +10,13 @@ open System.Net
 /// HTTP cookie
 type HttpCookie =
   { name      : string
-  ; value     : string
-  ; expires   : DateTimeOffset option
-  ; path      : string option
-  ; domain    : string option
-  ; secure    : bool
-  ; http_only : bool
-  ; version   : string option }
+    value     : string
+    expires   : DateTimeOffset option
+    path      : string option
+    domain    : string option
+    secure    : bool
+    http_only : bool
+    version   : string option }
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module HttpCookie =
@@ -63,64 +63,130 @@ module HttpCookie =
 /// A file's mime type and if compression is enabled or not
 type MimeType =
   { name         : string
-  ; compression  : bool }
+    compression  : bool }
+
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module MimeType =
+
+  let mk name compression =
+    { name        = name
+      compression = compression }
 
 type MimeTypesMap = string -> MimeType option
 
 /// A holder for uploaded file meta-data
-type HttpUpload(fieldname : string, filename : string, mime_type : string, temp_file_name : string) =
-  member x.FieldName = fieldname
-  member x.FileName  = filename
-  member x.MimeType  = mime_type
-  member x.Path      = temp_file_name
+type HttpUpload =
+  { field_name     : string
+    file_name      : string
+    mime_type      : string
+    temp_file_path : string }
+
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module HttpUpload =
+
+  let mk field_name file_name mime_type temp_file_path =
+    { field_name     = field_name
+      file_name      = file_name
+      mime_type      = mime_type
+      temp_file_path = temp_file_path }
+
+  let field_name x = x.field_name
+
+  let file_name x = x.file_name
+
+  let mime_type x = x.mime_type
+
+  let temp_file_path x = x.temp_file_path
 
 /// A holder for the data extracted from the request.
 type HttpRequest =
   { http_version     : string
-  ; url              : string
-  ; ``method``       : string
-  ; headers          : (string * string) list
-  ; raw_form         : byte []
-  ; raw_query        : string
-  ; files            : HttpUpload list
-  ; multipart_fields : (string * string) list
-  ; trace            : Log.TraceHeader
-  ; is_secure        : bool
-  ; ipaddr           : IPAddress }
+    url              : string
+    ``method``       : string
+    headers          : (string * string) list
+    raw_form         : byte []
+    raw_query        : string
+    files            : HttpUpload list
+    multipart_fields : (string * string) list
+    trace            : Log.TraceHeader
+    is_secure        : bool
+    ipaddr           : IPAddress }
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module HttpRequest =
+
+  open Suave.Utils
+
   let empty =
     { http_version     = "1.1"
-    ; url              = "/"
-    ; ``method``       = ""
-    ; headers          = []
-    ; raw_form         = Array.empty
-    ; raw_query        = ""
-    ; files            = []
-    ; multipart_fields = []
-    ; trace            = Log.TraceHeader.empty
-    ; is_secure        = false
-    ; ipaddr           = IPAddress.Loopback }
+      url              = "/"
+      ``method``       = ""
+      headers          = []
+      raw_form         = Array.empty
+      raw_query        = ""
+      files            = []
+      multipart_fields = []
+      trace            = Log.TraceHeader.empty
+      is_secure        = false
+      ipaddr           = IPAddress.Loopback }
 
   let mk http_version url meth headers raw_query trace_headers is_secure ip_addr =
     { http_version     = http_version
-    ; url              = url
-    ; ``method``       = meth
-    ; headers          = headers
-    ; raw_form         = Array.empty
-    ; raw_query        = raw_query
-    ; files            = []
-    ; multipart_fields = []
-    ; trace            = trace_headers //parse_trace_headers headers
-    ; is_secure        = is_secure
-    ; ipaddr           = ip_addr } //connection.ipaddr }
+      url              = url
+      ``method``       = meth
+      headers          = headers
+      raw_form         = Array.empty
+      raw_query        = raw_query
+      files            = []
+      multipart_fields = []
+      trace            = trace_headers
+      is_secure        = is_secure
+      ipaddr           = ip_addr }
 
-open Suave.Utils
-///// Gets the query from the HttpRequest
-let query (x : HttpRequest) = Parsing.parse_data x.raw_query |> List.ofArray
-///// Gets the form from the HttpRequest
-let form  (x : HttpRequest) = Parsing.parse_data (ASCII.to_string' x.raw_form) |> List.ofArray
+  /// Gets the header for the given key in the HttpRequest
+  let header x k =
+    x.headers %% k
+
+  /// Gets the query string from the HttpRequest. Use
+  /// (^^) to try to fetch data from this.
+  let query (x : HttpRequest) =
+    Parsing.parse_data x.raw_query
+    |> List.ofArray
+
+  /// Finds the key k from the query string in the HttpRequest
+  let query' (x : HttpRequest) (k : string) =
+    (query x) ^^ k
+
+  /// Gets the form from the HttpRequest
+  let form  (x : HttpRequest) =
+    Parsing.parse_data (ASCII.to_string' x.raw_form)
+    |> List.ofArray
+
+  /// Finds the key k from the form in the HttpRequest
+  let form' (x : HttpRequest) (k : string) =
+    (form x) ^^ k
+
+  let http_version x = x.http_version
+
+  let url x = x.url
+
+  let ``method`` x = x.``method``
+
+  let headers x = x.headers
+
+  let raw_form x = x.raw_form
+
+  let raw_query x = x.raw_query
+
+  let files x = x.files
+
+  let multipart_fields x = x.multipart_fields
+
+  let trace x = x.trace
+
+  let is_secure x = x.is_secure
+
+  let ipaddr x = x.ipaddr
 
 type ITlsProvider =
   abstract member Wrap : Connection -> SocketOp<Connection>
@@ -144,23 +210,51 @@ type Port = uint16
 
 /// A HTTP binding is a protocol is the product of HTTP or HTTP, a DNS or IP binding and a port number
 type HttpBinding =
-  /// The scheme in use
-  { scheme : Protocol
-  /// The host or IP address to bind to. This will be interpreted by the operating system
-  ; ip     : IPAddress
-  /// The port for the binding
-  ; port   : Port }
+  { /// The scheme in use
+    scheme : Protocol
+    /// The host or IP address to bind to. This will be interpreted by the operating system
+    ip     : IPAddress
+    /// The port for the binding
+    port   : Port }
 with
-  /// Create a HttpBinding for the given protocol, an IP address to bind to and a port
-  /// to listen on.
+  [<Obsolete "Use HttpBinding.mk or mk' instead">]
   static member Create(proto, ip : string, port : int) =
     { scheme = proto
-    ; ip     = IPAddress.Parse ip
-    ; port   = uint16 port }
+      ip     = IPAddress.Parse ip
+      port   = uint16 port }
   /// Overrides the default ToString() method to provide an implementation that is assignable
   /// to a BaseUri for a RestClient/HttpClient.
   override x.ToString() =
     sprintf "%O://%O:%d/" x.scheme x.ip x.port
+
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module HttpBinding =
+
+  [<Literal>]
+  let DefaultBindingPort = 8083us
+
+  let defaults =
+    { scheme = HTTP
+      ip     = IPAddress.Loopback
+      port   = DefaultBindingPort }
+
+  /// Create a HttpBinding for the given protocol, an IP address to bind to and a port
+  /// to listen on.
+  let mk scheme ip port =
+    { scheme = scheme
+      ip     = ip
+      port   = port }
+
+  let mk' scheme ip port =
+    { scheme = scheme
+      ip     = IPAddress.Parse ip
+      port   = uint16 (port : int) }
+
+  let scheme x = x.scheme
+
+  let ip x     = x.ip
+
+  let port x   = x.port
 
 /// A session store is a reader and a writer function pair keyed on strings.
 type SessionStore<'a> = (string -> 'a option) * (string -> 'a -> unit)
@@ -331,8 +425,8 @@ open Codes
 /// details on what is possible.
 type HttpResult =
   { status  : HttpCode
-  ; headers : (string * string) list
-  ; content : HttpContent }
+    headers : (string * string) list
+    content : HttpContent }
 
 /// A small module that helps you create a HttpResults.
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
@@ -340,14 +434,20 @@ module HttpResult =
   /// The empty HttpResult, with a 404 and a HttpContent.NullContent content
   let empty =
     { status  = HTTP_404
-    ; headers = []
-    ; content = HttpContent.NullContent }
+      headers = []
+      content = HttpContent.NullContent }
 
   /// Create a new HttpResult from the status, headers and content.
   let create status headers content =
     { status  = status
-    ; headers = headers
-    ; content = content }
+      headers = headers
+      content = content }
+
+  let status x = x.status
+
+  let headers x = x.headers
+
+  let content x = x.content
 
 /// A SuaveTask is an Async{'a option} which shows that it may need to be
 /// evaluated asynchronously to decide whether a value is available.
@@ -363,20 +463,20 @@ type ErrorHandler = Exception -> String -> WebPart
 /// value yourself, or use the `empty` one.
 and HttpRuntime =
   { protocol           : Protocol
-  ; error_handler      : ErrorHandler
-  ; mime_types_map     : MimeTypesMap
-  ; home_directory     : string
-  ; compression_folder : string
-  ; logger             : Log.Logger
-  ; session_provider   : ISessionProvider }
+    error_handler      : ErrorHandler
+    mime_types_map     : MimeTypesMap
+    home_directory     : string
+    compression_folder : string
+    logger             : Log.Logger
+    session_provider   : ISessionProvider }
 
 /// The HttpContext is the container of the request, runtime, user-state and
 /// response.
 and HttpContext =
   { request    : HttpRequest
-  ; runtime    : HttpRuntime
-  ; user_state : Map<string, obj>
-  ; response   : HttpResult }
+    runtime    : HttpRuntime
+    user_state : Map<string, obj>
+    response   : HttpResult }
 
 /// The session provider is a convenience interface for storing user session
 /// data.
@@ -409,22 +509,36 @@ module HttpRuntime =
   /// the output stream correctly.
   let empty =
     { protocol           = Protocol.HTTP
-    ; error_handler      = fun _ _ -> fun _ -> async.Return None
-    ; mime_types_map     = fun _ -> None
-    ; home_directory     = "."
-    ; compression_folder = "."
-    ; logger             = Log.Loggers.sane_defaults_for Log.Debug
-    ; session_provider   = stub_session_provider }
+      error_handler      = fun _ _ -> fun _ -> async.Return None
+      mime_types_map     = fun _ -> None
+      home_directory     = "."
+      compression_folder = "."
+      logger             = Log.Loggers.sane_defaults_for Log.Debug
+      session_provider   = stub_session_provider }
 
   /// make a new HttpRuntime from the given parameters
   let mk proto error_handler mime_types home_directory compression_folder logger session_provider =
     { protocol           = proto
-    ; error_handler      = error_handler
-    ; mime_types_map     = mime_types
-    ; home_directory     = home_directory
-    ; compression_folder = compression_folder
-    ; logger             = logger
-    ; session_provider   = session_provider }
+      error_handler      = error_handler
+      mime_types_map     = mime_types
+      home_directory     = home_directory
+      compression_folder = compression_folder
+      logger             = logger
+      session_provider   = session_provider }
+
+  let protocol x = x.protocol
+
+  let error_handler x = x.error_handler
+
+  let mime_types_map x = x.mime_types_map
+
+  let home_directory x = x.home_directory
+
+  let compression_folder x = x.compression_folder
+
+  let logger x = x.logger
+
+  let session_provider x = x.session_provider
 
 /// A module that provides functions to create a new HttpContext.
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
@@ -434,20 +548,28 @@ module HttpContext =
   /// in unit tests.
   let empty =
     { request    = HttpRequest.empty
-    ; user_state = Map.empty
-    ; runtime    = HttpRuntime.empty
-    ; response   = HttpResult.empty }
+      user_state = Map.empty
+      runtime    = HttpRuntime.empty
+      response   = HttpResult.empty }
 
   let mk request runtime =
     { request    = request
-    ; user_state = Map.empty
-    ; runtime    = runtime
-    ; response   = { status = HTTP_404
-                   ; headers = []
-                   ; content = NullContent } }
+      user_state = Map.empty
+      runtime    = runtime
+      response   = { status = HTTP_404
+                     headers = []
+                     content = NullContent } }
 
+  let request x = x.request
+
+  let user_state x = x.user_state
+
+  let runtime x = x.runtime
+
+  let response x = x.response
 
 let request f (a : HttpContext) = f a.request a
+
 let context f (a : HttpContext) = f a a
 
 open System.Threading
@@ -456,40 +578,56 @@ open System.Threading
 /// you can use to bootstrap the configuration:
 /// <code>{ default_config with bindings = [ ... ] }</code>
 type SuaveConfig =
-  /// The bindings for the web server to launch with
-  { bindings         : HttpBinding list
+  { /// The bindings for the web server to launch with
+    bindings                : HttpBinding list
+    /// An error handler to use for handling exceptions that are
+    /// are thrown from the web parts
+    error_handler           : ErrorHandler
+    /// Timeout to wait for the socket bind to finish
+    listen_timeout          : TimeSpan
+    /// A cancellation token for the web server. Signalling this token
+    /// means that the web server shuts down
+    ct                      : CancellationToken
+    /// buffer size for socket operations
+    buffer_size             : int
+    /// max number of concurrent socket operations
+    max_ops                 : int
+    /// MIME types
+    mime_types_map          : MimeTypesMap
+    /// Home or root directory
+    home_folder             : string option
+    /// Folder for temporary compressed files
+    compressed_files_folder : string option
+    /// A logger to log with
+    logger                  : Log.Logger
+    /// A http session provider
+    session_provider        : ISessionProvider }
 
-  /// An error handler to use for handling exceptions that are
-  /// are thrown from the web parts
-  ; error_handler    : ErrorHandler
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module SuaveConfig =
 
-  /// Timeout to wait for the socket bind to finish
-  ; listen_timeout   : TimeSpan
+  let bindings x = x.bindings
 
-  /// A cancellation token for the web server. Signalling this token
-  /// means that the web server shuts down
-  ; ct               : CancellationToken
+  let error_handler x = x.error_handler
 
-  /// buffer size for socket operations
-  ; buffer_size      : int
+  let listen_timeout x = x.listen_timeout
 
-  /// max number of concurrent socket operations
-  ; max_ops          : int
+  let ct x = x.ct
 
-  /// MIME types
-  ; mime_types_map   : MimeTypesMap
+  let buffer_size x = x.buffer_size
 
-  /// Home or root directory
-  ; home_folder      : string option
+  let max_ops x = x.max_ops
 
-  /// Folder for temporary compressed files
-  ; compressed_files_folder : string option
+  let mime_types_map x = x.mime_types_map
 
-  /// A logger to log with
-  ; logger           : Log.Logger
+  let home_folder x = x.home_folder
 
-  /// A http session provider
-  ; session_provider : ISessionProvider }
+  let compressed_files_folder x = x.compressed_files_folder
 
-/// An exception, raised e.g. if writing to the stream fails
+  let logger x = x.logger
+
+  let session_provider x = x.session_provider
+
+/// An exception, raised e.g. if writing to the stream fails, should not leak to
+/// users of this library
 exception InternalFailure of string

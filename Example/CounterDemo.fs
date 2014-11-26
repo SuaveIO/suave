@@ -34,7 +34,7 @@ let counter_demo (req : HttpRequest) (out : Connection) =
       return! async {
         do! Async.Sleep 100
         return Choice1Of2 () } }
-  let q = query req 
+  let q = HttpRequest.query req
   socket {
     let last_evt_id =
       (req.headers %% "last-event-id" |> Option.bind muint32) <!>

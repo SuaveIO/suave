@@ -39,7 +39,7 @@ asmver_files :asmver => :versioning do |a|
 end
 
 desc 'Perform full build'
-task :build => [:versioning, :restore, :asmver, :build_quick]
+task :compile => [:versioning, :restore, :asmver, :compile_quick]
 
 desc 'clean the project'
 build :clean do |b|
@@ -48,21 +48,29 @@ build :clean do |b|
   b.target = 'Clean'
 end
 
-build :build_quick do |b|
+build :compile_quick do |b|
   b.file = 'suave.sln'
   b.prop 'Configuration', 'Release'
 end
 
 namespace :tests do
-  desc 'run a stress test'
-  task :stress do
+  task :stress_quick do
     system 'Pong/bin/Release/Pong.exe', clr_command: true
   end
 
-  task :unit do
+  desc 'run a stress test'
+  task :stress => [:compile, :stress_quick]
+
+  task :unit_quick do
     system 'Tests/bin/Release/Tests.exe', clr_command: true
   end
+
+  desc 'run unit tests'
+  task :unit => [:compile, :unit_quick]
 end
+
+desc 'run all tests (stress, unit)'
+task :tests => [:'tests:stress', :'tests:unit']
 
 directory 'build/pkg'
 
@@ -92,10 +100,10 @@ task :create_nuget_quick => ['build/pkg', :versioning] do
 end
 
 desc 'create suave nuget'
-task :create_nuget => ['build/pkg', :versioning, :build, :create_nuget_quick]
+task :create_nuget => ['build/pkg', :versioning, :compile, :create_nuget_quick]
 
-desc 'build, gen versions, test and create nuget'
-task :default => [:build, :'tests:unit']
+desc 'compile, gen versions, test and create nuget'
+task :default => [:compile, :'tests:unit']
 
 task :increase_version_number do
   # inc patch version in .semver
@@ -118,7 +126,7 @@ namespace :docs do
   end
 
   desc 'build documentation'
-  task :build => :clean do
+  task :compile => :clean do
     system 'git clone https://github.com/SuaveIO/suave.git -b gh-pages gh-pages' unless Dir.exists? 'gh-pages'
     Dir.chdir 'gh-pages' do
       Bundler.with_clean_env do

@@ -114,12 +114,12 @@ let inline trans (a : SocketAsyncEventArgs) =
 /// and that can be closed.
 type Connection =
   { ipaddr       : IPAddress
-  ; read         : ArraySegment<byte> -> SocketOp<int>
-  ; write        : ArraySegment<byte> -> SocketOp<unit>
-  ; get_buffer   : string -> ArraySegment<byte>
-  ; free_buffer  : string -> ArraySegment<byte> -> unit
-  ; is_connected : unit -> bool
-  ; line_buffer  : ArraySegment<byte> }
+    read         : ArraySegment<byte> -> SocketOp<int>
+    write        : ArraySegment<byte> -> SocketOp<unit>
+    get_buffer   : string -> ArraySegment<byte>
+    free_buffer  : string -> ArraySegment<byte> -> unit
+    is_connected : unit -> bool
+    line_buffer  : ArraySegment<byte> }
 
 /// Workflow builder to read/write to async sockets with fail/success semantics
 type SocketMonad() =

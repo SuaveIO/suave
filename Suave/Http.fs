@@ -98,8 +98,7 @@ module Http =
 
     // TODO: I'm not sure about having MIME types in the Writers module
     let mk_mime_type a b =
-      { name = a
-      ; compression = b } |> Some
+      MimeType.mk a b |> Some
 
     let default_mime_types_map = function
       | ".bmp" -> mk_mime_type "image/bmp" false
@@ -351,11 +350,11 @@ module Http =
     let log (logger : Log.Logger) (formatter : HttpContext -> string) (ctx : HttpContext) =
       logger.Log Log.LogLevel.Debug <| fun _ ->
         { trace         = ctx.request.trace
-        ; message       = formatter ctx
-        ; level         = Log.LogLevel.Debug
-        ; path          = "suave/web-requests"
-        ; ``exception`` = None
-        ; ts_utc_ticks  = Globals.utc_now().Ticks }
+          message       = formatter ctx
+          level         = Log.LogLevel.Debug
+          path          = "Suave.Http.web-requests"
+          ``exception`` = None
+          ts_utc_ticks  = Globals.utc_now().Ticks }
 
       succeed ctx
 
@@ -637,8 +636,8 @@ module Http =
 
     type Message =
       { id       : string
-      ; data     : string
-      ; ``type`` : string option }
+        data     : string
+        ``type`` : string option }
 
     let mk_message id data =
       { id = id; data = data; ``type`` = None }

@@ -224,7 +224,7 @@ module ParsingAndControl =
           if file_length > int64(0) then
             let filename =
               (header_params content_disposition) ? filename |> Option.get |> (fun x -> x.Trim('"'))
-            let upload = new HttpUpload(fieldname, filename, content_type |> Option.get, temp_file_name)
+            let upload = HttpUpload.mk fieldname filename (content_type |> Option.get) temp_file_name
             return! loop boundary b { r with files = upload :: r.files }
           else
             File.Delete temp_file_name
@@ -319,19 +319,6 @@ module ParsingAndControl =
   /// A HttpProcessor takes a HttpRequest instance, returning asynchronously a HttpRequest that has been parsed
   type HttpProcessor = HttpRequest -> Connection -> BufferSegment option -> Async<(HttpRequest * (BufferSegment option)) option>
   type RequestResult = Done
-
-  let internal mk_request connection proto ipaddr : HttpRequest =
-    { http_version   = ""
-    ; url            = ""
-    ; ``method``     = ""
-    ; headers        = []
-    ; raw_form       = Array.empty
-    ; raw_query      = ""
-    ; files          = []
-    ; multipart_fields = []
-    ; is_secure      = match proto with HTTP -> false | HTTPS _ -> true
-    ; trace          = Log.TraceHeader.empty
-    ; ipaddr = ipaddr }
   
   let internal write_content_type connection (headers : (string*string) list) = socket {
     if not(List.exists(fun (x : string,_) -> x.ToLower().Equals("content-type")) headers )then
@@ -522,14 +509,14 @@ let web_server (config : SuaveConfig) (webpart : WebPart) =
 /// with a timeout of one minute for computations to run. Waiting for 2 seconds for the socket bind
 /// to succeed.
 let default_config : SuaveConfig =
-  { bindings         = [ { scheme = HTTP; ip = IPAddress.Loopback; port = 8083us } ]
-  ; error_handler    = default_error_handler
-  ; listen_timeout   = TimeSpan.FromSeconds(2.)
-  ; ct               = Async.DefaultCancellationToken
-  ; buffer_size      = 8192 // 8 KiB
-  ; max_ops          = 100
-  ; mime_types_map   = Http.Writers.default_mime_types_map
-  ; home_folder      = None
-  ; compressed_files_folder = None
-  ; logger           = Log.Loggers.sane_defaults_for Log.LogLevel.Info
-  ; session_provider = new DefaultSessionProvider() }
+  { bindings         = [ HttpBinding.defaults ]
+    error_handler    = default_error_handler
+    listen_timeout   = TimeSpan.FromSeconds(2.)
+    ct               = Async.DefaultCancellationToken
+    buffer_size      = 8192 // 8 KiB
+    max_ops          = 100
+    mime_types_map   = Http.Writers.default_mime_types_map
+    home_folder      = None
+    compressed_files_folder = None
+    logger           = Log.Loggers.sane_defaults_for Log.LogLevel.Info
+    session_provider = new DefaultSessionProvider() }

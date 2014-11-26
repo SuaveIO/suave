@@ -107,8 +107,8 @@ module Bytes =
 
   type BufferSegment =
     { buffer : ArraySegment<byte>
-    ; offset : int
-    ; length : int }
+      offset : int
+      length : int }
 
   let inline mk_buffer_segment buffer offset length =
     if length < 0 then failwith (sprintf "mk_buffer_segment: length = %d < 0" length)

@@ -63,7 +63,7 @@ choose [
   url "/guid" >>= OK (Guid.NewGuid().ToString())
   url "/hello" >>= OK "Hello World"
   (url "/apple" <|> url "/orange") >>= OK "Hello Fruit"
-  GET >>= url "/query" >>= request( fun x -> cond ((query x) ^^ "name") (fun y -> OK ("Hello " + y)) never)
+  GET >>= url "/query" >>= request( fun x -> cond ((HttpRequest.query x) ^^ "name") (fun y -> OK ("Hello " + y)) never)
   GET >>= url "/query" >>= OK "Hello beautiful"
   url "/redirect" >>= Redirection.redirect "/redirected"
   url "/redirected" >>=  OK "You have been redirected."
@@ -88,7 +88,11 @@ choose [
   POST >>= url "/upload" >>= OK "Upload successful."
   POST >>= url "/upload2"
     >>= request (fun x ->
-                   let files = x.files |> Seq.fold (fun x y -> x + "<br/>" + (sprintf "(%s, %s, %s)" y.FileName y.MimeType y.Path)) ""
+                   let files =
+                     x.files
+                     |> Seq.fold
+                       (fun x y -> x + "<br/>" + (sprintf "(%s, %s, %s)" y.file_name y.mime_type y.temp_file_path))
+                       ""
                    OK (sprintf "Upload successful.<br>POST data: %A<br>Uploaded files (%d): %s" x.multipart_fields (List.length x.files) files))
   POST >>= request (fun x -> OK (sprintf "POST data: %s" (ASCII.to_string' x.raw_form)))
   GET
@@ -98,8 +102,7 @@ choose [
   RequestErrors.NOT_FOUND "Found no handlers"
   ]
   |> web_server
-      { bindings =
-        [ HttpBinding.Create(HTTP, "127.0.0.1", 8082) ]
+      { bindings         = [ HttpBinding.mk' HTTP "127.0.0.1" 8082 ]
       ; error_handler    = default_error_handler
       ; listen_timeout   = TimeSpan.FromMilliseconds 2000.
       ; ct               = Async.DefaultCancellationToken

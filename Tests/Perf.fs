@@ -35,7 +35,7 @@ let perf_tests =
   let server_factory = SuavePerfHarness("default config", run_with default_config)
 
   let getFormValue name =
-    request (fun x -> OK (form x ^^ name |> Option.get))
+    request (fun x -> OK (HttpRequest.form x ^^ name |> Option.get))
 
   let longData = String.replicate 1815 "A"
 
