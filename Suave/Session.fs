@@ -57,7 +57,7 @@ let validate (session_map : MemoryCache) key (session_id : string) (ctx : HttpCo
   else
     let id, mac_given = Utils.split_session_id session_id
     let mac_calc = Utils.hmac_data id ctx.request |> Crypto.hmac' key |> Utils.base64_headers
-    String.eq_time_cmp_ord mac_given mac_calc && session_map.Contains id
+    String.cnst_time_cmp_ord mac_given mac_calc && session_map.Contains id
 
 /// TODO: same as HttpContext.session below??
 let get_session (session_map : MemoryCache) session_id =
