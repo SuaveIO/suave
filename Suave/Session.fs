@@ -15,6 +15,14 @@ module Session =
     let base64 = Convert.ToBase64String(s)
     base64.Replace('+','-').Replace('/','_').Trim([| '=' |])
 
+  /// Implements generic constant-time comparison vs timing attacks
+  let slow_equals (a : byte array) (b : byte array) =
+    let diff = ref ((uint32 a.Length) ^^^ (uint32 b.Length))
+    let min = min a.Length b.Length
+    for i = 0 to min - 1 do
+      diff := !diff ||| (uint32 (a.[i] ^^^ b.[i]))
+    !diff = 0ul
+
   /// Generates a cryptographically strong id of size id_size
   let internal strong_new_id =
     let rng = new RNGCryptoServiceProvider() //This type is thread safe.
@@ -48,7 +56,7 @@ module Session =
 
       let mac1 = hmac id (ctx.request.ipaddr.ToString()) key
 
-      String.CompareOrdinal(mac, mac1) = 0 && session_map.Contains id
+      slow_equals (UTF8.bytes mac) (UTF8.bytes mac1) && session_map.Contains id
 
   let get_session (session_map : MemoryCache) sessionId =
     let state_bag = 
