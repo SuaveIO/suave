@@ -87,6 +87,10 @@ module Http =
     /// Sets a header with the key and value specified
     val set_header : key:string -> value:string -> WebPart
 
+    /// Sets a user data key-value pair with the key and value specified. Downstream
+    /// web parts can read this.
+    val set_user_data : key:string -> value:'a -> WebPart
+
     /// Sets a cookie with the passed value in the 'cookie' parameter
     val set_cookie : cookie:HttpCookie -> WebPart
 

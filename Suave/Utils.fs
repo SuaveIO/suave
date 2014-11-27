@@ -89,6 +89,17 @@ module ASCII =
     let bytes = Convert.FromBase64String s
     Encoding.ASCII.GetString bytes
 
+module String =
+
+  /// Ordinally compare two strings in constant time, bounded by the length of the
+  /// longest string.
+  let eq_time_cmp_ord (str1 : string) (str2 : string) =
+    let mutable xx = uint32 str1.Length ^^^ uint32 str2.Length
+    let mutable i = 0
+    while i < str1.Length && i < str2.Length do
+      xx <- xx ||| uint32 (int str1.[i] ^^^ int str2.[i])
+    xx = 0u
+
 module Option =
   let or_default value opt =
     opt |> Option.fold (fun s t -> t) value
@@ -290,6 +301,49 @@ module Bytes =
       elif i > 0 && a (i - 1) = EOL.[0] && a i = EOL.[1] then Some (i - 1)
       else loop (i + 1)
     loop 0
+
+/// Small crypto module that can do HMACs and generate random strings to use
+/// as keys
+module Crypto =
+  open System
+  open System.Text
+  open System.Security.Cryptography
+
+  /// the global crypto-random pool for uniform and therefore cryptographically
+  /// secure random values
+  let crypt_random = RandomNumberGenerator.Create()
+
+  /// The default hmac algorithm
+  [<Literal>]
+  let HMACAlgorithm = "HMACSHA256"
+
+  /// Calculate the HMAC of the passed data given a private key
+  let hmac (key : byte []) (data : byte[]) =
+    use hmac = HMAC.Create(HMACAlgorithm)
+    hmac.Key <- key
+    hmac.ComputeHash data
+
+  /// Calculate the HMAC value given the string-key (will be converted to UTF8-bytes)
+  /// and a seq of string-data which will be concatenated in its order and hmac-ed.
+  let hmac' (key : string) (data : string seq) =
+    let data' = String.Concat data |> UTF8.bytes
+    hmac (UTF8.bytes key) data'
+
+  /// The default alphabet (a string of characters) that is used to generate keys.
+  [<Literal>]
+  let GenerateKeyDefaultAlphabet = "abcdefghijklmnopqrstuvwuxyz0123456789"
+
+  let generate_key (available_chars : string) (key_size : int) =
+    let arr = Array.create<byte> key_size 0uy
+    crypt_random.GetBytes arr
+    let result = new StringBuilder(key_size)
+    arr |> Array.iter (fun (b : byte) ->
+        result.Append available_chars.[int b % available_chars.Length] |> ignore)
+    result.ToString()
+
+  /// Generates a cryptographically strong id of size key_size with the
+  /// default alphabet
+  let generate_key' key_size = generate_key GenerateKeyDefaultAlphabet key_size
 
 module Compression =
   open System.IO

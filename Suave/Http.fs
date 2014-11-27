@@ -75,13 +75,18 @@ module Http =
         { ctx with response = response } |> succeed
 
   module Writers =
+    // TODO: transform into a set of lenses with Aether
+    // @ https://github.com/xyncro/aether and move closer to HttpContext.
 
     open System
 
     let set_header key value (ctx : HttpContext) =
-      let new_response =
-        { ctx.response with headers = (key,value) :: ctx.response.headers }
-      { ctx with response = new_response } |> succeed
+      { ctx with response = { ctx.response with headers = (key, value) :: ctx.response.headers } }
+      |> succeed
+
+    let set_user_data key value (ctx : HttpContext) =
+      { ctx with user_state = ctx.user_state |> Map.add key (box value) }
+      |> succeed
 
     let private cookie_to_string (x : HttpCookie) =
       let attributes = new System.Collections.Generic.List<string>()
