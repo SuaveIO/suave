@@ -28,10 +28,9 @@ module Session =
       result.ToString()
 
   /// Calculates an HMAC to verify authenticity of the cookie and prevents against session replay
-  let hmac (id : string) (user_agent : string) (remote_ip : string) (key : string) =
+  let hmac (id : string) (remote_ip : string) (key : string) =
     let builder = new StringBuilder(id, 512)
     builder.Append remote_ip  |> ignore
-    builder.Append user_agent |> ignore
     use hmac = new HMACSHA256(Encoding.UTF8.GetBytes(key))
     let hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(builder.ToString()))
     base64 hash
@@ -47,7 +46,7 @@ module Session =
       let id  = sessionId.Substring( 0, session_id_length)
       let mac = sessionId.Substring( session_id_length)
 
-      let mac1 = hmac id  (Option.get <| ctx.request.headers %% "user-agent") (ctx.request.ipaddr.ToString()) key
+      let mac1 = hmac id (ctx.request.ipaddr.ToString()) key
 
       String.CompareOrdinal(mac, mac1) = 0 && session_map.Contains id
 
@@ -78,7 +77,7 @@ module Session =
           session_map.Add(session_id, dict :> obj,
                           Globals.utc_now().Add expiration)
           |> ignore)
-        let id = session_id + hmac session_id (Option.get <| ctx.request.headers %% "user-agent") (ctx.request.ipaddr.ToString()) key
+        let id = session_id + hmac session_id  (ctx.request.ipaddr.ToString()) key
         id
 
       member this.Validate(s : string, ctx : HttpContext) =
