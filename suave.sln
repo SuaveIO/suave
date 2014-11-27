@@ -13,7 +13,7 @@ Project("{f2a71f9b-5d33-465a-a702-920d77279786}") = "Tests", "Tests\Tests.fsproj
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "docs", "docs", "{C7760769-4E33-4A06-BB7C-39B477B4FF1B}"
 	ProjectSection(SolutionItems) = preProject
-		README.textile = README.textile
+		README.md = README.md
 	EndProjectSection
 EndProject
 Project("{f2a71f9b-5d33-465a-a702-920d77279786}") = "Experimental", "Experimental\Experimental.fsproj", "{488FC139-5013-46A2-9982-2C40A6F1F777}"

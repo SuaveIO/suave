@@ -53,7 +53,7 @@
     <Content Include="Bug105-StopsResponding.verbose.txt" />
     <None Include="Bug105-StopsResponding.fsx" />
     <None Include="PerfLab.fsx" />
-	<Compile Include="AssemblyVersionInfo.fs" Condition="Exists('AssemblyVersionInfo.fs')" />
+    <Compile Include="AssemblyVersionInfo.fs" Condition="Exists('AssemblyVersionInfo.fs')" />
     <Compile Include="TestUtilities.fs" />
     <Compile Include="Smoke.fs" />
     <Compile Include="Utils.fs" />
