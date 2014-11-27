@@ -36,7 +36,7 @@ module ParsingAndControl =
         else loop tail (acc + x.length)
     loop pairs 0
 
-  let split index (pairs : BufferSegment list) connection select marker_lenght : Async<int * BufferSegment list>=
+  let split index (pairs : BufferSegment list) connection select marker_length : Async<int * BufferSegment list> =
     let rec loop xxs acc count =  async {
       match xxs with
       | [] -> return count, []
@@ -49,16 +49,18 @@ module ParsingAndControl =
           let bytes_read = index - acc
           do! select (ArraySegment(pair.buffer.Array, pair.offset, bytes_read)) bytes_read
           let remaining = pair.length - bytes_read
-          if remaining = marker_lenght then
+          if remaining = marker_length then
             connection.free_buffer "Suave.Web.split" pair.buffer
             return count + bytes_read, tail
           else
-            
-            if remaining - marker_lenght >= 0 then
-              return count + bytes_read,  mk_buffer_segment pair.buffer (pair.offset  + bytes_read  + marker_lenght) (remaining - marker_lenght) :: tail
+            if remaining - marker_length >= 0 then
+              let segment = mk_buffer_segment pair.buffer
+                                              (pair.offset  + bytes_read  + marker_length)
+                                              (remaining - marker_length)
+              return count + bytes_read, segment :: tail
             else
-              let new_tail = skip_buffers tail (marker_lenght - remaining) 
-              return count + bytes_read,  new_tail
+              let new_tail = skip_buffers tail (marker_length - remaining)
+              return count + bytes_read, new_tail
         else return failwith "Suave.Web.split: invalid case"
       }
     loop pairs 0 0
