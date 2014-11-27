@@ -4,17 +4,20 @@ module Suave.Utils
 
 open System.Collections.Generic
 
+/// A (string * string) list, use (%%) to access
 type NameValueList = (string * string) list
+
+/// A (string * string option) list, use (^^) to access
 type NameOptionValueList = (string * string option) list
 
 /// Try find a value by key in a dictionary
 let look_up (target : IDictionary<'b,'a>) key =
-  match target.TryGetValue(key) with
+  match target.TryGetValue key with
   | true, v  -> Some v
   | false, _ -> None
 
 let get_first (target : NameValueList) key =
-  match List.tryFind (fun (a,b) -> a.Equals(key)) target with
+  match List.tryFind (fun (a,b) -> a.Equals key) target with
   | Some value -> snd value |> Some
   | None -> None
 
@@ -26,7 +29,7 @@ let (%%) (target : NameValueList) key =
   get_first target key
 
 let (^^) (target : NameOptionValueList) key =
-  match List.tryFind (fun (a,b) -> a.Equals(key)) target with
+  match List.tryFind (fun (a,b) -> a.Equals key) target with
   | Some value ->
     snd value
   | None -> None
