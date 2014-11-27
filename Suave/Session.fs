@@ -32,7 +32,7 @@ module Session =
     let builder = new StringBuilder(id, 512)
     builder.Append remote_ip  |> ignore
     builder.Append user_agent |> ignore
-    use hmac = new HMACSHA1(Encoding.UTF8.GetBytes(key))
+    use hmac = new HMACSHA256(Encoding.UTF8.GetBytes(key))
     let hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(builder.ToString()))
     base64 hash
 
