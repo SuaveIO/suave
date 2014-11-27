@@ -111,7 +111,7 @@ module Session =
 
     let cookie, ctx' =
       { HttpCookie.mk' "suave_session_id" session_id
-        with http_only = false (* o'rly? *)
+        with http_only = true
              expires   = Some (Globals.utc_now().Add time_span) },
       { ctx with user_state = ctx.user_state |> Map.add "session_id" (box session_id) }
 
