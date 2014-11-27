@@ -31,7 +31,7 @@ module ParsingAndControl =
       | [] -> []
       | x :: tail ->
         if x.length + acc >= number then 
-          let segment = mk_buffer_segment x.buffer (x.offset  + (number - acc)) (x.length - number + acc)
+          let segment = BufferSegment.mk x.buffer (x.offset  + (number - acc)) (x.length - number + acc)
           segment :: tail
         else loop tail (acc + x.length)
     loop pairs 0
@@ -54,9 +54,9 @@ module ParsingAndControl =
             return count + bytes_read, tail
           else
             if remaining - marker_length >= 0 then
-              let segment = mk_buffer_segment pair.buffer
-                                              (pair.offset  + bytes_read  + marker_length)
-                                              (remaining - marker_length)
+              let segment = BufferSegment.mk pair.buffer
+                                             (pair.offset  + bytes_read  + marker_length)
+                                             (remaining - marker_length)
               return count + bytes_read, segment :: tail
             else
               let new_tail = skip_buffers tail (marker_length - remaining)
