@@ -72,7 +72,7 @@ choose [
   url "/session"
     >>= session_support (TimeSpan(0,30,0))
     >>= context (fun x ->
-        let get,set = session x
+        let get, set = HttpContext.session x
         match get "counter" with
         | Some y ->
           set "counter" (y + 1)
