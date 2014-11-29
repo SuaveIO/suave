@@ -203,7 +203,7 @@ module State =
     [<Literal>]
     let StateStoreType = "Suave.Session.State.MemoryCacheStateStore"
 
-    let private wrap (session_map : MemoryCache) session_id =
+    let private wrap (session_map : MemoryCache) relative_expiry session_id =
       let state_bag =
         lock session_map (fun _->
           if session_map.Contains session_id then
@@ -211,7 +211,8 @@ module State =
             :?> ConcurrentDictionary<string, obj>
           else
             let cd = new ConcurrentDictionary<string, obj>()
-            session_map.Set(CacheItem(session_id, cd), CacheItemPolicy())
+            let policy = CacheItemPolicy(SlidingExpiration = relative_expiry)
+            session_map.Set(CacheItem(session_id, cd), policy)
             cd)
 
       { new StateStore with
@@ -222,14 +223,11 @@ module State =
           member x.set key value =
             state_bag.[key] <- value }
 
-    let private mc_state = wrap (MemoryCache.Default)
-
-    let stateful failure
-                 (relative_expiry : TimeSpan) =
+    let stateful failure (relative_expiry : TimeSpan) =
       stateful relative_expiry
                failure
                StateStoreType
-               mc_state
+               (wrap (MemoryCache.Default) relative_expiry)
 
     let DefaultExpiry = TimeSpan.FromMinutes 30.
     
