@@ -323,6 +323,9 @@ module Crypto =
   [<Literal>]
   let HMACAlgorithm = "HMACSHA256"
 
+  [<Literal>]
+  let HMACBytes = 32 // = 256 / 8
+
   /// Calculate the HMAC of the passed data given a private key
   let hmac (key : byte []) (data : byte[]) =
     use hmac = HMAC.Create(HMACAlgorithm)

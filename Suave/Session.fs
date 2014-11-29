@@ -24,6 +24,15 @@ let SessionAuthCookie = "auth"
 let SessionIdCookie = "sid"
 
 module internal Utils =
+
+  let length_for_bytes byte_count =
+    // base64 expands 37.5% on the bytes' size
+    // 256 bits = 32 bytes = 44 chars base64
+    // 128 bits = 16 bytes = 22 chars base64
+    int (float byte_count * 1.375 - 1.) // -1 is removal of =-sign
+
+  let hmac_length = length_for_bytes 32. // depends on SHA256 in Crypto
+
   /// This is used to pack base64 in a cookie; generates a degenerated base64 string
   let base64_headers bytes =
     let base64 = Convert.ToBase64String bytes
@@ -41,11 +50,11 @@ module Auth =
 
   /// Extracts the actual session id and the mac value from the cookie's data.
   let private parse_cookie_data (cd : string) =
-    if cd.Length <= SessionIdLength then
+    if cd.Length < SessionIdLength + Utils.hmac_length then
       None
     else
       let id  = cd.Substring(0, SessionIdLength)
-      let mac = cd.Substring(SessionIdLength)
+      let mac = cd.Substring(SessionIdLength, Utils.hmac_length)
       Some (id, mac)
 
   /// Returns a list of the hmac data to use, from the request.
