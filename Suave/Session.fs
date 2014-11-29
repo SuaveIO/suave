@@ -14,25 +14,14 @@ open Types
 open Http
 
 [<Literal>]
-let ServerKeyLength = 64
-
-[<Literal>]
-let SessionIdLength = 40
-
-[<Literal>]
-let SessionHttpCookie = "suave_session_id"
+let SessionAuthCookie = "auth"
 
 /// This is the cookie that the client-side can use to check whether the
 /// user is logged on or not. It's only a marker, which is used for this
 /// purpose; the real auth cookie is the SessionHttpCookie, which isn't
 /// available to client-side.
 [<Literal>]
-let SessionJsCookie = "suave_session_enabled"
-
-/// The Id used in `context.user_state` to save the session id for downstream
-/// web parts.
-[<Literal>]
-let SessionIdStateKey = "suave_session_id"
+let SessionIdCookie = "sid"
 
 module internal Utils =
   /// This is used to pack base64 in a cookie; generates a degenerated base64 string
@@ -40,8 +29,18 @@ module internal Utils =
     let base64 = Convert.ToBase64String bytes
     base64.Replace('+','-').Replace('/','_').Trim([| '=' |])
 
+/// Use to set a session-id for the client, which is a way is how the client
+/// is 'authenticated'.
+module Auth =
+
+  [<Literal>]
+  let ServerKeyLength = 64
+
+  [<Literal>]
+  let SessionIdLength = 40
+
   /// Extracts the actual session id and the mac value from the cookie's data.
-  let parse_cookie_data (cd : string) =
+  let private parse_cookie_data (cd : string) =
     if cd.Length <= SessionIdLength then
       None
     else
@@ -50,73 +49,106 @@ module internal Utils =
       Some (id, mac)
 
   /// Returns a list of the hmac data to use, from the request.
-  let hmac_data session_id (request : HttpRequest) =
+  let private hmac_data session_id (request : HttpRequest) =
     [ session_id
       request.ipaddr.ToString()
-      (match request.headers %% "user-agent" with
-      | None -> ""
-      | Some ua -> ua)
+      request.headers %% "user-agent" |> Option.or_default ""
     ]
 
-let set_cookies (http_cookie, client_cookie) =
-  Writers.set_cookie http_cookie >>=
-    Writers.set_cookie client_cookie >>=
-    Writers.set_user_data SessionIdStateKey (box http_cookie.value)
+  /// Set +relative_expiry time span on the expiry time of the cookies
+  let private sliding_expiry relative_expiry auth_cookie client_cookie =
+    let expiry = Globals.utc_now().Add relative_expiry
+    { auth_cookie   with expires = Some expiry },
+    { client_cookie with expires = Some expiry }
 
-/// Use to validate, statelessly, whether the input from the web application is valid.
-module Stateless =
+  /// The key used in `context.user_state` to save the session id for downstream
+  /// web parts.
+  [<Literal>]
+  let SessionAuth = "Suave.Session.Auth"
 
-  /// Generate one server-side cookie and one client-side cookie.
-  let generate_cookies relative_expiry (ctx : HttpContext) =
+  let private client_cookie session_id =
+    { HttpCookie.mk' SessionIdCookie session_id with http_only = false }
+
+  /// Generate one server auth-side cookie and one client-side cookie.
+  let generate_cookies relative_expiry { request = req; runtime = run } =
     let session_id  = Crypto.generate_key' SessionIdLength
-    let hmac_data   = Utils.hmac_data session_id ctx.request
-    let hmac        = Crypto.hmac' ctx.runtime.server_key hmac_data |> Utils.base64_headers
+    let hmac_data   = hmac_data session_id req
+    let hmac        = Crypto.hmac' run.server_key hmac_data |> Utils.base64_headers
     let cookie_data = String.Concat [| session_id; hmac |]
-    let http_cookie, client_cookie =
-      let expiry = Some (Globals.utc_now().Add relative_expiry)
-      { HttpCookie.mk' SessionHttpCookie cookie_data with expires = expiry; http_only = true },
-      { HttpCookie.mk' SessionJsCookie   "true"      with expires = expiry; http_only = false }
-    http_cookie, client_cookie
+    let auth_cookie, client_cookie =
+      sliding_expiry relative_expiry
+        { HttpCookie.mk' SessionAuthCookie cookie_data with http_only = true }
+        (client_cookie session_id)
+    auth_cookie, client_cookie, session_id
 
-  /// Sets the server-signed cookies
-  let authenticated (relative_expiry : TimeSpan) (ctx : HttpContext) =
-    set_cookies (generate_cookies relative_expiry ctx)
+  let unset_cookies (auth_cookie, client_cookie, session_id) : WebPart =
+    Writers.unset_cookie auth_cookie >>=
+      Writers.unset_cookie client_cookie >>=
+      Writers.unset_user_data session_id
 
-  /// Validates the inner cookie data (use validate' for simplicity)
+  /// Sets the http-cookie, the client-cookie and sets the value of SessionAuth
+  /// in the user_data of the HttpContext.
+  let set_cookies (auth_cookie, client_cookie, session_id) : WebPart =
+    Writers.set_cookie auth_cookie >>=
+      Writers.set_cookie client_cookie >>=
+      Writers.set_user_data SessionAuth session_id
+
+  let refresh_cookies relative_expiry auth_cookie session_id : WebPart =
+    let a', c' = sliding_expiry relative_expiry auth_cookie (client_cookie session_id)
+    set_cookies (a', c', session_id)
+
+  /// Validates the inner cookie data (use validate' for simplicity) and
+  /// returns true if the calculated HMAC matches the given HMAC.
   let validate server_key request session_id hmac_given =
     let hmac_calc =
-      Utils.hmac_data session_id request
+      hmac_data session_id request
       |> Crypto.hmac' server_key
       |> Utils.base64_headers
     String.cnst_time_cmp_ord hmac_given hmac_calc
 
-  /// Validates the one server-side cookie that can be generated with 'generate_cookies'
-  let validate' (ctx : HttpContext) =
-    let cookies = ctx |> HttpContext.request |> HttpRequest.cookies
-    match cookies |> Map.tryFind SessionHttpCookie with
-    | Some http_cookie ->
-      match Utils.parse_cookie_data http_cookie.value with
-      | None -> None
-      | Some (session_id, hmac_given) ->
-        if validate ctx.runtime.server_key ctx.request session_id hmac_given then
-          Some (http_cookie, session_id, hmac_given)
-        else
-          None
-    | _ ->  None
+  /// Validates the one server-side cookie that can be generated with 'generate_cookies',
+  /// and returns the HttpCookie, session id string and given hmac value if it's all
+  /// valid.
+  let validate' ({runtime = { server_key = key }; request = req } as ctx : HttpContext) =
+    let cookies =
+      ctx
+      |> HttpContext.request
+      |> HttpRequest.cookies
 
-  let validate'' (ctx : HttpContext) =
-    match validate' ctx with
-    | Some _ -> ctx |> succeed
-    | None -> fail
+    cookies
+    |> Map.tryFind SessionAuthCookie
+    |> Option.bind (fun auth_cookie ->
+        parse_cookie_data auth_cookie.value
+        |> Option.map (fun x -> auth_cookie, x))
+    |> Option.bind (fun (auth_cookie, (session_id, hmac_given)) ->
+        if validate key req session_id hmac_given then
+          Some (auth_cookie, session_id, hmac_given)
+        else None)
+
+  /// Ensure the client/http context has a valid session id
+  let authenticate (relative_expiry : TimeSpan) : WebPart =
+    context (fun ctx ->
+      match validate' ctx with
+      | Some (a, session_id, _) ->  
+        refresh_cookies relative_expiry a session_id
+      | None   -> never)
+
+  /// Set server-signed cookies to make the response contain a cookie
+  /// with a valid session id
+  let authenticated (relative_expiry : TimeSpan) : WebPart =
+    context (fun ctx ->
+      set_cookies (generate_cookies relative_expiry ctx))
 
 /// TODO: provide abstraction over MemoryCache
-module Stateful =
+module State =
 
-  let validate (storage     : MemoryCache)
-               (ctx         : HttpContext) =
-    match Stateless.validate' http_cookie ctx with
-    | Some (session_id, hmac_given) as res when storage.Contains session_id ->
-      res
+  let ensure (storage : MemoryCache)
+             (ctx     : HttpContext) =
+
+    match Auth.validate' ctx with
+    | Some (auth_cookie, session_id, hmac_given) as res when storage.Contains session_id ->
+      succeed ctx
+    | Some 
     | _ -> None
 
   let authenticated (storage : MemoryCache)

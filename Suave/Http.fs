@@ -88,6 +88,10 @@ module Http =
       { ctx with user_state = ctx.user_state |> Map.add key (box value) }
       |> succeed
 
+    let unset_user_data key (ctx : HttpContext) =
+      { ctx with user_state = ctx.user_state |> Map.remove key }
+      |> succeed
+
     let private cookie_to_string (x : HttpCookie) =
       let attributes = new System.Collections.Generic.List<string>()
       attributes.Add(String.Format("{0}={1}", x.name ,x.value))
@@ -100,6 +104,13 @@ module Http =
 
     let set_cookie (cookie : HttpCookie) =
       set_header "Set-Cookie" (cookie_to_string cookie)
+
+    let unset_cookie (cookie : HttpCookie) =
+      let start_epoch = DateTimeOffset(1970, 1, 1, 0, 0, 1, TimeSpan.Zero) |> Some
+      let string_value =
+        cookie_to_string { cookie with expires = start_epoch
+                                       value   = "x" }
+      set_header "Set-Cookie" string_value
 
     // TODO: I'm not sure about having MIME types in the Writers module
     let mk_mime_type a b =
