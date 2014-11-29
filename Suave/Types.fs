@@ -151,20 +151,29 @@ module HttpRequest =
   /// (^^) to try to fetch data from this.
   let query (x : HttpRequest) =
     Parsing.parse_data x.raw_query
-    |> List.ofArray
 
   /// Finds the key k from the query string in the HttpRequest
   let query' (x : HttpRequest) (k : string) =
     (query x) ^^ k
 
-  /// Gets the form from the HttpRequest
+  /// Gets the form as a ((string*string option list) from the HttpRequest
   let form  (x : HttpRequest) =
     Parsing.parse_data (ASCII.to_string' x.raw_form)
-    |> List.ofArray
 
   /// Finds the key k from the form in the HttpRequest
   let form' (x : HttpRequest) (k : string) =
     (form x) ^^ k
+
+  /// Finds the cookies of the request, or an empty Map otherwise, if
+  /// there are no cookies.
+  let cookies (x : HttpRequest) =
+    x.headers
+    |> List.filter (fun (name, _) -> name.Equals "cookie")
+    |> List.map (snd >> Parsing.parse_cookie)
+    |> List.concat
+    |> List.fold (fun cookies (name, data) ->
+        cookies |> Map.add name (HttpCookie.mk' name data))
+        Map.empty
 
   let http_version x = x.http_version
 
@@ -257,7 +266,7 @@ module HttpBinding =
   let port x   = x.port
 
 /// A session store is a reader and a writer function pair keyed on strings.
-type SessionStore<'a> = (string -> 'a option) * (string -> 'a -> unit)
+type StateStore<'a> = (string -> 'a option) * (string -> 'a -> unit)
 
 type HttpContent =
   | NullContent
@@ -463,12 +472,17 @@ type ErrorHandler = Exception -> String -> WebPart
 /// value yourself, or use the `empty` one.
 and HttpRuntime =
   { protocol           : Protocol
+    server_key         : string
     error_handler      : ErrorHandler
     mime_types_map     : MimeTypesMap
     home_directory     : string
     compression_folder : string
     logger             : Log.Logger
-    session_provider   : ISessionProvider }
+    /// The state provider is responsible for serialising and deserialising the
+    /// state for the user of the request. If you deploy your web app across a
+    /// cluster with load balancing you should replace this with something that
+    /// writes to Memcached or Cassandra or Riak or something similar.
+    state_provider     : System.Runtime.Caching.MemoryCache }
 
 /// The HttpContext is the container of the request, runtime, user-state and
 /// response.
@@ -480,10 +494,10 @@ and HttpContext =
 
 /// The session provider is a convenience interface for storing user session
 /// data.
-and ISessionProvider =
-  abstract member Generate : TimeSpan * HttpContext -> string
-  abstract member Validate : string * HttpContext -> bool
-  abstract member Session<'a>  : string -> SessionStore<'a>
+and SessionStateProvider =
+  abstract member Generate : TimeSpan * HttpContext -> HttpCookie * HttpCookie
+  abstract member Validate : HttpCookie * HttpContext -> bool
+  abstract member Session<'a>  : string -> StateStore<'a>
 
 and WebPart = HttpContext -> SuaveTask<HttpContext>
 
@@ -494,37 +508,42 @@ module HttpRuntime =
   /// an empty session provider that doesn't work, but can be nice to use as a
   /// place-holder
   let stub_session_provider =
-    { new ISessionProvider with
+    { new SessionStateProvider with
         member x.Generate(expiration : TimeSpan, ctx : HttpContext) =
-          ""
-        member x.Validate(s : string, ctx : HttpContext) =
-          false
+          HttpCookie.empty, HttpCookie.empty
+        member x.Validate(s : HttpCookie, ctx : HttpContext) =
+          true
         //  (string -> 'a option) * (string -> 'a -> unit)
         member x.Session(s : string) =
           (fun _ -> None), (fun _ _ -> ())
     }
+
+  [<Literal>]
+  let ServerKeyLength = 64
 
   /// warn: this is not to be played around with; prefer using the config
   /// defaults instead, from Web.fs, as they contain the logic for printing to
   /// the output stream correctly.
   let empty =
     { protocol           = Protocol.HTTP
+      server_key         = ""
       error_handler      = fun _ _ -> fun _ -> async.Return None
       mime_types_map     = fun _ -> None
       home_directory     = "."
       compression_folder = "."
       logger             = Log.Loggers.sane_defaults_for Log.Debug
-      session_provider   = stub_session_provider }
+      state_provider     = stub_session_provider }
 
   /// make a new HttpRuntime from the given parameters
-  let mk proto error_handler mime_types home_directory compression_folder logger session_provider =
+  let mk proto server_key error_handler mime_types home_directory compression_folder logger session_provider =
     { protocol           = proto
+      server_key         = server_key
       error_handler      = error_handler
       mime_types_map     = mime_types
       home_directory     = home_directory
       compression_folder = compression_folder
       logger             = logger
-      session_provider   = session_provider }
+      state_provider     = session_provider }
 
   let protocol x = x.protocol
 
@@ -538,7 +557,7 @@ module HttpRuntime =
 
   let logger x = x.logger
 
-  let session_provider x = x.session_provider
+  let state_provider x = x.state_provider
 
 /// A module that provides functions to create a new HttpContext.
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]

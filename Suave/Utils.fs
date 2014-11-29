@@ -313,6 +313,11 @@ module Crypto =
   /// secure random values
   let crypt_random = RandomNumberGenerator.Create()
 
+  /// Fills the passed array with random bytes
+  let randomize (bytes : byte []) =
+    crypt_random.GetBytes bytes
+    bytes
+
   /// The default hmac algorithm
   [<Literal>]
   let HMACAlgorithm = "HMACSHA256"
@@ -411,7 +416,8 @@ module Parsing =
       if d.Length = 2 then (d.[0], Some <| System.Web.HttpUtility.UrlDecode(d.[1]))
       else d.[0],None
     s.Split('&')
-    |> Array.map (fun (k : string) -> k.Split('=') |> parse_arr)
+    |> Array.toList
+    |> List.map (fun (k : string) -> k.Split('=') |> parse_arr)
 
   /// parse the url into its constituents and fill out the passed dictionary with
   /// query string key-value pairs
@@ -426,12 +432,13 @@ module Parsing =
     else
       (parts.[0], parts.[1], String.Empty, parts.[2])
 
-  /// Parse the cookie data in the string into a dictionary
+  /// Parse the cookie's name and data in the string into a dictionary.
   let parse_cookie (s : string) =
     s.Split(';')
     |> Array.map (fun (x : string) ->
                   let parts = x.Split('=')
-                  (parts.[0].Trim(), parts.[1].Trim()))
+                  parts.[0].Trim(), parts.[1].Trim())
+    |> Array.toList
 
   /// Parse a string array of key-value-pairs, combined using the equality character '='
   /// into a dictionary
@@ -452,12 +459,3 @@ module Parsing =
       parse_key_value_pairs (Array.sub parts 1 (parts.Length - 1))
     | None ->
       failwith "did not find header, because header_params received None"
-
-  let get_cookies (headers : NameValueList) =
-    let cookies = new Dictionary<string,string>()
-    headers
-    |> Seq.filter (fun x -> (fst x).Equals("cookie"))
-    |> Seq.iter (fun x ->  snd x 
-                           |> parse_cookie
-                           |> Array.iter (fun y -> cookies.Add (fst y,snd y)))
-    cookies
