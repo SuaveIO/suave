@@ -71,14 +71,14 @@ module Auth =
     { HttpCookie.mk' SessionIdCookie session_id with http_only = false }
 
   /// Generate one server auth-side cookie and one client-side cookie.
-  let generate_cookies relative_expiry { request = req; runtime = run } =
+  let generate_cookies relative_expiry secure { request = req; runtime = run } =
     let session_id  = Crypto.generate_key' SessionIdLength
     let hmac_data   = hmac_data session_id req
     let hmac        = Crypto.hmac' run.server_key hmac_data |> Utils.base64_headers
     let cookie_data = String.Concat [| session_id; hmac |]
     let auth_cookie, client_cookie =
       sliding_expiry relative_expiry
-        { HttpCookie.mk' SessionAuthCookie cookie_data with http_only = true }
+        { HttpCookie.mk' SessionAuthCookie cookie_data with http_only = true; secure = secure }
         (mk_client_cookie session_id)
     auth_cookie, client_cookie, session_id
 
@@ -147,13 +147,17 @@ module Auth =
   /// part, you're setting cookies on the response; so you'll need to have the
   /// client re-send a request if you require authentication for it, after this
   /// web part has run.
-  let authenticated (relative_expiry : TimeSpan) : WebPart =
+  ///
+  /// Parameters:
+  ///  - `relative_expiry`: how long does the authentication cookie last?
+  /// - `secure`: HttpsOnly?
+  let authenticated (relative_expiry : TimeSpan) secure : WebPart =
     context (fun ctx ->
       choose [
         // either we're already authenticated and then we just refresh cookies
         // or otherwise we set fresh cookies
         authenticate relative_expiry never
-        set_cookies (generate_cookies relative_expiry ctx) ])
+        set_cookies (generate_cookies relative_expiry secure ctx) ])
 
   [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
   module HttpContext =
