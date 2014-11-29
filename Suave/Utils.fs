@@ -338,6 +338,7 @@ module Crypto =
   [<Literal>]
   let GenerateKeyDefaultAlphabet = "abcdefghijklmnopqrstuvwuxyz0123456789"
 
+  /// Generates a key from the available characters with the given key size.
   let generate_key (available_chars : string) (key_size : int) =
     let arr = Array.create<byte> key_size 0uy
     crypt_random.GetBytes arr

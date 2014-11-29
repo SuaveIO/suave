@@ -477,12 +477,7 @@ and HttpRuntime =
     mime_types_map     : MimeTypesMap
     home_directory     : string
     compression_folder : string
-    logger             : Log.Logger
-    /// The state provider is responsible for serialising and deserialising the
-    /// state for the user of the request. If you deploy your web app across a
-    /// cluster with load balancing you should replace this with something that
-    /// writes to Memcached or Cassandra or Riak or something similar.
-    state_provider     : System.Runtime.Caching.MemoryCache }
+    logger             : Log.Logger }
 
 /// The HttpContext is the container of the request, runtime, user-state and
 /// response.
@@ -495,8 +490,8 @@ and HttpContext =
 /// The session provider is a convenience interface for storing user session
 /// data.
 and SessionStateProvider =
-  abstract member Generate : TimeSpan * HttpContext -> HttpCookie * HttpCookie
-  abstract member Validate : HttpCookie * HttpContext -> bool
+  abstract member Generate     : TimeSpan * HttpContext -> HttpCookie * HttpCookie
+  abstract member Validate     : HttpCookie * HttpContext -> bool
   abstract member Session<'a>  : string -> StateStore<'a>
 
 and WebPart = HttpContext -> SuaveTask<HttpContext>

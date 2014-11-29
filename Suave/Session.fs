@@ -66,7 +66,8 @@ module Auth =
   [<Literal>]
   let SessionAuth = "Suave.Session.Auth"
 
-  let private client_cookie session_id =
+  /// Create a new client cookie with the session id in.
+  let private mk_client_cookie session_id =
     { HttpCookie.mk' SessionIdCookie session_id with http_only = false }
 
   /// Generate one server auth-side cookie and one client-side cookie.
@@ -78,9 +79,10 @@ module Auth =
     let auth_cookie, client_cookie =
       sliding_expiry relative_expiry
         { HttpCookie.mk' SessionAuthCookie cookie_data with http_only = true }
-        (client_cookie session_id)
+        (mk_client_cookie session_id)
     auth_cookie, client_cookie, session_id
 
+  /// Unsets the cookies, thereby unauthenticating the user.
   let unset_cookies (auth_cookie, client_cookie, session_id) : WebPart =
     Writers.unset_cookie auth_cookie >>=
       Writers.unset_cookie client_cookie >>=
@@ -93,8 +95,9 @@ module Auth =
       Writers.set_cookie client_cookie >>=
       Writers.set_user_data SessionAuth session_id
 
+  /// Bumps the expiry dates for all the cookies and user_data value.
   let refresh_cookies relative_expiry auth_cookie session_id : WebPart =
-    let a', c' = sliding_expiry relative_expiry auth_cookie (client_cookie session_id)
+    let a', c' = sliding_expiry relative_expiry auth_cookie (mk_client_cookie session_id)
     set_cookies (a', c', session_id)
 
   /// Validates the inner cookie data (use validate' for simplicity) and
@@ -114,7 +117,6 @@ module Auth =
       ctx
       |> HttpContext.request
       |> HttpRequest.cookies
-
     cookies
     |> Map.tryFind SessionAuthCookie
     |> Option.bind (fun auth_cookie ->
@@ -125,13 +127,20 @@ module Auth =
           Some (auth_cookie, session_id, hmac_given)
         else None)
 
-  /// Ensure the client/http context has a valid session id
-  let authenticate (relative_expiry : TimeSpan) : WebPart =
+  let authenticate (relative_expiry : TimeSpan) (failure : WebPart) : WebPart =
     context (fun ctx ->
       match validate' ctx with
-      | Some (a, session_id, _) ->  
-        refresh_cookies relative_expiry a session_id
-      | None   -> never)
+      | Some (auth_cookie, session_id, _) ->  
+        refresh_cookies relative_expiry auth_cookie session_id
+      | None   -> failure)
+
+  /// Ensure the client/http context has a valid session id which fails by
+  /// failing the full web part; but you can use the non-primed method if
+  /// you'd rather give a UNAUTHORIZED reply. It's a good idea not to leak
+  /// information about secred entities by not showing there's something
+  /// that the user wasn't authorized to view.
+  let authenticate' relative_expiry : WebPart =
+    authenticate relative_expiry never
 
   /// Set server-signed cookies to make the response contain a cookie
   /// with a valid session id
@@ -139,92 +148,98 @@ module Auth =
     context (fun ctx ->
       set_cookies (generate_cookies relative_expiry ctx))
 
-/// TODO: provide abstraction over MemoryCache
+  [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+  module HttpContext =
+    let session_id x =
+      x.user_state
+      |> Map.tryFind SessionAuth
+      |> Option.map (fun x -> x :?> string)
+
+/// Common for this module is that it requires that the Auth module
+/// above has been activated/used and that the user is authenticated.
 module State =
+  open Auth
 
-  let ensure (storage : MemoryCache)
-             (ctx     : HttpContext) =
+  /// Anything stateful implies the user is 'authenticated'. What it means for
+  /// your application that the user is authenticated in the sense that Suave
+  /// means it, is up to you as a programmer. You can choose to let all users
+  /// be authenticated with Suave.Session.Auth and then use this session store
+  /// with the session ids that that generates.
+  ///
+  /// A wilful refactor of this module would allow you to separate different
+  /// *sorts* of authentication.
+  let stateful relative_expiry
+               failure
+               (state_store_type : string)
+               (session_store : (*session id*) string -> StateStore<'a>)
+               : WebPart =
+    authenticate relative_expiry failure >>=
+      context (fun ctx ->
+        match ctx.user_state |> Map.tryFind state_store_type with
+        | None       ->
+          let session_id = ctx |> HttpContext.session_id |> Option.get
+          Writers.set_user_data state_store_type (session_store session_id)
+        | Some store ->
+          succeed)
 
-    match Auth.validate' ctx with
-    | Some (auth_cookie, session_id, hmac_given) as res when storage.Contains session_id ->
-      succeed ctx
-    | Some 
-    | _ -> None
+  [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+  module CookieStateStore =
+    ()
 
-  let authenticated (storage : MemoryCache)
-                    (ctx     : HttpContext) =
-    match validate storage with
+  /// This module contains the implementation for the memory-cache backed session
+  /// state store, when the memory cache is global for the server.
+  [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+  module MemoryCacheStateStore =
 
-  let ensure (storage : MemoryCache)
-             ({ request = req; runtime = { state_provider = sp } } as ctx) =
+    /// This key will be present in HttpContext.user_state and will contain the
+    /// MemoryCache instance.
+    [<Literal>]
+    let StateStoreType = "Suave.Session.State.MemoryCacheStateStore"
+
+    let private wrap (session_map : MemoryCache) session_id =
+      let state_bag =
+        lock session_map (fun _->
+          if session_map.Contains session_id then
+            session_map.Get session_id
+            :?> ConcurrentDictionary<string, obj>
+          else
+            let cd = new ConcurrentDictionary<string, obj>()
+            session_map.Set(CacheItem(session_id, cd), CacheItemPolicy())
+            cd)
+
+      let get =
+        fun s ->
+          if state_bag.ContainsKey s then
+            Some (state_bag.[s] :?> 'a)
+          else None
+      let set =
+        fun s v ->
+          state_bag.[s] <- v
+
+      get, set
+
+    let stateful failure
+                 (relative_expiry : TimeSpan)
+                 (mc : MemoryCache) =
+      stateful relative_expiry
+               failure
+               StateStoreType
+               (wrap mc)
+
+    let DefaultExpiry = TimeSpan.FromMinutes 30.
     
-    let cookies = req |> HttpRequest.cookies
+    let stateful' : WebPart =
+      stateful never DefaultExpiry (MemoryCache.Default)
 
+    /// Extensions to HttpContext for Session support.
+    [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+    module HttpContext =
 
-
-
-    let session_id =
-      match look_up cookies SessionIdStateKey with
-      | Some cookie ->
-        if ctx.runtime.state_provider.Validate (attr, ctx) then
-          cookie
-        else
-          ctx.runtime.state_provider.Generate (time_span, ctx)
-      | None ->
-        ctx.runtime.state_provider.Generate (time_span, ctx)
-
-    set_session session_id time_span)
-    let session_id = Crypto.generate_key' SessionIdLength
-    let dict = new ConcurrentDictionary<string, obj> ()
-    lock session_map (fun _ ->
-        session_map.Add(session_id, dict :> obj,
-                        Globals.utc_now().Add expiration)
-        |> ignore)
-      let hmac_data = Utils.hmac_data session_id ctx.request
-      String.Concat [ session_id; (Crypto.hmac' key hmac_data |> Utils.base64_headers) ]
-
-
-open Stateless
-open Stateful
-
-/// TODO: same as HttpContext.session below??
-let get_session (session_map : MemoryCache) session_id =
-  let state_bag = 
-    lock session_map (fun _->
-      if not (session_map.Contains session_id) then
-        failwith "invalid session id."
-      session_map.[session_id]) :?> ConcurrentDictionary<string, obj>
-  let get = 
-    fun s -> if state_bag.ContainsKey s then Some (state_bag.[s] :?> 'a) else None
-  let set = fun s v -> state_bag.[s] <- v
-  get, set
-
-/// Extensions to HttpContext for Session support.
-[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
-module HttpContext =
-
-  /// Read the session store from the HttpContext, or throw an exception otherwise.
-  /// If this throws an exception, it's a programming error from the consumer of the
-  /// suave library.
-  let state (ctx : HttpContext) : StateStore<'a> =
-    match ctx.user_state |> Map.tryFind SessionIdStateKey with
-    | Some x when x :? String && not (String.IsNullOrWhiteSpace (x :?> string)) ->
-      ctx.runtime.state_provider.Session (x :?> string)
-    | _ ->
-      failwith "session_support was not called (or this is a load-balanced node w/ default impl)"
-
-/// The default session provider is an in-process session state provider
-type DefaultSessionProvider() =
-
-  let key = Crypto.generate_key' ServerKeyLength
-  let session_map = MemoryCache.Default
-
-  interface SessionStateProvider with
-    member this.Generate(expiration : TimeSpan, ctx : HttpContext) =
-      Stateful.ensure session_map expiration ctx
-
-    member this.Validate(cookie : HttpCookie, ctx : HttpContext) =
-      validate session_map key cookie.value ctx
-
-    member this.Session(s : string)  =
-      get_session session_map (s.Substring(0, SessionIdLength))
+      /// Read the session store from the HttpContext, or throw an exception otherwise.
+      /// If this throws an exception, it's a programming error from the consumer of the
+      /// suave library.
+      let state (ctx : HttpContext) : StateStore<'a> =
+        ctx.user_state
+        |> Map.tryFind StateStoreType
+        |> Option.map (fun ss -> ss :?> StateStore<'a>)
+        |> Option.get
