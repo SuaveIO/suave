@@ -111,9 +111,8 @@ let proxy_server_async (config : SuaveConfig) resolver =
   let home_dir = ParsingAndControl.resolve_directory config.home_folder
   let compression_folder = Path.Combine(ParsingAndControl.resolve_directory config.compressed_files_folder, "_temporary_compressed_files")
   let mk_runtime proto =
-    HttpRuntime.mk
-      proto config.error_handler config.mime_types_map
-      home_dir compression_folder config.logger config.session_provider
+    HttpRuntime.mk proto config.server_key config.error_handler config.mime_types_map
+                   home_dir compression_folder config.logger
 
   let all =
     config.bindings

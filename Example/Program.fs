@@ -12,6 +12,7 @@ open Suave.Http.Successful
 open Suave.Types
 open Suave.Session
 open Suave.Log
+open Session.State.MemoryCacheStateStore
 
 let basic_auth : WebPart =
   Authentication.authenticate_basic ( fun (user_name,password) -> user_name.Equals("foo") && password.Equals("bar"))
@@ -55,7 +56,8 @@ let mime_types =
   Writers.default_mime_types_map
     >=> (function | ".avi" -> Writers.mk_mime_type "video/avi" false | _ -> None)
 
-choose [
+Auth.authenticated (TimeSpan.FromMinutes 30.)
+>>= choose [
   log logger log_format >>= never
   GET >>= url "/hello" >>= never
   url_regex "(.*?)\.(dll|mdb|log)$" >>= RequestErrors.FORBIDDEN "Access denied."
@@ -70,15 +72,15 @@ choose [
   url "/date" >>= warbler (fun _ -> OK (DateTimeOffset.UtcNow.ToString("o")))
   url "/timeout" >>= timeout_webpart (TimeSpan.FromSeconds 1.) (sleep 120000 "Did not timed out")
   url "/session"
-    >>= session_support (TimeSpan(0,30,0))
+    >>= stateful' // Session.State.MemoryCacheStateStore
     >>= context (fun x ->
-        let get, set = HttpContext.session x
-        match get "counter" with
+        let store = HttpContext.state x
+        match store.get "counter" with
         | Some y ->
-          set "counter" (y + 1)
+          store.set "counter" (y + 1)
           OK (sprintf "Hello %d time(s)" y )
         | None ->
-          set "counter" 1
+          store.set "counter" 1
           OK "First time")
   basic_auth // from here on it will require authentication
   GET >>= url "/events" >>= request (fun r -> EventSource.hand_shake (CounterDemo.counter_demo r))
@@ -103,13 +105,13 @@ choose [
   ]
   |> web_server
       { bindings         = [ HttpBinding.mk' HTTP "127.0.0.1" 8082 ]
-      ; error_handler    = default_error_handler
-      ; listen_timeout   = TimeSpan.FromMilliseconds 2000.
-      ; ct               = Async.DefaultCancellationToken
-      ; buffer_size      = 2048
-      ; max_ops          = 100
-      ; mime_types_map   = mime_types
-      ; home_folder      = None
-      ; compressed_files_folder = None
-      ; logger           = logger
-      ; session_provider = new DefaultSessionProvider() }
+        server_key       = Utils.Crypto.generate_key' HttpRuntime.ServerKeyLength
+        error_handler    = default_error_handler
+        listen_timeout   = TimeSpan.FromMilliseconds 2000.
+        ct               = Async.DefaultCancellationToken
+        buffer_size      = 2048
+        max_ops          = 100
+        mime_types_map   = mime_types
+        home_folder      = None
+        compressed_files_folder = None
+        logger           = logger }

@@ -1,5 +1,6 @@
 ﻿module Suave.Tests.Utils
 
+open Suave
 open Suave.Utils.Compression
 open Suave.Utils.Parsing
 
@@ -22,4 +23,16 @@ let utilities =
       Assert.Equal(
         "compress >> decompress == identity",
         str, (get_bytes >> gzip_encode >> gzip_decode >> from_bytes) str)
+
+    testCase "str eql" <| fun _ ->
+      for (str1, str2) in
+        [
+          "", ""
+          "a", "b"
+          "a", "aa"
+          "aa", "aa"
+        ] do
+        Assert.Equal("should have same as normal str equal",
+                     str1.Equals str2,
+                     String.cnst_time_cmp_ord str1 str2)
   ]

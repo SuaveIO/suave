@@ -143,10 +143,17 @@ module Auth =
     authenticate relative_expiry never
 
   /// Set server-signed cookies to make the response contain a cookie
-  /// with a valid session id
+  /// with a valid session id. It's worth having in mind that when you use this web
+  /// part, you're setting cookies on the response; so you'll need to have the
+  /// client re-send a request if you require authentication for it, after this
+  /// web part has run.
   let authenticated (relative_expiry : TimeSpan) : WebPart =
     context (fun ctx ->
-      set_cookies (generate_cookies relative_expiry ctx))
+      choose [
+        // either we're already authenticated and then we just refresh cookies
+        // or otherwise we set fresh cookies
+        authenticate relative_expiry never
+        set_cookies (generate_cookies relative_expiry ctx) ])
 
   [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
   module HttpContext =
@@ -171,7 +178,7 @@ module State =
   let stateful relative_expiry
                failure
                (state_store_type : string)
-               (session_store : (*session id*) string -> StateStore<'a>)
+               (session_store : (*session id*) string -> StateStore)
                : WebPart =
     authenticate relative_expiry failure >>=
       context (fun ctx ->
@@ -207,29 +214,27 @@ module State =
             session_map.Set(CacheItem(session_id, cd), CacheItemPolicy())
             cd)
 
-      let get =
-        fun s ->
-          if state_bag.ContainsKey s then
-            Some (state_bag.[s] :?> 'a)
-          else None
-      let set =
-        fun s v ->
-          state_bag.[s] <- v
+      { new StateStore with
+          member x.get key       =
+            if state_bag.ContainsKey key then
+              Some (state_bag.[key] :?> 'a)
+            else None
+          member x.set key value =
+            state_bag.[key] <- value }
 
-      get, set
+    let private mc_state = wrap (MemoryCache.Default)
 
     let stateful failure
-                 (relative_expiry : TimeSpan)
-                 (mc : MemoryCache) =
+                 (relative_expiry : TimeSpan) =
       stateful relative_expiry
                failure
                StateStoreType
-               (wrap mc)
+               mc_state
 
     let DefaultExpiry = TimeSpan.FromMinutes 30.
     
     let stateful' : WebPart =
-      stateful never DefaultExpiry (MemoryCache.Default)
+      stateful never DefaultExpiry
 
     /// Extensions to HttpContext for Session support.
     [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
@@ -238,8 +243,8 @@ module State =
       /// Read the session store from the HttpContext, or throw an exception otherwise.
       /// If this throws an exception, it's a programming error from the consumer of the
       /// suave library.
-      let state (ctx : HttpContext) : StateStore<'a> =
+      let state (ctx : HttpContext) : StateStore =
         ctx.user_state
         |> Map.tryFind StateStoreType
-        |> Option.map (fun ss -> ss :?> StateStore<'a>)
+        |> Option.map (fun ss -> ss :?> StateStore)
         |> Option.get

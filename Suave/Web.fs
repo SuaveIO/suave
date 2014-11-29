@@ -495,8 +495,8 @@ let web_server_async (config : SuaveConfig) (webpart : WebPart) =
     config.bindings
     |> List.map (fun { scheme = proto; ip = ip; port = port } ->
       let http_runtime =
-        HttpRuntime.mk proto config.error_handler config.mime_types_map
-          content_folder compression_folder config.logger config.session_provider
+        HttpRuntime.mk proto config.server_key config.error_handler config.mime_types_map
+                       content_folder compression_folder config.logger
       ParsingAndControl.web_worker (ip, port, config.buffer_size, config.max_ops, http_runtime) webpart)
   let listening = all |> Seq.map fst |> Async.Parallel
   let server    = all |> Seq.map snd |> Async.Parallel |> Async.Ignore
@@ -512,6 +512,7 @@ let web_server (config : SuaveConfig) (webpart : WebPart) =
 /// to succeed.
 let default_config : SuaveConfig =
   { bindings         = [ HttpBinding.defaults ]
+    server_key       = Utils.Crypto.generate_key' HttpRuntime.ServerKeyLength
     error_handler    = default_error_handler
     listen_timeout   = TimeSpan.FromSeconds(2.)
     ct               = Async.DefaultCancellationToken
@@ -520,5 +521,4 @@ let default_config : SuaveConfig =
     mime_types_map   = Http.Writers.default_mime_types_map
     home_folder      = None
     compressed_files_folder = None
-    logger           = Log.Loggers.sane_defaults_for Log.LogLevel.Info
-    session_provider = new DefaultSessionProvider() }
+    logger           = Log.Loggers.sane_defaults_for Log.LogLevel.Info }

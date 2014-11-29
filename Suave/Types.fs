@@ -266,7 +266,9 @@ module HttpBinding =
   let port x   = x.port
 
 /// A session store is a reader and a writer function pair keyed on strings.
-type StateStore<'a> = (string -> 'a option) * (string -> 'a -> unit)
+type StateStore =
+  abstract get<'a> : string -> 'a option
+  abstract set     : string -> 'a -> unit
 
 type HttpContent =
   | NullContent
@@ -492,7 +494,7 @@ and HttpContext =
 and SessionStateProvider =
   abstract member Generate     : TimeSpan * HttpContext -> HttpCookie * HttpCookie
   abstract member Validate     : HttpCookie * HttpContext -> bool
-  abstract member Session<'a>  : string -> StateStore<'a>
+  abstract member Session      : string -> StateStore
 
 and WebPart = HttpContext -> SuaveTask<HttpContext>
 
@@ -500,18 +502,6 @@ and WebPart = HttpContext -> SuaveTask<HttpContext>
 /// a HttpRuntime
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module HttpRuntime =
-  /// an empty session provider that doesn't work, but can be nice to use as a
-  /// place-holder
-  let stub_session_provider =
-    { new SessionStateProvider with
-        member x.Generate(expiration : TimeSpan, ctx : HttpContext) =
-          HttpCookie.empty, HttpCookie.empty
-        member x.Validate(s : HttpCookie, ctx : HttpContext) =
-          true
-        //  (string -> 'a option) * (string -> 'a -> unit)
-        member x.Session(s : string) =
-          (fun _ -> None), (fun _ _ -> ())
-    }
 
   [<Literal>]
   let ServerKeyLength = 64
@@ -526,19 +516,17 @@ module HttpRuntime =
       mime_types_map     = fun _ -> None
       home_directory     = "."
       compression_folder = "."
-      logger             = Log.Loggers.sane_defaults_for Log.Debug
-      state_provider     = stub_session_provider }
+      logger             = Log.Loggers.sane_defaults_for Log.Debug }
 
   /// make a new HttpRuntime from the given parameters
-  let mk proto server_key error_handler mime_types home_directory compression_folder logger session_provider =
+  let mk proto server_key error_handler mime_types home_directory compression_folder logger =
     { protocol           = proto
       server_key         = server_key
       error_handler      = error_handler
       mime_types_map     = mime_types
       home_directory     = home_directory
       compression_folder = compression_folder
-      logger             = logger
-      state_provider     = session_provider }
+      logger             = logger }
 
   let protocol x = x.protocol
 
@@ -551,8 +539,6 @@ module HttpRuntime =
   let compression_folder x = x.compression_folder
 
   let logger x = x.logger
-
-  let state_provider x = x.state_provider
 
 /// A module that provides functions to create a new HttpContext.
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
@@ -594,6 +580,10 @@ open System.Threading
 type SuaveConfig =
   { /// The bindings for the web server to launch with
     bindings                : HttpBinding list
+    /// A server-key to use for cryptographic operations. When generated it
+    /// should be completely random; you can share this key between load-balanced
+    /// servers if you want to have them cryptographically verify similarly.
+    server_key              : string
     /// An error handler to use for handling exceptions that are
     /// are thrown from the web parts
     error_handler           : ErrorHandler
@@ -613,14 +603,14 @@ type SuaveConfig =
     /// Folder for temporary compressed files
     compressed_files_folder : string option
     /// A logger to log with
-    logger                  : Log.Logger
-    /// A http session provider
-    session_provider        : ISessionProvider }
+    logger                  : Log.Logger }
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module SuaveConfig =
 
   let bindings x = x.bindings
+
+  let server_key x = x.server_key
 
   let error_handler x = x.error_handler
 
@@ -639,8 +629,6 @@ module SuaveConfig =
   let compressed_files_folder x = x.compressed_files_folder
 
   let logger x = x.logger
-
-  let session_provider x = x.session_provider
 
 /// An exception, raised e.g. if writing to the stream fails, should not leak to
 /// users of this library

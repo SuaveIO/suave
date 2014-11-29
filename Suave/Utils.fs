@@ -98,6 +98,7 @@ module String =
     let mutable i = 0
     while i < str1.Length && i < str2.Length do
       xx <- xx ||| uint32 (int str1.[i] ^^^ int str2.[i])
+      i <- i + 1
     xx = 0u
 
 module Option =
