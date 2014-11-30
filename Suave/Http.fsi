@@ -97,8 +97,8 @@ module Http =
     /// Sets a cookie with the passed value in the 'cookie' parameter
     val set_cookie : cookie:HttpCookie -> WebPart
 
-    /// Unset the cookie by expiring it.
-    val unset_cookie : cookie:HttpCookie -> WebPart
+    /// Unset the cookie by name by expiring it.
+    val unset_cookie : cookie_name:string -> WebPart
 
     /// <summary>
     /// Creates a MIME type record

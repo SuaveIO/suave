@@ -105,11 +105,9 @@ module Http =
     let set_cookie (cookie : HttpCookie) =
       set_header "Set-Cookie" (cookie_to_string cookie)
 
-    let unset_cookie (cookie : HttpCookie) =
+    let unset_cookie (cookie_name : string) =
       let start_epoch = DateTimeOffset(1970, 1, 1, 0, 0, 1, TimeSpan.Zero) |> Some
-      let string_value =
-        cookie_to_string { cookie with expires = start_epoch
-                                       value   = "x" }
+      let string_value = cookie_to_string { HttpCookie.mk' cookie_name "x" with expires = start_epoch }
       set_header "Set-Cookie" string_value
 
     // TODO: I'm not sure about having MIME types in the Writers module

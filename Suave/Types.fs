@@ -60,6 +60,22 @@ module HttpCookie =
   /// An empty cookie value
   let empty = mk' "" ""
 
+  let name x = x.name
+
+  let value x = x.value
+
+  let expires x = x.expires
+
+  let path x = x.path
+
+  let domain x = x.domain
+
+  let secure x = x.secure
+
+  let http_only x = x.http_only
+
+  let version x = x.version
+
 /// A file's mime type and if compression is enabled or not
 type MimeType =
   { name         : string
