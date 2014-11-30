@@ -119,6 +119,16 @@ module Bytes =
   open System
   open System.IO
   open System.Text
+ 
+  /// Ordinally compare two strings in constant time, bounded by the length of the
+  /// longest string.
+  let cnst_time_cmp (bits : byte []) (bobs : byte []) =
+    let mutable xx = uint32 bits.Length ^^^ uint32 bobs.Length
+    let mutable i = 0
+    while i < bits.Length && i < bobs.Length do
+      xx <- xx ||| uint32 (bits.[i] ^^^ bobs.[i])
+      i <- i + 1
+    xx = 0u
 
   type BufferSegment =
     { buffer : ArraySegment<byte>
@@ -325,20 +335,24 @@ module Crypto =
   [<Literal>]
   let HMACAlgorithm = "HMACSHA256"
 
+  /// The length of the HMAC value in number of bytes
   [<Literal>]
-  let HMACBytes = 32 // = 256 / 8
+  let HMACLength = 32 // = 256 / 8
 
   /// Calculate the HMAC of the passed data given a private key
-  let hmac (key : byte []) (data : byte[]) =
+  let hmac (key : byte []) offset count (data : byte[]) =
     use hmac = HMAC.Create(HMACAlgorithm)
     hmac.Key <- key
-    hmac.ComputeHash data
+    hmac.ComputeHash (data, offset, count)
+
+  let hmac' key (data : byte []) =
+    hmac key 0 (data.Length) data
 
   /// Calculate the HMAC value given the string-key (will be converted to UTF8-bytes)
   /// and a seq of string-data which will be concatenated in its order and hmac-ed.
-  let hmac' (key : string) (data : string seq) =
+  let hmac'' (key : string) (data : string seq) =
     let data' = String.Concat data |> UTF8.bytes
-    hmac (UTF8.bytes key) data'
+    hmac' (UTF8.bytes key) data'
 
   /// The default alphabet (a string of characters) that is used to generate
   /// human-readable keys.
@@ -361,20 +375,29 @@ module Crypto =
   let generate_key' key_size = generate_key GenerateKeyDefaultAlphabet key_size
 
   // iv | data \ hmac
-  let block_size = 128
-  let key_size   = 256
+
+  /// # bits in key
+  let KeySize   = 256
+
+  let KeyLength = KeySize / 8
+
+  /// # bits in block
+  let BlockSize = 128
+
+  /// # bytes in IV / nonce
+  let IVLength = BlockSize / 8
 
   let secretbox_gen () =
-    let key = Array.create<byte> (key_size / 8) 0uy
+    let key = Array.zeroCreate<byte> KeyLength // 32 bytes for 256 bit key
     crypt_random.GetNonZeroBytes key
-    let nonce = Array.create<byte> (block_size / 8) 0uy
+    let nonce = Array.zeroCreate<byte> IVLength // 16 bytes for 128 bit blocks
     crypt_random.GetNonZeroBytes nonce
     key, nonce
 
   let private secretbox_init key nonce =
     let aes = new AesManaged()
-    aes.KeySize   <- key_size
-    aes.BlockSize <- block_size
+    aes.KeySize   <- KeySize
+    aes.BlockSize <- BlockSize
     aes.Mode      <- CipherMode.CBC
     aes.IV        <- nonce
     aes.Key       <- key
@@ -384,9 +407,9 @@ module Crypto =
   /// http://nacl.cr.yp.to/secretbox.html
   /// https://gist.github.com/jbtule/4336842
   let secretbox (msg : string) (key : byte []) (nonce : byte []) =
-    use aes = secretbox_init key nonce
 
-    let mk_cipher_text (msg : string) =
+    let mk_cipher_text (msg : string) key nonce =
+      use aes      = secretbox_init key nonce
       use enc      = aes.CreateEncryptor(key, nonce)
       use cipher   = new MemoryStream()
       use crypto   = new CryptoStream(cipher, enc, CryptoStreamMode.Write)
@@ -399,16 +422,29 @@ module Crypto =
     use enc = new MemoryStream()
     use bw  = new BinaryWriter(enc)
     bw.Write nonce
-    bw.Write (mk_cipher_text msg)
+    bw.Write (mk_cipher_text msg key nonce)
     bw.Flush ()
 
-    let tag = hmac key (enc.ToArray())
-    bw.Write tag
+    let hmac = hmac' key (enc.ToArray())
+    bw.Write hmac
 
     enc.ToArray()
 
-  let secretbox_open cipher key nonce =
-    () // TODO
+  let secretbox_open (cipher_text : byte []) (key : byte []) (nonce : byte []) =
+
+    let hmac_calc = hmac key 0 (cipher_text.Length - HMACLength) cipher_text
+    let hmac_given = Array.zeroCreate<byte> HMACLength
+    Array.blit cipher_text (cipher_text.Length - HMACLength) // from
+               hmac_given  0                                 // to
+               HMACLength                                    // # bytes for hmac
+
+    if cipher_text.Length < HMACLength + IVLength then
+      None
+    elif not (Bytes.cnst_time_cmp hmac_calc hmac_given) then
+      None
+    else
+      Some ()
+
 
 module Compression =
   open System.IO
