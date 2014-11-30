@@ -307,6 +307,8 @@ module Bytes =
 /// as keys
 module Crypto =
   open System
+  open System.IO
+  open System.IO.Compression
   open System.Text
   open System.Security.Cryptography
 
@@ -338,11 +340,14 @@ module Crypto =
     let data' = String.Concat data |> UTF8.bytes
     hmac (UTF8.bytes key) data'
 
-  /// The default alphabet (a string of characters) that is used to generate keys.
+  /// The default alphabet (a string of characters) that is used to generate
+  /// human-readable keys.
   [<Literal>]
   let GenerateKeyDefaultAlphabet = "abcdefghijklmnopqrstuvwuxyz0123456789"
 
-  /// Generates a key from the available characters with the given key size.
+  /// Generates a string key from the available characters with the given key size
+  /// in characters. Note that this key is not cryptographically as random as a pure
+  /// random number generator would produce as we only use a small subset alphabet.
   let generate_key (available_chars : string) (key_size : int) =
     let arr = Array.create<byte> key_size 0uy
     crypt_random.GetBytes arr
@@ -354,6 +359,56 @@ module Crypto =
   /// Generates a cryptographically strong id of size key_size with the
   /// default alphabet
   let generate_key' key_size = generate_key GenerateKeyDefaultAlphabet key_size
+
+  // iv | data \ hmac
+  let block_size = 128
+  let key_size   = 256
+
+  let secretbox_gen () =
+    let key = Array.create<byte> (key_size / 8) 0uy
+    crypt_random.GetNonZeroBytes key
+    let nonce = Array.create<byte> (block_size / 8) 0uy
+    crypt_random.GetNonZeroBytes nonce
+    key, nonce
+
+  let private secretbox_init key nonce =
+    let aes = new AesManaged()
+    aes.KeySize   <- key_size
+    aes.BlockSize <- block_size
+    aes.Mode      <- CipherMode.CBC
+    aes.IV        <- nonce
+    aes.Key       <- key
+    aes.Padding   <- PaddingMode.PKCS7
+    aes
+
+  /// http://nacl.cr.yp.to/secretbox.html
+  /// https://gist.github.com/jbtule/4336842
+  let secretbox (msg : string) (key : byte []) (nonce : byte []) =
+    use aes = secretbox_init key nonce
+
+    let mk_cipher_text (msg : string) =
+      use enc      = aes.CreateEncryptor(key, nonce)
+      use cipher   = new MemoryStream()
+      use crypto   = new CryptoStream(cipher, enc, CryptoStreamMode.Write)
+      use compress = new GZipStream(crypto, CompressionLevel.Optimal)
+      use bw       = new BinaryWriter(compress, Encoding.UTF8)
+      bw.Write msg
+      bw.Flush ()
+      cipher.ToArray()
+
+    use enc = new MemoryStream()
+    use bw  = new BinaryWriter(enc)
+    bw.Write nonce
+    bw.Write (mk_cipher_text msg)
+    bw.Flush ()
+
+    let tag = hmac key (enc.ToArray())
+    bw.Write tag
+
+    enc.ToArray()
+
+  let secretbox_open cipher key nonce =
+    () // TODO
 
 module Compression =
   open System.IO

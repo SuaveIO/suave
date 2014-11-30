@@ -204,6 +204,15 @@ module State =
 
   [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
   module CookieStateStore =
+
+    // TODO, we basically want this:
+    // http://nacl.cr.yp.to/secretbox.html
+
+    // general format, | means concat:
+    // name = state
+    // value = state id \ cryptobox(iv | data | hmac)
+    // Value is encrypted with AES-256 in GCM mode
+
     ()
 
   /// This module contains the implementation for the memory-cache backed session
