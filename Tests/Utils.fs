@@ -40,6 +40,7 @@ let utilities =
                      str1.Equals str2,
                      String.cnst_time_cmp_ord str1 str2)
 
+    /// is 0.078125 KiB long
     testCase "crypto hello world" <| fun _ ->
       let str = "Hello World"
       let ca (str : string) = str.ToCharArray() |> Array.map (string<<int) |> String.concat ","
