@@ -375,7 +375,8 @@ module Compression =
       [||]
 
 /// Small crypto module that can do HMACs and generate random strings to use
-/// as keys
+/// as keys, as well as create a 'cryptobox'; i.e. a AES256+HMACSHA256 box with
+/// compressed plaintext contents so that they can be easily stored in cookies.
 module Crypto =
   open System
   open System.IO
