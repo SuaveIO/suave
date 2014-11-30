@@ -6,7 +6,6 @@ module ParsingAndControl =
 
   open System
   open System.IO
-
   open System.Text
   open System.Diagnostics
   open System.Threading
@@ -450,7 +449,6 @@ module ParsingAndControl =
 
   open Suave.Tcp
 
-
   /// Starts a new web worker, given the configuration and a web part to serve.
   let web_worker (ip, port, buffer_size, max_ops, runtime : HttpRuntime) (webpart : WebPart) =
     tcp_ip_server (ip, port, buffer_size, max_ops) runtime.logger (request_loop false runtime (WebPart webpart))
@@ -463,6 +461,7 @@ module ParsingAndControl =
 ////////////////////////////////////////////////////
 
 open System
+open System.IO
 open System.Net
 open Suave.Types
 open Suave.Http
@@ -490,7 +489,7 @@ let default_error_handler (ex : Exception) msg (ctx : HttpContext) =
 /// how quickly suave started.
 let web_server_async (config : SuaveConfig) (webpart : WebPart) =
   let content_folder = ParsingAndControl.resolve_directory config.home_folder
-  let compression_folder = System.IO.Path.Combine(ParsingAndControl.resolve_directory config.compressed_files_folder, "_temporary_compressed_files")
+  let compression_folder = Path.Combine(ParsingAndControl.resolve_directory config.compressed_files_folder, "_temporary_compressed_files")
   let all =
     config.bindings
     |> List.map (fun { scheme = proto; ip = ip; port = port } ->
@@ -512,7 +511,7 @@ let web_server (config : SuaveConfig) (webpart : WebPart) =
 /// to succeed.
 let default_config : SuaveConfig =
   { bindings         = [ HttpBinding.defaults ]
-    server_key       = Utils.Crypto.generate_key' HttpRuntime.ServerKeyLength
+    server_key       = Utils.Crypto.generate_key HttpRuntime.ServerKeyLength
     error_handler    = default_error_handler
     listen_timeout   = TimeSpan.FromSeconds(2.)
     ct               = Async.DefaultCancellationToken

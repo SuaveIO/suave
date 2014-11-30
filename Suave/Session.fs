@@ -24,6 +24,20 @@ let SessionAuthCookie = "auth"
 let SessionIdCookie = "sid"
 
 module internal Utils =
+  /// The default alphabet (a string of characters) that is used to generate
+  /// human-readable keys.
+  [<Literal>]
+  let GenerateKeyDefaultAlphabet = "abcdefghijklmnopqrstuvwuxyz0123456789"
+
+  /// Generates a string key from the available characters with the given key size
+  /// in characters. Note that this key is not cryptographically as random as a pure
+  /// random number generator would produce as we only use a small subset alphabet.
+  let generate_session_key (key_size : int) =
+    let arr = Array.zeroCreate<byte> key_size |> Crypto.randomize
+    let result = new StringBuilder(key_size)
+    arr |> Array.iter (fun (b : byte) ->
+        result.Append GenerateKeyDefaultAlphabet.[int b % GenerateKeyDefaultAlphabet.Length] |> ignore)
+    result.ToString()
 
   let length_for_bytes byte_count =
     // base64 expands 37.5% on the bytes' size
@@ -31,7 +45,7 @@ module internal Utils =
     // 128 bits = 16 bytes = 22 chars base64
     int (float byte_count * 1.375 - 1.) // -1 is removal of =-sign
 
-  let hmac_length = length_for_bytes 32. // depends on SHA256 in Crypto
+  let hmac_string_length = length_for_bytes Crypto.HMACLength // depends on SHA256 in Crypto
 
   /// This is used to pack base64 in a cookie; generates a degenerated base64 string
   let base64_headers bytes =
@@ -50,11 +64,11 @@ module Auth =
 
   /// Extracts the actual session id and the mac value from the cookie's data.
   let private parse_cookie_data (cd : string) =
-    if cd.Length < SessionIdLength + Utils.hmac_length then
+    if cd.Length < SessionIdLength + Utils.hmac_string_length then
       None
     else
       let id  = cd.Substring(0, SessionIdLength)
-      let mac = cd.Substring(SessionIdLength, Utils.hmac_length)
+      let mac = cd.Substring(SessionIdLength, Utils.hmac_string_length)
       Some (id, mac)
 
   /// Returns a list of the hmac data to use, from the request.
@@ -81,9 +95,9 @@ module Auth =
 
   /// Generate one server auth-side cookie and one client-side cookie.
   let generate_cookies relative_expiry secure { request = req; runtime = run } =
-    let session_id  = Crypto.generate_key' SessionIdLength
+    let session_id  = Utils.generate_session_key SessionIdLength
     let hmac_data   = hmac_data session_id req
-    let hmac        = Crypto.hmac' run.server_key hmac_data |> Utils.base64_headers
+    let hmac        = Crypto.hmac'' run.server_key hmac_data |> Utils.base64_headers
     let cookie_data = String.Concat [| session_id; hmac |]
     let auth_cookie, client_cookie =
       sliding_expiry relative_expiry
@@ -114,7 +128,7 @@ module Auth =
   let validate server_key request session_id hmac_given =
     let hmac_calc =
       hmac_data session_id request
-      |> Crypto.hmac' server_key
+      |> Crypto.hmac'' server_key
       |> Utils.base64_headers
     String.cnst_time_cmp_ord hmac_given hmac_calc
 

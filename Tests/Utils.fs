@@ -1,5 +1,7 @@
 ﻿module Suave.Tests.Utils
 
+open System
+
 open Suave
 open Suave.Utils.Compression
 open Suave.Utils.Parsing
@@ -35,4 +37,20 @@ let utilities =
         Assert.Equal("should have same as normal str equal",
                      str1.Equals str2,
                      String.cnst_time_cmp_ord str1 str2)
+
+    testCase "crypto hello world" <| fun _ ->
+      let str = "Hello World"
+      let ca (str : string) = str.ToCharArray() |> Array.map (string<<int) |> String.concat ","
+      let key = Crypto.generate_key' ()
+      let (Choice1Of2 cipher) = Crypto.secretbox key str
+      let (Choice1Of2 plain) = Crypto.secretbox_open key cipher
+      Assert.Equal(sprintf "'%s':%s = D(k, E(k, '%s':%s))" plain (ca plain) str (ca str), str, plain)
+
+    testProperty "can encrypt and then decrypt any string" <| fun (str : string) ->
+      let ca (str : string) = str.ToCharArray() |> Array.map (string<<int) |> String.concat ","
+      if not <| String.IsNullOrWhiteSpace str then
+        let key = Crypto.generate_key' ()
+        let (Choice1Of2 cipher) = Crypto.secretbox key str
+        let (Choice1Of2 plain) = Crypto.secretbox_open key cipher
+        Assert.Equal(sprintf "'%s':%s = D(k, E(k, '%s':%s))" plain (ca plain) str (ca str), str, plain)
   ]

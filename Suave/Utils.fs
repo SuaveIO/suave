@@ -105,6 +105,23 @@ module Option =
   let or_default value opt =
     opt |> Option.fold (fun s t -> t) value
 
+module Choice =
+
+  let mk x = Choice1Of2 x
+
+  let map f = function
+    | Choice1Of2 v -> Choice1Of2 (f v)
+    | Choice2Of2 msg -> Choice2Of2 msg
+
+  let bind (f : 'a -> Choice<'b, 'c>) (v : Choice<'a, 'c>) =
+    match v with
+    | Choice1Of2 v -> f v
+    | Choice2Of2 c -> Choice2Of2 c
+
+  let from_option on_missing = function
+    | Some x -> Choice1Of2 x
+    | None   -> Choice2Of2 on_missing
+
 module RandomExtensions =
   open System
 
@@ -313,139 +330,6 @@ module Bytes =
       else loop (i + 1)
     loop 0
 
-/// Small crypto module that can do HMACs and generate random strings to use
-/// as keys
-module Crypto =
-  open System
-  open System.IO
-  open System.IO.Compression
-  open System.Text
-  open System.Security.Cryptography
-
-  /// the global crypto-random pool for uniform and therefore cryptographically
-  /// secure random values
-  let crypt_random = RandomNumberGenerator.Create()
-
-  /// Fills the passed array with random bytes
-  let randomize (bytes : byte []) =
-    crypt_random.GetBytes bytes
-    bytes
-
-  /// The default hmac algorithm
-  [<Literal>]
-  let HMACAlgorithm = "HMACSHA256"
-
-  /// The length of the HMAC value in number of bytes
-  [<Literal>]
-  let HMACLength = 32 // = 256 / 8
-
-  /// Calculate the HMAC of the passed data given a private key
-  let hmac (key : byte []) offset count (data : byte[]) =
-    use hmac = HMAC.Create(HMACAlgorithm)
-    hmac.Key <- key
-    hmac.ComputeHash (data, offset, count)
-
-  let hmac' key (data : byte []) =
-    hmac key 0 (data.Length) data
-
-  /// Calculate the HMAC value given the string-key (will be converted to UTF8-bytes)
-  /// and a seq of string-data which will be concatenated in its order and hmac-ed.
-  let hmac'' (key : string) (data : string seq) =
-    let data' = String.Concat data |> UTF8.bytes
-    hmac' (UTF8.bytes key) data'
-
-  /// The default alphabet (a string of characters) that is used to generate
-  /// human-readable keys.
-  [<Literal>]
-  let GenerateKeyDefaultAlphabet = "abcdefghijklmnopqrstuvwuxyz0123456789"
-
-  /// Generates a string key from the available characters with the given key size
-  /// in characters. Note that this key is not cryptographically as random as a pure
-  /// random number generator would produce as we only use a small subset alphabet.
-  let generate_key (available_chars : string) (key_size : int) =
-    let arr = Array.create<byte> key_size 0uy
-    crypt_random.GetBytes arr
-    let result = new StringBuilder(key_size)
-    arr |> Array.iter (fun (b : byte) ->
-        result.Append available_chars.[int b % available_chars.Length] |> ignore)
-    result.ToString()
-
-  /// Generates a cryptographically strong id of size key_size with the
-  /// default alphabet
-  let generate_key' key_size = generate_key GenerateKeyDefaultAlphabet key_size
-
-  // iv | data \ hmac
-
-  /// # bits in key
-  let KeySize   = 256
-
-  let KeyLength = KeySize / 8
-
-  /// # bits in block
-  let BlockSize = 128
-
-  /// # bytes in IV
-  let IVLength = BlockSize / 8
-
-  let secretbox_gen () =
-    let key = Array.zeroCreate<byte> KeyLength // 32 bytes for 256 bit key
-    crypt_random.GetNonZeroBytes key
-    let iv = Array.zeroCreate<byte> IVLength // 16 bytes for 128 bit blocks
-    crypt_random.GetNonZeroBytes iv
-    key, iv
-
-  let private secretbox_init key iv =
-    let aes = new AesManaged()
-    aes.KeySize   <- KeySize
-    aes.BlockSize <- BlockSize
-    aes.Mode      <- CipherMode.CBC
-    aes.IV        <- iv
-    aes.Key       <- key
-    aes.Padding   <- PaddingMode.PKCS7
-    aes
-
-  /// http://nacl.cr.yp.to/secretbox.html
-  /// https://gist.github.com/jbtule/4336842
-  let secretbox (msg : string) (key : byte []) (iv : byte []) =
-
-    let mk_cipher_text (msg : string) key iv =
-      use aes      = secretbox_init key iv
-      use enc      = aes.CreateEncryptor(key, iv)
-      use cipher   = new MemoryStream()
-      use crypto   = new CryptoStream(cipher, enc, CryptoStreamMode.Write)
-      use compress = new GZipStream(crypto, CompressionLevel.Optimal)
-      use bw       = new BinaryWriter(compress, Encoding.UTF8)
-      bw.Write msg
-      bw.Flush ()
-      cipher.ToArray()
-
-    use enc = new MemoryStream()
-    use bw  = new BinaryWriter(enc)
-    bw.Write iv
-    bw.Write (mk_cipher_text msg key iv)
-    bw.Flush ()
-
-    let hmac = hmac' key (enc.ToArray())
-    bw.Write hmac
-
-    enc.ToArray()
-
-  let secretbox_open (cipher_text : byte []) (key : byte []) (iv : byte []) =
-
-    let hmac_calc = hmac key 0 (cipher_text.Length - HMACLength) cipher_text
-    let hmac_given = Array.zeroCreate<byte> HMACLength
-    Array.blit cipher_text (cipher_text.Length - HMACLength) // from
-               hmac_given  0                                 // to
-               HMACLength                                    // # bytes for hmac
-
-    if cipher_text.Length < HMACLength + IVLength then
-      None
-    elif not (Bytes.cnst_time_cmp hmac_calc hmac_given) then
-      None
-    else
-      Some ()
-
-
 module Compression =
   open System.IO
   open System.IO.Compression
@@ -489,6 +373,155 @@ module Compression =
       result.ToArray()
     else
       [||]
+
+/// Small crypto module that can do HMACs and generate random strings to use
+/// as keys
+module Crypto =
+  open System
+  open System.IO
+  open System.IO.Compression
+  open System.Text
+  open System.Security.Cryptography
+
+  /// The default hmac algorithm
+  [<Literal>]
+  let HMACAlgorithm = "HMACSHA256"
+
+  /// The length of the HMAC value in number of bytes
+  [<Literal>]
+  let HMACLength = 32 // = 256 / 8
+
+  /// Calculate the HMAC of the passed data given a private key
+  let hmac (key : byte []) offset count (data : byte[]) =
+    use hmac = HMAC.Create(HMACAlgorithm)
+    hmac.Key <- key
+    hmac.ComputeHash (data, offset, count)
+
+  let hmac' key (data : byte []) =
+    hmac key 0 (data.Length) data
+
+  /// Calculate the HMAC value given the key
+  /// and a seq of string-data which will be concatenated in its order and hmac-ed.
+  let hmac'' (key : byte []) (data : string seq) =
+    hmac' key (String.Concat data |> UTF8.bytes)
+
+  /// # bits in key
+  let KeySize   = 256
+
+  /// # bytes in key
+  let KeyLength = KeySize / 8
+
+  /// # bits in block
+  let BlockSize = 128
+
+  /// # bytes in IV
+  /// 16 bytes for 128 bit blocks
+  let IVLength = BlockSize / 8
+
+  /// the global crypto-random pool for uniform and therefore cryptographically
+  /// secure random values
+  let crypt_random = RandomNumberGenerator.Create()
+
+  /// Fills the passed array with random bytes
+  let randomize (bytes : byte []) =
+    crypt_random.GetBytes bytes
+    bytes
+
+  /// Generates a string key from the available characters with the given key size
+  /// in characters. Note that this key is not cryptographically as random as a pure
+  /// random number generator would produce as we only use a small subset alphabet.
+  let generate_key key_length =
+    Array.zeroCreate<byte> key_length |> randomize
+
+  let generate_key' () =
+    generate_key KeyLength
+
+  let generate_iv iv_length =
+    Array.zeroCreate<byte> iv_length |> randomize
+
+  let generate_iv' () =
+    generate_iv IVLength
+
+  /// key: 32 bytes for 256 bit key
+  /// Returns a new key and a new iv as two byte arrays as a tuple.
+  let generate_keys () =
+    generate_key' (), generate_iv' ()
+
+  type SecretboxEncryptionError =
+    | InvalidKeyLength of string
+    | EmptyMessageGiven
+
+  type SecretboxDecryptionError =
+    | TruncatedMessage of string
+    | AlteredOrCorruptMessage of string
+
+  let private secretbox_init key iv =
+    let aes = new AesManaged()
+    aes.KeySize   <- KeySize
+    aes.BlockSize <- BlockSize
+    aes.Mode      <- CipherMode.CBC
+    aes.Padding   <- PaddingMode.PKCS7
+    aes.IV        <- iv
+    aes.Key       <- key
+    aes
+
+  let secretbox (key : byte []) (msg : string) =
+    if key.Length <> KeyLength then
+      Choice2Of2 (InvalidKeyLength (sprintf "key should be %d bytes but was %d bytes" KeyLength (key.Length)))
+    elif String.IsNullOrWhiteSpace msg then
+      Choice2Of2 EmptyMessageGiven
+    else
+      let iv  = generate_iv' ()
+      use aes = secretbox_init key iv
+
+      let mk_cipher_text (msg : string) key iv =
+        use enc      = aes.CreateEncryptor(key, iv)
+        use cipher   = new MemoryStream()
+        use crypto   = new CryptoStream(cipher, enc, CryptoStreamMode.Write)
+        let bytes = msg |> UTF8.bytes |> Compression.gzip_encode
+        crypto.Write (bytes, 0, bytes.Length)
+        crypto.FlushFinalBlock()
+        cipher.ToArray()
+
+      use cipher_text = new MemoryStream()
+
+      let bw  = new BinaryWriter(cipher_text)
+      bw.Write iv
+      bw.Write (mk_cipher_text msg key iv)
+      bw.Flush ()
+
+      let hmac = hmac' key (cipher_text.ToArray())
+      bw.Write hmac
+      bw.Dispose()
+
+      Choice1Of2 (cipher_text.ToArray())
+
+  let secretbox_open (key : byte []) (cipher_text : byte []) =
+    let hmac_calc = hmac key 0 (cipher_text.Length - HMACLength) cipher_text
+    let hmac_given = Array.zeroCreate<byte> HMACLength
+    Array.blit cipher_text (cipher_text.Length - HMACLength) // from
+               hmac_given  0                                 // to
+               HMACLength                                    // # bytes for hmac
+
+    if cipher_text.Length < HMACLength + IVLength then
+      Choice2Of2 (
+        TruncatedMessage (
+          sprintf "cipher text length was %d but expected >= %d"
+                  cipher_text.Length (HMACLength + IVLength)))
+    elif not (Bytes.cnst_time_cmp hmac_calc hmac_given) then
+      Choice2Of2 (AlteredOrCorruptMessage "calculated HMAC does not match expected/given")
+    else
+      let iv = Array.zeroCreate<byte> IVLength
+      Array.blit cipher_text 0
+                 iv 0
+                 IVLength
+      use aes     = secretbox_init key iv
+      use denc    = aes.CreateDecryptor(key, iv)
+      use plain   = new MemoryStream()
+      use crypto  = new CryptoStream(plain, denc, CryptoStreamMode.Write)
+      crypto.Write(cipher_text, IVLength, cipher_text.Length - IVLength - HMACLength)
+      crypto.FlushFinalBlock()
+      Choice1Of2 (plain.ToArray() |> Compression.gzip_decode |> UTF8.to_string')
 
 module Parsing =
   open Bytes

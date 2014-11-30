@@ -105,7 +105,7 @@ Auth.authenticated (TimeSpan.FromMinutes 30.) false
   ]
   |> web_server
       { bindings         = [ HttpBinding.mk' HTTP "127.0.0.1" 8082 ]
-        server_key       = Utils.Crypto.generate_key' HttpRuntime.ServerKeyLength
+        server_key       = Utils.Crypto.generate_key HttpRuntime.ServerKeyLength
         error_handler    = default_error_handler
         listen_timeout   = TimeSpan.FromMilliseconds 2000.
         ct               = Async.DefaultCancellationToken

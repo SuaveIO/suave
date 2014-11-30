@@ -474,7 +474,7 @@ type ErrorHandler = Exception -> String -> WebPart
 /// value yourself, or use the `empty` one.
 and HttpRuntime =
   { protocol           : Protocol
-    server_key         : string
+    server_key         : byte []
     error_handler      : ErrorHandler
     mime_types_map     : MimeTypesMap
     home_directory     : string
@@ -489,13 +489,6 @@ and HttpContext =
     user_state : Map<string, obj>
     response   : HttpResult }
 
-/// The session provider is a convenience interface for storing user session
-/// data.
-and SessionStateProvider =
-  abstract member Generate     : TimeSpan * HttpContext -> HttpCookie * HttpCookie
-  abstract member Validate     : HttpCookie * HttpContext -> bool
-  abstract member Session      : string -> StateStore
-
 and WebPart = HttpContext -> SuaveTask<HttpContext>
 
 /// a module that gives you the `empty` (beware) and `mk` functions for creating
@@ -503,15 +496,16 @@ and WebPart = HttpContext -> SuaveTask<HttpContext>
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module HttpRuntime =
 
-  [<Literal>]
-  let ServerKeyLength = 64
+  /// The key length in bytes, references Crypto.KeyLength which is appropriate
+  /// for the underlying AES-256 bit symmetric crypto in use.
+  let ServerKeyLength = Crypto.KeyLength
 
   /// warn: this is not to be played around with; prefer using the config
   /// defaults instead, from Web.fs, as they contain the logic for printing to
   /// the output stream correctly.
   let empty =
     { protocol           = Protocol.HTTP
-      server_key         = ""
+      server_key         = Crypto.generate_key ServerKeyLength
       error_handler      = fun _ _ -> fun _ -> async.Return None
       mime_types_map     = fun _ -> None
       home_directory     = "."
@@ -529,6 +523,8 @@ module HttpRuntime =
       logger             = logger }
 
   let protocol x = x.protocol
+
+  let server_key x = x.server_key
 
   let error_handler x = x.error_handler
 
@@ -583,7 +579,7 @@ type SuaveConfig =
     /// A server-key to use for cryptographic operations. When generated it
     /// should be completely random; you can share this key between load-balanced
     /// servers if you want to have them cryptographically verify similarly.
-    server_key              : string
+    server_key              : byte []
     /// An error handler to use for handling exceptions that are
     /// are thrown from the web parts
     error_handler           : ErrorHandler
