@@ -384,33 +384,33 @@ module Crypto =
   /// # bits in block
   let BlockSize = 128
 
-  /// # bytes in IV / nonce
+  /// # bytes in IV
   let IVLength = BlockSize / 8
 
   let secretbox_gen () =
     let key = Array.zeroCreate<byte> KeyLength // 32 bytes for 256 bit key
     crypt_random.GetNonZeroBytes key
-    let nonce = Array.zeroCreate<byte> IVLength // 16 bytes for 128 bit blocks
-    crypt_random.GetNonZeroBytes nonce
-    key, nonce
+    let iv = Array.zeroCreate<byte> IVLength // 16 bytes for 128 bit blocks
+    crypt_random.GetNonZeroBytes iv
+    key, iv
 
-  let private secretbox_init key nonce =
+  let private secretbox_init key iv =
     let aes = new AesManaged()
     aes.KeySize   <- KeySize
     aes.BlockSize <- BlockSize
     aes.Mode      <- CipherMode.CBC
-    aes.IV        <- nonce
+    aes.IV        <- iv
     aes.Key       <- key
     aes.Padding   <- PaddingMode.PKCS7
     aes
 
   /// http://nacl.cr.yp.to/secretbox.html
   /// https://gist.github.com/jbtule/4336842
-  let secretbox (msg : string) (key : byte []) (nonce : byte []) =
+  let secretbox (msg : string) (key : byte []) (iv : byte []) =
 
-    let mk_cipher_text (msg : string) key nonce =
-      use aes      = secretbox_init key nonce
-      use enc      = aes.CreateEncryptor(key, nonce)
+    let mk_cipher_text (msg : string) key iv =
+      use aes      = secretbox_init key iv
+      use enc      = aes.CreateEncryptor(key, iv)
       use cipher   = new MemoryStream()
       use crypto   = new CryptoStream(cipher, enc, CryptoStreamMode.Write)
       use compress = new GZipStream(crypto, CompressionLevel.Optimal)
@@ -421,8 +421,8 @@ module Crypto =
 
     use enc = new MemoryStream()
     use bw  = new BinaryWriter(enc)
-    bw.Write nonce
-    bw.Write (mk_cipher_text msg key nonce)
+    bw.Write iv
+    bw.Write (mk_cipher_text msg key iv)
     bw.Flush ()
 
     let hmac = hmac' key (enc.ToArray())
@@ -430,7 +430,7 @@ module Crypto =
 
     enc.ToArray()
 
-  let secretbox_open (cipher_text : byte []) (key : byte []) (nonce : byte []) =
+  let secretbox_open (cipher_text : byte []) (key : byte []) (iv : byte []) =
 
     let hmac_calc = hmac key 0 (cipher_text.Length - HMACLength) cipher_text
     let hmac_given = Array.zeroCreate<byte> HMACLength
