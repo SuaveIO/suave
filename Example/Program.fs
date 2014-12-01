@@ -71,9 +71,9 @@ choose [
   url "/date" >>= warbler (fun _ -> OK (DateTimeOffset.UtcNow.ToString("o")))
   url "/timeout" >>= timeout_webpart (TimeSpan.FromSeconds 1.) (sleep 120000 "Did not timed out")
   url "/session"
-    >>= stateful' // Session.State.MemoryCacheStateStore
+    >>= State.CookieStateStore.stateful' // Session.State.MemoryCacheStateStore
     >>= context (fun x ->
-        let store = HttpContext.state x
+        let store = HttpContext.state x |> Option.get
         match store.get "counter" with
         | Some y ->
           store.set "counter" (y + 1)

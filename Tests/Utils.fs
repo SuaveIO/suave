@@ -40,7 +40,7 @@ let utilities =
                      str1.Equals str2,
                      String.cnst_time_cmp_ord str1 str2)
 
-    /// is 0.078125 KiB long
+    /// is 0.078125 KiB long (and that *1.375 when base-64 encoded)
     testCase "crypto hello world" <| fun _ ->
       let str = "Hello World"
       let ca (str : string) = str.ToCharArray() |> Array.map (string<<int) |> String.concat ","
@@ -69,5 +69,6 @@ let utilities =
         Assert.Equal(sprintf "'%s':%s = D(k, E(k, '%s':%s))" plain (ca plain) str (ca str), str, plain)
 
     testProperty "Bytes.encode_safe_base64 encoded <-> decoded" <| fun (str : string) ->
-      Assert.Equal("are equal", str, Bytes.encode_safe_base64 (Bytes.decode_safe_base64 str))
+      let enc, dec = Bytes.cookie_encoding
+      Assert.Equal("roundtrip", str, UTF8.to_string' (dec (enc (UTF8.bytes str))))
   ]

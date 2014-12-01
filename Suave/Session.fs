@@ -33,7 +33,7 @@ module Cookies =
   /// Set +relative_expiry time span on the expiry time of the http cookie
   /// and generate a corresponding client-side cookie with the same expiry, that
   /// has as its data, the cookie name of the http cookie.
-  let sliding_expiry (relative_expiry : Expiry) (http_cookie : HttpCookie) =
+  let private sliding_expiry (relative_expiry : Expiry) (http_cookie : HttpCookie) =
     let cookie_name = http_cookie.name
     let expiry =
       match relative_expiry with
@@ -41,35 +41,6 @@ module Cookies =
       | Expiry ts  -> Some (Globals.utc_now().Add ts)
     let http_cookie = { http_cookie with expires = expiry }
     http_cookie, client_cookie_from http_cookie
-
-  /// Generate one server-side cookie, and another client-side cookie with
-  /// name "${server-side-name}-client"
-  let generate_cookies key cookie_name relative_expiry secure plain_data =
-    match Crypto.secretbox key plain_data with
-    | Choice1Of2 cookie_data ->
-      let encoded_data = Bytes.encode_safe_base64 cookie_data
-      { HttpCookie.mk' cookie_name encoded_data
-          with http_only = true
-               secure = secure }
-      |> sliding_expiry relative_expiry
-    | err -> failwithf "internal error on encryption %A" err
-
-  /// Tries to read the cookie of the given name from the HttpContext, and
-  /// returns the cookie and its plaintext value if successful.
-  let read_cookies key cookie_name ctx =
-    let found =
-      ctx.request
-      |> HttpRequest.cookies
-      |> Map.tryFind cookie_name
-      |> Choice.from_option (NoCookieFound cookie_name)
-      |> Choice.map (fun c -> c, c |> (HttpCookie.value >> Bytes.decode_safe_base64))
-    match found with
-    | Choice1Of2 (cookie, cipher_data) ->
-      cipher_data
-      |> Crypto.secretbox_open key
-      |> Choice.map_2 DecryptionError
-      |> Choice.map (fun plain_text -> cookie, plain_text)
-    | Choice2Of2 x -> Choice2Of2 x
 
   /// Unsets the cookies, thereby unauthenticating the user.
   let unset_cookies (http_cookie : HttpCookie) : WebPart =
@@ -81,36 +52,101 @@ module Cookies =
     Writers.set_cookie http_cookie >>=
       Writers.set_cookie client_cookie
 
-  /// Bumps the expiry dates for all the cookies and user_data value.
+  type CookiesState =
+    { server_key      : byte []
+      cookie_name     : string
+      user_state_key  : string
+      relative_expiry : Expiry
+      secure          : bool }
+
+  [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+  module CookiesState =
+
+    let mk server_key cookie_name user_state_key relative_expiry secure =
+      { server_key      = server_key
+        cookie_name     = cookie_name
+        user_state_key  = user_state_key
+        relative_expiry = relative_expiry
+        secure          = secure }
+
+  /// Generate one server-side cookie, and another client-side cookie with
+  /// name "${server-side-name}-client"
+  let generate_cookies server_key cookie_name relative_expiry secure plain_data =
+    let enc, _ = Bytes.cookie_encoding
+    match Crypto.secretbox server_key plain_data with
+    | Choice1Of2 cookie_data ->
+      let encoded_data = enc cookie_data
+      { HttpCookie.mk' cookie_name encoded_data
+          with http_only = true
+               secure = secure }
+      |> sliding_expiry relative_expiry
+    | err -> failwithf "internal error on encryption %A" err
+
+  /// Tries to read the cookie of the given name from the HttpContext, and
+  /// returns the cookie and its plaintext value if successful.
+  let read_cookies key cookie_name ctx =
+    let _, dec = Bytes.cookie_encoding
+    let found =
+      ctx.request
+      |> HttpRequest.cookies
+      |> Map.tryFind cookie_name
+      |> Choice.from_option (NoCookieFound cookie_name)
+      |> Choice.map (fun c -> c, c |> (HttpCookie.value >> dec))
+    match found with
+    | Choice1Of2 (cookie, cipher_data) ->
+      cipher_data
+      |> Crypto.secretbox_open key
+      |> Choice.map_2 DecryptionError
+      |> Choice.map (fun plain_text -> cookie, plain_text)
+    | Choice2Of2 x -> Choice2Of2 x
+
+  /////////////// WEB PARTS ////////////////
+
+  /// Bumps the expiry dates for all the cookies.
   let refresh_cookies relative_expiry http_cookie : WebPart =
     sliding_expiry relative_expiry http_cookie ||> set_cookies
 
-  let cookie_state server_key
-                   cookie_name
-                   user_state_key
-                   relative_expiry
-                   secure
+  let update_cookies (csctx : CookiesState) f_plain_text : WebPart =
+    context (fun ctx ->
+      let plain_text' =
+        match read_cookies csctx.server_key csctx.cookie_name ctx with
+        | Choice1Of2 (_, plain_text) ->
+          f_plain_text (Some plain_text)
+        | Choice2Of2 _ ->
+          f_plain_text None
+
+      /// Since the contents will completely change every write, we
+      /// simply re-generate the cookie
+      generate_cookies csctx.server_key csctx.cookie_name
+                       csctx.relative_expiry csctx.secure
+                       plain_text'
+      ||> set_cookies
+      >>= Writers.set_user_data csctx.user_state_key plain_text')
+
+  let cookie_state (csctx : CookiesState)
                    // unit -> plain text OR something of your own!
                    (no_cookie : unit -> Choice<string, WebPart>)
-                   (failure   : _ -> WebPart)
+                   (decryption_failure   : _ -> WebPart)
                    : WebPart =
     context (fun ctx ->
-      match read_cookies server_key cookie_name ctx with
+      match read_cookies csctx.server_key csctx.cookie_name ctx with
       | Choice1Of2 (http_cookie, plain_text) ->
-        refresh_cookies relative_expiry http_cookie >>=
-          Writers.set_user_data user_state_key plain_text
+        refresh_cookies csctx.relative_expiry http_cookie >>=
+          Writers.set_user_data csctx.user_state_key plain_text
 
       | Choice2Of2 (NoCookieFound _) ->
         match no_cookie () with
         | Choice1Of2 plain_text ->
           let http_cookie, client_cookie =
-            generate_cookies server_key cookie_name relative_expiry secure plain_text
+            generate_cookies csctx.server_key csctx.cookie_name
+                             csctx.relative_expiry csctx.secure
+                             plain_text
           set_cookies http_cookie client_cookie >>=
-            Writers.set_user_data user_state_key plain_text
+            Writers.set_user_data csctx.user_state_key plain_text
         | Choice2Of2 wp_kont -> wp_kont
 
       | Choice2Of2 (DecryptionError err) ->
-        failure err)
+        decryption_failure err)
 
 /// Use to set a session-id for the client, which is a way is how the client
 /// is 'authenticated'.
@@ -136,7 +172,7 @@ module Auth =
   /// The key used in `context.user_state` to save the session id for downstream
   /// web parts.
   [<Literal>]
-  let UserStateKey = "Suave.Session.Auth"
+  let UserStateIdKey = "Suave.Session.Auth-id"
 
   [<Literal>]
   let SessionIdLength = 40
@@ -161,18 +197,20 @@ module Auth =
                    missing_cookie
                    (failure : Crypto.SecretboxDecryptionError -> WebPart)
                    : WebPart =
-    context (fun ({runtime = { server_key = key }} as ctx : HttpContext) ->
-      Cookies.cookie_state key
-                           SessionAuthCookie UserStateKey
-                           relative_expiry
-                           secure
-                           missing_cookie
-                           failure)
+    context (fun ctx ->
+      Cookies.cookie_state
+        { server_key      = ctx.runtime.server_key
+          cookie_name     = SessionAuthCookie
+          user_state_key  = UserStateIdKey
+          relative_expiry = relative_expiry
+          secure          = secure }
+        missing_cookie
+        failure)
 
   let authenticate' relative_expiry login_page : WebPart =
     authenticate relative_expiry false
-      (fun () -> Choice2Of2(Redirection.FOUND login_page))
-      (sprintf "%A" >> RequestErrors.BAD_REQUEST)
+                 (fun () -> Choice2Of2(Redirection.FOUND login_page))
+                 (sprintf "%A" >> RequestErrors.BAD_REQUEST)
 
   /// Set server-signed cookies to make the response contain a cookie
   /// with a valid session id. It's worth having in mind that when you use this web
@@ -192,27 +230,67 @@ module Auth =
   module HttpContext =
     let session_id x =
       x.user_state
-      |> Map.tryFind UserStateKey
+      |> Map.tryFind UserStateIdKey
       |> Option.map (fun x -> x :?> string |> parse_data)
 
 /// Common for this module is that it requires that the Auth module
 /// above has been activated/used and that the user is authenticated.
 module State =
 
-  /// We basically want this:
-  /// http://nacl.cr.yp.to/secretbox.html
   [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
   module CookieStateStore =
+    open System.IO
+    open System.Runtime.Serialization.Json
 
-    /// This key will be present in HttpContext.user_state and will contain the
-    /// MemoryCache instance.
     [<Literal>]
     let StateStoreType = "Suave.Session.State.CookieStateStore"
 
     [<Literal>]
     let StateCookie = "st"
 
-    ()
+    // TODO: this is a buggy proof of concept serialisation from .Net, consider
+    // reworking it to e.g. Fleece
+    let write relative_expiry secure key value =
+      let encode_map m =
+        let dcs = DataContractJsonSerializer(m.GetType())
+        use ms = new MemoryStream()
+        dcs.WriteObject(ms, m)
+        UTF8.to_string' (ms.ToArray())
+
+      context (fun ctx ->
+        Cookies.update_cookies
+          { server_key      = ctx.runtime.server_key
+            cookie_name     = StateCookie
+            user_state_key  = StateStoreType
+            relative_expiry = relative_expiry
+            secure          = secure }
+          (function
+           | None ->
+             encode_map (Map.empty |> Map.add key value)
+           | Some obj_str ->
+             let dcs = DataContractJsonSerializer(typeof<Map<string, string>>)
+             use ms = new MemoryStream()
+             let bytes = UTF8.bytes obj_str
+             ms.Write(bytes, 0, bytes.Length)
+             ms.Seek(0L, SeekOrigin.Begin) |> ignore
+             let m : Map<string, string> = dcs.ReadObject(ms) :?> Map<_,_>
+             let value' = m |> Map.add key value |> encode_map
+             value'
+             ))
+
+    let stateful relative_expiry secure : WebPart =
+      context (fun ctx ->
+        Cookies.cookie_state
+          { server_key      = ctx.runtime.server_key
+            cookie_name     = StateCookie
+            user_state_key  = StateStoreType
+            relative_expiry = relative_expiry
+            secure          = secure }
+          (fun () -> Choice1Of2("{}"))
+          (sprintf "%A" >> RequestErrors.BAD_REQUEST))
+
+    let stateful' : WebPart =
+      stateful Cookies.SessionCookie false
 
   /// This module contains the implementation for the memory-cache backed session
   /// state store, when the memory cache is global for the server.
@@ -225,7 +303,7 @@ module State =
     let StateStoreType = "Suave.Session.State.MemoryCacheStateStore"
 
     [<Literal>]
-    let UserStateKey = "Suave.Session.Auth"
+    let UserStateIdKey = "Suave.Session.State.MemoryCacheStateStore-id"
 
     [<Literal>]
     let StateCookie = "mc-st"
@@ -235,7 +313,7 @@ module State =
       /// Try to find the state id of the HttpContext
       let state_id ctx =
         ctx.user_state
-        |> Map.tryFind UserStateKey
+        |> Map.tryFind UserStateIdKey
         |> Option.map (fun x -> x :?> string)
   
       /// Read the session store from the HttpContext, or throw an exception otherwise.
