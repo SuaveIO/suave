@@ -156,6 +156,16 @@ module Bytes =
       offset : int
       length : int }
 
+  /// This is used to pack base64 in a cookie; generates a degenerated base64 string
+  /// which can safely stored in a cookie.
+  let encode_safe_base64 bytes =
+    let base64 = Convert.ToBase64String bytes
+    Uri.EscapeDataString base64
+
+  let decode_safe_base64 (str : string) =
+    let base64 = Uri.UnescapeDataString str
+    Convert.FromBase64String base64
+
   [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
   module BufferSegment =
 
@@ -432,9 +442,7 @@ module Crypto =
     crypt_random.GetBytes bytes
     bytes
 
-  /// Generates a string key from the available characters with the given key size
-  /// in characters. Note that this key is not cryptographically as random as a pure
-  /// random number generator would produce as we only use a small subset alphabet.
+  /// Generates a string key from the available characters with the given key size.
   let generate_key key_length =
     Array.zeroCreate<byte> key_length |> randomize
 

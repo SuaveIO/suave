@@ -56,8 +56,7 @@ let mime_types =
   Writers.default_mime_types_map
     >=> (function | ".avi" -> Writers.mk_mime_type "video/avi" false | _ -> None)
 
-Auth.authenticated Cookies.SessionCookie false
->>= choose [
+choose [
   log logger log_format >>= never
   GET >>= url "/hello" >>= never
   url_regex "(.*?)\.(dll|mdb|log)$" >>= RequestErrors.FORBIDDEN "Access denied."

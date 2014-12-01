@@ -67,4 +67,7 @@ let utilities =
         let (Choice1Of2 cipher) = Crypto.secretbox key str
         let (Choice1Of2 plain) = Crypto.secretbox_open key cipher
         Assert.Equal(sprintf "'%s':%s = D(k, E(k, '%s':%s))" plain (ca plain) str (ca str), str, plain)
+
+    testProperty "Bytes.encode_safe_base64 encoded <-> decoded" <| fun (str : string) ->
+      Assert.Equal("are equal", str, Bytes.encode_safe_base64 (Bytes.decode_safe_base64 str))
   ]

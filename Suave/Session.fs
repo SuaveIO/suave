@@ -23,17 +23,6 @@ module Cookies =
     | NoCookieFound of string (* cookie id *)
     | DecryptionError of Crypto.SecretboxDecryptionError
 
-  module Bytes =
-    /// This is used to pack base64 in a cookie; generates a degenerated base64 string
-    /// which can safely stored in a cookie.
-    let encode_safe_base64 bytes =
-      let base64 = Convert.ToBase64String bytes
-      Uri.EscapeDataString base64
-
-    let decode_safe_base64 (str : string) =
-      let base64 = Uri.UnescapeDataString str
-      Convert.FromBase64String base64
-
   let private client_cookie_from (http_cookie : HttpCookie) =
     let ccn = String.Concat [ http_cookie.name; "-client" ]
     { HttpCookie.mk' ccn http_cookie.name
