@@ -156,15 +156,26 @@ module Bytes =
       offset : int
       length : int }
 
-  /// This is used to pack base64 in a cookie; generates a degenerated base64 string
-  /// which can safely stored in a cookie.
-  let encode_safe_base64 bytes =
-    let base64 = Convert.ToBase64String bytes
-    Uri.EscapeDataString base64
 
-  let decode_safe_base64 (str : string) =
-    let base64 = Uri.UnescapeDataString str
-    Convert.FromBase64String base64
+  // for ci in (int '!')..(int '~') do printfn "%c" (char ci);;
+  // https://en.wikipedia.org/wiki/HTTP_cookie#Setting_a_cookie
+  let cookie_encoding =
+    let repls =
+      [ '+', '_'
+        '/', '!'
+        '=', '$' ]
+
+    let enc bytes =
+      let base64 =
+        Convert.ToBase64String bytes
+      repls |> List.fold (fun (str : string) (from, too) -> str.Replace (from, too)) base64
+
+    let dec (str : string) =
+      let base64 =
+        repls |> List.fold (fun (str : string) (too, from) -> str.Replace(from, too)) str
+      Convert.FromBase64String base64
+
+    enc, dec
 
   [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
   module BufferSegment =
