@@ -472,7 +472,7 @@ open Suave.Session
 /// thrown exceptions.
 let default_error_handler (ex : Exception) msg (ctx : HttpContext) =
   let request = ctx.request
-  msg |> Log.verbosee ctx.runtime.logger "Suave.Web.default_error_handler" ctx.request.trace ex
+  msg |> Log.infoe ctx.runtime.logger "Suave.Web.default_error_handler" ctx.request.trace ex
   if IPAddress.IsLoopback ctx.request.ipaddr then
     Response.response Codes.HTTP_500 (UTF8.bytes (sprintf "<h1>%s</h1><br/>%A" ex.Message ex)) ctx
   else 
