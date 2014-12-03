@@ -281,11 +281,6 @@ module HttpBinding =
 
   let port x   = x.port
 
-/// A session store is a reader and a writer function pair keyed on strings.
-type StateStore =
-  abstract get<'a> : string -> 'a option
-  abstract set     : string -> 'a -> unit
-
 type HttpContent =
   | NullContent
   | Bytes of byte []
@@ -506,6 +501,11 @@ and HttpContext =
     response   : HttpResult }
 
 and WebPart = HttpContext -> SuaveTask<HttpContext>
+
+/// A session store is a reader and a writer function pair keyed on strings.
+type StateStore =
+  abstract get<'a> : string -> 'a option
+  abstract set     : string -> 'a -> WebPart
 
 /// a module that gives you the `empty` (beware) and `mk` functions for creating
 /// a HttpRuntime

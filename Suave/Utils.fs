@@ -489,20 +489,20 @@ module Crypto =
     aes.Key       <- key
     aes
 
-  let secretbox (key : byte []) (msg : string) =
+  let secretbox (key : byte []) (msg : byte []) =
     if key.Length <> KeyLength then
       Choice2Of2 (InvalidKeyLength (sprintf "key should be %d bytes but was %d bytes" KeyLength (key.Length)))
-    elif String.IsNullOrWhiteSpace msg then
+    elif msg.Length = 0 then
       Choice2Of2 EmptyMessageGiven
     else
       let iv  = generate_iv' ()
       use aes = secretbox_init key iv
 
-      let mk_cipher_text (msg : string) key iv =
+      let mk_cipher_text (msg : byte []) (key : byte []) (iv : byte []) =
         use enc      = aes.CreateEncryptor(key, iv)
         use cipher   = new MemoryStream()
         use crypto   = new CryptoStream(cipher, enc, CryptoStreamMode.Write)
-        let bytes = msg |> UTF8.bytes |> Compression.gzip_encode
+        let bytes = msg |> Compression.gzip_encode
         crypto.Write (bytes, 0, bytes.Length)
         crypto.FlushFinalBlock()
         cipher.ToArray()
@@ -519,6 +519,9 @@ module Crypto =
       bw.Dispose()
 
       Choice1Of2 (cipher_text.ToArray())
+
+  let secretbox' (key : byte []) (msg : string) =
+    secretbox key (msg |> UTF8.bytes)
 
   let secretbox_open (key : byte []) (cipher_text : byte []) =
     let hmac_calc = hmac key 0 (cipher_text.Length - HMACLength) cipher_text
@@ -545,7 +548,10 @@ module Crypto =
       use crypto  = new CryptoStream(plain, denc, CryptoStreamMode.Write)
       crypto.Write(cipher_text, IVLength, cipher_text.Length - IVLength - HMACLength)
       crypto.FlushFinalBlock()
-      Choice1Of2 (plain.ToArray() |> Compression.gzip_decode |> UTF8.to_string')
+      Choice1Of2 (plain.ToArray() |> Compression.gzip_decode)
+
+  let secretbox_open' k c =
+    secretbox_open k c |> Choice.map UTF8.to_string'
 
 module Parsing =
   open Bytes

@@ -45,15 +45,15 @@ let utilities =
       let str = "Hello World"
       let ca (str : string) = str.ToCharArray() |> Array.map (string<<int) |> String.concat ","
       let key = Crypto.generate_key' ()
-      let (Choice1Of2 cipher) = Crypto.secretbox key str
-      let (Choice1Of2 plain) = Crypto.secretbox_open key cipher
+      let (Choice1Of2 cipher) = Crypto.secretbox' key str
+      let (Choice1Of2 plain) = Crypto.secretbox_open' key cipher
       Assert.Equal(sprintf "'%s':%s = D(k, E(k, '%s':%s))" plain (ca plain) str (ca str), str, plain)
 
     testCase "crypto hello world - avoid padding oracle" <| fun _ ->
       let str = "Hello World"
       let ca (str : string) = str.ToCharArray() |> Array.map (string<<int) |> String.concat ","
       let key = Crypto.generate_key' ()
-      let (Choice1Of2 cipher) = Crypto.secretbox key str
+      let (Choice1Of2 cipher) = Crypto.secretbox' key str
       cipher.[cipher.Length - Crypto.HMACLength - 1] <- 0uy
       match Crypto.secretbox_open key cipher with
       | Choice1Of2 _ -> Tests.failtest "should not decrypt successfully"
@@ -64,8 +64,8 @@ let utilities =
       let ca (str : string) = str.ToCharArray() |> Array.map (string<<int) |> String.concat ","
       if not <| String.IsNullOrWhiteSpace str then
         let key = Crypto.generate_key' ()
-        let (Choice1Of2 cipher) = Crypto.secretbox key str
-        let (Choice1Of2 plain) = Crypto.secretbox_open key cipher
+        let (Choice1Of2 cipher) = Crypto.secretbox' key str
+        let (Choice1Of2 plain) = Crypto.secretbox_open' key cipher
         Assert.Equal(sprintf "'%s':%s = D(k, E(k, '%s':%s))" plain (ca plain) str (ca str), str, plain)
 
     testProperty "Bytes.encode_safe_base64 encoded <-> decoded" <| fun (str : string) ->

@@ -10,8 +10,14 @@ open System.Collections.Concurrent
 open System.Security.Cryptography
 open System.Text
 open System.Runtime.Caching
-open Types
-open Http
+
+open Suave.Types
+open Suave.Http
+open Suave.Log
+
+let private log (logger : Logger) path level msg =
+  LogLine.mk path level TraceHeader.empty None msg
+  |> fun line -> logger.Log level (fun () -> line)
 
 module Cookies =
 
@@ -43,12 +49,12 @@ module Cookies =
     http_cookie, client_cookie_from http_cookie
 
   /// Unsets the cookies, thereby unauthenticating the user.
-  let unset_cookies (http_cookie : HttpCookie) : WebPart =
-    Writers.unset_cookie http_cookie.name >>=
-      Writers.unset_cookie (String.Concat [ http_cookie.name; "-client" ])
+  let internal unset_cookies http_cookie_name : WebPart =
+    Writers.unset_cookie http_cookie_name >>=
+      Writers.unset_cookie (String.Concat [ http_cookie_name; "-client" ])
 
   /// Sets the cookies to the HttpResponse
-  let set_cookies (http_cookie : HttpCookie) (client_cookie : HttpCookie) : WebPart =
+  let internal set_cookies (http_cookie : HttpCookie) (client_cookie : HttpCookie) : WebPart =
     Writers.set_cookie http_cookie >>=
       Writers.set_cookie client_cookie
 
@@ -78,7 +84,7 @@ module Cookies =
       let encoded_data = enc cookie_data
       { HttpCookie.mk' cookie_name encoded_data
           with http_only = true
-               secure = secure }
+               secure    = secure }
       |> sliding_expiry relative_expiry
     | err -> failwithf "internal error on encryption %A" err
 
@@ -107,16 +113,21 @@ module Cookies =
     sliding_expiry relative_expiry http_cookie ||> set_cookies
 
   let update_cookies (csctx : CookiesState) f_plain_text : WebPart =
-    context (fun ctx ->
+    context (fun ({ runtime = { logger = logger }} as ctx) ->
       let plain_text' =
         match read_cookies csctx.server_key csctx.cookie_name ctx with
         | Choice1Of2 (_, plain_text) ->
+          log logger "Suave.Session.Cookies.update_cookies" Debug
+            (sprintf "update_cookies - existing value: '%s'" (plain_text |> UTF8.to_string'))
           f_plain_text (Some plain_text)
         | Choice2Of2 _ ->
+          log logger "Suave.Session.Cookies.update_cookies" Debug "update_cookies - first time"
           f_plain_text None
 
-      /// Since the contents will completely change every write, we
-      /// simply re-generate the cookie
+      log logger "Suave.Session.Cookies.update_cookies" Debug
+        (sprintf "update_cookies - setting '%s'"
+          (plain_text' |> UTF8.to_string'))
+      /// Since the contents will completely change every write, we simply re-generate the cookie
       generate_cookies csctx.server_key csctx.cookie_name
                        csctx.relative_expiry csctx.secure
                        plain_text'
@@ -124,11 +135,11 @@ module Cookies =
       >>= Writers.set_user_data csctx.user_state_key plain_text')
 
   let cookie_state (csctx : CookiesState)
-                   // unit -> plain text OR something of your own!
-                   (no_cookie : unit -> Choice<string, WebPart>)
+                   // unit -> plain text to store OR something to run of your own!
+                   (no_cookie : unit -> Choice<byte [], WebPart>)
                    (decryption_failure   : _ -> WebPart)
                    : WebPart =
-    context (fun ctx ->
+    context (fun ({ runtime = { logger = logger }} as ctx) ->
       match read_cookies csctx.server_key csctx.cookie_name ctx with
       | Choice1Of2 (http_cookie, plain_text) ->
         refresh_cookies csctx.relative_expiry http_cookie >>=
@@ -137,6 +148,8 @@ module Cookies =
       | Choice2Of2 (NoCookieFound _) ->
         match no_cookie () with
         | Choice1Of2 plain_text ->
+          log logger "Suave.Session.Cookies.cookie_state" Debug
+            (sprintf "setting '%s' with value '%s'" csctx.cookie_name (UTF8.to_string' plain_text))
           let http_cookie, client_cookie =
             generate_cookies csctx.server_key csctx.cookie_name
                              csctx.relative_expiry csctx.secure
@@ -146,7 +159,10 @@ module Cookies =
         | Choice2Of2 wp_kont -> wp_kont
 
       | Choice2Of2 (DecryptionError err) ->
-        decryption_failure err)
+        log logger "Suave.Session.Cookies.cookie_state" Debug
+          (sprintf "decryption error: %A" err)
+        unset_cookies csctx.cookie_name >>=
+          decryption_failure err)
 
 /// Use to set a session-id for the client, which is a way is how the client
 /// is 'authenticated'.
@@ -172,7 +188,7 @@ module Auth =
   /// The key used in `context.user_state` to save the session id for downstream
   /// web parts.
   [<Literal>]
-  let UserStateIdKey = "Suave.Session.Auth-id"
+  let StateStoreType = "Suave.Session.Auth"
 
   [<Literal>]
   let SessionIdLength = 40
@@ -197,11 +213,13 @@ module Auth =
                    missing_cookie
                    (failure : Crypto.SecretboxDecryptionError -> WebPart)
                    : WebPart =
-    context (fun ctx ->
+    context (fun ({ runtime = { logger = logger }} as ctx) ->
+      log logger "Suave.Session.Auth.authenticate" Debug "authenticating"
+
       Cookies.cookie_state
         { server_key      = ctx.runtime.server_key
           cookie_name     = SessionAuthCookie
-          user_state_key  = UserStateIdKey
+          user_state_key  = StateStoreType
           relative_expiry = relative_expiry
           secure          = secure }
         missing_cookie
@@ -224,13 +242,17 @@ module Auth =
   let authenticated relative_expiry secure : WebPart =
     context (fun { request = req } ->
       authenticate relative_expiry secure
-                   (fun () -> Choice1Of2(generate_data req))
+                   (fun () -> Choice1Of2(generate_data req |> UTF8.bytes))
                    (sprintf "%A" >> RequestErrors.BAD_REQUEST))
+
+//  let deauthenticate : WebPart =
+//    Cookies.unset_cookies
     
   module HttpContext =
+
     let session_id x =
       x.user_state
-      |> Map.tryFind UserStateIdKey
+      |> Map.tryFind StateStoreType
       |> Option.map (fun x -> x :?> string |> parse_data)
 
 /// Common for this module is that it requires that the Auth module
@@ -241,42 +263,50 @@ module State =
   module CookieStateStore =
     open System.IO
     open System.Runtime.Serialization.Json
+    open System.Collections.Generic
 
+    /// "Suave.Session.State.CookieStateStore"
     [<Literal>]
     let StateStoreType = "Suave.Session.State.CookieStateStore"
 
+    /// "st"
     [<Literal>]
     let StateCookie = "st"
 
+    let encode_map m =
+      let dcs = DataContractJsonSerializer(m.GetType())
+      use ms = new MemoryStream()
+      dcs.WriteObject(ms, m)
+      ms.ToArray()
+
+    let decode_map bytes =
+      let dcs = DataContractJsonSerializer(typeof<Dictionary<string, string>>)
+      use ms = new MemoryStream()
+      ms.Write(bytes, 0, bytes.Length)
+      ms.Seek(0L, SeekOrigin.Begin) |> ignore
+      dcs.ReadObject(ms) :?> Dictionary<string, string>
+
     // TODO: this is a buggy proof of concept serialisation from .Net, consider
     // reworking it to e.g. Fleece
-    let write relative_expiry secure key value =
-      let encode_map m =
-        let dcs = DataContractJsonSerializer(m.GetType())
-        use ms = new MemoryStream()
-        dcs.WriteObject(ms, m)
-        UTF8.to_string' (ms.ToArray())
-
-      context (fun ctx ->
+    let write relative_expiry key value =
+      context (fun ({ runtime = { logger = logger }} as ctx) ->
+        log logger "Suave.Session.State.CookieStateStore.write" Debug 
+          (sprintf "updating key '%s' with value '%s'" key value)
         Cookies.update_cookies
           { server_key      = ctx.runtime.server_key
             cookie_name     = StateCookie
             user_state_key  = StateStoreType
             relative_expiry = relative_expiry
-            secure          = secure }
+            secure          = false }
           (function
            | None ->
-             encode_map (Map.empty |> Map.add key value)
+             let d = Dictionary<string, string>()
+             d.Add (key, value)
+             encode_map d
            | Some obj_str ->
-             let dcs = DataContractJsonSerializer(typeof<Map<string, string>>)
-             use ms = new MemoryStream()
-             let bytes = UTF8.bytes obj_str
-             ms.Write(bytes, 0, bytes.Length)
-             ms.Seek(0L, SeekOrigin.Begin) |> ignore
-             let m : Map<string, string> = dcs.ReadObject(ms) :?> Map<_,_>
-             let value' = m |> Map.add key value |> encode_map
-             value'
-             ))
+             let d = decode_map obj_str
+             d.Add (key, value)
+             encode_map d))
 
     let stateful relative_expiry secure : WebPart =
       context (fun ctx ->
@@ -286,11 +316,36 @@ module State =
             user_state_key  = StateStoreType
             relative_expiry = relative_expiry
             secure          = secure }
-          (fun () -> Choice1Of2("{}"))
+          (fun () -> Choice1Of2("{}" |> UTF8.bytes))
           (sprintf "%A" >> RequestErrors.BAD_REQUEST))
+      >>= Writers.set_user_data (StateStoreType + "-expiry") relative_expiry
 
+    ///
+    ///
+    /// Only save the state for the duration of the browser session.
     let stateful' : WebPart =
       stateful Cookies.SessionCookie false
+
+    module HttpContext =
+
+      let private mk_state_store (user_state : Map<string, obj>) (ss : obj) =
+        { new StateStore with
+            member x.get key =
+              let m = decode_map (ss :?> byte [])
+              match m.TryGetValue key with
+              | false, _ -> None
+              | true, value -> Some value
+              |> Option.map (fun x -> Convert.ChangeType(x, typeof<'a>) :?> 'a)
+            member x.set key value =
+              let expiry = user_state |> Map.find (StateStoreType + "-expiry") :?> Cookies.Expiry
+              write expiry key (value.ToString()) // TODO: handle gratiously all types of values
+              }
+  
+      /// Read the session store from the HttpContext.
+      let state (ctx : HttpContext) =
+        ctx.user_state
+        |> Map.tryFind StateStoreType
+        |> Option.map (mk_state_store ctx.user_state)
 
   /// This module contains the implementation for the memory-cache backed session
   /// state store, when the memory cache is global for the server.
@@ -310,20 +365,20 @@ module State =
 
     module HttpContext =
 
-      /// Try to find the state id of the HttpContext
+      /// Try to find the state id of the HttpContext.
       let state_id ctx =
         ctx.user_state
         |> Map.tryFind UserStateIdKey
         |> Option.map (fun x -> x :?> string)
+        |> Option.get
   
-      /// Read the session store from the HttpContext, or throw an exception otherwise.
-      /// If this throws an exception, it's a programming error from the consumer of the
-      /// suave library.
+      /// Read the session store from the HttpContext.
       let state (ctx : HttpContext) =
         ctx.user_state
         |> Map.tryFind StateStoreType
         |> Option.map (fun ss -> ss :?> StateStore)
-
+        |> Option.get
+        
     let private wrap (session_map : MemoryCache) relative_expiry session_id =
       let exp = function
         | Cookies.SessionCookie -> CacheItemPolicy()
@@ -340,22 +395,18 @@ module State =
             cd)
 
       { new StateStore with
-          member x.get key       =
+          member x.get key =
             if state_bag.ContainsKey key then
               Some (state_bag.[key] :?> 'a)
             else None
           member x.set key value =
-            state_bag.[key] <- value }
+            state_bag.[key] <- value
+            succeed }
 
     let stateful relative_expiry : WebPart =
       let state_store = wrap (MemoryCache.Default) relative_expiry
-
       context (fun ctx ->
-        match ctx |> HttpContext.state with
-        | None       ->
-          let state_id = ctx |> HttpContext.state_id |> Option.get
-          Writers.set_user_data StateStoreType (state_store state_id)
-        | Some store ->
-          succeed)
+        let state_id = ctx |> HttpContext.state_id
+        Writers.set_user_data StateStoreType (state_store state_id))
 
     let DefaultExpiry = TimeSpan.FromMinutes 30. |> Cookies.Expiry

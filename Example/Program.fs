@@ -10,14 +10,13 @@ open Suave.Http.Writers
 open Suave.Http.Files
 open Suave.Http.Successful
 open Suave.Types
-open Suave.Session
 open Suave.Log
-open Session.State.MemoryCacheStateStore
+open Session.State.CookieStateStore
 
 let basic_auth : WebPart =
   Authentication.authenticate_basic ( fun (user_name,password) -> user_name.Equals("foo") && password.Equals("bar"))
 
-let logger = Loggers.sane_defaults_for Debug
+let logger = Loggers.ConsoleWindowLogger Debug
 
 let myapp : WebPart =
   choose [
@@ -71,16 +70,18 @@ choose [
   url "/date" >>= warbler (fun _ -> OK (DateTimeOffset.UtcNow.ToString("o")))
   url "/timeout" >>= timeout_webpart (TimeSpan.FromSeconds 1.) (sleep 120000 "Did not timed out")
   url "/session"
-    >>= State.CookieStateStore.stateful' // Session.State.MemoryCacheStateStore
+    >>= stateful' // Session.State.CookieStateStore
     >>= context (fun x ->
-        let store = HttpContext.state x |> Option.get
+      match x |> HttpContext.state with
+      | None -> Redirection.FOUND "/session" // restarted server without keeping the key; set key manually?
+      | Some store ->
         match store.get "counter" with
         | Some y ->
           store.set "counter" (y + 1)
-          OK (sprintf "Hello %d time(s)" y )
+          >>= OK (sprintf "Hello %d time(s)" y )
         | None ->
           store.set "counter" 1
-          OK "First time")
+          >>= OK "First time")
   basic_auth // from here on it will require authentication
   GET >>= url "/events" >>= request (fun r -> EventSource.hand_shake (CounterDemo.counter_demo r))
   GET >>= browse' //serves file if exists
@@ -89,12 +90,12 @@ choose [
   POST >>= url "/upload" >>= OK "Upload successful."
   POST >>= url "/upload2"
     >>= request (fun x ->
-                   let files =
-                     x.files
-                     |> Seq.fold
-                       (fun x y -> x + "<br/>" + (sprintf "(%s, %s, %s)" y.file_name y.mime_type y.temp_file_path))
-                       ""
-                   OK (sprintf "Upload successful.<br>POST data: %A<br>Uploaded files (%d): %s" x.multipart_fields (List.length x.files) files))
+       let files =
+         x.files
+         |> Seq.fold
+           (fun x y -> x + "<br/>" + (sprintf "(%s, %s, %s)" y.file_name y.mime_type y.temp_file_path))
+           ""
+       OK (sprintf "Upload successful.<br>POST data: %A<br>Uploaded files (%d): %s" x.multipart_fields (List.length x.files) files))
   POST >>= request (fun x -> OK (sprintf "POST data: %s" (ASCII.to_string' x.raw_form)))
   GET
     >>= url "/custom_header"
