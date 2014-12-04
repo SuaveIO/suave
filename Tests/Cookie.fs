@@ -11,12 +11,10 @@ let tests =
   testList "parse cookie" [
     testCase "can parse cookie" <| fun _ ->
       let sample = @"st=oFqpYxbMObHvpEW!QLzedHwSZ1gZnotBs$; Path=/; HttpOnly"
-      let cookie = Cookie.parse_cookie sample
-
-      Assert.Equal("cookie should eq",
-                   { HttpCookie.mk' "st" "oFqpYxbMObHvpEW!QLzedHwSZ1gZnotBs$"
-                      with http_only = true },
-                   cookie)
+      let subject = Cookie.parse_cookie sample
+      let expected = { HttpCookie.mk' "st" "oFqpYxbMObHvpEW!QLzedHwSZ1gZnotBs$"
+                         with http_only = true }
+      Assert.Equal("cookie should eq", expected, subject)
 
     testProperty "can parse any cookie we generate" <| fun (cookie : HttpCookie) ->
       let parsed = Cookie.parse_cookie (HttpCookie.to_header cookie)

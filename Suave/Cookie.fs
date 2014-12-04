@@ -24,9 +24,12 @@ let parse_cookie (s : string) : HttpCookie =
   s.Split(';')
   |> Array.map (fun (x : string) ->
       let parts = x.Split('=')
-      parts.[0].Trim(), parts.[1].Trim()) // TODO won't work on flags
+      if parts.Length > 1 then
+        parts.[0].Trim(), parts.[1].Trim()
+      else
+        parts.[0], "")
   |> Array.fold (fun (iter, (cookie : HttpCookie)) -> function
-      | name, value when iter = 0 -> iter + 1, { cookie with name = name }
+      | name, value when iter = 0 -> iter + 1, { cookie with name = name; value = value }
       | "Domain", domain          -> iter + 1, { cookie with domain = Some domain }
       | "Path", path              -> iter + 1, { cookie with path = Some path }
       | "Expires", expires        -> iter + 1, { cookie with expires = Some (parse_expires expires) }

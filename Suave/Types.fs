@@ -36,7 +36,7 @@ module HttpCookie =
 
   /// Create a new cookie with the given name, value, and defaults:
   ///
-  /// - 5 days to expiry from the instant it's created
+  /// - no explicit expiry time
   /// - path at "/", so that it's global to the domain that it's created under.
   /// - no specific domain (defaults to the current domain plus its subdomains)
   /// - secure = false (you can set it over plain text HTTP - change to true in SSL terminator)
@@ -52,7 +52,7 @@ module HttpCookie =
   let mk' name value =
     { name      = name
       value     = value
-      expires   = (Globals.utc_now ()).AddDays 5. |> Some
+      expires   = None
       path      = Some "/"
       domain    = None
       secure    = false
