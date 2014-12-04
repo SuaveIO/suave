@@ -5,16 +5,15 @@ open Suave.Http
 open Suave.Log
 open Suave.Cookie
 
-[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module CookieStateStore =
   open System
   open System.IO
   open System.Runtime.Serialization.Json
   open System.Collections.Generic
 
-  /// "Suave.Session.State.CookieStateStore"
+  /// "Suave.State.CookieStateStore"
   [<Literal>]
-  let StateStoreType = "Suave.Session.State.CookieStateStore"
+  let StateStoreType = "Suave.State.CookieStateStore"
 
   /// "st"
   [<Literal>]
@@ -37,8 +36,9 @@ module CookieStateStore =
   // reworking it to e.g. Fleece
   let write relative_expiry key value =
     context (fun ({ runtime = { logger = logger }} as ctx) ->
-      log logger "Suave.Session.State.CookieStateStore.write" Debug 
-        (sprintf "updating key '%s' with value '%s'" key value)
+//      log logger "Suave.State.CookieStateStore.write" Debug 
+//        (sprintf "updating key '%s' with value '%s'" key value)
+      log logger "Suave.State.CookieStateStore.write" Debug (sprintf "writing to key '%s'" key)
       update_cookies
         { server_key      = ctx.runtime.server_key
           cookie_name     = StateCookie
@@ -96,7 +96,6 @@ module CookieStateStore =
 
 /// This module contains the implementation for the memory-cache backed session
 /// state store, when the memory cache is global for the server.
-[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module MemoryCacheStateStore =
   open System
   open System.Runtime.Caching
@@ -105,10 +104,10 @@ module MemoryCacheStateStore =
   /// This key will be present in HttpContext.user_state and will contain the
   /// MemoryCache instance.
   [<Literal>]
-  let StateStoreType = "Suave.Session.State.MemoryCacheStateStore"
+  let StateStoreType = "Suave.State.MemoryCacheStateStore"
 
   [<Literal>]
-  let UserStateIdKey = "Suave.Session.State.MemoryCacheStateStore-id"
+  let UserStateIdKey = "Suave.State.MemoryCacheStateStore-id"
 
   [<Literal>]
   let StateCookie = "mc-st"
@@ -131,7 +130,7 @@ module MemoryCacheStateStore =
       
   let private wrap (session_map : MemoryCache) relative_expiry session_id =
     let exp = function
-      | SessionCookie -> CacheItemPolicy()
+      | Session -> CacheItemPolicy()
       | MaxAge ts     -> CacheItemPolicy(SlidingExpiration = ts)
 
     let state_bag =

@@ -164,16 +164,17 @@ module Cookie =
       let plain_text' =
         match read_cookies csctx.server_key csctx.cookie_name ctx with
         | Choice1Of2 (_, plain_text) ->
-          Log.log logger "Suave.Cookie.update_cookies" Debug
-            (sprintf "update_cookies - existing value: '%s'" (plain_text |> UTF8.to_string'))
+//          Log.log logger "Suave.Cookie.update_cookies" Debug
+//            (sprintf "update_cookies - existing value: '%s'" (plain_text |> UTF8.to_string'))
+          Log.log logger "Suave.Cookie.update_cookies" Debug "update_cookies - existing"
           f_plain_text (Some plain_text)
         | Choice2Of2 _ ->
           Log.log logger "Suave.Cookie.update_cookies" Debug "update_cookies - first time"
           f_plain_text None
 
-      Log.log logger "Suave.Cookie.update_cookies" Debug
-        (sprintf "update_cookies - setting '%s'"
-          (plain_text' |> UTF8.to_string'))
+//      Log.log logger "Suave.Cookie.update_cookies" Debug
+//        (sprintf "update_cookies - setting '%s'"
+//          (plain_text' |> UTF8.to_string'))
       /// Since the contents will completely change every write, we simply re-generate the cookie
       generate_cookies csctx.server_key csctx.cookie_name
                        csctx.relative_expiry csctx.secure
@@ -195,8 +196,8 @@ module Cookie =
       | Choice2Of2 (NoCookieFound _) ->
         match no_cookie () with
         | Choice1Of2 plain_text ->
-          Log.log logger "Suave.Cookie.cookie_state" Debug
-            (sprintf "setting '%s' with value '%s'" csctx.cookie_name (UTF8.to_string' plain_text))
+//          Log.log logger "Suave.Cookie.cookie_state" Debug
+//            (sprintf "setting '%s' with value '%s'" csctx.cookie_name (UTF8.to_string' plain_text))
           let http_cookie, client_cookie =
             generate_cookies csctx.server_key csctx.cookie_name
                              csctx.relative_expiry csctx.secure

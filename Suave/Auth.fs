@@ -27,7 +27,7 @@ let SessionAuthCookie = "auth"
 /// The key used in `context.user_state` to save the session id for downstream
 /// web parts.
 [<Literal>]
-let StateStoreType = "Suave.Session.Auth"
+let StateStoreType = "Suave.Auth"
 
 [<Literal>]
 let SessionIdLength = 40
@@ -53,7 +53,7 @@ let authenticate relative_expiry secure
                  (failure : Crypto.SecretboxDecryptionError -> WebPart)
                  : WebPart =
   context (fun ({ runtime = { logger = logger }} as ctx) ->
-    Log.log logger "Suave.Session.Auth.authenticate" Debug "authenticating"
+    Log.log logger "Suave.Auth.authenticate" Debug "authenticating"
 
     cookie_state
       { server_key      = ctx.runtime.server_key
