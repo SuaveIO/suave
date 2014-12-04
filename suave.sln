@@ -18,8 +18,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "docs", "docs", "{C7760769-4
 EndProject
 Project("{f2a71f9b-5d33-465a-a702-920d77279786}") = "Experimental", "Experimental\Experimental.fsproj", "{488FC139-5013-46A2-9982-2C40A6F1F777}"
 EndProject
-Project("{f2a71f9b-5d33-465a-a702-920d77279786}") = "suave.WebMachine", "suave.WebMachine\suave.WebMachine.fsproj", "{301FC093-FD75-495C-AA2F-C8B3697B7114}"
-EndProject
 Project("{f2a71f9b-5d33-465a-a702-920d77279786}") = "suave.OpenSsl", "suave.OpenSsl\suave.OpenSsl.fsproj", "{EF9A327A-4265-4DB4-ACA4-368790CC7483}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "examples", "examples", "{E05A9F83-E283-4258-AB0E-AF626002B6EF}"
@@ -34,10 +32,6 @@ Global
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{301FC093-FD75-495C-AA2F-C8B3697B7114}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{301FC093-FD75-495C-AA2F-C8B3697B7114}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{301FC093-FD75-495C-AA2F-C8B3697B7114}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{301FC093-FD75-495C-AA2F-C8B3697B7114}.Release|Any CPU.Build.0 = Release|Any CPU
 		{3BE234C3-2BD4-4E53-9D11-7C134374500D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{3BE234C3-2BD4-4E53-9D11-7C134374500D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{3BE234C3-2BD4-4E53-9D11-7C134374500D}.Release|Any CPU.ActiveCfg = Release|Any CPU
