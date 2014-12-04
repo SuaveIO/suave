@@ -90,16 +90,27 @@ module ASCII =
     Encoding.ASCII.GetString bytes
 
 module String =
+  open System
 
   /// Ordinally compare two strings in constant time, bounded by the length of the
   /// longest string.
-  let cnst_time_cmp_ord (str1 : string) (str2 : string) =
+  let eq_ord_cnst_time (str1 : string) (str2 : string) =
     let mutable xx = uint32 str1.Length ^^^ uint32 str2.Length
     let mutable i = 0
     while i < str1.Length && i < str2.Length do
       xx <- xx ||| uint32 (int str1.[i] ^^^ int str2.[i])
       i <- i + 1
     xx = 0u
+
+  /// Compare ordinally
+  let eq_ord (str1 : string) (str2 : string) =
+    String.Equals(str1, str2, StringComparison.OrdinalIgnoreCase)
+
+  let trim (s : string) =
+    s.Trim()
+
+  let split (c : char) (s : string) =
+    s.Split c |> Array.toList
 
 module Option =
   let or_default value opt =
@@ -125,6 +136,13 @@ module Choice =
   let from_option on_missing = function
     | Some x -> Choice1Of2 x
     | None   -> Choice2Of2 on_missing
+
+module List =
+
+  let flat_map f xs =
+    xs
+    |> List.map f
+    |> List.concat
 
 module RandomExtensions =
   open System

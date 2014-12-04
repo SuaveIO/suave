@@ -39,7 +39,7 @@ let utilities =
         ] do
         Assert.Equal("should have same as normal str equal",
                      str1.Equals str2,
-                     String.cnst_time_cmp_ord str1 str2)
+                     String.eq_ord_cnst_time str1 str2)
 
     /// is 0.078125 KiB long (and that *1.375 when base-64 encoded)
     testCase "crypto hello world" <| fun _ ->
