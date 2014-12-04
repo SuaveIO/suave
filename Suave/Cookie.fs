@@ -44,6 +44,7 @@ module Cookie =
     |> snd
 
   module HttpRequest =
+
     let cookies (x : HttpRequest) =
       x.headers
       |> List.filter (fun (name, _) -> name.Equals "cookie")
@@ -56,7 +57,7 @@ module Cookie =
 
     let cookies (x : HttpResult) =
       x.headers
-      |> List.filter (fst >> (String.eq_ord "Set-Cookie"))
+      |> List.filter (fst >> (String.eq_ord_ci "Set-Cookie"))
       /// duplicate headers are comma separated
       |> List.flat_map (snd >> String.split ',' >> List.map String.trim)
       |> List.map parse_cookie
@@ -83,11 +84,22 @@ module Cookie =
     let http_cookie = { http_cookie with expires = expiry }
     http_cookie, client_cookie_from http_cookie
 
-  let set_cookie (cookie : HttpCookie) =
-    context (fun ctx ->
-    //  ctx.response
-    //  |> HttpResult.cookies
-      Writers.set_header "Set-Cookie" (HttpCookie.to_header cookie))
+  let set_cookie (cookie : HttpCookie) (ctx : HttpContext) =
+    let combine (cs : HttpCookie list) =
+      String.concat ", " (cs |> List.map HttpCookie.to_header)
+    let not_set_cookie : string * string -> bool =
+      fst >> (String.eq_ord_ci "Set-Cookie" >> not)
+    let cookie_header =
+      ctx.response
+      |> HttpResult.cookies // get current cookies
+      |> Map.put cookie.name cookie // possibly overwrite
+      |> Map.toList
+      |> List.map snd // get HttpCookie-s
+      |> combine // if needed
+    let headers' =
+      ("Set-Cookie", cookie_header) :: (ctx.response.headers |> List.filter not_set_cookie)
+    { ctx with response = { ctx.response with headers = headers' } }
+    |> succeed
 
   let unset_cookie (cookie_name : string) =
     let start_epoch = DateTimeOffset(1970, 1, 1, 0, 0, 1, TimeSpan.Zero) |> Some

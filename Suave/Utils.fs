@@ -102,8 +102,8 @@ module String =
       i <- i + 1
     xx = 0u
 
-  /// Compare ordinally
-  let eq_ord (str1 : string) (str2 : string) =
+  /// Compare ordinally with ignore case.
+  let eq_ord_ci (str1 : string) (str2 : string) =
     String.Equals(str1, str2, StringComparison.OrdinalIgnoreCase)
 
   let trim (s : string) =
@@ -115,6 +115,13 @@ module String =
 module Option =
   let or_default value opt =
     opt |> Option.fold (fun s t -> t) value
+
+module Map =
+
+  let put key value m =
+    match m |> Map.tryFind key with
+    | None -> m |> Map.add key value
+    | Some _ -> m |> Map.remove key |> Map.add key value
 
 module Choice =
 

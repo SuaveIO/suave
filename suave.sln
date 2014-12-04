@@ -62,7 +62,7 @@ Global
 		{68D30567-3281-41FB-BD69-30FB32196B79} = {E05A9F83-E283-4258-AB0E-AF626002B6EF}
 	EndGlobalSection
 	GlobalSection(MonoDevelopProperties) = preSolution
-		StartupItem = Tests\Tests.fsproj
+		StartupItem = Example\Example.fsproj
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

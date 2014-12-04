@@ -38,8 +38,22 @@ let tests =
       let parsed = Cookie.parse_cookie (HttpCookie.to_header cookie)
       Assert.Equal("eq", cookie, parsed)
 
-// painful RFC, let's do that when merging Freya
+// FsCheck character gen from RFC slightly painful; let's do that when merging Freya
 //    testPropertyWithConfig fscheck_config "anything generated" <| fun (cookie : HttpCookie) ->
 //      let parsed = Cookie.parse_cookie (HttpCookie.to_header cookie)
 //      Assert.Equal("eq", cookie, parsed)
+
+
+    testCase "set cookie (same name) twice keeps last" <| fun _ ->
+      let force = Async.RunSynchronously >> Option.get
+      let c1 = HttpCookie.mk' "a" "aa"
+      let c2 = HttpCookie.mk' "a" "bb"
+      let subject =
+        HttpContext.empty
+        |> Cookie.set_cookie c1 |> force
+        |> Cookie.set_cookie c2 |> force
+        
+      Assert.Equal("should keep bb-valued cookie",
+                   "bb",
+                   (subject.response |> HttpResult.cookies).["a"].value)
     ]
