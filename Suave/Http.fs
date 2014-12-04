@@ -92,17 +92,6 @@ module Http =
       { ctx with user_state = ctx.user_state |> Map.remove key }
       |> succeed
 
-    let set_cookie (cookie : HttpCookie) (ctx : HttpContext) =
-//      ctx.response.headers
-//      |> List.filter (fun (h_name, h_val) -> h_name = "Set-Cookie")
-//
-      set_header "Set-Cookie" (HttpCookie.to_header cookie) ctx
-
-    let unset_cookie (cookie_name : string) =
-      let start_epoch = DateTimeOffset(1970, 1, 1, 0, 0, 1, TimeSpan.Zero) |> Some
-      let string_value = HttpCookie.to_header { HttpCookie.mk' cookie_name "x" with expires = start_epoch }
-      set_header "Set-Cookie" string_value
-
     // TODO: I'm not sure about having MIME types in the Writers module
     let mk_mime_type a b =
       MimeType.mk a b |> Some

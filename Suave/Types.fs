@@ -474,17 +474,15 @@ module HttpResult =
 /// evaluated asynchronously to decide whether a value is available.
 type SuaveTask<'a> = Async<'a option>
 
-/// An error handler takes the exception, a programmer-provided message, a
-/// request (that failed) and returns an asynchronous workflow for the handling
-/// of the error.
-type ErrorHandler = Exception -> String -> WebPart
+/// A server-key is a 256 bit key with high entropy
+type ServerKey = byte []
 
 /// The HttpRuntime is created from the SuaveConfig structure when the web
 /// server starts. You can also use the `HttpRuntime` module to create a new
 /// value yourself, or use the `empty` one.
 and HttpRuntime =
   { protocol           : Protocol
-    server_key         : byte []
+    server_key         : ServerKey
     error_handler      : ErrorHandler
     mime_types_map     : MimeTypesMap
     home_directory     : string
@@ -500,6 +498,11 @@ and HttpContext =
     response   : HttpResult }
 
 and WebPart = HttpContext -> SuaveTask<HttpContext>
+
+/// An error handler takes the exception, a programmer-provided message, a
+/// request (that failed) and returns an asynchronous workflow for the handling
+/// of the error.
+and ErrorHandler = Exception -> String -> WebPart
 
 /// A session store is a reader and a writer function pair keyed on strings.
 type StateStore =

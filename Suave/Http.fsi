@@ -94,12 +94,6 @@ module Http =
     /// Unset the user data by the given key
     val unset_user_data : key : string -> WebPart
 
-    /// Sets a cookie with the passed value in the 'cookie' parameter
-    val set_cookie : cookie:HttpCookie -> WebPart
-
-    /// Unset the cookie by name by expiring it.
-    val unset_cookie : cookie_name:string -> WebPart
-
     /// <summary>
     /// Creates a MIME type record
     /// </summary>
