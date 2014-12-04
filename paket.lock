@@ -4,6 +4,7 @@ NUGET
     FsCheck (1.0.3)
     FSharp.Charting (0.90.6)
     FSharp.Core.3 (0.0.2)
+    FsPickler (1.0.6)
     Microsoft.AspNet.Razor (3.2.2)
     NuGet.CommandLine (2.8.3)
     RazorEngine (3.4.1)

@@ -8,8 +8,9 @@ open Suave.Cookie
 module CookieStateStore =
   open System
   open System.IO
-  open System.Runtime.Serialization.Json
   open System.Collections.Generic
+
+  open Nessos.FsPickler
 
   /// "Suave.State.CookieStateStore"
   [<Literal>]
@@ -19,25 +20,21 @@ module CookieStateStore =
   [<Literal>]
   let StateCookie = "st"
 
-  let encode_map m =
-    let dcs = DataContractJsonSerializer(m.GetType())
+  let private encode_map (map : Map<string, obj>) =
+    let pickler = FsPickler.CreateBinary ()
     use ms = new MemoryStream()
-    dcs.WriteObject(ms, m)
+    pickler.Serialize(ms, map)
     ms.ToArray()
 
-  let decode_map bytes =
-    let dcs = DataContractJsonSerializer(typeof<Dictionary<string, string>>)
+  let private decode_map bytes : Map<string, obj> =
+    let pickler = FsPickler.CreateBinary ()
     use ms = new MemoryStream()
-    ms.Write(bytes, 0, bytes.Length)
-    ms.Seek(0L, SeekOrigin.Begin) |> ignore
-    dcs.ReadObject(ms) :?> Dictionary<string, string>
+    ms.Write (bytes, 0, bytes.Length)
+    ms.Seek (0L, SeekOrigin.Begin) |> ignore
+    pickler.Deserialize ms
 
-  // TODO: this is a buggy proof of concept serialisation from .Net, consider
-  // reworking it to e.g. Fleece
-  let write relative_expiry key value =
+  let write relative_expiry (key : string) (value : 'a) =
     context (fun ({ runtime = { logger = logger }} as ctx) ->
-//      log logger "Suave.State.CookieStateStore.write" Debug 
-//        (sprintf "updating key '%s' with value '%s'" key value)
       log logger "Suave.State.CookieStateStore.write" Debug (sprintf "writing to key '%s'" key)
       update_cookies
         { server_key      = ctx.runtime.server_key
@@ -46,24 +43,25 @@ module CookieStateStore =
           relative_expiry = relative_expiry
           secure          = false }
         (function
-         | None ->
-           let d = Dictionary<string, string>()
-           d.Add (key, value)
-           encode_map d
-         | Some obj_str ->
-           let d = decode_map obj_str
-           d.Add (key, value)
-           encode_map d))
+         | None      ->
+           log logger "Suave.State.CookieStateStore.write" Debug "in f_plain_text, no existing"
+           Map.empty |> Map.add key (box value) |> encode_map
+         | Some data ->
+           let m = decode_map data
+           log logger "Suave.State.CookieStateStore.write" Debug
+             (sprintf "in f_plain_text, has existing %A" m)
+           m |> Map.add key (box value) |> encode_map))
 
   let stateful relative_expiry secure : WebPart =
-    context (fun ctx ->
+    context (fun ({ runtime = { logger = logger }} as ctx) ->
+      log logger "Suave.State.CookieStateStore.stateful" Debug "ensuring cookie state"
       cookie_state
         { server_key      = ctx.runtime.server_key
           cookie_name     = StateCookie
           user_state_key  = StateStoreType
           relative_expiry = relative_expiry
           secure          = secure }
-        (fun () -> Choice1Of2("{}" |> UTF8.bytes))
+        (fun () -> Choice1Of2(Map.empty<string, obj> |> encode_map))
         (sprintf "%A" >> RequestErrors.BAD_REQUEST))
     >>= Writers.set_user_data (StateStoreType + "-expiry") relative_expiry
 
@@ -78,15 +76,12 @@ module CookieStateStore =
     let private mk_state_store (user_state : Map<string, obj>) (ss : obj) =
       { new StateStore with
           member x.get key =
-            let m = decode_map (ss :?> byte [])
-            match m.TryGetValue key with
-            | false, _ -> None
-            | true, value -> Some value
+            decode_map (ss :?> byte []) |> Map.tryFind key
             |> Option.map (fun x -> Convert.ChangeType(x, typeof<'a>) :?> 'a)
           member x.set key value =
             let expiry = user_state |> Map.find (StateStoreType + "-expiry") :?> CookieLife
-            write expiry key (value.ToString()) // TODO: handle gratiously all types of values
-            }
+            write expiry key value
+          }
 
     /// Read the session store from the HttpContext.
     let state (ctx : HttpContext) =
@@ -130,8 +125,8 @@ module MemoryCacheStateStore =
       
   let private wrap (session_map : MemoryCache) relative_expiry session_id =
     let exp = function
-      | Session -> CacheItemPolicy()
-      | MaxAge ts     -> CacheItemPolicy(SlidingExpiration = ts)
+      | Session   -> CacheItemPolicy()
+      | MaxAge ts -> CacheItemPolicy(SlidingExpiration = ts)
 
     let state_bag =
       lock session_map (fun _->

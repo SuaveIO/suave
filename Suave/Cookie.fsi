@@ -17,7 +17,9 @@ module Cookie =
     | DecryptionError of Crypto.SecretboxDecryptionError
 
   /// Parse the cookie's name and data in the string into a dictionary.
-  val parse_cookie : cookie_string:string -> HttpCookie
+  val parse_cookies : cookie_string:string -> HttpCookie list
+
+  val parse_result_cookie : cookie_string:string -> HttpCookie
 
   module HttpRequest =
 

@@ -19,9 +19,14 @@ module Cookie =
     | NoCookieFound of string
     | DecryptionError of Crypto.SecretboxDecryptionError
 
-  /// TODO: follow RFC http://tools.ietf.org/html/rfc6265#section-4.1.1
-  ///       also see: http://stackoverflow.com/a/1969339/63621
-  let parse_cookie (s : string) : HttpCookie =
+  let parse_cookies (s : string) : HttpCookie list =
+    s.Split(';')
+    |> Array.toList
+    |> List.map (fun (cookie : string) ->
+        let parts = cookie.Split('=')
+        HttpCookie.mk' (String.trim parts.[0]) (String.trim parts.[1]))
+
+  let parse_result_cookie (s : string) : HttpCookie =
     let parse_expires (str : string) =
       DateTimeOffset.ParseExact(str, "R", CultureInfo.InvariantCulture)
     s.Split(';')
@@ -48,7 +53,7 @@ module Cookie =
     let cookies (x : HttpRequest) =
       x.headers
       |> List.filter (fun (name, _) -> name.Equals "cookie")
-      |> List.map (snd >> parse_cookie)
+      |> List.flat_map (snd >> parse_cookies)
       |> List.fold (fun cookies cookie ->
           cookies |> Map.add cookie.name cookie)
           Map.empty
@@ -60,7 +65,7 @@ module Cookie =
       |> List.filter (fst >> (String.eq_ord_ci "Set-Cookie"))
       /// duplicate headers are comma separated
       |> List.flat_map (snd >> String.split ',' >> List.map String.trim)
-      |> List.map parse_cookie
+      |> List.map parse_result_cookie
       |> List.fold (fun cookies cookie ->
           cookies |> Map.add cookie.name cookie)
           Map.empty
@@ -85,19 +90,20 @@ module Cookie =
     http_cookie, client_cookie_from http_cookie
 
   let set_cookie (cookie : HttpCookie) (ctx : HttpContext) =
-    let combine (cs : HttpCookie list) =
-      String.concat ", " (cs |> List.map HttpCookie.to_header)
     let not_set_cookie : string * string -> bool =
       fst >> (String.eq_ord_ci "Set-Cookie" >> not)
-    let cookie_header =
+    let cookie_headers =
       ctx.response
       |> HttpResult.cookies // get current cookies
       |> Map.put cookie.name cookie // possibly overwrite
       |> Map.toList
       |> List.map snd // get HttpCookie-s
-      |> combine // if needed
+      |> List.map HttpCookie.to_header
     let headers' =
-      ("Set-Cookie", cookie_header) :: (ctx.response.headers |> List.filter not_set_cookie)
+      cookie_headers
+      |> List.fold (fun headers header ->
+          ("Set-Cookie", header) :: headers)
+          (ctx.response.headers |> List.filter not_set_cookie)
     { ctx with response = { ctx.response with headers = headers' } }
     |> succeed
 
@@ -107,7 +113,11 @@ module Cookie =
     Writers.set_header "Set-Cookie" string_value
 
   let set_pair (http_cookie : HttpCookie) (client_cookie : HttpCookie) : WebPart =
-    set_cookie http_cookie >>= set_cookie client_cookie
+    context (fun { runtime = { logger = logger } } ->
+      Log.log logger "Suave.Cookie.set_pair" Debug
+        (sprintf "setting cookie '%s' len '%d'" http_cookie.name http_cookie.value.Length)
+      succeed)
+    >>= set_cookie http_cookie >>= set_cookie client_cookie
 
   let unset_pair http_cookie_name : WebPart =
     unset_cookie http_cookie_name >>= unset_cookie (String.Concat [ http_cookie_name; "-client" ])
@@ -164,17 +174,12 @@ module Cookie =
       let plain_text' =
         match read_cookies csctx.server_key csctx.cookie_name ctx with
         | Choice1Of2 (_, plain_text) ->
-//          Log.log logger "Suave.Cookie.update_cookies" Debug
-//            (sprintf "update_cookies - existing value: '%s'" (plain_text |> UTF8.to_string'))
           Log.log logger "Suave.Cookie.update_cookies" Debug "update_cookies - existing"
           f_plain_text (Some plain_text)
         | Choice2Of2 _ ->
           Log.log logger "Suave.Cookie.update_cookies" Debug "update_cookies - first time"
           f_plain_text None
 
-//      Log.log logger "Suave.Cookie.update_cookies" Debug
-//        (sprintf "update_cookies - setting '%s'"
-//          (plain_text' |> UTF8.to_string'))
       /// Since the contents will completely change every write, we simply re-generate the cookie
       generate_cookies csctx.server_key csctx.cookie_name
                        csctx.relative_expiry csctx.secure
@@ -190,21 +195,25 @@ module Cookie =
     context (fun ({ runtime = { logger = logger }} as ctx) ->
       match read_cookies csctx.server_key csctx.cookie_name ctx with
       | Choice1Of2 (http_cookie, plain_text) ->
+        Log.log logger "Suave.Cookie.cookie_state" Debug "existing cookie"
         refresh_cookies csctx.relative_expiry http_cookie >>=
           Writers.set_user_data csctx.user_state_key plain_text
 
       | Choice2Of2 (NoCookieFound _) ->
         match no_cookie () with
         | Choice1Of2 plain_text ->
-//          Log.log logger "Suave.Cookie.cookie_state" Debug
-//            (sprintf "setting '%s' with value '%s'" csctx.cookie_name (UTF8.to_string' plain_text))
+          Log.log logger "Suave.Cookie.cookie_state" Debug
+            "no existing cookie, setting text"
           let http_cookie, client_cookie =
             generate_cookies csctx.server_key csctx.cookie_name
                              csctx.relative_expiry csctx.secure
                              plain_text
           set_pair http_cookie client_cookie >>=
             Writers.set_user_data csctx.user_state_key plain_text
-        | Choice2Of2 wp_kont -> wp_kont
+        | Choice2Of2 wp_kont ->
+          Log.log logger "Suave.Cookie.cookie_state" Debug
+            "no existing cookie, calling app continuation"
+          wp_kont
 
       | Choice2Of2 (DecryptionError err) ->
         Log.log logger "Suave.Cookie.cookie_state" Debug

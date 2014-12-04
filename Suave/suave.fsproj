@@ -64,8 +64,7 @@
     <Compile Include="Compression.fs" />
     <Compile Include="Http.fsi" />
     <Compile Include="Http.fs" />
-    <Compile Include="Cookie.fsi">
-    </Compile>
+    <Compile Include="Cookie.fsi" />
     <Compile Include="Cookie.fs" />
     <Compile Include="State.fs" />
     <Compile Include="Auth.fs" />
@@ -106,6 +105,26 @@
         </Reference>
         <Reference Include="policy.2.3.FSharp.Core">
           <HintPath>..\packages\FSharp.Core.3\lib\net40\policy.2.3.FSharp.Core.dll</HintPath>
+          <Private>True</Private>
+          <Paket>True</Paket>
+        </Reference>
+      </ItemGroup>
+    </When>
+  </Choose>
+  <Choose>
+    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And ($(TargetFrameworkVersion) == 'v4.0')">
+      <ItemGroup>
+        <Reference Include="FsPickler">
+          <HintPath>..\packages\FsPickler\lib\net40\FsPickler.dll</HintPath>
+          <Private>True</Private>
+          <Paket>True</Paket>
+        </Reference>
+      </ItemGroup>
+    </When>
+    <When Condition="($(TargetFrameworkIdentifier) == '.NETFramework' And ($(TargetFrameworkVersion) == 'v4.5' Or $(TargetFrameworkVersion) == 'v4.5.1' Or $(TargetFrameworkVersion) == 'v4.5.2' Or $(TargetFrameworkVersion) == 'v4.5.3')) Or ($(TargetFrameworkIdentifier) == 'MonoAndroid') Or ($(TargetFrameworkIdentifier) == 'MonoTouch')">
+      <ItemGroup>
+        <Reference Include="FsPickler">
+          <HintPath>..\packages\FsPickler\lib\net45\FsPickler.dll</HintPath>
           <Private>True</Private>
           <Paket>True</Paket>
         </Reference>
