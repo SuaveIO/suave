@@ -24,8 +24,7 @@ let cookies =
     ; domain    = None
     ; path      = Some "/"
     ; http_only = false
-    ; secure    = false
-    ; version   = None }
+    ; secure    = false }
 
   testList "Cookies basic tests" [
       testCase "cookie data makes round trip" <| fun _ ->

@@ -17,6 +17,8 @@ type CookieError =
   | NoCookieFound of string (* cookie id *)
   | DecryptionError of Crypto.SecretboxDecryptionError
 
+/// TODO: follow RFC http://tools.ietf.org/html/rfc6265#section-4.1.1
+///       also see: http://stackoverflow.com/a/1969339/63621
 /// Parse the cookie's name and data in the string into a dictionary.
 let parse_cookie (s : string) : HttpCookie =
   let parse_expires (str : string) =
@@ -27,18 +29,18 @@ let parse_cookie (s : string) : HttpCookie =
       if parts.Length > 1 then
         parts.[0].Trim(), parts.[1].Trim()
       else
-        parts.[0], "")
+        parts.[0].Trim(), "")
   |> Array.fold (fun (iter, (cookie : HttpCookie)) -> function
-      | name, value when iter = 0 -> iter + 1, { cookie with name = name; value = value }
+      | name, value when iter = 0 -> iter + 1, { cookie with name = name
+                                                             value = value }
       | "Domain", domain          -> iter + 1, { cookie with domain = Some domain }
       | "Path", path              -> iter + 1, { cookie with path = Some path }
       | "Expires", expires        -> iter + 1, { cookie with expires = Some (parse_expires expires) }
       | "HttpOnly", _             -> iter + 1, { cookie with http_only = true }
       | "Secure", _               -> iter + 1, { cookie with secure = true }
       | _                         -> iter + 1, cookie)
-      (0, HttpCookie.empty)
+      (0, { HttpCookie.empty with http_only = false }) // default when parsing
   |> snd
-
 
 module HttpRequest =
 

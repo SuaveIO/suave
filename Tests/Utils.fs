@@ -1,6 +1,7 @@
 ﻿module Suave.Tests.Utils
 
 open System
+open System.Text
 
 open Suave
 open Suave.Utils.Compression
@@ -8,7 +9,7 @@ open Suave.Utils.Parsing
 
 open Fuchu
 
-open System.Text
+open TestUtilities
 
 #nowarn "25"
 
@@ -21,7 +22,7 @@ let utilities =
     testCase "loopback ipv6" <| fun _ ->
       Assert.Equal("::0 is a local address", true, is_local_address "::1")
 
-    testProperty "gzip_encode/gzip_decode" <| fun str ->
+    testPropertyWithConfig fscheck_config "gzip_encode/gzip_decode" <| fun str ->
       let get_bytes  = Encoding.UTF8.GetBytes  : string -> byte []
       let from_bytes = Encoding.UTF8.GetString : byte [] -> string
       Assert.Equal(
@@ -60,7 +61,7 @@ let utilities =
       | Choice2Of2 (Crypto.AlteredOrCorruptMessage(msg) as aocm) -> ()
       | x -> Tests.failtestf "got %A" x
 
-    testProperty "can encrypt and then decrypt any string" <| fun (str : string) ->
+    testPropertyWithConfig fscheck_config "can encrypt and then decrypt any string" <| fun (str : string) ->
       let ca (str : string) = str.ToCharArray() |> Array.map (string<<int) |> String.concat ","
       if not <| String.IsNullOrWhiteSpace str then
         let key = Crypto.generate_key' ()
@@ -68,7 +69,7 @@ let utilities =
         let (Choice1Of2 plain) = Crypto.secretbox_open' key cipher
         Assert.Equal(sprintf "'%s':%s = D(k, E(k, '%s':%s))" plain (ca plain) str (ca str), str, plain)
 
-    testProperty "Bytes.encode_safe_base64 encoded <-> decoded" <| fun (str : string) ->
+    testPropertyWithConfig fscheck_config "Bytes.encode_safe_base64 encoded <-> decoded" <| fun (str : string) ->
       let enc, dec = Bytes.cookie_encoding
       Assert.Equal("roundtrip", str, UTF8.to_string' (dec (enc (UTF8.bytes str))))
   ]

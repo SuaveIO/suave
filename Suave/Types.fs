@@ -17,22 +17,20 @@ type HttpCookie =
     path      : string option
     domain    : string option
     secure    : bool
-    http_only : bool
-    version   : string option }
+    http_only : bool }
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module HttpCookie =
 
   /// Create a new HttpCookie with all the given values.
-  let mk name value expires path domain secure http_only version =
+  let mk name value expires path domain secure http_only =
     { name      = name
       value     = value
       expires   = expires
       path      = path
       domain    = domain
       secure    = secure
-      http_only = http_only
-      version   = version }
+      http_only = http_only }
 
   /// Create a new cookie with the given name, value, and defaults:
   ///
@@ -53,11 +51,10 @@ module HttpCookie =
     { name      = name
       value     = value
       expires   = None
-      path      = Some "/"
+      path      = None
       domain    = None
       secure    = false
-      http_only = true
-      version   = None }
+      http_only = true }
 
   /// An empty cookie value
   let empty = mk' "" ""
@@ -76,8 +73,7 @@ module HttpCookie =
 
   let http_only x = x.http_only
 
-  let version x = x.version
-
+  /// Assumes only valid characters go in, see http://tools.ietf.org/html/rfc6265#section-4.1.1
   let to_header (x : HttpCookie) =
     let app (sb : StringBuilder) (value : string) = sb.Append value |> ignore
     let sb = new StringBuilder(String.Concat [ x.name; "="; x.value ])

@@ -17,7 +17,13 @@ open Suave.Web
 open Suave.Http
 open Suave.Log
 
+open FsCheck
+
 open Fuchu
+
+type Arbs =
+  static member String () = Arb.Default.String () |> Arb.filter (fun str -> str <> null)
+let fscheck_config = { Config.Default with Arbitrary = [ typeof<Arbs> ] }
 
 let current_path =
   Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location)
