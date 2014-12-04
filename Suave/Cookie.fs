@@ -16,7 +16,7 @@ module Cookie =
     | MaxAge of TimeSpan
 
   type CookieError =
-    | NoCookieFound of string (* cookie id *)
+    | NoCookieFound of string
     | DecryptionError of Crypto.SecretboxDecryptionError
 
   /// TODO: follow RFC http://tools.ietf.org/html/rfc6265#section-4.1.1
@@ -129,8 +129,6 @@ module Cookie =
         relative_expiry = relative_expiry
         secure          = secure }
 
-  /// Generate one server-side cookie, and another client-side cookie with
-  /// name "${server-side-name}-client"
   let generate_cookies server_key cookie_name relative_expiry secure plain_data =
     let enc, _ = Bytes.cookie_encoding
     match Crypto.secretbox server_key plain_data with
@@ -142,8 +140,6 @@ module Cookie =
       |> sliding_expiry relative_expiry
     | err -> failwithf "internal error on encryption %A" err
 
-  /// Tries to read the cookie of the given name from the HttpContext, and
-  /// returns the cookie and its plaintext value if successful.
   let read_cookies key cookie_name ctx =
     let _, dec = Bytes.cookie_encoding
     let found =
@@ -160,9 +156,6 @@ module Cookie =
       |> Choice.map (fun plain_text -> cookie, plain_text)
     | Choice2Of2 x -> Choice2Of2 x
 
-    /////////////////////
-
-  /// Bumps the expiry dates for all the cookies.
   let refresh_cookies relative_expiry http_cookie : WebPart =
     sliding_expiry relative_expiry http_cookie ||> set_pair
 
@@ -171,14 +164,14 @@ module Cookie =
       let plain_text' =
         match read_cookies csctx.server_key csctx.cookie_name ctx with
         | Choice1Of2 (_, plain_text) ->
-          Log.log logger "Suave.Session.Cookies.update_cookies" Debug
+          Log.log logger "Suave.Cookie.update_cookies" Debug
             (sprintf "update_cookies - existing value: '%s'" (plain_text |> UTF8.to_string'))
           f_plain_text (Some plain_text)
         | Choice2Of2 _ ->
-          Log.log logger "Suave.Session.Cookies.update_cookies" Debug "update_cookies - first time"
+          Log.log logger "Suave.Cookie.update_cookies" Debug "update_cookies - first time"
           f_plain_text None
 
-      Log.log logger "Suave.Session.Cookies.update_cookies" Debug
+      Log.log logger "Suave.Cookie.update_cookies" Debug
         (sprintf "update_cookies - setting '%s'"
           (plain_text' |> UTF8.to_string'))
       /// Since the contents will completely change every write, we simply re-generate the cookie
@@ -202,7 +195,7 @@ module Cookie =
       | Choice2Of2 (NoCookieFound _) ->
         match no_cookie () with
         | Choice1Of2 plain_text ->
-          Log.log logger "Suave.Session.Cookies.cookie_state" Debug
+          Log.log logger "Suave.Cookie.cookie_state" Debug
             (sprintf "setting '%s' with value '%s'" csctx.cookie_name (UTF8.to_string' plain_text))
           let http_cookie, client_cookie =
             generate_cookies csctx.server_key csctx.cookie_name
@@ -213,7 +206,7 @@ module Cookie =
         | Choice2Of2 wp_kont -> wp_kont
 
       | Choice2Of2 (DecryptionError err) ->
-        Log.log logger "Suave.Session.Cookies.cookie_state" Debug
+        Log.log logger "Suave.Cookie.cookie_state" Debug
           (sprintf "decryption error: %A" err)
         unset_pair csctx.cookie_name >>=
           decryption_failure err)

@@ -12,7 +12,8 @@ module Cookie =
     | MaxAge of TimeSpan
 
   type CookieError =
-    | NoCookieFound of string (* cookie id *)
+    /// Gives you the cookie id
+    | NoCookieFound of string
     | DecryptionError of Crypto.SecretboxDecryptionError
 
   /// Parse the cookie's name and data in the string into a dictionary.
@@ -54,6 +55,8 @@ module Cookie =
              secure:bool ->
              CookiesState
 
+  /// Generate one server-side cookie, and another client-side cookie with
+  /// name "${server-side-name}-client"
   val generate_cookies : server_key:ServerKey ->
                          cookie_name:string ->
                          relative_expiry:CookieLife ->
@@ -61,11 +64,14 @@ module Cookie =
                          plain_data:byte[] ->
                          HttpCookie * HttpCookie
 
+  /// Tries to read the cookie of the given name from the HttpContext, and
+  /// returns the cookie and its plaintext value if successful.
   val read_cookies : key:ServerKey ->
                      cookie_name:string ->
                      ctx:HttpContext ->
                      Choice<HttpCookie * byte [], CookieError>
 
+  /// Bumps the expiry dates for all the cookies.
   val refresh_cookies : expiry:CookieLife ->
                         cookie:HttpCookie ->
                         WebPart
