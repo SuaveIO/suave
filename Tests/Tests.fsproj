@@ -68,6 +68,7 @@
     <Compile Include="Perf.fs" />
     <Compile Include="Sscanf.fs" />
     <Compile Include="Json.fs" />
+    <Compile Include="Cookie.fs" />
     <Compile Include="Program.fs" />
     <None Include="paket.references" />
     <None Include="suave.p12">

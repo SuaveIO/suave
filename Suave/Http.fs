@@ -92,22 +92,15 @@ module Http =
       { ctx with user_state = ctx.user_state |> Map.remove key }
       |> succeed
 
-    let private cookie_to_string (x : HttpCookie) =
-      let attributes = new System.Collections.Generic.List<string>()
-      attributes.Add(String.Format("{0}={1}", x.name ,x.value))
-      match x.domain  with | Some n -> attributes.Add(String.Format("Domain={0}", n))  | _ -> ()
-      match x.path    with | Some n -> attributes.Add(String.Format("Path={0}", n))    | _ -> ()
-      match x.expires with | Some n -> attributes.Add(String.Format("Expires={0}", n.ToString("R"))) | _ -> ()
-      if x.http_only then attributes.Add(String.Format("HttpOnly"))
-      if x.secure    then attributes.Add(String.Format("Secure"))
-      String.concat "; " attributes
-
-    let set_cookie (cookie : HttpCookie) =
-      set_header "Set-Cookie" (cookie_to_string cookie)
+    let set_cookie (cookie : HttpCookie) (ctx : HttpContext) =
+//      ctx.response.headers
+//      |> List.filter (fun (h_name, h_val) -> h_name = "Set-Cookie")
+//
+      set_header "Set-Cookie" (HttpCookie.to_header cookie) ctx
 
     let unset_cookie (cookie_name : string) =
       let start_epoch = DateTimeOffset(1970, 1, 1, 0, 0, 1, TimeSpan.Zero) |> Some
-      let string_value = cookie_to_string { HttpCookie.mk' cookie_name "x" with expires = start_epoch }
+      let string_value = HttpCookie.to_header { HttpCookie.mk' cookie_name "x" with expires = start_epoch }
       set_header "Set-Cookie" string_value
 
     // TODO: I'm not sure about having MIME types in the Writers module

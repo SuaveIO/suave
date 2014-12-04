@@ -3,6 +3,7 @@ open System
 open System.Net
 
 open Suave
+open Suave.Log
 open Suave.Web
 open Suave.Http
 open Suave.Http.Applicatives
@@ -10,8 +11,7 @@ open Suave.Http.Writers
 open Suave.Http.Files
 open Suave.Http.Successful
 open Suave.Types
-open Suave.Log
-open Session.State.CookieStateStore
+open Suave.State.CookieStateStore
 
 let basic_auth : WebPart =
   Authentication.authenticate_basic ( fun (user_name,password) -> user_name.Equals("foo") && password.Equals("bar"))

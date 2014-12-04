@@ -4,8 +4,10 @@ open System
 open System.IO
 open System.Collections.Generic
 open System.Net.Sockets
-open Socket
 open System.Net
+open System.Text
+
+open Socket
 
 /// HTTP cookie
 type HttpCookie =
@@ -75,6 +77,18 @@ module HttpCookie =
   let http_only x = x.http_only
 
   let version x = x.version
+
+  let to_header (x : HttpCookie) =
+    let app (sb : StringBuilder) (value : string) = sb.Append value |> ignore
+    let sb = new StringBuilder(String.Concat [ x.name; "="; x.value ])
+    let app value = app sb (String.Concat [";"; value])
+    let appkv k f_map v = v |> Option.iter (fun v -> app (String.Concat [ k; "="; f_map v ]))
+    x.domain  |> appkv "Domain" id
+    x.path    |> appkv "Path" id
+    x.expires |> appkv "Expires" (fun (i : DateTimeOffset) -> i.ToString("R"))
+    if x.http_only then app "HttpOnly"
+    if x.secure    then app "Secure"
+    sb.ToString ()
 
 /// A file's mime type and if compression is enabled or not
 type MimeType =
@@ -179,17 +193,6 @@ module HttpRequest =
   /// Finds the key k from the form in the HttpRequest
   let form' (x : HttpRequest) (k : string) =
     (form x) ^^ k
-
-  /// Finds the cookies of the request, or an empty Map otherwise, if
-  /// there are no cookies.
-  let cookies (x : HttpRequest) =
-    x.headers
-    |> List.filter (fun (name, _) -> name.Equals "cookie")
-    |> List.map (snd >> Parsing.parse_cookie)
-    |> List.concat
-    |> List.fold (fun cookies (name, data) ->
-        cookies |> Map.add name (HttpCookie.mk' name data))
-        Map.empty
 
   let http_version x = x.http_version
 

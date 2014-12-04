@@ -64,12 +64,14 @@
     <Compile Include="Compression.fs" />
     <Compile Include="Http.fsi" />
     <Compile Include="Http.fs" />
+    <Compile Include="Cookie.fs" />
+    <Compile Include="Auth.fs" />
     <Compile Include="Json.fs" />
-    <Compile Include="Session.fs" />
     <Compile Include="Web.fs" />
     <Compile Include="Proxy.fs" />
     <Compile Include="AssemblyVersionInfo.fs" Condition="Exists('AssemblyVersionInfo.fs')" />
     <None Include="paket.references" />
+    <Compile Include="State.fs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="mscorlib" />

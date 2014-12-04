@@ -1,12 +1,4 @@
-﻿#if INTERACTIVE
-#load "Async.fs"
-open Suave.Async
-#load "Utils.fs"
-#load "Globals.fs"
-open Suave
-#else
-module Suave.Log
-#endif
+﻿module Suave.Log
 
 open System
 open System.Diagnostics
@@ -258,3 +250,7 @@ let interne (logger : Logger) path =
 
 let internf (logger : Logger) path f_format =
   f_format (Printf.kprintf (verbose logger path (TraceHeader.empty)))
+
+let log (logger : Logger) path level msg =
+  LogLine.mk path level TraceHeader.empty None msg
+  |> fun line -> logger.Log level (fun () -> line)

@@ -591,14 +591,6 @@ module Parsing =
     else
       (parts.[0], parts.[1], String.Empty, parts.[2])
 
-  /// Parse the cookie's name and data in the string into a dictionary.
-  let parse_cookie (s : string) =
-    s.Split(';')
-    |> Array.map (fun (x : string) ->
-                  let parts = x.Split('=')
-                  parts.[0].Trim(), parts.[1].Trim())
-    |> Array.toList
-
   /// Parse a string array of key-value-pairs, combined using the equality character '='
   /// into a dictionary
   let parse_key_value_pairs arr =
