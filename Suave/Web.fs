@@ -327,7 +327,7 @@ module ParsingAndControl =
   }
 
   let internal write_headers connection (headers : (string*string) seq) = socket {
-    for (x,y) in headers do
+    for x,y in headers do
       if not (List.exists (fun y -> x.ToLower().Equals(y)) ["server";"date";"content-length"]) then
         do! async_writeln connection (String.Concat [| x; ": "; y |])
     }
