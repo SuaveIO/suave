@@ -85,6 +85,7 @@ task :create_nuget_quick => ['build/pkg', :versioning] do
     m.release_notes = "Full version: #{ENV['BUILD_VERSION']}."
     m.license_url   = "https://github.com/ademar/suave/blob/master/COPYING"
     m.project_url   = "http://suave.io"
+    m.add_dependency 'FsPickler', '1.0.3'
   end
   p.add_file  "Suave/bin/Release/suave.dll", "lib"
   p.add_file  "Suave/bin/Release/suave.xml", "lib"
