@@ -16,15 +16,9 @@ type StartedData =
     source_port      : uint16 }
 with
   override x.ToString() =
-    sprintf "started in %f ms: %O:%d"
+    sprintf "%.3f ms with binding %O:%d"
       ((x.socket_bound_utc |> Option.fold (fun _ t -> t) x.start_called_utc) - x.start_called_utc).TotalMilliseconds
       x.source_ip x.source_port
-
-/// Asynchronous extension methods to TcpListener to make
-/// it nicer to consume in F#
-type TcpListener with
-  member x.AsyncAcceptTcpClient() =
-    Async.FromBeginEnd(x.BeginAcceptTcpClient, x.EndAcceptTcpClient)
 
 open Socket 
 
@@ -191,7 +185,7 @@ let tcp_ip_server (source_ip : IPAddress,
       logger.Log Log.LogLevel.Info <| fun _ ->
         { path          = "Suave.Tcp.tcp_ip_server"
           trace         = Log.TraceHeader.empty
-          message       = sprintf "started listener in: %O%s" start_data (if token.IsCancellationRequested then ", cancellation requested" else "")
+          message       = sprintf "listener started in %O%s" start_data (if token.IsCancellationRequested then ", cancellation requested" else "")
           level         = Log.LogLevel.Info
           ``exception`` = None
           ts_utc_ticks  = Globals.utc_now().Ticks }

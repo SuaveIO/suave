@@ -75,26 +75,22 @@ module Http =
         { ctx with response = response } |> succeed
 
   module Writers =
+    // TODO: transform into a set of lenses with Aether
+    // @ https://github.com/xyncro/aether and move closer to HttpContext.
 
     open System
 
     let set_header key value (ctx : HttpContext) =
-      let new_response =
-        { ctx.response with headers = (key,value) :: ctx.response.headers }
-      { ctx with response = new_response } |> succeed
+      { ctx with response = { ctx.response with headers = (key, value) :: ctx.response.headers } }
+      |> succeed
 
-    let private cookie_to_string (x : HttpCookie) =
-      let attributes = new System.Collections.Generic.List<string>()
-      attributes.Add(String.Format("{0}={1}", x.name ,x.value))
-      match x.domain  with | Some n -> attributes.Add(String.Format("Domain={0}", n))  | _ -> ()
-      match x.path    with | Some n -> attributes.Add(String.Format("Path={0}", n))    | _ -> ()
-      match x.expires with | Some n -> attributes.Add(String.Format("Expires={0}", n.ToString("R"))) | _ -> ()
-      if x.http_only then attributes.Add(String.Format("HttpOnly"))
-      if x.secure    then attributes.Add(String.Format("Secure"))
-      String.concat "; " attributes
+    let set_user_data key value (ctx : HttpContext) =
+      { ctx with user_state = ctx.user_state |> Map.add key (box value) }
+      |> succeed
 
-    let set_cookie (cookie : HttpCookie) =
-      set_header "Set-Cookie" (cookie_to_string cookie)
+    let unset_user_data key (ctx : HttpContext) =
+      { ctx with user_state = ctx.user_state |> Map.remove key }
+      |> succeed
 
     // TODO: I'm not sure about having MIME types in the Writers module
     let mk_mime_type a b =

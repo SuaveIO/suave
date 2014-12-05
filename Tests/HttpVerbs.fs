@@ -22,7 +22,7 @@ let gets =
       testCase "200 OK returns 'a'" <| fun _ ->
         Assert.Equal("expecting non-empty response", "a", run_with' (OK "a") |> req GET "/" None)
 
-      testProperty "200 OK returns equivalent" <| fun resp_str ->
+      testPropertyWithConfig fscheck_config "200 OK returns equivalent" <| fun resp_str ->
         (run_with' (OK resp_str) |> req GET "/hello" None) = resp_str
 
       testCase "204 No Content empty body" <| fun _ ->

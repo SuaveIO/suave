@@ -4,8 +4,10 @@ open System
 open System.IO
 open System.Collections.Generic
 open System.Net.Sockets
-open Socket
 open System.Net
+open System.Text
+
+open Socket
 
 /// HTTP cookie
 type HttpCookie =
@@ -15,26 +17,24 @@ type HttpCookie =
     path      : string option
     domain    : string option
     secure    : bool
-    http_only : bool
-    version   : string option }
+    http_only : bool }
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module HttpCookie =
 
   /// Create a new HttpCookie with all the given values.
-  let mk name value expires path domain secure http_only version =
+  let mk name value expires path domain secure http_only =
     { name      = name
       value     = value
       expires   = expires
       path      = path
       domain    = domain
       secure    = secure
-      http_only = http_only
-      version   = version }
+      http_only = http_only }
 
   /// Create a new cookie with the given name, value, and defaults:
   ///
-  /// - 5 days to expiry from the instant it's created
+  /// - no explicit expiry time
   /// - path at "/", so that it's global to the domain that it's created under.
   /// - no specific domain (defaults to the current domain plus its subdomains)
   /// - secure = false (you can set it over plain text HTTP - change to true in SSL terminator)
@@ -50,15 +50,41 @@ module HttpCookie =
   let mk' name value =
     { name      = name
       value     = value
-      expires   = (Globals.utc_now ()).AddDays 5. |> Some
-      path      = Some "/"
+      expires   = None
+      path      = None
       domain    = None
       secure    = false
-      http_only = true
-      version   = None }
+      http_only = true }
 
   /// An empty cookie value
   let empty = mk' "" ""
+
+  let name x = x.name
+
+  let value x = x.value
+
+  let expires x = x.expires
+
+  let path x = x.path
+
+  let domain x = x.domain
+
+  let secure x = x.secure
+
+  let http_only x = x.http_only
+
+  /// Assumes only valid characters go in, see http://tools.ietf.org/html/rfc6265#section-4.1.1
+  let to_header (x : HttpCookie) =
+    let app (sb : StringBuilder) (value : string) = sb.Append value |> ignore
+    let sb = new StringBuilder(String.Concat [ x.name; "="; x.value ])
+    let app value = app sb (String.Concat [";"; value])
+    let appkv k f_map v = v |> Option.iter (fun v -> app (String.Concat [ k; "="; f_map v ]))
+    x.domain  |> appkv "Domain" id
+    x.path    |> appkv "Path" id
+    x.expires |> appkv "Expires" (fun (i : DateTimeOffset) -> i.ToString("R"))
+    if x.http_only then app "HttpOnly"
+    if x.secure    then app "Secure"
+    sb.ToString ()
 
 /// A file's mime type and if compression is enabled or not
 type MimeType =
@@ -151,16 +177,14 @@ module HttpRequest =
   /// (^^) to try to fetch data from this.
   let query (x : HttpRequest) =
     Parsing.parse_data x.raw_query
-    |> List.ofArray
 
   /// Finds the key k from the query string in the HttpRequest
   let query' (x : HttpRequest) (k : string) =
     (query x) ^^ k
 
-  /// Gets the form from the HttpRequest
+  /// Gets the form as a ((string*string option list) from the HttpRequest
   let form  (x : HttpRequest) =
     Parsing.parse_data (ASCII.to_string' x.raw_form)
-    |> List.ofArray
 
   /// Finds the key k from the form in the HttpRequest
   let form' (x : HttpRequest) (k : string) =
@@ -255,9 +279,6 @@ module HttpBinding =
   let ip x     = x.ip
 
   let port x   = x.port
-
-/// A session store is a reader and a writer function pair keyed on strings.
-type SessionStore<'a> = (string -> 'a option) * (string -> 'a -> unit)
 
 type HttpContent =
   | NullContent
@@ -453,22 +474,20 @@ module HttpResult =
 /// evaluated asynchronously to decide whether a value is available.
 type SuaveTask<'a> = Async<'a option>
 
-/// An error handler takes the exception, a programmer-provided message, a
-/// request (that failed) and returns an asynchronous workflow for the handling
-/// of the error.
-type ErrorHandler = Exception -> String -> WebPart
+/// A server-key is a 256 bit key with high entropy
+type ServerKey = byte []
 
 /// The HttpRuntime is created from the SuaveConfig structure when the web
 /// server starts. You can also use the `HttpRuntime` module to create a new
 /// value yourself, or use the `empty` one.
 and HttpRuntime =
   { protocol           : Protocol
+    server_key         : ServerKey
     error_handler      : ErrorHandler
     mime_types_map     : MimeTypesMap
     home_directory     : string
     compression_folder : string
-    logger             : Log.Logger
-    session_provider   : ISessionProvider }
+    logger             : Log.Logger }
 
 /// The HttpContext is the container of the request, runtime, user-state and
 /// response.
@@ -478,55 +497,52 @@ and HttpContext =
     user_state : Map<string, obj>
     response   : HttpResult }
 
-/// The session provider is a convenience interface for storing user session
-/// data.
-and ISessionProvider =
-  abstract member Generate : TimeSpan * HttpContext -> string
-  abstract member Validate : string * HttpContext -> bool
-  abstract member Session<'a>  : string -> SessionStore<'a>
-
 and WebPart = HttpContext -> SuaveTask<HttpContext>
+
+/// An error handler takes the exception, a programmer-provided message, a
+/// request (that failed) and returns an asynchronous workflow for the handling
+/// of the error.
+and ErrorHandler = Exception -> String -> WebPart
+
+/// A session store is a reader and a writer function pair keyed on strings.
+type StateStore =
+  abstract get<'a> : string -> 'a option
+  abstract set     : string -> 'a -> WebPart
 
 /// a module that gives you the `empty` (beware) and `mk` functions for creating
 /// a HttpRuntime
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module HttpRuntime =
-  /// an empty session provider that doesn't work, but can be nice to use as a
-  /// place-holder
-  let stub_session_provider =
-    { new ISessionProvider with
-        member x.Generate(expiration : TimeSpan, ctx : HttpContext) =
-          ""
-        member x.Validate(s : string, ctx : HttpContext) =
-          false
-        //  (string -> 'a option) * (string -> 'a -> unit)
-        member x.Session(s : string) =
-          (fun _ -> None), (fun _ _ -> ())
-    }
+
+  /// The key length in bytes, references Crypto.KeyLength which is appropriate
+  /// for the underlying AES-256 bit symmetric crypto in use.
+  let ServerKeyLength = Crypto.KeyLength
 
   /// warn: this is not to be played around with; prefer using the config
   /// defaults instead, from Web.fs, as they contain the logic for printing to
   /// the output stream correctly.
   let empty =
     { protocol           = Protocol.HTTP
+      server_key         = Crypto.generate_key ServerKeyLength
       error_handler      = fun _ _ -> fun _ -> async.Return None
       mime_types_map     = fun _ -> None
       home_directory     = "."
       compression_folder = "."
-      logger             = Log.Loggers.sane_defaults_for Log.Debug
-      session_provider   = stub_session_provider }
+      logger             = Log.Loggers.sane_defaults_for Log.Debug }
 
   /// make a new HttpRuntime from the given parameters
-  let mk proto error_handler mime_types home_directory compression_folder logger session_provider =
+  let mk proto server_key error_handler mime_types home_directory compression_folder logger =
     { protocol           = proto
+      server_key         = server_key
       error_handler      = error_handler
       mime_types_map     = mime_types
       home_directory     = home_directory
       compression_folder = compression_folder
-      logger             = logger
-      session_provider   = session_provider }
+      logger             = logger }
 
   let protocol x = x.protocol
+
+  let server_key x = x.server_key
 
   let error_handler x = x.error_handler
 
@@ -537,8 +553,6 @@ module HttpRuntime =
   let compression_folder x = x.compression_folder
 
   let logger x = x.logger
-
-  let session_provider x = x.session_provider
 
 /// A module that provides functions to create a new HttpContext.
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
@@ -580,6 +594,10 @@ open System.Threading
 type SuaveConfig =
   { /// The bindings for the web server to launch with
     bindings                : HttpBinding list
+    /// A server-key to use for cryptographic operations. When generated it
+    /// should be completely random; you can share this key between load-balanced
+    /// servers if you want to have them cryptographically verify similarly.
+    server_key              : byte []
     /// An error handler to use for handling exceptions that are
     /// are thrown from the web parts
     error_handler           : ErrorHandler
@@ -599,14 +617,14 @@ type SuaveConfig =
     /// Folder for temporary compressed files
     compressed_files_folder : string option
     /// A logger to log with
-    logger                  : Log.Logger
-    /// A http session provider
-    session_provider        : ISessionProvider }
+    logger                  : Log.Logger }
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module SuaveConfig =
 
   let bindings x = x.bindings
+
+  let server_key x = x.server_key
 
   let error_handler x = x.error_handler
 
@@ -625,8 +643,6 @@ module SuaveConfig =
   let compressed_files_folder x = x.compressed_files_folder
 
   let logger x = x.logger
-
-  let session_provider x = x.session_provider
 
 /// An exception, raised e.g. if writing to the stream fails, should not leak to
 /// users of this library

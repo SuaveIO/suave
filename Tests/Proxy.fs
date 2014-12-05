@@ -41,7 +41,7 @@ let proxy =
   let proxy = run_with_factory proxy_server_async proxy_config
 
   testList "creating proxy" [
-    testProperty "GET / returns 200 OK with passed string" <| fun str ->
+    testPropertyWithConfig fscheck_config "GET / returns 200 OK with passed string" <| fun str ->
       run_in_context (run_target (Successful.OK str)) dispose_context <| fun _ ->
         Assert.Equal("target's WebPart should return its value", str,
           proxy to_target |> req HttpMethod.GET "/" None)

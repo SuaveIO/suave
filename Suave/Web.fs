@@ -6,7 +6,6 @@ module ParsingAndControl =
 
   open System
   open System.IO
-
   open System.Text
   open System.Diagnostics
   open System.Threading
@@ -31,7 +30,7 @@ module ParsingAndControl =
       | [] -> []
       | x :: tail ->
         if x.length + acc >= number then 
-          let segment = mk_buffer_segment x.buffer (x.offset  + (number - acc)) (x.length - number + acc)
+          let segment = BufferSegment.mk x.buffer (x.offset  + (number - acc)) (x.length - number + acc)
           segment :: tail
         else loop tail (acc + x.length)
     loop pairs 0
@@ -54,9 +53,9 @@ module ParsingAndControl =
             return count + bytes_read, tail
           else
             if remaining - marker_length >= 0 then
-              let segment = mk_buffer_segment pair.buffer
-                                              (pair.offset  + bytes_read  + marker_length)
-                                              (remaining - marker_length)
+              let segment = BufferSegment.mk pair.buffer
+                                             (pair.offset  + bytes_read  + marker_length)
+                                             (remaining - marker_length)
               return count + bytes_read, segment :: tail
             else
               let new_tail = skip_buffers tail (marker_length - remaining)
@@ -328,7 +327,7 @@ module ParsingAndControl =
   }
 
   let internal write_headers connection (headers : (string*string) seq) = socket {
-    for (x,y) in headers do
+    for x,y in headers do
       if not (List.exists (fun y -> x.ToLower().Equals(y)) ["server";"date";"content-length"]) then
         do! async_writeln connection (String.Concat [| x; ": "; y |])
     }
@@ -450,7 +449,6 @@ module ParsingAndControl =
 
   open Suave.Tcp
 
-
   /// Starts a new web worker, given the configuration and a web part to serve.
   let web_worker (ip, port, buffer_size, max_ops, runtime : HttpRuntime) (webpart : WebPart) =
     tcp_ip_server (ip, port, buffer_size, max_ops) runtime.logger (request_loop false runtime (WebPart webpart))
@@ -463,17 +461,17 @@ module ParsingAndControl =
 ////////////////////////////////////////////////////
 
 open System
+open System.IO
 open System.Net
 open Suave.Types
 open Suave.Http
 open Suave.Socket
-open Suave.Session
 
 /// The default error handler returns a 500 Internal Error in response to
 /// thrown exceptions.
 let default_error_handler (ex : Exception) msg (ctx : HttpContext) =
   let request = ctx.request
-  msg |> Log.verbosee ctx.runtime.logger "Suave.Web.default_error_handler" ctx.request.trace ex
+  msg |> Log.infoe ctx.runtime.logger "Suave.Web.default_error_handler" ctx.request.trace ex
   if IPAddress.IsLoopback ctx.request.ipaddr then
     Response.response Codes.HTTP_500 (UTF8.bytes (sprintf "<h1>%s</h1><br/>%A" ex.Message ex)) ctx
   else 
@@ -490,13 +488,13 @@ let default_error_handler (ex : Exception) msg (ctx : HttpContext) =
 /// how quickly suave started.
 let web_server_async (config : SuaveConfig) (webpart : WebPart) =
   let content_folder = ParsingAndControl.resolve_directory config.home_folder
-  let compression_folder = System.IO.Path.Combine(ParsingAndControl.resolve_directory config.compressed_files_folder, "_temporary_compressed_files")
+  let compression_folder = Path.Combine(ParsingAndControl.resolve_directory config.compressed_files_folder, "_temporary_compressed_files")
   let all =
     config.bindings
     |> List.map (fun { scheme = proto; ip = ip; port = port } ->
       let http_runtime =
-        HttpRuntime.mk proto config.error_handler config.mime_types_map
-          content_folder compression_folder config.logger config.session_provider
+        HttpRuntime.mk proto config.server_key config.error_handler config.mime_types_map
+                       content_folder compression_folder config.logger
       ParsingAndControl.web_worker (ip, port, config.buffer_size, config.max_ops, http_runtime) webpart)
   let listening = all |> Seq.map fst |> Async.Parallel
   let server    = all |> Seq.map snd |> Async.Parallel |> Async.Ignore
@@ -512,6 +510,7 @@ let web_server (config : SuaveConfig) (webpart : WebPart) =
 /// to succeed.
 let default_config : SuaveConfig =
   { bindings         = [ HttpBinding.defaults ]
+    server_key       = Utils.Crypto.generate_key HttpRuntime.ServerKeyLength
     error_handler    = default_error_handler
     listen_timeout   = TimeSpan.FromSeconds(2.)
     ct               = Async.DefaultCancellationToken
@@ -520,5 +519,4 @@ let default_config : SuaveConfig =
     mime_types_map   = Http.Writers.default_mime_types_map
     home_folder      = None
     compressed_files_folder = None
-    logger           = Log.Loggers.sane_defaults_for Log.LogLevel.Info
-    session_provider = new DefaultSessionProvider() }
+    logger           = Log.Loggers.sane_defaults_for Log.LogLevel.Info }

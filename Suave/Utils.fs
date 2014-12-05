@@ -4,17 +4,20 @@ module Suave.Utils
 
 open System.Collections.Generic
 
+/// A (string * string) list, use (%%) to access
 type NameValueList = (string * string) list
+
+/// A (string * string option) list, use (^^) to access
 type NameOptionValueList = (string * string option) list
 
 /// Try find a value by key in a dictionary
 let look_up (target : IDictionary<'b,'a>) key =
-  match target.TryGetValue(key) with
+  match target.TryGetValue key with
   | true, v  -> Some v
   | false, _ -> None
 
 let get_first (target : NameValueList) key =
-  match List.tryFind (fun (a,b) -> a.Equals(key)) target with
+  match List.tryFind (fun (a,b) -> a.Equals key) target with
   | Some value -> snd value |> Some
   | None -> None
 
@@ -26,7 +29,7 @@ let (%%) (target : NameValueList) key =
   get_first target key
 
 let (^^) (target : NameOptionValueList) key =
-  match List.tryFind (fun (a,b) -> a.Equals(key)) target with
+  match List.tryFind (fun (a,b) -> a.Equals key) target with
   | Some value ->
     snd value
   | None -> None
@@ -86,9 +89,67 @@ module ASCII =
     let bytes = Convert.FromBase64String s
     Encoding.ASCII.GetString bytes
 
+module String =
+  open System
+
+  /// Ordinally compare two strings in constant time, bounded by the length of the
+  /// longest string.
+  let eq_ord_cnst_time (str1 : string) (str2 : string) =
+    let mutable xx = uint32 str1.Length ^^^ uint32 str2.Length
+    let mutable i = 0
+    while i < str1.Length && i < str2.Length do
+      xx <- xx ||| uint32 (int str1.[i] ^^^ int str2.[i])
+      i <- i + 1
+    xx = 0u
+
+  /// Compare ordinally with ignore case.
+  let eq_ord_ci (str1 : string) (str2 : string) =
+    String.Equals(str1, str2, StringComparison.OrdinalIgnoreCase)
+
+  let trim (s : string) =
+    s.Trim()
+
+  let split (c : char) (s : string) =
+    s.Split c |> Array.toList
+
 module Option =
   let or_default value opt =
     opt |> Option.fold (fun s t -> t) value
+
+module Map =
+
+  let put key value m =
+    match m |> Map.tryFind key with
+    | None -> m |> Map.add key value
+    | Some _ -> m |> Map.remove key |> Map.add key value
+
+module Choice =
+
+  let mk x = Choice1Of2 x
+
+  let map f = function
+    | Choice1Of2 v   -> Choice1Of2 (f v)
+    | Choice2Of2 err -> Choice2Of2 err
+
+  let map_2 f = function
+    | Choice1Of2 v   -> Choice1Of2 v
+    | Choice2Of2 err -> Choice2Of2 (f err)
+
+  let bind (f : 'a -> Choice<'b, 'c>) (v : Choice<'a, 'c>) =
+    match v with
+    | Choice1Of2 v -> f v
+    | Choice2Of2 c -> Choice2Of2 c
+
+  let from_option on_missing = function
+    | Some x -> Choice1Of2 x
+    | None   -> Choice2Of2 on_missing
+
+module List =
+
+  let flat_map f xs =
+    xs
+    |> List.map f
+    |> List.concat
 
 module RandomExtensions =
   open System
@@ -104,15 +165,49 @@ module Bytes =
   open System
   open System.IO
   open System.Text
+ 
+  /// Ordinally compare two strings in constant time, bounded by the length of the
+  /// longest string.
+  let cnst_time_cmp (bits : byte []) (bobs : byte []) =
+    let mutable xx = uint32 bits.Length ^^^ uint32 bobs.Length
+    let mutable i = 0
+    while i < bits.Length && i < bobs.Length do
+      xx <- xx ||| uint32 (bits.[i] ^^^ bobs.[i])
+      i <- i + 1
+    xx = 0u
 
   type BufferSegment =
     { buffer : ArraySegment<byte>
       offset : int
       length : int }
 
-  let inline mk_buffer_segment buffer offset length =
-    if length < 0 then failwith (sprintf "mk_buffer_segment: length = %d < 0" length)
-    { buffer = buffer; offset = offset; length = length }
+
+  // for ci in (int '!')..(int '~') do printfn "%c" (char ci);;
+  // https://en.wikipedia.org/wiki/HTTP_cookie#Setting_a_cookie
+  let cookie_encoding =
+    let repls =
+      [ '+', '_'
+        '/', '!'
+        '=', '$' ]
+
+    let enc bytes =
+      let base64 =
+        Convert.ToBase64String bytes
+      repls |> List.fold (fun (str : string) (from, too) -> str.Replace (from, too)) base64
+
+    let dec (str : string) =
+      let base64 =
+        repls |> List.fold (fun (str : string) (too, from) -> str.Replace(from, too)) str
+      Convert.FromBase64String base64
+
+    enc, dec
+
+  [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+  module BufferSegment =
+
+    let inline mk buffer offset length =
+      if length < 0 then failwith (sprintf "BufferSegment.mk: length = %d < 0" length)
+      { buffer = buffer; offset = offset; length = length }
 
   /// The end-of-line literal, \r\n (CRLF)
   let [<Literal>] eol = "\r\n"
@@ -329,6 +424,160 @@ module Compression =
     else
       [||]
 
+/// Small crypto module that can do HMACs and generate random strings to use
+/// as keys, as well as create a 'cryptobox'; i.e. a AES256+HMACSHA256 box with
+/// compressed plaintext contents so that they can be easily stored in cookies.
+module Crypto =
+  open System
+  open System.IO
+  open System.IO.Compression
+  open System.Text
+  open System.Security.Cryptography
+
+  /// The default hmac algorithm
+  [<Literal>]
+  let HMACAlgorithm = "HMACSHA256"
+
+  /// The length of the HMAC value in number of bytes
+  [<Literal>]
+  let HMACLength = 32 // = 256 / 8
+
+  /// Calculate the HMAC of the passed data given a private key
+  let hmac (key : byte []) offset count (data : byte[]) =
+    use hmac = HMAC.Create(HMACAlgorithm)
+    hmac.Key <- key
+    hmac.ComputeHash (data, offset, count)
+
+  let hmac' key (data : byte []) =
+    hmac key 0 (data.Length) data
+
+  /// Calculate the HMAC value given the key
+  /// and a seq of string-data which will be concatenated in its order and hmac-ed.
+  let hmac'' (key : byte []) (data : string seq) =
+    hmac' key (String.Concat data |> UTF8.bytes)
+
+  /// # bits in key
+  let KeySize   = 256
+
+  /// # bytes in key
+  let KeyLength = KeySize / 8
+
+  /// # bits in block
+  let BlockSize = 128
+
+  /// # bytes in IV
+  /// 16 bytes for 128 bit blocks
+  let IVLength = BlockSize / 8
+
+  /// the global crypto-random pool for uniform and therefore cryptographically
+  /// secure random values
+  let crypt_random = RandomNumberGenerator.Create()
+
+  /// Fills the passed array with random bytes
+  let randomize (bytes : byte []) =
+    crypt_random.GetBytes bytes
+    bytes
+
+  /// Generates a string key from the available characters with the given key size.
+  let generate_key key_length =
+    Array.zeroCreate<byte> key_length |> randomize
+
+  let generate_key' () =
+    generate_key KeyLength
+
+  let generate_iv iv_length =
+    Array.zeroCreate<byte> iv_length |> randomize
+
+  let generate_iv' () =
+    generate_iv IVLength
+
+  /// key: 32 bytes for 256 bit key
+  /// Returns a new key and a new iv as two byte arrays as a tuple.
+  let generate_keys () =
+    generate_key' (), generate_iv' ()
+
+  type SecretboxEncryptionError =
+    | InvalidKeyLength of string
+    | EmptyMessageGiven
+
+  type SecretboxDecryptionError =
+    | TruncatedMessage of string
+    | AlteredOrCorruptMessage of string
+
+  let private secretbox_init key iv =
+    let aes = new AesManaged()
+    aes.KeySize   <- KeySize
+    aes.BlockSize <- BlockSize
+    aes.Mode      <- CipherMode.CBC
+    aes.Padding   <- PaddingMode.PKCS7
+    aes.IV        <- iv
+    aes.Key       <- key
+    aes
+
+  let secretbox (key : byte []) (msg : byte []) =
+    if key.Length <> KeyLength then
+      Choice2Of2 (InvalidKeyLength (sprintf "key should be %d bytes but was %d bytes" KeyLength (key.Length)))
+    elif msg.Length = 0 then
+      Choice2Of2 EmptyMessageGiven
+    else
+      let iv  = generate_iv' ()
+      use aes = secretbox_init key iv
+
+      let mk_cipher_text (msg : byte []) (key : byte []) (iv : byte []) =
+        use enc      = aes.CreateEncryptor(key, iv)
+        use cipher   = new MemoryStream()
+        use crypto   = new CryptoStream(cipher, enc, CryptoStreamMode.Write)
+        let bytes = msg |> Compression.gzip_encode
+        crypto.Write (bytes, 0, bytes.Length)
+        crypto.FlushFinalBlock()
+        cipher.ToArray()
+
+      use cipher_text = new MemoryStream()
+
+      let bw  = new BinaryWriter(cipher_text)
+      bw.Write iv
+      bw.Write (mk_cipher_text msg key iv)
+      bw.Flush ()
+
+      let hmac = hmac' key (cipher_text.ToArray())
+      bw.Write hmac
+      bw.Dispose()
+
+      Choice1Of2 (cipher_text.ToArray())
+
+  let secretbox' (key : byte []) (msg : string) =
+    secretbox key (msg |> UTF8.bytes)
+
+  let secretbox_open (key : byte []) (cipher_text : byte []) =
+    let hmac_calc = hmac key 0 (cipher_text.Length - HMACLength) cipher_text
+    let hmac_given = Array.zeroCreate<byte> HMACLength
+    Array.blit cipher_text (cipher_text.Length - HMACLength) // from
+               hmac_given  0                                 // to
+               HMACLength                                    // # bytes for hmac
+
+    if cipher_text.Length < HMACLength + IVLength then
+      Choice2Of2 (
+        TruncatedMessage (
+          sprintf "cipher text length was %d but expected >= %d"
+                  cipher_text.Length (HMACLength + IVLength)))
+    elif not (Bytes.cnst_time_cmp hmac_calc hmac_given) then
+      Choice2Of2 (AlteredOrCorruptMessage "calculated HMAC does not match expected/given")
+    else
+      let iv = Array.zeroCreate<byte> IVLength
+      Array.blit cipher_text 0
+                 iv 0
+                 IVLength
+      use aes     = secretbox_init key iv
+      use denc    = aes.CreateDecryptor(key, iv)
+      use plain   = new MemoryStream()
+      use crypto  = new CryptoStream(plain, denc, CryptoStreamMode.Write)
+      crypto.Write(cipher_text, IVLength, cipher_text.Length - IVLength - HMACLength)
+      crypto.FlushFinalBlock()
+      Choice1Of2 (plain.ToArray() |> Compression.gzip_decode)
+
+  let secretbox_open' k c =
+    secretbox_open k c |> Choice.map UTF8.to_string'
+
 module Parsing =
   open Bytes
 
@@ -351,7 +600,8 @@ module Parsing =
       if d.Length = 2 then (d.[0], Some <| System.Web.HttpUtility.UrlDecode(d.[1]))
       else d.[0],None
     s.Split('&')
-    |> Array.map (fun (k : string) -> k.Split('=') |> parse_arr)
+    |> Array.toList
+    |> List.map (fun (k : string) -> k.Split('=') |> parse_arr)
 
   /// parse the url into its constituents and fill out the passed dictionary with
   /// query string key-value pairs
@@ -365,13 +615,6 @@ module Parsing =
       (parts.[0], parts.[1].Substring(0,indexOfMark), raw_query, parts.[2])
     else
       (parts.[0], parts.[1], String.Empty, parts.[2])
-
-  /// Parse the cookie data in the string into a dictionary
-  let parse_cookie (s : string) =
-    s.Split(';')
-    |> Array.map (fun (x : string) ->
-                  let parts = x.Split('=')
-                  (parts.[0].Trim(), parts.[1].Trim()))
 
   /// Parse a string array of key-value-pairs, combined using the equality character '='
   /// into a dictionary
@@ -392,12 +635,3 @@ module Parsing =
       parse_key_value_pairs (Array.sub parts 1 (parts.Length - 1))
     | None ->
       failwith "did not find header, because header_params received None"
-
-  let get_cookies (headers : NameValueList) =
-    let cookies = new Dictionary<string,string>()
-    headers
-    |> Seq.filter (fun x -> (fst x).Equals("cookie"))
-    |> Seq.iter (fun x ->  snd x 
-                           |> parse_cookie
-                           |> Array.iter (fun y -> cookies.Add (fst y,snd y)))
-    cookies

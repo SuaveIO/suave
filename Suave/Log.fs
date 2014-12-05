@@ -1,12 +1,4 @@
-﻿#if INTERACTIVE
-#load "Async.fs"
-open Suave.Async
-#load "Utils.fs"
-#load "Globals.fs"
-open Suave
-#else
-module Suave.Log
-#endif
+﻿module Suave.Log
 
 open System
 open System.Diagnostics
@@ -157,9 +149,9 @@ type LogLine =
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module LogLine =
-  let mk path trace ex message =
+  let mk path level trace ex message =
     { message       = message
-      level         = Verbose
+      level         = level
       path          = path
       ``exception`` = ex
       trace         = trace
@@ -233,22 +225,22 @@ module Loggers =
           OutputWindowLogger(level) ]) :> Logger
 
 let verbose (logger : Logger) path trace message =
-  logger.Log Verbose (fun _ -> LogLine.mk path trace None message)
+  logger.Log Verbose (fun _ -> LogLine.mk path Verbose trace None message)
 
 let verbosef logger path trace f_format =
   f_format (Printf.kprintf (verbose logger path trace))
 
 let verbosee (logger : Logger) path trace ex message =
-  logger.Log Verbose (fun _ -> LogLine.mk path trace (Some ex) message)
+  logger.Log Verbose (fun _ -> LogLine.mk path Verbose trace (Some ex) message)
 
 let info (logger : Logger) path trace message =
-  logger.Log Info (fun _ -> LogLine.mk path trace None message)
+  logger.Log Info (fun _ -> LogLine.mk path Info trace None message)
 
 let infof logger path trace f_format =
   f_format (Printf.kprintf (info logger path trace))
 
 let infoe (logger : Logger) path trace ex message =
-  logger.Log Info (fun _ -> LogLine.mk path trace (Some ex) message)
+  logger.Log Info (fun _ -> LogLine.mk path Info trace (Some ex) message)
 
 let intern (logger : Logger) path =
   verbose logger path (TraceHeader.empty)
@@ -258,3 +250,7 @@ let interne (logger : Logger) path =
 
 let internf (logger : Logger) path f_format =
   f_format (Printf.kprintf (verbose logger path (TraceHeader.empty)))
+
+let log (logger : Logger) path level msg =
+  LogLine.mk path level TraceHeader.empty None msg
+  |> fun line -> logger.Log level (fun () -> line)
