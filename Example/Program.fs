@@ -58,7 +58,6 @@ let mime_types =
 
 let app =
   choose [
-    log logger log_format >>= never
     GET >>= url "/hello" >>= never
     url_regex "(.*?)\.(dll|mdb|log)$" >>= RequestErrors.FORBIDDEN "Access denied."
     url "/neverme" >>= never >>= OK (Guid.NewGuid().ToString())
@@ -104,7 +103,7 @@ let app =
       >>= set_header "X-Doge-Location" "http://www.elregalista.com/wp-content/uploads/2014/02/46263312.jpg"
       >>= OK "Doooooge"
     RequestErrors.NOT_FOUND "Found no handlers"
-    ]
+    ] >>= log logger log_format
 
 [<EntryPoint>]
 let main argv =
