@@ -29,8 +29,7 @@ open Suave.Http
 
 let map_json f  =
   Types.request(fun r ->
-    try
-      let output = f (from_json(r.raw_form)) |> to_json 
-      (Successful.ok output >>= Writers.set_mime_type "application/json") 
-    with e ->
-      ServerErrors.INTERNAL_ERROR (e.Message.ToString()))
+      f (from_json(r.raw_form)) 
+      |> to_json
+      |> Successful.ok 
+      >>= Writers.set_mime_type "application/json") 
