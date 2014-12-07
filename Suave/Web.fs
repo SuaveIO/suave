@@ -136,17 +136,19 @@ module ParsingAndControl =
     read_till_pattern connection preread (scan_marker marker select)
 
   /// Read a line from the stream, calling to_string on the bytes before the EOL marker
-  let read_line (connection : Connection) ahead (buf : ArraySegment<byte>) = socket {
+  let read_line (connection : Connection) ahead = socket {
     let offset = ref 0
+    let buf = connection.line_buffer
     let! count, rem = read_till_EOL connection (fun a count -> async { Array.blit a.Array a.Offset buf.Array (buf.Offset + !offset) count; offset := !offset + count }) ahead
     let result = ASCII.to_string buf.Array buf.Offset count
     return result, rem
   }
 
   /// Read all headers from the stream, returning a dictionary of the headers found
-  let read_headers connection read (buf : ArraySegment<byte>) =
+  let read_headers connection read =
     let rec loop (rem : BufferSegment list) headers = socket {
       let offset = ref 0
+      let buf = connection.line_buffer
       let! count, new_rem =
         read_till_EOL
           connection
@@ -193,15 +195,15 @@ module ParsingAndControl =
                       boundary
                       (request : HttpRequest)
                       (ahead : BufferSegment list)
-                      line_buffer : SocketOp<HttpRequest * BufferSegment list> =
+                      : SocketOp<HttpRequest * BufferSegment list> =
 
     let rec loop boundary rem (r : HttpRequest) = socket {
 
-      let! firstline, read = read_line connection rem line_buffer
+      let! firstline, read = read_line connection rem
 
       if not(firstline.Equals("--")) then
 
-        let! part_headers, rem = read_headers connection read line_buffer
+        let! part_headers, rem = read_headers connection read
 
         let content_disposition =  part_headers %% "content-disposition"
 
@@ -258,47 +260,43 @@ module ParsingAndControl =
       return raw_form , rem
     }
 
+  ///
+  let read_and_parse_post_data (request : HttpRequest) connection rem = socket{
+    
+    let content_encoding = request.headers %% "content-type"
+
+    match request.headers %% "content-length" with 
+    | Some content_length_string ->
+      let content_length = Convert.ToInt32(content_length_string)
+
+      match content_encoding with
+      | Some ce when ce.StartsWith("application/x-www-form-urlencoded") ->
+        let! raw_form, rem = get_raw_post_data connection content_length rem
+        return Some ({ request with raw_form = raw_form}, rem)
+      | Some ce when ce.StartsWith("multipart/form-data") ->
+        let boundary = "--" + ce.Substring(ce.IndexOf('=')+1).TrimStart()
+        let! r, rem = parse_multipart connection boundary request rem
+        return Some (r, rem)
+      | Some _ | None ->
+        let! raw_form, rem = get_raw_post_data connection content_length rem
+        return Some ({ request with raw_form = raw_form}, rem)
+    | None ->  return Some (request, rem)
+    }
+
   /// Process the request, reading as it goes from the incoming 'stream', yielding a HttpRequest
   /// when done
-  let process_request proxy_mode is_secure (bytes : BufferSegment list) connection : SocketOp<(HttpRequest * BufferSegment list) option> = socket {
+  let process_request is_secure (bytes : BufferSegment list) connection : SocketOp<(HttpRequest * BufferSegment list) option> = socket {
 
-    let line_buffer = connection.line_buffer
-
-    let! (first_line : string), rem = read_line connection bytes line_buffer
+    let! (first_line : string), rem = read_line connection bytes
 
     let meth, url, raw_query, http_version = parse_url first_line
-    let! headers, rem = read_headers connection rem line_buffer
+    let! headers, rem = read_headers connection rem
 
     let request =
       HttpRequest.mk http_version url meth headers raw_query
         (parse_trace_headers headers) is_secure connection.ipaddr
 
-    // won't continue parsing if on proxyMode with the intention of forwarding the stream as it is
-    // TODO: proxy mode might need headers and contents of request, but won't get it through this impl
-    if proxy_mode then return Some (request, rem)
-    else
-
-      if meth.Equals("POST") || meth.Equals("PUT") then
-
-        let content_encoding = request.headers %% "content-type"
-
-        match request.headers %% "content-length" with 
-        | Some content_length_string ->
-          let content_length = Convert.ToInt32(content_length_string)
-
-          match content_encoding with
-          | Some ce when ce.StartsWith("application/x-www-form-urlencoded") ->
-            let! raw_form, rem = get_raw_post_data connection content_length rem
-            return Some ({ request with raw_form = raw_form}, rem)
-          | Some ce when ce.StartsWith("multipart/form-data") ->
-            let boundary = "--" + ce.Substring(ce.IndexOf('=')+1).TrimStart()
-            let! r, rem = parse_multipart connection boundary request rem line_buffer
-            return Some (r, rem)
-          | Some _ | None ->
-            let! raw_form, rem = get_raw_post_data connection content_length rem
-            return Some ({ request with raw_form = raw_form}, rem)
-        | None ->  return Some (request, rem)
-      else return Some (request, rem)
+    return Some (request, rem)
   }
 
   open System.Net
@@ -383,7 +381,7 @@ module ParsingAndControl =
     | WebPart of WebPart
     | SocketPart of (HttpContext -> Async<(Connection -> SocketOp<unit>) option >)
 
-  let http_loop (proxy_mode : bool) (runtime : HttpRuntime) (consumer : HttpConsumer) (connection : Connection) =
+  let http_loop (runtime : HttpRuntime) (consumer : HttpConsumer) (connection : Connection) =
 
     let rec loop (bytes : BufferSegment list) = socket {
 
@@ -391,7 +389,7 @@ module ParsingAndControl =
       let verbosef = Log.verbosef runtime.logger "Suave.Web.request_loop.loop" Log.TraceHeader.empty
 
       verbose "-> processor"
-      let! result = process_request proxy_mode (match runtime.protocol with HTTP -> false | HTTPS _ -> true) bytes connection
+      let! result = process_request (match runtime.protocol with HTTP -> false | HTTPS _ -> true) bytes connection
       verbose "<- processor"
 
       match result with
@@ -436,14 +434,13 @@ module ParsingAndControl =
   /// a web part, an error handler and a Connection to use for read-write
   /// communication -- getting the initial request stream.
   let request_loop
-    (proxy_mode : bool)
     (runtime    : HttpRuntime)
     (consumer   : HttpConsumer)
     (connection : Connection) =
 
     socket {
       let! connection = load_connection runtime.logger runtime.protocol connection
-      do! http_loop proxy_mode runtime consumer connection
+      do! http_loop runtime consumer connection
       return ()
     }
 
@@ -451,7 +448,7 @@ module ParsingAndControl =
 
   /// Starts a new web worker, given the configuration and a web part to serve.
   let web_worker (ip, port, buffer_size, max_ops, runtime : HttpRuntime) (webpart : WebPart) =
-    tcp_ip_server (ip, port, buffer_size, max_ops) runtime.logger (request_loop false runtime (WebPart webpart))
+    tcp_ip_server (ip, port, buffer_size, max_ops) runtime.logger (request_loop runtime (WebPart webpart))
 
   let resolve_directory home_directory =
     match home_directory with
