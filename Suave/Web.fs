@@ -315,10 +315,6 @@ module ParsingAndControl =
 
   open System.Net.Sockets
 
-  /// A HttpProcessor takes a HttpRequest instance, returning asynchronously a HttpRequest that has been parsed
-  type HttpProcessor = HttpRequest -> Connection -> BufferSegment option -> Async<(HttpRequest * (BufferSegment option)) option>
-  type RequestResult = Done
-  
   let internal write_content_type connection (headers : (string*string) list) = socket {
     if not(List.exists(fun (x : string,_) -> x.ToLower().Equals("content-type")) headers )then
       do! async_writeln connection "Content-Type: text/html"
