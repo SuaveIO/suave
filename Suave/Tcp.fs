@@ -154,6 +154,7 @@ let tcp_ip_server (source_ip : IPAddress,
           free_buffer  = fun context buf -> bufferManager.FreeBuffer(buf, context)
           is_connected = fun _           -> is_good read_args && is_good write_args
           line_buffer  = bufferManager.PopBuffer "Suave.Tcp.tcp_ip_server.job" // buf allocate
+          segments     = []
         }
       use! oo = Async.OnCancel (fun () -> intern "disconnected client (async cancel)"
                                           shutdown_socket socket)

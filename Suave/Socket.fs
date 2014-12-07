@@ -119,7 +119,8 @@ type Connection =
     get_buffer   : string -> ArraySegment<byte>
     free_buffer  : string -> ArraySegment<byte> -> unit
     is_connected : unit -> bool
-    line_buffer  : ArraySegment<byte> }
+    line_buffer  : ArraySegment<byte>
+    segments        : BufferSegment list }
 
 /// Workflow builder to read/write to async sockets with fail/success semantics
 type SocketMonad() =
