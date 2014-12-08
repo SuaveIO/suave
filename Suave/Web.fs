@@ -35,45 +35,45 @@ module ParsingAndControl =
         else loop tail (acc + x.length)
     loop pairs 0
 
-  let split index (pairs : BufferSegment list) connection select marker_length : Async<int * BufferSegment list> =
-    let rec loop xxs acc count =  async {
-      match xxs with
-      | [] -> return count, []
+  let split index connection select marker_length : Async<int * Connection> =
+    let rec loop connection acc count =  async {
+      match connection.segments with
+      | [] -> return count, connection
       | pair :: tail ->
         if acc + pair.length < index then
           do! select (ArraySegment(pair.buffer.Array, pair.offset, pair.length)) pair.length
           connection.free_buffer "Suave.Web.split" pair.buffer
-          return! loop tail (acc + pair.length) (count + acc + pair.length)
+          return! loop {connection with segments = tail } (acc + pair.length) (count + acc + pair.length)
         elif acc + pair.length >= index then
           let bytes_read = index - acc
           do! select (ArraySegment(pair.buffer.Array, pair.offset, bytes_read)) bytes_read
           let remaining = pair.length - bytes_read
           if remaining = marker_length then
             connection.free_buffer "Suave.Web.split" pair.buffer
-            return count + bytes_read, tail
+            return count + bytes_read, { connection with segments = tail }
           else
             if remaining - marker_length >= 0 then
               let segment = BufferSegment.mk pair.buffer
                                              (pair.offset  + bytes_read  + marker_length)
                                              (remaining - marker_length)
-              return count + bytes_read, segment :: tail
+              return count + bytes_read, { connection with segments = segment :: tail}
             else
               let new_tail = skip_buffers tail (marker_length - remaining)
-              return count + bytes_read, new_tail
+              return count + bytes_read, { connection with segments = new_tail }
         else return failwith "Suave.Web.split: invalid case"
       }
-    loop pairs 0 0
+    loop connection 0 0
 
-  type ScanResult = NeedMore of (BufferSegment list) | Found of (int * BufferSegment list)
+  type ScanResult = NeedMore | Found of int
 
   /// Iterates over a BufferSegment list looking for a marker, data before the marker 
   /// is sent to the function select and the corresponding buffers are released
-  let scan_marker marker select connection (pairs : BufferSegment list) = async {
+  let scan_marker marker select connection = socket {
 
-    match kmp_z marker pairs with
+    match kmp_z marker connection.segments with
     | Some x -> 
-      let! res = split x pairs connection select marker.Length
-      return res |> Found
+      let! res, connection = lift_async <| split x connection select marker.Length
+      return Found res, connection
     | None   ->
       let rec loop (xs : BufferSegment list) (acc,n) =
         if n >= marker.Length then
@@ -82,13 +82,13 @@ module ParsingAndControl =
           match xs with
           | x :: tail -> loop tail (acc @ [x],n + x.length)
           | []  -> acc,[]
-      let rev = List.rev pairs
+      let rev = List.rev connection.segments
       let ret,free = loop rev ([],0)
       for b in free do
         assert (b.length >= 0)
-        do! select (ArraySegment(b.buffer.Array, b.offset, b.length)) b.length
+        do! lift_async <| select (ArraySegment(b.buffer.Array, b.offset, b.length)) b.length
         do connection.free_buffer "Suave.Web.scan_marker" b.buffer
-      return NeedMore ret
+      return NeedMore,{ connection with segments = ret }
     }
 
   open System.Net.Sockets
@@ -101,14 +101,14 @@ module ParsingAndControl =
       return! abort (Error.SocketError SocketError.Shutdown)
     }
 
-  let read_more_data connection continuation buffer_segment_list = async {
+  let read_more_data connection = async {
     let buff = connection.get_buffer "Suave.Web.read_till_pattern.loop"
     let! result = read_data connection buff
     match result with
     | Choice1Of2 data ->
-      return! continuation (buffer_segment_list @ [data])
+      return { connection with segments = connection.segments @ [data] } |> Choice1Of2
     | Choice2Of2 error ->
-      for b in buffer_segment_list do
+      for b in connection.segments do
         do connection.free_buffer "Suave.Web.read_till_pattern.loop" b.buffer
       do connection.free_buffer "Suave.Web.read_till_pattern.loop" buff
       return Choice2Of2 error
@@ -118,17 +118,18 @@ module ParsingAndControl =
   /// and returns an array containing excess data read past the marker
   let read_till_pattern (connection : Connection) scan_data =
 
-    let rec loop state = async {
-      let! res = scan_data connection state
+    let rec loop  (connection : Connection)  = socket {
+      let! res,connection = scan_data connection
       match res with
       | Found a ->
-        return Choice1Of2 a
-      | NeedMore buffer_segment_list ->
-        return! read_more_data connection loop buffer_segment_list
+        return (a,connection)
+      | NeedMore ->
+        let! connection = read_more_data connection
+        return! loop connection
     }
-    loop connection.segments
+    loop connection
 
-  let read_till_EOL (connection : Connection) select (preread : BufferSegment list) =
+  let read_till_EOL (connection : Connection) select =
     read_till_pattern connection (scan_marker EOL select)
 
   /// Read the stream until the marker appears.
@@ -139,29 +140,28 @@ module ParsingAndControl =
   let read_line (connection : Connection) = socket {
     let offset = ref 0
     let buf = connection.line_buffer
-    let! count, rem = read_till_EOL connection (fun a count -> async { Array.blit a.Array a.Offset buf.Array (buf.Offset + !offset) count; offset := !offset + count }) connection.segments
+    let! count, connection = read_till_EOL connection (fun a count -> async { Array.blit a.Array a.Offset buf.Array (buf.Offset + !offset) count; offset := !offset + count })
     let result = ASCII.to_string buf.Array buf.Offset count
-    return result, { connection with segments = rem }
+    return result, connection
   }
 
   /// Read all headers from the stream, returning a dictionary of the headers found
   let read_headers connection =
-    let rec loop (rem : BufferSegment list) headers = socket {
+    let rec loop (connection : Connection) headers = socket {
       let offset = ref 0
       let buf = connection.line_buffer
-      let! count, new_rem =
+      let! count, connection =
         read_till_EOL
           connection
           (fun a count -> async { Array.blit a.Array a.Offset buf.Array (buf.Offset + !offset) count; offset := !offset + count })
-          rem
       if count <> 0 then
         let line = ASCII.to_string buf.Array buf.Offset count
         let indexOfColon = line.IndexOf(':')
         let header = (line.Substring(0, indexOfColon).ToLower(), line.Substring(indexOfColon+1).TrimStart())
-        return! loop new_rem (header :: headers)
-      else return (headers, { connection with segments = new_rem })
+        return! loop connection (header :: headers)
+      else return (headers, connection )
     }
-    loop connection.segments []
+    loop connection []
 
   open Suave.Types
 
@@ -171,9 +171,9 @@ module ParsingAndControl =
   /// Read the post data from the stream, given the number of bytes that makes up the post data.
   let read_post_data (connection : Connection) (bytes : int) select  : SocketOp<Connection> =
 
-    let rec loop n xxs : SocketOp<Connection> =
+    let rec loop n (connection : Connection) : SocketOp<Connection> =
       socket {
-        match xxs with
+        match connection.segments with
         | segment :: tail ->
           if segment.length > n then
             do! lift_async <| select (array_segment_from_buffer_segment { segment with offset = n }) n
@@ -181,14 +181,15 @@ module ParsingAndControl =
           else
             do! lift_async <| select (array_segment_from_buffer_segment segment) segment.length
             do connection.free_buffer "Suave.Web.read_post_data:loop" segment.buffer
-            return! loop (n - segment.length) tail
+            return! loop (n - segment.length) { connection with segments = tail }
         | [] ->
           if n = 0 then
             return connection
           else
-            return! read_more_data connection (loop n) []
+            let! connection = read_more_data connection
+            return! loop n connection
       }
-    loop bytes connection.segments
+    loop bytes connection
 
   /// Parses multipart data from the stream, feeding it into the HttpRequest's property Files.
   let parse_multipart (connection : Connection)
