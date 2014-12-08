@@ -5,6 +5,7 @@ open Suave.Types
 open Suave.Types.Methods
 open Suave.Http
 open Suave.Http.Successful
+open Suave.Web
 open Suave.Tests.TestUtilities
 
 open Fuchu
@@ -35,6 +36,7 @@ let perf_tests =
   let server_factory = SuavePerfHarness("default config", run_with default_config)
 
   let getFormValue name =
+    ParsingAndControl.parse_post_data >>=
     request (fun x -> OK (HttpRequest.form x ^^ name |> Option.get))
 
   let longData = String.replicate 1815 "A"

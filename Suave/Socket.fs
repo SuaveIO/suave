@@ -210,6 +210,14 @@ let lift_task (a : Task) : SocketOp<unit>  =
     return Choice1Of2 s 
   }
 
+/// from the Socket monad to Async
+let to_async f = fun ctx -> async {
+  let! o = f ctx
+  match o with
+  | Choice1Of2 option -> return option
+  | Choice2Of2 error -> return failwith (sprintf "socket error: %A" error)
+ }
+
 /// Write the string s to the stream asynchronously as ASCII encoded text
 let inline async_write (connection : Connection) (s : string) : SocketOp<unit> = 
   async {

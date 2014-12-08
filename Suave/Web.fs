@@ -261,7 +261,7 @@ module ParsingAndControl =
     }
 
   ///
-  let parse_post_data (ctx : HttpContext) = socket{
+  let parse_post_data' (ctx : HttpContext) = socket{
     let request = ctx.request
     let content_encoding = request.headers %% "content-type"
 
@@ -282,6 +282,8 @@ module ParsingAndControl =
         return Some { ctx with request = { request with raw_form = raw_form}; connection = connection }
     | None ->  return Some ctx
     }
+
+  let parse_post_data = to_async <| parse_post_data'
 
   /// Process the request, reading as it goes from the incoming 'stream', yielding a HttpRequest
   /// when done

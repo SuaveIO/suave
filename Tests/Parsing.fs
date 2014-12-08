@@ -14,6 +14,7 @@ open Suave.Types
 open Suave.Http
 open Suave.Http.Successful
 open Suave.Tests.TestUtilities
+open Suave.Web
 
 [<Tests>]
 let parsing_multipart =
@@ -23,7 +24,8 @@ let parsing_multipart =
   let post_data2 = read_text "request-1.txt"
   let post_data3 = read_text "request-2.txt"
 
-  let test_url_encoded_form field_name = 
+  let test_url_encoded_form field_name =
+    ParsingAndControl.parse_post_data >>=
     request (fun r ->
       match (HttpRequest.form r) ^^ field_name  with
       | Some str -> OK str
