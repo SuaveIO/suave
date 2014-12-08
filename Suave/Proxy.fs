@@ -80,20 +80,20 @@ let forward (ip : IPAddress) (port : uint16) (ctx : HttpContext) =
       let! res = lift_async <| send_web_response ((data : WebResponse) :?> HttpWebResponse) ctx
       match res with
       | Some new_ctx ->
-        do! response_f new_ctx cn
+        do! response_f new_ctx
       | None -> ()
     with
     | :? WebException as ex when ex.Response <> null ->
       let! res = lift_async <| send_web_response (ex.Response :?> HttpWebResponse) ctx
       match res with
       | Some new_ctx ->
-        do! response_f new_ctx cn
+        do! response_f new_ctx
       | _ -> ()
     | :? WebException as ex when ex.Response = null ->
       let! res = lift_async <|response HTTP_502 (UTF8.bytes "suave proxy: Could not connect to upstream") ctx
       match res with
       | Some new_ctx ->
-        do! response_f new_ctx cn
+        do! response_f new_ctx
       | _ -> ()
   } |> succeed
 

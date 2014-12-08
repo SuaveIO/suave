@@ -261,7 +261,7 @@ module ParsingAndControl =
     }
 
   ///
-  let read_and_parse_post_data (ctx : HttpContext) connection = socket{
+  let parse_post_data (ctx : HttpContext) = socket{
     let request = ctx.request
     let content_encoding = request.headers %% "content-type"
 
@@ -271,32 +271,33 @@ module ParsingAndControl =
 
       match content_encoding with
       | Some ce when ce.StartsWith("application/x-www-form-urlencoded") ->
-        let! raw_form, connection = get_raw_post_data connection content_length
-        return Some ({ request with raw_form = raw_form}, connection)
+        let! raw_form, connection = get_raw_post_data ctx.connection content_length
+        return Some { ctx with request = { request with raw_form = raw_form}; connection = connection }
       | Some ce when ce.StartsWith("multipart/form-data") ->
         let boundary = "--" + ce.Substring(ce.IndexOf('=')+1).TrimStart()
-        let! r, connection = parse_multipart connection boundary request
-        return Some (r, connection)
+        let! r, connection = parse_multipart ctx.connection boundary request
+        return Some { ctx with request = r; connection = connection }
       | Some _ | None ->
-        let! raw_form, connection = get_raw_post_data connection content_length
-        return Some ({ request with raw_form = raw_form}, connection)
-    | None ->  return Some (request, connection)
+        let! raw_form, connection = get_raw_post_data ctx.connection content_length
+        return Some { ctx with request = { request with raw_form = raw_form}; connection = connection }
+    | None ->  return Some ctx
     }
 
   /// Process the request, reading as it goes from the incoming 'stream', yielding a HttpRequest
   /// when done
-  let process_request is_secure connection : SocketOp<(HttpRequest * Connection) option> = socket {
+  let process_request is_secure (ctx : HttpContext) : SocketOp<HttpContext option> = socket {
 
-    let! (first_line : string), connection = read_line connection
+    let! (first_line : string), connection = read_line ctx.connection
 
     let meth, url, raw_query, http_version = parse_url first_line
+
     let! headers, connection = read_headers connection
 
     let request =
       HttpRequest.mk http_version url meth headers raw_query
         (parse_trace_headers headers) is_secure connection.ipaddr
 
-    return Some (request, connection)
+    return Some { ctx with request = request; connection = connection }
   }
 
   open System.Net
@@ -330,8 +331,9 @@ module ParsingAndControl =
   open Globals
   open Suave.Compression
 
-  let write_content context connection = function
+  let write_content context = function
     | Bytes b -> socket {
+      let connection = context.connection
       let! (content : byte []) = Compression.transform b context connection
       // http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.13
       do! async_writeln connection (String.Concat [| "Content-Length: "; content.Length.ToString() |])
@@ -339,10 +341,12 @@ module ParsingAndControl =
       if content.Length > 0 then
         do! send connection (new ArraySegment<_>(content, 0, content.Length))
       }
-    | SocketTask f -> f connection
+    | SocketTask f -> f context.connection
     | NullContent -> failwith "TODO: unexpected NullContent value for 'write_content'"
 
-  let response_f ({ response = r } as context : HttpContext) connection = socket {
+  let response_f ({ response = r } as context : HttpContext) = socket {
+    
+    let connection = context.connection
     do! async_writeln connection (String.concat " " [ "HTTP/1.1"
                                                     ; (http_code r.status).ToString()
                                                     ; http_reason r.status ])
@@ -352,12 +356,12 @@ module ParsingAndControl =
     do! write_headers connection r.headers
     do! write_content_type connection r.headers
 
-    return! write_content context connection r.content
+    return! write_content context r.content
   }
 
   /// Check if the web part can perform its work on the current request. If it
   /// can't it will return None and the run method will return.
-  let internal run ctx (web_part : WebPart) connection = 
+  let internal run ctx (web_part : WebPart) = 
     let execute _ = async {
       try  
           let! q  = web_part ctx
@@ -369,7 +373,7 @@ module ParsingAndControl =
       let! result = lift_async <| execute ()
       match result with 
       | Some executed_part ->
-        return! response_f executed_part connection
+        return! response_f executed_part
       | None -> return ()
   }
 
@@ -377,43 +381,47 @@ module ParsingAndControl =
     | WebPart of WebPart
     | SocketPart of (HttpContext -> Async<(Connection -> SocketOp<unit>) option >)
 
-  let http_loop (runtime : HttpRuntime) (consumer : HttpConsumer) (connection : Connection) =
+  let http_loop (ctx : HttpContext) (consumer : HttpConsumer) =
 
-    let rec loop  (connection : Connection) = socket {
+    let runtime = ctx.runtime
+
+    let rec loop (ctx : HttpContext) = socket {
 
       let verbose  = Log.verbose runtime.logger "Suave.Web.request_loop.loop" Log.TraceHeader.empty
       let verbosef = Log.verbosef runtime.logger "Suave.Web.request_loop.loop" Log.TraceHeader.empty
 
       verbose "-> processor"
-      let! result = process_request (match runtime.protocol with HTTP -> false | HTTPS _ -> true) connection
+      let! result = process_request (match runtime.protocol with HTTP -> false | HTTPS _ -> true) ctx
       verbose "<- processor"
 
       match result with
       | None -> verbose "'result = None', exiting"
-      | Some (request : HttpRequest, rem) ->
-        let ctx = HttpContext.mk request runtime
+     // | Some (request : HttpRequest, rem) ->
+     //   let ctx = HttpContext.mk request runtime connection
+      | Some ctx ->
         match consumer with
         | WebPart web_part ->
-          do! run ctx web_part connection
+          do! run ctx web_part
         | SocketPart writer ->
           let! intermediate = lift_async <| writer ctx
           match intermediate with
           | Some task ->
-            do! task connection
+            do! task ctx.connection
           | None -> () // do nothing
+        let connection = ctx.connection
         if connection.read_args.SocketError = SocketError.Success && connection.write_args.SocketError = SocketError.Success then
-          match request.headers %% "connection" with
+          match ctx.request.headers %% "connection" with
           | Some (x : string) when x.ToLower().Equals("keep-alive") ->
-            verbosef (fun fmt -> fmt "'Connection: keep-alive' recurse, rem: %A" rem)
-            return! loop rem
+            verbose "'Connection: keep-alive' recurse"
+            return! loop ctx
           | Some _ ->
             free "Suave.Web.http_loop.loop (case Some _)" connection
             verbose "'Connection: close', exiting"
             return ()
           | None ->
-            if request.http_version.Equals("HTTP/1.1") then
+            if ctx.request.http_version.Equals("HTTP/1.1") then
               verbose "'Connection: keep-alive' recurse (!)"
-              return! loop rem
+              return! loop ctx
             else
               free "Suave.Web.http_loop.loop (case None, else branch)" connection
               verbose "'Connection: close', exiting"
@@ -423,7 +431,7 @@ module ParsingAndControl =
           verbose "'is_connected = false', exiting"
           return ()
     }
-    loop connection
+    loop ctx
 
   /// The request loop initialises a request with a processor to handle the
   /// incoming stream and possibly pass the request to the web parts, a protocol,
@@ -436,7 +444,7 @@ module ParsingAndControl =
 
     socket {
       let! connection = load_connection runtime.logger runtime.protocol connection
-      do! http_loop runtime consumer connection
+      do! http_loop { HttpContext.empty with runtime = runtime; connection = connection } consumer
       return ()
     }
 

@@ -17,6 +17,7 @@ open System.Threading.Tasks
 /// fragmenting heap memory.
 ///
 /// The operations exposed on the BufferManager class are not thread safe.
+[<AllowNullLiteral>]
 type BufferManager(total_bytes, buffer_size, logger) =
   do Log.internf logger "Suave.Socket.BufferManager" (fun fmt ->
     fmt "initialising BufferManager with %d bytes" total_bytes)
@@ -126,6 +127,17 @@ let inline receive (cn : Connection) (buf : B) =
 
 let inline send (cn : Connection) (buf : B) =
   async_do cn.socket.SendAsync (set_buffer buf) ignore cn.write_args
+
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module Connection =
+  let empty : Connection =
+    { ipaddr     = IPAddress.Loopback
+      socket       = null
+      read_args    = null
+      write_args   = null
+      buffer_manager = null
+      line_buffer  =  ArraySegment<byte>()
+      segments     = []  }
 
 /// Workflow builder to read/write to async sockets with fail/success semantics
 type SocketMonad() =
