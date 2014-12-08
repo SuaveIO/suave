@@ -22,7 +22,7 @@ module ParsingAndControl =
 
   /// Free up a list of buffers
   let internal free context connection =
-    List.iter (fun x -> connection.free_buffer context x.buffer) connection.segments
+    List.iter (fun x -> connection.buffer_manager.FreeBuffer (x.buffer, context)) connection.segments
 
   let skip_buffers (pairs : BufferSegment list) (number : int) :  BufferSegment list =
     let rec loop xxs acc = 
@@ -42,14 +42,14 @@ module ParsingAndControl =
       | pair :: tail ->
         if acc + pair.length < index then
           do! select (ArraySegment(pair.buffer.Array, pair.offset, pair.length)) pair.length
-          connection.free_buffer "Suave.Web.split" pair.buffer
+          connection.buffer_manager.FreeBuffer( pair.buffer, "Suave.Web.split")
           return! loop {connection with segments = tail } (acc + pair.length) (count + acc + pair.length)
         elif acc + pair.length >= index then
           let bytes_read = index - acc
           do! select (ArraySegment(pair.buffer.Array, pair.offset, bytes_read)) bytes_read
           let remaining = pair.length - bytes_read
           if remaining = marker_length then
-            connection.free_buffer "Suave.Web.split" pair.buffer
+            connection.buffer_manager.FreeBuffer( pair.buffer, "Suave.Web.split")
             return count + bytes_read, { connection with segments = tail }
           else
             if remaining - marker_length >= 0 then
@@ -87,14 +87,14 @@ module ParsingAndControl =
       for b in free do
         assert (b.length >= 0)
         do! lift_async <| select (ArraySegment(b.buffer.Array, b.offset, b.length)) b.length
-        do connection.free_buffer "Suave.Web.scan_marker" b.buffer
+        do connection.buffer_manager.FreeBuffer( b.buffer,"Suave.Web.scan_marker" )
       return NeedMore,{ connection with segments = ret }
     }
 
   open System.Net.Sockets
 
   let read_data (connection : Connection) buff = socket {
-    let! b = connection.read buff
+    let! b = receive connection buff 
     if b > 0 then
       return { buffer = buff; offset = buff.Offset; length = b }
     else
@@ -102,15 +102,15 @@ module ParsingAndControl =
     }
 
   let read_more_data connection = async {
-    let buff = connection.get_buffer "Suave.Web.read_till_pattern.loop"
+    let buff = connection.buffer_manager.PopBuffer("Suave.Web.read_till_pattern.loop")
     let! result = read_data connection buff
     match result with
     | Choice1Of2 data ->
       return { connection with segments = connection.segments @ [data] } |> Choice1Of2
     | Choice2Of2 error ->
       for b in connection.segments do
-        do connection.free_buffer "Suave.Web.read_till_pattern.loop" b.buffer
-      do connection.free_buffer "Suave.Web.read_till_pattern.loop" buff
+        do connection.buffer_manager.FreeBuffer( b.buffer, "Suave.Web.read_till_pattern.loop")
+      do connection.buffer_manager.FreeBuffer( buff, "Suave.Web.read_till_pattern.loop")
       return Choice2Of2 error
     }
 
@@ -180,7 +180,7 @@ module ParsingAndControl =
             return { connection with segments = { buffer = segment.buffer; offset = segment.offset + n; length = segment.length - n } :: tail }
           else
             do! lift_async <| select (array_segment_from_buffer_segment segment) segment.length
-            do connection.free_buffer "Suave.Web.read_post_data:loop" segment.buffer
+            do connection.buffer_manager.FreeBuffer(segment.buffer,"Suave.Web.read_post_data:loop")
             return! loop (n - segment.length) { connection with segments = tail }
         | [] ->
           if n = 0 then
@@ -261,8 +261,8 @@ module ParsingAndControl =
     }
 
   ///
-  let read_and_parse_post_data (request : HttpRequest) connection = socket{
-    
+  let read_and_parse_post_data (ctx : HttpContext) connection = socket{
+    let request = ctx.request
     let content_encoding = request.headers %% "content-type"
 
     match request.headers %% "content-length" with 
@@ -337,7 +337,7 @@ module ParsingAndControl =
       do! async_writeln connection (String.Concat [| "Content-Length: "; content.Length.ToString() |])
       do! async_writeln connection ""
       if content.Length > 0 then
-        do! connection.write (new ArraySegment<_>(content, 0, content.Length))
+        do! send connection (new ArraySegment<_>(content, 0, content.Length))
       }
     | SocketTask f -> f connection
     | NullContent -> failwith "TODO: unexpected NullContent value for 'write_content'"
@@ -401,7 +401,7 @@ module ParsingAndControl =
           | Some task ->
             do! task connection
           | None -> () // do nothing
-        if connection.is_connected () then
+        if connection.read_args.SocketError = SocketError.Success && connection.write_args.SocketError = SocketError.Success then
           match request.headers %% "connection" with
           | Some (x : string) when x.ToLower().Equals("keep-alive") ->
             verbosef (fun fmt -> fmt "'Connection: keep-alive' recurse, rem: %A" rem)

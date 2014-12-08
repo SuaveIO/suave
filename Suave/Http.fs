@@ -613,7 +613,7 @@ module Http =
       async_writebytes out (UTF8.bytes data)
 
     let dispatch (out : Connection) =
-      out.write ES_EOL_S
+      send out ES_EOL_S
 
     let comment (out : Connection) (cmt : string) =
       out <<. ": " + cmt + ES_EOL
