@@ -31,7 +31,8 @@ let parsing_multipart =
       | Some str -> OK str
       | None -> OK "field-does-not-exists")
 
-  let test_multipart_form = 
+  let test_multipart_form =
+    ParsingAndControl.parse_post_data >>=
     request (fun r ->
       match get_first r.multipart_fields "From" with
       | Some str -> OK str
