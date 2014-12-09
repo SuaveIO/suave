@@ -71,30 +71,33 @@ let forward (ip : IPAddress) (port : uint16) (ctx : HttpContext) =
 
   q.Headers.Add("X-Forwarded-For", p.ipaddr.ToString())
 
-  fun cn -> socket {
+  fun ctx -> socket {
     if p.``method`` = "POST" || p.``method`` = "PUT" then
       let content_length = Convert.ToInt32(p.headers %% "content-length")
-      do! transfer_len_x cn (q.GetRequestStream()) content_length
+      do! transfer_len_x ctx.connection (q.GetRequestStream()) content_length
     try
       let! data = lift_async <| q.AsyncGetResponse()
       let! res = lift_async <| send_web_response ((data : WebResponse) :?> HttpWebResponse) ctx
       match res with
       | Some new_ctx ->
         do! response_f new_ctx
-      | None -> ()
+        return Some new_ctx
+      | None -> return None
     with
     | :? WebException as ex when ex.Response <> null ->
       let! res = lift_async <| send_web_response (ex.Response :?> HttpWebResponse) ctx
       match res with
       | Some new_ctx ->
         do! response_f new_ctx
-      | _ -> ()
+        return Some new_ctx
+      | _ -> return None
     | :? WebException as ex when ex.Response = null ->
       let! res = lift_async <|response HTTP_502 (UTF8.bytes "suave proxy: Could not connect to upstream") ctx
       match res with
       | Some new_ctx ->
         do! response_f new_ctx
-      | _ -> ()
+        return Some new_ctx
+      | _ -> return None
   } |> succeed
 
 /// Proxy the HttpRequest 'r' with the proxy found with 'proxy_resolver'

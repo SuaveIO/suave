@@ -375,13 +375,27 @@ module ParsingAndControl =
       let! result = lift_async <| execute ()
       match result with 
       | Some executed_part ->
-        return! response_f executed_part
-      | None -> return ()
+        do! response_f executed_part
+        return Some <| executed_part
+      | None -> return None
   }
 
   type HttpConsumer =
     | WebPart of WebPart
-    | SocketPart of (HttpContext -> Async<(Connection -> SocketOp<unit>) option >)
+    | SocketPart of (HttpContext -> Async<(HttpContext -> SocketOp<HttpContext option>) option >)
+
+  let operate consumer ctx = socket {
+    match consumer with
+    | WebPart web_part ->
+      return! run ctx web_part
+    | SocketPart writer ->
+      let! intermediate = lift_async <| writer ctx
+      match intermediate with
+      | Some task ->
+        return! task ctx
+      | None -> return Some ctx
+    }
+
 
   let http_loop (ctx : HttpContext) (consumer : HttpConsumer) =
 
@@ -399,32 +413,27 @@ module ParsingAndControl =
       match result with
       | None -> verbose "'result = None', exiting"
       | Some ctx ->
-        match consumer with
-        | WebPart web_part ->
-          do! run ctx web_part
-        | SocketPart writer ->
-          let! intermediate = lift_async <| writer ctx
-          match intermediate with
-          | Some task ->
-            do! task ctx.connection
-          | None -> () // do nothing
-        let connection = ctx.connection
-        match ctx.request.headers %% "connection" with
-        | Some (x : string) when x.ToLower().Equals("keep-alive") ->
-          verbose "'Connection: keep-alive' recurse"
-          return! loop ctx
-        | Some _ ->
-          free "Suave.Web.http_loop.loop (case Some _)" connection
-          verbose "'Connection: close', exiting"
-          return ()
-        | None ->
-          if ctx.request.http_version.Equals("HTTP/1.1") then
-            verbose "'Connection: keep-alive' recurse (!)"
+        let! result = operate consumer ctx
+        match result with
+        | Some ctx ->
+          let connection = ctx.connection
+          match ctx.request.headers %% "connection" with
+          | Some (x : string) when x.ToLower().Equals("keep-alive") ->
+            verbose "'Connection: keep-alive' recurse"
             return! loop ctx
-          else
-            free "Suave.Web.http_loop.loop (case None, else branch)" connection
+          | Some _ ->
+            free "Suave.Web.http_loop.loop (case Some _)" connection
             verbose "'Connection: close', exiting"
             return ()
+          | None ->
+            if ctx.request.http_version.Equals("HTTP/1.1") then
+              verbose "'Connection: keep-alive' recurse (!)"
+              return! loop ctx
+            else
+              free "Suave.Web.http_loop.loop (case None, else branch)" connection
+              verbose "'Connection: close', exiting"
+              return ()
+        | None -> return ()
     }
     loop ctx
 
