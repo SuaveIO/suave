@@ -192,32 +192,23 @@ module ParsingAndControl =
     loop bytes connection
 
   /// Parses multipart data from the stream, feeding it into the HttpRequest's property Files.
-  let parse_multipart (connection : Connection)
-                      boundary
-                      (request : HttpRequest)
-                      : SocketOp<HttpRequest * Connection> =
+  let parse_multipart boundary (context : HttpContext) : SocketOp<HttpContext> =
 
-    let rec loop boundary (r : HttpRequest) = socket {
+    let rec loop boundary (ctx : HttpContext) = socket {
 
-      let! firstline, connection = read_line connection
-
+      let! firstline, connection = read_line ctx.connection
       if not(firstline.Equals("--")) then
-
         let! part_headers, connection = read_headers connection
-
         let content_disposition =  part_headers %% "content-disposition"
-
         let fieldname = 
           (header_params content_disposition) ? name 
           |> Option.get
           |> (fun x -> x.Trim('"'))
-
         let content_type = part_headers %% "content-type"
-
         match content_type with
         | Some(x) when x.StartsWith("multipart/mixed") ->
           let subboundary = "--" + x.Substring(x.IndexOf('=') + 1).TrimStart()
-          return! loop subboundary r
+          return! loop subboundary { ctx with connection = connection }
         | Some(x) ->
           let temp_file_name = Path.GetTempFileName()
           use temp_file = new FileStream(temp_file_name, FileMode.Truncate)
@@ -228,20 +219,19 @@ module ParsingAndControl =
             let filename =
               (header_params content_disposition) ? filename |> Option.get |> (fun x -> x.Trim('"'))
             let upload = HttpUpload.mk fieldname filename (content_type |> Option.get) temp_file_name
-            return! loop boundary { r with files = upload :: r.files }
+            return! loop boundary { ctx with request = { ctx.request with files = upload :: ctx.request.files};  connection = connection }
           else
             File.Delete temp_file_name
-            return! loop boundary r
-          
+            return! loop boundary { ctx with connection = connection }
         | None ->
           use mem = new MemoryStream()
           let! a, connection = read_until (ASCII.bytes(eol + boundary)) (fun x y -> async { do! mem.AsyncWrite(x.Array, x.Offset, y) } ) connection
           let byts = mem.ToArray()
-          return! loop boundary { r with multipart_fields = (fieldname,ASCII.to_string byts 0 byts.Length)::(r.multipart_fields) }
+          return! loop boundary { ctx with request = { ctx.request with multipart_fields = (fieldname,ASCII.to_string byts 0 byts.Length)::(ctx.request.multipart_fields) }; connection = connection}
       else 
-        return (r,connection)
+        return { ctx with connection = connection }
       }
-    loop boundary request
+    loop boundary context
 
   let parse_trace_headers (headers : NameValueList) =
     let parse_uint64 = (function | true, value -> Some value
@@ -275,8 +265,8 @@ module ParsingAndControl =
         return Some { ctx with request = { request with raw_form = raw_form}; connection = connection }
       | Some ce when ce.StartsWith("multipart/form-data") ->
         let boundary = "--" + ce.Substring(ce.IndexOf('=')+1).TrimStart()
-        let! r, connection = parse_multipart ctx.connection boundary request
-        return Some { ctx with request = r; connection = connection }
+        let! ctx = parse_multipart boundary ctx
+        return Some ctx
       | Some _ | None ->
         let! raw_form, connection = get_raw_post_data ctx.connection content_length
         return Some { ctx with request = { request with raw_form = raw_form}; connection = connection }
