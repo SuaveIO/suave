@@ -139,9 +139,7 @@ let tcp_ip_server (source_ip : IPAddress,
       let write_args = c.Pop()
       let connection =
         { ipaddr       = ip_address
-          socket       = socket
-          read_args    = read_args
-          write_args   = write_args
+          transport    = { socket = socket; read_args = read_args; write_args = write_args}
           buffer_manager = bufferManager
           line_buffer  = bufferManager.PopBuffer "Suave.Tcp.tcp_ip_server.job" // buf allocate
           segments     = []

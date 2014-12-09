@@ -118,11 +118,11 @@ open Microsoft.FSharp.NativeInterop
 let read_to_bio (con : Connection) read_bio ssl = socket {
   let bytes_pending = BIO_ctrl_pending read_bio
   if bytes_pending = 0u then 
-    let a = con.get_buffer "read_to_bio"
-    let! bytes_read = con.read a
+    let a = con.buffer_manager.PopBuffer "read_to_bio"
+    let! bytes_read = receive con a
     let buff = Array.zeroCreate bytes_read
     Array.blit a.Array a.Offset buff 0 bytes_read
-    con.free_buffer "read_to_bio" a
+    con.buffer_manager.FreeBuffer( a, "read_to_bio")
     BIO_write(read_bio, buff, bytes_read) |> ignore
   }
 
@@ -132,7 +132,7 @@ let write_from_bio  (con : Connection) write_bio = socket {
   if bytes_pending > 0u  then 
     let encrypted_buff = Array.zeroCreate SSL3_RT_MAX_PACKET_SIZE
     let len = BIO_read(write_bio,encrypted_buff,encrypted_buff.Length)
-    do! con.write  (new ArraySegment<_>(encrypted_buff,0,len))
+    do! send con  (new ArraySegment<_>(encrypted_buff,0,len))
   return ()
   }
 
@@ -166,14 +166,14 @@ let ssl_receive (con : Connection) (context, read_bio, write_bio) (bu : B) = soc
   //we need to check if there is data in the read bio before asking for more to the socket
   let bytes_pending = BIO_ctrl_pending read_bio
   if bytes_pending = 0u then 
-    let a = con.get_buffer "ssl_receive"
-    let! bytes_read = con.read a
+    let a = con.buffer_manager.PopBuffer "ssl_receive"
+    let! bytes_read = receive con a
 
     let buff = Array.zeroCreate bytes_read
     Array.blit a.Array a.Offset buff 0 bytes_read
     
     //Copy encrypted data into the SSL read_bio
-    con.free_buffer "ssl_receive" a
+    con.buffer_manager.FreeBuffer( a, "ssl_receive")
     BIO_write(read_bio, buff, bytes_read) |> ignore
 
   let decrypted_bytes_read = 
@@ -202,5 +202,5 @@ let ssl_send (con : Connection)  (context, _ , write_bio)  (buf: ArraySegment<_>
   //let bytes_pending = BIO_ctrl_pending write_bio
   let encrypted_buff = Array.zeroCreate SSL3_RT_MAX_PACKET_SIZE
   let len = BIO_read(write_bio,encrypted_buff,encrypted_buff.Length)
-  return! con.write  (new ArraySegment<_>(encrypted_buff,0,len))
+  return! send con  (new ArraySegment<_>(encrypted_buff,0,len))
   }

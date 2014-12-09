@@ -111,30 +111,41 @@ let inline accept (socket : Socket) =
 let inline trans (a : SocketAsyncEventArgs) =
   new ArraySegment<_>(a.Buffer, a.Offset, a.BytesTransferred)
 
+type ITransport =
+  abstract member read  : B -> SocketOp<int>
+  abstract member write : B -> SocketOp<unit>
+
+type TcpTransport =
+  { socket       : Socket
+    read_args    : SocketAsyncEventArgs
+    write_args   : SocketAsyncEventArgs
+  }
+  interface ITransport with
+    member this.read(buf : B) =
+      async_do this.socket.ReceiveAsync (set_buffer buf)  (fun a -> a.BytesTransferred) this.read_args
+    member this.write(buf : B) =
+      async_do this.socket.SendAsync (set_buffer buf) ignore this.write_args
+
 /// A connection (TCP implied) is a thing that can read and write from a socket
 /// and that can be closed.
 type Connection =
   { ipaddr       : IPAddress
-    socket       : Socket
-    read_args    : SocketAsyncEventArgs
-    write_args   : SocketAsyncEventArgs
+    transport    : ITransport
     buffer_manager : BufferManager
     line_buffer  : ArraySegment<byte>
     segments        : BufferSegment list }
 
 let inline receive (cn : Connection) (buf : B) =
-  async_do cn.socket.ReceiveAsync (set_buffer buf)  (fun a -> a.BytesTransferred) cn.read_args
+  cn.transport.read buf
 
-let inline send (cn : Connection) (buf : B) =
-  async_do cn.socket.SendAsync (set_buffer buf) ignore cn.write_args
+let inline send (cn :Connection) (buf : B) =
+  cn.transport.write buf
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Connection =
   let empty : Connection =
     { ipaddr     = IPAddress.Loopback
-      socket       = null
-      read_args    = null
-      write_args   = null
+      transport       =  { socket = null; read_args = null; write_args   = null }
       buffer_manager = null
       line_buffer  =  ArraySegment<byte>()
       segments     = []  }

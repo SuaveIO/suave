@@ -398,8 +398,6 @@ module ParsingAndControl =
 
       match result with
       | None -> verbose "'result = None', exiting"
-     // | Some (request : HttpRequest, rem) ->
-     //   let ctx = HttpContext.mk request runtime connection
       | Some ctx ->
         match consumer with
         | WebPart web_part ->
@@ -411,27 +409,22 @@ module ParsingAndControl =
             do! task ctx.connection
           | None -> () // do nothing
         let connection = ctx.connection
-        if connection.read_args.SocketError = SocketError.Success && connection.write_args.SocketError = SocketError.Success then
-          match ctx.request.headers %% "connection" with
-          | Some (x : string) when x.ToLower().Equals("keep-alive") ->
-            verbose "'Connection: keep-alive' recurse"
+        match ctx.request.headers %% "connection" with
+        | Some (x : string) when x.ToLower().Equals("keep-alive") ->
+          verbose "'Connection: keep-alive' recurse"
+          return! loop ctx
+        | Some _ ->
+          free "Suave.Web.http_loop.loop (case Some _)" connection
+          verbose "'Connection: close', exiting"
+          return ()
+        | None ->
+          if ctx.request.http_version.Equals("HTTP/1.1") then
+            verbose "'Connection: keep-alive' recurse (!)"
             return! loop ctx
-          | Some _ ->
-            free "Suave.Web.http_loop.loop (case Some _)" connection
+          else
+            free "Suave.Web.http_loop.loop (case None, else branch)" connection
             verbose "'Connection: close', exiting"
             return ()
-          | None ->
-            if ctx.request.http_version.Equals("HTTP/1.1") then
-              verbose "'Connection: keep-alive' recurse (!)"
-              return! loop ctx
-            else
-              free "Suave.Web.http_loop.loop (case None, else branch)" connection
-              verbose "'Connection: close', exiting"
-              return ()
-        else
-          free "http_loop.loop (not connected)" connection
-          verbose "'is_connected = false', exiting"
-          return ()
     }
     loop ctx
 
