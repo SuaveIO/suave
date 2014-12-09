@@ -26,8 +26,10 @@ let from_json<'a> (bytes : byte []) =
 ///   url "/path"  >>= map_json some_function;
 ///
 open Suave.Http
+open Suave.Web
 
-let map_json f  =
+let map_json f =
+  ParsingAndControl.parse_post_data >>=
   Types.request(fun r ->
       f (from_json(r.raw_form)) 
       |> to_json

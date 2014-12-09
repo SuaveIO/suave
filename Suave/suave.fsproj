@@ -68,8 +68,8 @@
     <Compile Include="Cookie.fs" />
     <Compile Include="State.fs" />
     <Compile Include="Auth.fs" />
-    <Compile Include="Json.fs" />
     <Compile Include="Web.fs" />
+    <Compile Include="Json.fs" />
     <Compile Include="Proxy.fs" />
     <Compile Include="AssemblyVersionInfo.fs" Condition="Exists('AssemblyVersionInfo.fs')" />
     <None Include="paket.references" />

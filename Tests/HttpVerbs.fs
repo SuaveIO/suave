@@ -41,6 +41,7 @@ let posts =
   let run_with' = run_with default_config
 
   let webId =
+    ParsingAndControl.parse_post_data >>=
     request (fun x -> OK (x.raw_form |> Text.Encoding.UTF8.GetString))
 
   let getFormValue name =
