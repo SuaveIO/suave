@@ -26,6 +26,8 @@ let version =
 type SuavePerfHarness(name, suave_config) =
   interface ITestable with
     member x.Name = name
+    member x.Init() = ()
+    member x.Fini() = ()
   member x.Serve part = suave_config part
 
 [<Tests>]
