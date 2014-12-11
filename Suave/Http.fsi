@@ -1328,13 +1328,9 @@ module Http =
     val send_file : file_name:string -> compression:bool -> WebPart
 
     /// <summary><para>
-    /// Send the file by the filename given. Will search relative to the current directory for
-    /// the file path, unless you pass it a file with a slash at the start of its name, in which
-    /// case it will search the root of the file system that is hosting the current directory.
+    /// Send the embedded file by the filename given. Will search relative to the current assembly.
     /// Will also set the MIME type based on the file extension.
     /// </para></summary>
-    /// <remarks>
-    /// </remarks>
     val file : file_name:string -> WebPart
 
     /// <summary><para>
