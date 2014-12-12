@@ -88,15 +88,6 @@ let create_pools logger max_ops buffer_size =
 // i.e: export MONO_GC_PARAMS=nursery-size=128m
 // The nursery size must be a power of two in bytes
 
-let inline receive (socket: Socket) (args : A)  (buf: B) = 
-  async_do socket.ReceiveAsync (set_buffer buf)  (fun a -> a.BytesTransferred) args
-
-let inline send (socket: Socket) (args : A) (buf: B) =
-  async_do socket.SendAsync (set_buffer buf) ignore args
-
-let inline is_good (args : A) =
-  args.SocketError = SocketError.Success
-
 /// Argh!! @ System.Net.Sockets.SocketException: Address already in use
 let private a_few_times f =
   let s ms = System.Threading.Thread.Sleep (ms : int)
@@ -148,12 +139,10 @@ let tcp_ip_server (source_ip : IPAddress,
       let write_args = c.Pop()
       let connection =
         { ipaddr       = ip_address
-          read         = receive socket read_args
-          write        = send socket write_args
-          get_buffer   = fun context     -> bufferManager.PopBuffer(context)
-          free_buffer  = fun context buf -> bufferManager.FreeBuffer(buf, context)
-          is_connected = fun _           -> is_good read_args && is_good write_args
+          transport    = { socket = socket; read_args = read_args; write_args = write_args}
+          buffer_manager = bufferManager
           line_buffer  = bufferManager.PopBuffer "Suave.Tcp.tcp_ip_server.job" // buf allocate
+          segments     = []
         }
       use! oo = Async.OnCancel (fun () -> intern "disconnected client (async cancel)"
                                           shutdown_socket socket)

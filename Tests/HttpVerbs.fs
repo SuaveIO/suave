@@ -41,10 +41,11 @@ let posts =
   let run_with' = run_with default_config
 
   let webId =
+    ParsingAndControl.parse_post_data >>=
     request (fun x -> OK (x.raw_form |> Text.Encoding.UTF8.GetString))
 
   let getFormValue name =
-    request (fun x -> let q = HttpRequest.form x in OK <| Option.get (q ^^ name))
+    ParsingAndControl.parse_post_data >>= request (fun x -> let q = HttpRequest.form x in OK <| Option.get (q ^^ name))
 
   let assertion = "eyJhbGciOiJSUzI1NiJ9.eyJwdWJsaWMta2V5Ijp7ImFsZ29yaXRobSI6IkR"+
                   "TIiwieSI6Ijc1MDMyNGRmYzQwNGI0OGQ3ZDg0MDdlOTI0NWMxNGVkZmVlZTY"+

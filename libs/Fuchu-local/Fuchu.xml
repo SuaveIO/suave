@@ -1,0 +1,690 @@
+<?xml version="1.0" encoding="utf-8"?>
+<doc>
+<assembly><name>Fuchu</name></assembly>
+<members>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="M:Fuchu.Test.Wrap(Fuchu.Test,System.Func{System.Action,System.Action})">
+<summary>
+ Maps all TestCodes in a Test
+</summary>
+</member>
+<member name="M:Fuchu.Test.Where(Fuchu.Test,System.Func{System.String,System.Boolean})">
+<summary>
+ Filter tests by name
+</summary>
+</member>
+<member name="M:Fuchu.Test.Timeout(System.Action,System.Int32)">
+<summary>
+ Applies a timeout to a test
+</summary>
+</member>
+<member name="M:Fuchu.Test.Skip(System.String,System.Object[])">
+<summary>
+ Skip this test
+</summary>
+</member>
+<member name="">
+
+</member>
+<member name="M:Fuchu.Test.Match``1(Fuchu.Test,System.Func{Microsoft.FSharp.Core.FSharpFunc{Microsoft.FSharp.Core.Unit,Microsoft.FSharp.Core.Unit},``0},System.Func{System.Collections.Generic.IEnumerable{Fuchu.Test},``0},System.Func{System.String,Fuchu.Test,``0})">
+<summary>
+ Pattern matching over a Test
+</summary>
+</member>
+<member name="M:Fuchu.Test.List``1(System.String,System.Func{``0,System.Action},System.Tuple{System.String,``0}[])">
+<summary>
+ Builds a list of parameterized tests
+</summary>
+</member>
+<member name="M:Fuchu.Test.List(System.Collections.Generic.IEnumerable{System.Action})">
+<summary>
+ Creates a group of tests
+</summary>
+</member>
+<member name="M:Fuchu.Test.List(System.String,Fuchu.Test[])">
+<summary>
+ Creates a group of tests
+</summary>
+</member>
+<member name="M:Fuchu.Test.List(System.Collections.Generic.IEnumerable{Fuchu.Test})">
+<summary>
+ Creates a group of tests
+</summary>
+</member>
+<member name="M:Fuchu.Test.List(System.Collections.Generic.IEnumerable{Fuchu.Test},System.String)">
+<summary>
+ Groups tests
+</summary>
+</member>
+<member name="M:Fuchu.Test.Fixture``1(System.Func{``0},System.Action{``0})">
+<summary>
+ Builds a setup/teardown function to apply to parameterized tests
+</summary>
+</member>
+<member name="M:Fuchu.Test.Fail(System.String,System.Object[])">
+<summary>
+ Fail this test
+</summary>
+</member>
+<member name="M:Fuchu.Test.Case``1(System.String,System.Action{``0})">
+<summary>
+ Parameterized test
+</summary>
+</member>
+<member name="M:Fuchu.Test.Case(System.String,System.Action)">
+<summary>
+ Test unit
+</summary>
+</member>
+<member name="M:Fuchu.Test.Case(System.Action)">
+<summary>
+ Test unit
+</summary>
+</member>
+<member name="T:Fuchu.Test">
+<summary>
+ Test tree
+</summary>
+</member>
+<member name="T:Fuchu.TestCode">
+<summary>
+ Actual test function
+</summary>
+</member>
+<member name="">
+
+</member>
+<member name="T:Fuchu.TestsAttribute">
+<summary>
+ Marks a top-level test for scanning
+</summary>
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="M:Fuchu.Helpers.tprintf``1(Microsoft.FSharp.Core.PrintfFormat{``0,Microsoft.FSharp.Core.Unit,System.String,Microsoft.FSharp.Core.Unit})">
+<summary>
+ Print to Console and Trace
+</summary>
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="T:Fuchu.Helpers.Seq">
+
+</member>
+<member name="T:Fuchu.Helpers">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="T:Fuchu.Impl.TestPrinters">
+<summary>
+ Hooks to print report through test run
+</summary>
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="M:Fuchu.Impl.testFromThisAssembly">
+<summary>
+ Scan tests marked with TestsAttribute from entry assembly
+</summary>
+</member>
+<member name="P:Fuchu.Impl.testFromAssembly">
+<summary>
+ Scan tests marked with TestsAttribute from an assembly
+</summary>
+</member>
+<member name="M:Fuchu.Impl.testFromAssemblyWithFilter(Microsoft.FSharp.Core.FSharpFunc{System.Type,System.Boolean},System.Reflection.Assembly)">
+<summary>
+ Scan filtered tests marked with TestsAttribute from an assembly
+</summary>
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="M:Fuchu.Impl.runEval``1(Microsoft.FSharp.Core.FSharpFunc{Fuchu.Test,``0},Fuchu.Test)">
+<summary>
+ Runs tests, returns error code
+</summary>
+</member>
+<member name="P:Fuchu.Impl.evalPar">
+<summary>
+ Evaluates tests in parallel
+</summary>
+</member>
+<member name="">
+
+</member>
+<member name="P:Fuchu.Impl.evalSeq">
+<summary>
+ Evaluates tests sequentially
+</summary>
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="M:Fuchu.Impl.eval(Fuchu.Impl.TestPrinters,Microsoft.FSharp.Core.FSharpFunc{Microsoft.FSharp.Core.FSharpFunc{System.Tuple{System.String,Microsoft.FSharp.Core.FSharpFunc{Microsoft.FSharp.Core.Unit,Microsoft.FSharp.Core.Unit}},Fuchu.Impl.TestRunResult},Microsoft.FSharp.Core.FSharpFunc{System.Collections.Generic.IEnumerable{System.Tuple{System.String,Microsoft.FSharp.Core.FSharpFunc{Microsoft.FSharp.Core.Unit,Microsoft.FSharp.Core.Unit}}},System.Collections.Generic.IEnumerable{Fuchu.Impl.TestRunResult}}},Fuchu.Test)">
+<summary>
+ Runs a tree of tests, with parameterized printers (progress indicators) and traversal.
+ Returns list of results.
+</summary>
+</member>
+<member name="P:Fuchu.Impl.evalTestList">
+<summary>
+ Runs a list of tests, with parameterized printers (progress indicators) and traversal.
+ Returns list of results.
+</summary>
+</member>
+<member name="">
+
+</member>
+<member name="T:Fuchu.Impl">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="T:Fuchu.MbUnit">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="T:Fuchu.NUnit">
+
+</member>
+<member name="M:Fuchu.TestModule.timeout(System.Int32,Microsoft.FSharp.Core.FSharpFunc{Microsoft.FSharp.Core.Unit,Microsoft.FSharp.Core.Unit})">
+<summary>
+ Applies a timeout to a test
+</summary>
+</member>
+<member name="M:Fuchu.TestModule.filter(Microsoft.FSharp.Core.FSharpFunc{System.String,System.Boolean})">
+<summary>
+ Filter tests by name
+</summary>
+</member>
+<member name="M:Fuchu.TestModule.replaceTestCode(Microsoft.FSharp.Core.FSharpFunc{System.String,Microsoft.FSharp.Core.FSharpFunc{Microsoft.FSharp.Core.FSharpFunc{Microsoft.FSharp.Core.Unit,Microsoft.FSharp.Core.Unit},Fuchu.Test}},Fuchu.Test)">
+<summary>
+ Recursively replaces TestCodes in a Test
+</summary>
+</member>
+<member name="M:Fuchu.TestModule.wrap(Microsoft.FSharp.Core.FSharpFunc{Microsoft.FSharp.Core.FSharpFunc{Microsoft.FSharp.Core.Unit,Microsoft.FSharp.Core.Unit},Microsoft.FSharp.Core.FSharpFunc{Microsoft.FSharp.Core.Unit,Microsoft.FSharp.Core.Unit}},Fuchu.Test)">
+<summary>
+ Recursively maps all TestCodes in a Test
+</summary>
+</member>
+<member name="P:Fuchu.TestModule.toTestCodeList">
+<summary>
+ Flattens a tree of tests
+</summary>
+</member>
+<member name="T:Fuchu.TestModule">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="M:Fuchu.Tests.DefaultMainThisAssembly(System.String[])">
+<summary>
+ Runs tests in this assembly with supplied command-line options. Returns 0 if all tests passed, otherwise 1
+</summary>
+</member>
+<member name="M:Fuchu.Tests.DefaultMain(Fuchu.Test)">
+<summary>
+ Runs tests with supplied command-line options. Returns 0 if all tests passed, otherwise 1
+</summary>
+</member>
+<member name="M:Fuchu.Tests.DefaultMainWithOptions(Fuchu.Test,Fuchu.Tests.RunOptions)">
+<summary>
+ Runs tests with supplied options. Returns 0 if all tests passed, otherwise 1
+</summary>
+</member>
+<member name="P:Fuchu.Tests.parseArgs">
+<summary>
+ Parses command-line arguments
+</summary>
+</member>
+<member name="M:Fuchu.Tests.RunParallel(Fuchu.Test)">
+<summary>
+ Runs tests in parallel
+</summary>
+</member>
+<member name="M:Fuchu.Tests.Run(Fuchu.Test)">
+<summary>
+ Runs tests
+</summary>
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="M:Fuchu.Tests.testParam``1(``0)">
+<summary>
+ Applies a value to a list of partial tests
+</summary>
+</member>
+<member name="M:Fuchu.Tests.testFixture``1(Microsoft.FSharp.Core.FSharpFunc{``0,Microsoft.FSharp.Core.FSharpFunc{Microsoft.FSharp.Core.Unit,Microsoft.FSharp.Core.Unit}})">
+<summary>
+ Applies a function to a list of values to build test cases
+</summary>
+</member>
+<member name="M:Fuchu.Tests.testCase(System.String,Microsoft.FSharp.Core.FSharpFunc{Microsoft.FSharp.Core.Unit,Microsoft.FSharp.Core.Unit})">
+<summary>
+ Builds a test case
+</summary>
+</member>
+<member name="M:Fuchu.Tests.testList(System.String,System.Collections.Generic.IEnumerable{Fuchu.Test})">
+<summary>
+ Builds a list/group of tests
+</summary>
+</member>
+<member name="M:Fuchu.Tests.skiptestf``2(Microsoft.FSharp.Core.PrintfFormat{``0,Microsoft.FSharp.Core.Unit,System.String,``1})">
+<summary>
+ Skip this test
+</summary>
+</member>
+<member name="M:Fuchu.Tests.skiptest``1(System.String)">
+<summary>
+ Skip this test
+</summary>
+</member>
+<member name="M:Fuchu.Tests.failtestf``2(Microsoft.FSharp.Core.PrintfFormat{``0,Microsoft.FSharp.Core.Unit,System.String,``1})">
+<summary>
+ Fail this test
+</summary>
+</member>
+<member name="M:Fuchu.Tests.failtest``1(System.String)">
+<summary>
+ Fail this test
+</summary>
+</member>
+<member name="T:Fuchu.Tests">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="">
+
+</member>
+<member name="T:Fuchu.XunitHelpers">
+
+</member>
+<member name="">
+
+</member>
+<member name="T:System.AssemblyVersionInformation">
+
+</member>
+</members>
+</doc>

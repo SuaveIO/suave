@@ -494,6 +494,7 @@ and HttpRuntime =
 and HttpContext =
   { request    : HttpRequest
     runtime    : HttpRuntime
+    connection : Connection
     user_state : Map<string, obj>
     response   : HttpResult }
 
@@ -564,12 +565,14 @@ module HttpContext =
     { request    = HttpRequest.empty
       user_state = Map.empty
       runtime    = HttpRuntime.empty
+      connection = Connection.empty
       response   = HttpResult.empty }
 
-  let mk request runtime =
+  let mk request runtime connection =
     { request    = request
       user_state = Map.empty
       runtime    = runtime
+      connection = connection
       response   = { status = HTTP_404
                      headers = []
                      content = NullContent } }

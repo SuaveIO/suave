@@ -17,6 +17,7 @@ open System.Threading.Tasks
 /// fragmenting heap memory.
 ///
 /// The operations exposed on the BufferManager class are not thread safe.
+[<AllowNullLiteral>]
 type BufferManager(total_bytes, buffer_size, logger) =
   do Log.internf logger "Suave.Socket.BufferManager" (fun fmt ->
     fmt "initialising BufferManager with %d bytes" total_bytes)
@@ -110,16 +111,44 @@ let inline accept (socket : Socket) =
 let inline trans (a : SocketAsyncEventArgs) =
   new ArraySegment<_>(a.Buffer, a.Offset, a.BytesTransferred)
 
+type ITransport =
+  abstract member read  : B -> SocketOp<int>
+  abstract member write : B -> SocketOp<unit>
+
+type TcpTransport =
+  { socket       : Socket
+    read_args    : SocketAsyncEventArgs
+    write_args   : SocketAsyncEventArgs
+  }
+  interface ITransport with
+    member this.read(buf : B) =
+      async_do this.socket.ReceiveAsync (set_buffer buf)  (fun a -> a.BytesTransferred) this.read_args
+    member this.write(buf : B) =
+      async_do this.socket.SendAsync (set_buffer buf) ignore this.write_args
+
 /// A connection (TCP implied) is a thing that can read and write from a socket
 /// and that can be closed.
 type Connection =
   { ipaddr       : IPAddress
-    read         : ArraySegment<byte> -> SocketOp<int>
-    write        : ArraySegment<byte> -> SocketOp<unit>
-    get_buffer   : string -> ArraySegment<byte>
-    free_buffer  : string -> ArraySegment<byte> -> unit
-    is_connected : unit -> bool
-    line_buffer  : ArraySegment<byte> }
+    transport    : ITransport
+    buffer_manager : BufferManager
+    line_buffer  : ArraySegment<byte>
+    segments        : BufferSegment list }
+
+let inline receive (cn : Connection) (buf : B) =
+  cn.transport.read buf
+
+let inline send (cn :Connection) (buf : B) =
+  cn.transport.write buf
+
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module Connection =
+  let empty : Connection =
+    { ipaddr     = IPAddress.Loopback
+      transport       =  { socket = null; read_args = null; write_args   = null }
+      buffer_manager = null
+      line_buffer  =  ArraySegment<byte>()
+      segments     = []  }
 
 /// Workflow builder to read/write to async sockets with fail/success semantics
 type SocketMonad() =
@@ -192,18 +221,26 @@ let lift_task (a : Task) : SocketOp<unit>  =
     return Choice1Of2 s 
   }
 
+/// from the Socket monad to Async
+let to_async f = fun ctx -> async {
+  let! o = f ctx
+  match o with
+  | Choice1Of2 option -> return option
+  | Choice2Of2 error -> return failwith (sprintf "socket error: %A" error)
+ }
+
 /// Write the string s to the stream asynchronously as ASCII encoded text
 let inline async_write (connection : Connection) (s : string) : SocketOp<unit> = 
   async {
     if s.Length > 0 then
       let buff = connection.line_buffer
       let c = bytes_to_buffer s buff.Array buff.Offset
-      return! connection.write (new ArraySegment<_>(buff.Array, buff.Offset, c))
+      return! send connection (new ArraySegment<_>(buff.Array, buff.Offset, c))
     else return Choice1Of2 ()
   }
 
 let inline async_write_nl (connection : Connection) = 
-  connection.write eol_array_segment
+  send connection eol_array_segment
 
 let inline async_writeln (connection : Connection) (s : string) : SocketOp<unit> = 
   socket {
@@ -213,7 +250,7 @@ let inline async_writeln (connection : Connection) (s : string) : SocketOp<unit>
 
 /// Write the string s to the stream asynchronously from a byte array
 let inline async_writebytes (connection : Connection) (b : byte[]) : SocketOp<unit> = async {
-  if b.Length > 0 then return! connection.write (new ArraySegment<_>(b, 0, b.Length))
+  if b.Length > 0 then return! send connection (new ArraySegment<_>(b, 0, b.Length))
   else return Choice1Of2 ()
 }
 
@@ -225,7 +262,7 @@ let transfer_x (to_stream : Connection) (from : Stream) : SocketOp<unit> =
     if read <= 0 then
       return ()
     else
-      do! to_stream.write (new ArraySegment<_>(buf,0,read))
+      do! send to_stream (new ArraySegment<_>(buf,0,read))
       return! do_block () }
   do_block ()
 
@@ -239,6 +276,6 @@ let transfer_len_x (to_stream : Connection) (from : Stream) len =
     if read <= 0 || left - read = 0 then
       return ()
     else
-      do! to_stream.write (new ArraySegment<_>(buf,0,read))
+      do! send to_stream (new ArraySegment<_>(buf,0,read))
       return! do_block (left - read) }
   do_block len

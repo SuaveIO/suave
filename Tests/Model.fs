@@ -14,6 +14,7 @@ open Suave.Types.Methods
 open Suave.Http
 open Suave.Http.Successful
 open Suave.Http.RequestErrors
+open Suave.Web
 open Suave.Tests.TestUtilities
 
 [<Tests>]
@@ -23,6 +24,7 @@ let tests =
   let post_data3 = read_text "request-2.txt"
   
   let test_url_encoded_form field_name : WebPart =
+    ParsingAndControl.parse_post_data >>=
     Binding.bind_req (Binding.form field_name Choice1Of2) OK BAD_REQUEST
 
   testList "Suave.Model" [

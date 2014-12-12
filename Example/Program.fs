@@ -17,7 +17,7 @@ open Suave.State.CookieStateStore
 let basic_auth : WebPart =
   Authentication.authenticate_basic ( fun (user_name,password) -> user_name.Equals("foo") && password.Equals("bar"))
 
-let logger = Loggers.ConsoleWindowLogger Debug
+let logger = Loggers.ConsoleWindowLogger Verbose
 
 let myapp : WebPart =
   choose [
@@ -89,7 +89,7 @@ let app =
     GET >>= dir' //show directory listing
     HEAD >>= url "/head" >>= sleep 100 "Nice sleep .."
     POST >>= url "/upload" >>= OK "Upload successful."
-    POST >>= url "/upload2"
+    POST >>= url "/upload2" >>= ParsingAndControl.parse_post_data
       >>= request (fun x ->
          let files =
            x.files
@@ -97,7 +97,7 @@ let app =
              (fun x y -> x + "<br/>" + (sprintf "(%s, %s, %s)" y.file_name y.mime_type y.temp_file_path))
              ""
          OK (sprintf "Upload successful.<br>POST data: %A<br>Uploaded files (%d): %s" x.multipart_fields (List.length x.files) files))
-    POST >>= request (fun x -> OK (sprintf "POST data: %s" (ASCII.to_string' x.raw_form)))
+    POST >>= ParsingAndControl.parse_post_data >>= request (fun x -> OK (sprintf "POST data: %s" (ASCII.to_string' x.raw_form)))
     GET
       >>= url "/custom_header"
       >>= set_header "X-Doge-Location" "http://www.elregalista.com/wp-content/uploads/2014/02/46263312.jpg"
