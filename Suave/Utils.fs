@@ -635,3 +635,11 @@ module Parsing =
       parse_key_value_pairs (Array.sub parts 1 (parts.Length - 1))
     | None ->
       failwith "did not find header, because header_params received None"
+
+module DateTime =
+
+    /// Trys to parse a DateTime and returns an option value.
+  let parse_to_option s =
+    match System.DateTime.TryParse s with
+      | true, date -> Some date
+      | _ -> None

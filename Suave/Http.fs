@@ -407,11 +407,11 @@ module Http =
         let mimes = ctx.runtime.mime_types_map <| get_extension key
         match mimes with
         | Some value ->
-          let modified_since = r.headers %% "if-modified-since"
+          let modified_since = r.headers %% "if-modified-since" |> Option.bind DateTime.parse_to_option
           match modified_since with
-          | Some v -> let date = DateTime.Parse v
-                      if get_last key > date then send_it value.name value.compression ctx
-                      else NOT_MODIFIED ctx
+          | Some date ->
+            if get_last key > date then send_it value.name value.compression ctx
+            else NOT_MODIFIED ctx
           | None   ->
             send_it value.name value.compression ctx
         | None ->
