@@ -386,6 +386,8 @@ module ParsingAndControl =
       | None -> return Some ctx
     }
 
+  let clean_response (ctx : HttpContext) =
+    { ctx with response = HttpResult.empty}
 
   let http_loop (ctx : HttpContext) (consumer : HttpConsumer) =
 
@@ -410,7 +412,7 @@ module ParsingAndControl =
           match ctx.request.headers %% "connection" with
           | Some (x : string) when x.ToLower().Equals("keep-alive") ->
             verbose "'Connection: keep-alive' recurse"
-            return! loop ctx
+            return! loop (clean_response ctx)
           | Some _ ->
             free "Suave.Web.http_loop.loop (case Some _)" connection
             verbose "'Connection: close', exiting"
@@ -418,7 +420,7 @@ module ParsingAndControl =
           | None ->
             if ctx.request.http_version.Equals("HTTP/1.1") then
               verbose "'Connection: keep-alive' recurse (!)"
-              return! loop ctx
+              return! loop (clean_response ctx)
             else
               free "Suave.Web.http_loop.loop (case None, else branch)" connection
               verbose "'Connection: close', exiting"
