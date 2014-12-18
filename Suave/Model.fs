@@ -45,6 +45,11 @@ module Parse =
     | true, uri -> Choice1Of2 uri
     | false, _  -> Choice2Of2 (sprintf "Could not parse '%s' into uri" s)
 
+  let dateTime str =
+    match DateTime.TryParse str with
+    | true, date -> Choice1Of2 date
+    | false, _ -> Choice2Of2 (sprintf "Could not parse '%s' into DateTime" str)
+
 let binding = ChoiceBuilder()
 
 [<AutoOpen>]
