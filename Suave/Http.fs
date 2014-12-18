@@ -456,6 +456,7 @@ module Http =
       { ctx with
           response =
             { ctx.response with
+                status = HTTP_200
                 content = SocketTask (write_file file_name) } }
       |> succeed
 
