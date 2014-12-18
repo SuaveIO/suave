@@ -16,6 +16,7 @@ type ChoiceBuilder() =
 [<RequireQualifiedAccess>]
 module Parse =
   open System
+  open System.Globalization
 
   let string (str : string) =
     Choice1Of2 str
@@ -46,7 +47,7 @@ module Parse =
     | false, _  -> Choice2Of2 (sprintf "Could not parse '%s' into uri" s)
 
   let dateTime str =
-    match DateTime.TryParse str with
+    match DateTime.TryParse(str, CultureInfo.InvariantCulture.DateTimeFormat, DateTimeStyles.None) with
     | true, date -> Choice1Of2 date
     | false, _ -> Choice2Of2 (sprintf "Could not parse '%s' into DateTime" str)
 
