@@ -388,6 +388,7 @@ module Http =
 
     open Writers
     open Redirection
+    open Model
 
     // If a response includes both an Expires header and a max-age directive,
     // the max-age directive overrides the Expires header, even if the Expires header is more restrictive
@@ -405,15 +406,23 @@ module Http =
 
       if exists key then
         let mimes = ctx.runtime.mime_types_map <| get_extension key
+        let foundCtx = {ctx with response = {ctx.response with status = Codes.HTTP_200}}
         match mimes with
         | Some value ->
           let modified_since = r.headers %% "if-modified-since"
           match modified_since with
-          | Some v -> let date = DateTime.Parse v
-                      if get_last key > date then send_it value.name value.compression ctx
-                      else NOT_MODIFIED ctx
+          | Some v ->
+            let parseResult = Parse.dateTime v
+            match parseResult with
+            | Choice1Of2 date ->
+              if get_last key > date then send_it value.name value.compression foundCtx
+              else NOT_MODIFIED foundCtx
+            | Choice2Of2 parseError ->
+              let parseErrorResponse = {ctx.response with status = Codes.HTTP_400}
+              let badRequestCtx = {ctx with response = parseErrorResponse}
+              send_it parseError value.compression badRequestCtx
           | None   ->
-            send_it value.name value.compression ctx
+            send_it value.name value.compression foundCtx
         | None ->
           let ext = get_extension key
           log (sprintf "failed to find matching mime for ext '%s'" ext)
@@ -452,7 +461,6 @@ module Http =
       { ctx with
           response =
             { ctx.response with
-                status = HTTP_200
                 content = SocketTask (write_file file_name) } }
       |> succeed
 
