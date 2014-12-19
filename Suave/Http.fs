@@ -412,7 +412,7 @@ module Http =
           let modified_since = r.headers %% "if-modified-since"
           match modified_since with
           | Some v ->
-            match Parse.dateTime v with
+            match Parse.date_time v with
             | Choice1Of2 date ->
               if get_last key > date then send_it value.name value.compression ctx
               else NOT_MODIFIED ctx
