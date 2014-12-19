@@ -46,7 +46,7 @@ module Parse =
     | true, uri -> Choice1Of2 uri
     | false, _  -> Choice2Of2 (sprintf "Could not parse '%s' into uri" s)
 
-  let dateTime str =
+  let date_time str =
     match DateTime.TryParse(str, CultureInfo.InvariantCulture.DateTimeFormat, DateTimeStyles.RoundtripKind) with
     | true, date -> Choice1Of2 date
     | false, _ -> Choice2Of2 (sprintf "Could not parse '%s' into DateTime" str)
