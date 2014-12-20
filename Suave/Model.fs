@@ -18,38 +18,17 @@ module Parse =
   open System
   open System.Globalization
 
-  let string (str : string) =
-    Choice1Of2 str
-
-  let int32 str =
-    match Int32.TryParse str with
+  let private parse_using<'a> (f:string -> bool * 'a) s =
+    match f s with
     | true, i -> Choice1Of2 i
-    | _       -> Choice2Of2 (sprintf "Could not parse '%s' to int" str)
+    | false, _ -> Choice2Of2 (sprintf "Cound not parse '%s' to %s" s typeof<'a>.Name)
 
-  let uint32 str =
-    match UInt32.TryParse str with
-    | true, i -> Choice1Of2 i
-    | _       -> Choice2Of2 (sprintf "Could not parse '%s' to int" str)
-
-  let int64 str =
-    match Int64.TryParse str with
-    | true, i -> Choice1Of2 i
-    | _       -> Choice2Of2 (sprintf "Could not parse '%s' to int" str)
-
-  let uint64 str =
-    match UInt64.TryParse str with
-    | true, i -> Choice1Of2 i
-    | _       -> Choice2Of2 (sprintf "Could not parse '%s' to int" str)
-
-  let uri (s : string) =
-    match Uri.TryCreate (s, UriKind.RelativeOrAbsolute) with
-    | true, uri -> Choice1Of2 uri
-    | false, _  -> Choice2Of2 (sprintf "Could not parse '%s' into uri" s)
-
-  let date_time str =
-    match DateTime.TryParse(str, CultureInfo.InvariantCulture.DateTimeFormat, DateTimeStyles.RoundtripKind) with
-    | true, date -> Choice1Of2 date
-    | false, _ -> Choice2Of2 (sprintf "Could not parse '%s' into DateTime" str)
+  let int32 = parse_using Int32.TryParse
+  let uint32 = parse_using UInt32.TryParse
+  let int64 = parse_using Int64.TryParse
+  let uint64 = parse_using UInt64.TryParse
+  let uri = parse_using (fun s -> Uri.TryCreate(s, UriKind.RelativeOrAbsolute))
+  let date_time = parse_using (fun s -> DateTime.TryParse(s, CultureInfo.InvariantCulture.DateTimeFormat, DateTimeStyles.RoundtripKind))
 
 let binding = ChoiceBuilder()
 
