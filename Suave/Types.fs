@@ -480,7 +480,7 @@ type ServerKey = byte []
 /// The HttpRuntime is created from the SuaveConfig structure when the web
 /// server starts. You can also use the `HttpRuntime` module to create a new
 /// value yourself, or use the `empty` one.
-and HttpRuntime =
+type HttpRuntime =
   { protocol           : Protocol
     server_key         : ServerKey
     error_handler      : ErrorHandler
