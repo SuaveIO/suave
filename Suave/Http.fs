@@ -388,6 +388,8 @@ module Http =
 
     open Writers
     open Redirection
+    open RequestErrors
+    open Model
 
     // If a response includes both an Expires header and a max-age directive,
     // the max-age directive overrides the Expires header, even if the Expires header is more restrictive
@@ -409,11 +411,13 @@ module Http =
         | Some value ->
           let modified_since = r.headers %% "if-modified-since"
           match modified_since with
-          | Some v -> let date = DateTime.Parse v
-                      if get_last key > date then send_it value.name value.compression ctx
-                      else NOT_MODIFIED ctx
-          | None   ->
-            send_it value.name value.compression ctx
+          | Some v ->
+            match Parse.date_time v with
+            | Choice1Of2 date ->
+              if get_last key > date then send_it value.name value.compression ctx
+              else NOT_MODIFIED ctx
+            | Choice2Of2 parse_error -> bad_request [||] ctx
+          | None -> send_it value.name value.compression ctx
         | None ->
           let ext = get_extension key
           log (sprintf "failed to find matching mime for ext '%s'" ext)

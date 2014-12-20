@@ -16,6 +16,7 @@ type ChoiceBuilder() =
 [<RequireQualifiedAccess>]
 module Parse =
   open System
+  open System.Globalization
 
   let string (str : string) =
     Choice1Of2 str
@@ -44,6 +45,11 @@ module Parse =
     match Uri.TryCreate (s, UriKind.RelativeOrAbsolute) with
     | true, uri -> Choice1Of2 uri
     | false, _  -> Choice2Of2 (sprintf "Could not parse '%s' into uri" s)
+
+  let date_time str =
+    match DateTime.TryParse(str, CultureInfo.InvariantCulture.DateTimeFormat, DateTimeStyles.RoundtripKind) with
+    | true, date -> Choice1Of2 date
+    | false, _ -> Choice2Of2 (sprintf "Could not parse '%s' into DateTime" str)
 
 let binding = ChoiceBuilder()
 
