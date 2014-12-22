@@ -117,14 +117,17 @@ There is a good tutorial on using the `>>=` operator to short circuit a series o
 
 There is also a good tutorial on computation expressions by the same author: http://fsharpforfunandprofit.com/posts/computation-expressions-intro/
 
-Composing bigger programs: HTTP combinators
+Composing bigger programs: combinators
 --------------------------------------------
 
 Defining the entire logic of your program in a single giant function called app would clearly be impossible. Functional programming is all about composing functions from several smaller functions, and both F# and Suave offer various tools to make this easy.
 
-In functional programming parlance, a "combinator" combines several things of the same type into a another thing of the same type (in mathematics it has a slightly different meaning, but we need not worry about this). In the case of Suave, we want to combine webparts to produce new webparts, and ultimately combine them all into a single webpart passed as an argument used to initialise the web server. Each combination will result in a new web part of the same type, namely:
+In functional programming parlance, a "combinator" combines several things of the same type into a another thing of the same type (in mathematics it has a slightly different meaning, but we need not worry about this). In the case of Suave, there are two types of combinator:
 
-`WebPart = HttpContext -> Async<HttpContext option>`
+- Combinators which combine multiple `WebPart` into a single `WebPart`.
+- Combinators that produce `WebPart` from more primitive values. Recall that `WebPart` has the type `HttpContext -> Async<HttpContext option>`. These combinators therefore always take a single HttpContext and produce a new HttpContext, wrapped inside an async option workflow.
+
+Together these are used to create web parts, combine them to produce new webparts, and ultimately combine them all into a single webpart passed as an argument used to initialise the web server.
 
 We have already seen several examples of combinators. The `choose` function seen above takes a list of `WebPart`, and combines them all into a single new `WebPart`:
 
@@ -135,6 +138,8 @@ val choose : (options : WebPart list) -> WebPart
 The `choose` combinator is implemented such that it will execute each webpart in the list until one returns success.
 
 `>>=` is also a combinator, one that combines exactly two web parts. It runs the first, waits for it to finish, and then either passes the result into the second part, or short circuits if the first part returns `None`.
+
+`OK` is a combinator of the second type. It always succeeds and writes its argument to the underlying response stream. It has type `string -> WebPart`.
 
 To gain access to the underlying `HttpRequest` and read query and http form data we can use the `request` combinator (the `^^` custom operator is shorthand for searching a list of key to option pairs and returning the option's value if present):
 
