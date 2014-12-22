@@ -1,17 +1,12 @@
 Introduction
 ============
 
+Suave is a lightweight, non-blocking web server. The non-blocking I/O model is efficient and allows good performance under high load. As such it is suitable for building fast, scalable network applications. In fact, Suave is written in a **completely non-blocking** fashion throughout. Suave **runs on Linux**, OS X and Windows flawlessly.
+
 Suave is inspired in the simplicity of Happstack and born out of the necessity
 of embedding web server capabilities in my own applications.  Still in its early
 stages Suave supports HTTPS, multiple TCP/IP bindings, Basic Access
 Authentication, Keep-Alive and HTTP compression.
-
-Suave also takes advantage of F# asynchronous workflows to perform non-blocking
-IO. In fact, Suave is written in a **completely non-blocking** fashion
-throughout. Suave **runs on Linux**, OS X and Windows flawlessly.
-
-What follows is a tutorial on how to create Suave applications. Scroll past the
-tutorial to see detailed function documentation.
 
 NuGet
 -----
@@ -30,8 +25,8 @@ source https://nuget.org/api/v2
 nuget Suave 0.16.0
 {% endhighlight %}
 
-Tutorial: Hello World!
-----------------------
+The simplest possible application: Hello World!
+-----------------------------------------------
 
 The simplest Suave application is a simple HTTP server that greets all visitors
 with the string `"Hello World!"`
@@ -57,32 +52,122 @@ docs. For the above reference to `web_server_async`, our code looks like this:
 
 ![web_server_async documentation](/images/web_server_async_code.png)
 
-WebParts
---------
+A slightly more complex example: routing HTTP requests
+----------------------------------------------------------
 
-WebParts are functions with the following type:
+Most .NET web frameworks are based on the object-oriented paradigm. This means that you have a class called something like CheesesController or CheesesModule, and then a bunch of methods on that class for things like listing cheeses, adding cheeses, tasting cheeses, etc. These methods are then associated with url routes, with the most common routing methods being:
 
-{% highlight fsharp %}
-type WebPart = HttpContext -> Async<HttpContext option>
-{% endhighlight %}
+- by convention based on class and method names. E.g. in Web API a GET request to `/api/cheeses/4` will automatically get routed to `CheeseController::GetCheeseById`
+- with attributes. E.g. adding attributes like `[Route("cheeses/{cheeseId}/taste")]` and `[HttpGet]` to a method named `TasteCheese`
+- by some sort of global routing table defined in its own class
 
-For every request `web_server` will evaluate the `WebPart`, if the evaluation
-succeeds it will send the calculated response back to the http client. A newbie
-mistake is to confuse the evaluation of the web part with the evaluation of the
-data structure in which you declare them; suave is highly performant, because
-it's common to declare your applicatives in a static context -- and these are
-evaluated at the time of launch of you application. E.g. given an app like this:
+Suave is designed to fit in with F#'s functional programming paradigm, so routing does not use any of these routing methods. Instead routing takes place using a single function, itself composed from many smaller functions. This function has the signature `WebPart`:
 
 {% highlight fsharp %}
-let app = OK (System.DateTimeOffset.UtcNow.ToString("o"))
+type SuaveTask<'a> = Async<'a option>
+type WebPart = HttpContext -> SuaveTask<HttpContext>
+// hence: WebPart = HttpContext -> Async<HttpContext option>
 {% endhighlight %}
 
-you will always get the same result.
+This function has a single parameter of type `HttpContext`. This is an F# record type that includes the HTTP request, the HTTP response, and a few other things. This should be pretty familiar to anyone who has done any web programming before.
 
-`OK` is a combinator that always succeed and writes its argument to the
-underlying response stream.
+A WebPart function returns an asynchronous workflow which itself ultimately returns an `HttpContext option`. Asynchronous workflows are hopefully already somewhat familiar. The `HttpContext option` returned by the asynchronous workflow is either `Some HttpContext` record or `None`, and it is the option that is used to determine routing. Here is a web server with some simple routing logic. You can ignore the `>>=` operator and the exact workings of `choose` for now (both are explained in more detail later), just focus on the tree-like structure of the code:
 
-Put another way, your web parts are "values" in the sense that they evaluate
+{% highlight fsharp %}
+open Suave                 // always open suave
+open Suave.Http.Successful // for OK-result
+open Suave.Web             // for config
+
+let app _ =
+  choose
+    [ GET >>= choose
+        [ url "/hello" >>= OK "Hello GET"
+          url "/goodbye" >>= OK "Good bye GET" ]
+      POST >>= choose
+        [ url "/hello" >>= OK "Hello POST"
+          url "/goodbye" >>= OK "Good bye POST" ] ]
+
+web_server default_config app
+{% endhighlight %}
+
+By using `choose` we execute different logic depending on whether the request was a GET or a POST, and depending on whether the url was /hello or /goodbye. If a request matches a given path in the decision tree, `choose` will return `Some HttpContext`, if it doesn't, `choose` will return `None`. The end result is that when someone makes a request the server will walk down this tree looking for the first part that returns `Some HttpContext`, and then return it to the client. If no part of the tree returns `Some HttpContext` then the result is a 404 page. The server won't evalute the entire data strucuture for every request, only the actual decisions, so there is no need to be concerned about performance.
+
+Async computation expressions and >>=
+-------------------------------------
+
+Suave WebParts use F# async computation expressions. For example you could write:
+
+{% highlight fsharp %}
+let sleep milliseconds message: WebPart =
+  fun (x : HttpContext) ->
+    async {
+      do! Async.Sleep milliseconds
+      return! OK message x
+    }
+{% endhighlight %}
+
+Async computation expressions are built into the F# language as a way of chaining asynchronous functions together. As well as `do!` and `return!` you can use `let!` to wait for another async function to return and then assign the result to a variable. For instance, `let! result = anotherAsyncWorkflow`. Behind the scenes "let!" is just syntactic sugar for calling the method `builder.Bind` on a computation builder.
+
+F# lets you define your own custom computation expressions with their own implementation of `Bind`, but instead of defining a custom computation builder with its own implementation of `Bind` Suave chooses to define the `>>=` operator. This is the standard operator for the `bind` operation in some other languages. So `>>=` chains asynchronous expressions in almost the same way as `let!`, except the expressions are not of type `Async<'b>` and `Async<'c>`, but rather `Async<'b option>` and `Async<'c option>`. That is to say, `>>=
+chains together Async options rather than just vanilla Async computations. If the result of the first of the two chained workflows is `None`, then the computation is short-circuited and the second computation is never run. If the first computation returns `Some x`, then `>>=` behaves in exactly the same way as `let!`.
+
+If you hear someone use the "M" word, they are referring to code that uses the `>>=` operator.
+
+There is a good tutorial on using the `>>=` operator to short circuit a series of operations here: http://fsharpforfunandprofit.com/posts/recipe-part2/
+
+There is also a good tutorial on computation expressions by the same author: http://fsharpforfunandprofit.com/posts/computation-expressions-intro/
+
+Composing bigger programs: combinators
+--------------------------------------------
+
+Defining the entire logic of your program in a single giant function called app would clearly be impossible. Functional programming is all about composing functions from several smaller functions, and both F# and Suave offer various tools to make this easy.
+
+In functional programming parlance, a "combinator" combines several things of the same type into a another thing of the same type (in mathematics it has a slightly different meaning, but we need not worry about this). In the case of Suave, there are two types of combinator:
+
+- Combinators which combine multiple `WebPart` into a single `WebPart`.
+- Combinators that produce `WebPart` from more primitive values. Recall that `WebPart` has the type `HttpContext -> Async<HttpContext option>`. These combinators therefore always take a single HttpContext and produce a new HttpContext, wrapped inside an async option workflow.
+
+Together these are used to create web parts, combine them to produce new webparts, and ultimately combine them all into a single webpart passed as an argument used to initialise the web server.
+
+We have already seen several examples of combinators. The `choose` function seen above takes a list of `WebPart`, and combines them all into a single new `WebPart`:
+
+{% highlight fsharp %}
+val choose : (options : WebPart list) -> WebPart
+{% endhighlight %}
+
+The `choose` combinator is implemented such that it will execute each webpart in the list until one returns success.
+
+`>>=` is also a combinator, one that combines exactly two web parts. It runs the first, waits for it to finish, and then either passes the result into the second part, or short circuits if the first part returns `None`.
+
+`OK` is a combinator of the second type. It always succeeds and writes its argument to the underlying response stream. It has type `string -> WebPart`.
+
+To gain access to the underlying `HttpRequest` and read query and http form data we can use the `request` combinator (the `^^` custom operator is shorthand for searching a list of key to option pairs and returning the option's value if present):
+
+{% highlight fsharp %}
+let greetings q =
+  defaultArg (q ^^ "name") "World" |> sprintf "Hello %s"
+
+let sample : WebPart = 
+    url "/hello" >>= choose [
+      GET  >>= request(fun r -> OK <| greetings (query r))
+      POST >>= request(fun r -> OK <| greetings (form r))
+      NOT_FOUND "Found no handlers" ]
+{% endhighlight %}
+
+You can similarly use `context` to gain access to the full `HttpContext` and connection.
+
+To protect a route with HTTP Basic Authentication the combinator `authenticate_basic` is used like in the following example.
+
+{% highlight fsharp %}
+let requires_authentication _ =
+  choose
+    [ GET >>= url "/public" >>= OK "Hello anonymous"
+      // access to handlers after this one will require authentication
+      authenticate_basic (fun (user, pass) -> user = "foo" && pass = "bar")
+      GET >>= url "/protected" >>= context (fun x -> OK ("Hello " + x.user_state.["user_name"])) ]
+{% endhighlight %}
+
+Your web parts are "values" in the sense that they evaluate
 once, e.g. when constructing `choose [ OK "hi" ]`, `OK "hi"` is evaluated once,
 not every request. You need to wrap your web part in a closure if you want to
 re-evaluated every request, with `Suave.Http.warbler`, `Suave.Types.context` or
@@ -102,7 +187,7 @@ return an applicative that is a WebPart (i.e. something that isn't from
 HttpRequest to something else, but from HttpContext to async http context
 option).
 
-Applicatives and Http combinators
+More Applicatives and HTTP combinators
 ---------------------------------
 
 The documentation for applicates is written in
@@ -147,89 +232,21 @@ RFC that documents all HTTP result codes, into this file.
 
 The numeric/discriminated-union HTTP codes can be found in `Suave.Types.Codes`.
 
-Tutorial: Composing bigger programs
------------------------------------
+Programming with fish (custom operator reference)
+----------------------------------------
 
-Logic is expressed with the help of different combinators built around the
-`WebPart = HttpContext -> Async<HttpContext option>` type.
+Functional programming tends to involve custom operators. An excessive number of custom operators makes for cryptic, illegible code, but a few well chosen ones allow logic to be more succint and readable. We have already seen `>>=`, and happily suave does not use either ><<*> or <*)))>{
 
-{% highlight fsharp %}
-let simple_app _ =
-  url "/hello" >>= OK "Hello World"
-{% endhighlight %}
+The other custom operators it declares are:
 
-To select between different routes or options we use the function `choose`.
-
-{% highlight fsharp %}
-val choose : (options : WebPart list) -> WebPart
-{% endhighlight %}
-
-For example:
-
-{% highlight fsharp %}
-let url_matching_app _ = 
-  choose
-    [ url "/hello" >>= never >>= OK "Is never returned"
-      url "/hello" >>= OK "Hello World" ]
-{% endhighlight %}
-
-The function `choose` accepts a list of webparts and execute each webpart in the
-list until one returns success. Since `choose` itself returns a webpart we can
-nest them for more complex logic.
-
-{% highlight fsharp %}
-let nested_logic _ =
-  choose
-    [ GET >>= choose
-        [ url "/hello" >>= OK "Hello GET"
-          url "/goodbye" >>= OK "Good bye GET" ]
-      POST >>= choose
-        [ url "/hello" >>= OK "Hello POST"
-          url "/goodbye" >>= OK "Good bye POST" ] ]
-{% endhighlight %}
-
-To gain access to the underlying `HttpRequest` and read query and http form data
-we can use the `request` combinator.
-
-{% highlight fsharp %}
-let greetings q =
-  defaultArg (q ^^ "name") "World" |> sprintf "Hello %s"
-
-let sample : WebPart = 
-    url "/hello" >>= choose [
-      GET  >>= request(fun r -> OK <| greetings (query r))
-      POST >>= request(fun r -> OK <| greetings (form r))
-      NOT_FOUND "Found no handlers" ]
-{% endhighlight %}
-
-You can similarly use `context` to gain access to the full `HttpContext` and
-connection.
-
-To protect a route with HTTP Basic Authentication the combinator
-`authenticate_basic` is used like in the following example.
-
-{% highlight fsharp %}
-let requires_authentication _ =
-  choose
-    [ GET >>= url "/public" >>= OK "Hello anonymous"
-      // access to handlers after this one will require authentication
-      authenticate_basic (fun (user, pass) -> user = "foo" && pass = "bar")
-      GET >>= url "/protected" >>= context (fun x -> OK ("Hello " + x.user_state.["user_name"])) ]
-{% endhighlight %}
-
-Programming Async WebParts
-------------------------------
-
-Suave WebParts live in the Async monad. For example you could write:
-
-{% highlight fsharp %}
-let sleep milliseconds message: WebPart =
-  fun (x : HttpContext) ->
-    async {
-      do! Async.Sleep milliseconds
-      return! OK message x
-    }
-{% endhighlight %}
+| Operator | Description |
+| ---------|-------------|
+|>=>       | Left-to-right Kleisli composition of monads, see Http.fsi
+|<|>       | Left-to-right Kleisli composition of web parts, see Http.fsi
+|?         | Try find a value by key in a dictionary
+|%%        | Search a list of key-value pairs and return the value (or None if not found)
+|^^        | Search a list of key-value option pairs and return the value (or None if not found)
+|?<-       | Assign a value to the key in the dictionary
 
 Typed routes
 ------------
