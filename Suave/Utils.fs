@@ -387,9 +387,9 @@ module Compression =
   let private encode (mk_stream : Stream * CompressionMode -> Stream) (bytes: byte[]) =
     if bytes.Length > 0 then
       use memory =  new MemoryStream()
-      use gzip = mk_stream(memory, CompressionMode.Compress)
-      do gzip.Write(bytes, 0, bytes.Length)
-      gzip.Close()
+      use compress_stream = mk_stream(memory, CompressionMode.Compress)
+      do compress_stream.Write(bytes, 0, bytes.Length)
+      compress_stream.Close()
       memory.ToArray()
     else
       [||]
@@ -397,9 +397,9 @@ module Compression =
   let private decode (mk_stream : Stream * CompressionMode -> Stream) (bytes: byte[]) =
     if bytes.Length > 0 then
       use compressed =  new MemoryStream(bytes)
-      use gzip = mk_stream(compressed, CompressionMode.Decompress)
+      use decompress_stream = mk_stream(compressed, CompressionMode.Decompress)
       use result = new MemoryStream()
-      gzip.CopyTo(result)
+      decompress_stream.CopyTo(result)
       result.ToArray()
     else
       [||]
