@@ -242,7 +242,7 @@ The other custom operators it declares are:
 | Operator | Description |
 | ---------|-------------|
 |>=>       | Left-to-right Kleisli composition of monads, see Http.fsi
-|<|>       | Left-to-right Kleisli composition of web parts, see Http.fsi
+|<&#124;>       | Left-to-right Kleisli composition of web parts, see Http.fsi
 |?         | Try find a value by key in a dictionary
 |%%        | Search a list of key-value pairs and return the value (or None if not found)
 |^^        | Search a list of key-value option pairs and return the value (or None if not found)
