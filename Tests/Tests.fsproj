@@ -655,6 +655,7 @@
     </Otherwise>
   </Choose>
   <ItemGroup>
+    <Compile Include="AssemblyInfo.fs" />
     <Content Include="large_xml.xml" />
     <Content Include="Bug106-ReadingInputData.txt" />
     <Content Include="Bug105-StopsResponding.verbose.txt" />
