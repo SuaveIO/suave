@@ -12,11 +12,8 @@ open Socket
 
 
 /// <summary>
-/// <para>These are the known HTTP methods.</para><para>
-/// If you are getting compile-errors
-/// on this; make sure you don't mean the similarly named functions from the
-/// Applicatives module, e.g. by opening Applicatives after opening Http.
-/// </para></summary>
+/// These are the known HTTP methods.
+/// </summary>
 [<RequireQualifiedAccess>]
 type HttpMethod =
   | GET
