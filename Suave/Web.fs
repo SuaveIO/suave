@@ -281,7 +281,8 @@ module ParsingAndControl =
 
     let! (first_line : string), connection = read_line ctx.connection
 
-    let meth, url, raw_query, http_version = parse_url first_line
+    let raw_method, url, raw_query, http_version = parse_url first_line
+    let meth = HttpMethod.parse raw_method
 
     let! headers, connection = read_headers connection
 

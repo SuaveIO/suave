@@ -10,7 +10,7 @@ open Fuchu
 open Suave
 open Suave.Types
 open Suave.Model
-open Suave.Types.Methods
+open Suave.Types
 open Suave.Http
 open Suave.Http.Successful
 open Suave.Http.RequestErrors
@@ -47,12 +47,12 @@ let tests =
         "should have read data",
         "identifier 123abc",
         run_with' (test_url_encoded_form "body-plain")
-        |> req_gzip POST "/" (Some <| new StringContent(post_data3, Encoding.UTF8, "application/x-www-form-urlencoded")))
+        |> req_gzip HttpMethod.POST "/" (Some <| new StringContent(post_data3, Encoding.UTF8, "application/x-www-form-urlencoded")))
 
     testCase "200 OK returns 'a'" <| fun _ ->
       Assert.Equal(
         "expecting nilsson response",
         "nilsson",
         run_with' (Binding.bind_req (Binding.query "apa" Choice1Of2) OK BAD_REQUEST)
-        |> req_query GET "/" "apa=nilsson")
+        |> req_query HttpMethod.GET "/" "apa=nilsson")
     ]

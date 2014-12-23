@@ -286,12 +286,12 @@ module Http =
     open System
     open System.Text.RegularExpressions
 
-    open Types.Methods
+    open Types
 
     let url s (x : HttpContext) = async { if s = x.request.url then return Some x else return None }
 
     let ``method`` (s : HttpMethod) (x : HttpContext) = async {
-      if s.ToString() = x.request.``method`` then return Some x else return None
+      if s = x.request.``method`` then return Some x else return None
       }
 
     let is_secure (x : HttpContext) = async {
@@ -304,15 +304,15 @@ module Http =
 
     // see http://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html
 
-    let GET     (x : HttpContext) = ``method`` GET x
-    let POST    (x : HttpContext) = ``method`` POST x
-    let DELETE  (x : HttpContext) = ``method`` DELETE x
-    let PUT     (x : HttpContext) = ``method`` PUT x
-    let HEAD    (x : HttpContext) = ``method`` HEAD x
-    let CONNECT (x : HttpContext) = ``method`` CONNECT x
-    let PATCH   (x : HttpContext) = ``method`` PATCH x
-    let TRACE   (x : HttpContext) = ``method`` TRACE x
-    let OPTIONS (x : HttpContext) = ``method`` OPTIONS x
+    let GET     (x : HttpContext) = ``method`` HttpMethod.GET x
+    let POST    (x : HttpContext) = ``method`` HttpMethod.POST x
+    let DELETE  (x : HttpContext) = ``method`` HttpMethod.DELETE x
+    let PUT     (x : HttpContext) = ``method`` HttpMethod.PUT x
+    let HEAD    (x : HttpContext) = ``method`` HttpMethod.HEAD x
+    let CONNECT (x : HttpContext) = ``method`` HttpMethod.CONNECT x
+    let PATCH   (x : HttpContext) = ``method`` HttpMethod.PATCH x
+    let TRACE   (x : HttpContext) = ``method`` HttpMethod.TRACE x
+    let OPTIONS (x : HttpContext) = ``method`` HttpMethod.OPTIONS x
 
     /// The default log format for <see cref="log" />.  NCSA Common log format
     /// 
@@ -337,7 +337,7 @@ module Http =
         process_id //TODO: obtain connection owner via Ident protocol
         (match Map.tryFind "user_name" ctx.user_state with Some x -> x :?> string | None -> "-")
         (DateTime.UtcNow.ToString("dd/MMM/yyyy:hh:mm:ss %K", ci))
-        ctx.request.``method``
+        (string ctx.request.``method``)
         ctx.request.url
         ctx.request.http_version
         (Codes.http_code ctx.response.status)

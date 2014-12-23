@@ -51,7 +51,7 @@ let forward (ip : IPAddress) (port : uint16) (ctx : HttpContext) =
   q.AllowAutoRedirect         <- false
   q.AllowReadStreamBuffering  <- false
   q.AllowWriteStreamBuffering <- false
-  q.Method  <- p.``method``
+  q.Method  <- string p.``method``
   q.Headers <- buildWebHeadersCollection p.headers
   q.Proxy   <- null
 
@@ -72,7 +72,7 @@ let forward (ip : IPAddress) (port : uint16) (ctx : HttpContext) =
   q.Headers.Add("X-Forwarded-For", p.ipaddr.ToString())
 
   fun ctx -> socket {
-    if p.``method`` = "POST" || p.``method`` = "PUT" then
+    if p.``method`` = HttpMethod.POST || p.``method`` = HttpMethod.PUT then
       let content_length = Convert.ToInt32(p.headers %% "content-length")
       do! transfer_len_x ctx.connection (q.GetRequestStream()) content_length
     try

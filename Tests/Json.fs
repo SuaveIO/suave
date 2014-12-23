@@ -9,7 +9,6 @@ open System.Net.Http.Headers
 open System.Text
 
 open Suave
-open Suave.Types.Methods
 open Suave.Types
 open Suave.Http
 open Suave.Json
@@ -38,5 +37,5 @@ let parsing_multipart =
   testList "map_json test" [
     testCase "simple test" <| fun _ ->
       Assert.Equal("returns correct json representation", "{\"bar\":\"foo\"}", 
-        run_with' (map_json (fun (a:Foo) -> { bar = a.foo })) |> req POST "/" (Some <| new ByteArrayContent(to_json { foo = "foo" }))) ]
+        run_with' (map_json (fun (a:Foo) -> { bar = a.foo })) |> req HttpMethod.POST "/" (Some <| new ByteArrayContent(to_json { foo = "foo" }))) ]
 
