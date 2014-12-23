@@ -124,7 +124,7 @@ Composing bigger programs: combinators
 
 Defining the entire logic of your program in a single giant function called app would clearly be impossible. Functional programming is all about composing functions from several smaller functions, and both F# and Suave offer various tools to make this easy.
 
-In functional programming parlance, a "combinator" either combines several things of the same type into a another thing of the same type, or otherwise takes a value and returns a new, modified version of that value. In mathematics it has a slightly different meaning, but we need not worry about this. In the case of Suave, there are two types of combinator:
+In functional programming parlance, a "combinator" either combines several things of the same type into another thing of the same type, or otherwise takes a value and returns a new, modified version of that value. In mathematics it has a slightly different meaning, but we need not worry about this. In the case of Suave, there are two types of combinator:
 
 - Combinators which combine multiple `WebPart` into a single `WebPart`.
 - Combinators that produce `WebPart` from more primitive values. Recall that `WebPart` has the type `HttpContext -> Async<HttpContext option>`. These combinators therefore always take a single HttpContext and produce a new HttpContext, wrapped inside an async option workflow.
