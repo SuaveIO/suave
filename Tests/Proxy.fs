@@ -12,7 +12,6 @@ open System.Net
 
 open Suave
 open Suave.Types
-open Suave.Types.Methods
 open Suave.Http.Successful
 open Suave.Http.Redirection
 open Suave.Http.ServerErrors

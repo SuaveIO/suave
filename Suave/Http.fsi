@@ -1053,7 +1053,7 @@ module Http =
   /// Functions have signature f :: params... -> HttpContext -> HttpContext option.
   module Applicatives =
 
-    open Types.Methods
+    open Types
 
     /// Match on the url
     val url : s:string -> WebPart

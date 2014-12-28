@@ -6,7 +6,7 @@ open System.Net.Http
 
 open Suave
 open Suave.Types
-open Suave.Types.Methods
+open Suave.Types
 open Suave.Web
 open Suave.Http
 open Successful
@@ -20,17 +20,17 @@ let gets =
   let run_with' = run_with default_config
   testList "getting basic responses" [
       testCase "200 OK returns 'a'" <| fun _ ->
-        Assert.Equal("expecting non-empty response", "a", run_with' (OK "a") |> req GET "/" None)
+        Assert.Equal("expecting non-empty response", "a", run_with' (OK "a") |> req HttpMethod.GET "/" None)
 
       testPropertyWithConfig fscheck_config "200 OK returns equivalent" <| fun resp_str ->
-        (run_with' (OK resp_str) |> req GET "/hello" None) = resp_str
+        (run_with' (OK resp_str) |> req HttpMethod.GET "/hello" None) = resp_str
 
       testCase "204 No Content empty body" <| fun _ ->
         Assert.Equal("empty string should always be returned by 204 No Content",
-                     "", (run_with' NO_CONTENT |> req GET "/" None))
+                     "", (run_with' NO_CONTENT |> req HttpMethod.GET "/" None))
 
       testCase "302 FOUND sends content-length header" <| fun _ ->
-        let headers = req_content_headers GET "/" None (run_with' (Redirection.FOUND "/url"))
+        let headers = req_content_headers HttpMethod.GET "/" None (run_with' (Redirection.FOUND "/url"))
         Assert.Equal("302 FOUND sends content-length header",
                      true,
                      headers.Contains("Content-Length"))
@@ -86,17 +86,17 @@ let posts =
   testList "posting basic data" [
       testCase "POST data round trips with no content-type" <| fun _ ->
         use data = new StringContent("bob")
-        Assert.Equal("expecting data to be returned", "bob", run_with' webId |> req POST "/" (Some data))
+        Assert.Equal("expecting data to be returned", "bob", run_with' webId |> req HttpMethod.POST "/" (Some data))
       testCase "POST form data makes round trip" <| fun _ ->
         use data = new FormUrlEncodedContent(dict [ "name", "bob"])
-        Assert.Equal("expecting form data to be returned", "bob", run_with' (getFormValue "name") |> req POST "/" (Some data))
+        Assert.Equal("expecting form data to be returned", "bob", run_with' (getFormValue "name") |> req HttpMethod.POST "/" (Some data))
       testCase "POST long data" <| fun _ ->
         use data = new FormUrlEncodedContent(dict [ "long", longData])
-        Assert.Equal("expecting form data to be returned", longData, run_with' (getFormValue "long") |> req POST "/" (Some data))
+        Assert.Equal("expecting form data to be returned", longData, run_with' (getFormValue "long") |> req HttpMethod.POST "/" (Some data))
       testCase "POST persona assertion" <| fun _ ->
         use data = new FormUrlEncodedContent(dict [ "assertion", assertion])
-        Assert.Equal("expecting form data to be returned", assertion, run_with' (getFormValue "assertion") |> req POST "/" (Some data))
+        Assert.Equal("expecting form data to be returned", assertion, run_with' (getFormValue "assertion") |> req HttpMethod.POST "/" (Some data))
       testCase "POST unicode data" <| fun _ ->
         use data = new FormUrlEncodedContent(dict [ "name", unicodeString ])
-        Assert.Equal("expecting form data to be returned", unicodeString, run_with' (getFormValue "name") |> req POST "/" (Some data))
+        Assert.Equal("expecting form data to be returned", unicodeString, run_with' (getFormValue "name") |> req HttpMethod.POST "/" (Some data))
     ]

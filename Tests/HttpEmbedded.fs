@@ -3,7 +3,7 @@
 open Fuchu
 
 open Suave
-open Suave.Types.Methods
+open Suave.Types
 open Suave.Http
 open Suave.Http.Successful
 open Suave.Http.Embedded
@@ -16,5 +16,5 @@ let embedded_resources =
 
   testList "test Embedded.browse" [
       testCase "200 OK returns embedded file" <| fun _ ->
-        Assert.Equal("expecting 'Hello World!'", "Hello World!", run_with' browse' |> req GET "/embedded-resource.txt" None)
+        Assert.Equal("expecting 'Hello World!'", "Hello World!", run_with' browse' |> req HttpMethod.GET "/embedded-resource.txt" None)
     ]

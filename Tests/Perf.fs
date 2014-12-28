@@ -2,7 +2,6 @@
 
 open Suave.Utils
 open Suave.Types
-open Suave.Types.Methods
 open Suave.Http
 open Suave.Http.Successful
 open Suave.Web
@@ -46,7 +45,7 @@ let perf_tests =
   testList "performance tests" [
     testPerfHistory "perf-GET" server_factory version [
       perfTest "GET /" <| fun harness ->
-        iterate 400 (fun _ -> harness.Serve (OK "a") |> req GET "/" None |> ignore)
+        iterate 400 (fun _ -> harness.Serve (OK "a") |> req HttpMethod.GET "/" None |> ignore)
       ]
 
     testPerfHistory "perf-POST" server_factory version [
@@ -55,6 +54,6 @@ let perf_tests =
           use data = new FormUrlEncodedContent(dict ["long", longData])
           Assert.Equal("expecting form data to be returned",
                        longData,
-                       harness.Serve (getFormValue "long") |> req POST "/" (Some data)))
+                       harness.Serve (getFormValue "long") |> req HttpMethod.POST "/" (Some data)))
       ]
     ]
