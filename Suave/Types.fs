@@ -12,11 +12,8 @@ open Socket
 
 
 /// <summary>
-/// <para>These are the known HTTP methods.</para><para>
-/// If you are getting compile-errors
-/// on this; make sure you don't mean the similarly named functions from the
-/// Applicatives module, e.g. by opening Applicatives after opening Http.
-/// </para></summary>
+/// These are the known HTTP methods. See http://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html
+/// </summary>
 [<RequireQualifiedAccess>]
 type HttpMethod =
   | GET
@@ -28,7 +25,7 @@ type HttpMethod =
   | PATCH
   | TRACE
   | OPTIONS
-  | OTHER of string
+  | OTHER of string // This represents a method string that isn't one of the standard methods.
   override x.ToString() =
     match x with
     | GET     -> "GET"
