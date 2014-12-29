@@ -42,6 +42,8 @@ Now that you've discovered how to do "Hello World!", go read the
 
 If you just want to hack away or try the samples, just open suave.sln and run them!
 
+For 'getting started quick', run 'build.sh'.
+
 ---
 
 If you want to reproduce a build or run a build in a CI-environment, just follow

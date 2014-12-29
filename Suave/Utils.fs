@@ -384,45 +384,34 @@ module Compression =
   open System.IO
   open System.IO.Compression
 
-  let gzip_encode (bytes : byte []) =
+  let private encode (mk_stream : Stream * CompressionMode -> Stream) (bytes: byte[]) =
     if bytes.Length > 0 then
       use memory =  new MemoryStream()
-      use gzip = new GZipStream(memory, CompressionMode.Compress)
-      do gzip.Write(bytes, 0, bytes.Length)
-      gzip.Close()
+      use compress_stream = mk_stream(memory, CompressionMode.Compress)
+      do compress_stream.Write(bytes, 0, bytes.Length)
+      compress_stream.Close()
       memory.ToArray()
     else
       [||]
 
-  let gzip_decode (bytes : byte []) =
+  let private decode (mk_stream : Stream * CompressionMode -> Stream) (bytes: byte[]) =
     if bytes.Length > 0 then
       use compressed =  new MemoryStream(bytes)
-      use gzip = new GZipStream(compressed, CompressionMode.Decompress)
+      use decompress_stream = mk_stream(compressed, CompressionMode.Decompress)
       use result = new MemoryStream()
-      gzip.CopyTo(result)
+      decompress_stream.CopyTo(result)
       result.ToArray()
     else
       [||]
 
-  let deflate_encode (bytes : byte []) =
-    if bytes.Length > 0 then
-      use memory =  new MemoryStream()
-      use gzip = new DeflateStream(memory, CompressionMode.Compress)
-      do gzip.Write(bytes, 0, bytes.Length)
-      gzip.Close()
-      memory.ToArray()
-    else
-      [||]
+  let private gzip (s:Stream, m:CompressionMode) = new GZipStream(s, m) :> Stream
+  let private deflate (s:Stream, m:CompressionMode) = new DeflateStream(s, m) :> Stream
 
-  let deflate_decode (bytes : byte []) =
-    if bytes.Length > 0 then
-      use compressed =  new MemoryStream(bytes)
-      use gzip = new DeflateStream(compressed, CompressionMode.Decompress)
-      use result = new MemoryStream()
-      gzip.CopyTo(result)
-      result.ToArray()
-    else
-      [||]
+  let gzip_encode = encode gzip
+  let gzip_decode = decode gzip
+
+  let deflate_encode = encode deflate
+  let deflate_decode = decode deflate
 
 /// Small crypto module that can do HMACs and generate random strings to use
 /// as keys, as well as create a 'cryptobox'; i.e. a AES256+HMACSHA256 box with
