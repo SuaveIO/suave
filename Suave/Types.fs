@@ -12,7 +12,7 @@ open Socket
 
 
 /// <summary>
-/// These are the known HTTP methods.
+/// These are the known HTTP methods. See http://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html
 /// </summary>
 [<RequireQualifiedAccess>]
 type HttpMethod =
@@ -25,7 +25,7 @@ type HttpMethod =
   | PATCH
   | TRACE
   | OPTIONS
-  | OTHER of string
+  | OTHER of string // This represents a method string that isn't one of the standard methods.
   override x.ToString() =
     match x with
     | GET     -> "GET"
