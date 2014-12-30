@@ -78,14 +78,13 @@ module RequestFactory =
   let run_with = run_with_factory web_server_async
 
   let to_http_method = function
-    | GET -> HttpMethod.Get
-    | POST -> HttpMethod.Post
-    | DELETE -> HttpMethod.Delete
-    | PUT-> HttpMethod.Put
-    | HEAD -> HttpMethod.Head
-    | TRACE -> HttpMethod.Trace
-    | OPTIONS -> HttpMethod.Options
-    | methd -> failwithf "unsupported method %A by HttpClient" methd
+    | HttpMethod.GET -> HttpMethod.Get
+    | HttpMethod.POST -> HttpMethod.Post
+    | HttpMethod.DELETE -> HttpMethod.Delete
+    | HttpMethod.PUT-> HttpMethod.Put
+    | HttpMethod.HEAD -> HttpMethod.Head
+    | HttpMethod.TRACE -> HttpMethod.Trace
+    | HttpMethod.OPTIONS -> HttpMethod.Options
 
   /// ensures the context is disposed after 'f ctx' is called
   let with_context f ctx =
