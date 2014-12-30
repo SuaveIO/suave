@@ -293,7 +293,11 @@
   </Choose>
   <ItemGroup>
     <Compile Include="Async.fs" />
-    <Compile Include="Utils.fs" />
+    <Compile Include="utils\Utils.fs" />
+    <Compile Include="utils\UTF8.fs" />
+    <Compile Include="utils\ASCII.fs" />
+    <Compile Include="utils\String.fs" />
+    <Compile Include="utils\Choice.fs" />
     <Compile Include="Globals.fs" />
     <Compile Include="Log.fs" />
     <Compile Include="Socket.fs" />
