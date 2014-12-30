@@ -44,12 +44,12 @@ let perf_tests =
 
   testList "performance tests" [
     testPerfHistory "perf-GET" server_factory version [
-      perfTest "GET /" <| fun harness ->
+      perfTest' "GET /" <| fun harness ->
         iterate 400 (fun _ -> harness.Serve (OK "a") |> req HttpMethod.GET "/" None |> ignore)
       ]
 
     testPerfHistory "perf-POST" server_factory version [
-      perfTest "POST / n' mirror" <| fun harness ->
+      perfTest' "POST / n' mirror" <| fun harness ->
         iterate 400 (fun _ ->
           use data = new FormUrlEncodedContent(dict ["long", longData])
           Assert.Equal("expecting form data to be returned",

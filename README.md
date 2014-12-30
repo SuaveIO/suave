@@ -120,6 +120,14 @@ more-often-varying parameters in the function signature.
 
 Run Tests as a console app. Return status code = 0 means success.
 
+## Upgrade openssl
+
+Windows: paket update openssl.redist
+
+OS X: brew install openssl && brew update openssl && cp /usr/local/Cellar/openssl/1.0.1j_1/lib/ .
+
+Linux: ...
+
 # Community
 
 ## Chat Room
