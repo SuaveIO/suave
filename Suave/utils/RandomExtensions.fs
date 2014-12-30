@@ -1,4 +1,4 @@
-﻿namespace Suave.Util
+﻿namespace Suave.Utils
 
 module RandomExtensions =
   open System
