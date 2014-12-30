@@ -20,6 +20,7 @@ open Suave.Http
 open Suave.Proxy
 
 open Suave.Tests.TestUtilities
+open Suave.Testing
 
 [<Tests>]
 let proxy =

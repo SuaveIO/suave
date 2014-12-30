@@ -9,7 +9,9 @@ open System.Text
 open Suave.Types
 open Suave.Http
 open Suave.Http.Successful
+
 open Suave.Tests.TestUtilities
+open Suave.Testing
 
 [<Tests>]
 let ``canonicalization attacks`` =

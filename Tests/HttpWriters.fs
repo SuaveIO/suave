@@ -11,6 +11,7 @@ open Suave.Http.Writers
 open Suave.Types
 
 open Suave.Tests.TestUtilities
+open Suave.Testing
 
 [<Tests>]
 let cookies =

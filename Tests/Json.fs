@@ -12,7 +12,9 @@ open Suave
 open Suave.Types
 open Suave.Http
 open Suave.Json
+
 open Suave.Tests.TestUtilities
+open Suave.Testing
 
 open System.Runtime.Serialization
 

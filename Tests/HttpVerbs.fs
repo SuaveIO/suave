@@ -12,6 +12,7 @@ open Successful
 open Suave.Utils
 
 open Suave.Tests.TestUtilities
+open Suave.Testing
 
 open Fuchu
 

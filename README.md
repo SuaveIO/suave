@@ -38,6 +38,39 @@ Now that you've discovered how to do "Hello World!", go read the
 [rest of the documentation](http://suave.io/) - editable on the
 [gh-pages branch](https://github.com/SuaveIO/suave/tree/gh-pages).
 
+# Suave.Testing
+
+We have a NuGet ready for your testing needs; Sauve is an excellent server for
+running in-process integation tests, as it's very fast to spawn. On an ordinary
+laptop, running hundreds of randomised tests and micro-benchmarks as well as all
+Suave unit tests, take about 5 seconds on mono.
+
+Start by installing:
+
+```
+paket add nuget suave.testing
+```
+
+You can now use it:
+
+``` fsharp
+open Suave
+open Suave.Types
+open Suave.Testing
+
+open Fuchu
+
+testCase "parsing a large multipart form" <| fun _ ->
+
+  let res =
+    run_with' test_multipart_form
+    |> req HttpMethod.POST "/" (Some <| byte_array_content)
+
+  Assert.Equal("", "Bob <bob@wishfulcoding.mailgun.org>", )
+```
+
+All of our tests use this assembly; you can do too.
+
 # How to Build
 
 If you just want to hack away or try the samples, just open suave.sln and run them!
