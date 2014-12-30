@@ -39,10 +39,14 @@ module Http =
   /// Return failure with a value that is ignored
   val never : WebPart
 
-  /// Compose (bind) two arguments, 'a' and 'b', so that the result of
-  /// the composition can be applied to an argument of 'a' and then passed
-  /// to 'b', if 'a' yields a value.
+  /// Compose (bind) two arguments, 'first' and 'second', so that the result of
+  /// the composition can be applied to an argument of 'input' and then passed
+  /// to 'second', if 'first' yields a value.
   val inline (>>=) : first:('a -> Async<'b option>) -> second:('b -> Async<'c option>) -> input:'a -> Async<'c option>
+
+  /// Compose (bind) two web parts; see (>>=) -- note the different parameter
+  /// ordering
+  val inline bind : second:('b -> Async<'c option>) -> first:('a -> Async<'b option>) -> input:'a -> Async<'c option>
 
   /// Left-to-right Kleisli composition of monads.
   val inline (>=>) : first:('a -> 'b option) -> second:('a -> 'b option) -> input:'a -> 'b option
