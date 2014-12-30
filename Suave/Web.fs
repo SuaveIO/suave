@@ -464,6 +464,7 @@ open System.Net
 open Suave.Types
 open Suave.Http
 open Suave.Socket
+open Suave.Utils
 
 /// The default error handler returns a 500 Internal Error in response to
 /// thrown exceptions.

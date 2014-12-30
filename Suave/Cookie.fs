@@ -10,6 +10,7 @@ module Cookie =
   open Suave.Types
   open Suave.Http
   open Suave.Log
+  open Suave.Utils
 
   type CookieLife =
     | Session

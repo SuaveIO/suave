@@ -3,6 +3,7 @@
 open System
 open System.Diagnostics
 
+open Suave.Utils
 open Suave.Utils.RandomExtensions
 
 /// The log levels specify the severity of the message.

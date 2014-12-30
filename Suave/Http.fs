@@ -132,9 +132,11 @@ module Http =
 
   // 2xx
   module Successful =
-
+    
+    open Suave.Utils
     open Response
     open Types.Codes
+    
 
     let ok s : WebPart = 
       fun ctx -> { ctx with response = { ctx.response with status = HTTP_200; content = Bytes s }} |> succeed
@@ -157,6 +159,7 @@ module Http =
   // 3xx
   module Redirection =
 
+    open Suave.Utils
     open Response
     open Writers
     open Types.Codes
@@ -194,6 +197,7 @@ module Http =
   // 4xx
   module RequestErrors =
 
+    open Suave.Utils
     open Response
     open Writers
     open Types.Codes
@@ -257,7 +261,8 @@ module Http =
     let TOO_MANY_REQUESTS s = too_many_requests (UTF8.bytes s)
 
   module ServerErrors =
-
+  
+    open Suave.Utils
     open Response
     open Types.Codes
 
@@ -286,7 +291,9 @@ module Http =
     let INVALID_HTTP_VERSION = invalid_http_version (UTF8.bytes (http_message HTTP_505))
 
   module Applicatives =
+  
 
+    open Suave.Utils
     open System
     open System.Text.RegularExpressions
 
@@ -604,10 +611,12 @@ module Http =
   // See www.w3.org/TR/eventsource/#event-stream-interpretation
   module EventSource =
     open System
+    
 
     open Suave
     open Suave.Socket
     open Suave.Types
+    open Suave.Utils
 
     [<Literal>]
     let private ES_EOL = "\n"
@@ -685,6 +694,7 @@ module Http =
   module Authentication =
 
     open RequestErrors
+    open Suave.Utils
 
     let internal parse_authentication_token (token : string) =
       let parts = token.Split (' ')

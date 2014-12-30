@@ -8,6 +8,7 @@ open Suave.Types
 open Suave.Cookie
 open Suave.Http
 open Suave.Log
+open Suave.Utils
 
 module internal Utils =
   /// Generates a string key from the available characters with the given key size
