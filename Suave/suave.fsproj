@@ -300,6 +300,8 @@
     <Compile Include="utils\Option.fs" />
     <Compile Include="utils\Map.fs" />
     <Compile Include="utils\Choice.fs" />
+    <Compile Include="utils\List.fs" />
+    <Compile Include="utils\RandomExtensions.fs" />
     <Compile Include="Globals.fs" />
     <Compile Include="Log.fs" />
     <Compile Include="Socket.fs" />

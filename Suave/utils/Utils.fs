@@ -38,23 +38,6 @@ let (^^) (target : NameOptionValueList) key =
 let (?<-) (target : IDictionary<string, 'a>) key value =
   target.[key] <- value
 
-module List =
-
-  let flat_map f xs =
-    xs
-    |> List.map f
-    |> List.concat
-
-module RandomExtensions =
-  open System
-
-  type internal Random with
-    /// generate a new random ulong64 value
-    member x.NextUInt64() =
-      let buffer = Array.zeroCreate<byte> sizeof<UInt64>
-      x.NextBytes buffer
-      BitConverter.ToUInt64(buffer, 0)
-
 module Bytes =
   open System
   open System.IO
