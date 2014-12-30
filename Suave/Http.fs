@@ -444,6 +444,7 @@ module Http =
     open System.Text
 
     open Suave.Socket
+    open Suave.Utils
     open Types.Codes
 
     open Response
@@ -550,6 +551,7 @@ module Http =
     open System.Reflection
 
     open Suave.Socket
+    open Suave.Utils
     open Types.Codes
 
     open Response

@@ -103,7 +103,7 @@ module Crypto =
         use enc      = aes.CreateEncryptor(key, iv)
         use cipher   = new MemoryStream()
         use crypto   = new CryptoStream(cipher, enc, CryptoStreamMode.Write)
-        let bytes = msg |> Compression.gzip_encode
+        let bytes = msg |> Encoding.gzip_encode
         crypto.Write (bytes, 0, bytes.Length)
         crypto.FlushFinalBlock()
         cipher.ToArray()
@@ -149,7 +149,7 @@ module Crypto =
       use crypto  = new CryptoStream(plain, denc, CryptoStreamMode.Write)
       crypto.Write(cipher_text, IVLength, cipher_text.Length - IVLength - HMACLength)
       crypto.FlushFinalBlock()
-      Choice1Of2 (plain.ToArray() |> Compression.gzip_decode)
+      Choice1Of2 (plain.ToArray() |> Encoding.gzip_decode)
 
   let secretbox_open' k c =
     secretbox_open k c |> Choice.map UTF8.to_string'

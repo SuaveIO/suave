@@ -43,7 +43,7 @@ module Bytes =
 
   [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
   module BufferSegment =
-
+    
     let inline mk buffer offset length =
       if length < 0 then failwith (sprintf "BufferSegment.mk: length = %d < 0" length)
       { buffer = buffer; offset = offset; length = length }

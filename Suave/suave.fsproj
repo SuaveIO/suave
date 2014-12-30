@@ -302,10 +302,10 @@
     <Compile Include="utils\Choice.fs" />
     <Compile Include="utils\List.fs" />
     <Compile Include="utils\RandomExtensions.fs" />
-    <Compile Include="utils\Compression.fs" />
+    <Compile Include="utils\Bytes.fs" />
+    <Compile Include="utils\Encoding.fs" />
     <Compile Include="utils\Crypto.fs" />
     <Compile Include="utils\Parsing.fs" />
-    <Compile Include="utils\Bytes.fs" />
     <Compile Include="Globals.fs" />
     <Compile Include="Log.fs" />
     <Compile Include="Socket.fs" />

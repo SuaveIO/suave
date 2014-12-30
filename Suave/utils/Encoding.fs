@@ -1,6 +1,6 @@
 ﻿namespace Suave.Utils
 
-module Compression =
+module Encoding =
   open System.IO
   open System.IO.Compression
 
