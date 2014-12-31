@@ -307,11 +307,11 @@
     <Compile Include="Utils\Crypto.fs" />
     <Compile Include="Utils\Parsing.fs" />
     <Compile Include="Globals.fs" />
-    <Compile Include="Log\LogLevel.fs" />
-    <Compile Include="Log\TraceHeader.fs" />
-    <Compile Include="Log\LogLine.fs" />
-    <Compile Include="Log\Logger.fs" />
-    <Compile Include="Log\Log.fs" />
+    <Compile Include="Logging\LogLevel.fs" />
+    <Compile Include="Logging\TraceHeader.fs" />
+    <Compile Include="Logging\LogLine.fs" />
+    <Compile Include="Logging\Logger.fs" />
+    <Compile Include="Log.fs" />
     <Compile Include="Socket.fs" />
     <Compile Include="Tcp.fs" />
     <Compile Include="Sscanf.fs" />
