@@ -9,7 +9,6 @@ open Suave.Utils
 open Suave.Utils.Bytes
 
 open Suave.Sockets
-open Suave.Socket
 
 open Suave.Types
 open Suave.Types.Codes

@@ -10,7 +10,6 @@ module SocketUtils =
     | SocketError of SocketError
     | OtherError of string
   
-  
   type ByteSegment = System.ArraySegment<byte>
   // Async is already a delayed type
   type SocketOp<'a> = Async<Choice<'a,Error>>

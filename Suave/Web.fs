@@ -14,7 +14,6 @@ module ParsingAndControl =
 
   open Suave.Http
   open Suave.Sockets
-  open Suave.Socket
   
   open Suave.Utils
   open Suave.Utils.Bytes
@@ -466,7 +465,6 @@ open System.IO
 open System.Net
 open Suave.Types
 open Suave.Http
-open Suave.Socket
 open Suave.Utils
 open Suave.Logging
 

@@ -4,7 +4,6 @@ module Suave.OpenSsl.Provider
 open OpenSSL.X509
 open OpenSSL.Core
 
-open Suave.Socket
 open Suave.Sockets
 open Suave.Types
 

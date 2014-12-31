@@ -28,7 +28,6 @@
 module Http =
 
   open Suave.Sockets
-  open Suave.Socket
   open Suave.Types
 
   /// Return success with some value

@@ -6,7 +6,6 @@ open System.Threading
 open System.Net
 open System.Net.Sockets
 open Suave.Logging
-open Socket
 open Suave.Sockets
 
 /// The max backlog of number of requests

@@ -9,7 +9,6 @@ open System.Text
 
 
 open Suave.Sockets
-open Suave.Socket
 open Suave.Utils
 open Suave.Log
 open Suave.Logging
