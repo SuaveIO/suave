@@ -11,7 +11,6 @@ module SocketUtils =
     | OtherError of string
   
   
-  type private A = System.Net.Sockets.SocketAsyncEventArgs
   type ByteSegment = System.ArraySegment<byte>
   // Async is already a delayed type
   type SocketOp<'a> = Async<Choice<'a,Error>>
@@ -19,10 +18,10 @@ module SocketUtils =
   let abort x = async { return Choice2Of2 x }
   
   /// Wraps the Socket.xxxAsync logic into F# async logic.
-  let inline async_do (op : A -> bool) (prepare : A -> unit) (select: A -> 'T) (args : A) =
+  let inline async_do (op : SocketAsyncEventArgs -> bool) (prepare : SocketAsyncEventArgs -> unit) (select: SocketAsyncEventArgs -> 'T) (args : SocketAsyncEventArgs) =
     Async.FromContinuations <| fun (ok, error, _) ->
       prepare args
-      let k (args : A) =
+      let k (args : SocketAsyncEventArgs) =
           match args.SocketError with
           | System.Net.Sockets.SocketError.Success ->
             let result = select args
@@ -33,7 +32,7 @@ module SocketUtils =
         k args
   
   /// Prepares the arguments by setting the buffer.
-  let inline set_buffer (buf : ByteSegment) (args: A) =
+  let inline set_buffer (buf : ByteSegment) (args: SocketAsyncEventArgs) =
     args.SetBuffer(buf.Array, buf.Offset, buf.Count)
   
   let inline accept (socket : Socket) =

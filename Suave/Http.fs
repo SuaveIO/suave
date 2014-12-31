@@ -3,6 +3,7 @@
 module Http =
 
   open Socket
+  open Suave.Sockets
   open Types
 
   let inline succeed x = async.Return (Some x)
@@ -621,6 +622,8 @@ module Http =
 
     open Suave
     open Suave.Socket
+    open Suave.Sockets
+    open Suave.Sockets.Connection
     open Suave.Types
     open Suave.Utils
 

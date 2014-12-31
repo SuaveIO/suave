@@ -8,7 +8,8 @@ open System.Net
 open System.Text
 
 
-open Socket
+open Suave.Sockets
+open Suave.Socket
 open Suave.Utils
 open Suave.Log
 open Suave.Logging

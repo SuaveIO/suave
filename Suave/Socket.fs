@@ -12,7 +12,6 @@ open System.Net
 open System.Net.Sockets
 open System.Threading.Tasks
 
-
 /// The socket monad   
 let socket = SocketMonad()
 
