@@ -22,6 +22,7 @@ open Suave.Socket
 open Suave.Types
 open Suave.Http
 open Suave.Http.EventSource
+open Suave.Utils
 
 open Helpers
 

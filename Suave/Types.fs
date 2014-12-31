@@ -7,7 +7,11 @@ open System.Net.Sockets
 open System.Net
 open System.Text
 
+
 open Socket
+open Suave.Utils
+open Suave.Log
+open Suave.Logging
 
 /// <summary>
 /// These are the known HTTP methods. See http://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html
@@ -303,7 +307,7 @@ type HttpRequest =
     raw_query        : string
     files            : HttpUpload list
     multipart_fields : (string * string) list
-    trace            : Log.TraceHeader
+    trace            : TraceHeader
     is_secure        : bool
     ipaddr           : IPAddress }
 
@@ -321,7 +325,7 @@ module HttpRequest =
       raw_query        = ""
       files            = []
       multipart_fields = []
-      trace            = Log.TraceHeader.empty
+      trace            = TraceHeader.empty
       is_secure        = false
       ipaddr           = IPAddress.Loopback }
 
@@ -502,7 +506,7 @@ type HttpRuntime =
     mime_types_map     : MimeTypesMap
     home_directory     : string
     compression_folder : string
-    logger             : Log.Logger }
+    logger             : Logger }
 
 /// The HttpContext is the container of the request, runtime, user-state and
 /// response.
@@ -544,7 +548,7 @@ module HttpRuntime =
       mime_types_map     = fun _ -> None
       home_directory     = "."
       compression_folder = "."
-      logger             = Log.Loggers.sane_defaults_for Log.Debug }
+      logger             = Loggers.sane_defaults_for LogLevel.Debug }
 
   /// make a new HttpRuntime from the given parameters
   let mk proto server_key error_handler mime_types home_directory compression_folder logger =
@@ -635,7 +639,7 @@ type SuaveConfig =
     /// Folder for temporary compressed files
     compressed_files_folder : string option
     /// A logger to log with
-    logger                  : Log.Logger }
+    logger                  : Logger }
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module SuaveConfig =

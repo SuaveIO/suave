@@ -6,10 +6,10 @@ open System.Net.Http
 
 open Suave
 open Suave.Types
-open Suave.Types
 open Suave.Web
 open Suave.Http
 open Successful
+open Suave.Utils
 
 open Suave.Tests.TestUtilities
 

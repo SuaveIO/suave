@@ -4,6 +4,7 @@ open Suave.Types
 open Suave.Http
 open Suave.Log
 open Suave.Cookie
+open Suave.Logging
 
 module CookieStateStore =
   open System
@@ -35,7 +36,7 @@ module CookieStateStore =
 
   let write relative_expiry (key : string) (value : 'a) =
     context (fun ({ runtime = { logger = logger }} as ctx) ->
-      log logger "Suave.State.CookieStateStore.write" Debug (sprintf "writing to key '%s'" key)
+      log logger "Suave.State.CookieStateStore.write" LogLevel.Debug (sprintf "writing to key '%s'" key)
       update_cookies
         { server_key      = ctx.runtime.server_key
           cookie_name     = StateCookie
@@ -44,17 +45,17 @@ module CookieStateStore =
           secure          = false }
         (function
          | None      ->
-           log logger "Suave.State.CookieStateStore.write" Debug "in f_plain_text, no existing"
+           log logger "Suave.State.CookieStateStore.write" LogLevel.Debug "in f_plain_text, no existing"
            Map.empty |> Map.add key (box value) |> encode_map
          | Some data ->
            let m = decode_map data
-           log logger "Suave.State.CookieStateStore.write" Debug
+           log logger "Suave.State.CookieStateStore.write" LogLevel.Debug
              (sprintf "in f_plain_text, has existing %A" m)
            m |> Map.add key (box value) |> encode_map))
 
   let stateful relative_expiry secure : WebPart =
     context (fun ({ runtime = { logger = logger }} as ctx) ->
-      log logger "Suave.State.CookieStateStore.stateful" Debug "ensuring cookie state"
+      log logger "Suave.State.CookieStateStore.stateful" LogLevel.Debug "ensuring cookie state"
       cookie_state
         { server_key      = ctx.runtime.server_key
           cookie_name     = StateCookie

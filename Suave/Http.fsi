@@ -1058,6 +1058,7 @@ module Http =
   module Applicatives =
 
     open Types
+    open Suave.Logging
 
     /// Match on the url
     val url : s:string -> WebPart
@@ -1079,7 +1080,7 @@ module Http =
     /// <summary><para>
     /// Log the HttpRequest to the given logger.
     /// </para></summary>
-    val log : Log.Logger -> (HttpContext -> string) -> WebPart
+    val log : Logger -> (HttpContext -> string) -> WebPart
 
     /// <summary><para>
     /// Strongly typed route matching! Matching the uri can be used with the 'parsers'

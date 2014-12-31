@@ -5,6 +5,7 @@ open System
 open System.Net
 open System.Collections.Generic
 
+open Suave.Utils
 open Suave.Utils.Bytes
 
 open Suave.Types

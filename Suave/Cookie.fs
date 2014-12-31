@@ -9,7 +9,8 @@ module Cookie =
   open Suave
   open Suave.Types
   open Suave.Http
-  open Suave.Log
+  open Suave.Logging
+  open Suave.Utils
 
   type CookieLife =
     | Session
@@ -114,7 +115,7 @@ module Cookie =
 
   let set_pair (http_cookie : HttpCookie) (client_cookie : HttpCookie) : WebPart =
     context (fun { runtime = { logger = logger } } ->
-      Log.log logger "Suave.Cookie.set_pair" Debug
+      Log.log logger "Suave.Cookie.set_pair" LogLevel.Debug
         (sprintf "setting cookie '%s' len '%d'" http_cookie.name http_cookie.value.Length)
       succeed)
     >>= set_cookie http_cookie >>= set_cookie client_cookie
@@ -174,10 +175,10 @@ module Cookie =
       let plain_text' =
         match read_cookies csctx.server_key csctx.cookie_name ctx with
         | Choice1Of2 (_, plain_text) ->
-          Log.log logger "Suave.Cookie.update_cookies" Debug "update_cookies - existing"
+          Log.log logger "Suave.Cookie.update_cookies" LogLevel.Debug "update_cookies - existing"
           f_plain_text (Some plain_text)
         | Choice2Of2 _ ->
-          Log.log logger "Suave.Cookie.update_cookies" Debug "update_cookies - first time"
+          Log.log logger "Suave.Cookie.update_cookies" LogLevel.Debug "update_cookies - first time"
           f_plain_text None
 
       /// Since the contents will completely change every write, we simply re-generate the cookie
@@ -195,14 +196,14 @@ module Cookie =
     context (fun ({ runtime = { logger = logger }} as ctx) ->
       match read_cookies csctx.server_key csctx.cookie_name ctx with
       | Choice1Of2 (http_cookie, plain_text) ->
-        Log.log logger "Suave.Cookie.cookie_state" Debug "existing cookie"
+        Log.log logger "Suave.Cookie.cookie_state" LogLevel.Debug "existing cookie"
         refresh_cookies csctx.relative_expiry http_cookie >>=
           Writers.set_user_data csctx.user_state_key plain_text
 
       | Choice2Of2 (NoCookieFound _) ->
         match no_cookie () with
         | Choice1Of2 plain_text ->
-          Log.log logger "Suave.Cookie.cookie_state" Debug
+          Log.log logger "Suave.Cookie.cookie_state" LogLevel.Debug
             "no existing cookie, setting text"
           let http_cookie, client_cookie =
             generate_cookies csctx.server_key csctx.cookie_name
@@ -211,12 +212,12 @@ module Cookie =
           set_pair http_cookie client_cookie >>=
             Writers.set_user_data csctx.user_state_key plain_text
         | Choice2Of2 wp_kont ->
-          Log.log logger "Suave.Cookie.cookie_state" Debug
+          Log.log logger "Suave.Cookie.cookie_state" LogLevel.Debug
             "no existing cookie, calling app continuation"
           wp_kont
 
       | Choice2Of2 (DecryptionError err) ->
-        Log.log logger "Suave.Cookie.cookie_state" Debug
+        Log.log logger "Suave.Cookie.cookie_state" LogLevel.Debug
           (sprintf "decryption error: %A" err)
         unset_pair csctx.cookie_name >>=
           decryption_failure err)

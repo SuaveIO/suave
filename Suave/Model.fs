@@ -1,11 +1,14 @@
 ﻿module Suave.Model
 
+open Suave.Utils
+
 [<AutoOpen>]
 module SyntacticSugar =
 
   let (>>.) a f = Choice.bind f a
 
 type ChoiceBuilder() =
+  
   member x.Bind (v, f) = Choice.bind f v
   member x.Return v = Choice1Of2 v
   member x.ReturnFrom o = o
@@ -37,6 +40,7 @@ module Binding =
 
   open Suave
   open Suave.Types
+  open Suave.Utils
 
   let bind f_bind
            (f_cont : 'a -> (HttpContext -> 'c))

@@ -5,6 +5,8 @@ open System.Collections.Generic
 open System.Threading
 open System.Net
 open System.Net.Sockets
+open Suave.Logging
+open Socket
 
 /// The max backlog of number of requests
 let MAX_BACK_LOG = Int32.MaxValue
@@ -20,7 +22,6 @@ with
       ((x.socket_bound_utc |> Option.fold (fun _ t -> t) x.start_called_utc) - x.start_called_utc).TotalMilliseconds
       x.source_ip x.source_port
 
-open Socket 
 
 /// Disconnect a socket for reuse
 let close_socket (s : Socket) =
@@ -42,7 +43,7 @@ let shutdown_socket (s : Socket) =
   with _ -> ()
 
 /// Stop the TCP listener server
-let stop_tcp (logger : Log.Logger) reason (socket : Socket) =
+let stop_tcp (logger : Logger) reason (socket : Socket) =
   try
     Log.internf logger "Tcp.stop_tcp" (fun fmt -> fmt "stopping tcp server, reason: '%s'" reason)
     socket.Close()
@@ -105,7 +106,7 @@ let tcp_ip_server (source_ip : IPAddress,
                    source_port : uint16,
                    buffer_size : int,
                    max_concurrent_ops : int)
-                  (logger : Log.Logger)
+                  (logger : Logger)
                   (serve_client : TcpWorker<unit>) =
 
   let start_data =
@@ -171,11 +172,11 @@ let tcp_ip_server (source_ip : IPAddress,
       let start_data = { start_data with socket_bound_utc = Some(Globals.utc_now()) }
       accepting_connections.Complete start_data |> ignore
 
-      logger.Log Log.LogLevel.Info <| fun _ ->
+      logger.Log LogLevel.Info <| fun _ ->
         { path          = "Suave.Tcp.tcp_ip_server"
-          trace         = Log.TraceHeader.empty
+          trace         = TraceHeader.empty
           message       = sprintf "listener started in %O%s" start_data (if token.IsCancellationRequested then ", cancellation requested" else "")
-          level         = Log.LogLevel.Info
+          level         = LogLevel.Info
           ``exception`` = None
           ts_utc_ticks  = Globals.utc_now().Ticks }
 

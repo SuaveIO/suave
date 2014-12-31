@@ -132,9 +132,11 @@ module Http =
 
   // 2xx
   module Successful =
-
+    
+    open Suave.Utils
     open Response
     open Types.Codes
+    
 
     let ok s : WebPart = 
       fun ctx -> { ctx with response = { ctx.response with status = HTTP_200; content = Bytes s }} |> succeed
@@ -157,6 +159,7 @@ module Http =
   // 3xx
   module Redirection =
 
+    open Suave.Utils
     open Response
     open Writers
     open Types.Codes
@@ -194,6 +197,7 @@ module Http =
   // 4xx
   module RequestErrors =
 
+    open Suave.Utils
     open Response
     open Writers
     open Types.Codes
@@ -257,7 +261,8 @@ module Http =
     let TOO_MANY_REQUESTS s = too_many_requests (UTF8.bytes s)
 
   module ServerErrors =
-
+  
+    open Suave.Utils
     open Response
     open Types.Codes
 
@@ -286,7 +291,10 @@ module Http =
     let INVALID_HTTP_VERSION = invalid_http_version (UTF8.bytes (http_message HTTP_505))
 
   module Applicatives =
+  
 
+    open Suave.Utils
+    open Suave.Logging
     open System
     open System.Text.RegularExpressions
 
@@ -347,11 +355,11 @@ module Http =
         (Codes.http_code ctx.response.status)
         "0"
 
-    let log (logger : Log.Logger) (formatter : HttpContext -> string) (ctx : HttpContext) =
-      logger.Log Log.LogLevel.Debug <| fun _ ->
+    let log (logger : Logger) (formatter : HttpContext -> string) (ctx : HttpContext) =
+      logger.Log LogLevel.Debug <| fun _ ->
         { trace         = ctx.request.trace
           message       = formatter ctx
-          level         = Log.LogLevel.Debug
+          level         = LogLevel.Debug
           path          = "Suave.Http.web-requests"
           ``exception`` = None
           ts_utc_ticks  = Globals.utc_now().Ticks }
@@ -394,6 +402,8 @@ module Http =
     open Redirection
     open RequestErrors
     open Model
+    open Suave.Utils
+    open Suave.Logging
 
     // If a response includes both an Expires header and a max-age directive,
     // the max-age directive overrides the Expires header, even if the Expires header is more restrictive
@@ -402,7 +412,7 @@ module Http =
                  (send : string -> bool -> WebPart)
                  ({ request = r; runtime = rt } as ctx) =
       let log =
-        Log.verbose rt.logger "Suave.Http.ServeResource.resource" Log.TraceHeader.empty
+        Log.verbose rt.logger "Suave.Http.ServeResource.resource" TraceHeader.empty
 
       let send_it name compression =
         set_header "Last-Modified" ((get_last key : DateTime).ToString("R"))
@@ -437,6 +447,8 @@ module Http =
     open System.Text
 
     open Suave.Socket
+    open Suave.Utils
+    open Suave.Logging
     open Types.Codes
 
     open Response
@@ -498,7 +510,7 @@ module Http =
       warbler (fun { request = r; runtime = { logger = l } } ->
         Log.verbose l
           "Suave.Http.Files.browse"
-          Log.TraceHeader.empty
+          TraceHeader.empty
           (sprintf "Files.browse trying file (local_file url:'%s' root:'%s')"
             r.url root_path)
         file (resolve_path root_path r.url))
@@ -543,6 +555,7 @@ module Http =
     open System.Reflection
 
     open Suave.Socket
+    open Suave.Utils
     open Types.Codes
 
     open Response
@@ -604,10 +617,12 @@ module Http =
   // See www.w3.org/TR/eventsource/#event-stream-interpretation
   module EventSource =
     open System
+    
 
     open Suave
     open Suave.Socket
     open Suave.Types
+    open Suave.Utils
 
     [<Literal>]
     let private ES_EOL = "\n"
@@ -685,6 +700,7 @@ module Http =
   module Authentication =
 
     open RequestErrors
+    open Suave.Utils
 
     let internal parse_authentication_token (token : string) =
       let parts = token.Split (' ')

@@ -4,6 +4,7 @@ module Compression =
 
   open Socket
   open Types
+  open Suave.Utils
 
   open System
   open System.IO
@@ -31,8 +32,8 @@ module Compression =
 
   let load_encoder s =
     match s with
-    | "gzip"    -> Some (GZIP, Compression.gzip_encode)
-    | "deflate" -> Some (Deflate, Compression.deflate_encode)
+    | "gzip"    -> Some (GZIP, Encoding.gzip_encode)
+    | "deflate" -> Some (Deflate, Encoding.deflate_encode)
     | _         -> None
 
   let get_encoder (request : HttpRequest) =
