@@ -6,7 +6,7 @@ open System.Threading
 open System.Net
 open System.Net.Sockets
 open Suave.Logging
-open Socket
+open Suave.Sockets
 
 /// The max backlog of number of requests
 let MAX_BACK_LOG = Int32.MaxValue
@@ -127,7 +127,7 @@ let tcp_ip_server (source_ip : IPAddress,
   // echo 5 > /proc/sys/net/ipv4/tcp_fin_timeout
   // echo 1 > /proc/sys/net/ipv4/tcp_tw_recycle
   // custom kernel with shorter TCP_TIMEWAIT_LEN in include/net/tcp.h
-  let inline job (accept_args : A) = async {
+  let inline job (accept_args : SocketAsyncEventArgs) = async {
     let intern  = Log.intern logger "Suave.Tcp.tcp_ip_server.job"
     let socket = accept_args.AcceptSocket
     let ip_address = (socket.RemoteEndPoint :?> IPEndPoint).Address

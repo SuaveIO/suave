@@ -2,9 +2,9 @@
 
 module Compression =
 
-  open Socket
-  open Types
+  open Suave.Types
   open Suave.Utils
+  open Suave.Sockets
 
   open System
   open System.IO

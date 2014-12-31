@@ -2,8 +2,8 @@
 
 module Http =
 
-  open Socket
-  open Types
+  open Suave.Sockets
+  open Suave.Types
 
   let inline succeed x = async.Return (Some x)
 
@@ -65,7 +65,6 @@ module Http =
 
   module Response =
 
-    open Socket
     open Types
     open Types.Codes
 
@@ -446,7 +445,6 @@ module Http =
     open System.IO
     open System.Text
 
-    open Suave.Socket
     open Suave.Utils
     open Suave.Logging
     open Types.Codes
@@ -554,7 +552,6 @@ module Http =
     open System.IO
     open System.Reflection
 
-    open Suave.Socket
     open Suave.Utils
     open Types.Codes
 
@@ -620,7 +617,8 @@ module Http =
     
 
     open Suave
-    open Suave.Socket
+    open Suave.Sockets
+    open Suave.Sockets.Connection
     open Suave.Types
     open Suave.Utils
 

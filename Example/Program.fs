@@ -43,7 +43,6 @@ let testapp : WebPart =
   ]
 
 System.Net.ServicePointManager.DefaultConnectionLimit <- Int32.MaxValue
-open Socket
 
 let sleep milliseconds message: WebPart =
   fun (x : HttpContext) ->

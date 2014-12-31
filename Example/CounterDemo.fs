@@ -18,7 +18,7 @@ module private Helpers =
     | _       -> None
 
 open Suave
-open Suave.Socket
+open Suave.Sockets
 open Suave.Types
 open Suave.Http
 open Suave.Http.EventSource

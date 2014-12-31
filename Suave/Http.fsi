@@ -27,8 +27,8 @@
 /// </summary>
 module Http =
 
-  open Socket
-  open Types
+  open Suave.Sockets
+  open Suave.Types
 
   /// Return success with some value
   val inline succeed : item:'a -> Async<'a option>

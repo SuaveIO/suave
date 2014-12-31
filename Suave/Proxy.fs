@@ -8,6 +8,8 @@ open System.Collections.Generic
 open Suave.Utils
 open Suave.Utils.Bytes
 
+open Suave.Sockets
+
 open Suave.Types
 open Suave.Types.Codes
 open Suave.Web
@@ -17,7 +19,6 @@ open Suave.Http
 open Suave.Http.Response
 open Suave.Web.ParsingAndControl
 
-open Socket
 
 /// Copies the headers from 'headers1' to 'headers2'
 let private to_header_list (headers : WebHeaderCollection) =

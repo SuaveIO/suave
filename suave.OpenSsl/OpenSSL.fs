@@ -11,7 +11,7 @@ open OpenSSL.Core
 open OpenSSL.SSL
 
 open Suave.OpenSsl.Native
-open Suave.Socket
+open Suave.Sockets
 
 let SSL_CTX_set_mode( ctx : IntPtr,  op : int) = SSL_CTX_ctrl(ctx, SSL_CTRL_MODE, op, IntPtr.Zero)
 let SSL_CTX_set_options( ctx : IntPtr, op : int) = SSL_CTX_ctrl(ctx, SSL_CTRL_OPTIONS, op, IntPtr.Zero)
@@ -114,6 +114,8 @@ let authenticate_as_server (cert : X509Certificate) =
   ssl,read_bio,write_bio
 
 open Microsoft.FSharp.NativeInterop
+open Suave.Sockets
+open Suave.Sockets.Connection
 
 let read_to_bio (con : Connection) read_bio ssl = socket {
   let bytes_pending = BIO_ctrl_pending read_bio
@@ -157,7 +159,7 @@ let rec accept conn (ssl, read_bio, write_bio) = socket{
   return ()
   }
 
-let ssl_receive (con : Connection) (context, read_bio, write_bio) (bu : B) = socket {
+let ssl_receive (con : Connection) (context, read_bio, write_bio) (bu : ByteSegment) = socket {
 
   let write_bytes_pending = BIO_ctrl_pending write_bio
   if write_bytes_pending > 0u  then 

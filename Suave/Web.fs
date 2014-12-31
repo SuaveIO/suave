@@ -12,8 +12,8 @@ module ParsingAndControl =
   open System.Security.Principal
   open System.Collections.Generic
 
-  open Http
-  open Socket
+  open Suave.Http
+  open Suave.Sockets
   
   open Suave.Utils
   open Suave.Utils.Bytes
@@ -92,6 +92,7 @@ module ParsingAndControl =
     }
 
   open System.Net.Sockets
+  open Suave.Sockets.Connection
 
   let read_data (connection : Connection) buff = socket {
     let! b = receive connection buff 
@@ -323,6 +324,7 @@ module ParsingAndControl =
   open Types.Codes
   open Globals
   open Suave.Compression
+  open Suave.Sockets.Connection
 
   let write_content context = function
     | Bytes b -> socket {
@@ -463,7 +465,6 @@ open System.IO
 open System.Net
 open Suave.Types
 open Suave.Http
-open Suave.Socket
 open Suave.Utils
 open Suave.Logging
 
