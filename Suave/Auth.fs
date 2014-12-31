@@ -7,7 +7,7 @@ open Suave
 open Suave.Types
 open Suave.Cookie
 open Suave.Http
-open Suave.Log
+open Suave.Logging
 open Suave.Utils
 
 module internal Utils =
@@ -54,7 +54,7 @@ let authenticate relative_expiry secure
                  (failure : Crypto.SecretboxDecryptionError -> WebPart)
                  : WebPart =
   context (fun ({ runtime = { logger = logger }} as ctx) ->
-    Log.log logger "Suave.Auth.authenticate" Debug "authenticating"
+    Log.log logger "Suave.Auth.authenticate" LogLevel.Debug "authenticating"
 
     cookie_state
       { server_key      = ctx.runtime.server_key

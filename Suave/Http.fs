@@ -294,6 +294,7 @@ module Http =
   
 
     open Suave.Utils
+    open Suave.Logging
     open System
     open System.Text.RegularExpressions
 
@@ -354,11 +355,11 @@ module Http =
         (Codes.http_code ctx.response.status)
         "0"
 
-    let log (logger : Log.Logger) (formatter : HttpContext -> string) (ctx : HttpContext) =
-      logger.Log Log.LogLevel.Debug <| fun _ ->
+    let log (logger : Logger) (formatter : HttpContext -> string) (ctx : HttpContext) =
+      logger.Log LogLevel.Debug <| fun _ ->
         { trace         = ctx.request.trace
           message       = formatter ctx
-          level         = Log.LogLevel.Debug
+          level         = LogLevel.Debug
           path          = "Suave.Http.web-requests"
           ``exception`` = None
           ts_utc_ticks  = Globals.utc_now().Ticks }
@@ -402,6 +403,7 @@ module Http =
     open RequestErrors
     open Model
     open Suave.Utils
+    open Suave.Logging
 
     // If a response includes both an Expires header and a max-age directive,
     // the max-age directive overrides the Expires header, even if the Expires header is more restrictive
@@ -410,7 +412,7 @@ module Http =
                  (send : string -> bool -> WebPart)
                  ({ request = r; runtime = rt } as ctx) =
       let log =
-        Log.verbose rt.logger "Suave.Http.ServeResource.resource" Log.TraceHeader.empty
+        Log.verbose rt.logger "Suave.Http.ServeResource.resource" TraceHeader.empty
 
       let send_it name compression =
         set_header "Last-Modified" ((get_last key : DateTime).ToString("R"))
@@ -446,6 +448,7 @@ module Http =
 
     open Suave.Socket
     open Suave.Utils
+    open Suave.Logging
     open Types.Codes
 
     open Response
@@ -507,7 +510,7 @@ module Http =
       warbler (fun { request = r; runtime = { logger = l } } ->
         Log.verbose l
           "Suave.Http.Files.browse"
-          Log.TraceHeader.empty
+          TraceHeader.empty
           (sprintf "Files.browse trying file (local_file url:'%s' root:'%s')"
             r.url root_path)
         file (resolve_path root_path r.url))

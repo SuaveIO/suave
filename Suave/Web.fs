@@ -18,6 +18,7 @@ module ParsingAndControl =
   open Suave.Utils
   open Suave.Utils.Bytes
   open Suave.Utils.Parsing
+  open Suave.Logging
 
   /// Free up a list of buffers
   let internal free context connection =
@@ -238,7 +239,7 @@ module ParsingAndControl =
                        ) << UInt64.TryParse
     let parent = "x-b3-spanid"  |> get_first headers |> Option.bind parse_uint64
     let trace  = "x-b3-traceid" |> get_first headers |> Option.bind parse_uint64
-    Log.TraceHeader.mk trace parent
+    TraceHeader.mk trace parent
 
   /// Reads raw POST data
   let get_raw_post_data connection content_length =
@@ -298,7 +299,7 @@ module ParsingAndControl =
   /// Load a readable plain-text stream, based on the protocol in use. If plain HTTP
   /// is being used, the stream is returned as it, otherwise a new SslStream is created
   /// to decipher the stream, without client certificates.
-  let inline load_connection (logger : Log.Logger) proto (connection : Connection) = socket{
+  let inline load_connection (logger : Logger) proto (connection : Connection) = socket{
     match proto with
     | HTTP       ->
       return connection
@@ -395,8 +396,8 @@ module ParsingAndControl =
 
     let rec loop (ctx : HttpContext) = socket {
 
-      let verbose  = Log.verbose runtime.logger "Suave.Web.request_loop.loop" Log.TraceHeader.empty
-      let verbosef = Log.verbosef runtime.logger "Suave.Web.request_loop.loop" Log.TraceHeader.empty
+      let verbose  = Log.verbose runtime.logger "Suave.Web.request_loop.loop" TraceHeader.empty
+      let verbosef = Log.verbosef runtime.logger "Suave.Web.request_loop.loop" TraceHeader.empty
 
       verbose "-> processor"
       let! result = process_request (match runtime.protocol with HTTP -> false | HTTPS _ -> true) ctx
@@ -464,6 +465,7 @@ open Suave.Types
 open Suave.Http
 open Suave.Socket
 open Suave.Utils
+open Suave.Logging
 
 /// The default error handler returns a 500 Internal Error in response to
 /// thrown exceptions.
@@ -517,4 +519,4 @@ let default_config : SuaveConfig =
     mime_types_map   = Http.Writers.default_mime_types_map
     home_folder      = None
     compressed_files_folder = None
-    logger           = Log.Loggers.sane_defaults_for Log.LogLevel.Info }
+    logger           = Loggers.sane_defaults_for LogLevel.Info }

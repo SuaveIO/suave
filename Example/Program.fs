@@ -4,7 +4,7 @@ open System
 open System.Net
 
 open Suave
-open Suave.Log
+open Suave.Logging
 open Suave.Web
 open Suave.Http
 open Suave.Http.Applicatives
@@ -18,7 +18,7 @@ open Suave.Utils
 let basic_auth : WebPart =
   Authentication.authenticate_basic ( fun (user_name,password) -> user_name.Equals("foo") && password.Equals("bar"))
 
-let logger = Loggers.ConsoleWindowLogger Verbose
+let logger = Loggers.ConsoleWindowLogger LogLevel.Verbose
 
 let myapp : WebPart =
   choose [

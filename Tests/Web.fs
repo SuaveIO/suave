@@ -3,7 +3,7 @@
 open Fuchu
 
 open Suave.Web.ParsingAndControl
-open Suave.Log
+open Suave.Logging
 
 let private (=>) a b = a, b
 
