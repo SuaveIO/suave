@@ -38,7 +38,6 @@ let scan_tests =
         ]
 
 open Suave.Types
-open Suave.Types.Methods
 open Suave.Http.Applicatives
 open Suave.Http.Successful
 open Suave.Tests.TestUtilities
