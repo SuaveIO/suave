@@ -53,3 +53,10 @@ type SocketMonad() =
   member this.For(sequence : seq<_>, body : 'a -> SocketOp<unit>) =
     this.Using(sequence.GetEnumerator(), fun (enum : IEnumerator<'a>) ->
     this.While(enum.MoveNext, this.Delay(fun _-> body enum.Current)))
+
+
+[<AutoOpen>]
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module SocketMonad =
+  /// The socket monad   
+  let socket = SocketMonad()

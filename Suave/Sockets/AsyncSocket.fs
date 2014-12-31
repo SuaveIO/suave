@@ -1,4 +1,5 @@
-﻿module Suave.Socket
+﻿[<AutoOpen>]
+module Suave.AsyncSocket
 
 open Suave.Utils.Bytes
 open Suave.Async
@@ -11,9 +12,6 @@ open System.IO
 open System.Net
 open System.Net.Sockets
 open System.Threading.Tasks
-
-/// The socket monad   
-let socket = SocketMonad()
 
 /// A TCP Worker is a thing that takes a TCP client and returns an asynchronous workflow thereof
 type TcpWorker<'a> = Connection -> SocketOp<'a>
