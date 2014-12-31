@@ -14,13 +14,13 @@ let private parse_decimal x = Decimal.Parse(x, System.Globalization.CultureInfo.
 let parsers =
   dict [
     'b', Boolean.Parse >> box
-    'd', int >> box
-    'i', int >> box
+    'd', int64 >> box
+    'i', int64 >> box
     's', box
-    'u', uint32 >> int >> box
-    'x', check (String.forall Char.IsLower) >> ((+) "0x") >> int >> box
-    'X', check (String.forall Char.IsUpper) >> ((+) "0x") >> int >> box
-    'o', ((+) "0o") >> int >> box
+    'u', uint32 >> int64 >> box
+    'x', check (String.forall Char.IsLower) >> ((+) "0x") >> int64 >> box
+    'X', check (String.forall Char.IsUpper) >> ((+) "0x") >> int64 >> box
+    'o', ((+) "0o") >> int64 >> box
     'e', float >> box // no check for correct format for floats
     'E', float >> box
     'f', float >> box
@@ -48,6 +48,14 @@ let rec get_formatters xs =
   | x :: xr          -> get_formatters xr
   | []               -> []
 
+// Coerce integer types from int64
+let coerce o = function
+  | v when v = typeof<int32> ->
+    int32(unbox<int64> o) |> box
+  | v when v = typeof<uint32> ->
+    uint32(unbox<int64> o) |> box
+  | _ -> o
+
 /// Parse the format in 'pf' from the string 's', failing and raising an exception
 /// otherwise
 let sscanf (pf:PrintfFormat<_,_,_,_,'t>) s : 't =
@@ -70,13 +78,22 @@ let sscanf (pf:PrintfFormat<_,_,_,_,'t>) s : 't =
     ||> Seq.map2 (fun g f -> g.Value |> parsers.[f])
     |> Seq.toArray
 
-  if matches.Length = 1 then matches.[0] :?> 't else FSharpValue.MakeTuple(matches, typeof<'t>) :?> 't
+  if matches.Length = 1 then
+    coerce matches.[0] typeof<'t> :?> 't
+  else
+    let tuple_types = FSharpType.GetTupleElements(typeof<'t>)
+    let matches =
+      (matches,tuple_types)
+      ||> Array.map2 ( fun a b -> coerce a b)
+    FSharpValue.MakeTuple(matches, typeof<'t>) :?> 't
 
 module private BasicTesting =
   // some basic testing
   let (a,b)           = sscanf "(%%%s,%M)" "(%hello, 4.53)"
+  let aaa : int32     = sscanf "aaaa%d" "aaaa4"
+  let bbb : int64     = sscanf "aaaa%d" "aaaa4"
   let (x,y,z)         = sscanf "%s-%s-%s" "test-this-string"
-  let (c,d,e,f,g,h,i) = sscanf "%b-%d-%i,%u,%x,%X,%o" "false-42--31,13,ff,FF,42"
+  let (c,d,e : uint32,f,g,h,i) = sscanf "%b-%d-%i,%u,%x,%X,%o" "false-42--31,13,ff,FF,42"
   let (j,k,l,m,n,o,p) = sscanf "%f %F %g %G %e %E %c" "1 2.1 3.4 .3 43.2e32 0 f"
 
-  let aa              = sscanf "(%s)" "(45.33)" //fails
+  let aa              = sscanf "(%s)" "(45.33)"
