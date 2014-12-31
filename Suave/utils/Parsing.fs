@@ -1,4 +1,4 @@
-﻿namespace Sauve.Utils
+﻿namespace Suave.Utils
 
 module Parsing =
 

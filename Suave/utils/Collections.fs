@@ -1,6 +1,6 @@
 ﻿/// A module for composing the applicatives.
 [<AutoOpen>]
-module Suave.Utils
+module Suave.Utils.Collections
 
 open System.Collections.Generic
 

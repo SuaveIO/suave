@@ -401,6 +401,7 @@ module Http =
     open Redirection
     open RequestErrors
     open Model
+    open Suave.Utils
 
     // If a response includes both an Expires header and a max-age directive,
     // the max-age directive overrides the Expires header, even if the Expires header is more restrictive

@@ -2,8 +2,6 @@ module Suave.Web
 
 /// Parsing and control flow handling for web requests
 module ParsingAndControl =
-  open Utils
-
   open System
   open System.IO
   open System.Text
@@ -16,7 +14,8 @@ module ParsingAndControl =
 
   open Http
   open Socket
-
+  
+  open Suave.Utils
   open Suave.Utils.Bytes
   open Suave.Utils.Parsing
 

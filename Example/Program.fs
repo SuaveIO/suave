@@ -13,6 +13,7 @@ open Suave.Http.Files
 open Suave.Http.Successful
 open Suave.Types
 open Suave.State.CookieStateStore
+open Suave.Utils
 
 let basic_auth : WebPart =
   Authentication.authenticate_basic ( fun (user_name,password) -> user_name.Equals("foo") && password.Equals("bar"))
