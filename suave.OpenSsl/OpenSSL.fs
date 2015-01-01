@@ -1,4 +1,4 @@
-﻿module Suave.OpenSSL.Functions
+module Suave.OpenSSL.Functions
 
 open System
 open System.IO
@@ -10,7 +10,7 @@ open OpenSSL.X509
 open OpenSSL.Core
 open OpenSSL.SSL
 
-open Suave.OpenSsl.Native
+open Suave.OpenSSL.Native
 open Suave.Sockets
 
 let SSL_CTX_set_mode( ctx : IntPtr,  op : int) = SSL_CTX_ctrl(ctx, SSL_CTRL_MODE, op, IntPtr.Zero)

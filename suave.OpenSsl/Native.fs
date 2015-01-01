@@ -1,4 +1,4 @@
-﻿module Suave.OpenSsl.Native
+module Suave.OpenSSL.Native
 
 open System
 open System.Runtime.InteropServices

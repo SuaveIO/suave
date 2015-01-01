@@ -1,5 +1,4 @@
-﻿
-module Suave.OpenSsl.Provider
+module Suave.OpenSSL.Provider
 
 open OpenSSL.X509
 open OpenSSL.Core
@@ -14,7 +13,7 @@ type TlsTransport(cn : Connection, ssl) =
     member this.read (buf : ByteSegment) = ssl_receive cn ssl buf
     member this.write(buf : ByteSegment) = ssl_send cn  ssl buf
 
-type OpenSslProvider(cert : X509Certificate) = 
+type OpenSSLProvider(cert : X509Certificate) = 
 
   interface ITlsProvider with
 
@@ -25,4 +24,4 @@ type OpenSslProvider(cert : X509Certificate) =
       return { connection with transport = tls_transport}
     }
 
-let open_ssl cert = new OpenSslProvider(cert)
+let open_ssl cert = new OpenSSLProvider(cert)
