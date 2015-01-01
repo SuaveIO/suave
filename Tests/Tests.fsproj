@@ -206,11 +206,6 @@
               <Private>True</Private>
               <Paket>True</Paket>
             </Reference>
-            <Reference Include="FsCheck">
-              <HintPath>..\packages\FsCheck\lib\net45\FsCheck.dll</HintPath>
-              <Private>True</Private>
-              <Paket>True</Paket>
-            </Reference>
           </ItemGroup>
         </Otherwise>
       </Choose>
@@ -660,6 +655,7 @@
     <Content Include="Bug105-StopsResponding.verbose.txt" />
     <None Include="Bug105-StopsResponding.fsx" />
     <None Include="PerfLab.fsx" />
+    <Compile Include="AssemblyInfo.fs" Condition="Exists('AssemblyInfo.fs')" />
     <Compile Include="AssemblyVersionInfo.fs" Condition="Exists('AssemblyVersionInfo.fs')" />
     <Compile Include="TestUtilities.fs" />
     <Compile Include="Smoke.fs" />
@@ -703,13 +699,20 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <None Include="App.config" />
+    <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
+    <Reference Include="FsCheck">
+      <HintPath>..\packages\FsCheck.0.9.2.0\lib\net40-Client\FsCheck.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
     <Reference Include="Fuchu">
-      <HintPath>..\libs\Fuchu-local\Fuchu.dll</HintPath>
+      <HintPath>..\packages\Fuchu.0.4.0.0\lib\Fuchu.dll</HintPath>
+      <Private>True</Private>
     </Reference>
     <Reference Include="Fuchu.FsCheck">
-      <HintPath>..\libs\Fuchu-local\Fuchu.FsCheck.dll</HintPath>
+      <HintPath>..\packages\Fuchu.FsCheck.0.4.0.0\lib\Fuchu.FsCheck.dll</HintPath>
+      <Private>True</Private>
     </Reference>
     <Reference Include="Fuchu.PerfUtil">
       <HintPath>..\libs\Fuchu-local\Fuchu.PerfUtil.dll</HintPath>
