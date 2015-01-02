@@ -82,7 +82,7 @@ directory 'build/pkg'
 
 nugets_pack :create_nuget_quick do |p|
   p.configuration = Configuration
-  p.files   = FileList['**/*.fsproj']
+  p.files   = FileList['src/**/*.fsproj'].exclude(/Tests/)
   p.out     = 'build/pkg'
   p.exe     = 'packages/NuGet.CommandLine/tools/NuGet.exe'
   p.with_metadata do |m|

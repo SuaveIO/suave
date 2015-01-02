@@ -6,11 +6,11 @@
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProjectGuid>{488FC139-5013-46A2-9982-2C40A6F1F777}</ProjectGuid>
     <OutputType>Library</OutputType>
-    <RootNamespace>Experimental</RootNamespace>
-    <AssemblyName>Experimental</AssemblyName>
+    <RootNamespace>Suave.Experimental</RootNamespace>
+    <AssemblyName>Suave.Experimental</AssemblyName>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <TargetFSharpCoreVersion>4.3.0.0</TargetFSharpCoreVersion>
-    <Name>Experimental</Name>
+    <Name>Suave.Experimental</Name>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
