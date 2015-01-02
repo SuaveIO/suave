@@ -17,12 +17,11 @@ open Fuchu
 open PerfUtil
 
 let version =
-  Assembly
-    .GetExecutingAssembly()
-    .GetCustomAttributes( typeof<AssemblyVersionAttribute>, true )
-    |> Seq.head
-    :?> AssemblyVersionAttribute
+  match Assembly.GetExecutingAssembly().GetCustomAttributes( typeof<AssemblyVersionAttribute>, true ) with
+  | [| attr |] ->
+    attr :?> AssemblyVersionAttribute
     |> fun a -> a.Version
+  | _ -> "0.0.0.1"
 
 type SuavePerfHarness(name, suave_config) =
   interface ITestable with
