@@ -14,19 +14,18 @@ Example:
   testCase "parsing a large multipart form" <| fun _ ->
 
     let res =
-      run_with' test_multipart_form
-      |> req HttpMethod.POST "/" (Some <| byte_array_content)
+      run_with' (OK "hi")
+      |> req HttpMethod.GET "/" None
 
-    Assert.Equal("", "Bob <bob@wishfulcoding.mailgun.org>", )
+    Assert.Equal("", "hi", res)
 
 *)
 module Suave.Testing
 
 open System
 open System.Threading
-open System.Net
-open System.Net.Http
-open System.Net.Http.Headers
+
+open HttpClient
 
 open Fuchu
 
@@ -36,20 +35,19 @@ open Suave.Web
 
 [<AutoOpen>]
 module ResponseData =
-  let response_headers (response : HttpResponseMessage) =
-    response.Headers
+  let response_headers (request : Request) =
+    request
+    |> getResponse
+    |> fun resp -> resp.Headers
 
-  let content_headers (response : HttpResponseMessage) =
-    response.Content.Headers
+  let status_code (resp : Response) =
+    resp.StatusCode
 
-  let status_code (response : HttpResponseMessage) =
-    response.StatusCode
+  let content_string (resp : Response) =
+    resp.EntityBody |> Option.get
 
-  let content_string (response : HttpResponseMessage) =
-    response.Content.ReadAsStringAsync().Result
-
-  let content_byte_array (response : HttpResponseMessage) =
-    response.Content.ReadAsByteArrayAsync().Result
+  let content_byte_array (resp : Response) =
+    res
 
 module Utilities =
     
@@ -63,10 +61,9 @@ module Utilities =
     | HttpMethod.HEAD -> HttpMethod.Head
     | HttpMethod.TRACE -> HttpMethod.Trace
     | HttpMethod.OPTIONS -> HttpMethod.Options
+    | HttpMethod.CONNECT -> HttpMethod.Connect
     | HttpMethod.PATCH -> failwithf "PATCH not a supported method in HttpClient"
-    | HttpMethod.CONNECT -> failwithf "CONNECT not a supported method in the unit tests"
     | HttpMethod.OTHER x -> failwithf "%A not a supported method" x
-
 
 open Utilities
 
@@ -139,8 +136,8 @@ let req_resp
   (resource : string)
   (query : string)
   data
-  (cookies : CookieContainer option)
-  (decompressionMethod : DecompressionMethods)
+  (cookies : NameValue list)
+  (decompressionMethod : DecompressionScheme)
   f_result =
 
   with_context <| fun ctx ->
@@ -149,51 +146,51 @@ let req_resp
     uri_builder.Path  <- resource
     uri_builder.Query <- query
 
-    use handler = new Net.Http.HttpClientHandler(AllowAutoRedirect = false)
-    handler.AutomaticDecompression <- decompressionMethod
-    cookies |> Option.iter (fun cookies -> handler.CookieContainer <- cookies)
-
-    use client = new Net.Http.HttpClient(handler)
-
-    let r = new HttpRequestMessage(to_http_method methd, uri_builder.Uri)
-    r.Headers.ConnectionClose <- Nullable(true)
-    data |> Option.iter (fun data -> r.Content <- data)
-
-    let get = client.SendAsync(r, HttpCompletionOption.ResponseContentRead, ctx.cts.Token)
+    let get =
+      createRequest (to_http_method methd) (uri_builder.Uri.ToString())
+      |> withAutoDecompression decompressionMethod
+      |> fun r ->
+        cookies |> List.fold (fun s c -> s |> withCookie c) r
+      |> withKeepAlive false
+      |> fun r ->
+        match data with
+        | None -> r
+        | Some body -> r |> withBody body
+      |> getResponseAsync
+      |> fun ras -> Async.StartAsTask(ras, cancellationToken = ctx.cts.Token)
 
     let completed = get.Wait(5000)
     if not completed && System.Diagnostics.Debugger.IsAttached then System.Diagnostics.Debugger.Break()
     else Assert.Equal("should finish request in 5000ms", true, completed)
 
-    use r = get.Result
-    f_result r
+    f_result (get.Result)
 
 let req methd resource data =
-  req_resp methd resource "" data None DecompressionMethods.None content_string
+  req_resp methd resource "" data [] DecompressionScheme.None content_string
 
 let req_query methd resource query =
-  req_resp methd resource query None None DecompressionMethods.None content_string
+  req_resp methd resource query None [] DecompressionScheme.None content_string
 
 let req_bytes methd resource data =
-  req_resp methd resource "" data None DecompressionMethods.None content_byte_array
+  req_resp methd resource "" data [] DecompressionScheme.None content_byte_array
 
 let req_gzip methd resource data =
-  req_resp methd resource "" data None DecompressionMethods.GZip content_string
+  req_resp methd resource "" data [] DecompressionScheme.GZip content_string
 
 let req_deflate methd resource data =
-  req_resp methd resource "" data None DecompressionMethods.Deflate content_string
+  req_resp methd resource "" data [] DecompressionScheme.Deflate content_string
 
 let req_gzip_bytes methd resource data =
-  req_resp methd resource "" data None DecompressionMethods.GZip content_byte_array
+  req_resp methd resource "" data [] DecompressionScheme.GZip content_byte_array
 
 let req_deflate_bytes methd resource data =
-  req_resp methd resource "" data None DecompressionMethods.Deflate content_byte_array
+  req_resp methd resource "" data [] DecompressionScheme.Deflate content_byte_array
 
 let req_headers methd resource data =
-  req_resp methd resource "" data None DecompressionMethods.None response_headers
+  req_resp methd resource "" data [] DecompressionScheme.None response_headers
 
 let req_content_headers methd resource data =
-  req_resp methd resource "" data None DecompressionMethods.None content_headers
+  req_resp methd resource "" data [] DecompressionScheme.None content_headers
 
 /// Test a request by looking at the cookies alone.
 let req_cookies methd resource data ctx =
@@ -201,7 +198,7 @@ let req_cookies methd resource data ctx =
   req_resp
     methd resource "" data
     (Some cookies)
-    DecompressionMethods.None
+    Compression.Plain
     id ctx
   |> ignore // places stuff in the cookie container
   cookies

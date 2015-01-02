@@ -10,3 +10,4 @@ nuget Fuchu-suave.FsCheck
 nuget Fuchu-suave.PerfUtil ~> 0.6
 nuget PerfUtil
 nuget openssl.redist
+nuget Http.fs
