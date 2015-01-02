@@ -41,6 +41,7 @@ open Suave.Types
 open Suave.Http.Applicatives
 open Suave.Http.Successful
 open Suave.Tests.TestUtilities
+open Suave.Testing
 
 [<Tests>]
 let more_scan_tests =

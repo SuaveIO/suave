@@ -33,4 +33,4 @@ let read_text relative_path =
 let read_bytes relative_path =
   File.ReadAllBytes(Path.Combine(current_path, relative_path))
 
-let default_config = { default_config with logger = Loggers.sane_defaults_for Log.LogLevel.Warn }
+let default_config = { default_config with logger = Loggers.sane_defaults_for LogLevel.Warn }
