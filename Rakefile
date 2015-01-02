@@ -80,19 +80,17 @@ task :tests => [:'tests:stress', :'tests:unit']
 
 directory 'build/pkg'
 
-nugets_pack :create_nuget_quick do |p|
+nugets_pack :create_nuget_quick => [:versioning] do |p|
   p.configuration = Configuration
   p.files   = FileList['src/**/*.fsproj'].exclude(/Tests/)
   p.out     = 'build/pkg'
   p.exe     = 'packages/NuGet.CommandLine/tools/NuGet.exe'
   p.with_metadata do |m|
-    m.id            = "Suave.Testing"
     m.version       = ENV['NUGET_VERSION']
     m.authors       = 'Ademar Gonzalez, Henrik Feldt'
     m.description   = suave_description
     m.language      = 'en-GB'
     m.copyright     = 'Ademar Gonzalez, Henrik Feldt'
-    m.release_notes = "Full version: #{ENV['BUILD_VERSION']}."
     m.license_url   = "https://github.com/SuaveIO/Suave/blob/master/COPYING"
     m.project_url   = "http://suave.io"
     # m.add_dependency 'Fuchu-suave', '0.5.0'
