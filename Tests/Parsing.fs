@@ -13,9 +13,11 @@ open Suave.Types
 open Suave.Types
 open Suave.Http
 open Suave.Http.Successful
-open Suave.Tests.TestUtilities
 open Suave.Utils
 open Suave.Web
+
+open Suave.Tests.TestUtilities
+open Suave.Testing
 
 [<Tests>]
 let parsing_multipart =

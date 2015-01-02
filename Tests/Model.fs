@@ -15,7 +15,9 @@ open Suave.Http
 open Suave.Http.Successful
 open Suave.Http.RequestErrors
 open Suave.Web
+
 open Suave.Tests.TestUtilities
+open Suave.Testing
 
 [<Tests>]
 let tests =

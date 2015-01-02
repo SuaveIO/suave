@@ -111,6 +111,10 @@
       <Project>{3DC9193E-BD0C-4486-9C58-56B630C36623}</Project>
     </ProjectReference>
     <Reference Include="System.Runtime.Serialization" />
+    <ProjectReference Include="..\Suave.Testing\Suave.Testing.fsproj">
+      <Project>{4BB79AAC-0D6D-4E0E-BB6E-8F61B3C6D99C}</Project>
+      <Name>Suave.Testing</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="..\tools\paket.targets" />
   <Choose>

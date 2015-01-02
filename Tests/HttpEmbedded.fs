@@ -9,6 +9,7 @@ open Suave.Http.Successful
 open Suave.Http.Embedded
 
 open Suave.Tests.TestUtilities
+open Suave.Testing
 
 [<Tests>]
 let embedded_resources =

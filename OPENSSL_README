@@ -1,2 +1,0 @@
-On MacOs and Linux copy libs/ManagedOpenSsl.dll.config to the application's  directory.
-On Windows copy libs/libeay32.dll and libs/ssleay32.dll to the application's directory.

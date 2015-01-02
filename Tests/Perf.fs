@@ -1,16 +1,18 @@
 ﻿module Suave.Tests.Perf
 
+open System.Reflection
+open System.Net.Http
+
 open Suave.Utils
 open Suave.Types
 open Suave.Http
 open Suave.Http.Successful
 open Suave.Web
+
 open Suave.Tests.TestUtilities
+open Suave.Testing
 
 open Fuchu
-
-open System.Reflection
-open System.Net.Http
 
 open PerfUtil
 
