@@ -124,8 +124,9 @@ module Http =
 
   // http://www.web-cache.com/Writings/http-status-codes.html
 
-  /// Intermediate responses - SUAVE TODO
-  /// Functions have signature f :: TODO
+  /// Intermediate responses - e.g. SWITCHING_PROTO
+  /// Functions have signature f :: WebPart but can't stand alone
+  /// to be done.
   module Intermediate =
     /// TODO
     val CONTINUE : x:HttpContext -> HttpContext option
