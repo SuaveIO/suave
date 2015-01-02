@@ -141,6 +141,7 @@ let req_resp
   data
   (cookies : CookieContainer option)
   (decompressionMethod : DecompressionMethods)
+  (f_request : HttpRequestMessage -> HttpRequestMessage)
   f_result =
 
   with_context <| fun ctx ->
@@ -157,6 +158,7 @@ let req_resp
 
     let r = new HttpRequestMessage(to_http_method methd, uri_builder.Uri)
     r.Headers.ConnectionClose <- Nullable(true)
+    let r = f_request r
     data |> Option.iter (fun data -> r.Content <- data)
 
     let get = client.SendAsync(r, HttpCompletionOption.ResponseContentRead, ctx.cts.Token)
@@ -169,31 +171,31 @@ let req_resp
     f_result r
 
 let req methd resource data =
-  req_resp methd resource "" data None DecompressionMethods.None content_string
+  req_resp methd resource "" data None DecompressionMethods.None id content_string
 
 let req_query methd resource query =
-  req_resp methd resource query None None DecompressionMethods.None content_string
+  req_resp methd resource query None None DecompressionMethods.None id content_string
 
 let req_bytes methd resource data =
-  req_resp methd resource "" data None DecompressionMethods.None content_byte_array
+  req_resp methd resource "" data None DecompressionMethods.None id content_byte_array
 
 let req_gzip methd resource data =
-  req_resp methd resource "" data None DecompressionMethods.GZip content_string
+  req_resp methd resource "" data None DecompressionMethods.GZip id content_string
 
 let req_deflate methd resource data =
-  req_resp methd resource "" data None DecompressionMethods.Deflate content_string
+  req_resp methd resource "" data None DecompressionMethods.Deflate id content_string
 
 let req_gzip_bytes methd resource data =
-  req_resp methd resource "" data None DecompressionMethods.GZip content_byte_array
+  req_resp methd resource "" data None DecompressionMethods.GZip id content_byte_array
 
 let req_deflate_bytes methd resource data =
-  req_resp methd resource "" data None DecompressionMethods.Deflate content_byte_array
+  req_resp methd resource "" data None DecompressionMethods.Deflate id content_byte_array
 
 let req_headers methd resource data =
-  req_resp methd resource "" data None DecompressionMethods.None response_headers
+  req_resp methd resource "" data None DecompressionMethods.None id response_headers
 
 let req_content_headers methd resource data =
-  req_resp methd resource "" data None DecompressionMethods.None content_headers
+  req_resp methd resource "" data None DecompressionMethods.None id content_headers
 
 /// Test a request by looking at the cookies alone.
 let req_cookies methd resource data ctx =
@@ -202,6 +204,8 @@ let req_cookies methd resource data ctx =
     methd resource "" data
     (Some cookies)
     DecompressionMethods.None
-    id ctx
+    id
+    content_string
+    ctx
   |> ignore // places stuff in the cookie container
   cookies

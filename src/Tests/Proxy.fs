@@ -49,7 +49,7 @@ let proxy =
     testCase "GET /redirect returns 'redirect'" <| fun _ ->
       run_in_context (run_target (url "/secret" >>= redirect "https://sts.example.se")) dispose_context <| fun _ ->
         let headers, stat =
-          proxy to_target |> req_resp HttpMethod.GET "/secret" "" None None DecompressionMethods.None
+          proxy to_target |> req_resp HttpMethod.GET "/secret" "" None None DecompressionMethods.None id
             (fun r -> r.Headers, r.StatusCode)
         Assert.Equal("should proxy redirect", HttpStatusCode.Found, stat)
         Assert.Equal("should give Location-header together with redirect",
@@ -59,10 +59,10 @@ let proxy =
       run_in_context (run_target (INTERNAL_ERROR "Oh noes")) dispose_context <| fun _ ->
         Assert.Equal("should have correct status code",
           HttpStatusCode.InternalServerError,
-          proxy to_target |> req_resp HttpMethod.GET "/" "" None None DecompressionMethods.None status_code)
+          proxy to_target |> req_resp HttpMethod.GET "/" "" None None DecompressionMethods.None id status_code)
         Assert.Equal("should have correct content",
           "Oh noes",
-          proxy to_target |> req_resp HttpMethod.GET "/" "" None None DecompressionMethods.None content_string)
+          proxy to_target |> req_resp HttpMethod.GET "/" "" None None DecompressionMethods.None id content_string)
 
     testCase "Proxy decides to return directly" <| fun _ ->
       run_in_context (run_target (OK "upstream reply")) dispose_context <| fun _ ->
