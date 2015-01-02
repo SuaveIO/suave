@@ -7,7 +7,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".paket", ".paket", "{F0556E
 		paket.lock = paket.lock
 	EndProjectSection
 EndProject
-Project("{f2a71f9b-5d33-465a-a702-920d77279786}") = "suave", "Suave\suave.fsproj", "{3DC9193E-BD0C-4486-9C58-56B630C36623}"
+Project("{f2a71f9b-5d33-465a-a702-920d77279786}") = "Suave", "Suave\Suave.fsproj", "{3DC9193E-BD0C-4486-9C58-56B630C36623}"
 EndProject
 Project("{f2a71f9b-5d33-465a-a702-920d77279786}") = "Tests", "Tests\Tests.fsproj", "{3BE234C3-2BD4-4E53-9D11-7C134374500D}"
 EndProject
@@ -18,7 +18,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "docs", "docs", "{C7760769-4
 EndProject
 Project("{f2a71f9b-5d33-465a-a702-920d77279786}") = "Experimental", "Experimental\Experimental.fsproj", "{488FC139-5013-46A2-9982-2C40A6F1F777}"
 EndProject
-Project("{f2a71f9b-5d33-465a-a702-920d77279786}") = "suave.OpenSsl", "suave.OpenSsl\suave.OpenSsl.fsproj", "{EF9A327A-4265-4DB4-ACA4-368790CC7483}"
+Project("{f2a71f9b-5d33-465a-a702-920d77279786}") = "Suave.OpenSSL", "Suave.OpenSSL\Suave.OpenSSL.fsproj", "{EF9A327A-4265-4DB4-ACA4-368790CC7483}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "examples", "examples", "{E05A9F83-E283-4258-AB0E-AF626002B6EF}"
 EndProject

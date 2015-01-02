@@ -30,7 +30,7 @@ end
 
 desc 'create assembly infos'
 asmver_files :asmver => :versioning do |a|
-  a.files = FileList['{Suave,Tests,Pong,WebMachine,Example,Experimental,Load,Suave.*,suave.*}/*proj']
+  a.files = FileList['{Suave,Suave.*,Tests,Pong,WebMachine,Example,Experimental,Load}/*proj']
   a.attributes assembly_description: suave_description,
                assembly_configuration: Configuration,
                assembly_company: 'Suave.IO',
@@ -38,6 +38,10 @@ asmver_files :asmver => :versioning do |a|
                assembly_version: ENV['LONG_VERSION'],
                assembly_file_version: ENV['LONG_VERSION'],
                assembly_informational_version: ENV['BUILD_VERSION']
+  a.handle_config do |proj, conf|
+    conf.namespace = proj.namespace + "Asm"
+    conf
+  end
 end
 
 desc 'Perform full build'
@@ -45,13 +49,13 @@ task :compile => [:versioning, :restore, :asmver, :compile_quick]
 
 desc 'clean the project'
 build :clean do |b|
-  b.file = 'suave.sln'
+  b.file = 'Suave.sln'
   b.prop 'Configuration', Configuration
   b.target = 'Clean'
 end
 
 build :compile_quick do |b|
-  b.file = 'suave.sln'
+  b.file = 'Suave.sln'
   b.prop 'Configuration', Configuration
 end
 
@@ -85,7 +89,7 @@ task :create_nuget_quick => ['build/pkg', :versioning] do
     m.language      = 'en-GB'
     m.copyright     = 'Ademar Gonzalez, Henrik Feldt'
     m.release_notes = "Full version: #{ENV['BUILD_VERSION']}."
-    m.license_url   = "https://github.com/ademar/suave/blob/master/COPYING"
+    m.license_url   = "https://github.com/SuaveIO/Suave/blob/master/COPYING"
     m.project_url   = "http://suave.io"
     m.add_dependency 'FsPickler', '1.0.3'
   end
@@ -116,9 +120,9 @@ nugets_pack :create_nuget_testing_quick do |p|
     m.language      = 'en-GB'
     m.copyright     = 'Ademar Gonzalez, Henrik Feldt'
     m.release_notes = "Full version: #{ENV['BUILD_VERSION']}."
-    m.license_url   = "https://github.com/ademar/suave/blob/master/COPYING"
+    m.license_url   = "https://github.com/SuaveIO/Suave/blob/master/COPYING"
     m.project_url   = "http://suave.io"
-    m.add_dependency 'Fuchu-suave', '0.5.0'
+    # m.add_dependency 'Fuchu-suave', '0.5.0'
   end
 end
 

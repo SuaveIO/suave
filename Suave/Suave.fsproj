@@ -6,11 +6,11 @@
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProjectGuid>{3DC9193E-BD0C-4486-9C58-56B630C36623}</ProjectGuid>
     <OutputType>Library</OutputType>
-    <RootNamespace>suave</RootNamespace>
-    <AssemblyName>suave</AssemblyName>
+    <RootNamespace>Suave</RootNamespace>
+    <AssemblyName>Suave</AssemblyName>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <TargetFSharpCoreVersion>4.3.0.0</TargetFSharpCoreVersion>
-    <Name>suave</Name>
+    <Name>Suave</Name>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -22,7 +22,7 @@
     <ConsolePause>false</ConsolePause>
     <Tailcalls>false</Tailcalls>
     <WarningLevel>3</WarningLevel>
-    <DocumentationFile>bin\Debug\suave.xml</DocumentationFile>
+    <DocumentationFile>bin\Debug\Suave.xml</DocumentationFile>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -33,7 +33,7 @@
     <ErrorReport>prompt</ErrorReport>
     <ConsolePause>false</ConsolePause>
     <WarningLevel>3</WarningLevel>
-    <DocumentationFile>bin\Release\suave.xml</DocumentationFile>
+    <DocumentationFile>bin\Release\Suave.xml</DocumentationFile>
   </PropertyGroup>
   <PropertyGroup>
     <MinimumVisualStudioVersion Condition="'$(MinimumVisualStudioVersion)' == ''">11</MinimumVisualStudioVersion>

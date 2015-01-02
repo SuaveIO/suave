@@ -20,7 +20,7 @@
     <OutputPath>bin\Debug\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <WarningLevel>3</WarningLevel>
-    <DocumentationFile>bin\Debug\Suave.Razor.XML</DocumentationFile>
+    <DocumentationFile>bin\Debug\Suave.Razor.xml</DocumentationFile>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
@@ -29,12 +29,12 @@
     <OutputPath>bin\Release\</OutputPath>
     <DefineConstants>TRACE</DefineConstants>
     <WarningLevel>3</WarningLevel>
-    <DocumentationFile>bin\Release\Suave.Razor.XML</DocumentationFile>
+    <DocumentationFile>bin\Release\Suave.Razor.xml</DocumentationFile>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Suave\suave.fsproj">
+    <ProjectReference Include="..\Suave\Suave.fsproj">
       <Project>{3DC9193E-BD0C-4486-9C58-56B630C36623}</Project>
-      <Name>suave</Name>
+      <Name>Suave</Name>
     </ProjectReference>
     <Reference Include="mscorlib" />
     <Reference Include="FSharp.Core, Version=4.3.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">

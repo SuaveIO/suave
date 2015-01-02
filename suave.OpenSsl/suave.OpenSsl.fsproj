@@ -56,9 +56,9 @@
     <None Include="paket.references" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Suave\suave.fsproj">
+    <ProjectReference Include="..\Suave\Suave.fsproj">
       <Project>{3DC9193E-BD0C-4486-9C58-56B630C36623}</Project>
-      <Name>suave</Name>
+      <Name>Suave</Name>
     </ProjectReference>
     <Reference Include="mscorlib" />
     <Reference Include="System" />
