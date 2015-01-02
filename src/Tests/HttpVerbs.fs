@@ -23,6 +23,12 @@ let gets =
       testCase "200 OK returns 'a'" <| fun _ ->
         Assert.Equal("expecting non-empty response", "a", run_with' (OK "a") |> req HttpMethod.GET "/" None)
 
+      testCase "200 OK returning url" <| fun _ ->
+        Assert.Equal("expecting correct url from binding",
+                     Uri("http://127.0.0.1:8083/").ToString(),
+                     run_with' (request (fun r -> OK r.url))
+                     |> req HttpMethod.GET "/" None)
+
       testPropertyWithConfig fscheck_config "200 OK returns equivalent" <| fun resp_str ->
         (run_with' (OK resp_str) |> req HttpMethod.GET "/hello" None) = resp_str
 
