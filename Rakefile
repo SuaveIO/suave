@@ -98,7 +98,7 @@ nugets_pack :create_nuget_quick => [:versioning] do |p|
 end
 
 desc 'create suave nuget'
-task :create_nuget => ['build/pkg', :versioning, :compile, :create_nuget_quick]
+task :nugets => ['build/pkg', :versioning, :compile, :create_nuget_quick]
 
 desc 'compile, gen versions, test and create nuget'
 task :default => [:compile, :'tests:unit']
@@ -113,7 +113,7 @@ end
 
 Albacore::Tasks::Release.new :release,
                              pkg_dir: 'build/pkg',
-                             depend_on: :create_nuget,
+                             depend_on: :nugets,
                              nuget_exe: 'packages/NuGet.CommandLine/tools/NuGet.exe',
                              api_key: ENV['NUGET_KEY']
 
