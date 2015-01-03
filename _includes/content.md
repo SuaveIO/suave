@@ -276,12 +276,9 @@ let ssl_cert = new X509Certificate("suave.pfx","easy");
 let cfg =
   { default_config with
       bindings =
-        [ { scheme = HTTP
-            ip     = IPAddress.Parse "127.0.0.1"
-            port   = 80us }
-          { scheme = HTTPS <| open_ssl ssl_cert
-            ip     = IPAddress.Parse "192.168.13.138"
-            port   = 443us } ]
+        [ HttpBinding.mk HTTP IPAddress.Loopback 80us
+          HttpBinding.mk (HTTPS (open_ssl ssl_cert)) (IPAddress.Parse "0.0.0.0") 443us
+        ]
       timeout = TimeSpan.FromMilliseconds 3000. }
 choose
   [ url "/hello" >>= OK "Hello World"
@@ -356,40 +353,43 @@ The first argument to `web_server` is a configuration record with the following 
 /// you can use to bootstrap the configuration:
 /// <code>{ default_config with bindings = [ ... ] }</code>
 type SuaveConfig =
-  /// The bindings for the web server to launch with
-  { bindings         : HttpBinding list
+  { /// The bindings for the web server to launch with
+    bindings         : HttpBinding list
 
-  /// An error handler to use for handling exceptions that are
-  /// are thrown from the web parts
-  ; error_handler    : ErrorHandler
+    /// The server key used for creating cookies
+    server_key       : byte [] // should be 64 bytes (256 bits)
 
-  /// Timeout to wait for the socket bind to finish
-  ; listen_timeout   : TimeSpan
+    /// An error handler to use for handling exceptions that are
+    /// are thrown from the web parts
+    error_handler    : ErrorHandler
 
-  /// A cancellation token for the web server. Signalling this token
-  /// means that the web server shuts down
-  ; ct               : CancellationToken
+    /// Timeout to wait for the socket bind to finish
+    listen_timeout   : TimeSpan
 
-  /// buffer size for socket operations
-  ; buffer_size      : int
+    /// A cancellation token for the web server. Signalling this token
+    /// means that the web server shuts down
+    ct               : CancellationToken
 
-  /// max number of concurrent socket operations
-  ; max_ops          : int
+    /// buffer size for socket operations
+    buffer_size      : int
 
-  /// MIME types
-  ; mime_types_map   : MimeTypesMap
+    /// max number of concurrent socket operations
+    max_ops          : int
 
-  /// Home or root directory
-  ; home_folder      : string option
+    /// MIME types
+    mime_types_map   : MimeTypesMap
 
-  /// Folder for temporary compressed files
-  ; compressed_files_folder : string option
+    /// Home or root directory
+    home_folder      : string option
 
-  /// A logger to log with
-  ; logger           : Log.Logger
+    /// Folder for temporary compressed files
+    compressed_files_folder : string option
 
-  /// A http session provider
-  ; session_provider : ISessionProvider }
+    /// A logger to log with
+    logger           : Log.Logger
+
+    /// A http session provider
+    session_provider : ISessionProvider }
 {% endhighlight %}
 
 With `Protocol` , `HttpBinding` and `MimeType` defined like follows:
