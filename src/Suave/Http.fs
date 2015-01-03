@@ -315,8 +315,12 @@ module Http =
     let url_regex regex (x : HttpContext) =
       async.Return (Option.iff (Regex.IsMatch(x.request.url.AbsolutePath, regex)) x)
 
-    let host hostname (x : HttpContext) =
-      async.Return (Option.iff (x.request.host.value = hostname) x)
+    let host hostname (x : HttpContext) = async {
+      if x.request.host.value = hostname then
+        return Some { x with request = { x.request with host = ServerClient hostname } }
+      else
+        return None
+      }
 
     // see http://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html
 

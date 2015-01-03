@@ -287,14 +287,15 @@ module ParsingAndControl =
     let meth = HttpMethod.parse raw_method
 
     let! headers, connection'' = read_headers connection'
+
+    // TODO: if client Host header not present, respond with 400 Bad Request as
+    // per http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html
     let host =
       headers %% "host" |> Option.get
       |> function
       | s when System.Text.RegularExpressions.Regex.IsMatch(s, ":\d+$") ->
         s.Substring(0, s.LastIndexOf(':'))
       | s -> s
-    // TODO: if client Host header not present, respond with 400 Bad Request as
-    // per http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html
 
     let request =
       HttpRequest.mk http_version
