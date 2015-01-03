@@ -119,11 +119,11 @@ module ParsingAndControl =
   /// and returns an array containing excess data read past the marker
   let read_till_pattern (connection : Connection) scan_data =
 
-    let rec loop  (connection : Connection)  = socket {
-      let! res,connection = scan_data connection
+    let rec loop (connection : Connection)  = socket {
+      let! res, connection = scan_data connection
       match res with
       | Found a ->
-        return (a,connection)
+        return (a, connection)
       | NeedMore ->
         let! connection = read_more_data connection
         return! loop connection
@@ -251,7 +251,6 @@ module ParsingAndControl =
       return raw_form , connection
     }
 
-  ///
   let parse_post_data' (ctx : HttpContext) = socket{
     let request = ctx.request
     let content_encoding = request.headers %% "content-type"
@@ -278,20 +277,37 @@ module ParsingAndControl =
 
   /// Process the request, reading as it goes from the incoming 'stream', yielding a HttpRequest
   /// when done
-  let process_request is_secure (ctx : HttpContext) : SocketOp<HttpContext option> = socket {
+  let process_request ({ connection = connection
+                         runtime    = runtime } as ctx)
+                      : SocketOp<HttpContext option> = socket {
 
-    let! (first_line : string), connection = read_line ctx.connection
+    let! (first_line : string), connection' = read_line connection
 
-    let raw_method, url, raw_query, http_version = parse_url first_line
+    let raw_method, path, raw_query, http_version = parse_url first_line
     let meth = HttpMethod.parse raw_method
 
-    let! headers, connection = read_headers connection
+    let! headers, connection'' = read_headers connection'
+
+    // TODO: if client Host header not present, respond with 400 Bad Request as
+    // per http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html
+    let host =
+      headers %% "host" |> Option.get
+      |> function
+      | s when System.Text.RegularExpressions.Regex.IsMatch(s, ":\d+$") ->
+        s.Substring(0, s.LastIndexOf(':'))
+      | s -> s
 
     let request =
-      HttpRequest.mk http_version url meth headers raw_query
-        (parse_trace_headers headers) is_secure connection.ipaddr
+      HttpRequest.mk http_version
+                     (runtime.matched_binding.uri path raw_query)
+                     (ClientOnly host)
+                     meth headers raw_query
+                     (parse_trace_headers headers)
+                     runtime.matched_binding.scheme.secure
+                     connection''.ipaddr
 
-    return Some { ctx with request = request; connection = connection }
+    return Some { ctx with request    = request
+                           connection = connection'' }
   }
 
   open System.Net
@@ -390,11 +406,11 @@ module ParsingAndControl =
     }
 
   let clean_response (ctx : HttpContext) =
-    { ctx with response = HttpResult.empty}
+    { ctx with response = HttpResult.empty }
 
-  let http_loop (ctx : HttpContext) (consumer : HttpConsumer) =
-
-    let runtime = ctx.runtime
+  let http_loop ({ runtime = runtime
+                   connection = connection } as ctx_outer)
+                (consumer : HttpConsumer) =
 
     let rec loop (ctx : HttpContext) = socket {
 
@@ -402,7 +418,7 @@ module ParsingAndControl =
       let verbosef = Log.verbosef runtime.logger "Suave.Web.request_loop.loop" TraceHeader.empty
 
       verbose "-> processor"
-      let! result = process_request (match runtime.protocol with HTTP -> false | HTTPS _ -> true) ctx
+      let! result = process_request ctx
       verbose "<- processor"
 
       match result with
@@ -411,7 +427,6 @@ module ParsingAndControl =
         let! result = operate consumer ctx
         match result with
         | Some ctx ->
-          let connection = ctx.connection
           match ctx.request.headers %% "connection" with
           | Some (x : string) when x.ToLower().Equals("keep-alive") ->
             verbose "'Connection: keep-alive' recurse"
@@ -430,7 +445,7 @@ module ParsingAndControl =
               return ()
         | None -> return ()
     }
-    loop ctx
+    loop ctx_outer
 
   /// The request loop initialises a request with a processor to handle the
   /// incoming stream and possibly pass the request to the web parts, a protocol,
@@ -442,7 +457,7 @@ module ParsingAndControl =
     (connection : Connection) =
 
     socket {
-      let! connection = load_connection runtime.logger runtime.protocol connection
+      let! connection = load_connection runtime.logger runtime.matched_binding.scheme connection
       do! http_loop { HttpContext.empty with runtime = runtime; connection = connection } consumer
       return ()
     }
@@ -450,8 +465,11 @@ module ParsingAndControl =
   open Suave.Tcp
 
   /// Starts a new web worker, given the configuration and a web part to serve.
-  let web_worker (ip, port, buffer_size, max_ops, runtime : HttpRuntime) (webpart : WebPart) =
-    tcp_ip_server (ip, port, buffer_size, max_ops) runtime.logger (request_loop runtime (WebPart webpart))
+  let web_worker (buffer_size, max_ops) (webpart : WebPart) (runtime : HttpRuntime) =
+    tcp_ip_server (buffer_size, max_ops)
+                  runtime.logger
+                  (request_loop runtime (WebPart webpart))
+                  runtime.matched_binding.socket_binding
 
   let resolve_directory home_directory =
     match home_directory with
@@ -488,17 +506,15 @@ let default_error_handler (ex : Exception) msg (ctx : HttpContext) =
 /// The return value from 'listening' (first item in tuple) gives you some metrics on
 /// how quickly suave started.
 let web_server_async (config : SuaveConfig) (webpart : WebPart) =
-  let content_folder = ParsingAndControl.resolve_directory config.home_folder
-  let compression_folder = Path.Combine(ParsingAndControl.resolve_directory config.compressed_files_folder, "_temporary_compressed_files")
-  let all =
-    config.bindings
-    |> List.map (fun { scheme = proto; ip = ip; port = port } ->
-      let http_runtime =
-        HttpRuntime.mk proto config.server_key config.error_handler config.mime_types_map
-                       content_folder compression_folder config.logger
-      ParsingAndControl.web_worker (ip, port, config.buffer_size, config.max_ops, http_runtime) webpart)
-  let listening = all |> Seq.map fst |> Async.Parallel
-  let server    = all |> Seq.map snd |> Async.Parallel |> Async.Ignore
+  let home_folder, compression_folder =
+    ParsingAndControl.resolve_directory config.home_folder,
+    Path.Combine(ParsingAndControl.resolve_directory config.compressed_files_folder, "_temporary_compressed_files")
+  let servers = // spawn tcp listeners/web workers
+    List.map (SuaveConfig.to_runtime config home_folder compression_folder
+              >> ParsingAndControl.web_worker (config.buffer_size, config.max_ops) webpart)
+              config.bindings
+  let listening = servers |> Seq.map fst |> Async.Parallel
+  let server    = servers |> Seq.map snd |> Async.Parallel |> Async.Ignore
   listening, server
 
 /// Runs the web server and blocks waiting for the asynchronous workflow to be cancelled or

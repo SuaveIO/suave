@@ -299,18 +299,27 @@ module Http =
 
     open Types
 
-    let url s (x : HttpContext) = async { if s = x.request.url then return Some x else return None }
+    module private Option =
+      let iff b x =
+        if b then Some x else None
 
-    let ``method`` (s : HttpMethod) (x : HttpContext) = async {
-      if s = x.request.``method`` then return Some x else return None
-      }
+    let url s (x : HttpContext) =
+      async.Return (Option.iff (s = x.request.url.AbsolutePath) x)
 
-    let is_secure (x : HttpContext) = async {
-      if x.request.is_secure then return Some x else return None
-      }
+    let ``method`` (m : HttpMethod) (x : HttpContext) =
+      async.Return (Option.iff (m = x.request.``method``) x)
 
-    let url_regex s (x : HttpContext) = async {
-      if Regex.IsMatch(x.request.url,s) then return Some x else return None
+    let is_secure (x : HttpContext) =
+      async.Return (Option.iff x.request.is_secure x)
+
+    let url_regex regex (x : HttpContext) =
+      async.Return (Option.iff (Regex.IsMatch(x.request.url.AbsolutePath, regex)) x)
+
+    let host hostname (x : HttpContext) = async {
+      if x.request.host.value = hostname then
+        return Some { x with request = { x.request with host = ServerClient hostname } }
+      else
+        return None
       }
 
     // see http://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html
@@ -349,7 +358,7 @@ module Http =
         (match Map.tryFind "user_name" ctx.user_state with Some x -> x :?> string | None -> "-")
         (DateTime.UtcNow.ToString("dd/MMM/yyyy:hh:mm:ss %K", ci))
         (string ctx.request.``method``)
-        ctx.request.url
+        ctx.request.url.AbsolutePath
         ctx.request.http_version
         (Codes.http_code ctx.response.status)
         "0"
@@ -377,7 +386,7 @@ module Http =
         with _ -> None
 
       let F (r:HttpContext) =
-        match scan r.request.url with
+        match scan r.request.url.AbsolutePath with
         | Some p ->
           let part = h p
           part r 
@@ -510,8 +519,8 @@ module Http =
           "Suave.Http.Files.browse"
           TraceHeader.empty
           (sprintf "Files.browse trying file (local_file url:'%s' root:'%s')"
-            r.url root_path)
-        file (resolve_path root_path r.url))
+            r.url.AbsolutePath root_path)
+        file (resolve_path root_path r.url.AbsolutePath))
 
     let browse' : WebPart =
       warbler (fun { runtime = q } -> browse q.home_directory)
@@ -521,7 +530,7 @@ module Http =
 
       let url = req.url
 
-      let dirname = resolve_path root_path url
+      let dirname = resolve_path root_path url.AbsolutePath
       let result = new StringBuilder()
 
       let filesize  (x : FileSystemInfo) =
@@ -606,7 +615,7 @@ module Http =
       resource default_source_assembly name
 
     let browse assembly : WebPart =
-      warbler (fun ctx -> resource assembly (ctx.request.url.TrimStart [|'/'|]))
+      warbler (fun ctx -> resource assembly (ctx.request.url.AbsolutePath.TrimStart [|'/'|]))
 
     let browse' : WebPart =
       browse default_source_assembly

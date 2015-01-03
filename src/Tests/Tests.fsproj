@@ -62,12 +62,14 @@
     <Compile Include="HttpFile.fs" />
     <Compile Include="HttpEmbedded.fs" />
     <Compile Include="HttpVerbs.fs" />
+    <Compile Include="HttpApplicatives.fs" />
     <Compile Include="Parsing.fs" />
     <Compile Include="Model.fs" />
     <Compile Include="Perf.fs" />
     <Compile Include="Sscanf.fs" />
     <Compile Include="Json.fs" />
     <Compile Include="Cookie.fs" />
+    <Compile Include="Types.fs" />
     <Compile Include="Program.fs" />
     <None Include="paket.references" />
     <None Include="suave.p12">

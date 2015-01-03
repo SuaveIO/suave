@@ -26,7 +26,7 @@ let gets =
       testCase "200 OK returning url" <| fun _ ->
         Assert.Equal("expecting correct url from binding",
                      Uri("http://127.0.0.1:8083/").ToString(),
-                     run_with' (request (fun r -> OK r.url))
+                     run_with' (request (fun r -> OK (r.url.ToString())))
                      |> req HttpMethod.GET "/" None)
 
       testPropertyWithConfig fscheck_config "200 OK returns equivalent" <| fun resp_str ->

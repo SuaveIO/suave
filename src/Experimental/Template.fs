@@ -107,7 +107,7 @@ open Types
 /// write the exception as a string to a 500 Internal Error response.
 let process_template (data : Map<string,Binder>) ({ request = http_request; runtime = runtime } as ctx : HttpContext) =
   try
-    let xmlReader = new XmlTextReader(Files.resolve_path runtime.home_directory http_request.url)
+    let xmlReader = new XmlTextReader(Files.resolve_path runtime.home_directory http_request.url.AbsolutePath)
     xmlReader.Namespaces <- false
 
     let transform = parser xmlReader (Xml [])
