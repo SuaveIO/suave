@@ -299,21 +299,24 @@ module Http =
 
     open Types
 
-    let url s (x : HttpContext) = async {
-      if s = x.request.url.AbsolutePath then return Some x else return None
-      }
+    module private Option =
+      let iff b x =
+        if b then Some x else None
 
-    let ``method`` (m : HttpMethod) (x : HttpContext) = async {
-      if m = x.request.``method`` then return Some x else return None
-      }
+    let url s (x : HttpContext) =
+      async.Return (Option.iff (s = x.request.url.AbsolutePath) x)
 
-    let is_secure (x : HttpContext) = async {
-      if x.request.is_secure then return Some x else return None
-      }
+    let ``method`` (m : HttpMethod) (x : HttpContext) =
+      async.Return (Option.iff (m = x.request.``method``) x)
 
-    let url_regex regex (x : HttpContext) = async {
-      if Regex.IsMatch(x.request.url.AbsolutePath, regex) then return Some x else return None
-      }
+    let is_secure (x : HttpContext) =
+      async.Return (Option.iff x.request.is_secure x)
+
+    let url_regex regex (x : HttpContext) =
+      async.Return (Option.iff (Regex.IsMatch(x.request.url.AbsolutePath, regex)) x)
+
+    let host hostname (x : HttpContext) =
+      async.Return (Option.iff (x.request.host.value = hostname) x)
 
     // see http://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html
 

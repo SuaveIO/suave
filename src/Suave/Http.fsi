@@ -1072,6 +1072,11 @@ module Http =
     /// Applies the regex to the url and matches on the result
     val url_regex : s:string -> WebPart
 
+    /// Match on the hostname (which is a required header for a Http client to send)
+    /// -> allows you to have multiple sites with a single application.
+    /// TODO: support SNI #177
+    val host : hostname:string -> WebPart
+
     /// <summary><para>
     /// Formats the HttpRequest as in the default manner
     /// </para></summary>
