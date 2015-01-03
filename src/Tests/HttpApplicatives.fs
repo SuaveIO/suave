@@ -40,7 +40,7 @@ let tests =
       Assert.Equal("should be IPv4 loopback", "127.0.0.1", res)
 
     testCase "when matching on Host but is forwarded" <| fun _ ->
-      Tests.skiptest "not done"
+      Tests.skiptest "not done, see issue #103"
       let app =
         host "127.0.0.1"
           >>= request (fun r ->
