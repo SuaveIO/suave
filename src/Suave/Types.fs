@@ -297,7 +297,7 @@ module HttpUpload =
   let temp_file_path x = x.temp_file_path
 
 type Host =
-  /// The Http.host applicative has ensured this value
+  /// The Http.Applicatives.host function has ensured this value
   | ServerClient of string
   /// The client's Host header is this value
   | ClientOnly of string
