@@ -7,11 +7,11 @@ open Suave.Utils.Bytes
 /// A connection (TCP implied) is a thing that can read and write from a socket
 /// and that can be closed.
 type Connection =
-  { ipaddr       : IPAddress
-    transport    : ITransport
+  { ipaddr         : IPAddress
+    transport      : ITransport
     buffer_manager : BufferManager
-    line_buffer  : ArraySegment<byte>
-    segments        : BufferSegment list }
+    line_buffer    : ArraySegment<byte>
+    segments       : BufferSegment list }
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Connection =

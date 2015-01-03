@@ -47,7 +47,7 @@ let forward (ip : IPAddress) (port : uint16) (ctx : HttpContext) =
       if not (WebHeaderCollection.IsRestricted key) then
         r.Add(key, snd e)
     r
-  let url = new UriBuilder("http", ip.ToString(), int port, p.url, p.raw_query)
+  let url = new UriBuilder("http", ip.ToString(), int port, p.url.AbsolutePath, p.raw_query)
   let q = WebRequest.Create(url.Uri) :?> HttpWebRequest
 
   q.AllowAutoRedirect         <- false
@@ -113,21 +113,18 @@ open System.IO
 /// Run a proxy server with the given configuration and given upstream/target
 /// resolver.
 let proxy_server_async (config : SuaveConfig) resolver =
-  let home_dir = ParsingAndControl.resolve_directory config.home_folder
-  let compression_folder = Path.Combine(ParsingAndControl.resolve_directory config.compressed_files_folder, "_temporary_compressed_files")
-  let mk_runtime proto =
-    HttpRuntime.mk proto config.server_key config.error_handler config.mime_types_map
-                   home_dir compression_folder config.logger
-
+  let home_folder, compression_folder =
+    ParsingAndControl.resolve_directory config.home_folder,
+    Path.Combine(ParsingAndControl.resolve_directory config.compressed_files_folder, "_temporary_compressed_files")
   let all =
-    config.bindings
-    |> List.map (fun { scheme = proto; ip = ip; port = port } ->
-        tcp_ip_server
-          (ip, port, config.buffer_size, config.max_ops)
-          config.logger
-          (ParsingAndControl.request_loop
-            (mk_runtime proto)
-            (SocketPart (proxy resolver))))
+    List.map (fun binding ->
+      tcp_ip_server (config.buffer_size, config.max_ops)
+                    config.logger
+                    (ParsingAndControl.request_loop
+                      (SuaveConfig.to_runtime config home_folder compression_folder binding)
+                      (SocketPart (proxy resolver)))
+                    binding.socket_binding)
+      config.bindings
   let listening = all |> Seq.map fst |> Async.Parallel |> Async.Ignore
   let server    = all |> Seq.map snd |> Async.Parallel |> Async.Ignore
   listening, server

@@ -7,7 +7,6 @@ open System.Net.Sockets
 open System.Net
 open System.Text
 
-
 open Suave.Sockets
 open Suave.Utils
 open Suave.Log
@@ -297,10 +296,24 @@ module HttpUpload =
 
   let temp_file_path x = x.temp_file_path
 
+type Host =
+  /// The Http.host applicative has ensured this value
+  | ServerClient of string
+  /// The client's Host header is this value
+  | ClientOnly of string
+  /// The
+  | Forwarded of forwarded_for:string * Host
+  member x.value =
+    match x with
+    | ServerClient v -> v
+    | ClientOnly v -> v
+    | Forwarded (forwarded_for, _) -> forwarded_for
+
 /// A holder for the data extracted from the request.
 type HttpRequest =
   { http_version     : string
-    url              : string
+    url              : Uri
+    host             : Host
     ``method``       : HttpMethod
     headers          : (string * string) list
     raw_form         : byte []
@@ -318,7 +331,8 @@ module HttpRequest =
 
   let empty =
     { http_version     = "1.1"
-      url              = "/"
+      url              = Uri("http://localhost/")
+      host             = ClientOnly "localhost"
       ``method``       = HttpMethod.OTHER("")
       headers          = []
       raw_form         = Array.empty
@@ -329,9 +343,10 @@ module HttpRequest =
       is_secure        = false
       ipaddr           = IPAddress.Loopback }
 
-  let mk http_version url meth headers raw_query trace_headers is_secure ip_addr =
+  let mk http_version url host meth headers raw_query trace_headers is_secure ip_addr =
     { http_version     = http_version
       url              = url
+      host             = host
       ``method``       = meth
       headers          = headers
       raw_form         = Array.empty
@@ -395,34 +410,33 @@ type Protocol =
   /// The HTTP protocol tunneled in a TLS tunnel
   | HTTPS of ITlsProvider
 with
+  member x.secure =
+    match x with | HTTP -> false | _ -> true
   override x.ToString() =
     match x with
     | HTTP    -> "http"
     | HTTPS _ -> "https"
 
-open System.Net
-
-/// A port is an unsigned short (uint16) structure
-type Port = uint16
-
 /// A HTTP binding is a protocol is the product of HTTP or HTTP, a DNS or IP binding and a port number
 type HttpBinding =
   { /// The scheme in use
-    scheme : Protocol
-    /// The host or IP address to bind to. This will be interpreted by the operating system
-    ip     : IPAddress
-    /// The port for the binding
-    port   : Port }
-with
-  [<Obsolete "Use HttpBinding.mk or mk' instead">]
-  static member Create(proto, ip : string, port : int) =
-    { scheme = proto
-      ip     = IPAddress.Parse ip
-      port   = uint16 port }
+    scheme         : Protocol
+    socket_binding : SocketBinding }
+
+  member x.uri path query =
+    String.Concat [
+      x.scheme.ToString(); "://"; x.socket_binding.ToString()
+      path
+      (match query with | "" -> "" | qs -> "?" + qs)
+    ]
+    |> fun x -> Uri x
+
   /// Overrides the default ToString() method to provide an implementation that is assignable
   /// to a BaseUri for a RestClient/HttpClient.
   override x.ToString() =
-    sprintf "%O://%O:%d/" x.scheme x.ip x.port
+    String.Concat [
+      x.scheme.ToString(); "://"; x.socket_binding.ToString()
+      ]
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module HttpBinding =
@@ -431,21 +445,18 @@ module HttpBinding =
   let DefaultBindingPort = 8083us
 
   let defaults =
-    { scheme = HTTP
-      ip     = IPAddress.Loopback
-      port   = DefaultBindingPort }
+    { scheme  = HTTP
+      socket_binding = SocketBinding.mk IPAddress.Loopback DefaultBindingPort }
 
   /// Create a HttpBinding for the given protocol, an IP address to bind to and a port
   /// to listen on.
   let mk scheme ip port =
-    { scheme = scheme
-      ip     = ip
-      port   = port }
+    { scheme  = scheme
+      socket_binding = SocketBinding.mk ip port }
 
   let mk' scheme ip port =
-    { scheme = scheme
-      ip     = IPAddress.Parse ip
-      port   = uint16 (port : int) }
+    { scheme  = scheme
+      socket_binding = SocketBinding.mk (IPAddress.Parse ip) (uint16 (port : int)) }
 
   let scheme x = x.scheme
 
@@ -500,13 +511,13 @@ type ServerKey = byte []
 /// server starts. You can also use the `HttpRuntime` module to create a new
 /// value yourself, or use the `empty` one.
 type HttpRuntime =
-  { protocol           : Protocol
-    server_key         : ServerKey
+  { server_key         : ServerKey
     error_handler      : ErrorHandler
     mime_types_map     : MimeTypesMap
     home_directory     : string
     compression_folder : string
-    logger             : Logger }
+    logger             : Logger
+    matched_binding    : HttpBinding }
 
 /// The HttpContext is the container of the request, runtime, user-state and
 /// response.
@@ -542,25 +553,25 @@ module HttpRuntime =
   /// defaults instead, from Web.fs, as they contain the logic for printing to
   /// the output stream correctly.
   let empty =
-    { protocol           = Protocol.HTTP
-      server_key         = Crypto.generate_key ServerKeyLength
+    { server_key         = Crypto.generate_key ServerKeyLength
       error_handler      = fun _ _ -> fun _ -> async.Return None
       mime_types_map     = fun _ -> None
       home_directory     = "."
       compression_folder = "."
-      logger             = Loggers.sane_defaults_for LogLevel.Debug }
+      logger             = Loggers.sane_defaults_for LogLevel.Debug
+      matched_binding    = HttpBinding.defaults }
 
   /// make a new HttpRuntime from the given parameters
-  let mk proto server_key error_handler mime_types home_directory compression_folder logger =
-    { protocol           = proto
-      server_key         = server_key
+  let mk server_key error_handler mime_types home_directory compression_folder logger binding =
+    { server_key         = server_key
       error_handler      = error_handler
       mime_types_map     = mime_types
       home_directory     = home_directory
       compression_folder = compression_folder
-      logger             = logger }
+      logger             = logger
+      matched_binding    = binding }
 
-  let protocol x = x.protocol
+  let matched_binding x = x.matched_binding
 
   let server_key x = x.server_key
 
@@ -643,6 +654,14 @@ type SuaveConfig =
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module SuaveConfig =
+
+  let to_runtime config content_folder compression_folder =
+    HttpRuntime.mk config.server_key
+                   config.error_handler
+                   config.mime_types_map
+                   content_folder
+                   compression_folder
+                   config.logger
 
   let bindings x = x.bindings
 

@@ -9,18 +9,18 @@ open Suave.Logging
 open Suave.Sockets
 
 /// The max backlog of number of requests
-let MAX_BACK_LOG = Int32.MaxValue
+[<Literal>]
+let MaxBacklog = Int32.MaxValue
 
 type StartedData =
   { start_called_utc : DateTimeOffset
     socket_bound_utc : DateTimeOffset option
-    source_ip        : IPAddress
-    source_port      : uint16 }
+    binding          : SocketBinding }
 with
   override x.ToString() =
     sprintf "%.3f ms with binding %O:%d"
       ((x.socket_bound_utc |> Option.fold (fun _ t -> t) x.start_called_utc) - x.start_called_utc).TotalMilliseconds
-      x.source_ip x.source_port
+      x.binding.ip x.binding.port
 
 
 /// Disconnect a socket for reuse
@@ -89,7 +89,6 @@ let create_pools logger max_ops buffer_size =
 // i.e: export MONO_GC_PARAMS=nursery-size=128m
 // The nursery size must be a power of two in bytes
 
-/// Argh!! @ System.Net.Sockets.SocketException: Address already in use
 let private a_few_times f =
   let s ms = System.Threading.Thread.Sleep (ms : int)
   let rec run = function
@@ -102,26 +101,23 @@ let private a_few_times f =
 /// listening to its address/port combination), and an asynchronous workflow that
 /// yields when the full server is cancelled. If the 'has started listening' workflow
 /// returns None, then the start timeout expired.
-let tcp_ip_server (source_ip : IPAddress,
-                   source_port : uint16,
-                   buffer_size : int,
+let tcp_ip_server (buffer_size        : int,
                    max_concurrent_ops : int)
-                  (logger : Logger)
-                  (serve_client : TcpWorker<unit>) =
+                  (logger             : Logger)
+                  (serve_client       : TcpWorker<unit>)
+                  (binding            : SocketBinding) =
 
   let start_data =
     { start_called_utc = Globals.utc_now ()
       socket_bound_utc = None
-      source_ip        = source_ip
-      source_port      = source_port }
+      binding          = binding }
 
   let accepting_connections = new AsyncResultCell<StartedData>()
   let a, b, c, bufferManager = create_pools logger max_concurrent_ops buffer_size
 
-  let local_ep = new IPEndPoint(source_ip, int source_port)
-  let listen_socket = new Socket(local_ep.AddressFamily, SocketType.Stream, ProtocolType.Tcp)
-  a_few_times (fun () -> listen_socket.Bind local_ep)
-  listen_socket.Listen MAX_BACK_LOG
+  let listen_socket = new Socket(binding.end_point.AddressFamily, SocketType.Stream, ProtocolType.Tcp)
+  a_few_times (fun () -> listen_socket.Bind binding.end_point)
+  listen_socket.Listen MaxBacklog
 
   // consider:
   // echo 5 > /proc/sys/net/ipv4/tcp_fin_timeout
