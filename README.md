@@ -63,10 +63,10 @@ open Fuchu
 testCase "parsing a large multipart form" <| fun _ ->
 
   let res =
-    run_with' test_multipart_form
+    run_with' (OK "hi")
     |> req HttpMethod.POST "/" (Some <| byte_array_content)
 
-  Assert.Equal("", "Bob <bob@wishfulcoding.mailgun.org>", )
+  Assert.Equal("should get the correct result", "hi", res)
 ```
 
 All of our tests use this assembly; you can do too.
@@ -127,7 +127,9 @@ Let type annotations be specified with spaces after the argument symbol and befo
 the type.
 
 ``` fsharp
-static member FromString(scheme : string, ?cert) =
+module MyType =
+  let from_string (scheme : string) =
+    // ...
 ```
 
 Method formatting with no spaces after/before normal parenthesis
@@ -173,3 +175,4 @@ We have a chat room in case you feel like chatting a bit.
 
  * https://github.com/rayokota/generator-angular-suave
  * [FsReveal](https://github.com/fsprojects/FsReveal)
+ * [TodoBackendSuave](https://github.com/JonCanning/TodoBackendSuave)
