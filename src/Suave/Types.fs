@@ -431,25 +431,69 @@ module HttpRequest =
 
   let http_version x = x.http_version
 
+  let http_version_ =
+    (fun x -> x.http_version),
+    fun v (x : HttpRequest) -> { x with http_version = v }
+
   let url x = x.url
+
+  let url_ =
+    (fun x -> x.url),
+    fun v (x : HttpRequest) -> { x with url = v }
 
   let ``method`` x = x.``method``
 
+  let method_ =
+    (fun x -> x.``method``),
+    fun v (x : HttpRequest) -> { x with ``method`` = v }
+
   let headers x = x.headers
+
+  let headers_ =
+    (fun x -> x.headers),
+    fun v (x : HttpRequest) -> { x with headers = v }
 
   let raw_form x = x.raw_form
 
+  let raw_form_ =
+    (fun x -> x.raw_form),
+    fun v (x : HttpRequest) -> { x with raw_form = v }
+
   let raw_query x = x.raw_query
+
+  let raw_query_ =
+    (fun x -> x.raw_query),
+    fun v (x : HttpRequest) -> { x with raw_query = v }
 
   let files x = x.files
 
+  let files_ =
+    (fun x -> x.files),
+    fun v (x : HttpRequest) -> { x with files = v }
+
   let multipart_fields x = x.multipart_fields
+
+  let multipart_fields_ =
+    (fun x -> x.multipart_fields),
+    fun v (x : HttpRequest) -> { x with multipart_fields = v }
 
   let trace x = x.trace
 
+  let trace_ =
+    (fun x -> x.trace),
+    fun v (x : HttpRequest) -> { x with trace = v }
+
   let is_secure x = x.is_secure
 
+  let is_secure_ =
+    (fun x -> x.is_secure),
+    fun v x -> { x with is_secure = v }
+
   let ipaddr x = x.ipaddr
+
+  let ipaddr_ =
+    (fun x -> x.ipaddr),
+    fun v (x : HttpRequest) -> { x with ipaddr = v }
 
 type ITlsProvider =
   abstract member Wrap : Connection -> SocketOp<Connection>
@@ -511,9 +555,15 @@ module HttpBinding =
 
   let scheme x = x.scheme
 
-  let ip x     = x.ip
+  let scheme_ =
+    (fun x -> x.scheme),
+    fun v x -> { x with scheme = v }
 
-  let port x   = x.port
+  let socket_binding x = x.socket_binding
+
+  let socket_binding_ =
+    (fun x -> x.socket_binding),
+    fun v x -> { x with socket_binding = v }
 
 type HttpContent =
   | NullContent
