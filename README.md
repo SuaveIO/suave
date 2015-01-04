@@ -40,7 +40,7 @@ Now that you've discovered how to do "Hello World!", go read the
 
 # Suave.Testing
 
-We have a NuGet ready for your testing needs; Sauve is an excellent server for
+We have a NuGet ready for your testing needs; Suave is an excellent server for
 running in-process integation tests, as it's very fast to spawn. On an ordinary
 laptop, running hundreds of randomised tests and micro-benchmarks as well as all
 Suave unit tests, take about 5 seconds on mono.
