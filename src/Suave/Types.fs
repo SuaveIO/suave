@@ -325,11 +325,27 @@ module HttpUpload =
 
   let field_name x = x.field_name
 
+  let field_name_ =
+    (fun x -> x.field_name),
+    fun v x -> { x with field_name = v }
+
   let file_name x = x.file_name
+
+  let file_name_ =
+    (fun x -> x.file_name),
+    fun v x -> { x with file_name = v }
 
   let mime_type x = x.mime_type
 
+  let mime_type_ =
+    (fun x -> x.mime_type),
+    fun v x -> { x with mime_type = v }
+
   let temp_file_path x = x.temp_file_path
+
+  let temp_file_path_ =
+    (fun x -> x.temp_file_path),
+    fun v x -> { x with temp_file_path = v }
 
 type Host =
   /// The Http.Applicatives.host function has ensured this value
