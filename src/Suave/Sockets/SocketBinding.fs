@@ -27,3 +27,11 @@ module SocketBinding =
   let mk ip port =
     { ip   = ip
       port = port }
+
+  let ip_ =
+    (fun x -> x.ip),
+    fun v x -> { x with ip = v }
+
+  let port_ =
+    (fun x -> x.port),
+    fun v x -> { x with port = v }
