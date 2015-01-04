@@ -180,7 +180,6 @@ module Codes =
     member x.Describe () =
       sprintf "%d %s: %s" (http_code x) (http_reason x) (http_message x)
 
-
 /// HTTP cookie
 type HttpCookie =
   { name      : string
@@ -297,6 +296,14 @@ module MimeType =
   let mk name compression =
     { name        = name
       compression = compression }
+
+  let name_ =
+    (fun x -> x.name),
+    fun v (x : MimeType) -> { x with name = v }
+
+  let compression_ =
+    (fun x -> x.compression),
+    fun v (x : MimeType) -> { x with compression = v }
 
 type MimeTypesMap = string -> MimeType option
 
