@@ -752,7 +752,7 @@ module HttpContext =
 
   let request_ =
     (fun x -> x.request),
-    fun v x -> { x with request = r }
+    fun v x -> { x with request = v }
 
   let user_state x = x.user_state
 

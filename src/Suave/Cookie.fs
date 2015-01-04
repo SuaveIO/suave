@@ -140,6 +140,26 @@ module Cookie =
         relative_expiry = relative_expiry
         secure          = secure }
 
+    let server_key_ =
+      (fun x -> x.server_key),
+      fun v (x : CookiesState) -> { x with server_key = v }
+
+    let cookie_name_ =
+      (fun x -> x.cookie_name),
+      fun v (x : CookiesState) -> { x with cookie_name = v }
+
+    let user_state_key_ =
+      (fun x -> x.user_state_key),
+      fun v (x : CookiesState) -> { x with user_state_key = v }
+
+    let relative_expiry_ =
+      (fun x -> x.relative_expiry),
+      fun v (x : CookiesState) -> { x with relative_expiry = v }
+
+    let secure_ =
+      (fun x -> x.secure),
+      fun v (x : CookiesState) -> { x with secure = v }
+
   let generate_cookies server_key cookie_name relative_expiry secure plain_data =
     let enc, _ = Bytes.cookie_encoding
     match Crypto.secretbox server_key plain_data with
