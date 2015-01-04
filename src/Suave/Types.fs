@@ -233,17 +233,45 @@ module HttpCookie =
 
   let name x = x.name
 
+  let name_ =
+    (fun x -> x.name),
+    fun v x -> { x with name = v }
+
   let value x = x.value
+
+  let value_ =
+    (fun x -> x.value),
+    fun v x -> { x with value = v }
 
   let expires x = x.expires
 
+  let expires_ =
+    (fun x -> x.expires),
+    fun v x -> { x with expires = v }
+
   let path x = x.path
+
+  let path_ =
+    (fun x -> x.path),
+    fun v (x : HttpCookie) -> { x with path = v }
 
   let domain x = x.domain
 
+  let domain_ =
+    (fun x -> x.domain),
+    fun v x -> { x with domain = v }
+
   let secure x = x.secure
 
+  let secure_ =
+    (fun x -> x.secure),
+    fun v x -> { x with secure = v }
+
   let http_only x = x.http_only
+
+  let http_only_ =
+    (fun x -> x.http_only),
+    fun v x -> { x with http_only = v }
 
   /// Assumes only valid characters go in, see http://tools.ietf.org/html/rfc6265#section-4.1.1
   let to_header (x : HttpCookie) =
