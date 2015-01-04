@@ -597,9 +597,21 @@ module HttpResult =
 
   let status x = x.status
 
+  let status_ =
+    (fun x -> x.status),
+    fun v (x : HttpResult) -> { x with status = v }
+
   let headers x = x.headers
 
+  let headers_ =
+    (fun x -> x.headers),
+    fun v (x : HttpResult) -> { x with headers = v }
+
   let content x = x.content
+
+  let content_ =
+    (fun x -> x.content),
+    fun v (x : HttpResult) -> { x with content = v }
 
 /// A SuaveTask is an Async{'a option} which shows that it may need to be
 /// evaluated asynchronously to decide whether a value is available.
