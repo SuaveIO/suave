@@ -684,19 +684,47 @@ module HttpRuntime =
       logger             = logger
       matched_binding    = binding }
 
-  let matched_binding x = x.matched_binding
-
   let server_key x = x.server_key
+
+  let server_key_ =
+    (fun x -> x.server_key),
+    fun v x -> { x with server_key = v }
 
   let error_handler x = x.error_handler
 
+  let error_handler_ =
+    (fun x -> x.error_handler),
+    fun v x -> { x with error_handler = v }
+
   let mime_types_map x = x.mime_types_map
+
+  let mime_types_map_ =
+    (fun x -> x.mime_types_map),
+    fun v x -> { x with mime_types_map = v }
 
   let home_directory x = x.home_directory
 
+  let home_directory_ =
+    (fun x -> x.home_directory),
+    fun v x -> { x with home_directory = v }
+
   let compression_folder x = x.compression_folder
 
+  let compression_folder_ =
+    (fun x -> x.compression_folder),
+    fun v x -> { x with compression_folder = v }
+
   let logger x = x.logger
+
+  let logger_ =
+    (fun x -> x.logger),
+    fun v x -> { x with logger = v }
+
+  let matched_binding x = x.matched_binding
+
+  let matched_binding_ =
+    (fun x -> x.matched_binding),
+    fun v x -> { x with matched_binding = v }
 
 /// A module that provides functions to create a new HttpContext.
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
@@ -722,11 +750,27 @@ module HttpContext =
 
   let request x = x.request
 
+  let request_ =
+    (fun x -> x.request),
+    fun v x -> { x with request = r }
+
   let user_state x = x.user_state
+
+  let user_state_ =
+    (fun x -> x.user_state),
+    fun v x -> { x with user_state = v }
 
   let runtime x = x.runtime
 
+  let runtime_ =
+    (fun x -> x.runtime),
+    fun v x -> { x with runtime = v }
+
   let response x = x.response
+
+  let response_ =
+    (fun x -> x.response),
+    fun v x -> { x with response = v }
 
 let request f (a : HttpContext) = f a.request a
 
@@ -778,25 +822,69 @@ module SuaveConfig =
 
   let bindings x = x.bindings
 
+  let bindings_ =
+    (fun x -> x.bindings),
+    fun v x -> { x with bindings = v }
+
   let server_key x = x.server_key
+
+  let server_key_ =
+    (fun x -> x.server_key),
+    fun v (x : SuaveConfig) -> { x with server_key = v }
 
   let error_handler x = x.error_handler
 
+  let error_handler_ =
+    (fun x -> x.error_handler),
+    fun v (x : SuaveConfig) -> { x with error_handler = v }
+
   let listen_timeout x = x.listen_timeout
+
+  let listen_timeout_ =
+    (fun x -> x.listen_timeout),
+    fun v x -> { x with listen_timeout = v }
 
   let ct x = x.ct
 
+  let ct_ =
+    (fun x -> x.ct),
+    fun v x -> { x with ct = v }
+
   let buffer_size x = x.buffer_size
+
+  let buffer_size_ =
+    (fun x -> x.buffer_size),
+    fun v x -> { x with buffer_size = v }
 
   let max_ops x = x.max_ops
 
+  let max_ops_ =
+    (fun x -> x.max_ops),
+    fun v x -> { x with max_ops = v }
+
   let mime_types_map x = x.mime_types_map
+
+  let mime_types_map_ =
+    (fun x -> x.mime_types_map),
+    fun v (x : SuaveConfig) -> { x with mime_types_map = v }
 
   let home_folder x = x.home_folder
 
+  let home_folder_ =
+    (fun x -> x.home_folder),
+    fun v x -> { x with home_folder = v }
+
   let compressed_files_folder x = x.compressed_files_folder
 
+  let compressed_folder_folder_ =
+    (fun x -> x.compressed_files_folder),
+    fun v x -> { x with compressed_files_folder = v }
+
   let logger x = x.logger
+
+  let logger_ =
+    (fun x -> x.logger),
+    fun v (x : SuaveConfig) -> { x with logger = v }
 
 /// An exception, raised e.g. if writing to the stream fails, should not leak to
 /// users of this library
