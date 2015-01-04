@@ -32,7 +32,7 @@ desc 'create assembly infos'
 asmver_files :asmver => :versioning do |a|
   a.files = FileList[
     'examples/**/*.fsproj',
-    'src/{Suave,Suave.*,Tests,Experimental}/*proj'
+    'src/{Suave,Suave.*,Experimental}/*proj'
   ]
   a.attributes assembly_description: suave_description,
                assembly_configuration: Configuration,
@@ -71,7 +71,7 @@ namespace :tests do
   task :stress => [:compile, :stress_quick]
 
   task :unit_quick do
-    system "src/Tests/bin/#{Configuration}/Tests.exe", clr_command: true
+    system "src/Suave.Tests/bin/#{Configuration}/Suave.Tests.exe", clr_command: true
   end
 
   desc 'run unit tests'
