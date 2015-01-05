@@ -12,6 +12,8 @@ open Suave.Utils
 open Suave.Log
 open Suave.Logging
 
+type Lens<'a,'b> = ('a -> 'b) * ('b -> 'a -> 'a)
+
 /// <summary>
 /// These are the known HTTP methods. See http://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html
 /// </summary>
@@ -180,7 +182,6 @@ module Codes =
     member x.Describe () =
       sprintf "%d %s: %s" (http_code x) (http_reason x) (http_message x)
 
-
 /// HTTP cookie
 type HttpCookie =
   { name      : string
@@ -233,17 +234,45 @@ module HttpCookie =
 
   let name x = x.name
 
+  let name_ =
+    (fun x -> x.name),
+    fun v x -> { x with name = v }
+
   let value x = x.value
+
+  let value_ =
+    (fun x -> x.value),
+    fun v x -> { x with value = v }
 
   let expires x = x.expires
 
+  let expires_ =
+    (fun x -> x.expires),
+    fun v x -> { x with expires = v }
+
   let path x = x.path
+
+  let path_ =
+    (fun x -> x.path),
+    fun v (x : HttpCookie) -> { x with path = v }
 
   let domain x = x.domain
 
+  let domain_ =
+    (fun x -> x.domain),
+    fun v x -> { x with domain = v }
+
   let secure x = x.secure
 
+  let secure_ =
+    (fun x -> x.secure),
+    fun v x -> { x with secure = v }
+
   let http_only x = x.http_only
+
+  let http_only_ =
+    (fun x -> x.http_only),
+    fun v x -> { x with http_only = v }
 
   /// Assumes only valid characters go in, see http://tools.ietf.org/html/rfc6265#section-4.1.1
   let to_header (x : HttpCookie) =
@@ -270,6 +299,14 @@ module MimeType =
     { name        = name
       compression = compression }
 
+  let name_ =
+    (fun x -> x.name),
+    fun v (x : MimeType) -> { x with name = v }
+
+  let compression_ =
+    (fun x -> x.compression),
+    fun v (x : MimeType) -> { x with compression = v }
+
 type MimeTypesMap = string -> MimeType option
 
 /// A holder for uploaded file meta-data
@@ -290,11 +327,27 @@ module HttpUpload =
 
   let field_name x = x.field_name
 
+  let field_name_ =
+    (fun x -> x.field_name),
+    fun v x -> { x with field_name = v }
+
   let file_name x = x.file_name
+
+  let file_name_ =
+    (fun x -> x.file_name),
+    fun v x -> { x with file_name = v }
 
   let mime_type x = x.mime_type
 
+  let mime_type_ =
+    (fun x -> x.mime_type),
+    fun v x -> { x with mime_type = v }
+
   let temp_file_path x = x.temp_file_path
+
+  let temp_file_path_ =
+    (fun x -> x.temp_file_path),
+    fun v x -> { x with temp_file_path = v }
 
 type Host =
   /// The Http.Applicatives.host function has ensured this value
@@ -380,25 +433,69 @@ module HttpRequest =
 
   let http_version x = x.http_version
 
+  let http_version_ =
+    (fun x -> x.http_version),
+    fun v (x : HttpRequest) -> { x with http_version = v }
+
   let url x = x.url
+
+  let url_ =
+    (fun x -> x.url),
+    fun v (x : HttpRequest) -> { x with url = v }
 
   let ``method`` x = x.``method``
 
+  let method_ =
+    (fun x -> x.``method``),
+    fun v (x : HttpRequest) -> { x with ``method`` = v }
+
   let headers x = x.headers
+
+  let headers_ =
+    (fun x -> x.headers),
+    fun v (x : HttpRequest) -> { x with headers = v }
 
   let raw_form x = x.raw_form
 
+  let raw_form_ =
+    (fun x -> x.raw_form),
+    fun v (x : HttpRequest) -> { x with raw_form = v }
+
   let raw_query x = x.raw_query
+
+  let raw_query_ =
+    (fun x -> x.raw_query),
+    fun v (x : HttpRequest) -> { x with raw_query = v }
 
   let files x = x.files
 
+  let files_ =
+    (fun x -> x.files),
+    fun v (x : HttpRequest) -> { x with files = v }
+
   let multipart_fields x = x.multipart_fields
+
+  let multipart_fields_ =
+    (fun x -> x.multipart_fields),
+    fun v (x : HttpRequest) -> { x with multipart_fields = v }
 
   let trace x = x.trace
 
+  let trace_ =
+    (fun x -> x.trace),
+    fun v (x : HttpRequest) -> { x with trace = v }
+
   let is_secure x = x.is_secure
 
+  let is_secure_ =
+    (fun x -> x.is_secure),
+    fun v x -> { x with is_secure = v }
+
   let ipaddr x = x.ipaddr
+
+  let ipaddr_ =
+    (fun x -> x.ipaddr),
+    fun v (x : HttpRequest) -> { x with ipaddr = v }
 
 type ITlsProvider =
   abstract member Wrap : Connection -> SocketOp<Connection>
@@ -460,9 +557,15 @@ module HttpBinding =
 
   let scheme x = x.scheme
 
-  let ip x     = x.ip
+  let scheme_ =
+    (fun x -> x.scheme),
+    fun v x -> { x with scheme = v }
 
-  let port x   = x.port
+  let socket_binding x = x.socket_binding
+
+  let socket_binding_ =
+    (fun x -> x.socket_binding),
+    fun v x -> { x with socket_binding = v }
 
 type HttpContent =
   | NullContent
@@ -496,9 +599,21 @@ module HttpResult =
 
   let status x = x.status
 
+  let status_ =
+    (fun x -> x.status),
+    fun v (x : HttpResult) -> { x with status = v }
+
   let headers x = x.headers
 
+  let headers_ =
+    (fun x -> x.headers),
+    fun v (x : HttpResult) -> { x with headers = v }
+
   let content x = x.content
+
+  let content_ =
+    (fun x -> x.content),
+    fun v (x : HttpResult) -> { x with content = v }
 
 /// A SuaveTask is an Async{'a option} which shows that it may need to be
 /// evaluated asynchronously to decide whether a value is available.
@@ -571,19 +686,47 @@ module HttpRuntime =
       logger             = logger
       matched_binding    = binding }
 
-  let matched_binding x = x.matched_binding
-
   let server_key x = x.server_key
+
+  let server_key_ =
+    (fun x -> x.server_key),
+    fun v x -> { x with server_key = v }
 
   let error_handler x = x.error_handler
 
+  let error_handler_ =
+    (fun x -> x.error_handler),
+    fun v x -> { x with error_handler = v }
+
   let mime_types_map x = x.mime_types_map
+
+  let mime_types_map_ =
+    (fun x -> x.mime_types_map),
+    fun v x -> { x with mime_types_map = v }
 
   let home_directory x = x.home_directory
 
+  let home_directory_ =
+    (fun x -> x.home_directory),
+    fun v x -> { x with home_directory = v }
+
   let compression_folder x = x.compression_folder
 
+  let compression_folder_ =
+    (fun x -> x.compression_folder),
+    fun v x -> { x with compression_folder = v }
+
   let logger x = x.logger
+
+  let logger_ =
+    (fun x -> x.logger),
+    fun v x -> { x with logger = v }
+
+  let matched_binding x = x.matched_binding
+
+  let matched_binding_ =
+    (fun x -> x.matched_binding),
+    fun v x -> { x with matched_binding = v }
 
 /// A module that provides functions to create a new HttpContext.
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
@@ -609,11 +752,27 @@ module HttpContext =
 
   let request x = x.request
 
+  let request_ =
+    (fun x -> x.request),
+    fun v x -> { x with request = v }
+
   let user_state x = x.user_state
+
+  let user_state_ =
+    (fun x -> x.user_state),
+    fun v x -> { x with user_state = v }
 
   let runtime x = x.runtime
 
+  let runtime_ =
+    (fun x -> x.runtime),
+    fun v x -> { x with runtime = v }
+
   let response x = x.response
+
+  let response_ =
+    (fun x -> x.response),
+    fun v x -> { x with response = v }
 
 let request f (a : HttpContext) = f a.request a
 
@@ -665,25 +824,69 @@ module SuaveConfig =
 
   let bindings x = x.bindings
 
+  let bindings_ =
+    (fun x -> x.bindings),
+    fun v x -> { x with bindings = v }
+
   let server_key x = x.server_key
+
+  let server_key_ =
+    (fun x -> x.server_key),
+    fun v (x : SuaveConfig) -> { x with server_key = v }
 
   let error_handler x = x.error_handler
 
+  let error_handler_ =
+    (fun x -> x.error_handler),
+    fun v (x : SuaveConfig) -> { x with error_handler = v }
+
   let listen_timeout x = x.listen_timeout
+
+  let listen_timeout_ =
+    (fun x -> x.listen_timeout),
+    fun v x -> { x with listen_timeout = v }
 
   let ct x = x.ct
 
+  let ct_ =
+    (fun x -> x.ct),
+    fun v x -> { x with ct = v }
+
   let buffer_size x = x.buffer_size
+
+  let buffer_size_ =
+    (fun x -> x.buffer_size),
+    fun v x -> { x with buffer_size = v }
 
   let max_ops x = x.max_ops
 
+  let max_ops_ =
+    (fun x -> x.max_ops),
+    fun v x -> { x with max_ops = v }
+
   let mime_types_map x = x.mime_types_map
+
+  let mime_types_map_ =
+    (fun x -> x.mime_types_map),
+    fun v (x : SuaveConfig) -> { x with mime_types_map = v }
 
   let home_folder x = x.home_folder
 
+  let home_folder_ =
+    (fun x -> x.home_folder),
+    fun v x -> { x with home_folder = v }
+
   let compressed_files_folder x = x.compressed_files_folder
 
+  let compressed_folder_folder_ =
+    (fun x -> x.compressed_files_folder),
+    fun v x -> { x with compressed_files_folder = v }
+
   let logger x = x.logger
+
+  let logger_ =
+    (fun x -> x.logger),
+    fun v (x : SuaveConfig) -> { x with logger = v }
 
 /// An exception, raised e.g. if writing to the stream fails, should not leak to
 /// users of this library

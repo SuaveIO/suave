@@ -58,6 +58,16 @@ module Cookie =
              secure:bool ->
              CookiesState
 
+    val server_key_ : Lens<CookiesState, ServerKey>
+
+    val cookie_name_ : Lens<CookiesState, string>
+
+    val user_state_key_ : Lens<CookiesState, string>
+
+    val relative_expiry_ : Lens<CookiesState, CookieLife>
+
+    val secure_ : Lens<CookiesState, bool>
+
   /// Generate one server-side cookie, and another client-side cookie with
   /// name "${server-side-name}-client"
   val generate_cookies : server_key:ServerKey ->

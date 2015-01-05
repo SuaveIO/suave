@@ -39,3 +39,15 @@ module TraceHeader =
     { trace_id      = trace_id |> Option.or_default new_id
       req_id        = new_id
       req_parent_id = span_parent_id }
+
+  let trace_id_ =
+    (fun x -> x.trace_id),
+    fun v x -> { x with trace_id = v }
+
+  let req_id_ =
+    (fun x -> x.req_id),
+    fun v x -> { x with req_id = v }
+
+  let req_parent_id_ =
+    (fun x -> x.req_parent_id),
+    fun v x -> { x with req_parent_id = v }
