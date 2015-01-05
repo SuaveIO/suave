@@ -73,12 +73,14 @@ This function has a single parameter of type `HttpContext`. This is an F# record
 
 A WebPart function returns an asynchronous workflow which itself ultimately returns an `HttpContext option`. Asynchronous workflows are hopefully already somewhat familiar. The `HttpContext option` returned by the asynchronous workflow is either `Some HttpContext` record or `None`, and it is the option that is used to determine routing. Here is a web server with some simple routing logic. You can ignore the `>>=` operator and the exact workings of `choose` for now (both are explained in more detail later), just focus on the tree-like structure of the code:
 
-{% highlight fsharp %}
-open Suave                 // always open suave
-open Suave.Http.Successful // for OK-result
-open Suave.Web             // for config
+{% highlight fsharp %}        
+open Suave
+open Suave.Http
+open Suave.Http.Applicatives
+open Suave.Http.Successful
+open Suave.Web
 
-let app _ =
+let app =
   choose
     [ GET >>= choose
         [ url "/hello" >>= OK "Hello GET"
