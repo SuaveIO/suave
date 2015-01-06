@@ -488,15 +488,15 @@ let default_error_handler (ex : Exception) msg (ctx : HttpContext) =
 /// The return value from 'listening' (first item in tuple) gives you some metrics on
 /// how quickly suave started.
 let web_server_async (config : SuaveConfig) (webpart : WebPart) =
-  let content_folder = ParsingAndControl.resolve_directory config.home_folder
-  let compression_folder = Path.Combine(ParsingAndControl.resolve_directory config.compressed_files_folder, "_temporary_compressed_files")
+  let content_folder = ParsingAndControl.resolve_directory config.properties.home_folder
+  let compression_folder = Path.Combine(ParsingAndControl.resolve_directory config.properties.compressed_files_folder, "_temporary_compressed_files")
   let all =
-    config.bindings
+    config.properties.bindings
     |> List.map (fun { scheme = proto; ip = ip; port = port } ->
       let http_runtime =
-        HttpRuntime.mk proto config.server_key config.error_handler config.mime_types_map
+        HttpRuntime.mk proto config.properties.server_key config.error_handler config.properties.mime_types_map.TryFind
                        content_folder compression_folder config.logger
-      ParsingAndControl.web_worker (ip, port, config.buffer_size, config.max_ops, http_runtime) webpart)
+      ParsingAndControl.web_worker (ip, port, config.properties.buffer_size, config.properties.max_ops, http_runtime) webpart)
   let listening = all |> Seq.map fst |> Async.Parallel
   let server    = all |> Seq.map snd |> Async.Parallel |> Async.Ignore
   listening, server
@@ -510,14 +510,18 @@ let web_server (config : SuaveConfig) (webpart : WebPart) =
 /// with a timeout of one minute for computations to run. Waiting for 2 seconds for the socket bind
 /// to succeed.
 let default_config : SuaveConfig =
-  { bindings         = [ HttpBinding.defaults ]
-    server_key       = Utils.Crypto.generate_key HttpRuntime.ServerKeyLength
+  {
     error_handler    = default_error_handler
-    listen_timeout   = TimeSpan.FromSeconds(2.)
     ct               = Async.DefaultCancellationToken
-    buffer_size      = 8192 // 8 KiB
-    max_ops          = 100
-    mime_types_map   = Http.Writers.default_mime_types_map
-    home_folder      = None
-    compressed_files_folder = None
-    logger           = Loggers.sane_defaults_for LogLevel.Info }
+    logger           = Loggers.sane_defaults_for LogLevel.Info
+    properties       =
+    {
+        bindings         = [ HttpBinding.defaults ]
+        server_key       = Utils.Crypto.generate_key HttpRuntime.ServerKeyLength
+        listen_timeout   = TimeSpan.FromSeconds(2.)
+        buffer_size      = 8192 // 8 KiB
+        max_ops          = 100
+        mime_types_map   = Http.Writers.default_mime_types_map
+        home_folder      = None
+        compressed_files_folder = None}
+    }

@@ -113,17 +113,17 @@ open System.IO
 /// Run a proxy server with the given configuration and given upstream/target
 /// resolver.
 let proxy_server_async (config : SuaveConfig) resolver =
-  let home_dir = ParsingAndControl.resolve_directory config.home_folder
-  let compression_folder = Path.Combine(ParsingAndControl.resolve_directory config.compressed_files_folder, "_temporary_compressed_files")
+  let home_dir = ParsingAndControl.resolve_directory config.properties.home_folder
+  let compression_folder = Path.Combine(ParsingAndControl.resolve_directory config.properties.compressed_files_folder, "_temporary_compressed_files")
   let mk_runtime proto =
-    HttpRuntime.mk proto config.server_key config.error_handler config.mime_types_map
+    HttpRuntime.mk proto config.properties.server_key config.error_handler config.properties.mime_types_map.TryFind
                    home_dir compression_folder config.logger
 
   let all =
-    config.bindings
+    config.properties.bindings
     |> List.map (fun { scheme = proto; ip = ip; port = port } ->
         tcp_ip_server
-          (ip, port, config.buffer_size, config.max_ops)
+          (ip, port, config.properties.buffer_size, config.properties.max_ops)
           config.logger
           (ParsingAndControl.request_loop
             (mk_runtime proto)

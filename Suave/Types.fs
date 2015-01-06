@@ -608,61 +608,51 @@ let request f (a : HttpContext) = f a.request a
 
 let context f (a : HttpContext) = f a a
 
-open System.Threading
-
-/// The core configuration of suave. See also Suave.Web.default_config which
-/// you can use to bootstrap the configuration:
-/// <code>{ default_config with bindings = [ ... ] }</code>
-type SuaveConfig =
+type ServerProperties =
   { /// The bindings for the web server to launch with
     bindings                : HttpBinding list
     /// A server-key to use for cryptographic operations. When generated it
     /// should be completely random; you can share this key between load-balanced
     /// servers if you want to have them cryptographically verify similarly.
     server_key              : byte []
-    /// An error handler to use for handling exceptions that are
-    /// are thrown from the web parts
-    error_handler           : ErrorHandler
     /// Timeout to wait for the socket bind to finish
     listen_timeout          : TimeSpan
-    /// A cancellation token for the web server. Signalling this token
-    /// means that the web server shuts down
-    ct                      : CancellationToken
     /// buffer size for socket operations
     buffer_size             : int
     /// max number of concurrent socket operations
     max_ops                 : int
     /// MIME types
-    mime_types_map          : MimeTypesMap
+    mime_types_map          : Map<string, MimeType>
     /// Home or root directory
     home_folder             : string option
     /// Folder for temporary compressed files
     compressed_files_folder : string option
+    }
+
+open System.Threading
+
+/// The core configuration of suave. See also Suave.Web.default_config which
+/// you can use to bootstrap the configuration:
+/// <code>{ default_config with bindings = [ ... ] }</code>
+type SuaveConfig =
+  { /// Static configuration variables
+    properties              : ServerProperties
+    /// An error handler to use for handling exceptions that are
+    /// are thrown from the web parts
+    error_handler           : ErrorHandler
+    /// A cancellation token for the web server. Signalling this token
+    /// means that the web server shuts down
+    ct                      : CancellationToken
     /// A logger to log with
     logger                  : Logger }
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module SuaveConfig =
-
-  let bindings x = x.bindings
-
-  let server_key x = x.server_key
+  let properties x = x.properties
 
   let error_handler x = x.error_handler
 
-  let listen_timeout x = x.listen_timeout
-
   let ct x = x.ct
-
-  let buffer_size x = x.buffer_size
-
-  let max_ops x = x.max_ops
-
-  let mime_types_map x = x.mime_types_map
-
-  let home_folder x = x.home_folder
-
-  let compressed_files_folder x = x.compressed_files_folder
 
   let logger x = x.logger
 

@@ -110,7 +110,7 @@ module Http =
     /// </para></summary>
     /// <remarks>
     /// </remarks>
-    val default_mime_types_map : ext:string -> MimeType option
+    val default_mime_types_map : Map<string, MimeType>
 
     /// <summary><para>
     /// Set the Content-Type header to the mime type given

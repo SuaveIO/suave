@@ -99,22 +99,24 @@ module Http =
     let mk_mime_type a b =
       MimeType.mk a b |> Some
 
-    let default_mime_types_map = function
-      | ".bmp" -> mk_mime_type "image/bmp" false
-      | ".css" -> mk_mime_type "text/css" true
-      | ".gif" -> mk_mime_type "image/gif" false
-      | ".png" -> mk_mime_type "image/png" false
-      | ".svg" -> mk_mime_type "image/svg+xml" false
-      | ".ico" -> mk_mime_type "image/x-icon" false
-      | ".htm"
-      | ".html" -> mk_mime_type "text/html" true
-      | ".jpe"
-      | ".jpeg"
-      | ".jpg" -> mk_mime_type "image/jpeg" false
-      | ".js"  -> mk_mime_type "application/x-javascript" true
-      | ".exe" -> mk_mime_type "application/exe" false
-      | ".txt" -> mk_mime_type "text/plain" true
-      | _      -> None
+    let default_mime_types_map =
+      let types = [
+        (".bmp" , MimeType.mk "image/bmp" false);
+        (".css" , MimeType.mk "text/css" true);
+        (".gif" , MimeType.mk "image/gif" false);
+        (".png" , MimeType.mk "image/png" false);
+        (".svg" , MimeType.mk "image/svg+xml" false);
+        (".ico" , MimeType.mk "image/x-icon" false);
+        (".htm" , MimeType.mk "text/html" true);
+        (".html", MimeType.mk "text/html" true);
+        (".jpe" , MimeType.mk "image/jpeg" false);
+        (".jpeg", MimeType.mk "image/jpeg" false);
+        (".jpg" , MimeType.mk "image/jpeg" false);
+        (".js"  , MimeType.mk "application/x-javascript" true);
+        (".exe" , MimeType.mk "application/exe" false);
+        (".txt" , MimeType.mk "text/plain" true)
+      ]
+      types |> Map.ofList
 
     let set_mime_type t = set_header "Content-Type" t
 
