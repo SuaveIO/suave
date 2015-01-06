@@ -63,10 +63,11 @@ module RequestFactory =
     ctx.cts.Dispose()
 
   let run_with_factory factory config web_parts : SuaveTestCtx =
-    let binding = config.bindings.Head
+    let binding = config.properties.bindings.Head
     let base_uri = binding.ToString()
     let cts = new CancellationTokenSource()
-    let config' = { config with ct = cts.Token; buffer_size = 128; max_ops = 10 }
+    let customProperties = { config.properties with buffer_size = 128; max_ops = 10 }
+    let config' = { config with ct = cts.Token; properties = customProperties }
 
     let listening, server = factory config web_parts
     Async.Start(server, cts.Token)
@@ -102,7 +103,7 @@ module RequestFactory =
     f_result =
 
     with_context <| fun ctx ->
-      let server = ctx.suave_config.bindings.Head.ToString()
+      let server = ctx.suave_config.properties.bindings.Head.ToString()
       let uri_builder   = UriBuilder server
       uri_builder.Path  <- resource
       uri_builder.Query <- query

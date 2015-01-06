@@ -11,10 +11,14 @@ open System.Threading
 let app : WebPart = OK "PONG"
 
 let config =
+  let customProperties =
+    { default_config.properties with
+        bindings = [ { scheme = HTTP ; ip = IPAddress.Parse "127.0.0.1" ; port   = 3000us } ]
+        buffer_size = 8192
+        max_ops = 10000
+    }
   { default_config with
-     bindings = [ { scheme = HTTP ; ip = IPAddress.Parse "127.0.0.1" ; port   = 3000us } ]
-     buffer_size = 8192
-     max_ops = 10000
+      properties = customProperties
   }
 
 open System.Diagnostics
