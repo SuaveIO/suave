@@ -38,6 +38,39 @@ Now that you've discovered how to do "Hello World!", go read the
 [rest of the documentation](http://suave.io/) - editable on the
 [gh-pages branch](https://github.com/SuaveIO/suave/tree/gh-pages).
 
+# Suave.Testing
+
+We have a NuGet ready for your testing needs; Suave is an excellent server for
+running in-process integation tests, as it's very fast to spawn. On an ordinary
+laptop, running hundreds of randomised tests and micro-benchmarks as well as all
+Suave unit tests, take about 5 seconds on mono.
+
+Start by installing:
+
+```
+paket add nuget suave.testing
+```
+
+You can now use it:
+
+``` fsharp
+open Suave
+open Suave.Types
+open Suave.Testing
+
+open Fuchu
+
+testCase "parsing a large multipart form" <| fun _ ->
+
+  let res =
+    run_with' (OK "hi")
+    |> req HttpMethod.POST "/" (Some <| byte_array_content)
+
+  Assert.Equal("should get the correct result", "hi", res)
+```
+
+All of our tests use this assembly; you can do too.
+
 # How to Build
 
 If you just want to hack away or try the samples, just open suave.sln and run them!
@@ -94,7 +127,9 @@ Let type annotations be specified with spaces after the argument symbol and befo
 the type.
 
 ``` fsharp
-static member FromString(scheme : string, ?cert) =
+module MyType =
+  let from_string (scheme : string) =
+    // ...
 ```
 
 Method formatting with no spaces after/before normal parenthesis
@@ -140,3 +175,4 @@ We have a chat room in case you feel like chatting a bit.
 
  * https://github.com/rayokota/generator-angular-suave
  * [FsReveal](https://github.com/fsprojects/FsReveal)
+ * [TodoBackendSuave](https://github.com/JonCanning/TodoBackendSuave)
