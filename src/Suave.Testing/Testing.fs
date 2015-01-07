@@ -98,10 +98,11 @@ let dispose_context (ctx : SuaveTestCtx) =
 /// be awaited inside this function but the server async value will
 /// be run on the thread pool.
 let run_with_factory factory config web_parts : SuaveTestCtx =
-  let binding = config.bindings.Head
+  let binding = config.properties.bindings.Head
   let base_uri = binding.ToString()
   let cts = new CancellationTokenSource()
-  let config' = { config with ct = cts.Token; buffer_size = 128; max_ops = 10 }
+  let custom_properties = { config.properties with buffer_size = 128; max_ops = 10 }
+  let config' = { config with ct = cts.Token; properties = custom_properties }
 
   let listening, server = factory config web_parts
   Async.Start(server, cts.Token)
@@ -145,7 +146,7 @@ let req_resp
   f_result =
 
   with_context <| fun ctx ->
-    let server = ctx.suave_config.bindings.Head.ToString()
+    let server = ctx.suave_config.properties.bindings.Head.ToString()
     let uri_builder   = UriBuilder server
     uri_builder.Path  <- resource
     uri_builder.Query <- query
