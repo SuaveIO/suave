@@ -355,7 +355,7 @@ type Host =
   /// The client's Host header is this value
   | ClientOnly of string
   /// The
-  | Forwarded of forwarded_for:string * Host
+  | Forwarded of string * Host
   member x.value =
     match x with
     | ServerClient v -> v
@@ -796,8 +796,7 @@ type ServerProperties =
     /// Home or root directory
     home_folder             : string option
     /// Folder for temporary compressed files
-    compressed_files_folder : string option
-    }
+    compressed_files_folder : string option }
 
 open System.Threading
 open Nessos.FsPickler.Json
@@ -818,17 +817,7 @@ type SuaveConfig =
     logger                  : Logger }
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
-module SuaveConfig =
-  let properties x = x.properties
-
-  let to_runtime config content_folder compression_folder =
-    HttpRuntime.mk config.server_key
-                   config.error_handler
-                   config.mime_types_map
-                   content_folder
-                   compression_folder
-                   config.logger
-
+module ServerProperties =
   let bindings x = x.bindings
 
   let bindings_ =
@@ -839,25 +828,13 @@ module SuaveConfig =
 
   let server_key_ =
     (fun x -> x.server_key),
-    fun v (x : SuaveConfig) -> { x with server_key = v }
-
-  let error_handler x = x.error_handler
-
-  let error_handler_ =
-    (fun x -> x.error_handler),
-    fun v (x : SuaveConfig) -> { x with error_handler = v }
-
+    fun v (x : ServerProperties) -> { x with server_key = v }
+  
   let listen_timeout x = x.listen_timeout
 
   let listen_timeout_ =
     (fun x -> x.listen_timeout),
     fun v x -> { x with listen_timeout = v }
-
-  let ct x = x.ct
-
-  let ct_ =
-    (fun x -> x.ct),
-    fun v x -> { x with ct = v }
 
   let buffer_size x = x.buffer_size
 
@@ -875,7 +852,7 @@ module SuaveConfig =
 
   let mime_types_map_ =
     (fun x -> x.mime_types_map),
-    fun v (x : SuaveConfig) -> { x with mime_types_map = v }
+    fun v (x : ServerProperties) -> { x with mime_types_map = v }
 
   let home_folder x = x.home_folder
 
@@ -888,6 +865,30 @@ module SuaveConfig =
   let compressed_folder_folder_ =
     (fun x -> x.compressed_files_folder),
     fun v x -> { x with compressed_files_folder = v }
+  
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module SuaveConfig =
+  let properties x = x.properties
+
+  let to_runtime config content_folder compression_folder =
+    HttpRuntime.mk config.properties.server_key
+                   config.error_handler
+                   config.properties.mime_types_map.TryFind
+                   content_folder
+                   compression_folder
+                   config.logger
+
+  let error_handler x = x.error_handler
+
+  let error_handler_ =
+    (fun x -> x.error_handler),
+    fun v (x : SuaveConfig) -> { x with error_handler = v }
+
+  let ct x = x.ct
+
+  let ct_ =
+    (fun x -> x.ct),
+    fun v x -> { x with ct = v }
 
   let logger x = x.logger
 
