@@ -1,28 +1,64 @@
-﻿<html>
-<head><title>test page</title></head>
+﻿<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <title>Suave Test Page</title>
+  <script type="text/javascript">
+    function handleSubmit(evt) {
+      console.log('hi')
+      var form = document.getElementsByName("up3");
+      var files = Array.prototype.slice.call(evt.target.files, 0);
+      var fd = new FormData();
+      fs.append('edit1', form.edit1.value);
+      fd.append('myfile1', files[0]);
+      fd.append('myfile2', files[1]);
+      var request = new XMLHttpRequest();
+      request.open("POST", "/upload2");
+      request.send(formData);
+      return false;
+    }
+  </script>
+</head>
 <body>
-<br />
-POST test
-<form method="post" action="test.html">
-<input type="text" name="edit1" /><br />
-<input type="submit" />
-</form>
-<br />
-File Upload test
-<form method="post" action="upload" enctype="multipart/form-data">
-<input type="file" name="myfile" /><br />
-<input type="submit" />
-</form>
-<br />
-Multiple File Upload test
-<form method="post" action="upload2" enctype="multipart/form-data">
-<input type="file" name="myfile1" /><br />
-<input type="file" name="myfile2" /><br />
-<input type="text" name="edit1" /><br />
-<input type="submit" />
-</form>
-<h2>Image</h2>
-<img src="examples.png" />
+  <h1>POST testing</h1>
+
+  <h2>Simple data POST</h2>
+  <form method="post" action="test.html">
+    <p>
+        <input type="text" name="edit1" /><br />
+        <input type="submit" />
+    </p>
+  </form>
+
+  <h2>1. File Upload test</h2>
+  <form method="post" action="upload" enctype="multipart/form-data">
+    <p>
+      <input type="file" name="myfile" /><br />
+      <input type="submit" />
+    </p>
+  </form>
+
+  <h2>2. Multiple File Upload test &ndash; <pre>multipart/form-data</pre></h2>
+  <form method="post" action="upload2" enctype="multipart/form-data">
+    <p>
+      <input type="file" name="myfile1" /><br />
+      <input type="file" name="myfile2" /><br />
+      <input type="text" name="edit1" /><br />
+      <input type="submit" />
+    </p>
+  </form>
+
+  <h2>3. Multiple File Upload test through FormData &ndash; <pre>default enctype</pre></h2>
+  <form id="up3" method="post" action="upload2" onsubmit="return handleSubmit()">
+    <p>
+      <input type="file" name="myfile1" accept="image/*;capture=camera" /><br />
+      <input type="file" name="myfile2" accept="image/*;capture=camera" /><br />
+      <input type="text" name="edit1" /><br />
+      <input type="submit" />
+    </p>
+  </form>
+
+  <h2>Image</h2>
+  <img src="examples.png" />
 </body>
 </html>
-
