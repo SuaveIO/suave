@@ -21,7 +21,7 @@
             console.error('error', event);
           }
         });
-        request.open(event.target.method, event.target.action);
+        request.open("PUT", event.target.action);
         request.send(fd);
       };
 
@@ -53,7 +53,7 @@
   </form>
 
   <h2>2. Multiple File Upload test &ndash; <pre>multipart/form-data</pre></h2>
-  <form method="post" action="upload2" enctype="multipart/form-data">
+  <form method="PUT" action="upload2" enctype="multipart/form-data">
     <p>
       <input type="file" name="myfile1" /><br />
       <input type="file" name="myfile2" /><br />
@@ -63,7 +63,8 @@
   </form>
 
   <h2>3. Multiple File JavaScript/FormData Upload test</h2>
-  <form id="up3" name="up3" method="POST" action="upload2">
+  <form id="up3" name="up3" method="PUT" action="upload2">
+    <p>Will post with <pre>Content-Type: multipart/form-data; boundary=---------------------------15407761691467256857631277098</pre></p>
     <p>
       <input type="file" name="myfile1" accept="image/*;capture=camera" required="required" /> *<br />
       <input type="file" name="myfile2" accept="image/*;capture=camera" /><br />
