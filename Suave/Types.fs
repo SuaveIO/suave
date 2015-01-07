@@ -630,6 +630,7 @@ type ServerProperties =
     }
 
 open System.Threading
+open Nessos.FsPickler.Json
 
 /// The core configuration of suave. See also Suave.Web.default_config which
 /// you can use to bootstrap the configuration:
@@ -655,6 +656,25 @@ module SuaveConfig =
   let ct x = x.ct
 
   let logger x = x.logger
+
+let private json = FsPickler.CreateJson(indent = true)
+
+let private read_file path =
+  try
+    Choice1Of2 (File.ReadAllText path)
+  with e ->
+    Choice2Of2 e.Message
+
+let private parse_config raw_config =
+  try
+    Choice1Of2 (json.UnPickleOfString<ServerProperties> raw_config)
+  with e ->
+    Choice2Of2 e.Message
+
+/// Creates a ServerProperties from a JSON file. Returns the ServerProperties or the
+/// error message if something went wrong.
+let load_config =
+  read_file >> (Choice.bind parse_config)
 
 /// An exception, raised e.g. if writing to the stream fails, should not leak to
 /// users of this library
