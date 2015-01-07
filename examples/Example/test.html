@@ -1,22 +1,36 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 
 <head>
   <title>Suave Test Page</title>
   <script type="text/javascript">
-    function handleSubmit(evt) {
-      console.log('hi')
-      var form = document.getElementsByName("up3");
-      var files = Array.prototype.slice.call(evt.target.files, 0);
-      var fd = new FormData();
-      fs.append('edit1', form.edit1.value);
-      fd.append('myfile1', files[0]);
-      fd.append('myfile2', files[1]);
-      var request = new XMLHttpRequest();
-      request.open("POST", "/upload2");
-      request.send(formData);
-      return false;
-    }
+  //<![CDATA[
+    window.addEventListener("load", function () {
+      var sendFiles = function(event) {
+        var fd = new FormData(event.target);
+        fd.append('custom', 1337);
+
+        var request = new XMLHttpRequest();
+        request.addEventListener("load", function(event) {
+          if (console && console.log) {
+            console.info('success', event.target.responseText);
+          }
+        });
+        request.addEventListener("error", function(event) {
+          if (console && console.log) {
+            console.error('error', event);
+          }
+        });
+        request.open(event.target.method, event.target.action);
+        request.send(fd);
+      };
+
+      document.getElementById("up3").addEventListener("submit", function (event) {
+        event.preventDefault();
+        sendFiles(event);
+      });
+    });
+  //]]>
   </script>
 </head>
 <body>
@@ -48,10 +62,10 @@
     </p>
   </form>
 
-  <h2>3. Multiple File Upload test through FormData &ndash; <pre>default enctype</pre></h2>
-  <form id="up3" method="post" action="upload2" onsubmit="return handleSubmit()">
+  <h2>3. Multiple File JavaScript/FormData Upload test</h2>
+  <form id="up3" name="up3" method="POST" action="upload2">
     <p>
-      <input type="file" name="myfile1" accept="image/*;capture=camera" /><br />
+      <input type="file" name="myfile1" accept="image/*;capture=camera" required="required" /> *<br />
       <input type="file" name="myfile2" accept="image/*;capture=camera" /><br />
       <input type="text" name="edit1" /><br />
       <input type="submit" />
