@@ -101,20 +101,20 @@ module Http =
 
     let default_mime_types_map =
       let types = [
-        (".bmp" , MimeType.mk "image/bmp" false);
-        (".css" , MimeType.mk "text/css" true);
-        (".gif" , MimeType.mk "image/gif" false);
-        (".png" , MimeType.mk "image/png" false);
-        (".svg" , MimeType.mk "image/svg+xml" false);
-        (".ico" , MimeType.mk "image/x-icon" false);
-        (".htm" , MimeType.mk "text/html" true);
-        (".html", MimeType.mk "text/html" true);
-        (".jpe" , MimeType.mk "image/jpeg" false);
-        (".jpeg", MimeType.mk "image/jpeg" false);
-        (".jpg" , MimeType.mk "image/jpeg" false);
-        (".js"  , MimeType.mk "application/x-javascript" true);
-        (".exe" , MimeType.mk "application/exe" false);
-        (".txt" , MimeType.mk "text/plain" true)
+        ".bmp" , MimeType.mk "image/bmp" false
+        ".css" , MimeType.mk "text/css" true
+        ".gif" , MimeType.mk "image/gif" false
+        ".png" , MimeType.mk "image/png" false
+        ".svg" , MimeType.mk "image/svg+xml" false
+        ".ico" , MimeType.mk "image/x-icon" false
+        ".htm" , MimeType.mk "text/html" true
+        ".html", MimeType.mk "text/html" true
+        ".jpe" , MimeType.mk "image/jpeg" false
+        ".jpeg", MimeType.mk "image/jpeg" false
+        ".jpg" , MimeType.mk "image/jpeg" false
+        ".js"  , MimeType.mk "application/x-javascript" true
+        ".exe" , MimeType.mk "application/exe" false
+        ".txt" , MimeType.mk "text/plain" true
       ]
       types |> Map.ofList
 
