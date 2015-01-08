@@ -1,28 +1,79 @@
-﻿<html>
-<head><title>test page</title></head>
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <title>Suave Test Page</title>
+  <script type="text/javascript">
+  //<![CDATA[
+    window.addEventListener("load", function () {
+      var sendFiles = function(event) {
+        var fd = new FormData(event.target);
+        fd.append('custom', 1337);
+
+        var request = new XMLHttpRequest();
+        request.addEventListener("load", function(event) {
+          if (console && console.log) {
+            console.info('success', event.target.responseText);
+          }
+        });
+        request.addEventListener("error", function(event) {
+          if (console && console.log) {
+            console.error('error', event);
+          }
+        });
+        request.open("PUT", event.target.action);
+        request.send(fd);
+      };
+
+      document.getElementById("up3").addEventListener("submit", function (event) {
+        event.preventDefault();
+        sendFiles(event);
+      });
+    });
+  //]]>
+  </script>
+</head>
 <body>
-<br />
-POST test
-<form method="post" action="test.html">
-<input type="text" name="edit1" /><br />
-<input type="submit" />
-</form>
-<br />
-File Upload test
-<form method="post" action="upload" enctype="multipart/form-data">
-<input type="file" name="myfile" /><br />
-<input type="submit" />
-</form>
-<br />
-Multiple File Upload test
-<form method="post" action="upload2" enctype="multipart/form-data">
-<input type="file" name="myfile1" /><br />
-<input type="file" name="myfile2" /><br />
-<input type="text" name="edit1" /><br />
-<input type="submit" />
-</form>
-<h2>Image</h2>
-<img src="examples.png" />
+  <h1>POST testing</h1>
+
+  <h2>Simple data POST</h2>
+  <form method="post" action="test.html">
+    <p>
+        <input type="text" name="edit1" /><br />
+        <input type="submit" />
+    </p>
+  </form>
+
+  <h2>1. File Upload test</h2>
+  <form method="post" action="upload" enctype="multipart/form-data">
+    <p>
+      <input type="file" name="myfile" /><br />
+      <input type="submit" />
+    </p>
+  </form>
+
+  <h2>2. Multiple File Upload test &ndash; <pre>multipart/form-data</pre></h2>
+  <form method="PUT" action="upload2" enctype="multipart/form-data">
+    <p>
+      <input type="file" name="myfile1" /><br />
+      <input type="file" name="myfile2" /><br />
+      <input type="text" name="edit1" /><br />
+      <input type="submit" />
+    </p>
+  </form>
+
+  <h2>3. Multiple File JavaScript/FormData Upload test</h2>
+  <form id="up3" name="up3" method="PUT" action="upload2">
+    <p>Will post with <pre>Content-Type: multipart/form-data; boundary=---------------------------15407761691467256857631277098</pre></p>
+    <p>
+      <input type="file" name="myfile1" accept="image/*;capture=camera" required="required" /> *<br />
+      <input type="file" name="myfile2" accept="image/*;capture=camera" /><br />
+      <input type="text" name="edit1" /><br />
+      <input type="submit" />
+    </p>
+  </form>
+
+  <h2>Image</h2>
+  <img src="examples.png" />
 </body>
 </html>
-
