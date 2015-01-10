@@ -32,6 +32,7 @@ module Parse =
   let uint64 = parse_using UInt64.TryParse
   let uri = parse_using (fun s -> Uri.TryCreate(s, UriKind.RelativeOrAbsolute))
   let date_time = parse_using (fun s -> DateTime.TryParse(s, CultureInfo.InvariantCulture.DateTimeFormat, DateTimeStyles.RoundtripKind))
+  let decimal = parse_using (fun s -> Decimal.TryParse(s, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture))
 
 let binding = ChoiceBuilder()
 
