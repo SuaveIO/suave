@@ -799,7 +799,6 @@ type ServerProperties =
     compressed_files_folder : string option }
 
 open System.Threading
-open Nessos.FsPickler.Json
 
 /// The core configuration of suave. See also Suave.Web.default_config which
 /// you can use to bootstrap the configuration:
@@ -896,7 +895,33 @@ module SuaveConfig =
     (fun x -> x.logger),
     fun v (x : SuaveConfig) -> { x with logger = v }
 
-let private json = FsPickler.CreateJson(indent = true)
+open System.Runtime.Serialization
+open System.Runtime.Serialization.Json
+
+[<DataContract>]
+type ServerPropertiesJson = {
+  [<field: DataMember(Name="bindings")>]
+  bindings: HttpBinding list;
+  [<field: DataMember(Name="server_key")>]
+  server_key: byte [];
+  [<field: DataMember(Name="listen_timeout")>]
+  listen_timeout: TimeSpan;
+  [<field: DataMember(Name="buffer_size")>]
+  buffer_size: int;
+  [<field: DataMember(Name="max_ops")>]
+  max_ops: int;
+  [<field: DataMember(Name="mime_types_map")>]
+  mime_types_map: Map<string, MimeType>;
+  [<field: DataMember(Name="home_folder")>]
+  home_folder: string option;
+  [<field: DataMember(Name="compressed_files_folder")>]
+  compressed_files_folder: string option}
+
+let deserialize(s:string)  =
+    let json = new DataContractJsonSerializer(typeof<ServerPropertiesJson>)
+    let byteArray = Encoding.UTF8.GetBytes(s)
+    let stream = new MemoryStream(byteArray)
+    json.ReadObject(stream) :?> ServerPropertiesJson
 
 let private read_file path =
   try
@@ -906,7 +931,7 @@ let private read_file path =
 
 let private parse_config raw_config =
   try
-    Choice1Of2 (json.UnPickleOfString<ServerProperties> raw_config)
+    Choice1Of2 (deserialize raw_config)
   with e ->
     Choice2Of2 e.Message
 
