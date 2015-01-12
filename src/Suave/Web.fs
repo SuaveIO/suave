@@ -507,12 +507,12 @@ let default_error_handler (ex : Exception) msg (ctx : HttpContext) =
 /// how quickly suave started.
 let web_server_async (config : SuaveConfig) (webpart : WebPart) =
   let home_folder, compression_folder =
-    ParsingAndControl.resolve_directory config.properties.home_folder,
-    Path.Combine(ParsingAndControl.resolve_directory config.properties.compressed_files_folder, "_temporary_compressed_files")
+    ParsingAndControl.resolve_directory config.props.home_folder,
+    Path.Combine(ParsingAndControl.resolve_directory config.props.compressed_files_folder, "_temporary_compressed_files")
   let servers = // spawn tcp listeners/web workers
     List.map (SuaveConfig.to_runtime config home_folder compression_folder
-              >> ParsingAndControl.web_worker (config.properties.buffer_size, config.properties.max_ops) webpart)
-              config.properties.bindings
+              >> ParsingAndControl.web_worker (config.props.buffer_size, config.props.max_ops) webpart)
+              config.props.bindings
   let listening = servers |> Seq.map fst |> Async.Parallel
   let server    = servers |> Seq.map snd |> Async.Parallel |> Async.Ignore
   listening, server
@@ -530,7 +530,7 @@ let default_config : SuaveConfig =
     error_handler    = default_error_handler
     ct               = Async.DefaultCancellationToken
     logger           = Loggers.sane_defaults_for LogLevel.Info
-    properties       =
+    props       =
     {
         bindings         = [ HttpBinding.defaults ]
         server_key       = Utils.Crypto.generate_key HttpRuntime.ServerKeyLength

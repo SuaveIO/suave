@@ -13,13 +13,13 @@ let logger = Loggers.sane_defaults_for LogLevel.Verbose
 
 let config : SuaveConfig =
   let custom_properties =
-    { default_config.properties with
+    { default_config.props with
         bindings = [ HttpBinding.mk' HTTP "127.0.0.1" 8082 ]
         ; buffer_size = 2048
         ; max_ops = 10000
     }
   { default_config with
-      properties = custom_properties
+      props = custom_properties
       logger = logger }
 
 let listening, server = web_server_async config (choose [ GET >>= browse' ])

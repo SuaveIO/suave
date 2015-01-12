@@ -805,7 +805,7 @@ open System.Threading
 /// <code>{ default_config with bindings = [ ... ] }</code>
 type SuaveConfig =
   { /// Static configuration variables
-    properties              : ServerProperties
+    props              : ServerProperties
     /// An error handler to use for handling exceptions that are
     /// are thrown from the web parts
     error_handler           : ErrorHandler
@@ -867,12 +867,12 @@ module ServerProperties =
   
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module SuaveConfig =
-  let properties x = x.properties
+  let properties x = x.props
 
   let to_runtime config content_folder compression_folder =
-    HttpRuntime.mk config.properties.server_key
+    HttpRuntime.mk config.props.server_key
                    config.error_handler
-                   config.properties.mime_types_map.TryFind
+                   config.props.mime_types_map.TryFind
                    content_folder
                    compression_folder
                    config.logger

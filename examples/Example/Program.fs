@@ -108,7 +108,7 @@ let app =
 [<EntryPoint>]
 let main argv =
   web_server
-    { properties =
+    { props =
         { bindings         = [ HttpBinding.mk' HTTP "127.0.0.1" 8082 ]
           server_key       = Utils.Crypto.generate_key HttpRuntime.ServerKeyLength
           listen_timeout   = TimeSpan.FromMilliseconds 2000.

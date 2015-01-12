@@ -12,13 +12,13 @@ let app : WebPart = OK "PONG"
 
 let config =
   let customProperties =
-    { default_config.properties with
+    { default_config.props with
         bindings = [ HttpBinding.mk HTTP IPAddress.Loopback 3000us ]
         buffer_size = 8192
         max_ops = 10000
     }
   { default_config with
-      properties = customProperties
+      props = customProperties
   }
 
 open System.Diagnostics
