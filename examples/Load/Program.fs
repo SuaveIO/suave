@@ -15,8 +15,8 @@ let config : SuaveConfig =
   let custom_properties =
     { default_config.props with
         bindings = [ HttpBinding.mk' HTTP "127.0.0.1" 8082 ]
-        ; buffer_size = 2048
-        ; max_ops = 10000
+        buffer_size = 2048
+        max_ops = 10000
     }
   { default_config with
       props = custom_properties
