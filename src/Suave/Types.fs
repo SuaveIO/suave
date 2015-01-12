@@ -355,7 +355,7 @@ type Host =
   /// The client's Host header is this value
   | ClientOnly of string
   /// The
-  | Forwarded of string * Host
+  | Forwarded of forwarded_for:string * Host
   member x.value =
     match x with
     | ServerClient v -> v
