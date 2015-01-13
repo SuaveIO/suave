@@ -116,7 +116,7 @@ end
 
 Albacore::Tasks::Release.new :release,
                              pkg_dir: 'build/pkg',
-                             depend_on: :nugets,
+                             depend_on: [:tests, :nugets],
                              nuget_exe: 'packages/NuGet.CommandLine/tools/NuGet.exe',
                              api_key: ENV['NUGET_KEY']
 

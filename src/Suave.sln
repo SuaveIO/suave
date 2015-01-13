@@ -75,7 +75,7 @@ Global
 		{F7E7DAB3-1823-4038-96D8-3A29A82D3AAC} = {E05A9F83-E283-4258-AB0E-AF626002B6EF}
 	EndGlobalSection
 	GlobalSection(MonoDevelopProperties) = preSolution
-		StartupItem = Suave.Tests\Suave.Tests.fsproj
+		StartupItem = ..\examples\Example\Example.fsproj
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

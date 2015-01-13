@@ -89,7 +89,7 @@ let app =
     GET >>= dir' //show directory listing
     HEAD >>= url "/head" >>= sleep 100 "Nice sleep .."
     POST >>= url "/upload" >>= OK "Upload successful."
-    POST >>= url "/upload2" >>= ParsingAndControl.parse_post_data
+    PUT >>= url "/upload2" >>= ParsingAndControl.parse_post_data
       >>= request (fun x ->
          let files =
            x.files

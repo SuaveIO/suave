@@ -38,11 +38,9 @@ type BufferManager(total_bytes, buffer_size, logger) =
         running_offset <- running_offset + buffer_size)
 
   /// Frees the buffer back to the buffer pool
-  /// WARNING: there is nothing preventing you from freeing the same offset
-  /// more than once with nasty consequences
   member x.FreeBuffer(args : ArraySegment<_>, ?context : string) =
     let free_count = lock free_offsets (fun _ ->
-      if free_offsets.Contains args.Offset then failwith "double free"
+      if free_offsets.Contains args.Offset then failwithf "double free buffer %d" args.Offset
       free_offsets.Push args.Offset
       free_offsets.Count)
     Log.internf logger "Suave.Socket.BufferManager" (fun fmt ->
