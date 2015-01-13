@@ -54,7 +54,7 @@ let sleep milliseconds message: WebPart =
 // Adds a new mime type to the default map
 let mime_types =
   Writers.default_mime_types_map 
-  |> Map.add (".avi", MimeType.mk "video/avi" false)
+  |> Map.add ".avi" (MimeType.mk "video/avi" false)
 
 let app =
   choose [
