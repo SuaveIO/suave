@@ -778,6 +778,10 @@ let request f (a : HttpContext) = f a.request a
 
 let context f (a : HttpContext) = f a a
 
+open System.Runtime.Serialization
+open System.Runtime.Serialization.Json
+
+[<DataContract>]
 type ServerProperties =
   { /// The bindings for the web server to launch with
     bindings                : HttpBinding list
@@ -895,33 +899,16 @@ module SuaveConfig =
     (fun x -> x.logger),
     fun v (x : SuaveConfig) -> { x with logger = v }
 
-open System.Runtime.Serialization
-open System.Runtime.Serialization.Json
+let private serialize<'t> (myObj:'t) =
+        use ms = new MemoryStream()
+        (new DataContractJsonSerializer(typeof<'t>)).WriteObject(ms, myObj)
+        Encoding.Default.GetString(ms.ToArray())
 
-[<DataContract>]
-type ServerPropertiesJson = {
-  [<field: DataMember(Name="bindings")>]
-  bindings: HttpBinding list;
-  [<field: DataMember(Name="server_key")>]
-  server_key: byte [];
-  [<field: DataMember(Name="listen_timeout")>]
-  listen_timeout: TimeSpan;
-  [<field: DataMember(Name="buffer_size")>]
-  buffer_size: int;
-  [<field: DataMember(Name="max_ops")>]
-  max_ops: int;
-  [<field: DataMember(Name="mime_types_map")>]
-  mime_types_map: Map<string, MimeType>;
-  [<field: DataMember(Name="home_folder")>]
-  home_folder: string option;
-  [<field: DataMember(Name="compressed_files_folder")>]
-  compressed_files_folder: string option}
-
-let deserialize(s:string)  =
-    let json = new DataContractJsonSerializer(typeof<ServerPropertiesJson>)
+let private deserialize(s:string)  =
+    let json = new DataContractJsonSerializer(typeof<ServerProperties>)
     let byteArray = Encoding.UTF8.GetBytes(s)
     let stream = new MemoryStream(byteArray)
-    json.ReadObject(stream) :?> ServerPropertiesJson
+    json.ReadObject(stream) :?> ServerProperties
 
 let private read_file path =
   try
