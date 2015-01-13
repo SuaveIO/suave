@@ -37,7 +37,10 @@ let proxy =
 
   // let sslCert = X509Certificate.FromPKCS12(BIO.File("suave.p12","r"), "easy")
   // let proxy_config = { default_config with bindings = [ HttpBinding.Create(Protocol.HTTPS(sslCert), "127.0.0.1", 8084) ] }
-  let customProperties = { default_config.props with bindings = [ HttpBinding.mk HTTP IPAddress.Loopback 8084us ] }
+  let customProperties =
+    let loopback_binding = HttpBinding.mk HTTP IPAddress.Loopback 8084us
+    { default_config.props with bindings = [loopback_binding] }
+
   let proxy_config = { default_config with props = customProperties}
   let proxy = run_with_factory proxy_server_async proxy_config
 

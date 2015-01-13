@@ -530,8 +530,8 @@ let default_config : SuaveConfig =
     error_handler    = default_error_handler
     ct               = Async.DefaultCancellationToken
     logger           = Loggers.sane_defaults_for LogLevel.Info
-    props       =
-    {
+    props            =
+      {
         bindings         = [ HttpBinding.defaults ]
         server_key       = Utils.Crypto.generate_key HttpRuntime.ServerKeyLength
         listen_timeout   = TimeSpan.FromSeconds(2.)
@@ -539,5 +539,4 @@ let default_config : SuaveConfig =
         max_ops          = 100
         mime_types_map   = Http.Writers.default_mime_types_map
         home_folder      = None
-        compressed_files_folder = None}
-    }
+        compressed_files_folder = None} }
