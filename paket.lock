@@ -15,7 +15,6 @@ NUGET
       Fuchu-suave (>= 0.6.1)
       PerfUtil (>= 0.1.8)
     Microsoft.AspNet.Razor (3.2.2)
-    Newtonsoft.Json (6.0.8)
     NuGet.CommandLine (2.8.3)
     openssl.redist (1.0.1.25)
     PerfUtil (0.1.8)

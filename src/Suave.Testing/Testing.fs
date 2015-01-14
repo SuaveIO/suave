@@ -170,17 +170,14 @@ let req_resp
     use r = get.Result
     f_result r
 
-let req_resp_with_defaults methd resource data f_result =
-    req_resp methd resource "" data None DecompressionMethods.None id f_result
-
 let req methd resource data =
-  req_resp_with_defaults methd resource data content_string
+  req_resp methd resource "" data None DecompressionMethods.None id content_string
 
 let req_query methd resource query =
   req_resp methd resource query None None DecompressionMethods.None id content_string
 
 let req_bytes methd resource data =
-  req_resp_with_defaults methd resource data content_byte_array
+  req_resp methd resource "" data None DecompressionMethods.None id content_byte_array
 
 let req_gzip methd resource data =
   req_resp methd resource "" data None DecompressionMethods.GZip id content_string
@@ -195,13 +192,10 @@ let req_deflate_bytes methd resource data =
   req_resp methd resource "" data None DecompressionMethods.Deflate id content_byte_array
 
 let req_headers methd resource data =
-  req_resp_with_defaults methd resource data response_headers
+  req_resp methd resource "" data None DecompressionMethods.None id response_headers
 
 let req_content_headers methd resource data =
-  req_resp_with_defaults methd resource data  content_headers
-
-let req_status_code methd resource data =
-  req_resp_with_defaults methd resource data status_code    
+  req_resp methd resource "" data None DecompressionMethods.None id content_headers
 
 /// Test a request by looking at the cookies alone.
 let req_cookies methd resource data ctx =
