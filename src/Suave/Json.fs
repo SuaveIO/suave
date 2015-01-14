@@ -37,14 +37,13 @@ let map_json' f =
     | None, str -> json_parse_fail str)
 
 let map_json_async' (f: 'a -> Async<'b>): Types.WebPart =
-  fun httpContext ->
+  fun http_context ->
     async {
-      match try_parse_json httpContext.request with
-      | Some requestJson, _ ->
-        let! response = f requestJson
-        let responseJson = JsonConvert.SerializeObject(response)
-        return! json_success responseJson httpContext
-      | None, str -> return! json_parse_fail str httpContext
+      match try_parse_json http_context.request with
+      | Some request_json, _ ->
+        let! response = f request_json
+        return! json_success response http_context
+      | None, str -> return! json_parse_fail str http_context
   }
 
 /// Expose function f through an async json call
