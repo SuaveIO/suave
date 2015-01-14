@@ -41,10 +41,10 @@ let tests =
           """{"bar":"foo"}""", response_data))
 
       testCase "map_json_async test" (fun () ->
-        let post_data = new ByteArrayContent(Encoding.UTF8.GetBytes("""{"foo":"foo"}"""))
+        let bad_post_data = new ByteArrayContent(Encoding.UTF8.GetBytes("""{"foo":"foo"}"""))
         let response_data =
           (run_with' (map_json_async async_mapping_func))
-          |> req HttpMethod.POST "/" (Some post_data)
+          |> req HttpMethod.POST "/" (Some bad_post_data)
 
         Assert.Equal(
           "Should map JSON from one class to another",
