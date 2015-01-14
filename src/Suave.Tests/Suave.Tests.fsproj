@@ -107,7 +107,6 @@
     <Reference Include="System.Core" />
     <Reference Include="System.Numerics" />
     <Reference Include="System.Net.Http" />
-    <Reference Include="System.Runtime.Serialization" />
     <ProjectReference Include="..\Suave.Testing\Suave.Testing.fsproj">
       <Project>{4BB79AAC-0D6D-4E0E-BB6E-8F61B3C6D99C}</Project>
       <Name>Suave.Testing</Name>
