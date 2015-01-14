@@ -10,6 +10,7 @@ suave.sln.DotSettings.user
 *.swp
 *.lock
 *.nuspec
+*.suo
 .bundle/
 gh-pages/
 AssemblyVersionInfo.fs
