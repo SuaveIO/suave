@@ -3,9 +3,8 @@
 open Fuchu
 
 open System
-open System.IO
+open System.Net
 open System.Net.Http
-open System.Net.Http.Headers
 open System.Text
 
 open Suave
@@ -16,28 +15,48 @@ open Suave.Json
 open Suave.Tests.TestUtilities
 open Suave.Testing
 
-open System.Runtime.Serialization
+let run_with' = run_with default_config
 
-[<DataContract>]
-type Foo =
-  { 
-  [<field: DataMember(Name = "foo")>]
-  foo : string;
-  }
+type Foo = { foo : string; }
 
-[<DataContract>]
-type Bar =
-  { 
-  [<field: DataMember(Name = "bar")>]
-  bar : string;
-  }
+type Bar = { bar : string; }
 
 [<Tests>]
-let parsing_multipart =
-  let run_with' = run_with default_config
+let tests =
+  let async_mapping_func (a:Foo) = 
+    async {
+      return { bar = a.foo }
+    }
 
-  testList "map_json test" [
-    testCase "simple test" <| fun _ ->
-      Assert.Equal("returns correct json representation", "{\"bar\":\"foo\"}", 
-        run_with' (map_json (fun (a:Foo) -> { bar = a.foo })) |> req HttpMethod.POST "/" (Some <| new ByteArrayContent(to_json { foo = "foo" }))) ]
+  testList "Json tests"
+    [
+      testCase "map_json test" (fun () ->
+        let post_data = new ByteArrayContent(Encoding.UTF8.GetBytes("""{"foo":"foo"}"""))
+        let response_data =
+          (run_with' (map_json (fun (a:Foo) -> { bar = a.foo })))
+          |> req HttpMethod.POST "/" (Some post_data)
 
+        Assert.Equal(
+          "Should map JSON from one class to another",
+          """{"bar":"foo"}""", response_data))
+
+      testCase "map_json_async test" (fun () ->
+        let post_data = new ByteArrayContent(Encoding.UTF8.GetBytes("""{"foo":"foo"}"""))
+        let response_data =
+          (run_with' (map_json_async async_mapping_func))
+          |> req HttpMethod.POST "/" (Some post_data)
+
+        Assert.Equal(
+          "Should map JSON from one class to another",
+          """{"bar":"foo"}""", response_data))
+
+      testCase "map_json_async bad request test" (fun () ->
+        let post_data = new ByteArrayContent(Encoding.UTF8.GetBytes("""{"foo":foo"}"""))
+        let actual_status_code =
+          (run_with' (map_json_async async_mapping_func))
+          |> req_status_code HttpMethod.POST "/" (Some post_data)
+
+        Assert.Equal(
+          "Badly formatted JSON should return 400",
+          HttpStatusCode.BadRequest, actual_status_code))
+    ]
