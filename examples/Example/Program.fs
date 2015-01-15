@@ -16,7 +16,7 @@ open Suave.State.CookieStateStore
 open Suave.Utils
 
 let basic_auth : WebPart =
-  Authentication.authenticate_basic ( fun (user_name,password) -> user_name.Equals("foo") && password.Equals("bar"))
+  Authentication.authenticate_basic ((=) ("foo", "bar"))
 
 let logger = Loggers.ConsoleWindowLogger LogLevel.Verbose
 
