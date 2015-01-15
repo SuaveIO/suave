@@ -66,6 +66,7 @@
     <Compile Include="Parsing.fs" />
     <Compile Include="Model.fs" />
     <Compile Include="Perf.fs" />
+    <Compile Include="Connection.fs" />
     <Compile Include="Sscanf.fs" />
     <Compile Include="Json.fs" />
     <Compile Include="Cookie.fs" />

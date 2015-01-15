@@ -23,6 +23,7 @@ Example:
 module Suave.Testing
 
 open System
+open System.Diagnostics
 open System.Threading
 open System.Net
 open System.Net.Http
@@ -119,6 +120,34 @@ let with_context f ctx =
     f ctx
   finally dispose_context ctx
 
+/// Create a new HttpRequestMessage towards the endpoint
+let mk_request methd resource query data (endpoint : string) =
+  let uri_builder   = UriBuilder endpoint
+  uri_builder.Path  <- resource
+  uri_builder.Query <- query
+
+  let request = new HttpRequestMessage(to_http_method methd, uri_builder.Uri)
+  request.Headers.ConnectionClose <- Nullable(true)
+  data |> Option.iter (fun data -> request.Content <- data)
+  request
+
+/// Create a new disposable HttpClientHandler
+let mk_handler decomp_method cookies =
+  let handler = new Net.Http.HttpClientHandler(AllowAutoRedirect = false)
+  handler.AutomaticDecompression <- decomp_method
+  cookies |> Option.iter (fun cookies -> handler.CookieContainer <- cookies)
+  handler
+
+/// Send the request with the client - returning the result of the request
+let send (client : HttpClient) (timeout : TimeSpan) ct request =
+  let send = client.SendAsync(request, HttpCompletionOption.ResponseContentRead, ct)
+
+  let completed = send.Wait (int timeout.TotalMilliseconds, ct)
+  if not completed && Debugger.IsAttached then Debugger.Break()
+  else Assert.Equal("should finish request in 5000ms", true, completed)
+
+  send.Result
+
 /// This is the main function for the testing library; it lets you assert
 /// on the request/response values while ensuring deterministic
 /// disposal of suave.
@@ -140,35 +169,19 @@ let req_resp
   (query : string)
   data
   (cookies : CookieContainer option)
-  (decompressionMethod : DecompressionMethods)
+  (decomp_method : DecompressionMethods)
   (f_request : HttpRequestMessage -> HttpRequestMessage)
   f_result =
 
+  let default_timeout = TimeSpan.FromSeconds 5.
+
   with_context <| fun ctx ->
-    let server = ctx.suave_config.bindings.Head.ToString()
-    let uri_builder   = UriBuilder server
-    uri_builder.Path  <- resource
-    uri_builder.Query <- query
-
-    use handler = new Net.Http.HttpClientHandler(AllowAutoRedirect = false)
-    handler.AutomaticDecompression <- decompressionMethod
-    cookies |> Option.iter (fun cookies -> handler.CookieContainer <- cookies)
-
+    let endpoint = ctx.suave_config.bindings.Head.ToString()
+    use handler = mk_handler decomp_method cookies
     use client = new Net.Http.HttpClient(handler)
-
-    let r = new HttpRequestMessage(to_http_method methd, uri_builder.Uri)
-    r.Headers.ConnectionClose <- Nullable(true)
-    let r = f_request r
-    data |> Option.iter (fun data -> r.Content <- data)
-
-    let get = client.SendAsync(r, HttpCompletionOption.ResponseContentRead, ctx.cts.Token)
-
-    let completed = get.Wait(5000)
-    if not completed && System.Diagnostics.Debugger.IsAttached then System.Diagnostics.Debugger.Break()
-    else Assert.Equal("should finish request in 5000ms", true, completed)
-
-    use r = get.Result
-    f_result r
+    use request = mk_request methd resource query data endpoint |> f_request
+    use result = request |> send client default_timeout ctx.cts.Token
+    f_result result
 
 let req methd resource data =
   req_resp methd resource "" data None DecompressionMethods.None id content_string
