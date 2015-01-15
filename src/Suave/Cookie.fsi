@@ -95,5 +95,6 @@ module Cookie =
   
   val cookie_state : csctx:CookiesState ->
                      no_cookie :(unit -> Choice<byte [], WebPart>) ->
-                     decryption_failure:(Crypto.SecretboxDecryptionError -> WebPart) ->
+                     decryption_failure:(Crypto.SecretboxDecryptionError -> Choice<byte [], WebPart>) ->
+                     f_success:WebPart ->
                      WebPart

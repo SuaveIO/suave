@@ -68,7 +68,6 @@ module Utilities =
     | HttpMethod.CONNECT -> failwithf "CONNECT not a supported method in the unit tests"
     | HttpMethod.OTHER x -> failwithf "%A not a supported method" x
 
-
 open Utilities
 
 /// This test context is a holder for the runtime values of the web
@@ -121,7 +120,7 @@ let with_context f ctx =
   finally dispose_context ctx
 
 /// Create a new HttpRequestMessage towards the endpoint
-let mk_request methd resource query data (endpoint : string) =
+let mk_request methd resource query data (endpoint : Uri) =
   let uri_builder   = UriBuilder endpoint
   uri_builder.Path  <- resource
   uri_builder.Query <- query
@@ -138,15 +137,23 @@ let mk_handler decomp_method cookies =
   cookies |> Option.iter (fun cookies -> handler.CookieContainer <- cookies)
   handler
 
-/// Send the request with the client - returning the result of the request
-let send (client : HttpClient) (timeout : TimeSpan) ct request =
-  let send = client.SendAsync(request, HttpCompletionOption.ResponseContentRead, ct)
+let mk_client handler =
+  new HttpClient(handler)
 
-  let completed = send.Wait (int timeout.TotalMilliseconds, ct)
+/// Send the request with the client - returning the result of the request
+let send (client : HttpClient) (timeout : TimeSpan) (ctx : SuaveTestCtx) (request : HttpRequestMessage) =
+  Log.intern ctx.suave_config.logger "Suave.Tests"
+             (sprintf "%s %O"  request.Method.Method request.RequestUri)
+  let send = client.SendAsync(request, HttpCompletionOption.ResponseContentRead, ctx.cts.Token)
+
+  let completed = send.Wait (int timeout.TotalMilliseconds, ctx.cts.Token)
   if not completed && Debugger.IsAttached then Debugger.Break()
   else Assert.Equal("should finish request in 5000ms", true, completed)
 
   send.Result
+
+let endpoint_uri (suave_config : SuaveConfig) =
+  Uri(suave_config.bindings.Head.ToString())
 
 /// This is the main function for the testing library; it lets you assert
 /// on the request/response values while ensuring deterministic
@@ -176,11 +183,10 @@ let req_resp
   let default_timeout = TimeSpan.FromSeconds 5.
 
   with_context <| fun ctx ->
-    let endpoint = ctx.suave_config.bindings.Head.ToString()
     use handler = mk_handler decomp_method cookies
-    use client = new Net.Http.HttpClient(handler)
-    use request = mk_request methd resource query data endpoint |> f_request
-    use result = request |> send client default_timeout ctx.cts.Token
+    use client = mk_client handler
+    use request = mk_request methd resource query data (endpoint_uri ctx.suave_config) |> f_request
+    use result = request |> send client default_timeout ctx
     f_result result
 
 let req methd resource data =
@@ -222,3 +228,9 @@ let req_cookies methd resource data ctx =
     ctx
   |> ignore // places stuff in the cookie container
   cookies
+
+/// Returns the cookie collection for the default binding.
+let req_cookies' methd resource data ctx =
+  req_cookies methd resource data ctx
+  |> fun cookies ->
+    cookies.GetCookies(endpoint_uri ctx.suave_config)
