@@ -55,11 +55,7 @@ docs. For the above reference to `web_server_async`, our code looks like this:
 A slightly more complex example: routing HTTP requests
 ----------------------------------------------------------
 
-Most .NET web frameworks are based on the object-oriented paradigm. This means that you have a class called something like CheesesController or CheesesModule, and then a bunch of methods on that class for things like listing cheeses, adding cheeses, tasting cheeses, etc. These methods are then associated with url routes, with the most common routing methods being:
-
-- by convention based on class and method names. E.g. in Web API a GET request to `/api/cheeses/4` will automatically get routed to `CheeseController::GetCheeseById`
-- with attributes. E.g. adding attributes like `[Route("cheeses/{cheeseId}/taste")]` and `[HttpGet]` to a method named `TasteCheese`
-- by some sort of global routing table defined in its own class
+Most .NET web frameworks are based on the object-oriented paradigm. This means that you have a class called something like CheesesController or CheesesModule. The methods in that class are then associated with url routes, with the most common routing methods being convention based, attribute-based (e.g. adding attributes like `[Route("cheeses/{cheeseId}/taste")]` and `[HttpGet]`) or some sort of global routing table.
 
 Suave is designed to fit in with F#'s functional programming paradigm, so routing does not use any of these routing methods. Instead routing takes place using a single function, itself composed from many smaller functions. This function has the signature `WebPart`:
 
@@ -452,9 +448,11 @@ You can register additional MIME extensions by creating a new mime map in the fo
 
 {% highlight fsharp %}
 // Adds a new mime type to the default map
-let mime_types x =
+let mime_types =
   default_mime_types_map
     >=> (function | ".avi" -> mk_mime_type "video/avi" false | _ -> None)
+
+let web_config = { default_config with mime_types_map = mime_types }
 {% endhighlight %}
 
 ## Overview
@@ -532,10 +530,9 @@ Use the `SuaveAdapter` type to set the Logger in Suave's configuration:
         Rule.createForTarget "debugger"
       ]
     )
-  let context = parse_ctx logary args
+
   let web_config =
     { default_config with
-        bindings = context.settings.GetBindings ()
         logger   = SuaveAdapter(logary.GetLogger "suave")
     }
 {% endhighlight %}
