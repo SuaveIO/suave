@@ -105,7 +105,14 @@ let tests =
 
       // mutability bonanza here:
       let container = CookieContainer()
-      let interact methd resource = req_cookies container ctx methd resource id
+      let interact methd resource =
+        let response = req_cookies container ctx methd resource id
+        // set the response cookies accordingly
+        match response.Headers.TryGetValues("Set-Cookie") with
+        | false, _ -> ()
+        | true, values -> values |> Seq.iter (fun cookie -> container.SetCookies(endpoint_uri ctx.suave_config, cookie))
+        response
+
       let cookies = cookies ctx.suave_config container
 
       // when
