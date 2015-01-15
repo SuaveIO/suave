@@ -56,6 +56,13 @@ module CookieStateStore =
   let stateful relative_expiry secure : WebPart =
     context (fun ({ runtime = { logger = logger }} as ctx) ->
       log logger "Suave.State.CookieStateStore.stateful" LogLevel.Debug "ensuring cookie state"
+
+      let cipher_text_corrupt =
+        sprintf "%A" >> RequestErrors.BAD_REQUEST >> Choice2Of2
+
+      let set_expiry : WebPart =
+        Writers.set_user_data (StateStoreType + "-expiry") relative_expiry
+
       cookie_state
         { server_key      = ctx.runtime.server_key
           cookie_name     = StateCookie
@@ -63,8 +70,8 @@ module CookieStateStore =
           relative_expiry = relative_expiry
           secure          = secure }
         (fun () -> Choice1Of2(Map.empty<string, obj> |> encode_map))
-        (sprintf "%A" >> RequestErrors.BAD_REQUEST))
-    >>= Writers.set_user_data (StateStoreType + "-expiry") relative_expiry
+        cipher_text_corrupt
+        set_expiry)
 
   ///
   ///
