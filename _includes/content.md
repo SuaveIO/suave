@@ -448,9 +448,11 @@ You can register additional MIME extensions by creating a new mime map in the fo
 
 {% highlight fsharp %}
 // Adds a new mime type to the default map
-let mime_types x =
+let mime_types =
   default_mime_types_map
     >=> (function | ".avi" -> mk_mime_type "video/avi" false | _ -> None)
+
+let web_config = { default_config with mime_types_map = mime_types }
 {% endhighlight %}
 
 ## Overview
