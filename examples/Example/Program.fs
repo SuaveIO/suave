@@ -79,7 +79,7 @@ let app =
           match store.get "counter" with
           | Some y ->
             store.set "counter" (y + 1)
-            >>= OK (sprintf "Hello %d time(s)" y )
+            >>= OK (sprintf "Hello %d time(s)" (y + 1) )
           | None ->
             store.set "counter" 1
             >>= OK "First time")
