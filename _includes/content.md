@@ -530,10 +530,9 @@ Use the `SuaveAdapter` type to set the Logger in Suave's configuration:
         Rule.createForTarget "debugger"
       ]
     )
-  let context = parse_ctx logary args
+
   let web_config =
     { default_config with
-        bindings = context.settings.GetBindings ()
         logger   = SuaveAdapter(logary.GetLogger "suave")
     }
 {% endhighlight %}
