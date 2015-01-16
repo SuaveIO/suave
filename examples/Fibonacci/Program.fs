@@ -1,0 +1,34 @@
+﻿open Suave.Types
+open Suave.Web
+open Suave.Http.Applicatives
+open Suave.Http.Successful
+
+open System.Net
+
+/// Inspired by https://news.ycombinator.com/item?id=3067403
+
+let fib n = 
+  let rec loop a b i = async {
+    if i > n then
+      return b
+    else
+      return! loop b (a + b) (i + 1I)
+  }
+  async {
+    if n = 1I || n = 2I then
+      return 1I
+    else
+      return! loop 1I 1I 3I
+  }
+
+let app : WebPart =
+  url_scan "/%d" (fun (n : int) -> fun x -> async{ let! r = fib (bigint n) in return! OK (r.ToString()) x })
+
+let config =
+  { default_config with
+     bindings = [ HttpBinding.mk HTTP IPAddress.Loopback 3000us ] }
+
+[<EntryPoint>]
+let main _ =
+  web_server config app
+  0    
