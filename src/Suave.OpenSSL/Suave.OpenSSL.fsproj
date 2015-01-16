@@ -53,6 +53,7 @@
     <Compile Include="OpenSSL.fs" />
     <Compile Include="Provider.fs" />
     <None Include="paket.references" />
+    <None Include="App.config" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Suave\Suave.fsproj">

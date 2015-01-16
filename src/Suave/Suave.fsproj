@@ -98,6 +98,7 @@
     <Compile Include="Proxy.fs" />
     <Compile Include="AssemblyVersionInfo.fs" Condition="Exists('AssemblyVersionInfo.fs')" />
     <None Include="paket.references" />
+    <None Include="App.config" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="mscorlib" />
