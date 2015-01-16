@@ -55,6 +55,7 @@
     <Compile Include="Template.fs" />
     <Compile Include="Data.fs" />
     <None Include="paket.references" />
+    <None Include="App.config" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="ManagedOpenSsl">
