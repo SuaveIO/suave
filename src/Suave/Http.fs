@@ -54,6 +54,34 @@ module Http =
       | None   -> return! choose tail arg
     }
 
+  /// Inject a web_part
+  ///
+  /// +------------+                                            +--------------+
+  /// | url "/a"   +----------+                       +---------+   cont1      |
+  /// +------------+          |                       |         +--------------+
+  ///                         |                       |                         
+  /// +-------------+         |       +----------+    |         +--------------+
+  /// |  url "/b"   +---------+-------+ injected +----+---------+  cont2       |
+  /// +-------------+         |       +----------+    |         +--------------+
+  ///                         |                       |                         
+  /// +-------------+         |                       |         +--------------+
+  /// | url "/b"    +---------+                       +---------+  cont3       |
+  /// +-------------+                                           +--------------+
+
+  let rec inject (post_op : WebPart) (options : WebPart list) (continuations : WebPart list): WebPart =
+    fun arg -> async {
+      assert (List.length options = List.length continuations)
+      match options with
+      | []        -> return None
+      | p :: tail ->
+        let! res = p arg
+        let c :: continuations' = continuations
+        match res with
+        | Some x ->
+          return! (post_op >>= c) x
+        | None   -> return! inject post_op tail continuations' arg
+      }
+
   let inline warbler f a = f a a //which bird? A Warbler!
 
   let inline cnst x = fun _ -> x
