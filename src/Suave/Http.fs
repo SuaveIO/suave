@@ -68,18 +68,16 @@ module Http =
   /// | url "/b"    +---------+                       +---------+  cont3       |
   /// +-------------+                                           +--------------+
 
-  let rec inject (post_op : WebPart) (options : WebPart list) (continuations : WebPart list): WebPart =
+  let rec inject (post_op : WebPart) (pairs : (WebPart*WebPart) list) : WebPart =
     fun arg -> async {
-      assert (List.length options = List.length continuations)
-      match options with
+      match pairs with
       | []        -> return None
-      | p :: tail ->
+      | (p,q) :: tail ->
         let! res = p arg
-        let c :: continuations' = continuations
         match res with
         | Some x ->
-          return! (post_op >>= c) x
-        | None   -> return! inject post_op tail continuations' arg
+          return! (post_op >>= q) x
+        | None   -> return! inject post_op tail arg
       }
 
   let inline warbler f a = f a a //which bird? A Warbler!
