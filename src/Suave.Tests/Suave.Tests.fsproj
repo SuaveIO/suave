@@ -77,6 +77,7 @@
     <None Include="suave.p12">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+	<!--
     <None Include="..\..\packages\openssl.redist\build\native\bin\v120\Win32\Release\dynamic\ssleay32.dll">
       <Link>ssleay32.dll</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
@@ -85,6 +86,7 @@
       <Link>libeay32.dll</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+	-->
     <None Include="test-text-file.txt">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
