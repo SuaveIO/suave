@@ -1,12 +1,9 @@
 source https://nuget.org/api/v2
 
 nuget FSharp.Charting
-nuget FSharp.Core
 nuget RazorEngine
 nuget NuGet.CommandLine
 nuget FsPickler
-nuget Fuchu-suave ~> 0.6
 nuget Fuchu-suave.FsCheck
 nuget Fuchu-suave.PerfUtil ~> 0.6
-nuget PerfUtil
 nuget openssl.redist
