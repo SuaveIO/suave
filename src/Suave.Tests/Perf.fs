@@ -43,6 +43,8 @@ let perf_tests =
 
   let longData = String.replicate 1815 "A"
 
+  let perfTest' name testImpl = perfTest name testImpl 1
+
   testList "performance tests" [
     testPerfHistory "perf-GET" server_factory version [
       perfTest' "GET /" <| fun harness ->
