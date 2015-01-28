@@ -10,8 +10,6 @@ open Suave.Tests.TestUtilities
 let tests =
   let json = serialize default_config.props
 
-  printfn "json str: %s" json
-
   File.WriteAllLines("test.json", [json])
 
   let path = Path.Combine(current_path, "test.json")
