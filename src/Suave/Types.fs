@@ -960,7 +960,8 @@ let private deserialize(s:string)  =
   let temp_props = json.ReadObject(stream) :?> ServerPropertiesForSerialization
   let to_real_bind (old_bind : HttpBindingForSerialization) =
     let real_bind : HttpBinding =
-      { scheme         = if old_bind.scheme = "http" then HTTP else HTTPS
+      { // This does not work with HTTPS
+        scheme         = HTTP //if old_bind.scheme = "http" then HTTP else HTTPS
         socket_binding =
           { ip           = IPAddress.Parse old_bind.socket_binding.ip
             port         = Port.Parse old_bind.socket_binding.port} }
