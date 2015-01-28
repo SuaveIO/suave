@@ -899,16 +899,84 @@ module SuaveConfig =
     (fun x -> x.logger),
     fun v (x : SuaveConfig) -> { x with logger = v }
 
-let private serialize<'t> (myObj:'t) =
-        use ms = new MemoryStream()
-        (new DataContractJsonSerializer(typeof<'t>)).WriteObject(ms, myObj)
-        Encoding.Default.GetString(ms.ToArray())
+type private SocketBindingForSerialization =
+  { ip   : string
+    port : string }
+
+type private HttpBindingForSerialization =
+  { scheme : string
+    socket_binding : SocketBindingForSerialization }
+
+[<DataContract>]
+type private ServerPropertiesForSerialization =
+  { [<field: DataMember(Name = "bindings")>]
+    bindings                : HttpBindingForSerialization []
+    [<field: DataMember(Name = "server_key")>]
+    server_key              : byte []
+    [<field: DataMember(Name = "listen_timeout")>]
+    listen_timeout          : TimeSpan
+    [<field: DataMember(Name = "namebuffer_size")>]
+    buffer_size             : int
+    [<field: DataMember(Name = "max_ops")>]
+    max_ops                 : int
+    [<field: DataMember(Name = "mime_types_map")>]
+    mime_types_map          : Map<string, MimeType>
+    [<field: DataMember(Name = "home_folder")>]
+    home_folder             : string option
+    [<field: DataMember(Name = "compressed_files_folder")>]
+    compressed_files_folder : string option }
+
+let serialize (properties : ServerProperties)=
+  let getSerializableHttpBinding (binding : HttpBinding) =
+    let serializable : HttpBindingForSerialization =
+      { scheme         = binding.scheme.ToString()
+        socket_binding =
+          { ip           = binding.socket_binding.ip.ToString()
+            port         = binding.socket_binding.port.ToString()} }
+    serializable
+
+  let binds = List.toArray properties.bindings
+
+  let new_binds = Array.map(fun n -> getSerializableHttpBinding n) binds
+
+  let props_for_serialization : ServerPropertiesForSerialization =
+    { bindings         = new_binds
+      server_key       = properties.server_key
+      listen_timeout   = properties.listen_timeout
+      buffer_size      = properties.buffer_size
+      max_ops          = properties.max_ops
+      mime_types_map   = properties.mime_types_map
+      home_folder      = properties.home_folder
+      compressed_files_folder = properties.compressed_files_folder }
+
+  use ms = new MemoryStream()
+  (new DataContractJsonSerializer(typeof<ServerPropertiesForSerialization>)).WriteObject(ms, props_for_serialization)
+  Encoding.Default.GetString(ms.ToArray())
 
 let private deserialize(s:string)  =
-    let json = new DataContractJsonSerializer(typeof<ServerProperties>)
-    let byteArray = Encoding.UTF8.GetBytes(s)
-    let stream = new MemoryStream(byteArray)
-    json.ReadObject(stream) :?> ServerProperties
+  let json = new DataContractJsonSerializer(typeof<ServerPropertiesForSerialization>)
+  let byte_array = Encoding.UTF8.GetBytes(s)
+  let stream = new MemoryStream(byte_array)
+  let temp_props = json.ReadObject(stream) :?> ServerPropertiesForSerialization
+  let to_real_bind (old_bind : HttpBindingForSerialization) =
+    let real_bind : HttpBinding =
+      { scheme         = if old_bind.scheme = "http" then HTTP else HTTPS
+        socket_binding =
+          { ip           = IPAddress.Parse old_bind.socket_binding.ip
+            port         = Port.Parse old_bind.socket_binding.port} }
+    real_bind
+
+  let real_binds = Array.map(fun n -> to_real_bind n) temp_props.bindings
+  let props : ServerProperties =
+    { bindings         = Array.toList real_binds
+      server_key       = temp_props.server_key
+      listen_timeout   = temp_props.listen_timeout
+      buffer_size      = temp_props.buffer_size
+      max_ops          = temp_props.max_ops
+      mime_types_map   = temp_props.mime_types_map
+      home_folder      = temp_props.home_folder
+      compressed_files_folder = temp_props.compressed_files_folder }
+  props
 
 let private read_file path =
   try
