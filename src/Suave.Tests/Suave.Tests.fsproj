@@ -70,6 +70,7 @@
     <Compile Include="Json.fs" />
     <Compile Include="Cookie.fs" />
     <Compile Include="Types.fs" />
+    <Compile Include="ConfigReader.fs" />
     <Compile Include="Program.fs" />
     <None Include="paket.references" />
     <None Include="suave.p12">
