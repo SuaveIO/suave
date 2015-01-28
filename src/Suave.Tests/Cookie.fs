@@ -43,7 +43,6 @@ let tests =
 //      let parsed = Cookie.parse_cookie (HttpCookie.to_header cookie)
 //      Assert.Equal("eq", cookie, parsed)
 
-
     testCase "set cookie (same name) twice keeps last" <| fun _ ->
       let force = Async.RunSynchronously >> Option.get
       let c1 = HttpCookie.mk' "a" "aa"

@@ -211,33 +211,43 @@ module Cookie =
   let cookie_state (csctx : CookiesState)
                    // unit -> plain text to store OR something to run of your own!
                    (no_cookie : unit -> Choice<byte [], WebPart>)
-                   (decryption_failure   : _ -> WebPart)
+                   (decryption_failure   : _ -> Choice<byte [], WebPart>)
+                   (f_success : WebPart)
                    : WebPart =
     context (fun ({ runtime = { logger = logger }} as ctx) ->
+
+      let log = Log.log logger "Suave.Cookie.cookie_state" LogLevel.Debug
+
+      let set_cookies plain_text =
+        let http_cookie, client_cookie =
+          generate_cookies csctx.server_key csctx.cookie_name
+                           csctx.relative_expiry csctx.secure
+                           plain_text
+        set_pair http_cookie client_cookie >>=
+          Writers.set_user_data csctx.user_state_key plain_text
+
       match read_cookies csctx.server_key csctx.cookie_name ctx with
       | Choice1Of2 (http_cookie, plain_text) ->
-        Log.log logger "Suave.Cookie.cookie_state" LogLevel.Debug "existing cookie"
-        refresh_cookies csctx.relative_expiry http_cookie >>=
-          Writers.set_user_data csctx.user_state_key plain_text
+        log "existing cookie"
+        refresh_cookies csctx.relative_expiry http_cookie
+          >>= Writers.set_user_data csctx.user_state_key plain_text
+          >>= f_success
 
       | Choice2Of2 (NoCookieFound _) ->
         match no_cookie () with
         | Choice1Of2 plain_text ->
-          Log.log logger "Suave.Cookie.cookie_state" LogLevel.Debug
-            "no existing cookie, setting text"
-          let http_cookie, client_cookie =
-            generate_cookies csctx.server_key csctx.cookie_name
-                             csctx.relative_expiry csctx.secure
-                             plain_text
-          set_pair http_cookie client_cookie >>=
-            Writers.set_user_data csctx.user_state_key plain_text
+          log "no existing cookie, setting text"
+          set_cookies plain_text
         | Choice2Of2 wp_kont ->
-          Log.log logger "Suave.Cookie.cookie_state" LogLevel.Debug
-            "no existing cookie, calling app continuation"
+          log "no existing cookie, calling app continuation"
           wp_kont
 
       | Choice2Of2 (DecryptionError err) ->
-        Log.log logger "Suave.Cookie.cookie_state" LogLevel.Debug
-          (sprintf "decryption error: %A" err)
-        unset_pair csctx.cookie_name >>=
-          decryption_failure err)
+        log (sprintf "decryption error: %A" err)
+        match decryption_failure err with
+        | Choice1Of2 plain_text ->
+          log "existing, broken cookie, setting cookie text anew"
+          set_cookies plain_text
+        | Choice2Of2 wp_kont    ->
+          log "existing, broken cookie, unsetting it, forwarding to given failure web part"
+          wp_kont >>= unset_pair csctx.cookie_name)

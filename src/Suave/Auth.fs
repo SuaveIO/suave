@@ -51,7 +51,8 @@ let generate_data (request : HttpRequest) =
 
 let authenticate relative_expiry secure
                  missing_cookie
-                 (failure : Crypto.SecretboxDecryptionError -> WebPart)
+                 (decryption_failure : Crypto.SecretboxDecryptionError -> Choice<byte [], WebPart>)
+                 (f_success : WebPart)
                  : WebPart =
   context (fun ({ runtime = { logger = logger }} as ctx) ->
     Log.log logger "Suave.Auth.authenticate" LogLevel.Debug "authenticating"
@@ -63,12 +64,14 @@ let authenticate relative_expiry secure
         relative_expiry = relative_expiry
         secure          = secure }
       missing_cookie
-      failure)
+      decryption_failure
+      f_success)
 
-let authenticate' relative_expiry login_page : WebPart =
+let authenticate' relative_expiry login_page f_success : WebPart =
   authenticate relative_expiry false
                (fun () -> Choice2Of2(Redirection.FOUND login_page))
-               (sprintf "%A" >> RequestErrors.BAD_REQUEST)
+               (sprintf "%A" >> RequestErrors.BAD_REQUEST >> Choice2Of2)
+               f_success
 
 /// Set server-signed cookies to make the response contain a cookie
 /// with a valid session id. It's worth having in mind that when you use this web
@@ -79,11 +82,15 @@ let authenticate' relative_expiry login_page : WebPart =
 /// Parameters:
 ///  - `relative_expiry`: how long does the authentication cookie last?
 /// - `secure`: HttpsOnly?
+///
+/// Always succeeds.
 let authenticated relative_expiry secure : WebPart =
   context (fun { request = req } ->
+    let data = generate_data req |> UTF8.bytes
     authenticate relative_expiry secure
-                 (fun () -> Choice1Of2(generate_data req |> UTF8.bytes))
-                 (sprintf "%A" >> RequestErrors.BAD_REQUEST))
+                 (fun _ -> Choice1Of2 data)
+                 (fun _ -> Choice1Of2 data)
+                 Suave.Http.succeed)
 
 //  let deauthenticate : WebPart =
 //    Cookies.unset_cookies

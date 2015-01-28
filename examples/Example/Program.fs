@@ -16,7 +16,7 @@ open Suave.State.CookieStateStore
 open Suave.Utils
 
 let basic_auth : WebPart =
-  Authentication.authenticate_basic ( fun (user_name,password) -> user_name.Equals("foo") && password.Equals("bar"))
+  Authentication.authenticate_basic ((=) ("foo", "bar"))
 
 let logger = Loggers.ConsoleWindowLogger LogLevel.Verbose
 
@@ -79,7 +79,7 @@ let app =
           match store.get "counter" with
           | Some y ->
             store.set "counter" (y + 1)
-            >>= OK (sprintf "Hello %d time(s)" y )
+            >>= OK (sprintf "Hello %d time(s)" (y + 1) )
           | None ->
             store.set "counter" 1
             >>= OK "First time")

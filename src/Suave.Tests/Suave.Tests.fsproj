@@ -66,8 +66,10 @@
     <Compile Include="Parsing.fs" />
     <Compile Include="Model.fs" />
     <Compile Include="Perf.fs" />
+    <Compile Include="Connection.fs" />
     <Compile Include="Sscanf.fs" />
     <Compile Include="Json.fs" />
+    <Compile Include="Auth.fs" />
     <Compile Include="Cookie.fs" />
     <Compile Include="Types.fs" />
     <Compile Include="ConfigReader.fs" />
@@ -76,6 +78,7 @@
     <None Include="suave.p12">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+	<!--
     <None Include="..\..\packages\openssl.redist\build\native\bin\v120\Win32\Release\dynamic\ssleay32.dll">
       <Link>ssleay32.dll</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
@@ -84,6 +87,7 @@
       <Link>libeay32.dll</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+	-->
     <None Include="test-text-file.txt">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
