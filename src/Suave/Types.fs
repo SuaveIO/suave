@@ -1,3 +1,4 @@
+
 module Suave.Types
 
 open System
@@ -632,7 +633,8 @@ type HttpRuntime =
     home_directory     : string
     compression_folder : string
     logger             : Logger
-    matched_binding    : HttpBinding }
+    matched_binding    : HttpBinding
+    parse_post_data    : bool }
 
 /// The HttpContext is the container of the request, runtime, user-state and
 /// response.
@@ -674,17 +676,19 @@ module HttpRuntime =
       home_directory     = "."
       compression_folder = "."
       logger             = Loggers.sane_defaults_for LogLevel.Debug
-      matched_binding    = HttpBinding.defaults }
+      matched_binding    = HttpBinding.defaults
+      parse_post_data    = false }
 
   /// make a new HttpRuntime from the given parameters
-  let mk server_key error_handler mime_types home_directory compression_folder logger binding =
+  let mk server_key error_handler mime_types home_directory compression_folder logger parse_post_data binding =
     { server_key         = server_key
       error_handler      = error_handler
       mime_types_map     = mime_types
       home_directory     = home_directory
       compression_folder = compression_folder
       logger             = logger
-      matched_binding    = binding }
+      matched_binding    = binding
+      parse_post_data    = parse_post_data }
 
   let server_key x = x.server_key
 
@@ -727,6 +731,12 @@ module HttpRuntime =
   let matched_binding_ =
     (fun x -> x.matched_binding),
     fun v x -> { x with matched_binding = v }
+
+  let parse_post_data x = x.parse_post_data
+
+  let parse_post_data_ =
+    (fun x -> x.parse_post_data),
+    fun v x -> { x with parse_post_data = v }
 
 /// A module that provides functions to create a new HttpContext.
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
@@ -809,7 +819,9 @@ type SuaveConfig =
     /// Folder for temporary compressed files
     compressed_files_folder : string option
     /// A logger to log with
-    logger                  : Logger }
+    logger                  : Logger
+    /// Parse POST data by default 
+    parse_post_data         : bool }
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module SuaveConfig =
@@ -821,6 +833,7 @@ module SuaveConfig =
                    content_folder
                    compression_folder
                    config.logger
+                   config.parse_post_data
 
   let bindings x = x.bindings
 

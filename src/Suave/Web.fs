@@ -306,8 +306,10 @@ module ParsingAndControl =
                      runtime.matched_binding.scheme.secure
                      connection''.ipaddr
 
-    return Some { ctx with request    = request
-                           connection = connection'' }
+    if runtime.parse_post_data then
+      return! parse_post_data' { ctx with request = request; connection = connection'' }
+    else
+      return Some { ctx with request = request; connection = connection'' }
   }
 
   open System.Net
@@ -536,4 +538,5 @@ let default_config : SuaveConfig =
     mime_types_map   = Http.Writers.default_mime_types_map
     home_folder      = None
     compressed_files_folder = None
-    logger           = Loggers.sane_defaults_for LogLevel.Info }
+    logger           = Loggers.sane_defaults_for LogLevel.Info
+    parse_post_data  = true }
