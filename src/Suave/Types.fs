@@ -778,50 +778,49 @@ let request f (a : HttpContext) = f a.request a
 
 let context f (a : HttpContext) = f a a
 
-open System.Threading
+open System.Runtime.Serialization
+open System.Runtime.Serialization.Json
 
-/// The core configuration of suave. See also Suave.Web.default_config which
-/// you can use to bootstrap the configuration:
-/// <code>{ default_config with bindings = [ ... ] }</code>
-type SuaveConfig =
+[<DataContract>]
+type ServerProperties =
   { /// The bindings for the web server to launch with
     bindings                : HttpBinding list
     /// A server-key to use for cryptographic operations. When generated it
     /// should be completely random; you can share this key between load-balanced
     /// servers if you want to have them cryptographically verify similarly.
     server_key              : byte []
-    /// An error handler to use for handling exceptions that are
-    /// are thrown from the web parts
-    error_handler           : ErrorHandler
     /// Timeout to wait for the socket bind to finish
     listen_timeout          : TimeSpan
-    /// A cancellation token for the web server. Signalling this token
-    /// means that the web server shuts down
-    ct                      : CancellationToken
     /// buffer size for socket operations
     buffer_size             : int
     /// max number of concurrent socket operations
     max_ops                 : int
     /// MIME types
-    mime_types_map          : MimeTypesMap
+    mime_types_map          : Map<string, MimeType>
     /// Home or root directory
     home_folder             : string option
     /// Folder for temporary compressed files
-    compressed_files_folder : string option
+    compressed_files_folder : string option }
+
+open System.Threading
+
+/// The core configuration of suave. See also Suave.Web.default_config which
+/// you can use to bootstrap the configuration:
+/// <code>{ default_config with bindings = [ ... ] }</code>
+type SuaveConfig =
+  { /// Static configuration variables
+    props              : ServerProperties
+    /// An error handler to use for handling exceptions that are
+    /// are thrown from the web parts
+    error_handler           : ErrorHandler
+    /// A cancellation token for the web server. Signalling this token
+    /// means that the web server shuts down
+    ct                      : CancellationToken
     /// A logger to log with
     logger                  : Logger }
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
-module SuaveConfig =
-
-  let to_runtime config content_folder compression_folder =
-    HttpRuntime.mk config.server_key
-                   config.error_handler
-                   config.mime_types_map
-                   content_folder
-                   compression_folder
-                   config.logger
-
+module ServerProperties =
   let bindings x = x.bindings
 
   let bindings_ =
@@ -832,25 +831,13 @@ module SuaveConfig =
 
   let server_key_ =
     (fun x -> x.server_key),
-    fun v (x : SuaveConfig) -> { x with server_key = v }
-
-  let error_handler x = x.error_handler
-
-  let error_handler_ =
-    (fun x -> x.error_handler),
-    fun v (x : SuaveConfig) -> { x with error_handler = v }
-
+    fun v (x : ServerProperties) -> { x with server_key = v }
+  
   let listen_timeout x = x.listen_timeout
 
   let listen_timeout_ =
     (fun x -> x.listen_timeout),
     fun v x -> { x with listen_timeout = v }
-
-  let ct x = x.ct
-
-  let ct_ =
-    (fun x -> x.ct),
-    fun v x -> { x with ct = v }
 
   let buffer_size x = x.buffer_size
 
@@ -868,7 +855,7 @@ module SuaveConfig =
 
   let mime_types_map_ =
     (fun x -> x.mime_types_map),
-    fun v (x : SuaveConfig) -> { x with mime_types_map = v }
+    fun v (x : ServerProperties) -> { x with mime_types_map = v }
 
   let home_folder x = x.home_folder
 
@@ -881,12 +868,133 @@ module SuaveConfig =
   let compressed_folder_folder_ =
     (fun x -> x.compressed_files_folder),
     fun v x -> { x with compressed_files_folder = v }
+  
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module SuaveConfig =
+  let properties x = x.props
+
+  let to_runtime config content_folder compression_folder =
+    HttpRuntime.mk config.props.server_key
+                   config.error_handler
+                   config.props.mime_types_map.TryFind
+                   content_folder
+                   compression_folder
+                   config.logger
+
+  let error_handler x = x.error_handler
+
+  let error_handler_ =
+    (fun x -> x.error_handler),
+    fun v (x : SuaveConfig) -> { x with error_handler = v }
+
+  let ct x = x.ct
+
+  let ct_ =
+    (fun x -> x.ct),
+    fun v x -> { x with ct = v }
 
   let logger x = x.logger
 
   let logger_ =
     (fun x -> x.logger),
     fun v (x : SuaveConfig) -> { x with logger = v }
+
+type private SocketBindingForSerialization =
+  { ip   : string
+    port : string }
+
+type private HttpBindingForSerialization =
+  { scheme : string
+    socket_binding : SocketBindingForSerialization }
+
+[<DataContract>]
+type private ServerPropertiesForSerialization =
+  { [<field: DataMember(Name = "bindings")>]
+    bindings                : HttpBindingForSerialization []
+    [<field: DataMember(Name = "server_key")>]
+    server_key              : byte []
+    [<field: DataMember(Name = "listen_timeout")>]
+    listen_timeout          : TimeSpan
+    [<field: DataMember(Name = "namebuffer_size")>]
+    buffer_size             : int
+    [<field: DataMember(Name = "max_ops")>]
+    max_ops                 : int
+    [<field: DataMember(Name = "mime_types_map")>]
+    mime_types_map          : Map<string, MimeType>
+    [<field: DataMember(Name = "home_folder")>]
+    home_folder             : string option
+    [<field: DataMember(Name = "compressed_files_folder")>]
+    compressed_files_folder : string option }
+
+let serialize (properties : ServerProperties)=
+  let getSerializableHttpBinding (binding : HttpBinding) =
+    let serializable : HttpBindingForSerialization =
+      { scheme         = binding.scheme.ToString()
+        socket_binding =
+          { ip           = binding.socket_binding.ip.ToString()
+            port         = binding.socket_binding.port.ToString()} }
+    serializable
+
+  let binds = List.toArray properties.bindings
+
+  let new_binds = Array.map(fun n -> getSerializableHttpBinding n) binds
+
+  let props_for_serialization : ServerPropertiesForSerialization =
+    { bindings         = new_binds
+      server_key       = properties.server_key
+      listen_timeout   = properties.listen_timeout
+      buffer_size      = properties.buffer_size
+      max_ops          = properties.max_ops
+      mime_types_map   = properties.mime_types_map
+      home_folder      = properties.home_folder
+      compressed_files_folder = properties.compressed_files_folder }
+
+  use ms = new MemoryStream()
+  (new DataContractJsonSerializer(typeof<ServerPropertiesForSerialization>)).WriteObject(ms, props_for_serialization)
+  Encoding.Default.GetString(ms.ToArray())
+
+let private deserialize(s:string)  =
+  let json = new DataContractJsonSerializer(typeof<ServerPropertiesForSerialization>)
+  let byte_array = Encoding.UTF8.GetBytes(s)
+  let stream = new MemoryStream(byte_array)
+  let temp_props = json.ReadObject(stream) :?> ServerPropertiesForSerialization
+  let to_real_bind (old_bind : HttpBindingForSerialization) =
+    let real_bind : HttpBinding =
+      { // This does not work with HTTPS
+        scheme         = HTTP //if old_bind.scheme = "http" then HTTP else HTTPS
+        socket_binding =
+          { ip           = IPAddress.Parse old_bind.socket_binding.ip
+            port         = Port.Parse old_bind.socket_binding.port} }
+    real_bind
+
+  let real_binds = Array.map(fun n -> to_real_bind n) temp_props.bindings
+  let props : ServerProperties =
+    { bindings         = Array.toList real_binds
+      server_key       = temp_props.server_key
+      listen_timeout   = temp_props.listen_timeout
+      buffer_size      = temp_props.buffer_size
+      max_ops          = temp_props.max_ops
+      mime_types_map   = temp_props.mime_types_map
+      home_folder      = temp_props.home_folder
+      compressed_files_folder = temp_props.compressed_files_folder }
+  props
+
+let private read_file path =
+  try
+    Choice1Of2 (File.ReadAllText path)
+  with e ->
+    Choice2Of2 e.Message
+
+let private parse_config raw_config =
+  try
+    Choice1Of2 (deserialize raw_config)
+  with e ->
+    Choice2Of2 e.Message
+
+/// Creates a ServerProperties from a JSON file. Returns the ServerProperties or the
+/// error message if something went wrong.
+let load_config =
+  read_file >> (Choice.bind parse_config)
 
 /// An exception, raised e.g. if writing to the stream fails, should not leak to
 /// users of this library

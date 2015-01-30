@@ -53,8 +53,8 @@ let sleep milliseconds message: WebPart =
 
 // Adds a new mime type to the default map
 let mime_types =
-  Writers.default_mime_types_map
-    >=> (function | ".avi" -> Writers.mk_mime_type "video/avi" false | _ -> None)
+  Writers.default_mime_types_map 
+  |> Map.add ".avi" (MimeType.mk "video/avi" false)
 
 let app =
   choose [
@@ -108,16 +108,17 @@ let app =
 [<EntryPoint>]
 let main argv =
   web_server
-    { bindings         = [ HttpBinding.mk' HTTP "127.0.0.1" 8082 ]
-      server_key       = Utils.Crypto.generate_key HttpRuntime.ServerKeyLength
+    { props =
+        { bindings         = [ HttpBinding.mk' HTTP "127.0.0.1" 8082 ]
+          server_key       = Utils.Crypto.generate_key HttpRuntime.ServerKeyLength
+          listen_timeout   = TimeSpan.FromMilliseconds 2000.
+          buffer_size      = 2048
+          max_ops          = 100
+          mime_types_map   = mime_types
+          home_folder      = None
+          compressed_files_folder = None }
       error_handler    = default_error_handler
-      listen_timeout   = TimeSpan.FromMilliseconds 2000.
       ct               = Async.DefaultCancellationToken
-      buffer_size      = 2048
-      max_ops          = 100
-      mime_types_map   = mime_types
-      home_folder      = None
-      compressed_files_folder = None
       logger           = logger }
     app
   0

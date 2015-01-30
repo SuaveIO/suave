@@ -24,9 +24,8 @@ let fib n =
 let app : WebPart =
   url_scan "/%d" (fun (n : int) -> fun x -> async{ let! r = fib (bigint n) in return! OK (r.ToString()) x })
 
-let config =
-  { default_config with
-     bindings = [ HttpBinding.mk HTTP IPAddress.Loopback 3000us ] }
+let props = { default_config.props with bindings = [ HttpBinding.mk HTTP IPAddress.Loopback 3000us ] }
+let config = { default_config with props = props }
 
 [<EntryPoint>]
 let main _ =

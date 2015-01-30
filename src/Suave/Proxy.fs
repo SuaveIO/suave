@@ -114,17 +114,17 @@ open System.IO
 /// resolver.
 let proxy_server_async (config : SuaveConfig) resolver =
   let home_folder, compression_folder =
-    ParsingAndControl.resolve_directory config.home_folder,
-    Path.Combine(ParsingAndControl.resolve_directory config.compressed_files_folder, "_temporary_compressed_files")
+    ParsingAndControl.resolve_directory config.props.home_folder,
+    Path.Combine(ParsingAndControl.resolve_directory config.props.compressed_files_folder, "_temporary_compressed_files")
   let all =
     List.map (fun binding ->
-      tcp_ip_server (config.buffer_size, config.max_ops)
+      tcp_ip_server (config.props.buffer_size, config.props.max_ops)
                     config.logger
                     (ParsingAndControl.request_loop
                       (SuaveConfig.to_runtime config home_folder compression_folder binding)
                       (SocketPart (proxy resolver)))
                     binding.socket_binding)
-      config.bindings
+      config.props.bindings
   let listening = all |> Seq.map fst |> Async.Parallel |> Async.Ignore
   let server    = all |> Seq.map snd |> Async.Parallel |> Async.Ignore
   listening, server

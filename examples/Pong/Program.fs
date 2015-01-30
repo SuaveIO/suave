@@ -11,10 +11,14 @@ open System.Threading
 let app : WebPart = OK "PONG"
 
 let config =
+  let customProperties =
+    { default_config.props with
+        bindings = [ HttpBinding.mk HTTP IPAddress.Loopback 3000us ]
+        buffer_size = 8192
+        max_ops = 10000
+    }
   { default_config with
-     bindings = [ HttpBinding.mk HTTP IPAddress.Loopback 3000us ]
-     buffer_size = 8192
-     max_ops = 10000
+      props = customProperties
   }
 
 open System.Diagnostics

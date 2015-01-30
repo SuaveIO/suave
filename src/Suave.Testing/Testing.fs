@@ -98,10 +98,11 @@ let dispose_context (ctx : SuaveTestCtx) =
 /// be awaited inside this function but the server async value will
 /// be run on the thread pool.
 let run_with_factory factory config web_parts : SuaveTestCtx =
-  let binding = config.bindings.Head
+  let binding = config.props.bindings.Head
   let base_uri = binding.ToString()
   let cts = new CancellationTokenSource()
-  let config' = { config with ct = cts.Token; buffer_size = 128; max_ops = 10 }
+  let custom_properties = { config.props with buffer_size = 128; max_ops = 10 }
+  let config' = { config with ct = cts.Token; props = custom_properties }
 
   let listening, server = factory config web_parts
   Async.Start(server, cts.Token)
@@ -153,7 +154,7 @@ let send (client : HttpClient) (timeout : TimeSpan) (ctx : SuaveTestCtx) (reques
   send.Result
 
 let endpoint_uri (suave_config : SuaveConfig) =
-  Uri(suave_config.bindings.Head.ToString())
+  Uri(suave_config.props.bindings.Head.ToString())
 
 /// This is the main function for the testing library; it lets you assert
 /// on the request/response values while ensuring deterministic

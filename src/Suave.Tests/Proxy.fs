@@ -24,7 +24,7 @@ open Suave.Testing
 
 [<Tests>]
 let proxy =
-  let bind :: _ = default_config.bindings
+  let bind :: _ = default_config.props.bindings
   let to_target r = Some (bind.socket_binding.ip, bind.socket_binding.port)
 
   let run_target = run_with default_config
@@ -37,9 +37,11 @@ let proxy =
 
   // let sslCert = X509Certificate.FromPKCS12(BIO.File("suave.p12","r"), "easy")
   // let proxy_config = { default_config with bindings = [ HttpBinding.Create(Protocol.HTTPS(sslCert), "127.0.0.1", 8084) ] }
-  let proxy_config =
-    { default_config with
-        bindings = [ HttpBinding.mk HTTP IPAddress.Loopback 8084us ] }
+  let customProperties =
+    let loopback_binding = HttpBinding.mk HTTP IPAddress.Loopback 8084us
+    { default_config.props with bindings = [loopback_binding] }
+
+  let proxy_config = { default_config with props = customProperties}
   let proxy = run_with_factory proxy_server_async proxy_config
 
   testList "creating proxy" [
