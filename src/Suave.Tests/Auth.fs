@@ -10,6 +10,7 @@ open Fuchu
 open Suave
 open Suave.Logging
 open Suave.Cookie
+open Suave.State.CookieStateStore
 open Suave.Http
 open Suave.Web
 open Suave.Types
@@ -136,4 +137,44 @@ let tests =
         use res''' = interact HttpMethod.GET "/protected"
         Assert.Equal("should have access to protected", "You have reached the place of your dreams!", content_string res''')
         Assert.Equal("code 200 OK", HttpStatusCode.OK, status_code res''')
+
+    testCase "test session is maintained across requests" <| fun _ ->
+      // given
+      
+      let ctx =
+        run_with' ( 
+          stateful'
+          >>= context (fun x ->
+            match x |> HttpContext.state with
+            | None -> 
+                RequestErrors.BAD_REQUEST "damn it"
+            | Some store ->
+              match store.get "counter" with
+              | Some y ->
+                store.set "counter" (y + 1)
+                >>= OK ((y + 1).ToString())
+              | None ->
+                store.set "counter" 0
+                >>= OK "0"))
+      
+      let container = CookieContainer()
+      let interact methd resource =
+        let response = req_cookies container ctx methd resource id
+        match response.Headers.TryGetValues("Set-Cookie") with
+        | false, _ -> ()
+        | true, values -> values |> Seq.iter (fun cookie -> container.SetCookies(endpoint_uri ctx.suave_config, cookie))
+        response
+
+      let cookies = cookies ctx.suave_config container
+
+      interaction ctx  (fun _ ->
+
+        use res = interact HttpMethod.GET "/"
+        Assert.Equal("should return number zero", "0", content_string res)
+
+        use res' = interact HttpMethod.GET "/"
+        Assert.Equal("should return number one", "1", content_string res')
+
+        use res'' = interact HttpMethod.GET "/"
+        Assert.Equal("should return number two", "2", content_string res''))
     ]
