@@ -237,7 +237,7 @@ module Cookie =
         match no_cookie () with
         | Choice1Of2 plain_text ->
           log "no existing cookie, setting text"
-          set_cookies plain_text
+          set_cookies plain_text >>= f_success
         | Choice2Of2 wp_kont ->
           log "no existing cookie, calling app continuation"
           wp_kont
@@ -247,7 +247,7 @@ module Cookie =
         match decryption_failure err with
         | Choice1Of2 plain_text ->
           log "existing, broken cookie, setting cookie text anew"
-          set_cookies plain_text
+          set_cookies plain_text >>= f_success
         | Choice2Of2 wp_kont    ->
           log "existing, broken cookie, unsetting it, forwarding to given failure web part"
           wp_kont >>= unset_pair csctx.cookie_name)
