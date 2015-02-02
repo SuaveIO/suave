@@ -273,7 +273,7 @@ module ParsingAndControl =
     | None ->  return Some ctx
     }
 
-  let parse_post_data = to_async <| parse_post_data'
+  let private parse_post_data = to_async <| parse_post_data'
 
   /// Process the request, reading as it goes from the incoming 'stream', yielding a HttpRequest
   /// when done
