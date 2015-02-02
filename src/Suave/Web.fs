@@ -512,7 +512,7 @@ let web_server_async (config : SuaveConfig) (webpart : WebPart) =
     ParsingAndControl.resolve_directory config.home_folder,
     Path.Combine(ParsingAndControl.resolve_directory config.compressed_files_folder, "_temporary_compressed_files")
   let servers = // spawn tcp listeners/web workers
-    List.map (SuaveConfig.to_runtime config home_folder compression_folder
+    List.map (SuaveConfig.to_runtime config home_folder compression_folder true
               >> ParsingAndControl.web_worker (config.buffer_size, config.max_ops) webpart)
               config.bindings
   let listening = servers |> Seq.map fst |> Async.Parallel
@@ -538,5 +538,4 @@ let default_config : SuaveConfig =
     mime_types_map   = Http.Writers.default_mime_types_map
     home_folder      = None
     compressed_files_folder = None
-    logger           = Loggers.sane_defaults_for LogLevel.Info
-    parse_post_data  = true }
+    logger           = Loggers.sane_defaults_for LogLevel.Info }

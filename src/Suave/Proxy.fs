@@ -121,7 +121,7 @@ let proxy_server_async (config : SuaveConfig) resolver =
       tcp_ip_server (config.buffer_size, config.max_ops)
                     config.logger
                     (ParsingAndControl.request_loop
-                      (SuaveConfig.to_runtime config home_folder compression_folder binding)
+                      (SuaveConfig.to_runtime config home_folder compression_folder false binding )
                       (SocketPart (proxy resolver)))
                     binding.socket_binding)
       config.bindings

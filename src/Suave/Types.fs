@@ -819,21 +819,19 @@ type SuaveConfig =
     /// Folder for temporary compressed files
     compressed_files_folder : string option
     /// A logger to log with
-    logger                  : Logger
-    /// Parse POST data by default 
-    parse_post_data         : bool }
+    logger                  : Logger }
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module SuaveConfig =
 
-  let to_runtime config content_folder compression_folder =
+  let to_runtime config content_folder compression_folder parse_post_data =
     HttpRuntime.mk config.server_key
                    config.error_handler
                    config.mime_types_map
                    content_folder
                    compression_folder
                    config.logger
-                   config.parse_post_data
+                   parse_post_data
 
   let bindings x = x.bindings
 

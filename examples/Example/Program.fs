@@ -118,7 +118,6 @@ let main argv =
       mime_types_map   = mime_types
       home_folder      = None
       compressed_files_folder = None
-      logger           = logger
-      parse_post_data  = true }
+      logger           = logger }
     app
   0
