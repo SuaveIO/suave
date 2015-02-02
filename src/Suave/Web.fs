@@ -273,7 +273,7 @@ module ParsingAndControl =
     | None ->  return Some ctx
     }
 
-  let parse_post_data = to_async <| parse_post_data'
+  let private parse_post_data = to_async <| parse_post_data'
 
   /// Process the request, reading as it goes from the incoming 'stream', yielding a HttpRequest
   /// when done
@@ -306,8 +306,10 @@ module ParsingAndControl =
                      runtime.matched_binding.scheme.secure
                      connection''.ipaddr
 
-    return Some { ctx with request    = request
-                           connection = connection'' }
+    if runtime.parse_post_data then
+      return! parse_post_data' { ctx with request = request; connection = connection'' }
+    else
+      return Some { ctx with request = request; connection = connection'' }
   }
 
   open System.Net
@@ -510,7 +512,7 @@ let web_server_async (config : SuaveConfig) (webpart : WebPart) =
     ParsingAndControl.resolve_directory config.home_folder,
     Path.Combine(ParsingAndControl.resolve_directory config.compressed_files_folder, "_temporary_compressed_files")
   let servers = // spawn tcp listeners/web workers
-    List.map (SuaveConfig.to_runtime config home_folder compression_folder
+    List.map (SuaveConfig.to_runtime config home_folder compression_folder true
               >> ParsingAndControl.web_worker (config.buffer_size, config.max_ops) webpart)
               config.bindings
   let listening = servers |> Seq.map fst |> Async.Parallel
