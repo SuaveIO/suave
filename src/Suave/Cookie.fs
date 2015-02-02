@@ -171,11 +171,10 @@ module Cookie =
       |> sliding_expiry relative_expiry
     | err -> failwithf "internal error on encryption %A" err
 
-  let read_cookies key cookie_name ctx =
+  let read_cookies key cookie_name cookies =
     let _, dec = Bytes.cookie_encoding
     let found =
-      ctx.request
-      |> HttpRequest.cookies
+      cookies
       |> Map.tryFind cookie_name
       |> Choice.from_option (NoCookieFound cookie_name)
       |> Choice.map (fun c -> c, c |> (HttpCookie.value >> dec))
@@ -193,7 +192,7 @@ module Cookie =
   let update_cookies (csctx : CookiesState) f_plain_text : WebPart =
     context (fun ({ runtime = { logger = logger }} as ctx) ->
       let plain_text' =
-        match read_cookies csctx.server_key csctx.cookie_name ctx with
+        match read_cookies csctx.server_key csctx.cookie_name (ctx.response |> HttpResult.cookies) with
         | Choice1Of2 (_, plain_text) ->
           Log.log logger "Suave.Cookie.update_cookies" LogLevel.Debug "update_cookies - existing"
           f_plain_text (Some plain_text)
@@ -226,7 +225,7 @@ module Cookie =
         set_pair http_cookie client_cookie >>=
           Writers.set_user_data csctx.user_state_key plain_text
 
-      match read_cookies csctx.server_key csctx.cookie_name ctx with
+      match read_cookies csctx.server_key csctx.cookie_name (ctx.request |> HttpRequest.cookies) with
       | Choice1Of2 (http_cookie, plain_text) ->
         log "existing cookie"
         refresh_cookies csctx.relative_expiry http_cookie

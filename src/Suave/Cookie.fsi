@@ -81,7 +81,7 @@ module Cookie =
   /// returns the cookie and its plaintext value if successful.
   val read_cookies : key:ServerKey ->
                      cookie_name:string ->
-                     ctx:HttpContext ->
+                     cookies:Map<string, HttpCookie> ->
                      Choice<HttpCookie * byte [], CookieError>
 
   /// Bumps the expiry dates for all the cookies.
