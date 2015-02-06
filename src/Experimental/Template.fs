@@ -34,6 +34,9 @@ let (|Pat|NoPat|) (x : String) =
     Pat(x.Substring(0,index), x.Substring(index+1))
   else NoPat
 
+/// A binder takes XML, applies a transform, and returns the XML back.
+type Binder = Xml -> Xml
+
 /// Extract an XML/HTML template from the input 'xml', in 'ns1:keyhere' form
 /// for tags that can be parsed. Replace those tags with their values as defined
 /// in the 'bindings'.
@@ -100,6 +103,33 @@ let rec xml_to_string1 (Xml(nodes)) (stream : StringWriter) =
       xml_to_string1 children stream
 
 open Types
+
+/// Read an attribute from the xml reader by moving it
+/// one step along and then yielding that value.
+let readatt (reader : XmlReader) = seq {
+  while reader.MoveToNextAttribute() do
+    yield (reader.Name,reader.Value)
+}
+
+/// Read through the xml reader, appending the elements of the XML as you
+/// go to the value in the XML(l) input. Returns the read XML as an XML value.
+let rec parser (reader : XmlReader) (Xml(l) as k) =
+  if reader.Read() then
+    match reader.NodeType with
+    | XmlNodeType.Element ->
+      let name  = reader.LocalName
+      let attrs = readatt reader |> Seq.toArray
+      if reader.IsEmptyElement then
+        parser reader (Xml( l@ [Element(name,reader.Prefix,attrs),Xml([])]))
+      else
+        parser reader (Xml(l @ [Element(name,reader.Prefix,attrs),parser reader (Xml([]))]))
+    | XmlNodeType.EndElement -> k
+    | XmlNodeType.Text       -> parser reader (Xml(l @ [Text(reader.Value),Xml([])]))
+    | XmlNodeType.Whitespace -> parser reader (Xml(l @ [WhiteSpace(reader.Value),Xml([])]))
+    | XmlNodeType.Comment    -> parser reader k
+    | x                      -> Xml(l)
+  else
+    k
 
 /// Process the template/html that is the requested LocalPath in the request Uri,
 /// binding the 'user' elements to values from the 'data' bindings. If the processing
