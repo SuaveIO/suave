@@ -18,26 +18,26 @@ open Fuchu
 
 [<Tests>]
 let gets =
-  let run_with' = runWith SuaveConfig.defaults
+  let runWith' = runWith SuaveConfig.defaults
   testList "getting basic responses" [
       testCase "200 OK returns 'a'" <| fun _ ->
-        Assert.Equal("expecting non-empty response", "a", run_with' (OK "a") |> req HttpMethod.GET "/" None)
+        Assert.Equal("expecting non-empty response", "a", runWith' (OK "a") |> req HttpMethod.GET "/" None)
 
       testCase "200 OK returning url" <| fun _ ->
         Assert.Equal("expecting correct url from binding",
                      Uri("http://127.0.0.1:8083/").ToString(),
-                     run_with' (request (fun r -> OK (r.url.ToString())))
+                     runWith' (request (fun r -> OK (r.url.ToString())))
                      |> req HttpMethod.GET "/" None)
 
       testPropertyWithConfig fsCheckConfig "200 OK returns equivalent" <| fun resp_str ->
-        (run_with' (OK resp_str) |> req HttpMethod.GET "/hello" None) = resp_str
+        (runWith' (OK resp_str) |> req HttpMethod.GET "/hello" None) = resp_str
 
       testCase "204 No Content empty body" <| fun _ ->
         Assert.Equal("empty string should always be returned by 204 No Content",
-                     "", (run_with' NO_CONTENT |> req HttpMethod.GET "/" None))
+                     "", (runWith' NO_CONTENT |> req HttpMethod.GET "/" None))
 
       testCase "302 FOUND sends content-length header" <| fun _ ->
-        let headers = req_content_headers HttpMethod.GET "/" None (run_with' (Redirection.FOUND "/url"))
+        let headers = req_content_headers HttpMethod.GET "/" None (runWith' (Redirection.FOUND "/url"))
         Assert.Equal("302 FOUND sends content-length header",
                      true,
                      headers.Contains("Content-Length"))
@@ -45,7 +45,7 @@ let gets =
 
 [<Tests>]
 let posts =
-  let run_with' = runWith SuaveConfig.defaults
+  let runWith' = runWith SuaveConfig.defaults
 
   let webId =
     request (fun x -> OK (x.rawForm |> Encoding.UTF8.GetString))
@@ -92,17 +92,17 @@ let posts =
   testList "posting basic data" [
       testCase "POST data round trips with no content-type" <| fun _ ->
         use data = new StringContent("bob")
-        Assert.Equal("expecting data to be returned", "bob", run_with' webId |> req HttpMethod.POST "/" (Some data))
+        Assert.Equal("expecting data to be returned", "bob", runWith' webId |> req HttpMethod.POST "/" (Some data))
       testCase "POST form data makes round trip" <| fun _ ->
         use data = new FormUrlEncodedContent(dict [ "name", "bob"])
-        Assert.Equal("expecting form data to be returned", "bob", run_with' (getFormValue "name") |> req HttpMethod.POST "/" (Some data))
+        Assert.Equal("expecting form data to be returned", "bob", runWith' (getFormValue "name") |> req HttpMethod.POST "/" (Some data))
       testCase "POST long data" <| fun _ ->
         use data = new FormUrlEncodedContent(dict [ "long", longData])
-        Assert.Equal("expecting form data to be returned", longData, run_with' (getFormValue "long") |> req HttpMethod.POST "/" (Some data))
+        Assert.Equal("expecting form data to be returned", longData, runWith' (getFormValue "long") |> req HttpMethod.POST "/" (Some data))
       testCase "POST persona assertion" <| fun _ ->
         use data = new FormUrlEncodedContent(dict [ "assertion", assertion])
-        Assert.Equal("expecting form data to be returned", assertion, run_with' (getFormValue "assertion") |> req HttpMethod.POST "/" (Some data))
+        Assert.Equal("expecting form data to be returned", assertion, runWith' (getFormValue "assertion") |> req HttpMethod.POST "/" (Some data))
       testCase "POST unicode data" <| fun _ ->
         use data = new FormUrlEncodedContent(dict [ "name", unicodeString ])
-        Assert.Equal("expecting form data to be returned", unicodeString, run_with' (getFormValue "name") |> req HttpMethod.POST "/" (Some data))
+        Assert.Equal("expecting form data to be returned", unicodeString, runWith' (getFormValue "name") |> req HttpMethod.POST "/" (Some data))
     ]

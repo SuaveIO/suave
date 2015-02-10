@@ -20,7 +20,7 @@ open Suave.Http.RequestErrors
 
 open Suave.Testing
 
-let run_with' = runWith { SuaveConfig.defaults with logger = Loggers.saneDefaultsFor LogLevel.Debug }
+let runWith' = runWith { SuaveConfig.defaults with logger = Loggers.saneDefaultsFor LogLevel.Debug }
 
 type Assert with
   static member Null (msg : string, o : obj) =
@@ -35,7 +35,7 @@ type Assert with
       // printfn "found %A" v
       ()
 
-let req_resp
+let reqResp
   (methd : HttpMethod)
   (resource : string)
   (cookies : CookieContainer option)
@@ -50,7 +50,7 @@ let req_resp
 
   use handler = mk_handler DecompressionMethods.None cookies
   use client = mk_client handler
-  use request = mk_request methd resource "" None (endpoint_uri ctx.suave_config) |> f_request
+  use request = mk_request methd resource "" None (endpointUri ctx.suave_config) |> f_request
 
   for h in request.Headers do
     log (sprintf "%s: %s" h.Key (String.Join(", ", h.Value)))
@@ -59,19 +59,19 @@ let req_resp
   let result = request |> send client default_timeout ctx
   f_result result
 
-let set_connection_keep_alive (r : HttpRequestMessage) =
+let setConnectionKeepAlive (r : HttpRequestMessage) =
   r.Headers.ConnectionClose <- Nullable(false)
   r
 
 /// Test a request by looking at the cookies alone.
 let req_cookies cookies ctx methd resource f_req =
-  req_resp methd resource (Some cookies)
-           set_connection_keep_alive
+  reqResp methd resource (Some cookies)
+           setConnectionKeepAlive
            f_req
            ctx
 
-let cookies suave_config (container : CookieContainer) =
-  container.GetCookies(endpoint_uri suave_config)
+let cookies suaveConfig (container : CookieContainer) =
+  container.GetCookies(endpointUri suaveConfig)
 
 let interaction ctx f_ctx = with_context f_ctx ctx
 
@@ -79,10 +79,10 @@ let interact methd resource container ctx =
   let response = req_cookies container ctx methd resource id
   match response.Headers.TryGetValues("Set-Cookie") with
   | false, _ -> ()
-  | true, values -> values |> Seq.iter (fun cookie -> container.SetCookies(endpoint_uri ctx.suave_config, cookie))
+  | true, values -> values |> Seq.iter (fun cookie -> container.SetCookies(endpointUri ctx.suave_config, cookie))
   response
 
-let session_state f =
+let sessionState f =
   context( fun r ->
     match HttpContext.state r with
     | None ->  RequestErrors.BAD_REQUEST "damn it"
@@ -92,19 +92,19 @@ let session_state f =
 let tests =
   testList "auth tests" [
     testCase "baseline, no auth cookie" <| fun _ ->
-      let ctx = run_with' (OK "ACK")
+      let ctx = runWith' (OK "ACK")
       let cookies = ctx |> req_cookies' HttpMethod.GET "/"  None
       Assert.Null("should not have auth cookie", cookies.[Auth.SessionAuthCookie])
       
     testCase "can set cookie" <| fun _ ->
-      let ctx = run_with' (Auth.authenticated Session false >>= OK "ACK")
+      let ctx = runWith' (Auth.authenticated Session false >>= OK "ACK")
       let cookies = ctx |> req_cookies' HttpMethod.GET "/"  None
       Assert.NotNull("should have auth cookie", cookies.[Auth.SessionAuthCookie])
 
     testCase "can access authenticated contents" <| fun _ ->
       // given
       let ctx =
-        run_with' (
+        runWith' (
           choose [
             url "/" >>= OK "root"
             url "/auth" >>= Auth.authenticated Session false >>= OK "authed"
@@ -147,9 +147,9 @@ let tests =
     testCase "test session is maintained across requests" <| fun _ ->
       // given
       let ctx =
-        run_with' ( 
+        runWith' ( 
           statefulForSession
-          >>= session_state (fun store ->
+          >>= sessionState (fun store ->
               match store.get "counter" with
               | Some y ->
                 store.set "counter" (y + 1)
@@ -174,13 +174,13 @@ let tests =
     testCase "set more than one variable in the session" <| fun _ ->
       // given
       let ctx =
-        run_with' ( 
+        runWith' ( 
           statefulForSession
           >>= choose [
-            url "/a"     >>= session_state (fun state -> state.set "a" "a" >>= OK "a" )
-            url "/b"     >>= session_state (fun state -> state.set "b" "b" >>= OK "b" )
-            url "/get_a" >>= session_state (fun state -> match state.get "a" with Some a -> OK a | None -> RequestErrors.BAD_REQUEST "fail")
-            url "/get_b" >>= session_state (fun state -> match state.get "b" with Some a -> OK a | None -> RequestErrors.BAD_REQUEST "fail" )
+            url "/a"     >>= sessionState (fun state -> state.set "a" "a" >>= OK "a" )
+            url "/b"     >>= sessionState (fun state -> state.set "b" "b" >>= OK "b" )
+            url "/get_a" >>= sessionState (fun state -> match state.get "a" with Some a -> OK a | None -> RequestErrors.BAD_REQUEST "fail")
+            url "/get_b" >>= sessionState (fun state -> match state.get "b" with Some a -> OK a | None -> RequestErrors.BAD_REQUEST "fail" )
             ])
 
       let container = CookieContainer()
@@ -202,11 +202,11 @@ let tests =
     testCase "set two session values on the same request" <| fun _ ->
       // given
       let ctx =
-        run_with' ( 
+        runWith' ( 
           statefulForSession >>= choose [
-            url "/ab"     >>= session_state (fun state -> state.set "a" "a" >>= session_state ( fun state' -> state'.set "b" "b" >>= OK "a" ))
-            url "/get_a" >>= session_state (fun state -> match state.get "a" with Some a -> OK a | None -> RequestErrors.BAD_REQUEST "fail")
-            url "/get_b" >>= session_state (fun state -> match state.get "b" with Some a -> OK a | None -> RequestErrors.BAD_REQUEST "fail" )
+            url "/ab"     >>= sessionState (fun state -> state.set "a" "a" >>= sessionState ( fun state' -> state'.set "b" "b" >>= OK "a" ))
+            url "/get_a" >>= sessionState (fun state -> match state.get "a" with Some a -> OK a | None -> RequestErrors.BAD_REQUEST "fail")
+            url "/get_b" >>= sessionState (fun state -> match state.get "b" with Some a -> OK a | None -> RequestErrors.BAD_REQUEST "fail" )
             ])
 
       let container = CookieContainer()

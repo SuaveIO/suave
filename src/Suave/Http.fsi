@@ -31,7 +31,7 @@ module Http =
   open Suave.Types
 
   /// Return success with some value
-  val inline succeed : item:'a -> Async<'a option>
+  val inline succeed : item:'T -> Async<'T option>
 
   /// Return failure without any value
   val fail : Async<HttpContext option> 
@@ -42,14 +42,14 @@ module Http =
   /// Compose (bind) two arguments, 'first' and 'second', so that the result of
   /// the composition can be applied to an argument of 'input' and then passed
   /// to 'second', if 'first' yields a value.
-  val inline (>>=) : first:('a -> Async<'b option>) -> second:('b -> Async<'c option>) -> input:'a -> Async<'c option>
+  val inline (>>=) : first:('T -> Async<'U option>) -> second:('U -> Async<'V option>) -> input:'T -> Async<'V option>
 
   /// Compose (bind) two web parts; see (>>=) -- note the different parameter
   /// ordering
-  val inline bind : second:('b -> Async<'c option>) -> first:('a -> Async<'b option>) -> input:'a -> Async<'c option>
+  val inline bind : second:('U -> Async<'V option>) -> first:('T -> Async<'U option>) -> input:'T -> Async<'V option>
 
   /// Left-to-right Kleisli composition of monads.
-  val inline (>=>) : first:('a -> 'b option) -> second:('a -> 'b option) -> input:'a -> 'b option
+  val inline (>=>) : first:('T -> 'U option) -> second:('T -> 'U option) -> input:'T -> 'U option
 
   /// Left-to-right Kleisli composition of web parts.
   val inline (<|>) : first:HttpPart -> second:HttpPart -> HttpPart
@@ -61,17 +61,17 @@ module Http =
   val choose : options : HttpPart list -> HttpPart
 
   /// Pipe the request through to a bird that can peck at it.
-  val inline warbler : f:('a -> 'a -> 'b) -> 'a -> 'b
+  val inline warbler : f:('T -> 'T -> 'U) -> 'T -> 'U
 
   /// The constant function, which returns its constant, no matter
   /// its input.
   /// - theorem: identity = (cnst |> warbler)
   /// (warbler cnst) x = cnst x x = fun _ -> x
-  val inline cnst : x:'a -> 'b -> 'a
+  val inline cnst : x:'T -> 'U -> 'T
 
   /// The conditional function that applies f x a if there's a value in d,
   /// or otherwise, applies g a, if there is no value in d.
-  val cond : item:'a option -> f:('a -> 'b -> 'c) -> g:('b -> 'c) -> 'b -> 'c
+  val cond : item:'T option -> f:('T -> 'U -> 'V) -> g:('U -> 'V) -> 'U -> 'V
 
   /// general response functions
   module Response =
@@ -93,7 +93,7 @@ module Http =
 
     /// Sets a user data key-value pair with the key and value specified. Downstream
     /// web parts can read this.
-    val setUserData : key:string -> value:'a -> HttpPart
+    val setUserData : key:string -> value:'T -> HttpPart
 
     /// Unset the user data by the given key
     val unsetUserData : key : string -> HttpPart

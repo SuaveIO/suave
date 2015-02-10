@@ -96,10 +96,10 @@ module Http =
     open System
     open System.IO
 
-    let response status_code (cnt : byte []) =
+    let response statusCode (cnt : byte []) =
       fun (ctx : HttpContext) ->
         let response = 
-          { ctx.response with status = status_code; content = Bytes cnt }
+          { ctx.response with status = statusCode; content = Bytes cnt }
         { ctx with response = response } |> succeed
 
   module Writers =
@@ -740,7 +740,7 @@ module Http =
     let internal parseAuthenticationToken (token : string) =
       let parts = token.Split (' ')
       let enc = parts.[1].Trim()
-      let decoded = ASCII.base64_decode enc
+      let decoded = ASCII.decodeBase64 enc
       let indexOfColon = decoded.IndexOf(':')
       (parts.[0].ToLower(), decoded.Substring(0,indexOfColon), decoded.Substring(indexOfColon+1))
 

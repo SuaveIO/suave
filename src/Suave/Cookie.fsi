@@ -17,74 +17,74 @@ module Cookie =
     | DecryptionError of Crypto.SecretboxDecryptionError
 
   /// Parse the cookie's name and data in the string into a dictionary.
-  val parse_cookies : cookie_string:string -> HttpCookie list
+  val parseCookies : cookieString:string -> HttpCookie list
 
-  val parse_result_cookie : cookie_string:string -> HttpCookie
+  val parseResultCookie : cookieString:string -> HttpCookie
 
-  module HttpRequest =
+  type HttpRequest with
 
     /// Finds the cookies of the request, or an empty Map otherwise, if
     /// there are no cookies.
-    val cookies : request:HttpRequest -> Map<string, HttpCookie>
+    member cookies : Map<string, HttpCookie>
 
-  module HttpResult =
+  type HttpResult with
 
-    val cookies : result:HttpResult -> Map<string, HttpCookie>
+    member cookies : Map<string, HttpCookie>
 
-  val set_cookie : cookie:HttpCookie -> HttpPart
-  val unset_cookie : name:string -> HttpPart
+  val setCookie : cookie:HttpCookie -> HttpPart
+  val unsetCookie : name:string -> HttpPart
 
   /// Sets the cookies to the HttpResult
-  val set_pair   : http_cookie:HttpCookie -> client_cookie:HttpCookie -> HttpPart
-  val unset_pair : http_cookie_name:string -> HttpPart
+  val setPair   : httpCookie:HttpCookie -> clientCookie:HttpCookie -> HttpPart
+  val unsetPair : httpCookieName:string -> HttpPart
 
   /// A DTO structure for passing the right parameters to the XXX_cookies functions
   /// in this module.
   type CookiesState =
-    { server_key      : ServerKey
-      cookie_name     : string
-      user_state_key  : string
-      relative_expiry : CookieLife
-      secure          : bool }
+    { serverKey      : ServerKey
+      cookieName     : string
+      userStateKey   : string
+      relativeExpiry : CookieLife
+      secure         : bool }
 
   [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
   module CookiesState =
 
-    val mk : server_key:ServerKey ->
-             cookie_name:string ->
-             user_state_key:string ->
-             relative_expiry:CookieLife ->
+    val mk : serverKey:ServerKey ->
+             cookieName:string ->
+             userStateKey:string ->
+             relativeExpiry:CookieLife ->
              secure:bool ->
              CookiesState
 
 
   /// Generate one server-side cookie, and another client-side cookie with
   /// name "${server-side-name}-client"
-  val generate_cookies : server_key:ServerKey ->
-                         cookie_name:string ->
-                         relative_expiry:CookieLife ->
-                         secure:bool ->
-                         plain_data:byte[] ->
-                         HttpCookie * HttpCookie
+  val generateCookies : serverKey:ServerKey ->
+                        cookieName:string ->
+                        relativeExpiry:CookieLife ->
+                        secure:bool ->
+                        plainData:byte[] ->
+                        HttpCookie * HttpCookie
 
   /// Tries to read the cookie of the given name from the HttpContext, and
   /// returns the cookie and its plaintext value if successful.
-  val read_cookies : key:ServerKey ->
-                     cookie_name:string ->
-                     cookies:Map<string, HttpCookie> ->
-                     Choice<HttpCookie * byte [], CookieError>
+  val readCookies : key:ServerKey ->
+                    cookieName:string ->
+                    cookies:Map<string, HttpCookie> ->
+                    Choice<HttpCookie * byte [], CookieError>
 
   /// Bumps the expiry dates for all the cookies.
-  val refresh_cookies : expiry:CookieLife ->
-                        cookie:HttpCookie ->
-                        HttpPart
+  val refreshCookies : expiry:CookieLife ->
+                       cookie:HttpCookie ->
+                       HttpPart
 
-  val update_cookies :  csctx:CookiesState ->
-                        f_plain_text : (byte [] option -> byte []) ->
-                        HttpPart
+  val updateCookies :  csctx:CookiesState ->
+                       f_plain_text : (byte [] option -> byte []) ->
+                       HttpPart
   
-  val cookie_state : csctx:CookiesState ->
-                     no_cookie :(unit -> Choice<byte [], HttpPart>) ->
-                     decryption_failure:(Crypto.SecretboxDecryptionError -> Choice<byte [], HttpPart>) ->
-                     f_success:HttpPart ->
-                     HttpPart
+  val cookieState : csctx:CookiesState ->
+                    noCookie :(unit -> Choice<byte [], HttpPart>) ->
+                    decryptionFailure:(Crypto.SecretboxDecryptionError -> Choice<byte [], HttpPart>) ->
+                    f_success:HttpPart ->
+                    HttpPart

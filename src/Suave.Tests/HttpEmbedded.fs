@@ -13,9 +13,9 @@ open Suave.Testing
 
 [<Tests>]
 let embedded_resources =
-  let run_with' = runWith defaultConfig
+  let runWith' = runWith defaultConfig
 
   testList "test Embedded.browse" [
       testCase "200 OK returns embedded file" <| fun _ ->
-        Assert.Equal("expecting 'Hello World!'", "Hello World!", run_with' browseDefaultAsssembly |> req HttpMethod.GET "/embedded-resource.txt" None)
+        Assert.Equal("expecting 'Hello World!'", "Hello World!", runWith' browseDefaultAsssembly |> req HttpMethod.GET "/embedded-resource.txt" None)
     ]

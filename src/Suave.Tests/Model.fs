@@ -21,7 +21,7 @@ open Suave.Testing
 
 [<Tests>]
 let tests =
-  let run_with' = runWith defaultConfig
+  let runWith' = runWith defaultConfig
 
   let post_data3 = read_text "request-2.txt"
   
@@ -47,13 +47,13 @@ let tests =
       Assert.Equal(
         "should have read data",
         "identifier 123abc",
-        run_with' (test_url_encoded_form "body-plain")
+        runWith' (test_url_encoded_form "body-plain")
         |> req_gzip HttpMethod.POST "/" (Some <| new StringContent(post_data3, Encoding.UTF8, "application/x-www-form-urlencoded")))
 
     testCase "200 OK returns 'a'" <| fun _ ->
       Assert.Equal(
         "expecting nilsson response",
         "nilsson",
-        run_with' (Binding.bind_req (Binding.query "apa" Choice1Of2) OK BAD_REQUEST)
+        runWith' (Binding.bind_req (Binding.query "apa" Choice1Of2) OK BAD_REQUEST)
         |> req_query HttpMethod.GET "/" "apa=nilsson")
     ]

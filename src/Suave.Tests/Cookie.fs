@@ -15,7 +15,7 @@ let tests =
   testList "parse result cookie" [
     testCase "parse path" <| fun _ ->
       let sample = @"st=oFqpYxbMObHvpEW!QLzedHwSZ1gZnotBs$; Path=/; HttpOnly"
-      let subject = Cookie.parse_result_cookie sample
+      let subject = Cookie.parseResultCookie sample
       let expected =
         { name      = "st"
           value     = "oFqpYxbMObHvpEW!QLzedHwSZ1gZnotBs$"
@@ -35,7 +35,7 @@ let tests =
           domain    = None
           secure    = true
           http_only = false }
-      let parsed = Cookie.parse_result_cookie (HttpCookie.to_header cookie)
+      let parsed = Cookie.parseResultCookie (HttpCookie.to_header cookie)
       Assert.Equal("eq", cookie, parsed)
 
 // FsCheck character gen from RFC slightly painful; let's do that when merging Freya

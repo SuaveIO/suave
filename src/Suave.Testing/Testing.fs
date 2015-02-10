@@ -9,12 +9,12 @@ Example:
 
   open Fuchu
 
-  let run_with' = run_with default_config
+  let runWith' = run_with default_config
   
   testCase "parsing a large multipart form" <| fun _ ->
 
     let res =
-      run_with' test_multipart_form
+      runWith' test_multipart_form
       |> req HttpMethod.POST "/" (Some <| byte_array_content)
 
     Assert.Equal("", "Bob <bob@wishfulcoding.mailgun.org>", )
@@ -152,7 +152,7 @@ let send (client : HttpClient) (timeout : TimeSpan) (ctx : SuaveTestCtx) (reques
 
   send.Result
 
-let endpoint_uri (suave_config : SuaveConfig) =
+let endpointUri (suave_config : SuaveConfig) =
   Uri(suave_config.bindings.Head.ToString())
 
 /// This is the main function for the testing library; it lets you assert
@@ -185,7 +185,7 @@ let req_resp
   with_context <| fun ctx ->
     use handler = mk_handler decomp_method cookies
     use client = mk_client handler
-    use request = mk_request methd resource query data (endpoint_uri ctx.suave_config) |> f_request
+    use request = mk_request methd resource query data (endpointUri ctx.suave_config) |> f_request
     use result = request |> send client default_timeout ctx
     f_result result
 
@@ -233,4 +233,4 @@ let req_cookies methd resource data ctx =
 let req_cookies' methd resource data ctx =
   req_cookies methd resource data ctx
   |> fun cookies ->
-    cookies.GetCookies(endpoint_uri ctx.suave_config)
+    cookies.GetCookies(endpointUri ctx.suave_config)

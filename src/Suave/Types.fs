@@ -66,14 +66,7 @@ type HttpCode =
     | HTTP_407 | HTTP_408 | HTTP_409 | HTTP_410 | HTTP_411 | HTTP_412 | HTTP_413
     | HTTP_422 | HTTP_428 | HTTP_429 | HTTP_414 | HTTP_415 | HTTP_416 | HTTP_417
     | HTTP_500 | HTTP_501 | HTTP_502 | HTTP_503 | HTTP_504 | HTTP_505
-    static member TryParse (code : int) =
-      // TODO: replace with match code with | 100 -> HTTP_100 | ... when API is more set
-      let cases = Microsoft.FSharp.Reflection.FSharpType.GetUnionCases(typeof<HttpCode>)
-      let map_cases =
-        cases
-        |> Array.map (fun case -> case.Name, Microsoft.FSharp.Reflection.FSharpValue.MakeUnion(case, [||]) :?> HttpCode)
-        |> Map.ofArray
-      map_cases |> Map.tryFind ("HTTP_" + code.ToString())
+
 
     member x.Code = 
         match x with 
@@ -184,6 +177,19 @@ type HttpCode =
       member x.Describe () =
         sprintf "%d %s: %s" x.Code x.Reason x.Message
 
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module HttpCode =
+    // TODO: replace with match code with | 100 -> HTTP_100 | ... when API is more set
+    let mapCases =
+      lazy
+        let cases = Microsoft.FSharp.Reflection.FSharpType.GetUnionCases(typeof<HttpCode>)
+        cases
+        |> Array.map (fun case -> case.Name, Microsoft.FSharp.Reflection.FSharpValue.MakeUnion(case, [||]) :?> HttpCode)
+        |> Map.ofArray
+
+    let tryParse (code: int) =
+      mapCases.Force() |> Map.tryFind ("HTTP_" + string code)
+
 /// HTTP cookie
 type HttpCookie =
   { name      : string
@@ -192,20 +198,28 @@ type HttpCookie =
     path      : string option
     domain    : string option
     secure    : bool
-    http_only : bool }
+    httpOnly  : bool }
+
+  static member nameP = (fun x -> x.name),    fun v x -> { x with name = v }
+  static member valueP = (fun x -> x.value), fun v x -> { x with value = v }
+  static member expiresP = (fun x -> x.expires), fun v x -> { x with expires = v }
+  static member pathP = (fun x -> x.path), fun v (x : HttpCookie) -> { x with path = v }
+  static member domainP = (fun x -> x.domain), fun v x -> { x with domain = v }
+  static member secureP = (fun x -> x.secure), fun v x -> { x with secure = v }
+  static member httpOnlyP = (fun x -> x.httpOnly), fun v x -> { x with httpOnly = v }
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module HttpCookie =
 
   /// Create a new HttpCookie with all the given values.
-  let mk name value expires path domain secure http_only =
+  let mk name value expires path domain secure httpOnly =
     { name      = name
       value     = value
       expires   = expires
       path      = path
       domain    = domain
       secure    = secure
-      http_only = http_only }
+      httpOnly = httpOnly }
 
   /// Create a new cookie with the given name, value, and defaults:
   ///
@@ -222,62 +236,21 @@ module HttpCookie =
   /// - http://www.nczonline.net/blog/2009/05/05/http-cookies-explained/
   /// - https://developer.mozilla.org/en-US/docs/Web/API/document.cookie
   ///
-  let mk' name value =
+  let mkSimple name value =
     { name      = name
       value     = value
       expires   = None
       path      = None
       domain    = None
       secure    = false
-      http_only = true }
+      httpOnly = true }
 
   /// An empty cookie value
-  let empty = mk' "" ""
+  let empty = mkSimple "" ""
 
-  let name x = x.name
-
-  let name_ =
-    (fun x -> x.name),
-    fun v x -> { x with name = v }
-
-  let value x = x.value
-
-  let value_ =
-    (fun x -> x.value),
-    fun v x -> { x with value = v }
-
-  let expires x = x.expires
-
-  let expires_ =
-    (fun x -> x.expires),
-    fun v x -> { x with expires = v }
-
-  let path x = x.path
-
-  let path_ =
-    (fun x -> x.path),
-    fun v (x : HttpCookie) -> { x with path = v }
-
-  let domain x = x.domain
-
-  let domain_ =
-    (fun x -> x.domain),
-    fun v x -> { x with domain = v }
-
-  let secure x = x.secure
-
-  let secure_ =
-    (fun x -> x.secure),
-    fun v x -> { x with secure = v }
-
-  let http_only x = x.http_only
-
-  let http_only_ =
-    (fun x -> x.http_only),
-    fun v x -> { x with http_only = v }
 
   /// Assumes only valid characters go in, see http://tools.ietf.org/html/rfc6265#section-4.1.1
-  let to_header (x : HttpCookie) =
+  let toHeader (x : HttpCookie) =
     let app (sb : StringBuilder) (value : string) = sb.Append value |> ignore
     let sb = new StringBuilder(String.Concat [ x.name; "="; x.value ])
     let app value = app sb (String.Concat [";"; value])
@@ -285,7 +258,7 @@ module HttpCookie =
     x.domain  |> appkv "Domain" id
     x.path    |> appkv "Path" id
     x.expires |> appkv "Expires" (fun (i : DateTimeOffset) -> i.ToString("R"))
-    if x.http_only then app "HttpOnly"
+    if x.httpOnly then app "HttpOnly"
     if x.secure    then app "Secure"
     sb.ToString ()
 
@@ -320,13 +293,13 @@ type Host =
   /// The client's Host header is this value
   | ClientOnly of string
   /// The
-  | Forwarded of forwarded_for:string * Host
+  | Forwarded of forwardedFor:string * Host
 
   member x.value =
     match x with
     | ServerClient v -> v
     | ClientOnly v -> v
-    | Forwarded (forwarded_for, _) -> forwarded_for
+    | Forwarded (forwardedFor, _) -> forwardedFor
 
 /// A holder for the data extracted from the request.
 type HttpRequest =
@@ -370,7 +343,7 @@ type HttpRequest =
 
   /// Gets the form as a ((string*string option list) from the HttpRequest
   member x.formDataAll  =
-    Parsing.parseData (ASCII.to_string' x.rawForm)
+    Parsing.parseData (ASCII.toString x.rawForm)
 
   /// Finds the key k from the form in the HttpRequest
   member x.formDataItem (k : string) =

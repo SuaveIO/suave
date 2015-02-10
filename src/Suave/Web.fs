@@ -148,7 +148,7 @@ module internal ParsingAndControl =
     let offset = ref 0
     let buf = connection.lineBuffer
     let! count, connection = readUntilEOL connection (fun a count -> async { Array.blit a.Array a.Offset buf.Array (buf.Offset + !offset) count; offset := !offset + count })
-    let result = ASCII.toString buf.Array buf.Offset count
+    let result = ASCII.toStringAtOffset buf.Array buf.Offset count
     return result, connection
   }
 
@@ -162,7 +162,7 @@ module internal ParsingAndControl =
           connection
           (fun a count -> async { Array.blit a.Array a.Offset buf.Array (buf.Offset + !offset) count; offset := !offset + count })
       if count <> 0 then
-        let line = ASCII.toString buf.Array buf.Offset count
+        let line = ASCII.toStringAtOffset buf.Array buf.Offset count
         let indexOfColon = line.IndexOf(':')
         let header = (line.Substring(0, indexOfColon).ToLower(), line.Substring(indexOfColon+1).TrimStart())
         return! loop connection (header :: headers)
@@ -236,7 +236,7 @@ module internal ParsingAndControl =
           use mem = new MemoryStream()
           let! a, connection = readUntil (ASCII.bytes(eol + boundary)) (fun x y -> async { do! mem.AsyncWrite(x.Array, x.Offset, y) } ) connection
           let byts = mem.ToArray()
-          return! loop boundary { ctx with request = { ctx.request with multiPartFields = (fieldname,ASCII.toString byts 0 byts.Length)::(ctx.request.multiPartFields) }; connection = connection}
+          return! loop boundary { ctx with request = { ctx.request with multiPartFields = (fieldname,ASCII.toStringAtOffset byts 0 byts.Length)::(ctx.request.multiPartFields) }; connection = connection}
       else 
         return { ctx with connection = connection }
       }

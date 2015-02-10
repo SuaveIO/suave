@@ -25,7 +25,7 @@ open System.Collections.Concurrent
 /// A map of compressed files:
 /// TODO - evaluate if we can't service requests
 /// by writing these to disk instead
-let internal compressed_files_map = new ConcurrentDictionary<string,string>()
+let internal compressedFilesMap = new ConcurrentDictionary<string,string>()
 
 [<assembly:System.Runtime.CompilerServices.InternalsVisibleToAttribute("Suave.Experimental")>]
 [<assembly:System.Runtime.CompilerServices.InternalsVisibleToAttribute("Suave.Tests")>]
