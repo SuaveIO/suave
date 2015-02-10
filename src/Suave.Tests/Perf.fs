@@ -35,10 +35,10 @@ let perf_tests =
   let inline iterate times (testF : unit -> unit) =
     for i = 1 to times do testF ()
 
-  let server_factory = SuavePerfHarness("default config", run_with default_config)
+  let server_factory = SuavePerfHarness("default config", runWith SuaveConfig.defaults)
 
   let getFormValue name =
-    request (fun x -> OK (HttpRequest.form x ^^ name |> Option.get))
+    request (fun x -> OK (x.queryParam name |> Option.get))
 
   let longData = String.replicate 1815 "A"
 

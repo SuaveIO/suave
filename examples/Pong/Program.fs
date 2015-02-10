@@ -5,23 +5,24 @@ open Suave.Http.Successful
 open System
 open System.Net
 open System.Threading
+open System.Diagnostics
 
 // NOTE: this test is only available on Linux
 
-let app : WebPart = OK "PONG"
+let app = OK "PONG"
 
+let port = 3000us
 let config =
-  { default_config with
-     bindings = [ HttpBinding.mk HTTP IPAddress.Loopback 3000us ]
-     buffer_size = 8192
-     max_ops = 10000
+  { SuaveConfig.defaults with
+     bindings = [ HttpBinding(HTTP, IPAddress.Loopback, port) ]
+     bufferSize = 8192
+     maxOps = 10000
   }
 
-open System.Diagnostics
 
 let execute cmd args =
 
-  use proc = new Process();
+  use proc = new Process()
 
   proc.StartInfo.FileName         <- cmd
   proc.StartInfo.CreateNoWindow   <- true
@@ -39,14 +40,14 @@ open System.Text.RegularExpressions
 [<EntryPoint>]
 let main _ =
   let cts = new CancellationTokenSource()
-  let listening, server = web_server_async config app
+  let listening, server = createWebServerAsync config app
   Async.Start(server, cts.Token)
 
   // wait for the server to start listening
   listening |> Async.RunSynchronously |> printfn "start stats: %A"
 
   // launch httpref
-  let output = execute "httperf" "--hog --server=localhost --port=3000 --uri=/ --rate=1000 --num-conns=1000 --num-calls=1000 --burst-length=20"
+  let output = execute "httperf" (sprintf "--hog --server=localhost --port=%d --uri=/ --rate=1000 --num-conns=1000 --num-calls=1000 --burst-length=20" port)
 
   Console.WriteLine output
 

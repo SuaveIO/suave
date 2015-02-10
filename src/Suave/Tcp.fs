@@ -7,6 +7,7 @@ open System.Net
 open System.Net.Sockets
 open Suave.Logging
 open Suave.Sockets
+open Suave.Utils.Async
 
 /// The max backlog of number of requests
 [<Literal>]
@@ -16,7 +17,7 @@ type StartedData =
   { start_called_utc : DateTimeOffset
     socket_bound_utc : DateTimeOffset option
     binding          : SocketBinding }
-with
+
   override x.ToString() =
     sprintf "%.3f ms with binding %O:%d"
       ((x.socket_bound_utc |> Option.fold (fun _ t -> t) x.start_called_utc) - x.start_called_utc).TotalMilliseconds
@@ -101,11 +102,11 @@ let private a_few_times f =
 /// listening to its address/port combination), and an asynchronous workflow that
 /// yields when the full server is cancelled. If the 'has started listening' workflow
 /// returns None, then the start timeout expired.
-let tcp_ip_server (buffer_size        : int,
-                   max_concurrent_ops : int)
-                  (logger             : Logger)
-                  (serve_client       : TcpWorker<unit>)
-                  (binding            : SocketBinding) =
+let createTcpIpServer (bufferSize        : int, 
+                       maxConcurrentOps : int, 
+                       logger             : Logger,
+                       serve_client       : TcpWorker<unit>,
+                       binding            : SocketBinding) =
 
   let start_data =
     { start_called_utc = Globals.utc_now ()
@@ -113,7 +114,7 @@ let tcp_ip_server (buffer_size        : int,
       binding          = binding }
 
   let accepting_connections = new AsyncResultCell<StartedData>()
-  let a, b, c, bufferManager = create_pools logger max_concurrent_ops buffer_size
+  let a, b, c, bufferManager = create_pools logger maxConcurrentOps bufferSize
 
   let listen_socket = new Socket(binding.end_point.AddressFamily, SocketType.Stream, ProtocolType.Tcp)
   a_few_times (fun () -> listen_socket.Bind binding.end_point)
@@ -137,8 +138,8 @@ let tcp_ip_server (buffer_size        : int,
       let connection =
         { ipaddr       = ip_address
           transport    = { socket = socket; read_args = read_args; write_args = write_args}
-          buffer_manager = bufferManager
-          line_buffer  = bufferManager.PopBuffer "Suave.Tcp.tcp_ip_server.job" // buf allocate
+          bufferManager = bufferManager
+          lineBuffer  = bufferManager.PopBuffer "Suave.Tcp.tcp_ip_server.job" // buf allocate
           segments     = []
         }
       use! oo = Async.OnCancel (fun () -> intern "disconnected client (async cancel)"
@@ -150,7 +151,7 @@ let tcp_ip_server (buffer_size        : int,
       a.Push accept_args
       b.Push read_args
       c.Push write_args
-      bufferManager.FreeBuffer(connection.line_buffer, "Suave.Tcp.tcp_ip_server.job") // buf free OK
+      bufferManager.FreeBuffer(connection.lineBuffer, "Suave.Tcp.tcp_ip_server.job") // buf free OK
       Interlocked.Decrement(Globals.number_of_clients) |> ignore
       Log.internf logger "Suave.Tcp.tcp_ip_server.job" (fun fmt -> fmt "%O disconnected, total: %d clients" ip_address !Globals.number_of_clients)
     with 

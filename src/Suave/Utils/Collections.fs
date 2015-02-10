@@ -34,6 +34,8 @@ let (^^) (target : NameOptionValueList) key =
     snd value
   | None -> None
 
-/// Assign a value to the key in the dictionary
-let (?<-) (target : IDictionary<string, 'a>) key value =
-  target.[key] <- value
+
+type Property<'T,'P> = ('T -> 'P) * ('P -> 'T -> 'T) 
+
+let internal Property<'T,'P> getter setter : Property<'T,'P> = (getter,setter)
+

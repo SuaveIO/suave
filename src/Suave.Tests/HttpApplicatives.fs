@@ -17,7 +17,7 @@ open Fuchu
 
 [<Tests>]
 let tests =
-  let run_with' = run_with default_config
+  let run_with' = runWith SuaveConfig.defaults
 
   testList "primitives: Host applicative" [
     testCase "when not matching on Host" <| fun _ ->

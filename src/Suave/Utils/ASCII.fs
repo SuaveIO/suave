@@ -1,7 +1,7 @@
 ﻿namespace Suave.Utils
 
 [<RequireQualifiedAccess>]
-module ASCII =
+module internal ASCII =
   open System
   open System.Text
 

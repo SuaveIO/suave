@@ -51,14 +51,14 @@ let generate_data (request : HttpRequest) =
 
 let authenticate relative_expiry secure
                  missing_cookie
-                 (decryption_failure : Crypto.SecretboxDecryptionError -> Choice<byte [], WebPart>)
-                 (f_success : WebPart)
-                 : WebPart =
+                 (decryption_failure : Crypto.SecretboxDecryptionError -> Choice<byte [], HttpPart>)
+                 (f_success : HttpPart)
+                 : HttpPart =
   context (fun ({ runtime = { logger = logger }} as ctx) ->
     Log.log logger "Suave.Auth.authenticate" LogLevel.Debug "authenticating"
 
     cookie_state
-      { server_key      = ctx.runtime.server_key
+      { server_key      = ctx.runtime.serverKey
         cookie_name     = SessionAuthCookie
         user_state_key  = StateStoreType
         relative_expiry = relative_expiry
@@ -67,7 +67,7 @@ let authenticate relative_expiry secure
       decryption_failure
       f_success)
 
-let authenticate' relative_expiry login_page f_success : WebPart =
+let authenticate' relative_expiry login_page f_success : HttpPart =
   authenticate relative_expiry false
                (fun () -> Choice2Of2(Redirection.FOUND login_page))
                (sprintf "%A" >> RequestErrors.BAD_REQUEST >> Choice2Of2)
@@ -84,7 +84,7 @@ let authenticate' relative_expiry login_page f_success : WebPart =
 /// - `secure`: HttpsOnly?
 ///
 /// Always succeeds.
-let authenticated relative_expiry secure : WebPart =
+let authenticated relative_expiry secure : HttpPart =
   context (fun { request = req } ->
     let data = generate_data req |> UTF8.bytes
     authenticate relative_expiry secure
@@ -92,12 +92,12 @@ let authenticated relative_expiry secure : WebPart =
                  (fun _ -> Choice1Of2 data)
                  Suave.Http.succeed)
 
-//  let deauthenticate : WebPart =
+//  let deauthenticate : HttpPart =
 //    Cookies.unset_cookies
   
 module HttpContext =
 
   let session_id x =
-    x.user_state
+    x.userState
     |> Map.tryFind StateStoreType
     |> Option.map (fun x -> x :?> string |> parse_data)

@@ -21,14 +21,14 @@ let fib n =
       return! loop 1I 1I 3I
   }
 
-let app : WebPart =
-  url_scan "/%d" (fun (n : int) -> fun x -> async{ let! r = fib (bigint n) in return! OK (r.ToString()) x })
+let app =
+  urlScan "/%d" (fun (n : int) -> fun x -> async{ let! r = fib (bigint n) in return! OK (r.ToString()) x })
 
 let config =
-  { default_config with
-     bindings = [ HttpBinding.mk HTTP IPAddress.Loopback 3000us ] }
+  { SuaveConfig.defaults with
+     bindings = [ HttpBinding(HTTP, IPAddress.Loopback, 3000us) ] }
 
 [<EntryPoint>]
 let main _ =
-  web_server config app
+  startWebServer config app
   0    

@@ -32,8 +32,8 @@ module Compression =
 
   let load_encoder s =
     match s with
-    | "gzip"    -> Some (GZIP, Encoding.gzip_encode)
-    | "deflate" -> Some (Deflate, Encoding.deflate_encode)
+    | "gzip"    -> Some (GZIP, Encoding.gzipEncode)
+    | "deflate" -> Some (Deflate, Encoding.deflateEncode)
     | _         -> None
 
   let get_encoder (request : HttpRequest) =

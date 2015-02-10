@@ -97,21 +97,21 @@ let dispose_context (ctx : SuaveTestCtx) =
 /// async value of the running server. The listening async value will
 /// be awaited inside this function but the server async value will
 /// be run on the thread pool.
-let run_with_factory factory config web_parts : SuaveTestCtx =
+let runWithFactory factory config webParts : SuaveTestCtx =
   let binding = config.bindings.Head
-  let base_uri = binding.ToString()
+  let baseUri = binding.ToString()
   let cts = new CancellationTokenSource()
-  let config' = { config with ct = cts.Token; buffer_size = 128; max_ops = 10 }
+  let config2 = { config with cancellationToken = cts.Token; bufferSize = 128; maxOps = 10 }
 
-  let listening, server = factory config web_parts
+  let listening, server = factory config webParts
   Async.Start(server, cts.Token)
   listening |> Async.RunSynchronously |> ignore // wait for the server to start listening
 
   { cts = cts
-    suave_config = config' }
+    suave_config = config2 }
 
 /// Similar to run_with_factory, but uses the default suave factory.
-let run_with = run_with_factory web_server_async
+let runWith = runWithFactory createWebServerAsync
 
 /// Ensures the context is disposed after 'f ctx' is called.
 let with_context f ctx =

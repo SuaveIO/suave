@@ -20,7 +20,7 @@ open Suave.Http.RequestErrors
 
 open Suave.Testing
 
-let run_with' = run_with { default_config with logger = Loggers.sane_defaults_for LogLevel.Debug }
+let run_with' = runWith { SuaveConfig.defaults with logger = Loggers.sane_defaults_for LogLevel.Debug }
 
 type Assert with
   static member Null (msg : string, o : obj) =
@@ -148,7 +148,7 @@ let tests =
       // given
       let ctx =
         run_with' ( 
-          stateful'
+          statefulForSession
           >>= session_state (fun store ->
               match store.get "counter" with
               | Some y ->
@@ -175,7 +175,7 @@ let tests =
       // given
       let ctx =
         run_with' ( 
-          stateful'
+          statefulForSession
           >>= choose [
             url "/a"     >>= session_state (fun state -> state.set "a" "a" >>= OK "a" )
             url "/b"     >>= session_state (fun state -> state.set "b" "b" >>= OK "b" )
@@ -203,7 +203,7 @@ let tests =
       // given
       let ctx =
         run_with' ( 
-          stateful' >>= choose [
+          statefulForSession >>= choose [
             url "/ab"     >>= session_state (fun state -> state.set "a" "a" >>= session_state ( fun state' -> state'.set "b" "b" >>= OK "a" ))
             url "/get_a" >>= session_state (fun state -> match state.get "a" with Some a -> OK a | None -> RequestErrors.BAD_REQUEST "fail")
             url "/get_b" >>= session_state (fun state -> match state.get "b" with Some a -> OK a | None -> RequestErrors.BAD_REQUEST "fail" )

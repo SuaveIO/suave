@@ -2,6 +2,7 @@
 
 open System.Net
 open System
+open Suave.Utils
 open Suave.Utils.Bytes
 
 /// A connection (TCP implied) is a thing that can read and write from a socket
@@ -9,8 +10,8 @@ open Suave.Utils.Bytes
 type Connection =
   { ipaddr         : IPAddress
     transport      : ITransport
-    buffer_manager : BufferManager
-    line_buffer    : ArraySegment<byte>
+    bufferManager  : BufferManager
+    lineBuffer     : ArraySegment<byte>
     segments       : BufferSegment list }
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
@@ -19,8 +20,8 @@ module Connection =
   let empty : Connection =
     { ipaddr     = IPAddress.Loopback
       transport       =  { socket = null; read_args = null; write_args   = null }
-      buffer_manager = null
-      line_buffer  =  ArraySegment<byte>()
+      bufferManager = null
+      lineBuffer  =  ArraySegment<byte>()
       segments     = []  }
       
   let inline receive (cn : Connection) (buf : ByteSegment) =
@@ -38,12 +39,12 @@ module Connection =
     fun v x -> { x with transport = v }
 
   let buffer_manager_ =
-    (fun x -> x.buffer_manager),
-    fun v x -> { x with buffer_manager = v }
+    (fun x -> x.bufferManager),
+    fun v x -> { x with bufferManager = v }
 
   let line_buffer_ =
-    (fun x -> x.line_buffer),
-    fun v x -> { x with line_buffer = v }
+    (fun x -> x.lineBuffer),
+    fun v x -> { x with lineBuffer = v }
 
   let segments_ =
     (fun x -> x.segments),

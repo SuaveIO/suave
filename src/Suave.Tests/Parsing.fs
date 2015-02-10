@@ -21,21 +21,21 @@ open Suave.Testing
 
 [<Tests>]
 let parsing_multipart =
-  let run_with' = run_with default_config
+  let run_with' = runWith SuaveConfig.defaults
 
   let post_data1 = read_bytes "request.txt"
   let post_data2 = read_text "request-1.txt"
   let post_data3 = read_text "request-2.txt"
 
-  let test_url_encoded_form field_name =
+  let test_url_encoded_form fieldName =
     request (fun r ->
-      match (HttpRequest.form r) ^^ field_name  with
+      match r.queryParam fieldName  with
       | Some str -> OK str
       | None -> OK "field-does-not-exists")
 
   let test_multipart_form =
     request (fun r ->
-      match get_first r.multipart_fields "From" with
+      match get_first r.multiPartFields "From" with
       | Some str -> OK str
       | None -> OK "field-does-not-exists")
 

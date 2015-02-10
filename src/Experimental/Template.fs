@@ -102,7 +102,7 @@ let rec xml_to_string1 (Xml(nodes)) (stream : StringWriter) =
       stream.Write(s)
       xml_to_string1 children stream
 
-open Types
+open Suave.Types
 
 /// Read an attribute from the xml reader by moving it
 /// one step along and then yielding that value.
@@ -137,7 +137,7 @@ let rec parser (reader : XmlReader) (Xml(l) as k) =
 /// write the exception as a string to a 500 Internal Error response.
 let process_template (data : Map<string,Binder>) ({ request = http_request; runtime = runtime } as ctx : HttpContext) =
   try
-    let xmlReader = new XmlTextReader(Files.resolve_path runtime.home_directory http_request.url.AbsolutePath)
+    let xmlReader = new XmlTextReader(Files.resolvePath runtime.homeDirectory http_request.url.AbsolutePath)
     xmlReader.Namespaces <- false
 
     let transform = parser xmlReader (Xml [])

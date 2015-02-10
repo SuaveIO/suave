@@ -2,7 +2,7 @@
 module Suave.AsyncSocket
 
 open Suave.Utils.Bytes
-open Suave.Async
+open Suave.Utils.Async
 open Suave.Sockets
 open Suave.Sockets.Connection
 
@@ -39,26 +39,26 @@ let to_async f = fun ctx -> async {
  }
 
 /// Write the string s to the stream asynchronously as ASCII encoded text
-let inline async_write (connection : Connection) (s : string) : SocketOp<unit> = 
+let async_write (connection : Connection) (s : string) : SocketOp<unit> = 
   async {
     if s.Length > 0 then
-      let buff = connection.line_buffer
+      let buff = connection.lineBuffer
       let c = bytes_to_buffer s buff.Array buff.Offset
       return! send connection (new ArraySegment<_>(buff.Array, buff.Offset, c))
     else return Choice1Of2 ()
   }
 
-let inline async_write_nl (connection : Connection) = 
+let async_write_nl (connection : Connection) = 
   send connection eol_array_segment
 
-let inline async_writeln (connection : Connection) (s : string) : SocketOp<unit> = 
+let async_writeln (connection : Connection) (s : string) : SocketOp<unit> = 
   socket {
     do! async_write connection s
     do! async_write_nl connection
   }
 
 /// Write the string s to the stream asynchronously from a byte array
-let inline async_writebytes (connection : Connection) (b : byte[]) : SocketOp<unit> = async {
+let async_writebytes (connection : Connection) (b : byte[]) : SocketOp<unit> = async {
   if b.Length > 0 then return! send connection (new ArraySegment<_>(b, 0, b.Length))
   else return Choice1Of2 ()
 }

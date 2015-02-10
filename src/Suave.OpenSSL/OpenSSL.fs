@@ -120,11 +120,11 @@ open Suave.Sockets.Connection
 let read_to_bio (con : Connection) read_bio ssl = socket {
   let bytes_pending = BIO_ctrl_pending read_bio
   if bytes_pending = 0u then 
-    let a = con.buffer_manager.PopBuffer "read_to_bio"
+    let a = con.bufferManager.PopBuffer "read_to_bio"
     let! bytes_read = receive con a
     let buff = Array.zeroCreate bytes_read
     Array.blit a.Array a.Offset buff 0 bytes_read
-    con.buffer_manager.FreeBuffer( a, "read_to_bio")
+    con.bufferManager.FreeBuffer( a, "read_to_bio")
     BIO_write(read_bio, buff, bytes_read) |> ignore
   }
 
@@ -168,14 +168,14 @@ let ssl_receive (con : Connection) (context, read_bio, write_bio) (bu : ByteSegm
   //we need to check if there is data in the read bio before asking for more to the socket
   let bytes_pending = BIO_ctrl_pending read_bio
   if bytes_pending = 0u then 
-    let a = con.buffer_manager.PopBuffer "ssl_receive"
+    let a = con.bufferManager.PopBuffer "ssl_receive"
     let! bytes_read = receive con a
 
     let buff = Array.zeroCreate bytes_read
     Array.blit a.Array a.Offset buff 0 bytes_read
     
     //Copy encrypted data into the SSL read_bio
-    con.buffer_manager.FreeBuffer( a, "ssl_receive")
+    con.bufferManager.FreeBuffer( a, "ssl_receive")
     BIO_write(read_bio, buff, bytes_read) |> ignore
 
   let decrypted_bytes_read = 

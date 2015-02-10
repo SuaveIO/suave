@@ -51,7 +51,7 @@
   </Choose>
   <Import Project="$(FSharpTargetsPath)" Condition="Exists('$(FSharpTargetsPath)')" />
   <ItemGroup>
-    <Compile Include="Async.fs" />
+    <Compile Include="Utils\Async.fs" />
     <Compile Include="Utils\Collections.fs" />
     <Compile Include="Utils\UTF8.fs" />
     <Compile Include="Utils\ASCII.fs" />

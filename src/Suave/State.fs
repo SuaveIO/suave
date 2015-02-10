@@ -7,17 +7,17 @@ open Suave.Cookie
 open Suave.Logging
 
 module CookieStateStore =
+
   open System
   open System.IO
   open System.Collections.Generic
-
   open Nessos.FsPickler
 
-  /// "Suave.State.CookieStateStore"
+  /// The user state key for the state store. Always "Suave.State.CookieStateStore". 
   [<Literal>]
   let StateStoreType = "Suave.State.CookieStateStore"
 
-  /// "st"
+  /// The cookie name for the state store. Always "st".
   [<Literal>]
   let StateCookie = "st"
 
@@ -38,7 +38,7 @@ module CookieStateStore =
     context (fun ({ runtime = { logger = logger }} as ctx) ->
       log logger "Suave.State.CookieStateStore.write" LogLevel.Debug (sprintf "writing to key '%s'" key)
       update_cookies
-        { server_key      = ctx.runtime.server_key
+        { server_key      = ctx.runtime.serverKey
           cookie_name     = StateCookie
           user_state_key  = StateStoreType
           relative_expiry = relative_expiry
@@ -53,18 +53,18 @@ module CookieStateStore =
              (sprintf "in f_plain_text, has existing %A" m)
            m |> Map.add key (box value) |> encode_map))
 
-  let stateful relative_expiry secure : WebPart =
+  let stateful relative_expiry secure : HttpPart =
     context (fun ({ runtime = { logger = logger }} as ctx) ->
       log logger "Suave.State.CookieStateStore.stateful" LogLevel.Debug "ensuring cookie state"
 
       let cipher_text_corrupt =
         sprintf "%A" >> RequestErrors.BAD_REQUEST >> Choice2Of2
 
-      let set_expiry : WebPart =
-        Writers.set_user_data (StateStoreType + "-expiry") relative_expiry
+      let set_expiry : HttpPart =
+        Writers.setUserData (StateStoreType + "-expiry") relative_expiry
 
       cookie_state
-        { server_key      = ctx.runtime.server_key
+        { server_key      = ctx.runtime.serverKey
           cookie_name     = StateCookie
           user_state_key  = StateStoreType
           relative_expiry = relative_expiry
@@ -76,7 +76,7 @@ module CookieStateStore =
   ///
   ///
   /// Only save the state for the duration of the browser session.
-  let stateful' : WebPart =
+  let statefulForSession : HttpPart =
     stateful Session false
 
   module HttpContext =
@@ -93,9 +93,9 @@ module CookieStateStore =
 
     /// Read the session store from the HttpContext.
     let state (ctx : HttpContext) =
-      ctx.user_state
+      ctx.userState
       |> Map.tryFind StateStoreType
-      |> Option.map (mk_state_store ctx.user_state)
+      |> Option.map (mk_state_store ctx.userState)
 
 /// This module contains the implementation for the memory-cache backed session
 /// state store, when the memory cache is global for the server.
@@ -119,14 +119,14 @@ module MemoryCacheStateStore =
 
     /// Try to find the state id of the HttpContext.
     let state_id ctx =
-      ctx.user_state
+      ctx.userState
       |> Map.tryFind UserStateIdKey
       |> Option.map (fun x -> x :?> string)
       |> Option.get
 
     /// Read the session store from the HttpContext.
     let state (ctx : HttpContext) =
-      ctx.user_state
+      ctx.userState
       |> Map.tryFind StateStoreType
       |> Option.map (fun ss -> ss :?> StateStore)
       |> Option.get
@@ -155,10 +155,10 @@ module MemoryCacheStateStore =
           state_bag.[key] <- value
           succeed }
 
-  let stateful relative_expiry : WebPart =
+  let stateful relative_expiry : HttpPart =
     let state_store = wrap (MemoryCache.Default) relative_expiry
     context (fun ctx ->
       let state_id = ctx |> HttpContext.state_id
-      Writers.set_user_data StateStoreType (state_store state_id))
+      Writers.setUserData StateStoreType (state_store state_id))
 
   let DefaultExpiry = TimeSpan.FromMinutes 30. |> MaxAge

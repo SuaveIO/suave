@@ -2,6 +2,7 @@
 module Suave.Proxy
 
 open System
+open System.IO
 open System.Net
 open System.Collections.Generic
 
@@ -9,9 +10,7 @@ open Suave.Utils
 open Suave.Utils.Bytes
 
 open Suave.Sockets
-
 open Suave.Types
-open Suave.Types.Codes
 open Suave.Web
 open Suave.Tcp
 
@@ -21,15 +20,15 @@ open Suave.Web.ParsingAndControl
 
 
 /// Copies the headers from 'headers1' to 'headers2'
-let private to_header_list (headers : WebHeaderCollection) =
+let private toHeaderList (headers : WebHeaderCollection) =
   
   headers.AllKeys
   |> Seq.map (fun key -> key, headers.[key])
   |> List.ofSeq
 
 /// Send the web response from HttpWebResponse to the HttpRequest 'p'
-let private send_web_response (data : HttpWebResponse) ({ request = { trace = t }; response = resp } as ctx : HttpContext) =
-  let headers = to_header_list data.Headers 
+let private sendWebResponse (data : HttpWebResponse) ({ request = { trace = t }; response = resp } as ctx : HttpContext) =
+  let headers = toHeaderList data.Headers 
   // TODO: if downstream sends a Content-Length header copy from one stream
   // to the other asynchronously
   "-> read_fully" |> Log.verbose ctx.runtime.logger "Suave.Proxy.send_web_response:GetResponseStream" t
@@ -47,7 +46,7 @@ let forward (ip : IPAddress) (port : uint16) (ctx : HttpContext) =
       if not (WebHeaderCollection.IsRestricted key) then
         r.Add(key, snd e)
     r
-  let url = new UriBuilder("http", ip.ToString(), int port, p.url.AbsolutePath, p.raw_query)
+  let url = new UriBuilder("http", ip.ToString(), int port, p.url.AbsolutePath, p.rawQuery)
   let q = WebRequest.Create(url.Uri) :?> HttpWebRequest
 
   q.AllowAutoRedirect         <- false
@@ -75,19 +74,19 @@ let forward (ip : IPAddress) (port : uint16) (ctx : HttpContext) =
 
   fun ctx -> socket {
     if p.``method`` = HttpMethod.POST || p.``method`` = HttpMethod.PUT then
-      let content_length = Convert.ToInt32(p.headers %% "content-length")
-      do! transfer_len_x ctx.connection (q.GetRequestStream()) content_length
+      let contentLength = Convert.ToInt32(p.headers %% "content-length")
+      do! transfer_len_x ctx.connection (q.GetRequestStream()) contentLength
     try
       let! data = lift_async <| q.AsyncGetResponse()
-      let! res = lift_async <| send_web_response ((data : WebResponse) :?> HttpWebResponse) ctx
+      let! res = lift_async <| sendWebResponse ((data : WebResponse) :?> HttpWebResponse) ctx
       match res with
-      | Some new_ctx ->
-        do! response_f new_ctx
-        return Some new_ctx
+      | Some newCtx ->
+        do! response_f newCtx
+        return Some newCtx
       | None -> return None
     with
     | :? WebException as ex when ex.Response <> null ->
-      let! res = lift_async <| send_web_response (ex.Response :?> HttpWebResponse) ctx
+      let! res = lift_async <| sendWebResponse (ex.Response :?> HttpWebResponse) ctx
       match res with
       | Some new_ctx ->
         do! response_f new_ctx
@@ -103,32 +102,29 @@ let forward (ip : IPAddress) (port : uint16) (ctx : HttpContext) =
   } |> succeed
 
 /// Proxy the HttpRequest 'r' with the proxy found with 'proxy_resolver'
-let proxy proxy_resolver (r : HttpContext) =
-  match proxy_resolver r.request with
+let private proxy proxyResolver (r : HttpContext) =
+  match proxyResolver r.request with
   | Some (ip, port) -> forward ip port r
   | None            -> failwith "invalid request."
 
-open System.IO
-
 /// Run a proxy server with the given configuration and given upstream/target
 /// resolver.
-let proxy_server_async (config : SuaveConfig) resolver =
-  let home_folder, compression_folder =
-    ParsingAndControl.resolve_directory config.home_folder,
-    Path.Combine(ParsingAndControl.resolve_directory config.compressed_files_folder, "_temporary_compressed_files")
+let createProxyServerAsync (config : SuaveConfig) resolver =
+  let homeFolder, compressionFolder =
+    ParsingAndControl.resolveDirectory config.homeFolder,
+    Path.Combine(ParsingAndControl.resolveDirectory config.compressedFilesFolder, "_temporary_compressed_files")
   let all =
-    List.map (fun binding ->
-      tcp_ip_server (config.buffer_size, config.max_ops)
-                    config.logger
-                    (ParsingAndControl.request_loop
-                      (SuaveConfig.to_runtime config home_folder compression_folder false binding )
-                      (SocketPart (proxy resolver)))
-                    binding.socket_binding)
-      config.bindings
-  let listening = all |> Seq.map fst |> Async.Parallel |> Async.Ignore
-  let server    = all |> Seq.map snd |> Async.Parallel |> Async.Ignore
+    [ for binding in config.bindings do 
+        let reqLoop = ParsingAndControl.requestLoop (config.ToRuntime homeFolder compressionFolder false binding )  (SocketPart (proxy resolver))
+        let server = createTcpIpServer (config.bufferSize, config.maxOps, config.logger,
+                         reqLoop ,
+                         binding.socketBinding)
+        yield server ]
+      
+  let listening = all |> List.map fst |> Async.Parallel |> Async.Ignore
+  let server    = all |> List.map snd |> Async.Parallel |> Async.Ignore
   listening, server
 
-let proxy_server config resolver =
-  Async.RunSynchronously(proxy_server_async config resolver |> snd,
-    cancellationToken = config.ct)
+let startProxyServer config resolver =
+  Async.RunSynchronously(createProxyServerAsync config resolver |> snd,
+    cancellationToken = config.cancellationToken)

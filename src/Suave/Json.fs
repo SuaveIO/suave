@@ -30,7 +30,7 @@ open Suave.Web
 
 let map_json f =
   Types.request(fun r ->
-      f (from_json(r.raw_form)) 
+      f (from_json(r.rawForm)) 
       |> to_json
       |> Successful.ok 
-      >>= Writers.set_mime_type "application/json") 
+      >>= Writers.setMimeType "application/json") 

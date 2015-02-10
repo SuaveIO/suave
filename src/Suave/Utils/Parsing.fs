@@ -17,7 +17,7 @@ module Parsing =
 
   /// Parse the data in the string to a dictionary, assuming k/v pairs are separated
   /// by the ampersand character.
-  let parse_data (s : string) =
+  let parseData (s : string) =
     let parse_arr (d : string array) =
       if d.Length = 2 then (d.[0], Some <| System.Web.HttpUtility.UrlDecode(d.[1]))
       else d.[0],None
@@ -50,7 +50,7 @@ module Parsing =
 
   /// Parse the header parameters into key-value pairs, as a dictionary.
   /// Fails if the header is a None.
-  let header_params (header : string option) =
+  let headerParams (header : string option) =
     match header with
     | Some x ->
       let parts = x.Split(';') |> Array.map (fun x -> x.TrimStart())

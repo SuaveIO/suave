@@ -5,8 +5,7 @@ module Cookie =
   open System.Text
   open System.Globalization
   open Suave.Utils
-
-  open Types
+  open Suave.Types
 
   type CookieLife =
     | Session
@@ -32,12 +31,12 @@ module Cookie =
 
     val cookies : result:HttpResult -> Map<string, HttpCookie>
 
-  val set_cookie : cookie:HttpCookie -> WebPart
-  val unset_cookie : name:string -> WebPart
+  val set_cookie : cookie:HttpCookie -> HttpPart
+  val unset_cookie : name:string -> HttpPart
 
   /// Sets the cookies to the HttpResult
-  val set_pair   : http_cookie:HttpCookie -> client_cookie:HttpCookie -> WebPart
-  val unset_pair : http_cookie_name:string -> WebPart
+  val set_pair   : http_cookie:HttpCookie -> client_cookie:HttpCookie -> HttpPart
+  val unset_pair : http_cookie_name:string -> HttpPart
 
   /// A DTO structure for passing the right parameters to the XXX_cookies functions
   /// in this module.
@@ -58,15 +57,6 @@ module Cookie =
              secure:bool ->
              CookiesState
 
-    val server_key_ : Lens<CookiesState, ServerKey>
-
-    val cookie_name_ : Lens<CookiesState, string>
-
-    val user_state_key_ : Lens<CookiesState, string>
-
-    val relative_expiry_ : Lens<CookiesState, CookieLife>
-
-    val secure_ : Lens<CookiesState, bool>
 
   /// Generate one server-side cookie, and another client-side cookie with
   /// name "${server-side-name}-client"
@@ -87,14 +77,14 @@ module Cookie =
   /// Bumps the expiry dates for all the cookies.
   val refresh_cookies : expiry:CookieLife ->
                         cookie:HttpCookie ->
-                        WebPart
+                        HttpPart
 
   val update_cookies :  csctx:CookiesState ->
                         f_plain_text : (byte [] option -> byte []) ->
-                        WebPart
+                        HttpPart
   
   val cookie_state : csctx:CookiesState ->
-                     no_cookie :(unit -> Choice<byte [], WebPart>) ->
-                     decryption_failure:(Crypto.SecretboxDecryptionError -> Choice<byte [], WebPart>) ->
-                     f_success:WebPart ->
-                     WebPart
+                     no_cookie :(unit -> Choice<byte [], HttpPart>) ->
+                     decryption_failure:(Crypto.SecretboxDecryptionError -> Choice<byte [], HttpPart>) ->
+                     f_success:HttpPart ->
+                     HttpPart

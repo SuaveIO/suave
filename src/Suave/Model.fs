@@ -52,20 +52,20 @@ module Binding =
       | Choice1Of2 m   -> f_cont m
       | Choice2Of2 err -> f_err err)
 
-  let bind_req f_bind f_cont f_err =
-    bind (HttpContext.request >> f_bind) f_cont f_err
+  let bind_req f f_cont f_err =
+    bind (HttpContext.request >> f) f_cont f_err
 
-  let header key f_bind (req : HttpRequest) =
+  let header key f (req : HttpRequest) =
     (req.headers %% key)
     |> Choice.from_option (sprintf "Missing header '%s'" key)
-    |> Choice.bind f_bind
+    |> Choice.bind f
 
-  let form form_key f_bind (req : HttpRequest) =
-    (HttpRequest.form req) ^^ form_key
-    |> Choice.from_option (sprintf "Missing form field '%s'" form_key)
-    |> Choice.bind f_bind
+  let form formKey f (req : HttpRequest) =
+    req.formDataItem formKey
+    |> Choice.from_option (sprintf "Missing form field '%s'" formKey)
+    |> Choice.bind f
 
-  let query qs_key f_bind (req : HttpRequest) =
-    (HttpRequest.query req) ^^ qs_key
-    |> Choice.from_option (sprintf "Missing query string key '%s'" qs_key)
-    |> Choice.bind f_bind
+  let query queryKey f (req : HttpRequest) =
+    req.queryParam queryKey
+    |> Choice.from_option (sprintf "Missing query string key '%s'" queryKey)
+    |> Choice.bind f

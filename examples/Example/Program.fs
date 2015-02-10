@@ -15,12 +15,12 @@ open Suave.Types
 open Suave.State.CookieStateStore
 open Suave.Utils
 
-let basic_auth : WebPart =
-  Authentication.authenticate_basic ((=) ("foo", "bar"))
+let basicAuth =
+  Authentication.authenticateBasic ((=) ("foo", "bar"))
 
 let logger = Loggers.ConsoleWindowLogger LogLevel.Verbose
 
-let myapp : WebPart =
+let myApp =
   choose [
     GET >>= choose
       [ url "/hello" >>= OK "Hello GET" ; url "/goodbye" >>= OK "Good bye GET" ];
@@ -33,18 +33,19 @@ let myapp : WebPart =
   ]
 
 // typed routes
-let testapp : WebPart =
+let testApp =
   choose [
-    log logger log_format >>= never
-    url_scan "/add/%d/%d"   (fun (a,b) -> OK((a + b).ToString()))
-    url_scan "/minus/%d/%d" (fun (a,b) -> OK((a - b).ToString()))
-    url_scan "/divide/%d/%d" (fun (a,b) -> OK((a / b).ToString()))
+    log logger logFormat >>= never
+    urlScan "/add/%d/%d"   (fun (a,b) -> OK((a + b).ToString()))
+    urlScan "/minus/%d/%d" (fun (a,b) -> OK((a - b).ToString()))
+    urlScan "/divide/%d/%d" (fun (a,b) -> OK((a / b).ToString()))
     RequestErrors.NOT_FOUND "Found no handlers"
   ]
 
 System.Net.ServicePointManager.DefaultConnectionLimit <- Int32.MaxValue
 
-let sleep milliseconds message: WebPart =
+// How to write a new primitive HttpPart
+let sleep milliseconds message: HttpPart =
   fun (x : HttpContext) ->
     async {
       do! Async.Sleep milliseconds
@@ -52,26 +53,26 @@ let sleep milliseconds message: WebPart =
       }
 
 // Adds a new mime type to the default map
-let mime_types =
-  Writers.default_mime_types_map
-    >=> (function | ".avi" -> Writers.mk_mime_type "video/avi" false | _ -> None)
+let mimeTypes =
+  Writers.defaultMimeTypesMap
+    >=> (function | ".avi" -> Writers.mkMimeType "video/avi" false | _ -> None)
 
 let app =
   choose [
     GET >>= url "/hello" >>= never
-    url_regex "(.*?)\.(dll|mdb|log)$" >>= RequestErrors.FORBIDDEN "Access denied."
+    urlRegex "(.*?)\.(dll|mdb|log)$" >>= RequestErrors.FORBIDDEN "Access denied."
     url "/neverme" >>= never >>= OK (Guid.NewGuid().ToString())
     url "/guid" >>= OK (Guid.NewGuid().ToString())
     url "/hello" >>= OK "Hello World"
     (url "/apple" <|> url "/orange") >>= OK "Hello Fruit"
-    GET >>= url "/query" >>= request( fun x -> cond ((HttpRequest.query x) ^^ "name") (fun y -> OK ("Hello " + y)) never)
+    GET >>= url "/query" >>= queryParam "name" (fun y -> OK ("Hello " + y))
     GET >>= url "/query" >>= OK "Hello beautiful"
     url "/redirect" >>= Redirection.redirect "/redirected"
     url "/redirected" >>=  OK "You have been redirected."
     url "/date" >>= warbler (fun _ -> OK (DateTimeOffset.UtcNow.ToString("o")))
-    url "/timeout" >>= timeout_webpart (TimeSpan.FromSeconds 1.) (sleep 120000 "Did not timed out")
+    url "/timeout" >>= timeoutHttpPart (TimeSpan.FromSeconds 1.) (sleep 120000 "Did not timed out")
     url "/session"
-      >>= stateful' // Session.State.CookieStateStore
+      >>= statefulForSession // Session.State.CookieStateStore
       >>= context (fun x ->
         match x |> HttpContext.state with
         | None -> Redirection.FOUND "/session" // restarted server without keeping the key; set key manually?
@@ -83,41 +84,40 @@ let app =
           | None ->
             store.set "counter" 1
             >>= OK "First time")
-    basic_auth // from here on it will require authentication
-    GET >>= url "/events" >>= request (fun r -> EventSource.hand_shake (CounterDemo.counter_demo r))
-    GET >>= browse' //serves file if exists
-    GET >>= dir' //show directory listing
+    basicAuth // from here on it will require authentication
+    GET >>= url "/events" >>= request (fun r -> EventSource.handShake (CounterDemo.counterDemo r))
+    GET >>= browseHomeDirectory //serves file if exists
+    GET >>= dirHomeDirectory //show directory listing
     HEAD >>= url "/head" >>= sleep 100 "Nice sleep .."
     POST >>= url "/upload" >>= OK "Upload successful."
     PUT >>= url "/upload2"
       >>= request (fun x ->
          let files =
-           x.files
-           |> Seq.fold
-             (fun x y -> x + "<br/>" + (sprintf "(%s, %s, %s)" y.file_name y.mime_type y.temp_file_path))
-             ""
-         OK (sprintf "Upload successful.<br>POST data: %A<br>Uploaded files (%d): %s" x.multipart_fields (List.length x.files) files))
-    POST >>= request (fun x -> OK (sprintf "POST data: %s" (ASCII.to_string' x.raw_form)))
+           x.files 
+           |> Seq.map (fun y -> sprintf "(%s, %s, %s)" y.fileName y.mimeType y.tempFilePath)
+           |> String.concat "<br/>"
+         OK (sprintf "Upload successful.<br>POST data: %A<br>Uploaded files (%d): %s" x.multiPartFields (List.length x.files) files))
+    POST >>= request (fun x -> OK (sprintf "POST data: %s" (System.Text.Encoding.ASCII.GetString x.rawForm)))
     GET
       >>= url "/custom_header"
-      >>= set_header "X-Doge-Location" "http://www.elregalista.com/wp-content/uploads/2014/02/46263312.jpg"
+      >>= setHeader "X-Doge-Location" "http://www.elregalista.com/wp-content/uploads/2014/02/46263312.jpg"
       >>= OK "Doooooge"
     RequestErrors.NOT_FOUND "Found no handlers"
-    ] >>= log logger log_format
+    ] >>= log logger logFormat
 
 [<EntryPoint>]
 let main argv =
-  web_server
-    { bindings         = [ HttpBinding.mk' HTTP "127.0.0.1" 8082 ]
-      server_key       = Utils.Crypto.generate_key HttpRuntime.ServerKeyLength
-      error_handler    = default_error_handler
-      listen_timeout   = TimeSpan.FromMilliseconds 2000.
-      ct               = Async.DefaultCancellationToken
-      buffer_size      = 2048
-      max_ops          = 100
-      mime_types_map   = mime_types
-      home_folder      = None
-      compressed_files_folder = None
+  startWebServer
+    { bindings         = [ HttpBinding(HTTP, "127.0.0.1", 8082) ]
+      serverKey       = Utils.Crypto.generateKey HttpRuntime.ServerKeyLength
+      errorHandler    = defaultErrorHandler
+      listenTimeout   = TimeSpan.FromMilliseconds 2000.
+      cancellationToken = Async.DefaultCancellationToken
+      bufferSize      = 2048
+      maxOps          = 100
+      mimeTypesMap   = mimeTypes
+      homeFolder      = None
+      compressedFilesFolder = None
       logger           = logger }
     app
   0

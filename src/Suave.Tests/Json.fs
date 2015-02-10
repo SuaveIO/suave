@@ -34,7 +34,7 @@ type Bar =
 
 [<Tests>]
 let parsing_multipart =
-  let run_with' = run_with default_config
+  let run_with' = runWith defaultConfig
 
   testList "map_json test" [
     testCase "simple test" <| fun _ ->

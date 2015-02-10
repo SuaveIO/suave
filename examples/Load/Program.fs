@@ -11,14 +11,14 @@ open Suave.Logging
 
 let logger = Loggers.sane_defaults_for LogLevel.Verbose
 
-let config : SuaveConfig = 
-  { default_config with 
-      bindings = [ HttpBinding.mk' HTTP "127.0.0.1" 8082 ]
-      ; buffer_size = 2048
-      ; max_ops = 10000
-      ; logger = logger }
+let config = 
+  { SuaveConfig.defaults with 
+      bindings = [ HttpBinding(HTTP, "127.0.0.1", 8082) ]
+      bufferSize = 2048
+      maxOps = 10000
+      logger = logger }
 
-let listening, server = web_server_async config (choose [ GET >>= browse' ])
+let listening, server = createWebServerAsync config (choose [ GET >>= browseHomeDirectory ])
 Async.Start server
 
 // wait for the server to start listening

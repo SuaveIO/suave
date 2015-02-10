@@ -111,16 +111,16 @@ module Cookie =
   let unset_cookie (cookie_name : string) =
     let start_epoch = DateTimeOffset(1970, 1, 1, 0, 0, 1, TimeSpan.Zero) |> Some
     let string_value = HttpCookie.to_header { HttpCookie.mk' cookie_name "x" with expires = start_epoch }
-    Writers.set_header "Set-Cookie" string_value
+    Writers.setHeader "Set-Cookie" string_value
 
-  let set_pair (http_cookie : HttpCookie) (client_cookie : HttpCookie) : WebPart =
+  let set_pair (http_cookie : HttpCookie) (client_cookie : HttpCookie) : HttpPart =
     context (fun { runtime = { logger = logger } } ->
       Log.log logger "Suave.Cookie.set_pair" LogLevel.Debug
         (sprintf "setting cookie '%s' len '%d'" http_cookie.name http_cookie.value.Length)
       succeed)
     >>= set_cookie http_cookie >>= set_cookie client_cookie
 
-  let unset_pair http_cookie_name : WebPart =
+  let unset_pair http_cookie_name : HttpPart =
     unset_cookie http_cookie_name >>= unset_cookie (String.Concat [ http_cookie_name; "-client" ])
 
   type CookiesState =
@@ -139,26 +139,6 @@ module Cookie =
         user_state_key  = user_state_key
         relative_expiry = relative_expiry
         secure          = secure }
-
-    let server_key_ =
-      (fun x -> x.server_key),
-      fun v (x : CookiesState) -> { x with server_key = v }
-
-    let cookie_name_ =
-      (fun x -> x.cookie_name),
-      fun v (x : CookiesState) -> { x with cookie_name = v }
-
-    let user_state_key_ =
-      (fun x -> x.user_state_key),
-      fun v (x : CookiesState) -> { x with user_state_key = v }
-
-    let relative_expiry_ =
-      (fun x -> x.relative_expiry),
-      fun v (x : CookiesState) -> { x with relative_expiry = v }
-
-    let secure_ =
-      (fun x -> x.secure),
-      fun v (x : CookiesState) -> { x with secure = v }
 
   let generate_cookies server_key cookie_name relative_expiry secure plain_data =
     let enc, _ = Bytes.cookie_encoding
@@ -181,15 +161,15 @@ module Cookie =
     match found with
     | Choice1Of2 (cookie, cipher_data) ->
       cipher_data
-      |> Crypto.secretbox_open key
+      |> Crypto.secretboxOpen key
       |> Choice.map_2 DecryptionError
       |> Choice.map (fun plain_text -> cookie, plain_text)
     | Choice2Of2 x -> Choice2Of2 x
 
-  let refresh_cookies relative_expiry http_cookie : WebPart =
+  let refresh_cookies relative_expiry http_cookie : HttpPart =
     sliding_expiry relative_expiry http_cookie ||> set_pair
 
-  let update_cookies (csctx : CookiesState) f_plain_text : WebPart =
+  let update_cookies (csctx : CookiesState) f_plain_text : HttpPart =
     context (fun ({ runtime = { logger = logger }} as ctx) ->
       let plain_text' =
         match read_cookies csctx.server_key csctx.cookie_name (ctx.response |> HttpResult.cookies) with
@@ -205,14 +185,14 @@ module Cookie =
                        csctx.relative_expiry csctx.secure
                        plain_text'
       ||> set_pair
-      >>= Writers.set_user_data csctx.user_state_key plain_text')
+      >>= Writers.setUserData csctx.user_state_key plain_text')
 
   let cookie_state (csctx : CookiesState)
                    // unit -> plain text to store OR something to run of your own!
-                   (no_cookie : unit -> Choice<byte [], WebPart>)
-                   (decryption_failure   : _ -> Choice<byte [], WebPart>)
-                   (f_success : WebPart)
-                   : WebPart =
+                   (no_cookie : unit -> Choice<byte [], HttpPart>)
+                   (decryption_failure   : _ -> Choice<byte [], HttpPart>)
+                   (f_success : HttpPart)
+                   : HttpPart =
     context (fun ({ runtime = { logger = logger }} as ctx) ->
 
       let log = Log.log logger "Suave.Cookie.cookie_state" LogLevel.Debug
@@ -223,13 +203,13 @@ module Cookie =
                            csctx.relative_expiry csctx.secure
                            plain_text
         set_pair http_cookie client_cookie >>=
-          Writers.set_user_data csctx.user_state_key plain_text
+          Writers.setUserData csctx.user_state_key plain_text
 
       match read_cookies csctx.server_key csctx.cookie_name (ctx.request |> HttpRequest.cookies) with
       | Choice1Of2 (http_cookie, plain_text) ->
         log "existing cookie"
         refresh_cookies csctx.relative_expiry http_cookie
-          >>= Writers.set_user_data csctx.user_state_key plain_text
+          >>= Writers.setUserData csctx.user_state_key plain_text
           >>= f_success
 
       | Choice2Of2 (NoCookieFound _) ->

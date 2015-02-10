@@ -1,10 +1,24 @@
 ﻿namespace Suave.Utils
 
-module Bytes =
-  open System
-  open System.IO
-  open System.Text
-  open Suave.Async
+open System
+open System.IO
+open System.Text
+open Suave.Utils.Async
+
+type BufferSegment =
+  { buffer : ArraySegment<byte>
+    offset : int
+    length : int }
+
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module BufferSegment =
+    
+    let inline mk buffer offset length =
+      if length < 0 then failwith (sprintf "BufferSegment.mk: length = %d < 0" length)
+      { buffer = buffer; offset = offset; length = length }
+
+
+module (* internal *) Bytes =
  
   /// Ordinally compare two strings in constant time, bounded by the length of the
   /// longest string.
@@ -15,11 +29,6 @@ module Bytes =
       xx <- xx ||| uint32 (bits.[i] ^^^ bobs.[i])
       i <- i + 1
     xx = 0u
-
-  type BufferSegment =
-    { buffer : ArraySegment<byte>
-      offset : int
-      length : int }
 
 
   // for ci in (int '!')..(int '~') do printfn "%c" (char ci);;
@@ -41,13 +50,6 @@ module Bytes =
       Convert.FromBase64String base64
 
     enc, dec
-
-  [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
-  module BufferSegment =
-    
-    let inline mk buffer offset length =
-      if length < 0 then failwith (sprintf "BufferSegment.mk: length = %d < 0" length)
-      { buffer = buffer; offset = offset; length = length }
 
   /// The end-of-line literal, \r\n (CRLF)
   let [<Literal>] eol = "\r\n"

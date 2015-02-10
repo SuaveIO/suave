@@ -15,7 +15,7 @@ open Suave.Testing
 
 [<Tests>]
 let cookies =
-  let run_with' = run_with default_config
+  let run_with' = runWith defaultConfig
 
   let basic_cookie =
     { name      = "mycookie"

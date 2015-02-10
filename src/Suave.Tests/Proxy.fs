@@ -24,10 +24,10 @@ open Suave.Testing
 
 [<Tests>]
 let proxy =
-  let bind :: _ = default_config.bindings
-  let to_target r = Some (bind.socket_binding.ip, bind.socket_binding.port)
+  let bind :: _ = defaultConfig.bindings
+  let to_target r = Some (bind.socketBinding.ip, bind.socketBinding.port)
 
-  let run_target = run_with default_config
+  let run_target = runWith defaultConfig
 
   let run_in_context item f_finally f_body =
     try
@@ -38,9 +38,9 @@ let proxy =
   // let sslCert = X509Certificate.FromPKCS12(BIO.File("suave.p12","r"), "easy")
   // let proxy_config = { default_config with bindings = [ HttpBinding.Create(Protocol.HTTPS(sslCert), "127.0.0.1", 8084) ] }
   let proxy_config =
-    { default_config with
-        bindings = [ HttpBinding.mk HTTP IPAddress.Loopback 8084us ] }
-  let proxy = run_with_factory proxy_server_async proxy_config
+    { defaultConfig with
+        bindings = [ HttpBinding(HTTP, IPAddress.Loopback, 8084us) ] }
+  let proxy = runWithFactory createProxyServerAsync proxy_config
 
   testList "creating proxy" [
     testPropertyWithConfig fscheck_config "GET / returns 200 OK with passed string" <| fun str ->

@@ -19,18 +19,18 @@ module Crypto =
   let HMACLength = 32 // = 256 / 8
 
   /// Calculate the HMAC of the passed data given a private key
-  let hmac (key : byte []) offset count (data : byte[]) =
+  let hmacAtOffset (key : byte []) offset count (data : byte[]) =
     use hmac = HMAC.Create(HMACAlgorithm)
     hmac.Key <- key
     hmac.ComputeHash (data, offset, count)
 
-  let hmac' key (data : byte []) =
-    hmac key 0 (data.Length) data
+  let hmacOfBytes key (data : byte []) =
+    hmacAtOffset key 0 (data.Length) data
 
   /// Calculate the HMAC value given the key
   /// and a seq of string-data which will be concatenated in its order and hmac-ed.
-  let hmac'' (key : byte []) (data : string seq) =
-    hmac' key (String.Concat data |> UTF8.bytes)
+  let hmacOfText (key : byte []) (data : seq<string>) =
+    hmacOfBytes key (String.Concat data |> UTF8.bytes)
 
   /// # bits in key
   let KeySize   = 256
@@ -47,30 +47,30 @@ module Crypto =
 
   /// the global crypto-random pool for uniform and therefore cryptographically
   /// secure random values
-  let crypt_random = RandomNumberGenerator.Create()
+  let cryptRandom = RandomNumberGenerator.Create()
 
   /// Fills the passed array with random bytes
   let randomize (bytes : byte []) =
-    crypt_random.GetBytes bytes
+    cryptRandom.GetBytes bytes
     bytes
 
   /// Generates a string key from the available characters with the given key size.
-  let generate_key key_length =
-    Array.zeroCreate<byte> key_length |> randomize
+  let generateKey keyLength =
+    Array.zeroCreate<byte> keyLength |> randomize
 
-  let generate_key' () =
-    generate_key KeyLength
+  let generateStdKey () =
+    generateKey KeyLength
 
-  let generate_iv iv_length =
-    Array.zeroCreate<byte> iv_length |> randomize
+  let generateIV ivLength =
+    Array.zeroCreate<byte> ivLength |> randomize
 
-  let generate_iv' () =
-    generate_iv IVLength
+  let generateStdIV () =
+    generateIV IVLength
 
   /// key: 32 bytes for 256 bit key
   /// Returns a new key and a new iv as two byte arrays as a tuple.
-  let generate_keys () =
-    generate_key' (), generate_iv' ()
+  let generateKeys () =
+    generateStdKey (), generateStdIV ()
 
   type SecretboxEncryptionError =
     | InvalidKeyLength of string
@@ -96,14 +96,14 @@ module Crypto =
     elif msg.Length = 0 then
       Choice2Of2 EmptyMessageGiven
     else
-      let iv  = generate_iv' ()
+      let iv  = generateStdIV ()
       use aes = secretbox_init key iv
 
       let mk_cipher_text (msg : byte []) (key : byte []) (iv : byte []) =
         use enc      = aes.CreateEncryptor(key, iv)
         use cipher   = new MemoryStream()
         use crypto   = new CryptoStream(cipher, enc, CryptoStreamMode.Write)
-        let bytes = msg |> Encoding.gzip_encode
+        let bytes = msg |> Encoding.gzipEncode
         crypto.Write (bytes, 0, bytes.Length)
         crypto.FlushFinalBlock()
         cipher.ToArray()
@@ -115,17 +115,17 @@ module Crypto =
       bw.Write (mk_cipher_text msg key iv)
       bw.Flush ()
 
-      let hmac = hmac' key (cipher_text.ToArray())
+      let hmac = hmacOfBytes key (cipher_text.ToArray())
       bw.Write hmac
       bw.Dispose()
 
       Choice1Of2 (cipher_text.ToArray())
 
-  let secretbox' (key : byte []) (msg : string) =
+  let secretboxOfText (key : byte []) (msg : string) =
     secretbox key (msg |> UTF8.bytes)
 
-  let secretbox_open (key : byte []) (cipher_text : byte []) =
-    let hmac_calc = hmac key 0 (cipher_text.Length - HMACLength) cipher_text
+  let secretboxOpen (key : byte []) (cipher_text : byte []) =
+    let hmac_calc = hmacAtOffset key 0 (cipher_text.Length - HMACLength) cipher_text
     let hmac_given = Array.zeroCreate<byte> HMACLength
     Array.blit cipher_text (cipher_text.Length - HMACLength) // from
                hmac_given  0                                 // to
@@ -149,7 +149,7 @@ module Crypto =
       use crypto  = new CryptoStream(plain, denc, CryptoStreamMode.Write)
       crypto.Write(cipher_text, IVLength, cipher_text.Length - IVLength - HMACLength)
       crypto.FlushFinalBlock()
-      Choice1Of2 (plain.ToArray() |> Encoding.gzip_decode)
+      Choice1Of2 (plain.ToArray() |> Encoding.gzipDecode)
 
-  let secretbox_open' k c =
-    secretbox_open k c |> Choice.map UTF8.to_string'
+  let secretboxOpenAsString keyText cipherText =
+    secretboxOpen keyText cipherText |> Choice.map UTF8.toString

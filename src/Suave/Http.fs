@@ -9,7 +9,7 @@ module Http =
 
   let fail = async.Return None
 
-  let never : WebPart = fun x -> fail
+  let never : HttpPart = fun x -> fail
 
   let inline bind (second : 'b -> Async<'c option>) (first : 'a -> Async<'b option>) : 'a -> Async<'c option> =
     fun x -> 
@@ -30,7 +30,7 @@ module Http =
     | None   -> b x
     | r      -> r
 
-  let inline (<|>) (a : WebPart) (b : WebPart) : WebPart =
+  let inline (<|>) (a : HttpPart) (b : HttpPart) : HttpPart =
     fun x ->
       async{
         let! e = a x
@@ -43,7 +43,7 @@ module Http =
         | r -> return r
       }
 
-  let rec choose (options : WebPart list): WebPart =
+  let rec choose (options : HttpPart list): HttpPart =
     fun arg -> async {
     match options with
     | []        -> return None
@@ -68,7 +68,7 @@ module Http =
   /// | url "/b"    +---------+                       +---------+  cont3       |
   /// +-------------+                                           +--------------+
 
-  let rec inject (post_op : WebPart) (pairs : (WebPart*WebPart) list) : WebPart =
+  let rec inject (post_op : HttpPart) (pairs : (HttpPart*HttpPart) list) : HttpPart =
     fun arg -> async {
       match pairs with
       | []        -> return None
@@ -91,8 +91,7 @@ module Http =
 
   module Response =
 
-    open Types
-    open Types.Codes
+    open Suave.Types
 
     open System
     open System.IO
@@ -109,40 +108,40 @@ module Http =
 
     open System
 
-    let set_header key value (ctx : HttpContext) =
+    let setHeader key value (ctx : HttpContext) =
       { ctx with response = { ctx.response with headers = (key, value) :: ctx.response.headers } }
       |> succeed
 
-    let set_user_data key value (ctx : HttpContext) =
-      { ctx with user_state = ctx.user_state |> Map.add key (box value) }
+    let setUserData key value (ctx : HttpContext) =
+      { ctx with userState = ctx.userState |> Map.add key (box value) }
       |> succeed
 
-    let unset_user_data key (ctx : HttpContext) =
-      { ctx with user_state = ctx.user_state |> Map.remove key }
+    let unsetUserData key (ctx : HttpContext) =
+      { ctx with userState = ctx.userState |> Map.remove key }
       |> succeed
 
     // TODO: I'm not sure about having MIME types in the Writers module
-    let mk_mime_type a b =
+    let mkMimeType a b =
       MimeType.mk a b |> Some
 
-    let default_mime_types_map = function
-      | ".bmp" -> mk_mime_type "image/bmp" false
-      | ".css" -> mk_mime_type "text/css" true
-      | ".gif" -> mk_mime_type "image/gif" false
-      | ".png" -> mk_mime_type "image/png" false
-      | ".svg" -> mk_mime_type "image/svg+xml" false
-      | ".ico" -> mk_mime_type "image/x-icon" false
+    let defaultMimeTypesMap = function
+      | ".bmp" -> mkMimeType "image/bmp" false
+      | ".css" -> mkMimeType "text/css" true
+      | ".gif" -> mkMimeType "image/gif" false
+      | ".png" -> mkMimeType "image/png" false
+      | ".svg" -> mkMimeType "image/svg+xml" false
+      | ".ico" -> mkMimeType "image/x-icon" false
       | ".htm"
-      | ".html" -> mk_mime_type "text/html" true
+      | ".html" -> mkMimeType "text/html" true
       | ".jpe"
       | ".jpeg"
-      | ".jpg" -> mk_mime_type "image/jpeg" false
-      | ".js"  -> mk_mime_type "application/x-javascript" true
-      | ".exe" -> mk_mime_type "application/exe" false
-      | ".txt" -> mk_mime_type "text/plain" true
+      | ".jpg" -> mkMimeType "image/jpeg" false
+      | ".js"  -> mkMimeType "application/x-javascript" true
+      | ".exe" -> mkMimeType "application/exe" false
+      | ".txt" -> mkMimeType "text/plain" true
       | _      -> None
 
-    let set_mime_type t = set_header "Content-Type" t
+    let setMimeType t = setHeader "Content-Type" t
 
   // 1xx
   module Intermediate =
@@ -160,10 +159,10 @@ module Http =
     
     open Suave.Utils
     open Response
-    open Types.Codes
+    open Suave.Types
     
 
-    let ok s : WebPart = 
+    let ok s : HttpPart = 
       fun ctx -> { ctx with response = { ctx.response with status = HTTP_200; content = Bytes s }} |> succeed
 
     let OK a = ok (UTF8.bytes a)
@@ -176,7 +175,7 @@ module Http =
 
     let ACCEPTED s = accepted (UTF8.bytes s)
 
-    let no_content : WebPart =
+    let no_content : HttpPart =
       fun ctx -> { ctx with response = { status = HTTP_204; headers = ctx.response.headers; content = Bytes [||] }} |> succeed
 
     let NO_CONTENT = no_content
@@ -187,36 +186,36 @@ module Http =
     open Suave.Utils
     open Response
     open Writers
-    open Types.Codes
+    open Suave.Types
 
     let moved_permanently location =
-      set_header "Location" location
+      setHeader "Location" location
       >>= response HTTP_301 [||]
 
     let MOVED_PERMANENTLY location = moved_permanently location
 
     let found location =
-      set_header "Location" location
+      setHeader "Location" location
       >>= response HTTP_302 [||]
 
     let FOUND location = found location
 
     let redirect url =
-      set_header "Location" url
-      >>= set_header "Content-Type" "text/html; charset=utf-8"
+      setHeader "Location" url
+      >>= setHeader "Content-Type" "text/html; charset=utf-8"
       >>= response HTTP_302 (
         UTF8.bytes(sprintf "<html>
     <body>
       <a href=\"%s\">%s</a>
     </body>
   </html>"
-        url (http_message HTTP_302)))
+        url HTTP_302.Message))
      
 
-    let not_modified : WebPart =
+    let not_modified : HttpPart =
       fun ctx -> { ctx with response = {status = HTTP_304; headers = []; content = Bytes [||] }} |> succeed
 
-    let NOT_MODIFIED : WebPart =
+    let NOT_MODIFIED : HttpPart =
       not_modified
 
   // 4xx
@@ -225,7 +224,7 @@ module Http =
     open Suave.Utils
     open Response
     open Writers
-    open Types.Codes
+    open Suave.Types
 
     let bad_request s = response HTTP_400 s
 
@@ -233,12 +232,12 @@ module Http =
 
     /// 401: see http://stackoverflow.com/questions/3297048/403-forbidden-vs-401-unauthorized-http-responses/12675357
     let unauthorized s =
-      set_header "WWW-Authenticate" "Basic realm=\"protected\""
+      setHeader "WWW-Authenticate" "Basic realm=\"protected\""
       >>= response HTTP_401 s
 
     let UNAUTHORIZED s = unauthorized (UTF8.bytes s)
 
-    let challenge = UNAUTHORIZED (http_message HTTP_401)
+    let challenge = UNAUTHORIZED HTTP_401.Message
 
     let forbidden s = response HTTP_403 s
 
@@ -289,7 +288,7 @@ module Http =
   
     open Suave.Utils
     open Response
-    open Types.Codes
+    open Suave.Types
 
     let internal_error arr = response HTTP_500 arr
 
@@ -313,7 +312,7 @@ module Http =
 
     let invalid_http_version arr = response HTTP_505 arr
 
-    let INVALID_HTTP_VERSION = invalid_http_version (UTF8.bytes (http_message HTTP_505))
+    let INVALID_HTTP_VERSION = invalid_http_version (UTF8.bytes HTTP_505.Message)
 
   module Applicatives =
   
@@ -323,11 +322,14 @@ module Http =
     open System
     open System.Text.RegularExpressions
 
-    open Types
+    open Suave.Types
 
     module private Option =
       let iff b x =
         if b then Some x else None
+
+    let queryParam nm f : HttpPart = request( fun x -> cond (x.queryParam nm) f never)
+    let formData nm f : HttpPart = request( fun x -> cond (x.formDataItem nm) f never)
 
     let url s (x : HttpContext) =
       async.Return (Option.iff (s = x.request.url.AbsolutePath) x)
@@ -335,10 +337,10 @@ module Http =
     let ``method`` (m : HttpMethod) (x : HttpContext) =
       async.Return (Option.iff (m = x.request.``method``) x)
 
-    let is_secure (x : HttpContext) =
-      async.Return (Option.iff x.request.is_secure x)
+    let isSecure (x : HttpContext) =
+      async.Return (Option.iff x.request.isSecure x)
 
-    let url_regex regex (x : HttpContext) =
+    let urlRegex regex (x : HttpContext) =
       async.Return (Option.iff (Regex.IsMatch(x.request.url.AbsolutePath, regex)) x)
 
     let host hostname (x : HttpContext) = async {
@@ -373,7 +375,7 @@ module Http =
     /// "GET /apache_pb.gif HTTP/1.0" is the request line from the client. The method GET, /apache_pb.gif the resource requested, and HTTP/1.0 the HTTP protocol.
     /// 200 is the HTTP status code returned to the client. 2xx is a successful response, 3xx a redirection, 4xx a client error, and 5xx a server error.
     /// 2326 is the size of the object returned to the client, measured in bytes.
-    let log_format (ctx : HttpContext) =
+    let logFormat (ctx : HttpContext) =
       
       let dash = function | "" | null -> "-" | x -> x
       let ci = Globalization.CultureInfo("en-US")
@@ -381,12 +383,12 @@ module Http =
       sprintf "%O %s %s [%s] \"%s %s %s\" %d %s"
         ctx.request.ipaddr
         process_id //TODO: obtain connection owner via Ident protocol
-        (match Map.tryFind "user_name" ctx.user_state with Some x -> x :?> string | None -> "-")
+        (match Map.tryFind "user_name" ctx.userState with Some x -> x :?> string | None -> "-")
         (DateTime.UtcNow.ToString("dd/MMM/yyyy:hh:mm:ss %K", ci))
         (string ctx.request.``method``)
         ctx.request.url.AbsolutePath
-        ctx.request.http_version
-        (Codes.http_code ctx.response.status)
+        ctx.request.httpVersion
+        ctx.response.status.Code
         "0"
 
     let log (logger : Logger) (formatter : HttpContext -> string) (ctx : HttpContext) =
@@ -403,7 +405,7 @@ module Http =
     open Suave.Sscanf
     open ServerErrors
 
-    let url_scan (pf : PrintfFormat<_,_,_,_,'t>) (h : 't ->  WebPart) : WebPart =
+    let urlScan (pf : PrintfFormat<_,_,_,_,'t>) (h : 't ->  HttpPart) : HttpPart =
       
       let scan url =
         try 
@@ -420,13 +422,13 @@ module Http =
           fail
       F
           
-    let timeout_webpart (time_span : TimeSpan) (web_part : WebPart) : WebPart =
+    let timeoutHttpPart (time_span : TimeSpan) (web_part : HttpPart) : HttpPart =
       fun (ctx : HttpContext) -> async {
         try
           return! Async.WithTimeout (time_span, web_part ctx)
         with
           | :? TimeoutException ->
-            return! Response.response Codes.HTTP_408 (UTF8.bytes "Request Timeout") ctx
+            return! Response.response HttpCode.HTTP_408 (UTF8.bytes "Request Timeout") ctx
             }
 
   module ServeResource =
@@ -443,18 +445,18 @@ module Http =
     // the max-age directive overrides the Expires header, even if the Expires header is more restrictive
     // 'Cache-Control' and 'Expires' headers should be left up to the user
     let resource key exists get_last get_extension
-                 (send : string -> bool -> WebPart)
+                 (send : string -> bool -> HttpPart)
                  ({ request = r; runtime = rt } as ctx) =
       let log =
         Log.verbose rt.logger "Suave.Http.ServeResource.resource" TraceHeader.empty
 
       let send_it name compression =
-        set_header "Last-Modified" ((get_last key : DateTime).ToString("R"))
-        >>= set_mime_type name
+        setHeader "Last-Modified" ((get_last key : DateTime).ToString("R"))
+        >>= setMimeType name
         >>= send key compression
 
       if exists key then
-        let mimes = ctx.runtime.mime_types_map <| get_extension key
+        let mimes = ctx.runtime.mimeTypesMap <| get_extension key
         match mimes with
         | Some value ->
           let modified_since = r.headers %% "if-modified-since"
@@ -482,7 +484,7 @@ module Http =
 
     open Suave.Utils
     open Suave.Logging
-    open Types.Codes
+    open Suave.Types
 
     open Response
     open Writers
@@ -490,11 +492,11 @@ module Http =
     open Redirection
     open ServeResource
 
-    let send_file file_name (compression : bool) (ctx : HttpContext) =
+    let sendFile fileName (compression : bool) (ctx : HttpContext) =
       let write_file file conn = socket {
         let get_fs = fun path -> new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read) :> Stream
         let get_lm = fun path -> FileInfo(path).LastWriteTime
-        use! fs = Compression.transform_x file get_fs get_lm compression ctx.runtime.compression_folder ctx conn
+        use! fs = Compression.transform_x file get_fs get_lm compression ctx.runtime.compressionFolder ctx conn
 
         do! async_writeln conn (sprintf "Content-Length: %d" (fs : Stream).Length)
         do! async_writeln conn ""
@@ -506,57 +508,57 @@ module Http =
           response =
             { ctx.response with
                 status = HTTP_200
-                content = SocketTask (write_file file_name) } }
+                content = SocketTask (write_file fileName) } }
       |> succeed
 
-    let file file_name =
+    let file fileName : HttpPart =
       resource
-        file_name
+        fileName
         (File.Exists)
         (fun name -> FileInfo(name).LastAccessTime)
         (Path.GetExtension)
-        send_file
+        sendFile
 
-    let resolve_path (root_path : string) (file_name : string) =
-      let file_name =
-        if Path.DirectorySeparatorChar.Equals('/') then file_name
-        else file_name.Replace('/', Path.DirectorySeparatorChar)
-      let calculated_path = Path.Combine(root_path, file_name.TrimStart([| Path.DirectorySeparatorChar; Path.AltDirectorySeparatorChar |]))
-      if calculated_path = Path.GetFullPath(calculated_path) then
-        if calculated_path.StartsWith root_path then
-          calculated_path
+    let resolvePath (rootPath : string) (fileName : string) =
+      let fileName =
+        if Path.DirectorySeparatorChar.Equals('/') then fileName
+        else fileName.Replace('/', Path.DirectorySeparatorChar)
+      let calculatedPath = Path.Combine(rootPath, fileName.TrimStart([| Path.DirectorySeparatorChar; Path.AltDirectorySeparatorChar |]))
+      if calculatedPath = Path.GetFullPath(calculatedPath) then
+        if calculatedPath.StartsWith rootPath then
+          calculatedPath
         else raise <| Exception("File canonalization issue.")
       else raise <| Exception("File canonalization issue.")
 
-    [<Obsolete("Use resolve_path")>]
-    let local_file file_name root_path = resolve_path root_path file_name
+    [<Obsolete("Use resolvePath")>]
+    let local_file file_name rootPath = resolvePath rootPath file_name
 
-    let browse_file root_path file_name =
+    let browseFile rootPath file_name =
       fun ({request = r; runtime = q} as h) ->
-        file (resolve_path root_path file_name) h
+        file (resolvePath rootPath file_name) h
 
-    let browse_file' file_name =
+    let browseFileInHomeDirectory file_name =
       fun ({request = r; runtime = q} as h) ->
-        browse_file q.home_directory file_name h
+        browseFile q.homeDirectory file_name h
     
-    let browse root_path : WebPart =
+    let browse rootPath : HttpPart =
       warbler (fun { request = r; runtime = { logger = l } } ->
         Log.verbose l
           "Suave.Http.Files.browse"
           TraceHeader.empty
           (sprintf "Files.browse trying file (local_file url:'%s' root:'%s')"
-            r.url.AbsolutePath root_path)
-        file (resolve_path root_path r.url.AbsolutePath))
+            r.url.AbsolutePath rootPath)
+        file (resolvePath rootPath r.url.AbsolutePath))
 
-    let browse' : WebPart =
-      warbler (fun { runtime = q } -> browse q.home_directory)
+    let browseHomeDirectory : HttpPart =
+      warbler (fun { runtime = q } -> browse q.homeDirectory)
 
-    let dir root_path (ctx : HttpContext) =
+    let dir rootPath (ctx : HttpContext) =
       let req = ctx.request
 
       let url = req.url
 
-      let dirname = resolve_path root_path url.AbsolutePath
+      let dirname = resolvePath rootPath url.AbsolutePath
       let result = new StringBuilder()
 
       let filesize  (x : FileSystemInfo) =
@@ -578,8 +580,8 @@ module Http =
         OK (result.ToString()) ctx
       else fail
 
-    let dir' ctx =
-      dir ctx.runtime.home_directory ctx
+    let dirHomeDirectory ctx =
+      dir ctx.runtime.homeDirectory ctx
 
   module Embedded =
     
@@ -588,7 +590,7 @@ module Http =
     open System.Reflection
 
     open Suave.Utils
-    open Types.Codes
+    open Suave.Types
 
     open Response
     open ServeResource
@@ -601,17 +603,17 @@ module Http =
     let resources (assembly : Assembly) =
       assembly.GetManifestResourceNames()
 
-    let last_modified (assembly : Assembly) =
+    let lastModified (assembly : Assembly) =
       FileInfo(assembly.Location).CreationTime
     
-    let send_resource (assembly : Assembly)
+    let sendResource (assembly : Assembly)
                       resource_name
                       (compression : bool)
                       (ctx : HttpContext) =
       let write_resource name conn = socket {
         let get_fs = fun name -> assembly.GetManifestResourceStream(name)
-        let get_lm = fun _ -> last_modified assembly
-        use! fs = Compression.transform_x name get_fs get_lm compression ctx.runtime.compression_folder ctx conn
+        let get_lm = fun _ -> lastModified assembly
+        use! fs = Compression.transform_x name get_fs get_lm compression ctx.runtime.compressionFolder ctx conn
 
         do! async_writeln conn (sprintf "Content-Length: %d" (fs: Stream).Length)
         do! async_writeln conn ""
@@ -626,24 +628,24 @@ module Http =
                 content = SocketTask (write_resource resource_name) }}
       |> succeed
 
-    let send_resource' resource_name compression =
-      send_resource default_source_assembly resource_name compression
+    let sendResourceFromDefaultAssembly resource_name compression =
+      sendResource default_source_assembly resource_name compression
 
     let resource assembly name =
       resource
         name
         (fun name -> resources assembly |> Array.exists ((=) name))
-        (fun _ -> last_modified assembly)
+        (fun _ -> lastModified assembly)
         (Path.GetExtension)
-        (send_resource assembly)
+        (sendResource assembly)
 
-    let resource' name =
+    let resourceFromDefaultAssembly name =
       resource default_source_assembly name
 
-    let browse assembly : WebPart =
+    let browse assembly =
       warbler (fun ctx -> resource assembly (ctx.request.url.AbsolutePath.TrimStart [|'/'|]))
 
-    let browse' : WebPart =
+    let browseDefaultAsssembly =
       browse default_source_assembly
 
   // See www.w3.org/TR/eventsource/#event-stream-interpretation
@@ -674,11 +676,11 @@ module Http =
     let comment (out : Connection) (cmt : string) =
       out <<. ": " + cmt + ES_EOL
 
-    let event_type (out : Connection) (event_type : string) =
-      out <<. "event: " + event_type + ES_EOL
+    let event_type (out : Connection) (evType : string) =
+      out <<. "event: " + evType + ES_EOL
 
-    let data (out : Connection) (data : string) =
-      out <<. "data: " + data + ES_EOL
+    let data (out : Connection) (text : string) =
+      out <<. "data: " + text + ES_EOL
 
     let es_id (out : Connection) (last_event_id : string) =
       out <<. "id: " + last_event_id + ES_EOL
@@ -706,7 +708,7 @@ module Http =
         do! msg.data |> data out
         return! dispatch out }
 
-    let private hand_shake' f (out : Connection) =
+    let private handShakeAux f (out : Connection) =
       socket {
         // resp.SendChunked       <- false
         // Buggy Internet Explorer; 2kB of comment padding for IE
@@ -714,17 +716,17 @@ module Http =
         do! 2000u |> retry out
         return! f out }
 
-    let hand_shake f ({ request = req } as ctx : HttpContext) =
+    let handShake f ({ request = req } as ctx : HttpContext) =
       { ctx with
           response =
             { ctx.response with
-                status = Codes.HTTP_200
+                status = HTTP_200
                 headers =
                      ("Content-Type",                "text/event-stream; charset=utf-8")
                   :: ("Cache-Control",               "no-cache")
                   :: ("Access-Control-Allow-Origin", "*")
                   :: []
-                content = SocketTask (hand_shake' f)
+                content = SocketTask (handShakeAux f)
                 //chunked = false
             }
       }
@@ -735,22 +737,22 @@ module Http =
     open RequestErrors
     open Suave.Utils
 
-    let internal parse_authentication_token (token : string) =
+    let internal parseAuthenticationToken (token : string) =
       let parts = token.Split (' ')
       let enc = parts.[1].Trim()
       let decoded = ASCII.base64_decode enc
       let indexOfColon = decoded.IndexOf(':')
       (parts.[0].ToLower(), decoded.Substring(0,indexOfColon), decoded.Substring(indexOfColon+1))
 
-    let authenticate_basic f (ctx : HttpContext) =
+    let authenticateBasic f (ctx : HttpContext) =
       let p = ctx.request
       let headers = p.headers
       match headers %% "authorization" with
       | Some header ->
-        let (typ, username, password) = parse_authentication_token header
+        let (typ, username, password) = parseAuthenticationToken header
         if (typ.Equals("basic")) && f (username, password) then
           fail
         else
-          challenge { ctx with user_state = ctx.user_state.Add("user_name",username) }
+          challenge { ctx with userState = ctx.userState.Add("user_name",username) }
       | None ->
         challenge ctx

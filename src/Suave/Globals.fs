@@ -27,6 +27,10 @@ open System.Collections.Concurrent
 /// by writing these to disk instead
 let internal compressed_files_map = new ConcurrentDictionary<string,string>()
 
+[<assembly:System.Runtime.CompilerServices.InternalsVisibleToAttribute("Suave.Experimental")>]
+[<assembly:System.Runtime.CompilerServices.InternalsVisibleToAttribute("Suave.Tests")>]
+do()
+
 module Internals =
 
   open System
