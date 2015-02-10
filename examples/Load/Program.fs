@@ -9,7 +9,7 @@ open Suave.Http.Applicatives
 open Suave.Http.Files
 open Suave.Logging
 
-let logger = Loggers.sane_defaults_for LogLevel.Verbose
+let logger = Loggers.saneDefaultsFor LogLevel.Verbose
 
 let config = 
   { SuaveConfig.defaults with 

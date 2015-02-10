@@ -17,21 +17,21 @@ open System.Threading.Tasks
 type TcpWorker<'a> = Connection -> SocketOp<'a>
 
 /// lift a Async<'a> type to the Socket monad
-let lift_async (a : Async<'a>) : SocketOp<'a> = 
+let liftAsync (a : Async<'a>) : SocketOp<'a> = 
   async { 
     let! s = a
     return Choice1Of2 s 
   }
 
 /// lift a Task type to the Socket monad
-let lift_task (a : Task) : SocketOp<unit>  = 
+let liftTask (a : Task) : SocketOp<unit>  = 
   async {
     let! s = a
     return Choice1Of2 s 
   }
 
 /// from the Socket monad to Async
-let to_async f = fun ctx -> async {
+let toAsync f = fun ctx -> async {
   let! o = f ctx
   match o with
   | Choice1Of2 option -> return option
@@ -39,7 +39,7 @@ let to_async f = fun ctx -> async {
  }
 
 /// Write the string s to the stream asynchronously as ASCII encoded text
-let async_write (connection : Connection) (s : string) : SocketOp<unit> = 
+let asyncWrite (connection : Connection) (s : string) : SocketOp<unit> = 
   async {
     if s.Length > 0 then
       let buff = connection.lineBuffer
@@ -48,43 +48,43 @@ let async_write (connection : Connection) (s : string) : SocketOp<unit> =
     else return Choice1Of2 ()
   }
 
-let async_write_nl (connection : Connection) = 
-  send connection eol_array_segment
+let asyncWriteNewLine (connection : Connection) = 
+  send connection eolArraySegment
 
-let async_writeln (connection : Connection) (s : string) : SocketOp<unit> = 
+let asyncWriteLn (connection : Connection) (s : string) : SocketOp<unit> = 
   socket {
-    do! async_write connection s
-    do! async_write_nl connection
+    do! asyncWrite connection s
+    do! asyncWriteNewLine connection
   }
 
 /// Write the string s to the stream asynchronously from a byte array
-let async_writebytes (connection : Connection) (b : byte[]) : SocketOp<unit> = async {
+let asyncWriteBytes (connection : Connection) (b : byte[]) : SocketOp<unit> = async {
   if b.Length > 0 then return! send connection (new ArraySegment<_>(b, 0, b.Length))
   else return Choice1Of2 ()
 }
 
 /// Asynchronously write from the 'from' stream to the 'to' stream.
-let transfer_x (to_stream : Connection) (from : Stream) : SocketOp<unit> =
+let transferStream (toStream : Connection) (from : Stream) : SocketOp<unit> =
   let buf = Array.zeroCreate<byte> 0x2000
   let rec do_block () = socket {
-    let! read = lift_async <| from.AsyncRead buf
+    let! read = liftAsync <| from.AsyncRead buf
     if read <= 0 then
       return ()
     else
-      do! send to_stream (new ArraySegment<_>(buf,0,read))
+      do! send toStream (new ArraySegment<_>(buf,0,read))
       return! do_block () }
   do_block ()
 
 /// Asynchronously write from the 'from' stream to the 'to' stream, with an upper bound on
 /// amount to transfer by len
-let transfer_len_x (to_stream : Connection) (from : Stream) len =
+let transferStreamBounded (toStream : Connection) (from : Stream) len =
   let buf_size = 0x2000
   let buf = Array.zeroCreate<byte> 0x2000
-  let rec do_block left = socket {
-    let! read = lift_async <| from.AsyncRead(buf, 0, Math.Min(buf_size, left))
+  let rec doBlock left = socket {
+    let! read = liftAsync <| from.AsyncRead(buf, 0, Math.Min(buf_size, left))
     if read <= 0 || left - read = 0 then
       return ()
     else
-      do! send to_stream (new ArraySegment<_>(buf,0,read))
-      return! do_block (left - read) }
-  do_block len
+      do! send toStream (new ArraySegment<_>(buf,0,read))
+      return! doBlock (left - read) }
+  doBlock len

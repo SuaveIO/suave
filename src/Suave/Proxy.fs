@@ -32,7 +32,7 @@ let private sendWebResponse (data : HttpWebResponse) ({ request = { trace = t };
   // TODO: if downstream sends a Content-Length header copy from one stream
   // to the other asynchronously
   "-> read_fully" |> Log.verbose ctx.runtime.logger "Suave.Proxy.send_web_response:GetResponseStream" t
-  let bytes = data.GetResponseStream() |> read_fully
+  let bytes = data.GetResponseStream() |> readFully
   "<- read_fully" |> Log.verbose ctx.runtime.logger "Suave.Proxy.send_web_response:GetResponseStream" t
   response (HttpCode.TryParse(int data.StatusCode) |> Option.get) bytes { ctx with response = { resp with headers = resp.headers @ headers } }
 
@@ -57,7 +57,7 @@ let forward (ip : IPAddress) (port : uint16) (ctx : HttpContext) =
   q.Proxy   <- null
 
   //copy restricted headers
-  let header s = get_first p.headers s
+  let header s = getFirst p.headers s
   header "accept"            |> Option.iter (fun v -> q.Accept <- v)
   header "date"              |> Option.iter (fun v -> q.Date <- DateTime.Parse v)
   header "expect"            |> Option.iter (fun v -> q.Expect <- v)
@@ -75,10 +75,10 @@ let forward (ip : IPAddress) (port : uint16) (ctx : HttpContext) =
   fun ctx -> socket {
     if p.``method`` = HttpMethod.POST || p.``method`` = HttpMethod.PUT then
       let contentLength = Convert.ToInt32(p.headers %% "content-length")
-      do! transfer_len_x ctx.connection (q.GetRequestStream()) contentLength
+      do! transferStreamBounded ctx.connection (q.GetRequestStream()) contentLength
     try
-      let! data = lift_async <| q.AsyncGetResponse()
-      let! res = lift_async <| sendWebResponse ((data : WebResponse) :?> HttpWebResponse) ctx
+      let! data = liftAsync <| q.AsyncGetResponse()
+      let! res = liftAsync <| sendWebResponse ((data : WebResponse) :?> HttpWebResponse) ctx
       match res with
       | Some newCtx ->
         do! response_f newCtx
@@ -86,14 +86,14 @@ let forward (ip : IPAddress) (port : uint16) (ctx : HttpContext) =
       | None -> return None
     with
     | :? WebException as ex when ex.Response <> null ->
-      let! res = lift_async <| sendWebResponse (ex.Response :?> HttpWebResponse) ctx
+      let! res = liftAsync <| sendWebResponse (ex.Response :?> HttpWebResponse) ctx
       match res with
       | Some new_ctx ->
         do! response_f new_ctx
         return Some new_ctx
       | _ -> return None
     | :? WebException as ex when ex.Response = null ->
-      let! res = lift_async <|response HTTP_502 (UTF8.bytes "suave proxy: Could not connect to upstream") ctx
+      let! res = liftAsync <|response HTTP_502 (UTF8.bytes "suave proxy: Could not connect to upstream") ctx
       match res with
       | Some new_ctx ->
         do! response_f new_ctx

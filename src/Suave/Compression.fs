@@ -66,7 +66,7 @@ module Compression =
         let enconding = get_encoder request
         match enconding with
         | Some (n,encoder) ->
-          do! async_writeln connection (String.Concat [| "Content-Encoding: "; n.ToString() |])
+          do! asyncWriteLn connection (String.Concat [| "Content-Encoding: "; n.ToString() |])
           return encoder content
         | None ->
           return content
@@ -79,11 +79,11 @@ module Compression =
     match encoding with
     | GZIP ->
       use gzip = new GZipStream(new_fs, CompressionMode.Compress)
-      do! lift_task (fs.CopyToAsync gzip)
+      do! liftTask (fs.CopyToAsync gzip)
       gzip.Close()
     | Deflate ->
       use deflate = new DeflateStream(new_fs, CompressionMode.Compress)
-      do! lift_task (fs.CopyToAsync deflate)
+      do! liftTask (fs.CopyToAsync deflate)
       deflate.Close()
     | _ ->
       return failwith "invalid case."
@@ -106,7 +106,7 @@ module Compression =
         let enconding = parse_encoder q
         match enconding with
         | Some (n) ->
-          do! async_writeln connection (String.Concat [| "Content-Encoding: "; n.ToString() |])
+          do! asyncWriteLn connection (String.Concat [| "Content-Encoding: "; n.ToString() |])
           if Globals.compressed_files_map.ContainsKey key then
             let last_modified = get_last key
             let cmpr_info = new FileInfo(Globals.compressed_files_map.[key])

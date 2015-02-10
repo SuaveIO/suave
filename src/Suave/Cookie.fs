@@ -141,7 +141,7 @@ module Cookie =
         secure          = secure }
 
   let generate_cookies server_key cookie_name relative_expiry secure plain_data =
-    let enc, _ = Bytes.cookie_encoding
+    let enc, _ = Bytes.cookieEncoding
     match Crypto.secretbox server_key plain_data with
     | Choice1Of2 cookie_data ->
       let encoded_data = enc cookie_data
@@ -152,7 +152,7 @@ module Cookie =
     | err -> failwithf "internal error on encryption %A" err
 
   let read_cookies key cookie_name cookies =
-    let _, dec = Bytes.cookie_encoding
+    let _, dec = Bytes.cookieEncoding
     let found =
       cookies
       |> Map.tryFind cookie_name

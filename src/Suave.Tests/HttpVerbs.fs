@@ -29,7 +29,7 @@ let gets =
                      run_with' (request (fun r -> OK (r.url.ToString())))
                      |> req HttpMethod.GET "/" None)
 
-      testPropertyWithConfig fscheck_config "200 OK returns equivalent" <| fun resp_str ->
+      testPropertyWithConfig fsCheckConfig "200 OK returns equivalent" <| fun resp_str ->
         (run_with' (OK resp_str) |> req HttpMethod.GET "/hello" None) = resp_str
 
       testCase "204 No Content empty body" <| fun _ ->

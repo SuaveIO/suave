@@ -27,7 +27,7 @@ module Parsing =
 
   /// parse the url into its constituents and fill out the passed dictionary with
   /// query string key-value pairs
-  let inline parse_url (line : string) =
+  let inline parseUrl (line : string) =
     let parts = line.Split(' ')
     if parts.Length < 2 || parts.Length > 3 then failwith (sprintf "invalid url: '%s'" line)
     let indexOfMark = parts.[1].IndexOf('?')

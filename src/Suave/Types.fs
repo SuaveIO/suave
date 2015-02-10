@@ -294,20 +294,9 @@ type MimeType =
   { name         : string
     compression  : bool }
 
-[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
-module MimeType =
+  static member nameP = Property (fun x -> x.name) (fun v (x : MimeType) -> { x with name = v })
+  static member compressionP = Property (fun x -> x.compression) (fun v (x : MimeType) -> { x with compression = v })
 
-  let mk name compression =
-    { name        = name
-      compression = compression }
-
-  let name_ =
-    (fun x -> x.name),
-    fun v (x : MimeType) -> { x with name = v }
-
-  let compression_ =
-    (fun x -> x.compression),
-    fun v (x : MimeType) -> { x with compression = v }
 
 type MimeTypesMap = string -> MimeType option
 
@@ -407,20 +396,6 @@ module HttpRequest =
       isSecure        = false
       ipaddr           = IPAddress.Loopback }
 
-  let mk httpVersion url host meth headers rawQuery traceHeaders isSecure ipaddr =
-    { httpVersion      = httpVersion
-      url              = url
-      host             = host
-      ``method``       = meth
-      headers          = headers
-      rawForm          = Array.empty
-      rawQuery         = rawQuery
-      files            = []
-      multiPartFields  = []
-      trace            = traceHeaders
-      isSecure         = isSecure
-      ipaddr           = ipaddr }
-
 
 
 type ITlsProvider =
@@ -451,7 +426,7 @@ type HttpBinding(scheme: Protocol, socketBinding : SocketBinding) =
 
   member x.socketBinding = socketBinding
 
-  member x.Uri path query =
+  member x.uri path query =
     String.Concat [
       scheme.ToString(); "://"; socketBinding.ToString()
       path
@@ -473,7 +448,7 @@ type HttpBinding(scheme: Protocol, socketBinding : SocketBinding) =
 
   static member DefaultBindingPort = 8083us
 
-  static member Defaults = HttpBinding(HTTP, IPAddress.Loopback, HttpBinding.DefaultBindingPort)
+  static member defaults = HttpBinding(HTTP, IPAddress.Loopback, HttpBinding.DefaultBindingPort)
 
   static member schemeP = Property<HttpBinding,_> (fun x -> x.scheme) (fun v x -> HttpBinding(scheme=v,socketBinding=x.socketBinding))
   static member socketBindingP = Property<HttpBinding,_> (fun x -> x.socketBinding) (fun v x -> HttpBinding(scheme=x.scheme,socketBinding=v))
@@ -498,16 +473,9 @@ type HttpResult =
       headers = []
       content = HttpContent.NullContent }
 
-
-  static member status_ = Property<HttpResult,_> (fun x -> x.status) (fun v x -> { x with status = v })
-
-  static member headers_ =
-    (fun x -> x.headers),
-    fun v (x : HttpResult) -> { x with headers = v }
-
-  static member content_ =
-    (fun x -> x.content),
-    fun v (x : HttpResult) -> { x with content = v }
+  static member statusP = Property<HttpResult,_> (fun x -> x.status) (fun v x -> { x with status = v })
+  static member headersP = Property<HttpResult,_> (fun x -> x.headers) (fun v x -> { x with headers = v })
+  static member contentP = Property<HttpResult,_> (fun x -> x.content) (fun v x -> { x with content = v })
 
 /// A SuaveTask is an Async{'T option} which shows that it may need to be
 /// evaluated asynchronously to decide whether a value is available.
@@ -528,6 +496,15 @@ type HttpRuntime =
     logger             : Logger
     matchedBinding     : HttpBinding
     parsePostData      : bool }
+
+  static member serverKeyP = Property (fun x -> x.serverKey) (fun v x -> { x with serverKey = v })
+  static member errorHandlerP = Property (fun x -> x.errorHandler) (fun v x -> { x with errorHandler = v })
+  static member mimeTypesMapP = Property (fun x -> x.mimeTypesMap) (fun v x -> { x with mimeTypesMap = v })
+  static member homeDirectoryP = Property (fun x -> x.homeDirectory) (fun v x -> { x with homeDirectory = v })
+  static member compressionFolderP = Property (fun x -> x.compressionFolder) (fun v x -> { x with compressionFolder = v })
+  static member loggerP = Property (fun x -> x.logger) (fun v x -> { x with logger = v })
+  static member matchedBindingP = Property (fun x -> x.matchedBinding) (fun v x -> { x with matchedBinding = v })
+  static member parsePostDataP = Property (fun x -> x.parsePostData) (fun v x -> { x with parsePostData = v })
 
 /// The HttpContext is the container of the request, runtime, user-state and
 /// response.
@@ -568,8 +545,8 @@ module HttpRuntime =
       mimeTypesMap     = fun _ -> None
       homeDirectory     = "."
       compressionFolder = "."
-      logger             = Loggers.sane_defaults_for LogLevel.Debug
-      matchedBinding    = HttpBinding.Defaults
+      logger             = Loggers.saneDefaultsFor LogLevel.Debug
+      matchedBinding    = HttpBinding.defaults
       parsePostData    = false }
 
   /// make a new HttpRuntime from the given parameters
@@ -583,53 +560,6 @@ module HttpRuntime =
       matchedBinding    = binding
       parsePostData    = parsePostData }
 
-  let server_key x = x.serverKey
-
-  let server_key_ =
-    (fun x -> x.serverKey),
-    fun v x -> { x with serverKey = v }
-
-  let error_handler x = x.errorHandler
-
-  let error_handler_ =
-    (fun x -> x.errorHandler),
-    fun v x -> { x with errorHandler = v }
-
-  let mime_types_map x = x.mimeTypesMap
-
-  let mime_types_map_ =
-    (fun x -> x.mimeTypesMap),
-    fun v x -> { x with mimeTypesMap = v }
-
-  let home_directory x = x.homeDirectory
-
-  let home_directory_ =
-    (fun x -> x.homeDirectory),
-    fun v x -> { x with homeDirectory = v }
-
-  let compression_folder x = x.compressionFolder
-
-  let compression_folder_ =
-    (fun x -> x.compressionFolder),
-    fun v x -> { x with compressionFolder = v }
-
-  let logger x = x.logger
-
-  let logger_ =
-    (fun x -> x.logger),
-    fun v x -> { x with logger = v }
-
-  let matched_binding x = x.matchedBinding
-
-  let matched_binding_ =
-    (fun x -> x.matchedBinding),
-    fun v x -> { x with matchedBinding = v }
-
-  let parse_post_data x = x.parsePostData
-
-  let parse_post_data_ =
-    (fun x -> x.parsePostData),
-    fun v x -> { x with parsePostData = v }
 
 /// A module that provides functions to create a new HttpContext.
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]

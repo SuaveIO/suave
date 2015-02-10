@@ -35,7 +35,7 @@ let parsing_multipart =
 
   let test_multipart_form =
     request (fun r ->
-      match get_first r.multiPartFields "From" with
+      match getFirst r.multiPartFields "From" with
       | Some str -> OK str
       | None -> OK "field-does-not-exists")
 

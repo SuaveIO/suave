@@ -38,4 +38,4 @@ module Internals =
 
   let SUAVE_VERSION = Assembly.GetExecutingAssembly().GetName().Version.ToString()
 
-  let server_header = String.Concat [| "Server: Suave/"; SUAVE_VERSION; " (http://suave.io)" |]
+  let serverHeader = String.Concat [| "Server: Suave/"; SUAVE_VERSION; " (http://suave.io)" |]

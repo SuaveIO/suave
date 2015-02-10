@@ -27,25 +27,25 @@ let http_binding =
     testCase "IPv6 uri" <| fun _ ->
       let binding = HttpBinding(HTTP, IPAddress.IPv6Loopback, 8084us)
       Assert.Equal("uri", "http://[::1]:8084/a?b=2",
-                   binding.Uri "/a" "b=2" |> sprintf "%O")
+                   binding.uri "/a" "b=2" |> sprintf "%O")
 
     testCase "IPv6 uri 2" <| fun _ ->
       let binding = HttpBinding(HTTP, IPAddress.IPv6Loopback, 80us)
       Assert.Equal("uri", "http://[::1]/a?b=2",
-                   binding.Uri "/a" "b=2" |> sprintf "%O")
+                   binding.uri "/a" "b=2" |> sprintf "%O")
 
     testCase "IPv4 uri" <| fun _ ->
       let binding = HttpBinding(HTTP, IPAddress.Loopback, 8084us)
       Assert.Equal("uri", "http://127.0.0.1:8084/a?b=2",
-                   binding.Uri "/a" "b=2" |> sprintf "%O")
+                   binding.uri "/a" "b=2" |> sprintf "%O")
 
     testCase "IPv4 uri 2" <| fun _ ->
       let binding = HttpBinding(HTTP, IPAddress.Loopback, 80us)
       Assert.Equal("uri", "http://127.0.0.1/a?b=2",
-                   binding.Uri "/a" "b=2" |> sprintf "%O")
+                   binding.uri "/a" "b=2" |> sprintf "%O")
 
     testCase "IPv4 uri 3" <| fun _ ->
       let binding = HttpBinding(HTTP, IPAddress.Loopback, 80us)
       Assert.Equal("uri", "http://127.0.0.1/",
-                   binding.Uri "/" "" |> sprintf "%O")
+                   binding.uri "/" "" |> sprintf "%O")
     ]

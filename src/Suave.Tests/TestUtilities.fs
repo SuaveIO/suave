@@ -22,17 +22,18 @@ open Fuchu
 
 type Arbs =
   static member String () = Arb.Default.String () |> Arb.filter (fun str -> str <> null)
-let fscheck_config = { Config.Default with Arbitrary = [ typeof<Arbs> ] }
 
-let current_path =
+let fsCheckConfig = { Config.Default with Arbitrary = [ typeof<Arbs> ] }
+
+let currentPath =
   Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location)
 
 let read_text relative_path =
-  File.ReadAllText(Path.Combine(current_path, relative_path))
+  File.ReadAllText(Path.Combine(currentPath, relative_path))
 
 let read_bytes relative_path =
-  File.ReadAllBytes(Path.Combine(current_path, relative_path))
+  File.ReadAllBytes(Path.Combine(currentPath, relative_path))
 
 let defaultConfig =
   { SuaveConfig.defaults with
-      logger = Loggers.sane_defaults_for LogLevel.Warn }
+      logger = Loggers.saneDefaultsFor LogLevel.Warn }

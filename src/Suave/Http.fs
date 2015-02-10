@@ -121,8 +121,8 @@ module Http =
       |> succeed
 
     // TODO: I'm not sure about having MIME types in the Writers module
-    let mkMimeType a b =
-      MimeType.mk a b |> Some
+    let mkMimeType name compression =
+      { name=name; compression=compression } |> Some
 
     let defaultMimeTypesMap = function
       | ".bmp" -> mkMimeType "image/bmp" false
@@ -498,11 +498,11 @@ module Http =
         let get_lm = fun path -> FileInfo(path).LastWriteTime
         use! fs = Compression.transform_x file get_fs get_lm compression ctx.runtime.compressionFolder ctx conn
 
-        do! async_writeln conn (sprintf "Content-Length: %d" (fs : Stream).Length)
-        do! async_writeln conn ""
+        do! asyncWriteLn conn (sprintf "Content-Length: %d" (fs : Stream).Length)
+        do! asyncWriteLn conn ""
 
         if fs.Length > 0L then
-          do! transfer_x conn fs
+          do! transferStream conn fs
       }
       { ctx with
           response =
@@ -615,11 +615,11 @@ module Http =
         let get_lm = fun _ -> lastModified assembly
         use! fs = Compression.transform_x name get_fs get_lm compression ctx.runtime.compressionFolder ctx conn
 
-        do! async_writeln conn (sprintf "Content-Length: %d" (fs: Stream).Length)
-        do! async_writeln conn ""
+        do! asyncWriteLn conn (sprintf "Content-Length: %d" (fs: Stream).Length)
+        do! asyncWriteLn conn ""
 
         if fs.Length > 0L then
-          do! transfer_x conn fs
+          do! transferStream conn fs
       }
       { ctx with
           response =
@@ -665,10 +665,10 @@ module Http =
     let private ES_EOL_S = ArraySegment<_>(UTF8.bytes ES_EOL, 0, 1)
 
     let async_write (out : Connection) (data : string) =
-      async_writebytes out (UTF8.bytes data)
+      asyncWriteBytes out (UTF8.bytes data)
 
     let (<<.) (out : Connection) (data : string) =
-      async_writebytes out (UTF8.bytes data)
+      asyncWriteBytes out (UTF8.bytes data)
 
     let dispatch (out : Connection) =
       send out ES_EOL_S

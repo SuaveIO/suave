@@ -136,7 +136,7 @@ module Crypto =
         TruncatedMessage (
           sprintf "cipher text length was %d but expected >= %d"
                   cipher_text.Length (HMACLength + IVLength)))
-    elif not (Bytes.cnst_time_cmp hmac_calc hmac_given) then
+    elif not (Bytes.constantTimeCompare hmac_calc hmac_given) then
       Choice2Of2 (AlteredOrCorruptMessage "calculated HMAC does not match expected/given")
     else
       let iv = Array.zeroCreate<byte> IVLength

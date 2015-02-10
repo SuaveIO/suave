@@ -61,7 +61,7 @@ module Loggers =
     interface Logger with
       member x.Log level f_line = if level >= min_level then log (f_line ())
 
-  let sane_defaults_for level =
+  let saneDefaultsFor level =
     if level >= LogLevel.Warn then
       ConsoleWindowLogger(level) :> Logger
     else

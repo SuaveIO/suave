@@ -11,7 +11,7 @@ module internal ASCII =
 
   /// Convert the byte array of ASCII-encoded chars to a string, starting at 'index' for 'count' characters
   /// (each character is necessarily one byte)
-  let inline to_string (buff : byte[]) (index : int) (count : int) =
+  let inline toString (buff : byte[]) (index : int) (count : int) =
     Encoding.ASCII.GetString(buff, index, count)
 
   let inline to_string' (b : byte []) =

@@ -20,7 +20,7 @@ open Suave.Http.RequestErrors
 
 open Suave.Testing
 
-let run_with' = runWith { SuaveConfig.defaults with logger = Loggers.sane_defaults_for LogLevel.Debug }
+let run_with' = runWith { SuaveConfig.defaults with logger = Loggers.saneDefaultsFor LogLevel.Debug }
 
 type Assert with
   static member Null (msg : string, o : obj) =
