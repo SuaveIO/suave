@@ -64,7 +64,7 @@ testCase "parsing a large multipart form" <| fun _ ->
 
   let res =
     run_with' (OK "hi")
-    |> req HttpMethod.POST "/" (Some <| byte_array_content)
+    |> req HttpMethod.POST "/" (Some byte_array_content)
 
   Assert.Equal("should get the correct result", "hi", res)
 ```
