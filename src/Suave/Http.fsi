@@ -1359,11 +1359,6 @@ module Http =
     /// </remarks>
     val resolvePath : rootPath:string -> fileName:string -> string
 
-    /// Deprecated: use `resolve_path` and swap the arguments' positions. It
-    /// has been deprecated so that you can curry the rootPath in your function
-    /// scope, with the root path.
-    [<System.Obsolete("Use resolvePath")>]
-    val local_file : fileName:string -> rootPath:string -> string
 
     /// <summary><para>
     /// 'browse' the file given as the filename, by sending it to the browser with a
@@ -1407,6 +1402,21 @@ module Http =
     /// Serve a 'file browser' for the current directory
     /// </para></summary>
     val dirHomeDirectory : WebPart
+
+    [<System.Obsolete("Use dirHomeDirectory")>]
+    val dir' : WebPart
+    [<System.Obsolete("Use browseHomeDirectory")>]
+    val browse' : WebPart
+    [<System.Obsolete("Use browseFileInHomeDirectory")>]
+    val browse_file' : fileName:string -> WebPart
+    [<System.Obsolete("Use browseFile")>]
+    val browse_file : rootPath:string -> fileName:string -> WebPart
+    [<System.Obsolete("Use resolvePath")>]
+    val local_file : fileName:string -> rootPath:string -> string
+    [<System.Obsolete("Use resolvePath")>]
+    val resolve_path : rootPath:string -> fileName:string -> string
+    [<System.Obsolete("Use sendFile")>]
+    val send_file : fileName:string -> compression:bool -> WebPart
 
   module Embedded =
 
@@ -1460,6 +1470,15 @@ module Http =
     /// <remarks>
     /// </remarks>
     val browseDefaultAsssembly : WebPart
+
+    [<System.Obsolete("Use browseDefaultAsssembly")>]
+    val internal browse' : WebPart
+    [<System.Obsolete("Use resourceFromDefaultAssembly")>]
+    val resource' : name:string -> WebPart
+    [<System.Obsolete("Use sendResource")>]
+    val send_resource : source:Assembly -> resource_name:string -> compression:bool -> WebPart
+    [<System.Obsolete("Use sendResourceFromDefaultAssembly")>]
+    val send_resource' : resource_name:string -> compression:bool -> WebPart
 
   /// A module that implements the Server-Sent Event specification, which can be
   /// read at www.w3.org/TR/eventsource.
@@ -1518,6 +1537,9 @@ module Http =
     /// to start a new event-stream protocol session with the browser.
     val handShake : f_cont:(Connection -> SocketOp<unit>) -> WebPart
 
+    [<System.Obsolete("Use handShake")>]
+    val hand_shake : f_cont:(Connection -> SocketOp<unit>) -> WebPart
+
   module Authentication =
 
     /// <summary><para>
@@ -1540,3 +1562,7 @@ module Http =
     /// <remarks>
     /// </remarks>
     val authenticateBasic : f:(string * string -> bool) -> WebPart
+
+    [<System.Obsolete("Use authenticateBasic")>]
+    val authenticate_basic : f:(string * string -> bool) -> WebPart
+

@@ -102,9 +102,6 @@ module Http =
           { ctx.response with status = statusCode; content = Bytes cnt }
         { ctx with response = response } |> succeed
 
-    [<Obsolete("Renamed to statusCode'")>]
-    let status_code = statusCode
-
   module Writers =
     // TODO: transform into a set of lenses with Aether
     // @ https://github.com/xyncro/aether and move closer to HttpContext.
@@ -623,7 +620,7 @@ module Http =
     open Response
     open ServeResource
     
-    let default_source_assembly =
+    let defaultSourceAssembly =
       if Assembly.GetEntryAssembly() = null
       then Assembly.GetCallingAssembly()
       else Assembly.GetEntryAssembly()
@@ -657,7 +654,7 @@ module Http =
       |> succeed
 
     let sendResourceFromDefaultAssembly resource_name compression =
-      sendResource default_source_assembly resource_name compression
+      sendResource defaultSourceAssembly resource_name compression
 
     let resource assembly name =
       resource
@@ -668,13 +665,26 @@ module Http =
         (sendResource assembly)
 
     let resourceFromDefaultAssembly name =
-      resource default_source_assembly name
+      resource defaultSourceAssembly name
 
     let browse assembly =
       warbler (fun ctx -> resource assembly (ctx.request.url.AbsolutePath.TrimStart [|'/'|]))
 
     let browseDefaultAsssembly =
-      browse default_source_assembly
+      browse defaultSourceAssembly
+
+    [<Obsolete("Use browseDefaultAsssembly")>]
+    let browse' = browseDefaultAsssembly 
+    [<Obsolete("Use resourceFromDefaultAssembly")>]
+    let resource' name = resourceFromDefaultAssembly name
+    [<Obsolete("Use sendResourceFromDefaultAssembly")>]
+    let send_resource' resource_name compression = sendResourceFromDefaultAssembly resource_name compression
+    [<Obsolete("Use sendResource")>]
+    let send_resource assembly resource_name compression ctx = sendResource assembly resource_name compression ctx
+    [<Obsolete("Use lastModified")>]
+    let last_modified assembly = lastModified assembly
+    [<Obsolete("Use defaultSourceAssembly")>]
+    let default_source_assembly = defaultSourceAssembly
 
   // See www.w3.org/TR/eventsource/#event-stream-interpretation
   module EventSource =
@@ -744,7 +754,7 @@ module Http =
         do! 2000u |> retry out
         return! f out }
 
-    let handShake f ({ request = req } as ctx : HttpContext) =
+    let handShake f (ctx : HttpContext) =
       { ctx with
           response =
             { ctx.response with
@@ -759,6 +769,9 @@ module Http =
             }
       }
       |> succeed
+
+    [<Obsolete("Use handShake")>]
+    let hand_shake f ctx = handShake f ctx
 
   module Authentication =
 
@@ -784,3 +797,6 @@ module Http =
           challenge { ctx with userState = ctx.userState.Add("user_name",username) }
       | None ->
         challenge ctx
+
+    [<System.Obsolete("Use authenticateBasic")>]
+    let authenticate_basic f ctx = authenticateBasic f ctx
