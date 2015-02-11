@@ -48,9 +48,9 @@ let reqResp
 
   let default_timeout = TimeSpan.FromSeconds 5.
 
-  use handler = mk_handler DecompressionMethods.None cookies
-  use client = mk_client handler
-  use request = mk_request methd resource "" None (endpointUri ctx.suave_config) |> f_request
+  use handler = mkHandler DecompressionMethods.None cookies
+  use client = mkClient handler
+  use request = mkRequest methd resource "" None (endpointUri ctx.suave_config) |> f_request
 
   for h in request.Headers do
     log (sprintf "%s: %s" h.Key (String.Join(", ", h.Value)))
@@ -73,7 +73,7 @@ let req_cookies cookies ctx methd resource f_req =
 let cookies suaveConfig (container : CookieContainer) =
   container.GetCookies(endpointUri suaveConfig)
 
-let interaction ctx f_ctx = with_context f_ctx ctx
+let interaction ctx f_ctx = withContext f_ctx ctx
 
 let interact methd resource container ctx =
   let response = req_cookies container ctx methd resource id
@@ -93,12 +93,12 @@ let tests =
   testList "auth tests" [
     testCase "baseline, no auth cookie" <| fun _ ->
       let ctx = runWith' (OK "ACK")
-      let cookies = ctx |> req_cookies' HttpMethod.GET "/"  None
+      let cookies = ctx |> reqCookies' HttpMethod.GET "/"  None
       Assert.Null("should not have auth cookie", cookies.[Auth.SessionAuthCookie])
       
     testCase "can set cookie" <| fun _ ->
       let ctx = runWith' (Auth.authenticated Session false >>= OK "ACK")
-      let cookies = ctx |> req_cookies' HttpMethod.GET "/"  None
+      let cookies = ctx |> reqCookies' HttpMethod.GET "/"  None
       Assert.NotNull("should have auth cookie", cookies.[Auth.SessionAuthCookie])
 
     testCase "can access authenticated contents" <| fun _ ->
@@ -125,24 +125,24 @@ let tests =
       // when
       interaction ctx <| fun _ ->
         use res = interact HttpMethod.GET "/"
-        Assert.Equal("should allow root request", "root", content_string res)
+        Assert.Equal("should allow root request", "root", contentString res)
 
         match cookies.[Auth.SessionAuthCookie] with
         | null -> ()
         | cookie -> Tests.failtestf "should not have auth cookie, but was %A" cookie
 
         use res' = interact HttpMethod.GET "/protected"
-        Assert.Equal("should not have access to protected", "please authenticate", content_string res')
-        Assert.Equal("code 403 FORBIDDEN", HttpStatusCode.Forbidden, status_code res')
+        Assert.Equal("should not have access to protected", "please authenticate", contentString res')
+        Assert.Equal("code 403 FORBIDDEN", HttpStatusCode.Forbidden, statusCode res')
 
         use res'' = interact HttpMethod.GET "/auth"
         Assert.Contains("after authentication", (fun (str : string) -> str.Contains("auth=")),
                                                 res''.Headers.GetValues "Set-Cookie")
-        Assert.Equal("after authentication", "authed", content_string res'')
+        Assert.Equal("after authentication", "authed", contentString res'')
 
         use res''' = interact HttpMethod.GET "/protected"
-        Assert.Equal("should have access to protected", "You have reached the place of your dreams!", content_string res''')
-        Assert.Equal("code 200 OK", HttpStatusCode.OK, status_code res''')
+        Assert.Equal("should have access to protected", "You have reached the place of your dreams!", contentString res''')
+        Assert.Equal("code 200 OK", HttpStatusCode.OK, statusCode res''')
 
     testCase "test session is maintained across requests" <| fun _ ->
       // given
@@ -163,13 +163,13 @@ let tests =
 
       interaction ctx  (fun _ ->
         use res = interact HttpMethod.GET "/"
-        Assert.Equal("should return number zero", "0", content_string res)
+        Assert.Equal("should return number zero", "0", contentString res)
 
         use res' = interact HttpMethod.GET "/"
-        Assert.Equal("should return number one", "1", content_string res')
+        Assert.Equal("should return number one", "1", contentString res')
 
         use res'' = interact HttpMethod.GET "/"
-        Assert.Equal("should return number two", "2", content_string res''))
+        Assert.Equal("should return number two", "2", contentString res''))
 
     testCase "set more than one variable in the session" <| fun _ ->
       // given
@@ -188,16 +188,16 @@ let tests =
 
       interaction ctx  (fun _ ->
         use res = interact HttpMethod.GET "/a"
-        Assert.Equal("should return a", "a", content_string res)
+        Assert.Equal("should return a", "a", contentString res)
 
         use res' = interact HttpMethod.GET "/b"
-        Assert.Equal("should return b", "b", content_string res')
+        Assert.Equal("should return b", "b", contentString res')
 
         use res'' = interact HttpMethod.GET "/get_a"
-        Assert.Equal("should return a", "a", content_string res'')
+        Assert.Equal("should return a", "a", contentString res'')
 
         use res''' = interact HttpMethod.GET "/get_b"
-        Assert.Equal("should return b", "b", content_string res'''))
+        Assert.Equal("should return b", "b", contentString res'''))
         
     testCase "set two session values on the same request" <| fun _ ->
       // given
@@ -214,11 +214,11 @@ let tests =
 
       interaction ctx  (fun _ ->
         use res = interact HttpMethod.GET "/ab"
-        Assert.Equal("should return a", "a", content_string res)
+        Assert.Equal("should return a", "a", contentString res)
 
         use res''' = interact HttpMethod.GET "/get_b"
-        Assert.Equal("should return b", "b", content_string res''')
+        Assert.Equal("should return b", "b", contentString res''')
 
         use res'' = interact HttpMethod.GET "/get_a"
-        Assert.Equal("should return a", "a", content_string res''))
+        Assert.Equal("should return a", "a", contentString res''))
     ]

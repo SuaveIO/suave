@@ -48,12 +48,12 @@ let tests =
         "should have read data",
         "identifier 123abc",
         runWith' (test_url_encoded_form "body-plain")
-        |> req_gzip HttpMethod.POST "/" (Some <| new StringContent(post_data3, Encoding.UTF8, "application/x-www-form-urlencoded")))
+        |> reqGZip HttpMethod.POST "/" (Some <| new StringContent(post_data3, Encoding.UTF8, "application/x-www-form-urlencoded")))
 
     testCase "200 OK returns 'a'" <| fun _ ->
       Assert.Equal(
         "expecting nilsson response",
         "nilsson",
         runWith' (Binding.bind_req (Binding.query "apa" Choice1Of2) OK BAD_REQUEST)
-        |> req_query HttpMethod.GET "/" "apa=nilsson")
+        |> reqQuery HttpMethod.GET "/" "apa=nilsson")
     ]

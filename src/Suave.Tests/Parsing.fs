@@ -48,21 +48,21 @@ let parsing_multipart =
 
       testCase "parsing a large urlencoded form data" <| fun _ ->
         Assert.Equal("", "hallo wereld", 
-          runWith' (test_url_encoded_form "stripped-text") |> req_gzip HttpMethod.POST "/" (Some <| new StringContent(post_data2, Encoding.UTF8, "application/x-www-form-urlencoded")))
+          runWith' (test_url_encoded_form "stripped-text") |> reqGZip HttpMethod.POST "/" (Some <| new StringContent(post_data2, Encoding.UTF8, "application/x-www-form-urlencoded")))
 
       testCase "parsing a large urlencoded form data" <| fun _ ->
         Assert.Equal("", "Pepijn de Vos <pepijndevos@gmail.com>", 
-          runWith' (test_url_encoded_form "from") |> req_gzip HttpMethod.POST "/" (Some <| new StringContent(post_data3, Encoding.UTF8, "application/x-www-form-urlencoded")))
+          runWith' (test_url_encoded_form "from") |> reqGZip HttpMethod.POST "/" (Some <| new StringContent(post_data3, Encoding.UTF8, "application/x-www-form-urlencoded")))
 
       testCase "parsing a large urlencoded form data" <| fun _ ->
         Assert.Equal("", "no attachment 2", 
-          runWith' (test_url_encoded_form "subject") |> req_gzip HttpMethod.POST "/" (Some <| new StringContent(post_data3, Encoding.UTF8, "application/x-www-form-urlencoded")))
+          runWith' (test_url_encoded_form "subject") |> reqGZip HttpMethod.POST "/" (Some <| new StringContent(post_data3, Encoding.UTF8, "application/x-www-form-urlencoded")))
 
       testCase "parsing a large urlencoded form data" <| fun _ ->
         Assert.Equal("", "identifier 123abc", 
-          runWith' (test_url_encoded_form "body-plain") |> req_gzip HttpMethod.POST "/" (Some <| new StringContent(post_data3, Encoding.UTF8, "application/x-www-form-urlencoded")))
+          runWith' (test_url_encoded_form "body-plain") |> reqGZip HttpMethod.POST "/" (Some <| new StringContent(post_data3, Encoding.UTF8, "application/x-www-form-urlencoded")))
 
       testCase "parsing a large urlencoded form data" <| fun _ ->
         Assert.Equal("", "field-does-not-exists", 
-          runWith' (test_url_encoded_form "body-html") |> req_gzip HttpMethod.POST "/" (Some <| new StringContent(post_data3, Encoding.UTF8, "application/x-www-form-urlencoded")))
+          runWith' (test_url_encoded_form "body-html") |> reqGZip HttpMethod.POST "/" (Some <| new StringContent(post_data3, Encoding.UTF8, "application/x-www-form-urlencoded")))
   ]

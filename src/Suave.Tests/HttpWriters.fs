@@ -30,21 +30,21 @@ let cookies =
       testCase "cookie data makes round trip" <| fun _ ->
         Assert.Equal("expecting cookie value"
         , "42"
-        , (req_cookies HttpMethod.GET "/" None
+        , (reqCookies HttpMethod.GET "/" None
           (runWith' (Cookie.setCookie basic_cookie >>= OK "test")))
             .GetCookies(Uri("http://127.0.0.1")).[0].Value)
 
       testCase "cookie name makes round trip" <| fun _ ->
         Assert.Equal("expecting cookie name"
         , "mycookie"
-        , (req_cookies HttpMethod.GET "/" None
+        , (reqCookies HttpMethod.GET "/" None
             (runWith' (Cookie.setCookie basic_cookie >>= OK "test")))
             .GetCookies(Uri("http://127.0.0.1")).[0].Name)
 
       testCase "http_only cookie is http_only" <| fun _ ->
         Assert.Equal("expecting http_only"
         , true
-        , (req_cookies HttpMethod.GET "/" None
+        , (reqCookies HttpMethod.GET "/" None
           (runWith' (Cookie.setCookie { basic_cookie with httpOnly = true } >>= OK "test")))
             .GetCookies(Uri("http://127.0.0.1")).[0].HttpOnly)
     ]
