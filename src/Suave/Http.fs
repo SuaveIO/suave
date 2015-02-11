@@ -422,7 +422,7 @@ module Http =
           fail
       F
           
-    let timeoutHttpPart (time_span : TimeSpan) (web_part : WebPart) : WebPart =
+    let timeoutWebPart (time_span : TimeSpan) (web_part : WebPart) : WebPart =
       fun (ctx : HttpContext) -> async {
         try
           return! Async.WithTimeout (time_span, web_part ctx)

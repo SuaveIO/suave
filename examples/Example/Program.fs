@@ -44,7 +44,7 @@ let testApp =
 
 System.Net.ServicePointManager.DefaultConnectionLimit <- Int32.MaxValue
 
-// How to write a new primitive HttpPart
+// How to write a new primitive WebPart
 let sleep milliseconds message: WebPart =
   fun (x : HttpContext) ->
     async {
@@ -70,7 +70,7 @@ let app =
     url "/redirect" >>= Redirection.redirect "/redirected"
     url "/redirected" >>=  OK "You have been redirected."
     url "/date" >>= warbler (fun _ -> OK (DateTimeOffset.UtcNow.ToString("o")))
-    url "/timeout" >>= timeoutHttpPart (TimeSpan.FromSeconds 1.) (sleep 120000 "Did not timed out")
+    url "/timeout" >>= timeoutWebPart (TimeSpan.FromSeconds 1.) (sleep 120000 "Did not timed out")
     url "/session"
       >>= statefulForSession // Session.State.CookieStateStore
       >>= context (fun x ->

@@ -5,7 +5,7 @@ open Suave.Http
 
 open Successful
 
-let app : HttpPart =
+let app : WebPart =
   choose [
     Applicatives.POST
       >>= ((Applicatives.url "/special") >=> (Applicatives.url_regex @"^/api/\w/.*$"))

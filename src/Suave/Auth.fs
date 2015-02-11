@@ -92,7 +92,7 @@ let authenticated relativeExpiry secure : WebPart =
                  (fun _ -> Choice1Of2 data)
                  Suave.Http.succeed)
 
-//  let deauthenticate : HttpPart =
+//  let deauthenticate : WebPart =
 //    Cookies.unset_cookies
   
 module HttpContext =

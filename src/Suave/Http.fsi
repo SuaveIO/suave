@@ -21,7 +21,7 @@
 /// <para>and these main types:</para>
 /// <list>
 ///   <item>WebResult = Async&lt;unit&gt; option</item>
-///   <item>HttpPart = HttpContext -&gt; WebResult</item>
+///   <item>WebPart = HttpContext -&gt; WebResult</item>
 ///   <item>HttpMethod</item>
 /// </list>
 /// </summary>
@@ -1116,8 +1116,8 @@ module Http =
     /// </para></summary>
     val urlScan : pf:PrintfFormat<'a,'b,'c,'d,'t> -> h:('t -> WebPart) -> WebPart
 
-    /// <summary> Fails the HttpPart after x seconds</summary>
-    val timeoutHttpPart : x:System.TimeSpan -> WebPart -> WebPart
+    /// <summary> Fails the WebPart after x seconds</summary>
+    val timeoutWebPart : x:System.TimeSpan -> WebPart -> WebPart
 
     /// <summary>
     /// Match on GET requests.

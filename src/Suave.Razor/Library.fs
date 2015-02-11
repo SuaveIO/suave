@@ -33,11 +33,11 @@ module Razor =
       return razorTemplate
     }
 
-  /// razor HttpPart
+  /// razor WebPart
   ///
   /// type Bar = { foo : string }
   ///
-  /// let app : HttpPart =
+  /// let app : WebPart =
   ///   url "/home" >>= razor "/home.chtml" { foo = "Bar" }
   ///
   let razor<'a> path (model : 'a) =

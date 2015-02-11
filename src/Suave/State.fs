@@ -79,9 +79,16 @@ module CookieStateStore =
   let statefulForSession : WebPart =
     stateful Session false
 
+  [<Obsolete("Renamed to decodeMap")>]
+  let decode_map bytes = decodeMap bytes
+  [<Obsolete("Renamed to encodeMap")>]
+  let encode_map bytes = encodeMap bytes
+  [<Obsolete("Renamed to statefulForSession")>]
+  let stateful' = statefulForSession
+
   module HttpContext =
 
-    let private mk_state_store (user_state : Map<string, obj>) (ss : obj) =
+    let private mkStateStore (user_state : Map<string, obj>) (ss : obj) =
       { new StateStore with
           member x.get key =
             decodeMap (ss :?> byte []) |> Map.tryFind key
@@ -95,7 +102,7 @@ module CookieStateStore =
     let state (ctx : HttpContext) =
       ctx.userState
       |> Map.tryFind StateStoreType
-      |> Option.map (mk_state_store ctx.userState)
+      |> Option.map (mkStateStore ctx.userState)
 
 /// This module contains the implementation for the memory-cache backed session
 /// state store, when the memory cache is global for the server.
@@ -104,7 +111,7 @@ module MemoryCacheStateStore =
   open System.Runtime.Caching
   open System.Collections.Concurrent
 
-  /// This key will be present in HttpContext.user_state and will contain the
+  /// This key will be present in HttpContext.userState and will contain the
   /// MemoryCache instance.
   [<Literal>]
   let StateStoreType = "Suave.State.MemoryCacheStateStore"
@@ -131,6 +138,9 @@ module MemoryCacheStateStore =
       |> Option.map (fun ss -> ss :?> StateStore)
       |> Option.get
       
+    [<Obsolete("Renamed to stateId")>]
+    let state_id ctx = stateId ctx
+
   let private wrap (sessionMap : MemoryCache) relativeExpiry sessionId =
     let exp = function
       | Session   -> CacheItemPolicy()

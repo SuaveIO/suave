@@ -398,12 +398,12 @@ module internal ParsingAndControl =
   }
 
   type HttpConsumer =
-    | HttpPart of WebPart
+    | WebPart of WebPart
     | SocketPart of (HttpContext -> Async<(HttpContext -> SocketOp<HttpContext option>) option >)
 
   let operate consumer ctx = socket {
     match consumer with
-    | HttpPart webPart ->
+    | WebPart webPart ->
       return! run ctx webPart
     | SocketPart writer ->
       let! intermediate = liftAsync <| writer ctx
@@ -475,7 +475,7 @@ module internal ParsingAndControl =
   let createHttpServer (bufferSize, maxOps) (webpart : WebPart) (runtime : HttpRuntime) =
     createTcpIpServer 
         (bufferSize, maxOps, runtime.logger, 
-         requestLoop runtime (HttpPart webpart), runtime.matchedBinding.socketBinding)
+         requestLoop runtime (WebPart webpart), runtime.matchedBinding.socketBinding)
 
   let resolveDirectory homeDirectory =
     match homeDirectory with
