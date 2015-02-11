@@ -450,9 +450,6 @@ type HttpResult =
   static member headersP = Property<HttpResult,_> (fun x -> x.headers) (fun v x -> { x with headers = v })
   static member contentP = Property<HttpResult,_> (fun x -> x.content) (fun v x -> { x with content = v })
 
-/// A SuaveTask is an Async{'T option} which shows that it may need to be
-/// evaluated asynchronously to decide whether a value is available.
-type SuaveTask<'T> = Async<'T option>
 
 /// A server-key is a 256 bit key with high entropy
 type ServerKey = byte []
@@ -488,7 +485,9 @@ and HttpContext =
     userState  : Map<string, obj>
     response   : HttpResult }
 
-and WebPart = HttpContext -> SuaveTask<HttpContext>
+/// A WebPart is an asynchronous function that transforms the HttpContext.  An asynchronous return
+/// value of None indicates 'did not handle'. 
+and WebPart = HttpContext -> Async<HttpContext option>
 
 /// An error handler takes the exception, a programmer-provided message, a
 /// request (that failed) and returns an asynchronous workflow for the handling

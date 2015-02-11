@@ -118,7 +118,7 @@ module MemoryCacheStateStore =
   module HttpContext =
 
     /// Try to find the state id of the HttpContext.
-    let state_id ctx =
+    let stateId ctx =
       ctx.userState
       |> Map.tryFind UserStateIdKey
       |> Option.map (fun x -> x :?> string)
@@ -131,34 +131,34 @@ module MemoryCacheStateStore =
       |> Option.map (fun ss -> ss :?> StateStore)
       |> Option.get
       
-  let private wrap (session_map : MemoryCache) relativeExpiry session_id =
+  let private wrap (sessionMap : MemoryCache) relativeExpiry sessionId =
     let exp = function
       | Session   -> CacheItemPolicy()
       | MaxAge ts -> CacheItemPolicy(SlidingExpiration = ts)
 
-    let state_bag =
-      lock session_map (fun _->
-        if session_map.Contains session_id then
-          session_map.Get session_id
+    let stateBag =
+      lock sessionMap (fun _->
+        if sessionMap.Contains sessionId then
+          sessionMap.Get sessionId
           :?> ConcurrentDictionary<string, obj>
         else
           let cd = new ConcurrentDictionary<string, obj>()
-          session_map.Set(CacheItem(session_id, cd), exp relativeExpiry)
+          sessionMap.Set(CacheItem(sessionId, cd), exp relativeExpiry)
           cd)
 
     { new StateStore with
         member x.get key =
-          if state_bag.ContainsKey key then
-            Some (state_bag.[key] :?> 'T)
+          if stateBag.ContainsKey key then
+            Some (stateBag.[key] :?> 'T)
           else None
         member x.set key value =
-          state_bag.[key] <- value
+          stateBag.[key] <- value
           succeed }
 
   let stateful relativeExpiry : WebPart =
-    let state_store = wrap (MemoryCache.Default) relativeExpiry
+    let stateStore = wrap (MemoryCache.Default) relativeExpiry
     context (fun ctx ->
-      let state_id = ctx |> HttpContext.state_id
-      Writers.setUserData StateStoreType (state_store state_id))
+      let stateId = ctx |> HttpContext.stateId
+      Writers.setUserData StateStoreType (stateStore stateId))
 
   let DefaultExpiry = TimeSpan.FromMinutes 30. |> MaxAge
