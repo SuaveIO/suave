@@ -26,7 +26,7 @@ let app =
 
 let config =
   { SuaveConfig.defaults with
-     bindings = [ HttpBinding(HTTP, IPAddress.Loopback, 3000us) ] }
+     bindings = [ HttpBinding.mk HTTP IPAddress.Loopback 3000us ] }
 
 [<EntryPoint>]
 let main _ =

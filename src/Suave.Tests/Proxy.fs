@@ -39,8 +39,8 @@ let proxy =
   // let proxy_config = { default_config with bindings = [ HttpBinding.Create(Protocol.HTTPS(sslCert), "127.0.0.1", 8084) ] }
   let proxy_config =
     { defaultConfig with
-        bindings = [ HttpBinding(HTTP, IPAddress.Loopback, 8084us) ] }
-  let proxy = runWithFactory createProxyServerAsync proxy_config
+        bindings = [ HttpBinding.mk HTTP IPAddress.Loopback 8084us ] }
+  let proxy = runWithFactory createReverseProxyServerAsync proxy_config
 
   testList "creating proxy" [
     testPropertyWithConfig fsCheckConfig "GET / returns 200 OK with passed string" <| fun str ->

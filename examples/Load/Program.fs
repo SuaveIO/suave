@@ -13,7 +13,7 @@ let logger = Loggers.saneDefaultsFor LogLevel.Verbose
 
 let config = 
   { SuaveConfig.defaults with 
-      bindings = [ HttpBinding(HTTP, "127.0.0.1", 8082) ]
+      bindings = [ HttpBinding.mk' HTTP "127.0.0.1" 8082 ]
       bufferSize = 2048
       maxOps = 10000
       logger = logger }

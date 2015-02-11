@@ -115,7 +115,7 @@ let createReverseProxyServerAsync (config : SuaveConfig) resolver =
     Path.Combine(ParsingAndControl.resolveDirectory config.compressedFilesFolder, "_temporary_compressed_files")
   let all =
     [ for binding in config.bindings do 
-        let reqLoop = ParsingAndControl.requestLoop (config.ToRuntime homeFolder compressionFolder false binding )  (SocketPart (proxy resolver))
+        let reqLoop = ParsingAndControl.requestLoop (SuaveConfig.to_runtime config homeFolder compressionFolder false binding )  (SocketPart (proxy resolver))
         let server = createTcpIpServer (config.bufferSize, config.maxOps) config.logger reqLoop binding.socketBinding
         yield server ]
       

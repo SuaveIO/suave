@@ -26,3 +26,7 @@ type SocketBinding =
 
   static member ip_ = Property<SocketBinding,_> (fun x -> x.ip) (fun v x -> { x with ip=v })
   static member port_ = Property<SocketBinding,_> (fun x -> x.port) (fun v x -> { x with port=v })
+
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module SocketBinding =
+  let mk ip port = { ip = ip; port = port }

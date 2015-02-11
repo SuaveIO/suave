@@ -108,7 +108,7 @@ let app =
 [<EntryPoint>]
 let main argv =
   startWebServer
-    { bindings         = [ HttpBinding(HTTP, "127.0.0.1", 8082) ]
+    { bindings         = [ HttpBinding.mk' HTTP "127.0.0.1" 8082 ]
       serverKey       = Utils.Crypto.generateKey HttpRuntime.ServerKeyLength
       errorHandler    = defaultErrorHandler
       listenTimeout   = TimeSpan.FromMilliseconds 2000.

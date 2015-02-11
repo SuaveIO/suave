@@ -416,15 +416,13 @@ type Protocol =
 
 
 /// A HTTP binding is a protocol is the product of HTTP or HTTP, a DNS or IP binding and a port number
-type HttpBinding(scheme: Protocol, socketBinding : SocketBinding) =
-
-  member x.scheme  = scheme
-
-  member x.socketBinding = socketBinding
+type HttpBinding = 
+  { scheme: Protocol
+    socketBinding : SocketBinding } 
 
   member x.uri path query =
     String.Concat [
-      scheme.ToString(); "://"; socketBinding.ToString()
+      x.scheme.ToString(); "://"; x.socketBinding.ToString()
       path
       (match query with | "" -> "" | qs -> "?" + qs)
     ]
@@ -432,22 +430,33 @@ type HttpBinding(scheme: Protocol, socketBinding : SocketBinding) =
 
   /// Overrides the default ToString() method to provide an implementation that is assignable
   /// to a BaseUri for a RestClient/HttpClient.
-  override x.ToString() = String.Concat [ scheme.ToString(); "://"; socketBinding.ToString() ]
+  override x.ToString() = String.Concat [ x.scheme.ToString(); "://"; x.socketBinding.ToString() ]
+
+  static member scheme_ = Property<HttpBinding,_> (fun x -> x.scheme) (fun v x -> { x with scheme = v })
+  static member socketBinding_ = Property<HttpBinding,_> (fun x -> x.socketBinding) (fun v x -> { x with socketBinding=v })
+
+
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module HttpBinding =
+
+  let DefaultBindingPort = 8083us
+
+  let defaults =  
+    { scheme  = HTTP
+      socketBinding = SocketBinding.mk IPAddress.Loopback DefaultBindingPort }
 
   /// Create a HttpBinding for the given protocol, an IP address to bind to and a port
   /// to listen on.
-  new (scheme, ip:IPAddress, port:Port) = HttpBinding(scheme, SocketBinding(ip, port))
+  let mk scheme (ip:IPAddress) (port:Port) = 
+    { scheme  = scheme
+      socketBinding = SocketBinding.mk ip port }
 
   /// Create a HttpBinding for the given protocol, an IP address to bind to and a port
   /// to listen on.
-  new (scheme, ip:string, port:int) = HttpBinding(scheme, SocketBinding(IPAddress.Parse ip, uint16 port))
+  let mk' scheme ip (port : int) = 
+    { scheme  = scheme 
+      socketBinding = SocketBinding.mk (IPAddress.Parse ip) (uint16 port) } 
 
-  static member DefaultBindingPort = 8083us
-
-  static member defaults = HttpBinding(HTTP, IPAddress.Loopback, HttpBinding.DefaultBindingPort)
-
-  static member scheme_ = Property<HttpBinding,_> (fun x -> x.scheme) (fun v x -> HttpBinding(scheme=v,socketBinding=x.socketBinding))
-  static member socketBinding_ = Property<HttpBinding,_> (fun x -> x.socketBinding) (fun v x -> HttpBinding(scheme=x.scheme,socketBinding=v))
 
 
 type HttpContent =

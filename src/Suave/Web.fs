@@ -314,7 +314,7 @@ module internal ParsingAndControl =
         files            = []
         multiPartFields  = []
         trace            = parseTraceHeaders headers
-        isSecure         = runtime.matchedBinding.scheme.IsSecure
+        isSecure         = runtime.matchedBinding.scheme.secure
         ipaddr           = connection''.ipaddr }
 
     if runtime.parsePostData then
@@ -522,7 +522,7 @@ let createWebServerAsync (config : SuaveConfig) (webpart : WebPart) =
 
   // spawn tcp listeners/web workers
   let servers = 
-    config.bindings |> List.map (config.ToRuntime homeFolder compressionFolder true
+    config.bindings |> List.map (SuaveConfig.to_runtime config homeFolder compressionFolder true
               >> ParsingAndControl.createHttpServer (config.bufferSize, config.maxOps) webpart)
               
   let listening = servers |> Seq.map fst |> Async.Parallel

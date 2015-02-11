@@ -14,7 +14,7 @@ let app = OK "PONG"
 let port = 3000us
 let config =
   { SuaveConfig.defaults with
-     bindings = [ HttpBinding(HTTP, IPAddress.Loopback, port) ]
+     bindings = [ HttpBinding.mk HTTP IPAddress.Loopback port ]
      bufferSize = 8192
      maxOps = 10000
   }
