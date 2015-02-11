@@ -53,14 +53,14 @@ module CookieStateStore =
              (sprintf "in f_plain_text, has existing %A" m)
            m |> Map.add key (box value) |> encodeMap))
 
-  let stateful relativeExpiry secure : HttpPart =
+  let stateful relativeExpiry secure : WebPart =
     context (fun ({ runtime = { logger = logger }} as ctx) ->
       log logger "Suave.State.CookieStateStore.stateful" LogLevel.Debug "ensuring cookie state"
 
       let cipherTextCorrupt =
         sprintf "%A" >> RequestErrors.BAD_REQUEST >> Choice2Of2
 
-      let setExpiry : HttpPart =
+      let setExpiry : WebPart =
         Writers.setUserData (StateStoreType + "-expiry") relativeExpiry
 
       cookieState
@@ -76,7 +76,7 @@ module CookieStateStore =
   ///
   ///
   /// Only save the state for the duration of the browser session.
-  let statefulForSession : HttpPart =
+  let statefulForSession : WebPart =
     stateful Session false
 
   module HttpContext =
@@ -155,7 +155,7 @@ module MemoryCacheStateStore =
           state_bag.[key] <- value
           succeed }
 
-  let stateful relativeExpiry : HttpPart =
+  let stateful relativeExpiry : WebPart =
     let state_store = wrap (MemoryCache.Default) relativeExpiry
     context (fun ctx ->
       let state_id = ctx |> HttpContext.state_id

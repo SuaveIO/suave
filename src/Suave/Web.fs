@@ -380,7 +380,7 @@ module internal ParsingAndControl =
 
   /// Check if the web part can perform its work on the current request. If it
   /// can't it will return None and the run method will return.
-  let internal run ctx (webPart : HttpPart) = 
+  let internal run ctx (webPart : WebPart) = 
     let execute _ = async {
       try  
           let! q  = webPart ctx
@@ -398,7 +398,7 @@ module internal ParsingAndControl =
   }
 
   type HttpConsumer =
-    | HttpPart of HttpPart
+    | HttpPart of WebPart
     | SocketPart of (HttpContext -> Async<(HttpContext -> SocketOp<HttpContext option>) option >)
 
   let operate consumer ctx = socket {
@@ -472,7 +472,7 @@ module internal ParsingAndControl =
 
 
   /// Starts a new web worker, given the configuration and a web part to serve.
-  let createHttpServer (bufferSize, maxOps) (webpart : HttpPart) (runtime : HttpRuntime) =
+  let createHttpServer (bufferSize, maxOps) (webpart : WebPart) (runtime : HttpRuntime) =
     createTcpIpServer 
         (bufferSize, maxOps, runtime.logger, 
          requestLoop runtime (HttpPart webpart), runtime.matchedBinding.socketBinding)
@@ -513,7 +513,7 @@ let defaultErrorHandler (ex : Exception) msg (ctx : HttpContext) =
 /// In other words: don't block on 'listening' unless you have started the server.
 /// The return value from 'listening' (first item in tuple) gives you some metrics on
 /// how quickly suave started.
-let createWebServerAsync (config : SuaveConfig) (webpart : HttpPart) =
+let createWebServerAsync (config : SuaveConfig) (webpart : WebPart) =
   let homeFolder, compressionFolder =
     ParsingAndControl.resolveDirectory config.homeFolder,
     Path.Combine(ParsingAndControl.resolveDirectory config.compressedFilesFolder, "_temporary_compressed_files")
@@ -529,7 +529,7 @@ let createWebServerAsync (config : SuaveConfig) (webpart : HttpPart) =
 
 /// Runs the web server and blocks waiting for the asynchronous workflow to be cancelled or
 /// it returning itself.
-let startWebServer (config : SuaveConfig) (webpart : HttpPart) =
+let startWebServer (config : SuaveConfig) (webpart : WebPart) =
   Async.RunSynchronously(createWebServerAsync config webpart |> snd, cancellationToken = config.cancellationToken)
 
 /// The default configuration binds on IPv4, 127.0.0.1:8083 with a regular 500 Internal Error handler,

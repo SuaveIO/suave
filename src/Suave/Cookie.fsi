@@ -31,12 +31,12 @@ module Cookie =
 
     member cookies : Map<string, HttpCookie>
 
-  val setCookie : cookie:HttpCookie -> HttpPart
-  val unsetCookie : name:string -> HttpPart
+  val setCookie : cookie:HttpCookie -> WebPart
+  val unsetCookie : name:string -> WebPart
 
   /// Sets the cookies to the HttpResult
-  val setPair   : httpCookie:HttpCookie -> clientCookie:HttpCookie -> HttpPart
-  val unsetPair : httpCookieName:string -> HttpPart
+  val setPair   : httpCookie:HttpCookie -> clientCookie:HttpCookie -> WebPart
+  val unsetPair : httpCookieName:string -> WebPart
 
   /// A DTO structure for passing the right parameters to the XXX_cookies functions
   /// in this module.
@@ -77,14 +77,14 @@ module Cookie =
   /// Bumps the expiry dates for all the cookies.
   val refreshCookies : expiry:CookieLife ->
                        cookie:HttpCookie ->
-                       HttpPart
+                       WebPart
 
   val updateCookies :  csctx:CookiesState ->
                        f_plain_text : (byte [] option -> byte []) ->
-                       HttpPart
+                       WebPart
   
   val cookieState : csctx:CookiesState ->
-                    noCookie :(unit -> Choice<byte [], HttpPart>) ->
-                    decryptionFailure:(Crypto.SecretboxDecryptionError -> Choice<byte [], HttpPart>) ->
-                    f_success:HttpPart ->
-                    HttpPart
+                    noCookie :(unit -> Choice<byte [], WebPart>) ->
+                    decryptionFailure:(Crypto.SecretboxDecryptionError -> Choice<byte [], WebPart>) ->
+                    f_success:WebPart ->
+                    WebPart

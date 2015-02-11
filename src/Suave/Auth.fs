@@ -51,9 +51,9 @@ let generate_data (request : HttpRequest) =
 
 let authenticate relativeExpiry secure
                  missingCookie
-                 (decryptionFailure : Crypto.SecretboxDecryptionError -> Choice<byte [], HttpPart>)
-                 (f_success : HttpPart)
-                 : HttpPart =
+                 (decryptionFailure : Crypto.SecretboxDecryptionError -> Choice<byte [], WebPart>)
+                 (f_success : WebPart)
+                 : WebPart =
   context (fun ctx ->
     Log.log ctx.runtime.logger "Suave.Auth.authenticate" LogLevel.Debug "authenticating"
 
@@ -67,7 +67,7 @@ let authenticate relativeExpiry secure
       decryptionFailure
       f_success)
 
-let authenticate' relativeExpiry login_page f_success : HttpPart =
+let authenticate' relativeExpiry login_page f_success : WebPart =
   authenticate relativeExpiry false
                (fun () -> Choice2Of2(Redirection.FOUND login_page))
                (sprintf "%A" >> RequestErrors.BAD_REQUEST >> Choice2Of2)
@@ -84,7 +84,7 @@ let authenticate' relativeExpiry login_page f_success : HttpPart =
 /// - `secure`: HttpsOnly?
 ///
 /// Always succeeds.
-let authenticated relativeExpiry secure : HttpPart =
+let authenticated relativeExpiry secure : WebPart =
   context (fun { request = req } ->
     let data = generate_data req |> UTF8.bytes
     authenticate relativeExpiry secure

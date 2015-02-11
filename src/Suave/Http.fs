@@ -9,7 +9,7 @@ module Http =
 
   let fail = async.Return None
 
-  let never : HttpPart = fun x -> fail
+  let never : WebPart = fun x -> fail
 
   let inline bind (second : 'b -> Async<'c option>) (first : 'a -> Async<'b option>) : 'a -> Async<'c option> =
     fun x -> 
@@ -30,7 +30,7 @@ module Http =
     | None   -> b x
     | r      -> r
 
-  let inline (<|>) (a : HttpPart) (b : HttpPart) : HttpPart =
+  let inline (<|>) (a : WebPart) (b : WebPart) : WebPart =
     fun x ->
       async{
         let! e = a x
@@ -43,7 +43,7 @@ module Http =
         | r -> return r
       }
 
-  let rec choose (options : HttpPart list): HttpPart =
+  let rec choose (options : WebPart list): WebPart =
     fun arg -> async {
     match options with
     | []        -> return None
@@ -68,7 +68,7 @@ module Http =
   /// | url "/b"    +---------+                       +---------+  cont3       |
   /// +-------------+                                           +--------------+
 
-  let rec inject (post_op : HttpPart) (pairs : (HttpPart*HttpPart) list) : HttpPart =
+  let rec inject (post_op : WebPart) (pairs : (WebPart*WebPart) list) : WebPart =
     fun arg -> async {
       match pairs with
       | []        -> return None
@@ -162,7 +162,7 @@ module Http =
     open Suave.Types
     
 
-    let ok s : HttpPart = 
+    let ok s : WebPart = 
       fun ctx -> { ctx with response = { ctx.response with status = HTTP_200; content = Bytes s }} |> succeed
 
     let OK a = ok (UTF8.bytes a)
@@ -175,7 +175,7 @@ module Http =
 
     let ACCEPTED s = accepted (UTF8.bytes s)
 
-    let no_content : HttpPart =
+    let no_content : WebPart =
       fun ctx -> { ctx with response = { status = HTTP_204; headers = ctx.response.headers; content = Bytes [||] }} |> succeed
 
     let NO_CONTENT = no_content
@@ -212,10 +212,10 @@ module Http =
         url HTTP_302.Message))
      
 
-    let not_modified : HttpPart =
+    let not_modified : WebPart =
       fun ctx -> { ctx with response = {status = HTTP_304; headers = []; content = Bytes [||] }} |> succeed
 
-    let NOT_MODIFIED : HttpPart =
+    let NOT_MODIFIED : WebPart =
       not_modified
 
   // 4xx
@@ -328,8 +328,8 @@ module Http =
       let iff b x =
         if b then Some x else None
 
-    let queryParam nm f : HttpPart = request( fun x -> cond (x.queryParam nm) f never)
-    let formData nm f : HttpPart = request( fun x -> cond (x.formDataItem nm) f never)
+    let queryParam nm f : WebPart = request( fun x -> cond (x.queryParam nm) f never)
+    let formData nm f : WebPart = request( fun x -> cond (x.formDataItem nm) f never)
 
     let url s (x : HttpContext) =
       async.Return (Option.iff (s = x.request.url.AbsolutePath) x)
@@ -405,7 +405,7 @@ module Http =
     open Suave.Sscanf
     open ServerErrors
 
-    let urlScan (pf : PrintfFormat<_,_,_,_,'t>) (h : 't ->  HttpPart) : HttpPart =
+    let urlScan (pf : PrintfFormat<_,_,_,_,'t>) (h : 't ->  WebPart) : WebPart =
       
       let scan url =
         try 
@@ -422,7 +422,7 @@ module Http =
           fail
       F
           
-    let timeoutHttpPart (time_span : TimeSpan) (web_part : HttpPart) : HttpPart =
+    let timeoutHttpPart (time_span : TimeSpan) (web_part : WebPart) : WebPart =
       fun (ctx : HttpContext) -> async {
         try
           return! Async.WithTimeout (time_span, web_part ctx)
@@ -445,7 +445,7 @@ module Http =
     // the max-age directive overrides the Expires header, even if the Expires header is more restrictive
     // 'Cache-Control' and 'Expires' headers should be left up to the user
     let resource key exists get_last get_extension
-                 (send : string -> bool -> HttpPart)
+                 (send : string -> bool -> WebPart)
                  ({ request = r; runtime = rt } as ctx) =
       let log =
         Log.verbose rt.logger "Suave.Http.ServeResource.resource" TraceHeader.empty
@@ -511,7 +511,7 @@ module Http =
                 content = SocketTask (write_file fileName) } }
       |> succeed
 
-    let file fileName : HttpPart =
+    let file fileName : WebPart =
       resource
         fileName
         (File.Exists)
@@ -541,7 +541,7 @@ module Http =
       fun ({request = r; runtime = q} as h) ->
         browseFile q.homeDirectory file_name h
     
-    let browse rootPath : HttpPart =
+    let browse rootPath : WebPart =
       warbler (fun { request = r; runtime = { logger = l } } ->
         Log.verbose l
           "Suave.Http.Files.browse"
@@ -550,7 +550,7 @@ module Http =
             r.url.AbsolutePath rootPath)
         file (resolvePath rootPath r.url.AbsolutePath))
 
-    let browseHomeDirectory : HttpPart =
+    let browseHomeDirectory : WebPart =
       warbler (fun { runtime = q } -> browse q.homeDirectory)
 
     let dir rootPath (ctx : HttpContext) =

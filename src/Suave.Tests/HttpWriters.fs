@@ -23,7 +23,7 @@ let cookies =
     ; expires   = None
     ; domain    = None
     ; path      = Some "/"
-    ; http_only = false
+    ; httpOnly = false
     ; secure    = false }
 
   testList "Cookies basic tests" [
@@ -31,20 +31,20 @@ let cookies =
         Assert.Equal("expecting cookie value"
         , "42"
         , (req_cookies HttpMethod.GET "/" None
-          (runWith' (Cookie.set_cookie basic_cookie >>= OK "test")))
+          (runWith' (Cookie.setCookie basic_cookie >>= OK "test")))
             .GetCookies(Uri("http://127.0.0.1")).[0].Value)
 
       testCase "cookie name makes round trip" <| fun _ ->
         Assert.Equal("expecting cookie name"
         , "mycookie"
         , (req_cookies HttpMethod.GET "/" None
-            (runWith' (Cookie.set_cookie basic_cookie >>= OK "test")))
+            (runWith' (Cookie.setCookie basic_cookie >>= OK "test")))
             .GetCookies(Uri("http://127.0.0.1")).[0].Name)
 
       testCase "http_only cookie is http_only" <| fun _ ->
         Assert.Equal("expecting http_only"
         , true
         , (req_cookies HttpMethod.GET "/" None
-          (runWith' (Cookie.set_cookie { basic_cookie with http_only = true } >>= OK "test")))
+          (runWith' (Cookie.setCookie { basic_cookie with httpOnly = true } >>= OK "test")))
             .GetCookies(Uri("http://127.0.0.1")).[0].HttpOnly)
     ]

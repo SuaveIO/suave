@@ -488,17 +488,17 @@ and HttpContext =
     userState  : Map<string, obj>
     response   : HttpResult }
 
-and HttpPart = HttpContext -> SuaveTask<HttpContext>
+and WebPart = HttpContext -> SuaveTask<HttpContext>
 
 /// An error handler takes the exception, a programmer-provided message, a
 /// request (that failed) and returns an asynchronous workflow for the handling
 /// of the error.
-and ErrorHandler = Exception -> String -> HttpPart
+and ErrorHandler = Exception -> String -> WebPart
 
 /// A session store is a reader and a writer function pair keyed on strings.
 type StateStore =
   abstract get<'T> : string -> 'T option
-  abstract set<'T> : string -> 'T -> HttpPart
+  abstract set<'T> : string -> 'T -> WebPart
 
 /// a module that gives you the `empty` (beware) and `mk` functions for creating
 /// a HttpRuntime

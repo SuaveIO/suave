@@ -25,7 +25,7 @@ let tests =
 
   let post_data3 = read_text "request-2.txt"
   
-  let test_url_encoded_form field_name : HttpPart =
+  let test_url_encoded_form field_name : WebPart =
     Binding.bind_req (Binding.form field_name Choice1Of2) OK BAD_REQUEST
 
   testList "Suave.Model" [

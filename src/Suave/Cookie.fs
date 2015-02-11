@@ -112,14 +112,14 @@ module Cookie =
     let string_value = HttpCookie.toHeader { HttpCookie.mkSimple cookieName "x" with expires = start_epoch }
     Writers.setHeader "Set-Cookie" string_value
 
-  let setPair (httpCookie : HttpCookie) (clientCookie : HttpCookie) : HttpPart =
+  let setPair (httpCookie : HttpCookie) (clientCookie : HttpCookie) : WebPart =
     context (fun { runtime = { logger = logger } } ->
       Log.log logger "Suave.Cookie.set_pair" LogLevel.Debug
         (sprintf "setting cookie '%s' len '%d'" httpCookie.name httpCookie.value.Length)
       succeed)
     >>= setCookie httpCookie >>= setCookie clientCookie
 
-  let unsetPair httpCookieName : HttpPart =
+  let unsetPair httpCookieName : WebPart =
     unsetCookie httpCookieName >>= unsetCookie (String.Concat [ httpCookieName; "-client" ])
 
   type CookiesState =
@@ -156,7 +156,7 @@ module Cookie =
       cookies
       |> Map.tryFind cookieName
       |> Choice.from_option (NoCookieFound cookieName)
-      |> Choice.map (fun c -> c, c |> (HttpCookie.value >> dec))
+      |> Choice.map (fun c -> c, c.value |> dec)
     match found with
     | Choice1Of2 (cookie, cipher_data) ->
       cipher_data
@@ -165,10 +165,10 @@ module Cookie =
       |> Choice.map (fun plainText -> cookie, plainText)
     | Choice2Of2 x -> Choice2Of2 x
 
-  let refreshCookies relativeExpiry httpCookie : HttpPart =
+  let refreshCookies relativeExpiry httpCookie : WebPart =
     slidingExpiry relativeExpiry httpCookie ||> setPair
 
-  let updateCookies (csctx : CookiesState) f_plainText : HttpPart =
+  let updateCookies (csctx : CookiesState) f_plainText : WebPart =
     context (fun ctx ->
       let logger = ctx.runtime.logger
       let plainText =
@@ -189,10 +189,10 @@ module Cookie =
 
   let cookieState (csctx : CookiesState)
                    // unit -> plain text to store OR something to run of your own!
-                   (noCookie : unit -> Choice<byte [], HttpPart>)
-                   (decryptionFailure   : _ -> Choice<byte [], HttpPart>)
-                   (f_success : HttpPart)
-                   : HttpPart =
+                   (noCookie : unit -> Choice<byte [], WebPart>)
+                   (decryptionFailure   : _ -> Choice<byte [], WebPart>)
+                   (f_success : WebPart)
+                   : WebPart =
     context (fun ({ runtime = { logger = logger }} as ctx) ->
 
       let log = Log.log logger "Suave.Cookie.cookie_state" LogLevel.Debug
