@@ -39,13 +39,13 @@ let separators =
 
 // Creates a list of formatter characters from a format string,
 // for example "(%s,%d)" -> ['s', 'd']
-let rec get_formatters xs =
+let rec getFormatters xs =
   match xs with
-  | '%' :: '%' :: xr -> get_formatters xr
+  | '%' :: '%' :: xr -> getFormatters xr
   | '%' :: x :: xr   ->
-    if parsers.ContainsKey x then x :: get_formatters xr
+    if parsers.ContainsKey x then x :: getFormatters xr
     else failwithf "Unknown formatter %%%c" x
-  | x :: xr          -> get_formatters xr
+  | x :: xr          -> getFormatters xr
   | []               -> []
 
 // Coerce integer types from int64
@@ -67,7 +67,7 @@ let sscanf (pf:PrintfFormat<_,_,_,_,'t>) s : 't =
                    |> String.concat "%"
   let regex      = Regex("^" + regexStr + "$")
   let formatters = formatStr.ToCharArray() // need original string here (possibly with "%%"s)
-                   |> Array.toList |> get_formatters
+                   |> Array.toList |> getFormatters
   let groups =
     regex.Match(s).Groups
     |> Seq.cast<Group>
@@ -81,9 +81,9 @@ let sscanf (pf:PrintfFormat<_,_,_,_,'t>) s : 't =
   if matches.Length = 1 then
     coerce matches.[0] typeof<'t> :?> 't
   else
-    let tuple_types = FSharpType.GetTupleElements(typeof<'t>)
+    let tupleTypes = FSharpType.GetTupleElements(typeof<'t>)
     let matches =
-      (matches,tuple_types)
+      (matches,tupleTypes)
       ||> Array.map2 ( fun a b -> coerce a b)
     FSharpValue.MakeTuple(matches, typeof<'t>) :?> 't
 

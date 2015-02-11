@@ -59,7 +59,6 @@
     <Compile Include="Utils\Option.fs" />
     <Compile Include="Utils\Map.fs" />
     <Compile Include="Utils\Choice.fs" />
-    <Compile Include="Utils\List.fs" />
     <Compile Include="Utils\RandomExtensions.fs" />
     <Compile Include="Utils\Bytes.fs" />
     <Compile Include="Utils\Encoding.fs" />

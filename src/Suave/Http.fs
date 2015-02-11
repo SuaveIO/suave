@@ -54,7 +54,7 @@ module Http =
       | None   -> return! choose tail arg
     }
 
-  /// Inject a web_part
+  /// Inject a webPart
   ///
   /// +------------+                                            +--------------+
   /// | url "/a"   +----------+                       +---------+   cont1      |
@@ -68,7 +68,7 @@ module Http =
   /// | url "/b"    +---------+                       +---------+  cont3       |
   /// +-------------+                                           +--------------+
 
-  let rec inject (post_op : WebPart) (pairs : (WebPart*WebPart) list) : WebPart =
+  let rec inject (postOp : WebPart) (pairs : (WebPart*WebPart) list) : WebPart =
     fun arg -> async {
       match pairs with
       | []        -> return None
@@ -76,8 +76,8 @@ module Http =
         let! res = p arg
         match res with
         | Some x ->
-          return! (post_op >>= q) x
-        | None   -> return! inject post_op tail arg
+          return! (postOp >>= q) x
+        | None   -> return! inject postOp tail arg
       }
 
   let inline warbler f a = f a a //which bird? A Warbler!
@@ -429,10 +429,10 @@ module Http =
           fail
       F
           
-    let timeoutWebPart (time_span : TimeSpan) (web_part : WebPart) : WebPart =
+    let timeoutWebPart (timeSpan : TimeSpan) (webPart : WebPart) : WebPart =
       fun (ctx : HttpContext) -> async {
         try
-          return! Async.WithTimeout (time_span, web_part ctx)
+          return! Async.WithTimeout (timeSpan, webPart ctx)
         with
           | :? TimeoutException ->
             return! Response.response HttpCode.HTTP_408 (UTF8.bytes "Request Timeout") ctx
@@ -456,32 +456,32 @@ module Http =
     // If a response includes both an Expires header and a max-age directive,
     // the max-age directive overrides the Expires header, even if the Expires header is more restrictive
     // 'Cache-Control' and 'Expires' headers should be left up to the user
-    let resource key exists get_last get_extension
+    let resource key exists getLast getExtension
                  (send : string -> bool -> WebPart)
                  ({ request = r; runtime = rt } as ctx) =
       let log =
         Log.verbose rt.logger "Suave.Http.ServeResource.resource" TraceHeader.empty
 
-      let send_it name compression =
-        setHeader "Last-Modified" ((get_last key : DateTime).ToString("R"))
+      let sendIt name compression =
+        setHeader "Last-Modified" ((getLast key : DateTime).ToString("R"))
         >>= setMimeType name
         >>= send key compression
 
       if exists key then
-        let mimes = ctx.runtime.mimeTypesMap <| get_extension key
+        let mimes = ctx.runtime.mimeTypesMap <| getExtension key
         match mimes with
         | Some value ->
-          let modified_since = r.headers %% "if-modified-since"
-          match modified_since with
+          let modifiedSince = r.headers %% "if-modified-since"
+          match modifiedSince with
           | Some v ->
             match Parse.date_time v with
             | Choice1Of2 date ->
-              if get_last key > date then send_it value.name value.compression ctx
+              if getLast key > date then sendIt value.name value.compression ctx
               else NOT_MODIFIED ctx
             | Choice2Of2 parse_error -> bad_request [||] ctx
-          | None -> send_it value.name value.compression ctx
+          | None -> sendIt value.name value.compression ctx
         | None ->
-          let ext = get_extension key
+          let ext = getExtension key
           log (sprintf "failed to find matching mime for ext '%s'" ext)
           fail
       else
@@ -505,7 +505,7 @@ module Http =
     open ServeResource
 
     let sendFile fileName (compression : bool) (ctx : HttpContext) =
-      let write_file file conn = socket {
+      let writeFile file conn = socket {
         let get_fs = fun path -> new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read) :> Stream
         let get_lm = fun path -> FileInfo(path).LastWriteTime
         use! fs = Compression.transformStream file get_fs get_lm compression ctx.runtime.compressionFolder ctx conn
@@ -520,7 +520,7 @@ module Http =
           response =
             { ctx.response with
                 status = HTTP_200
-                content = SocketTask (write_file fileName) } }
+                content = SocketTask (writeFile fileName) } }
       |> succeed
 
     let file fileName : WebPart =
@@ -543,13 +543,13 @@ module Http =
       else raise <| Exception("File canonalization issue.")
 
 
-    let browseFile rootPath file_name =
+    let browseFile rootPath fileName =
       fun ({request = r; runtime = q} as h) ->
-        file (resolvePath rootPath file_name) h
+        file (resolvePath rootPath fileName) h
 
-    let browseFileInHomeDirectory file_name =
+    let browseFileInHomeDirectory fileName =
       fun ({request = r; runtime = q} as h) ->
-        browseFile q.homeDirectory file_name h
+        browseFile q.homeDirectory fileName h
     
     let browse rootPath : WebPart =
       warbler (fun { request = r; runtime = { logger = l } } ->
@@ -594,15 +594,15 @@ module Http =
       dir ctx.runtime.homeDirectory ctx
 
     [<Obsolete("Use resolvePath")>]
-    let local_file file_name rootPath = resolvePath rootPath file_name
+    let local_file fileName rootPath = resolvePath rootPath fileName
     [<Obsolete("Use sendFile")>]
     let send_file fileName compression ctx = sendFile fileName compression ctx
     [<Obsolete("Use resolvePath")>]
     let resolve_path rootPat fileName = resolvePath rootPat fileName
     [<Obsolete("Use browseFile")>]
-    let browse_file rootPath file_name = browseFile rootPath file_name
+    let browse_file rootPath fileName = browseFile rootPath fileName
     [<Obsolete("Use browseFileInHomeDirectory")>]
-    let browse_file' file_name = browseFileInHomeDirectory file_name
+    let browse_file' fileName = browseFileInHomeDirectory fileName
     [<Obsolete("Use browseHomeDirectory")>]
     let browse' = browseHomeDirectory
     [<Obsolete("Use dirHomeDirectory")>]
@@ -632,7 +632,7 @@ module Http =
       FileInfo(assembly.Location).CreationTime
     
     let sendResource (assembly : Assembly)
-                      resource_name
+                      resourceName
                       (compression : bool)
                       (ctx : HttpContext) =
       let write_resource name conn = socket {
@@ -650,11 +650,11 @@ module Http =
           response =
             { ctx.response with
                 status = HTTP_200
-                content = SocketTask (write_resource resource_name) }}
+                content = SocketTask (write_resource resourceName) }}
       |> succeed
 
-    let sendResourceFromDefaultAssembly resource_name compression =
-      sendResource defaultSourceAssembly resource_name compression
+    let sendResourceFromDefaultAssembly resourceName compression =
+      sendResource defaultSourceAssembly resourceName compression
 
     let resource assembly name =
       resource
@@ -678,9 +678,9 @@ module Http =
     [<Obsolete("Use resourceFromDefaultAssembly")>]
     let resource' name = resourceFromDefaultAssembly name
     [<Obsolete("Use sendResourceFromDefaultAssembly")>]
-    let send_resource' resource_name compression = sendResourceFromDefaultAssembly resource_name compression
+    let send_resource' resourceName compression = sendResourceFromDefaultAssembly resourceName compression
     [<Obsolete("Use sendResource")>]
-    let send_resource assembly resource_name compression ctx = sendResource assembly resource_name compression ctx
+    let send_resource assembly resourceName compression ctx = sendResource assembly resourceName compression ctx
     [<Obsolete("Use lastModified")>]
     let last_modified assembly = lastModified assembly
     [<Obsolete("Use defaultSourceAssembly")>]
@@ -720,8 +720,8 @@ module Http =
     let data (out : Connection) (text : string) =
       out <<. "data: " + text + ES_EOL
 
-    let es_id (out : Connection) (last_event_id : string) =
-      out <<. "id: " + last_event_id + ES_EOL
+    let es_id (out : Connection) (lastEventId : string) =
+      out <<. "id: " + lastEventId + ES_EOL
 
     let retry (out : Connection) (retry : uint32) =
       out <<. "retry: " + (string retry) + ES_EOL

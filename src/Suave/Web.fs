@@ -95,7 +95,7 @@ module internal ParsingAndControl =
       for b in free do
         assert (b.length >= 0)
         do! liftAsync <| select (ArraySegment(b.buffer.Array, b.offset, b.length)) b.length
-        do connection.bufferManager.FreeBuffer( b.buffer,"Suave.Web.scan_marker" )
+        do connection.bufferManager.FreeBuffer( b.buffer,"Suave.Web.scanMarker" )
       return NeedMore,{ connection with segments = ret }
     }
 
@@ -252,12 +252,12 @@ module internal ParsingAndControl =
     TraceHeader.create trace parent
 
   /// Reads raw POST data
-  let getRawPostData connection content_length =
+  let getRawPostData connection contentLength =
     socket {
       let offset = ref 0
-      let raw_form = Array.zeroCreate content_length
-      let! connection = readPostData connection content_length (fun a count -> async { Array.blit a.Array a.Offset raw_form !offset count; offset := !offset + count })
-      return raw_form , connection
+      let rawForm = Array.zeroCreate contentLength
+      let! connection = readPostData connection contentLength (fun a count -> async { Array.blit a.Array a.Offset rawForm !offset count; offset := !offset + count })
+      return rawForm , connection
     }
 
   let parsePostData (ctx : HttpContext) = socket{
@@ -266,18 +266,18 @@ module internal ParsingAndControl =
 
     match request.headers %% "content-length" with 
     | Some contentLengthString ->
-      let content_length = Convert.ToInt32(contentLengthString)
+      let contentLength = Convert.ToInt32(contentLengthString)
 
       match contentEncoding with
       | Some ce when ce.StartsWith("application/x-www-form-urlencoded") ->
-        let! raw_form, connection = getRawPostData ctx.connection content_length
-        return Some { ctx with request = { request with rawForm = raw_form}; connection = connection }
+        let! rawForm, connection = getRawPostData ctx.connection contentLength
+        return Some { ctx with request = { request with rawForm = rawForm}; connection = connection }
       | Some ce when ce.StartsWith("multipart/form-data") ->
         let boundary = "--" + ce.Substring(ce.IndexOf('=')+1).TrimStart()
         let! ctx = parseMultipart boundary ctx
         return Some ctx
       | Some _ | None ->
-        let! rawForm, connection = getRawPostData ctx.connection content_length
+        let! rawForm, connection = getRawPostData ctx.connection contentLength
         return Some { ctx with request = { request with rawForm = rawForm}; connection = connection }
     | None ->  return Some ctx
     }
@@ -349,7 +349,7 @@ module internal ParsingAndControl =
     }
 
 
-  let write_content context = function
+  let writeContent context = function
     | Bytes b -> socket {
       let connection = context.connection
       let! (content : byte []) = Compression.transform b context connection
@@ -375,7 +375,7 @@ module internal ParsingAndControl =
     do! writeHeaders connection r.headers
     do! writeContentType connection r.headers
 
-    return! write_content context r.content
+    return! writeContent context r.content
   }
 
   /// Check if the web part can perform its work on the current request. If it
@@ -522,7 +522,7 @@ let createWebServerAsync (config : SuaveConfig) (webpart : WebPart) =
 
   // spawn tcp listeners/web workers
   let servers = 
-    config.bindings |> List.map (SuaveConfig.to_runtime config homeFolder compressionFolder true
+    config.bindings |> List.map (SuaveConfig.toRuntime config homeFolder compressionFolder true
               >> ParsingAndControl.createHttpServer (config.bufferSize, config.maxOps) webpart)
               
   let listening = servers |> Seq.map fst |> Async.Parallel

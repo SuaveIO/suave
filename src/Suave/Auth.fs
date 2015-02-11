@@ -14,10 +14,10 @@ module internal Utils =
   /// Generates a string key from the available characters with the given key size
   /// in characters. Note that this key is not cryptographically as random as a pure
   /// random number generator would produce as we only use a small subset alphabet.
-  let generateReadableKey (key_size : int) =
-    let arr = Array.zeroCreate<byte> key_size |> Crypto.randomize
+  let generateReadableKey (keySize : int) =
+    let arr = Array.zeroCreate<byte> keySize |> Crypto.randomize
     let alpha = "abcdefghijklmnopqrstuvwuxyz0123456789"
-    let result = new StringBuilder(key_size)
+    let result = new StringBuilder(keySize)
     arr
     |> Array.iter (fun (b : byte) -> result.Append alpha.[int b % alpha.Length] |> ignore)
     result.ToString()
@@ -68,9 +68,9 @@ let authenticate relativeExpiry secure
       decryptionFailure
       f_success)
 
-let authenticateWithLogin relativeExpiry login_page f_success : WebPart =
+let authenticateWithLogin relativeExpiry loginPage f_success : WebPart =
   authenticate relativeExpiry false
-               (fun () -> Choice2Of2(Redirection.FOUND login_page))
+               (fun () -> Choice2Of2(Redirection.FOUND loginPage))
                (sprintf "%A" >> RequestErrors.BAD_REQUEST >> Choice2Of2)
                f_success
 

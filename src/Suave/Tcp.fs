@@ -125,9 +125,9 @@ let createTcpIpServer (bufferSize        : int,
     let intern  = Log.intern logger "Suave.Tcp.tcp_ip_server.job"
     let socket = acceptArgs.AcceptSocket
     let ipaddr = (socket.RemoteEndPoint :?> IPEndPoint).Address
-    Interlocked.Increment Globals.number_of_clients |> ignore
+    Interlocked.Increment Globals.numberOfClients |> ignore
 
-    Log.internf logger "Suave.Tcp.tcp_ip_server.job" (fun fmt -> fmt "%O connected, total: %d clients" ipaddr !Globals.number_of_clients)
+    Log.internf logger "Suave.Tcp.tcp_ip_server.job" (fun fmt -> fmt "%O connected, total: %d clients" ipaddr !Globals.numberOfClients)
 
     try
       let readArgs = b.Pop()
@@ -149,8 +149,8 @@ let createTcpIpServer (bufferSize        : int,
       b.Push readArgs
       c.Push writeArgs
       bufferManager.FreeBuffer(connection.lineBuffer, "Suave.Tcp.tcp_ip_server.job") // buf free OK
-      Interlocked.Decrement(Globals.number_of_clients) |> ignore
-      Log.internf logger "Suave.Tcp.tcp_ip_server.job" (fun fmt -> fmt "%O disconnected, total: %d clients" ipaddr !Globals.number_of_clients)
+      Interlocked.Decrement(Globals.numberOfClients) |> ignore
+      Log.internf logger "Suave.Tcp.tcp_ip_server.job" (fun fmt -> fmt "%O disconnected, total: %d clients" ipaddr !Globals.numberOfClients)
     with 
     | :? System.IO.EndOfStreamException ->
       intern "disconnected client (end of stream)"

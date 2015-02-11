@@ -359,6 +359,16 @@ type HttpRequest =
   member x.formDataItem (k : string) =
     x.formData ^^ k
 
+  [<Obsolete("Renamed to httpVersion")>]
+  member x.http_version = x.httpVersion
+  [<Obsolete("Renamed to isSecure")>]
+  member x.is_secure = x.isSecure
+  [<Obsolete("Renamed to multiPartFields")>]
+  member x.multi_part_fields = x.multiPartFields
+  [<Obsolete("Renamed to rawForm")>]
+  member x.raw_form = x.rawForm
+  [<Obsolete("Renamed to rawQuery")>]
+  member x.raw_query = x.rawQuery
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module HttpRequest =
@@ -435,6 +445,8 @@ type HttpBinding =
   static member scheme_ = Property<HttpBinding,_> (fun x -> x.scheme) (fun v x -> { x with scheme = v })
   static member socketBinding_ = Property<HttpBinding,_> (fun x -> x.socketBinding) (fun v x -> { x with socketBinding=v })
 
+  [<Obsolete("Renamed to socketBinding")>]
+  member x.socket_binding = x.socketBinding
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module HttpBinding =
@@ -508,14 +520,41 @@ type HttpRuntime =
   static member matchedBinding_ = Property (fun x -> x.matchedBinding) (fun v x -> { x with matchedBinding = v })
   static member parsePostData_ = Property (fun x -> x.parsePostData) (fun v x -> { x with parsePostData = v })
 
+  [<Obsolete("Renamed to compressionFolder")>]
+  member x.compression_folder = x.compressionFolder
+  [<Obsolete("Renamed to errorHandler")>]
+  member x.error_handler = x.errorHandler
+  [<Obsolete("Renamed to homeDirectory")>]
+  member x.home_directory = x.homeDirectory
+  [<Obsolete("Renamed to matchedBinding")>]
+  member x.matched_binding = x.matchedBinding
+  [<Obsolete("Renamed to mimeTypesMap")>]
+  member x.mime_types_map = x.mimeTypesMap
+  [<Obsolete("Renamed to parsePostData")>]
+  member x.parse_post_data = x.parsePostData
+  [<Obsolete("Renamed to serverKey")>]
+  member x.server_key = x.serverKey
+
 /// The HttpContext is the container of the request, runtime, user-state and
 /// response.
 and HttpContext =
-  { request    : HttpRequest
+  { /// The HTTP request being processed
+    request    : HttpRequest
+
+    /// The HttpRuntime for the request being processed
     runtime    : HttpRuntime
+
+    /// The connection for the request being processed
     connection : Connection
+
+    /// The user state for the request being processed
     userState  : Map<string, obj>
+
+    /// The response for the request being processed
     response   : HttpResult }
+
+  [<Obsolete("Renamed to userState")>]
+  member x.user_state = x.userState
 
 /// A WebPart is an asynchronous function that transforms the HttpContext.  An asynchronous return
 /// value of None indicates 'did not handle'. 
@@ -528,7 +567,9 @@ and ErrorHandler = Exception -> String -> WebPart
 
 /// A session store is a reader and a writer function pair keyed on strings.
 type StateStore =
+  /// Get an item from the state store
   abstract get<'T> : string -> 'T option
+  /// Set an item in the state store
   abstract set<'T> : string -> 'T -> WebPart
 
 /// a module that gives you the `empty` (beware) and `mk` functions for creating
@@ -672,7 +713,7 @@ type SuaveConfig =
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module SuaveConfig =
-  let to_runtime config contentFolder compressionFolder parsePostData =
+  let toRuntime config contentFolder compressionFolder parsePostData =
     HttpRuntime.mk config.serverKey
                    config.errorHandler
                    config.mimeTypesMap

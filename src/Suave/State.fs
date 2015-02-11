@@ -88,13 +88,13 @@ module CookieStateStore =
 
   module HttpContext =
 
-    let private mkStateStore (user_state : Map<string, obj>) (ss : obj) =
+    let private mkStateStore (userState : Map<string, obj>) (ss : obj) =
       { new StateStore with
           member x.get key =
             decodeMap (ss :?> byte []) |> Map.tryFind key
             |> Option.map (fun x -> Convert.ChangeType(x, typeof<'T>) :?> 'T)
           member x.set key value =
-            let expiry = user_state |> Map.find (StateStoreType + "-expiry") :?> CookieLife
+            let expiry = userState |> Map.find (StateStoreType + "-expiry") :?> CookieLife
             write expiry key value
           }
 

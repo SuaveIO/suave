@@ -33,18 +33,18 @@ let PrintfFormatProc (worker : string * obj list -> 'b) (query : PrintfFormat<'a
   if not (FSharpType.IsFunction typeof<'a>) then
     unbox (worker (query.Value, []))
   else
-    let rec get_flattened_function_elements (functionType : Type) =
+    let rec getFlattenedFunctionElements (functionType : Type) =
       let domain, range = FSharpType.GetFunctionElements functionType
       if not (FSharpType.IsFunction range)
       then domain :: [range]
-      else domain :: get_flattened_function_elements range
+      else domain :: getFlattenedFunctionElements range
 
-    let types = get_flattened_function_elements typeof<'a>
+    let types = getFlattenedFunctionElements typeof<'a>
 
-    let rec make_function_type (types : Type list) =
+    let rec makeFunctionType (types : Type list) =
       match types with
       | [x; y]  -> FSharpType.MakeFunctionType(x, y)
-      | x :: xs -> FSharpType.MakeFunctionType(x, make_function_type xs)
+      | x :: xs -> FSharpType.MakeFunctionType(x, makeFunctionType xs)
       | _       -> failwith "shouldn't happen"
     let rec proc (types : Type list) (values : obj list) (a : obj) : obj =
       let values = a :: values
@@ -54,7 +54,7 @@ let PrintfFormatProc (worker : string * obj list -> 'b) (query : PrintfFormat<'a
         box result
       | x :: y :: z :: xs ->
         let cont = proc (y :: z :: xs) values
-        let ft = make_function_type (y :: z :: xs)
+        let ft = makeFunctionType (y :: z :: xs)
         let cont = FSharpValue.MakeFunction(ft, cont)
         box cont
       | _ -> failwith "shouldn't happen"
@@ -70,35 +70,35 @@ type SQuery<'a,'b,'c> = PrintfFormat<'a,'b, 'c, DbCommand>
 /// against the database form the monad builder.
 type SQLBuilder(conn : DbConnection) =
 
-  let sql_processor (sql : string, values : obj list) : DbCommand =
+  let sqlProcessor (sql : string, values : obj list) : DbCommand =
 
-    let strip_formatting s =
+    let stripFormatting s =
       let i = ref -1
       let eval (rx_match : Match) =
         incr i
         sprintf "@p%d" !i // TODO: isn't this tying the implementation to SQL Server?
       Regex.Replace(s, "%.", eval)
 
-    let sql = strip_formatting sql
+    let sql = stripFormatting sql
     
     let cmd = conn.CreateCommand()
     cmd.CommandText <- sql
 
-    let create_param i (p : obj) =
+    let createParam i (p : obj) =
       let param = cmd.CreateParameter()
       param.ParameterName <- sprintf "@p%d" i // TODO: isn't this tying the implementation to SQL Server?
       param.Value <- p
       cmd.Parameters.Add param |> ignore
 
-    values |> Seq.iteri create_param
+    values |> Seq.iteri createParam
 
     cmd
 
   member b.Query(a) =
-    PrintfFormatProc sql_processor a
+    PrintfFormatProc sqlProcessor a
 
   member b.Enum(a) = seq {
-    let cmd : DbCommand = PrintfFormatProc sql_processor a
+    let cmd : DbCommand = PrintfFormatProc sqlProcessor a
     use reader = cmd.ExecuteReader()
     while reader.Read() do
       yield (eval reader)
@@ -132,9 +132,9 @@ type SQLBuilder(conn : DbConnection) =
 let sql conn = SQLBuilder conn
 
 /// Executes a non-query against the command
-let execute_non_query (cmd : DbCommand) =
+let executeNonQuery (cmd : DbCommand) =
   cmd.ExecuteNonQuery() |> ignore
 
 /// Executes a command with arguments
 let execute_command cmd arg =
-  cmd arg |> execute_non_query
+  cmd arg |> executeNonQuery

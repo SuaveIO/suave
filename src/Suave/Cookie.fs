@@ -54,7 +54,7 @@ module Cookie =
     member x.cookies =
       x.headers
       |> List.filter (fun (name, _) -> name.Equals "cookie")
-      |> List.flat_map (snd >> parseCookies)
+      |> List.collect (snd >> parseCookies)
       |> List.fold (fun cookies cookie ->
           cookies |> Map.add cookie.name cookie)
           Map.empty
@@ -65,7 +65,7 @@ module Cookie =
       x.headers
       |> List.filter (fst >> (String.eq_ord_ci "Set-Cookie"))
       /// duplicate headers are comma separated
-      |> List.flat_map (snd >> String.split ',' >> List.map String.trim)
+      |> List.collect (snd >> String.split ',' >> List.map String.trim)
       |> List.map parseResultCookie
       |> List.fold (fun cookies cookie ->
           cookies |> Map.add cookie.name cookie)
@@ -109,8 +109,8 @@ module Cookie =
 
   let unsetCookie (cookieName : string) =
     let startEpoch = DateTimeOffset(1970, 1, 1, 0, 0, 1, TimeSpan.Zero) |> Some
-    let string_value = HttpCookie.toHeader { HttpCookie.mkSimple cookieName "x" with expires = startEpoch }
-    Writers.setHeader "Set-Cookie" string_value
+    let stringValue = HttpCookie.toHeader { HttpCookie.mkSimple cookieName "x" with expires = startEpoch }
+    Writers.setHeader "Set-Cookie" stringValue
 
   let setPair (httpCookie : HttpCookie) (clientCookie : HttpCookie) : WebPart =
     context (fun { runtime = { logger = logger } } ->
@@ -158,8 +158,8 @@ module Cookie =
       |> Choice.from_option (NoCookieFound cookieName)
       |> Choice.map (fun c -> c, c.value |> dec)
     match found with
-    | Choice1Of2 (cookie, cipher_data) ->
-      cipher_data
+    | Choice1Of2 (cookie, cipherData) ->
+      cipherData
       |> Crypto.secretboxOpen key
       |> Choice.map_2 DecryptionError
       |> Choice.map (fun plainText -> cookie, plainText)
@@ -173,9 +173,9 @@ module Cookie =
       let logger = ctx.runtime.logger
       let plainText =
         match readCookies csctx.serverKey csctx.cookieName ctx.response.cookies with
-        | Choice1Of2 (_, plain_text) ->
+        | Choice1Of2 (_, plainText) ->
           Log.log logger "Suave.Cookie.updateCookies" LogLevel.Debug "updateCookies - existing"
-          f_plainText (Some plain_text)
+          f_plainText (Some plainText)
         | Choice2Of2 _ ->
           Log.log logger "Suave.Cookie.updateCookies" LogLevel.Debug "updateCookies - first time"
           f_plainText None
@@ -197,26 +197,26 @@ module Cookie =
 
       let log = Log.log logger "Suave.Cookie.cookie_state" LogLevel.Debug
 
-      let setCookies plain_text =
+      let setCookies plainText =
         let httpCookie, clientCookie =
           generateCookies csctx.serverKey csctx.cookieName
                            csctx.relativeExpiry csctx.secure
-                           plain_text
+                           plainText
         setPair httpCookie clientCookie >>=
-          Writers.setUserData csctx.userStateKey plain_text
+          Writers.setUserData csctx.userStateKey plainText
 
       match readCookies csctx.serverKey csctx.cookieName ctx.request.cookies with
-      | Choice1Of2 (httpCookie, plain_text) ->
+      | Choice1Of2 (httpCookie, plainText) ->
         log "existing cookie"
         refreshCookies csctx.relativeExpiry httpCookie
-          >>= Writers.setUserData csctx.userStateKey plain_text
+          >>= Writers.setUserData csctx.userStateKey plainText
           >>= f_success
 
       | Choice2Of2 (NoCookieFound _) ->
         match noCookie () with
-        | Choice1Of2 plain_text ->
+        | Choice1Of2 plainText ->
           log "no existing cookie, setting text"
-          setCookies plain_text >>= f_success
+          setCookies plainText >>= f_success
         | Choice2Of2 wp_kont ->
           log "no existing cookie, calling app continuation"
           wp_kont
@@ -224,9 +224,9 @@ module Cookie =
       | Choice2Of2 (DecryptionError err) ->
         log (sprintf "decryption error: %A" err)
         match decryptionFailure err with
-        | Choice1Of2 plain_text ->
+        | Choice1Of2 plainText ->
           log "existing, broken cookie, setting cookie text anew"
-          setCookies plain_text >>= f_success
+          setCookies plainText >>= f_success
         | Choice2Of2 wp_kont    ->
           log "existing, broken cookie, unsetting it, forwarding to given failure web part"
           wp_kont >>= unsetPair csctx.cookieName)

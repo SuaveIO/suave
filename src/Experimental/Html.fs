@@ -24,7 +24,7 @@ let empty = Xml[]
 
 let text s = Xml([Text s, Xml[]])
 
-let empty_text = text ""
+let emptyText = text ""
 
 /// HTML elements.
 /// If you need to pass attributes use the version sufixed by ` (funny quote symbol)
@@ -71,7 +71,7 @@ let input = inputAttr [ ]
 
 /// Example
 
-let sample_page = 
+let samplePage = 
   html [ 
     head [
       title "Little HTML DSL"
@@ -90,7 +90,7 @@ let sample_page =
 
 /// Rendering
 
-let internal leaf_element_to_string = function
+let internal leafElementToString = function
  | Text text -> text
  | WhiteSpace text -> text
  | Element (e,id, attributes) ->
@@ -102,7 +102,7 @@ let internal leaf_element_to_string = function
        |> String.Concat
      sprintf "<%s %s/>" e ats
 
-let internal begin_element_to_string = function
+let internal beginElementToString = function
  | Text text -> failwith "invalid option"
  | WhiteSpace text -> failwith "invalid option"
  | Element (e,id, attributes) ->
@@ -114,21 +114,21 @@ let internal begin_element_to_string = function
        |> String.Concat
      sprintf "<%s %s>" e ats
 
-let internal end_element_to_string = function
+let internal endElementToString = function
  | Text text -> failwith "invalid option"
  | WhiteSpace text -> failwith "invalid option"
  | Element (e,_, _) ->
    sprintf "</%s>" e
 
-let rec internal node_to_string (element : Element, xml) =
+let rec internal nodeToString (element : Element, xml) =
   match xml with
-  | Xml [] -> leaf_element_to_string element
+  | Xml [] -> leafElementToString element
   | _  ->
-    let inner = xml_to_string xml
-    (begin_element_to_string element) + inner + (end_element_to_string element)
+    let inner = xmlToString xml
+    (beginElementToString element) + inner + (endElementToString element)
 
-and xml_to_string (Xml xml) =
-  String.Concat (List.map node_to_string xml)
+and xmlToString (Xml xml) =
+  String.Concat (List.map nodeToString xml)
 
 ///
 /// let html = sample_page |> xml_to_string

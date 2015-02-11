@@ -17,7 +17,7 @@ module SocketUtils =
   let abort x = async { return Choice2Of2 x }
   
   /// Wraps the Socket.xxxAsync logic into F# async logic.
-  let inline async_do (op : SocketAsyncEventArgs -> bool) (prepare : SocketAsyncEventArgs -> unit) (select: SocketAsyncEventArgs -> 'T) (args : SocketAsyncEventArgs) =
+  let inline asyncDo (op : SocketAsyncEventArgs -> bool) (prepare : SocketAsyncEventArgs -> unit) (select: SocketAsyncEventArgs -> 'T) (args : SocketAsyncEventArgs) =
     Async.FromContinuations <| fun (ok, error, _) ->
       prepare args
       let k (args : SocketAsyncEventArgs) =
@@ -31,11 +31,11 @@ module SocketUtils =
         k args
   
   /// Prepares the arguments by setting the buffer.
-  let inline set_buffer (buf : ByteSegment) (args: SocketAsyncEventArgs) =
+  let inline setBuffer (buf : ByteSegment) (args: SocketAsyncEventArgs) =
     args.SetBuffer(buf.Array, buf.Offset, buf.Count)
   
   let inline accept (socket : Socket) =
-    async_do socket.AcceptAsync ignore (fun a -> a.AcceptSocket)
+    asyncDo socket.AcceptAsync ignore (fun a -> a.AcceptSocket)
   
   let inline trans (a : SocketAsyncEventArgs) =
     new ArraySegment<_>(a.Buffer, a.Offset, a.BytesTransferred)
