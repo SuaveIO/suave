@@ -40,8 +40,9 @@ let parseData (textBlob : string) =
     sessionId
   | _ -> failwith "internal error; should not have successfully decrypted data"
 
+
 /// Returns a list of the hmac data to use, from the request.
-let generate_data (request : HttpRequest) =
+let generateData (request : HttpRequest) =
   let sessionId = Utils.generateReadableKey SessionIdLength
   String.concat "\n"
     [ sessionId
@@ -67,7 +68,7 @@ let authenticate relativeExpiry secure
       decryptionFailure
       f_success)
 
-let authenticate' relativeExpiry login_page f_success : WebPart =
+let authenticateWithLogin relativeExpiry login_page f_success : WebPart =
   authenticate relativeExpiry false
                (fun () -> Choice2Of2(Redirection.FOUND login_page))
                (sprintf "%A" >> RequestErrors.BAD_REQUEST >> Choice2Of2)
@@ -86,7 +87,7 @@ let authenticate' relativeExpiry login_page f_success : WebPart =
 /// Always succeeds.
 let authenticated relativeExpiry secure : WebPart =
   context (fun { request = req } ->
-    let data = generate_data req |> UTF8.bytes
+    let data = generateData req |> UTF8.bytes
     authenticate relativeExpiry secure
                  (fun _ -> Choice1Of2 data)
                  (fun _ -> Choice1Of2 data)
@@ -97,7 +98,17 @@ let authenticated relativeExpiry secure : WebPart =
   
 module HttpContext =
 
-  let session_id x =
+  let sessionId x =
     x.userState
     |> Map.tryFind StateStoreType
     |> Option.map (fun x -> x :?> string |> parseData)
+
+  [<Obsolete("Renamed to sessionId'")>]
+  let session_id x = sessionId x
+
+[<Obsolete("Renamed to parseData'")>]
+let parse_data textBlob = parseData textBlob 
+[<Obsolete("Renamed to generateData'")>]
+let generate_data request = generateData request
+[<Obsolete("Renamed to authenticateWithLogin'")>]
+let authenticate' relativeExpiry login_page f_success = authenticateWithLogin relativeExpiry login_page f_success

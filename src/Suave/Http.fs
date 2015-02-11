@@ -102,6 +102,9 @@ module Http =
           { ctx.response with status = statusCode; content = Bytes cnt }
         { ctx with response = response } |> succeed
 
+    [<Obsolete("Renamed to statusCode'")>]
+    let status_code = statusCode
+
   module Writers =
     // TODO: transform into a set of lenses with Aether
     // @ https://github.com/xyncro/aether and move closer to HttpContext.
@@ -142,6 +145,13 @@ module Http =
       | _      -> None
 
     let setMimeType t = setHeader "Content-Type" t
+
+    let set_header key value ctx = setHeader key value ctx
+    let set_user_data key value ctx = setUserData key value ctx
+    let unset_user_data key ctx = unsetUserData key ctx
+    let mk_mime_type name compression = mkMimeType name compression
+    let default_mime_types_map = defaultMimeTypesMap
+    let set_mime_type t = setMimeType t
 
   // 1xx
   module Intermediate =
@@ -431,6 +441,11 @@ module Http =
             return! Response.response HttpCode.HTTP_408 (UTF8.bytes "Request Timeout") ctx
             }
 
+    let is_secure x = isSecure x
+    let url_regex regex x = urlRegex regex x
+    let log_format ctx = logFormat ctx
+    let url_scan pf h = urlScan pf h
+
   module ServeResource =
     open System
 
@@ -496,7 +511,7 @@ module Http =
       let write_file file conn = socket {
         let get_fs = fun path -> new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read) :> Stream
         let get_lm = fun path -> FileInfo(path).LastWriteTime
-        use! fs = Compression.transform_x file get_fs get_lm compression ctx.runtime.compressionFolder ctx conn
+        use! fs = Compression.transformStream file get_fs get_lm compression ctx.runtime.compressionFolder ctx conn
 
         do! asyncWriteLn conn (sprintf "Content-Length: %d" (fs : Stream).Length)
         do! asyncWriteLn conn ""
@@ -530,8 +545,6 @@ module Http =
         else raise <| Exception("File canonalization issue.")
       else raise <| Exception("File canonalization issue.")
 
-    [<Obsolete("Use resolvePath")>]
-    let local_file file_name rootPath = resolvePath rootPath file_name
 
     let browseFile rootPath file_name =
       fun ({request = r; runtime = q} as h) ->
@@ -583,6 +596,21 @@ module Http =
     let dirHomeDirectory ctx =
       dir ctx.runtime.homeDirectory ctx
 
+    [<Obsolete("Use resolvePath")>]
+    let local_file file_name rootPath = resolvePath rootPath file_name
+    [<Obsolete("Use sendFile")>]
+    let send_file fileName compression ctx = sendFile fileName compression ctx
+    [<Obsolete("Use resolvePath")>]
+    let resolve_path rootPat fileName = resolvePath rootPat fileName
+    [<Obsolete("Use browseFile")>]
+    let browse_file rootPath file_name = browseFile rootPath file_name
+    [<Obsolete("Use browseFileInHomeDirectory")>]
+    let browse_file' file_name = browseFileInHomeDirectory file_name
+    [<Obsolete("Use browseHomeDirectory")>]
+    let browse' = browseHomeDirectory
+    [<Obsolete("Use dirHomeDirectory")>]
+    let dir' ctx = dirHomeDirectory ctx
+
   module Embedded =
     
     open System
@@ -613,7 +641,7 @@ module Http =
       let write_resource name conn = socket {
         let get_fs = fun name -> assembly.GetManifestResourceStream(name)
         let get_lm = fun _ -> lastModified assembly
-        use! fs = Compression.transform_x name get_fs get_lm compression ctx.runtime.compressionFolder ctx conn
+        use! fs = Compression.transformStream name get_fs get_lm compression ctx.runtime.compressionFolder ctx conn
 
         do! asyncWriteLn conn (sprintf "Content-Length: %d" (fs: Stream).Length)
         do! asyncWriteLn conn ""

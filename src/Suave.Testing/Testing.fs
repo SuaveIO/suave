@@ -190,31 +190,31 @@ let reqResp
     f_result result
 
 let req methd resource data =
-  reqResp methd resource "" data None DecompressionMethods.None id content_string
+  reqResp methd resource "" data None DecompressionMethods.None id contentString
 
 let reqQuery methd resource query =
-  reqResp methd resource query None None DecompressionMethods.None id content_string
+  reqResp methd resource query None None DecompressionMethods.None id contentString
 
 let reqBytes methd resource data =
-  reqResp methd resource "" data None DecompressionMethods.None id content_byte_array
+  reqResp methd resource "" data None DecompressionMethods.None id contentByteArray
 
 let reqGZip methd resource data =
-  reqResp methd resource "" data None DecompressionMethods.GZip id content_string
+  reqResp methd resource "" data None DecompressionMethods.GZip id contentString
 
 let reqDeflate methd resource data =
-  reqResp methd resource "" data None DecompressionMethods.Deflate id content_string
+  reqResp methd resource "" data None DecompressionMethods.Deflate id contentString
 
 let reqGZipBytes methd resource data =
-  reqResp methd resource "" data None DecompressionMethods.GZip id content_byte_array
+  reqResp methd resource "" data None DecompressionMethods.GZip id contentByteArray
 
 let reqDeflateBytes methd resource data =
-  reqResp methd resource "" data None DecompressionMethods.Deflate id content_byte_array
+  reqResp methd resource "" data None DecompressionMethods.Deflate id contentByteArray
 
 let reqHeaders methd resource data =
-  reqResp methd resource "" data None DecompressionMethods.None id response_headers
+  reqResp methd resource "" data None DecompressionMethods.None id responseHeaders
 
 let reqContentHeaders methd resource data =
-  reqResp methd resource "" data None DecompressionMethods.None id content_headers
+  reqResp methd resource "" data None DecompressionMethods.None id contentHeaders
 
 /// Test a request by looking at the cookies alone.
 let reqCookies methd resource data ctx =

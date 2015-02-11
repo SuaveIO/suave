@@ -88,3 +88,38 @@ module Cookie =
                     decryptionFailure:(Crypto.SecretboxDecryptionError -> Choice<byte [], WebPart>) ->
                     f_success:WebPart ->
                     WebPart
+
+
+  [<Obsolete("Renamed to parseCookies'")>]
+  val parse_cookies : cookieString:string -> HttpCookie list
+  [<Obsolete("Renamed to parseResultCookie'")>]
+  val parse_result_cookie : cookieString:string -> HttpCookie
+
+  [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+  module HttpRequest =
+    [<Obsolete("Use the .cookies property instead'")>]
+    val cookies : HttpRequest -> Map<string, HttpCookie>
+
+  [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+  module HttpResult =
+    [<Obsolete("Use the .cookies property instead'")>]
+    val cookies : HttpResult -> Map<string, HttpCookie>
+
+  [<Obsolete("Renamed to setCookie'")>]
+  val set_cookie : cookie:HttpCookie -> WebPart
+  [<Obsolete("Renamed to unsetCookie'")>]
+  val unset_cookie : name:string -> WebPart
+  [<Obsolete("Renamed to setPair'")>]
+  val set_pair   : httpCookie:HttpCookie -> clientCookie:HttpCookie -> WebPart
+  [<Obsolete("Renamed to unsetPair'")>]
+  val unset_pair : httpCookieName:string -> WebPart
+  [<Obsolete("Renamed to generateCookies'")>]
+  val generate_cookies : serverKey:ServerKey -> cookieName:string -> relativeExpiry:CookieLife -> secure:bool -> plainData:byte[] -> HttpCookie * HttpCookie
+  [<Obsolete("Renamed to readCookies'")>]
+  val read_cookies : key:ServerKey -> cookieName:string -> cookies:Map<string, HttpCookie> -> Choice<HttpCookie * byte [], CookieError>
+  [<Obsolete("Renamed to refreshCookies'")>]
+  val refresh_cookies : expiry:CookieLife -> cookie:HttpCookie -> WebPart
+  [<Obsolete("Renamed to updateCookies'")>]
+  val update_cookies :  csctx:CookiesState -> f_plain_text : (byte [] option -> byte []) -> WebPart
+  [<Obsolete("Renamed to cookieState'")>]
+  val cookie_state : csctx:CookiesState -> noCookie :(unit -> Choice<byte [], WebPart>) -> decryptionFailure:(Crypto.SecretboxDecryptionError -> Choice<byte [], WebPart>) -> f_success:WebPart -> WebPart

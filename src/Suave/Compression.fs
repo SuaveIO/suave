@@ -99,7 +99,7 @@ module Compression =
     return new_path
   }
 
-  let transform_x (key : string) (getData : string -> Stream) (getLast : string -> DateTime) compression compressionFolder ({ request = q } as ctx) connection =
+  let transformStream (key : string) (getData : string -> Stream) (getLast : string -> DateTime) compression compressionFolder ({ request = q } as ctx) connection =
     socket {
       let stream = getData key
       if compression && stream.Length > int64(MIN_BYTES_TO_COMPRESS) && stream.Length < int64(MAX_BYTES_TO_COMPRESS) then
@@ -108,18 +108,30 @@ module Compression =
         | Some (n) ->
           do! asyncWriteLn connection (String.Concat [| "Content-Encoding: "; n.ToString() |])
           if Globals.compressedFilesMap.ContainsKey key then
-            let last_modified = getLast key
+            let lastModified = getLast key
             let cmpr_info = new FileInfo(Globals.compressedFilesMap.[key])
-            if last_modified > cmpr_info.CreationTime then
-              let! new_path =  compressFile n stream compressionFolder
-              Globals.compressedFilesMap.[key] <- new_path
+            if lastModified > cmpr_info.CreationTime then
+              let! newPath =  compressFile n stream compressionFolder
+              Globals.compressedFilesMap.[key] <- newPath
           else
-            let! new_path =  compressFile n stream compressionFolder
-            Globals.compressedFilesMap.TryAdd(key,new_path) |> ignore
+            let! newPath =  compressFile n stream compressionFolder
+            Globals.compressedFilesMap.TryAdd(key,newPath) |> ignore
           return new FileStream(Globals.compressedFilesMap.[key] , FileMode.Open, FileAccess.Read, FileShare.Read) :> Stream
         | None ->
           return stream
       else
         return stream
     }
+
+
+  [<Obsolete("Renamed to load_encoder'")>]
+  let load_encoder s = loadEncoder s
+  [<Obsolete("Renamed to get_encoder'")>]
+  let get_encoder request = getEncoder  request
+  [<Obsolete("Renamed to parse_encoder'")>]
+  let parse_encoder request = parseEncoder request
+  [<Obsolete("Renamed to compress_file'")>]
+  let compress_file n stream compressionFolder = compressFile stream compressionFolder
+  [<Obsolete("Renamed to transformStream'")>]
+  let transform_x key getData getLast compression compressionFolder ctx connection = transformStream key getData getLast compression compressionFolder ctx connection
 

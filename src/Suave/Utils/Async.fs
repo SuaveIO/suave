@@ -7,7 +7,7 @@ open System.Threading.Tasks
 open System.Threading
 
 /// Helper to just invoke the three 'funcs' once.
-let internal invoke_once funcs =
+let internal invokeOnce funcs =
   let counter = ref 0
   let invoke_once' f x =
     if (Interlocked.CompareExchange (counter, 1, 0) = 0) then
@@ -20,7 +20,7 @@ type Microsoft.FSharp.Control.Async with
   /// the timeout.
   static member WithTimeout(timeout : TimeSpan, computation : Async<'T>) : Async<'T> =
     let callback (success, error, cancellation) =
-      let (success, error, cancellation) = invoke_once (success, error, cancellation)
+      let (success, error, cancellation) = invokeOnce (success, error, cancellation)
       let fetchResult = async {
         try
           let! result = computation

@@ -28,7 +28,7 @@ module Cookie =
         HttpCookie.mkSimple (String.trim parts.[0]) (String.trim parts.[1]))
 
   let parseResultCookie (s : string) : HttpCookie =
-    let parse_expires (str : string) =
+    let parseExpires (str : string) =
       DateTimeOffset.ParseExact(str, "R", CultureInfo.InvariantCulture)
     s.Split(';')
     |> Array.map (fun (x : string) ->
@@ -42,7 +42,7 @@ module Cookie =
                                                                value = value }
         | "Domain", domain          -> iter + 1, { cookie with domain = Some domain }
         | "Path", path              -> iter + 1, { cookie with path = Some path }
-        | "Expires", expires        -> iter + 1, { cookie with expires = Some (parse_expires expires) }
+        | "Expires", expires        -> iter + 1, { cookie with expires = Some (parseExpires expires) }
         | "HttpOnly", _             -> iter + 1, { cookie with httpOnly = true }
         | "Secure", _               -> iter + 1, { cookie with secure = true }
         | _                         -> iter + 1, cookie)
@@ -71,7 +71,7 @@ module Cookie =
           cookies |> Map.add cookie.name cookie)
           Map.empty
 
-  let private client_cookie_from (httpCookie : HttpCookie) =
+  let private clientCookieFrom (httpCookie : HttpCookie) =
     let ccn = String.Concat [ httpCookie.name; "-client" ]
     { HttpCookie.mkSimple ccn httpCookie.name
         with httpOnly = false
@@ -88,28 +88,28 @@ module Cookie =
       | Session -> None
       | MaxAge ts  -> Some (Globals.utc_now().Add ts)
     let httpCookie = { httpCookie with expires = expiry }
-    httpCookie, client_cookie_from httpCookie
+    httpCookie, clientCookieFrom httpCookie
 
   let setCookie (cookie : HttpCookie) (ctx : HttpContext) =
-    let not_set_cookie : string * string -> bool =
+    let notSetCookie : string * string -> bool =
       fst >> (String.eq_ord_ci "Set-Cookie" >> not)
-    let cookie_headers =
+    let cookieHeaders =
       ctx.response.cookies
       |> Map.put cookie.name cookie // possibly overwrite
       |> Map.toList
       |> List.map snd // get HttpCookie-s
       |> List.map HttpCookie.toHeader
     let headers' =
-      cookie_headers
+      cookieHeaders
       |> List.fold (fun headers header ->
           ("Set-Cookie", header) :: headers)
-          (ctx.response.headers |> List.filter not_set_cookie)
+          (ctx.response.headers |> List.filter notSetCookie)
     { ctx with response = { ctx.response with headers = headers' } }
     |> succeed
 
   let unsetCookie (cookieName : string) =
-    let start_epoch = DateTimeOffset(1970, 1, 1, 0, 0, 1, TimeSpan.Zero) |> Some
-    let string_value = HttpCookie.toHeader { HttpCookie.mkSimple cookieName "x" with expires = start_epoch }
+    let startEpoch = DateTimeOffset(1970, 1, 1, 0, 0, 1, TimeSpan.Zero) |> Some
+    let string_value = HttpCookie.toHeader { HttpCookie.mkSimple cookieName "x" with expires = startEpoch }
     Writers.setHeader "Set-Cookie" string_value
 
   let setPair (httpCookie : HttpCookie) (clientCookie : HttpCookie) : WebPart =
@@ -230,3 +230,36 @@ module Cookie =
         | Choice2Of2 wp_kont    ->
           log "existing, broken cookie, unsetting it, forwarding to given failure web part"
           wp_kont >>= unsetPair csctx.cookieName)
+
+  [<Obsolete("Renamed to parseCookies'")>]
+  let parse_cookies s = parseCookies s
+  [<Obsolete("Renamed to parseResultCookie'")>]
+  let parse_result_cookie (s : string) : HttpCookie = parseResultCookie s 
+  [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+  module HttpRequest =
+    [<Obsolete("Use the .cookies property instead'")>]
+    let cookies (x:HttpRequest) = x.cookies
+
+  [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+  module HttpResult =
+    [<Obsolete("Use the .cookies property instead'")>]
+    let cookies (x:HttpResult) = x.cookies
+
+  [<Obsolete("Renamed to setCookie'")>]
+  let set_cookie cookie ctx = setCookie cookie ctx
+  [<Obsolete("Renamed to unsetCookie'")>]
+  let unset_cookie cookieName = unsetCookie cookieName
+  [<Obsolete("Renamed to setPair'")>]
+  let set_pair httpCookie clientCookie = setPair httpCookie clientCookie
+  [<Obsolete("Renamed to unsetPair'")>]
+  let unset_pair httpCookieName = unsetPair httpCookieName 
+  [<Obsolete("Renamed to generateCookies'")>]
+  let generate_cookies serverKey cookieName relativeExpiry secure plainData = generateCookies serverKey cookieName relativeExpiry secure plainData
+  [<Obsolete("Renamed to readCookies'")>]
+  let read_cookies key cookieName cookies = readCookies key cookieName cookies
+  [<Obsolete("Renamed to refreshCookies'")>]
+  let refresh_cookies relativeExpiry httpCookie = refreshCookies relativeExpiry httpCookie 
+  [<Obsolete("Renamed to updateCookies'")>]
+  let update_cookies relativeExpiry httpCookie = updateCookies relativeExpiry httpCookie 
+  [<Obsolete("Renamed to cookieState'")>]
+  let cookie_state csctx noCookie decryptionFailure f_success = cookieState csctx noCookie decryptionFailure f_success 
