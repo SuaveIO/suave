@@ -68,3 +68,6 @@ module Loggers =
       CombiningLogger(
         [ ConsoleWindowLogger(level)
           OutputWindowLogger(level) ]) :> Logger
+
+  [<System.Obsolete("Use saneDefaultsFor")>]
+  let sane_defaults_for level = saneDefaultsFor level

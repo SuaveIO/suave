@@ -5,17 +5,6 @@ open System.IO
 open System.Text
 open Suave.Utils.Async
 
-type BufferSegment =
-    { buffer : ArraySegment<byte>
-      offset : int
-      length : int }
-
-[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
-module BufferSegment =
-    
-    let inline mk buffer offset length =
-      if length < 0 then failwith (sprintf "BufferSegment.mk: length = %d < 0" length)
-      { buffer = buffer; offset = offset; length = length }
 
 
 module (* internal *) Bytes =
@@ -30,6 +19,17 @@ module (* internal *) Bytes =
       i <- i + 1
     xx = 0u
 
+  type BufferSegment =
+    { buffer : ArraySegment<byte>
+      offset : int
+      length : int }
+
+  [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+  module BufferSegment =
+    
+    let inline mk buffer offset length =
+      if length < 0 then failwith (sprintf "BufferSegment.mk: length = %d < 0" length)
+      { buffer = buffer; offset = offset; length = length }
 
   // for ci in (int '!')..(int '~') do printfn "%c" (char ci);;
   // https://en.wikipedia.org/wiki/HTTP_cookie#Setting_a_cookie

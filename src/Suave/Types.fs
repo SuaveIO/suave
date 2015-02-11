@@ -15,6 +15,9 @@ open Suave.Utils
 open Suave.Log
 open Suave.Logging
 
+[<System.Obsolete("Renamed to Property")>]
+type Lens<'T,'P> = Property<'T,'P>
+
 /// <summary>
 /// These are the known HTTP methods. See http://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html
 /// </summary>
@@ -190,6 +193,13 @@ module HttpCode =
     let tryParse (code: int) =
       mapCases.Force() |> Map.tryFind ("HTTP_" + string code)
 
+[<System.Obsolete("Don't open this module. Renamed to Suave.Types.HttpCode")>]
+module Codes =
+    type X = HttpCode
+    [<System.Obsolete("Use Suave.Types.HttpCode")>]
+    type HttpCode = X
+
+
 /// HTTP cookie
 type HttpCookie =
   { name      : string
@@ -267,8 +277,8 @@ type MimeType =
   { name         : string
     compression  : bool }
 
-  static member nameP = Property (fun x -> x.name) (fun v (x : MimeType) -> { x with name = v })
-  static member compressionP = Property (fun x -> x.compression) (fun v (x : MimeType) -> { x with compression = v })
+  static member name_ = Property (fun x -> x.name) (fun v (x : MimeType) -> { x with name = v })
+  static member compression_ = Property (fun x -> x.compression) (fun v (x : MimeType) -> { x with compression = v })
 
 
 type MimeTypesMap = string -> MimeType option
@@ -280,10 +290,10 @@ type HttpUpload =
     mimeType      : string
     tempFilePath : string }
 
-  static member fieldNameP = Property<HttpUpload,_> (fun x -> x.fieldName) (fun v x -> { x with fieldName = v })
-  static member fileNameP = Property<HttpUpload,_> (fun x -> x.fileName) (fun v x -> { x with fileName = v })
-  static member mimeTypeP = Property<HttpUpload,_> (fun x -> x.mimeType) (fun v x -> { x with mimeType = v })
-  static member tempFilePathP = Property<HttpUpload,_> (fun x -> x.tempFilePath) (fun v x -> { x with tempFilePath = v })
+  static member fieldName_ = Property<HttpUpload,_> (fun x -> x.fieldName) (fun v x -> { x with fieldName = v })
+  static member fileName_ = Property<HttpUpload,_> (fun x -> x.fileName) (fun v x -> { x with fileName = v })
+  static member mimeType_ = Property<HttpUpload,_> (fun x -> x.mimeType) (fun v x -> { x with mimeType = v })
+  static member tempFilePath_ = Property<HttpUpload,_> (fun x -> x.tempFilePath) (fun v x -> { x with tempFilePath = v })
 
 
 
@@ -316,17 +326,17 @@ type HttpRequest =
     isSecure         : bool
     ipaddr           : IPAddress }
 
-  static member httpVersionP     = Property<HttpRequest,_> (fun x -> x.httpVersion) (fun v (x : HttpRequest) -> { x with httpVersion = v })
-  static member urlP             = Property<HttpRequest,_> (fun x -> x.url) (fun v x -> { x with url = v })
-  static member methodP          = Property<HttpRequest,_> (fun x -> x.``method``) (fun v x -> { x with ``method`` = v })
-  static member headersP         = Property<HttpRequest,_> (fun x -> x.headers) (fun v x -> { x with headers = v })
-  static member rawFormP         = Property<HttpRequest,_> (fun x -> x.rawForm) (fun v x -> { x with rawForm = v })
-  static member rawQueryP        = Property<HttpRequest,_> (fun x -> x.rawQuery) (fun v x -> { x with rawQuery = v })
-  static member filesP           = Property<HttpRequest,_> (fun x -> x.files) (fun v x -> { x with files = v })
-  static member multipartFieldsP = Property<HttpRequest,_> (fun x -> x.multiPartFields) (fun v x -> { x with multiPartFields = v })
-  static member traceP           = Property<HttpRequest,_> (fun x -> x.trace) (fun v x -> { x with trace = v })
-  static member isSecureP        = Property<HttpRequest,_> (fun x -> x.isSecure) (fun v x -> { x with isSecure = v })
-  static member ipaddrP          = Property<HttpRequest,_> (fun x -> x.ipaddr) (fun v x -> { x with ipaddr = v })
+  static member httpVersion_     = Property<HttpRequest,_> (fun x -> x.httpVersion) (fun v (x : HttpRequest) -> { x with httpVersion = v })
+  static member url_             = Property<HttpRequest,_> (fun x -> x.url) (fun v x -> { x with url = v })
+  static member method_          = Property<HttpRequest,_> (fun x -> x.``method``) (fun v x -> { x with ``method`` = v })
+  static member headers_         = Property<HttpRequest,_> (fun x -> x.headers) (fun v x -> { x with headers = v })
+  static member rawForm_         = Property<HttpRequest,_> (fun x -> x.rawForm) (fun v x -> { x with rawForm = v })
+  static member rawQuery_        = Property<HttpRequest,_> (fun x -> x.rawQuery) (fun v x -> { x with rawQuery = v })
+  static member files_           = Property<HttpRequest,_> (fun x -> x.files) (fun v x -> { x with files = v })
+  static member multipartFields_ = Property<HttpRequest,_> (fun x -> x.multiPartFields) (fun v x -> { x with multiPartFields = v })
+  static member trace_           = Property<HttpRequest,_> (fun x -> x.trace) (fun v x -> { x with trace = v })
+  static member isSecure_        = Property<HttpRequest,_> (fun x -> x.isSecure) (fun v x -> { x with isSecure = v })
+  static member ipaddr_          = Property<HttpRequest,_> (fun x -> x.ipaddr) (fun v x -> { x with ipaddr = v })
 
   /// Gets the query string from the HttpRequest. Use
   /// (^^) to try to fetch data from this.
@@ -342,12 +352,12 @@ type HttpRequest =
     x.headers %% k
 
   /// Gets the form as a ((string*string option list) from the HttpRequest
-  member x.formDataAll  =
+  member x.formData  =
     Parsing.parseData (ASCII.toString x.rawForm)
 
   /// Finds the key k from the form in the HttpRequest
   member x.formDataItem (k : string) =
-    x.formDataAll ^^ k
+    x.formData ^^ k
 
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
@@ -369,7 +379,20 @@ module HttpRequest =
       isSecure        = false
       ipaddr           = IPAddress.Loopback }
 
+  [<System.Obsolete("Use request.queryParams")>]
+  let query (x : HttpRequest) = x.queryParams
 
+  [<System.Obsolete("Use request.queryParam key")>]
+  let query' (x : HttpRequest) k = x.queryParam k
+
+  [<System.Obsolete("Use request.header")>]
+  let header (x : HttpRequest) k = x.header
+
+  [<System.Obsolete("Use request.formData")>]
+  let form  (x : HttpRequest) = x.formData
+
+  [<System.Obsolete("Use request.formDataItem key")>]
+  let form'   (x : HttpRequest) k = x.formDataItem k
 
 type ITlsProvider =
   abstract member Wrap : Connection -> SocketOp<Connection>
@@ -381,7 +404,7 @@ type Protocol =
     /// The HTTP protocol tunneled in a TLS tunnel
     | HTTPS of ITlsProvider
     
-    member x.IsSecure = 
+    member x.secure = 
         match x with
         | HTTP -> false
         | _ -> true
@@ -423,8 +446,8 @@ type HttpBinding(scheme: Protocol, socketBinding : SocketBinding) =
 
   static member defaults = HttpBinding(HTTP, IPAddress.Loopback, HttpBinding.DefaultBindingPort)
 
-  static member schemeP = Property<HttpBinding,_> (fun x -> x.scheme) (fun v x -> HttpBinding(scheme=v,socketBinding=x.socketBinding))
-  static member socketBindingP = Property<HttpBinding,_> (fun x -> x.socketBinding) (fun v x -> HttpBinding(scheme=x.scheme,socketBinding=v))
+  static member scheme_ = Property<HttpBinding,_> (fun x -> x.scheme) (fun v x -> HttpBinding(scheme=v,socketBinding=x.socketBinding))
+  static member socketBinding_ = Property<HttpBinding,_> (fun x -> x.socketBinding) (fun v x -> HttpBinding(scheme=x.scheme,socketBinding=v))
 
 
 type HttpContent =
@@ -446,9 +469,9 @@ type HttpResult =
       headers = []
       content = HttpContent.NullContent }
 
-  static member statusP = Property<HttpResult,_> (fun x -> x.status) (fun v x -> { x with status = v })
-  static member headersP = Property<HttpResult,_> (fun x -> x.headers) (fun v x -> { x with headers = v })
-  static member contentP = Property<HttpResult,_> (fun x -> x.content) (fun v x -> { x with content = v })
+  static member status_ = Property<HttpResult,_> (fun x -> x.status) (fun v x -> { x with status = v })
+  static member headers_ = Property<HttpResult,_> (fun x -> x.headers) (fun v x -> { x with headers = v })
+  static member content_ = Property<HttpResult,_> (fun x -> x.content) (fun v x -> { x with content = v })
 
 
 /// A server-key is a 256 bit key with high entropy
@@ -467,14 +490,14 @@ type HttpRuntime =
     matchedBinding     : HttpBinding
     parsePostData      : bool }
 
-  static member serverKeyP = Property (fun x -> x.serverKey) (fun v x -> { x with serverKey = v })
-  static member errorHandlerP = Property (fun x -> x.errorHandler) (fun v x -> { x with errorHandler = v })
-  static member mimeTypesMapP = Property (fun x -> x.mimeTypesMap) (fun v x -> { x with mimeTypesMap = v })
-  static member homeDirectoryP = Property (fun x -> x.homeDirectory) (fun v x -> { x with homeDirectory = v })
-  static member compressionFolderP = Property (fun x -> x.compressionFolder) (fun v x -> { x with compressionFolder = v })
-  static member loggerP = Property (fun x -> x.logger) (fun v x -> { x with logger = v })
-  static member matchedBindingP = Property (fun x -> x.matchedBinding) (fun v x -> { x with matchedBinding = v })
-  static member parsePostDataP = Property (fun x -> x.parsePostData) (fun v x -> { x with parsePostData = v })
+  static member serverKey_ = Property (fun x -> x.serverKey) (fun v x -> { x with serverKey = v })
+  static member errorHandler_ = Property (fun x -> x.errorHandler) (fun v x -> { x with errorHandler = v })
+  static member mimeTypesMap_ = Property (fun x -> x.mimeTypesMap) (fun v x -> { x with mimeTypesMap = v })
+  static member homeDirectory_ = Property (fun x -> x.homeDirectory) (fun v x -> { x with homeDirectory = v })
+  static member compressionFolder_ = Property (fun x -> x.compressionFolder) (fun v x -> { x with compressionFolder = v })
+  static member logger_ = Property (fun x -> x.logger) (fun v x -> { x with logger = v })
+  static member matchedBinding_ = Property (fun x -> x.matchedBinding) (fun v x -> { x with matchedBinding = v })
+  static member parsePostData_ = Property (fun x -> x.parsePostData) (fun v x -> { x with parsePostData = v })
 
 /// The HttpContext is the container of the request, runtime, user-state and
 /// response.
@@ -626,7 +649,21 @@ type SuaveConfig =
     /// A logger to log with
     logger                  : Logger }
 
-  member config.ToRuntime contentFolder compressionFolder parsePostData =
+  static member bindings_              = Property<SuaveConfig,_> (fun x -> x.bindings)              (fun v x -> { x with bindings = v })
+  static member serverKey_             = Property<SuaveConfig,_> (fun x -> x.serverKey)             (fun v x -> { x with serverKey = v })
+  static member errorHandler_          = Property<SuaveConfig,_> (fun x -> x.errorHandler)          (fun v x -> { x with errorHandler = v })
+  static member listenTimeout_         = Property<SuaveConfig,_> (fun x -> x.listenTimeout)         (fun v x -> { x with listenTimeout = v })
+  static member ct_                    = Property<SuaveConfig,_> (fun x -> x.cancellationToken)     (fun v x -> { x with cancellationToken = v })
+  static member bufferSize_            = Property<SuaveConfig,_> (fun x -> x.bufferSize)            (fun v x -> { x with bufferSize = v })
+  static member maxOps_                = Property<SuaveConfig,_> (fun x -> x.maxOps)                (fun v x -> { x with maxOps = v })
+  static member mimeTypesMap_          = Property<SuaveConfig,_> (fun x -> x.mimeTypesMap)          (fun v x -> { x with mimeTypesMap = v })
+  static member homeFolder_            = Property<SuaveConfig,_> (fun x -> x.homeFolder)            (fun v x -> { x with homeFolder = v })
+  static member compressedFilesFolder_ = Property<SuaveConfig,_> (fun x -> x.compressedFilesFolder) (fun v x -> { x with compressedFilesFolder = v })
+  static member logger_                = Property<SuaveConfig,_> (fun x -> x.logger)                (fun v x -> { x with logger = v })
+
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module SuaveConfig =
+  let to_runtime config contentFolder compressionFolder parsePostData =
     HttpRuntime.mk config.serverKey
                    config.errorHandler
                    config.mimeTypesMap
@@ -634,16 +671,4 @@ type SuaveConfig =
                    compressionFolder
                    config.logger
                    parsePostData
-
-  static member bindingsP              = Property<SuaveConfig,_> (fun x -> x.bindings)              (fun v x -> { x with bindings = v })
-  static member serverKeyP             = Property<SuaveConfig,_> (fun x -> x.serverKey)             (fun v x -> { x with serverKey = v })
-  static member errorHandlerP          = Property<SuaveConfig,_> (fun x -> x.errorHandler)          (fun v x -> { x with errorHandler = v })
-  static member listenTimeoutP         = Property<SuaveConfig,_> (fun x -> x.listenTimeout)         (fun v x -> { x with listenTimeout = v })
-  static member ctP                    = Property<SuaveConfig,_> (fun x -> x.cancellationToken)     (fun v x -> { x with cancellationToken = v })
-  static member bufferSizeP            = Property<SuaveConfig,_> (fun x -> x.bufferSize)            (fun v x -> { x with bufferSize = v })
-  static member maxOpsP                = Property<SuaveConfig,_> (fun x -> x.maxOps)                (fun v x -> { x with maxOps = v })
-  static member mimeTypesMapP          = Property<SuaveConfig,_> (fun x -> x.mimeTypesMap)          (fun v x -> { x with mimeTypesMap = v })
-  static member homeFolderP            = Property<SuaveConfig,_> (fun x -> x.homeFolder)            (fun v x -> { x with homeFolder = v })
-  static member compressedFilesFolderP = Property<SuaveConfig,_> (fun x -> x.compressedFilesFolder) (fun v x -> { x with compressedFilesFolder = v })
-  static member loggerP                = Property<SuaveConfig,_> (fun x -> x.logger)                (fun v x -> { x with logger = v })
 

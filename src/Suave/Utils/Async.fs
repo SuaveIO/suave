@@ -1,5 +1,5 @@
 [<AutoOpen>]
-module internal Suave.Utils.Async
+module Suave.Utils.Async
 
 open System
 open System.IO
@@ -37,11 +37,15 @@ type Microsoft.FSharp.Control.Async with
 
     Async.FromContinuations callback
 
+  /// Raise an exception on the async computation/workflow. 
+  static member AsyncRaise (e : exn) = 
+    Async.FromContinuations(fun (_,econt,_) -> econt e) 
+
   /// Await a task asynchronously
   static member AwaitTask (t : Task) =
     let flattenExns (e : AggregateException) = e.Flatten().InnerExceptions.[0]
     let rewrapAsyncExn (it : Async<unit>) =
-      async { try do! it with :? AggregateException as ae -> raise (flattenExns ae) }
+      async { try do! it with :? AggregateException as ae -> do! Async.AsyncRaise (flattenExns ae) }
     let tcs = new TaskCompletionSource<unit>(TaskCreationOptions.None)
     t.ContinueWith((fun t' ->
       if t.IsFaulted then tcs.SetException(t.Exception |> flattenExns)

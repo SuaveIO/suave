@@ -23,9 +23,9 @@ type TraceHeader =
     /// In ZipKin/Dapper-speak, this is the span parent id
     reqParentId : uint64 option }
 
-  static member traceIdP = Property (fun x -> x.traceId) (fun v x -> { x with traceId = v })
-  static member reqIdP = Property (fun x -> x.reqId) (fun v x -> { x with reqId = v })
-  static member reqParentIdP = Property (fun x -> x.reqParentId) (fun v x -> { x with reqParentId = v })
+  static member traceId_     = Property (fun x -> x.traceId) (fun v x -> { x with traceId = v })
+  static member reqId_       = Property (fun x -> x.reqId) (fun v x -> { x with reqId = v })
+  static member reqParentId_ = Property (fun x -> x.reqParentId) (fun v x -> { x with reqParentId = v })
 
   /// The empty trace header has zeroes for trace and request id.
   static member empty =

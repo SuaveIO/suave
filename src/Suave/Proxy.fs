@@ -109,22 +109,26 @@ let private proxy proxyResolver (r : HttpContext) =
 
 /// Run a proxy server with the given configuration and given upstream/target
 /// resolver.
-let createProxyServerAsync (config : SuaveConfig) resolver =
+let createReverseProxyServerAsync (config : SuaveConfig) resolver =
   let homeFolder, compressionFolder =
     ParsingAndControl.resolveDirectory config.homeFolder,
     Path.Combine(ParsingAndControl.resolveDirectory config.compressedFilesFolder, "_temporary_compressed_files")
   let all =
     [ for binding in config.bindings do 
         let reqLoop = ParsingAndControl.requestLoop (config.ToRuntime homeFolder compressionFolder false binding )  (SocketPart (proxy resolver))
-        let server = createTcpIpServer (config.bufferSize, config.maxOps, config.logger,
-                         reqLoop ,
-                         binding.socketBinding)
+        let server = createTcpIpServer (config.bufferSize, config.maxOps) config.logger reqLoop binding.socketBinding
         yield server ]
       
   let listening = all |> List.map fst |> Async.Parallel |> Async.Ignore
   let server    = all |> List.map snd |> Async.Parallel |> Async.Ignore
   listening, server
 
-let startProxyServer config resolver =
-  Async.RunSynchronously(createProxyServerAsync config resolver |> snd,
+let startReverseProxyServer config resolver =
+  Async.RunSynchronously(createReverseProxyServerAsync config resolver |> snd,
     cancellationToken = config.cancellationToken)
+
+[<System.Obsolete("Use createReverseProxyServerAsync")>]
+let proxy_server_async config resolver = createReverseProxyServerAsync config resolver
+
+[<System.Obsolete("Use startReverseProxyServer")>]
+let proxy_server config resolver = startReverseProxyServer config resolver

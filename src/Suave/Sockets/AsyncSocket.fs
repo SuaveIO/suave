@@ -88,3 +88,22 @@ let transferStreamBounded (toStream : Connection) (from : Stream) len =
       do! send toStream (new ArraySegment<_>(buf,0,read))
       return! doBlock (left - read) }
   doBlock len
+
+[<System.Obsolete("Use liftAsync")>]
+let lift_async a = liftAsync a
+[<System.Obsolete("Use liftTask")>]
+let lift_task a = liftTask a
+[<System.Obsolete("Use toAsync")>]
+let to_async f = toAsync f
+[<System.Obsolete("Use asyncWrite")>]
+let async_write connection s = asyncWrite connection s
+[<System.Obsolete("Use asyncWriteNewLine")>]
+let async_write_nl connection = asyncWriteNewLine connection
+[<System.Obsolete("Use asyncWriteLn")>]
+let async_writeln  connection s = asyncWriteLn connection s
+[<System.Obsolete("Use asyncWriteBytes")>]
+let async_writebytes  connection b = asyncWriteBytes connection b
+[<System.Obsolete("Use transferStream")>]
+let transfer_x toStream from = transferStream toStream from
+[<System.Obsolete("Use transferStreamBounded")>]
+let transfer_len_x toStream from len = transferStreamBounded toStream from len

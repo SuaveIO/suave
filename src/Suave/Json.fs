@@ -1,9 +1,11 @@
 ﻿module Suave.Json
 
 open System.IO
-
 open System.Runtime.Serialization.Json
 open System.Text
+
+open Suave.Http
+open Suave.Web
 
 /// Convert the object to a JSON representation inside a byte array (can be made string of)
 let toJson<'T> (o: 'T) =
@@ -25,8 +27,6 @@ let fromJson<'T> (bytes : byte []) =
 /// let app =
 ///   url "/path"  >>= map_json some_function;
 ///
-open Suave.Http
-open Suave.Web
 
 let mapJson f =
   Types.request(fun r ->
@@ -34,3 +34,10 @@ let mapJson f =
       |> toJson
       |> Successful.ok 
       >>= Writers.setMimeType "application/json") 
+
+[<System.Obsolete("Use toJson")>]
+let to_json o = toJson o
+[<System.Obsolete("Use fromJson")>]
+let from_json  bytes  = fromJson bytes
+[<System.Obsolete("Use mapJson")>]
+let map_json f = mapJson f

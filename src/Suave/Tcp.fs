@@ -100,10 +100,10 @@ let private a_few_times f =
 /// yields when the full server is cancelled. If the 'has started listening' workflow
 /// returns None, then the start timeout expired.
 let createTcpIpServer (bufferSize        : int, 
-                       maxConcurrentOps : int, 
-                       logger             : Logger,
-                       serveClient        : TcpWorker<unit>,
-                       binding            : SocketBinding) =
+                       maxConcurrentOps : int) 
+                      (logger             : Logger)
+                      (serveClient        : TcpWorker<unit>)
+                      (binding            : SocketBinding) =
 
   let startData =
     { startCalledUtc = Globals.utc_now ()
@@ -185,3 +185,14 @@ let createTcpIpServer (bufferSize        : int,
       "tcp server failed" |> Log.interne logger "Suave.Tcp.tcp_ip_server" ex
       return ()
   }
+
+[<Obsolete("Renamed to closeSocket")>]
+let close_socket s = closeSocket s
+[<Obsolete("Renamed to shutdownSocket")>]
+let shutdown_socket s = shutdownSocket s
+[<Obsolete("Renamed to stopTcp")>]
+let stop_tcp logger reason socket = stopTcp logger reason socket
+[<Obsolete("Renamed to createPools")>]
+let create_pools  logger maxOps bufferSize = createPools logger maxOps bufferSize
+[<Obsolete("Renamed to createTcpIpServer")>]
+let tcp_ip_server  (bufferSize, maxConcurrentOps) logger serveClient binding = createTcpIpServer (bufferSize, maxConcurrentOps) logger serveClient binding

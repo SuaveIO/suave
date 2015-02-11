@@ -473,9 +473,11 @@ module internal ParsingAndControl =
 
   /// Starts a new web worker, given the configuration and a web part to serve.
   let createHttpServer (bufferSize, maxOps) (webpart : WebPart) (runtime : HttpRuntime) =
-    createTcpIpServer 
-        (bufferSize, maxOps, runtime.logger, 
-         requestLoop runtime (WebPart webpart), runtime.matchedBinding.socketBinding)
+    createTcpIpServer
+        (bufferSize, maxOps) 
+        runtime.logger 
+        (requestLoop runtime (WebPart webpart)) 
+        runtime.matchedBinding.socketBinding
 
   let resolveDirectory homeDirectory =
     match homeDirectory with

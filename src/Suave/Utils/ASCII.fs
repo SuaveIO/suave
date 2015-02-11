@@ -1,7 +1,7 @@
 ﻿namespace Suave.Utils
 
 [<RequireQualifiedAccess>]
-module internal ASCII =
+module ASCII =
   open System
   open System.Text
 
@@ -26,3 +26,12 @@ module internal ASCII =
   let inline decodeBase64 (s : string) =
     let bytes = Convert.FromBase64String s
     Encoding.ASCII.GetString bytes
+
+  [<Obsolete("Renamed to toStringAtOffset")>]
+  let to_string  buff index count = toStringAtOffset buff index count
+  [<Obsolete("Renamed to toString")>]
+  let to_string'  b = toString b
+  [<Obsolete("Renamed to encodeBase64")>]
+  let base64_encode  s = encodeBase64 s
+  [<Obsolete("Renamed to decodeBase64")>]
+  let base64_decode  s =  decodeBase64 s
