@@ -21,7 +21,7 @@ let set_connection_keep_alive (r : HttpRequestMessage) =
 let tests =
   testList "connecting" [
     testCase "connect with keep-alive default" <| fun _ ->
-      let context = runWith SuaveConfig.defaults (OK "ACK")
+      let context = runWith defaultConfig (OK "ACK")
       let res =
         reqResp HttpMethod.GET "/"  "" None
                  None DecompressionMethods.None

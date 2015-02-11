@@ -25,7 +25,7 @@ let app =
   urlScan "/%d" (fun (n : int) -> fun x -> async{ let! r = fib (bigint n) in return! OK (r.ToString()) x })
 
 let config =
-  { SuaveConfig.defaults with
+  { defaultConfig with
      bindings = [ HttpBinding.mk HTTP IPAddress.Loopback 3000us ] }
 
 [<EntryPoint>]

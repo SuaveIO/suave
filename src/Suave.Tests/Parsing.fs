@@ -21,7 +21,7 @@ open Suave.Testing
 
 [<Tests>]
 let parsing_multipart =
-  let runWith' = runWith SuaveConfig.defaults
+  let runWith' = runWith defaultConfig
 
   let post_data1 = read_bytes "request.txt"
   let post_data2 = read_text "request-1.txt"

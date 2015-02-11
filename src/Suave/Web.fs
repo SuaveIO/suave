@@ -537,16 +537,15 @@ let startWebServer (config : SuaveConfig) (webpart : WebPart) =
 /// The default configuration binds on IPv4, 127.0.0.1:8083 with a regular 500 Internal Error handler,
 /// with a timeout of one minute for computations to run. Waiting for 2 seconds for the socket bind
 /// to succeed.
-type SuaveConfig with 
-  static member defaults = 
-      { bindings           = [ HttpBinding.defaults ]
-        serverKey          = Utils.Crypto.generateKey HttpRuntime.ServerKeyLength
-        errorHandler       = defaultErrorHandler
-        listenTimeout      = TimeSpan.FromSeconds(2.)
-        cancellationToken  = Async.DefaultCancellationToken
-        bufferSize         = 8192 // 8 KiB
-        maxOps             = 100
-        mimeTypesMap       = Http.Writers.defaultMimeTypesMap
-        homeFolder         = None
-        compressedFilesFolder = None
-        logger             = Loggers.saneDefaultsFor LogLevel.Info }
+let defaultConfig = 
+  { bindings           = [ HttpBinding.defaults ]
+    serverKey          = Utils.Crypto.generateKey HttpRuntime.ServerKeyLength
+    errorHandler       = defaultErrorHandler
+    listenTimeout      = TimeSpan.FromSeconds(2.)
+    cancellationToken  = Async.DefaultCancellationToken
+    bufferSize         = 8192 // 8 KiB
+    maxOps             = 100
+    mimeTypesMap       = Http.Writers.defaultMimeTypesMap
+    homeFolder         = None
+    compressedFilesFolder = None
+    logger             = Loggers.saneDefaultsFor LogLevel.Info }

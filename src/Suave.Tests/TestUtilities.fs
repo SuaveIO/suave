@@ -35,5 +35,5 @@ let read_bytes relative_path =
   File.ReadAllBytes(Path.Combine(currentPath, relative_path))
 
 let defaultConfig =
-  { SuaveConfig.defaults with
+  { defaultConfig with
       logger = Loggers.saneDefaultsFor LogLevel.Warn }

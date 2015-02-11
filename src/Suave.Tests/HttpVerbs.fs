@@ -18,7 +18,7 @@ open Fuchu
 
 [<Tests>]
 let gets =
-  let runWith' = runWith SuaveConfig.defaults
+  let runWith' = runWith defaultConfig
   testList "getting basic responses" [
       testCase "200 OK returns 'a'" <| fun _ ->
         Assert.Equal("expecting non-empty response", "a", runWith' (OK "a") |> req HttpMethod.GET "/" None)
@@ -45,7 +45,7 @@ let gets =
 
 [<Tests>]
 let posts =
-  let runWith' = runWith SuaveConfig.defaults
+  let runWith' = runWith defaultConfig
 
   let webId =
     request (fun x -> OK (x.rawForm |> Encoding.UTF8.GetString))
