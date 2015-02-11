@@ -473,7 +473,7 @@ module internal ParsingAndControl =
 
   /// Starts a new web worker, given the configuration and a web part to serve.
   let createHttpServer (bufferSize, maxOps) (webpart : WebPart) (runtime : HttpRuntime) =
-    createTcpIpServer
+    startTcpIpServerAsync
         (bufferSize, maxOps) 
         runtime.logger 
         (requestLoop runtime (WebPart webpart)) 
@@ -515,7 +515,7 @@ let defaultErrorHandler (ex : Exception) msg (ctx : HttpContext) =
 /// In other words: don't block on 'listening' unless you have started the server.
 /// The return value from 'listening' (first item in tuple) gives you some metrics on
 /// how quickly suave started.
-let createWebServerAsync (config : SuaveConfig) (webpart : WebPart) =
+let startWebServerAsync (config : SuaveConfig) (webpart : WebPart) =
   let homeFolder, compressionFolder =
     ParsingAndControl.resolveDirectory config.homeFolder,
     Path.Combine(ParsingAndControl.resolveDirectory config.compressedFilesFolder, "_temporary_compressed_files")
@@ -532,7 +532,7 @@ let createWebServerAsync (config : SuaveConfig) (webpart : WebPart) =
 /// Runs the web server and blocks waiting for the asynchronous workflow to be cancelled or
 /// it returning itself.
 let startWebServer (config : SuaveConfig) (webpart : WebPart) =
-  Async.RunSynchronously(createWebServerAsync config webpart |> snd, cancellationToken = config.cancellationToken)
+  Async.RunSynchronously(startWebServerAsync config webpart |> snd, cancellationToken = config.cancellationToken)
 
 /// The default configuration binds on IPv4, 127.0.0.1:8083 with a regular 500 Internal Error handler,
 /// with a timeout of one minute for computations to run. Waiting for 2 seconds for the socket bind
@@ -549,3 +549,12 @@ let defaultConfig =
     homeFolder         = None
     compressedFilesFolder = None
     logger             = Loggers.saneDefaultsFor LogLevel.Info }
+
+[<Obsolete("Renamed to defaultErrorHandler")>]
+let default_error_handler ex msg ctx = defaultErrorHandler ex msg ctx
+[<Obsolete("Renamed to startWebServerAsync")>]
+let web_server_async config webpart  = startWebServerAsync config webpart
+[<Obsolete("Renamed to startWebServer")>]
+let web_server config webpart = startWebServer config webpart
+[<Obsolete("Renamed to defaultConfig")>]
+let default_config = defaultConfig

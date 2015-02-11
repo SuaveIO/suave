@@ -40,7 +40,7 @@ open System.Text.RegularExpressions
 [<EntryPoint>]
 let main _ =
   let cts = new CancellationTokenSource()
-  let listening, server = createWebServerAsync config app
+  let listening, server = startWebServerAsync config app
   Async.Start(server, cts.Token)
 
   // wait for the server to start listening

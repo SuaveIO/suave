@@ -18,7 +18,7 @@ let config =
       maxOps = 10000
       logger = logger }
 
-let listening, server = createWebServerAsync config (choose [ GET >>= browseHomeDirectory ])
+let listening, server = startWebServerAsync config (choose [ GET >>= browseHomeDirectory ])
 Async.Start server
 
 // wait for the server to start listening

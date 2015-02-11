@@ -116,7 +116,7 @@ let createReverseProxyServerAsync (config : SuaveConfig) resolver =
   let all =
     [ for binding in config.bindings do 
         let reqLoop = ParsingAndControl.requestLoop (SuaveConfig.toRuntime config homeFolder compressionFolder false binding )  (SocketPart (proxy resolver))
-        let server = createTcpIpServer (config.bufferSize, config.maxOps) config.logger reqLoop binding.socketBinding
+        let server = startTcpIpServerAsync (config.bufferSize, config.maxOps) config.logger reqLoop binding.socketBinding
         yield server ]
       
   let listening = all |> List.map fst |> Async.Parallel |> Async.Ignore

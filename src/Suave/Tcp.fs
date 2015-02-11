@@ -99,11 +99,12 @@ let private a_few_times f =
 /// listening to its address/port combination), and an asynchronous workflow that
 /// yields when the full server is cancelled. If the 'has started listening' workflow
 /// returns None, then the start timeout expired.
-let createTcpIpServer (bufferSize        : int, 
-                       maxConcurrentOps : int) 
-                      (logger             : Logger)
-                      (serveClient        : TcpWorker<unit>)
-                      (binding            : SocketBinding) =
+let startTcpIpServerAsync 
+       (bufferSize        : int, 
+        maxConcurrentOps : int) 
+       (logger             : Logger)
+       (serveClient        : TcpWorker<unit>)
+       (binding            : SocketBinding) =
 
   let startData =
     { startCalledUtc = Globals.utc_now ()
@@ -194,5 +195,5 @@ let shutdown_socket s = shutdownSocket s
 let stop_tcp logger reason socket = stopTcp logger reason socket
 [<Obsolete("Renamed to createPools")>]
 let create_pools  logger maxOps bufferSize = createPools logger maxOps bufferSize
-[<Obsolete("Renamed to createTcpIpServer")>]
-let tcp_ip_server  (bufferSize, maxConcurrentOps) logger serveClient binding = createTcpIpServer (bufferSize, maxConcurrentOps) logger serveClient binding
+[<Obsolete("Renamed to startTcpIpServerAsync")>]
+let tcp_ip_server  (bufferSize, maxConcurrentOps) logger serveClient binding = startTcpIpServerAsync (bufferSize, maxConcurrentOps) logger serveClient binding

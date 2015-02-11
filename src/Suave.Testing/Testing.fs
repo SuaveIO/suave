@@ -111,7 +111,7 @@ let runWithFactory factory config webParts : SuaveTestCtx =
     suave_config = config2 }
 
 /// Similar to run_with_factory, but uses the default suave factory.
-let runWith config webParts = runWithFactory createWebServerAsync config webParts
+let runWith config webParts = runWithFactory startWebServerAsync config webParts
 
 /// Ensures the context is disposed after 'f ctx' is called.
 let withContext f ctx =
