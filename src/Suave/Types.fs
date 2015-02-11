@@ -711,6 +711,26 @@ type SuaveConfig =
   static member compressedFilesFolder_ = Property<SuaveConfig,_> (fun x -> x.compressedFilesFolder) (fun v x -> { x with compressedFilesFolder = v })
   static member logger_                = Property<SuaveConfig,_> (fun x -> x.logger)                (fun v x -> { x with logger = v })
 
+  [<Obsolete("Renamed to serverKey")>]
+  member x.server_key = x.serverKey
+  [<Obsolete("Renamed to bufferSize")>]
+  member x.buffer_size = x.bufferSize
+  [<Obsolete("Renamed to cancellationToken")>]
+  member x.ct = x.cancellationToken
+  [<Obsolete("Renamed to compressedFilesFolder")>]
+  member x.compressed_files_folder = x.compressedFilesFolder
+  [<Obsolete("Renamed to errorHandler")>]
+  member x.error_handler = x.errorHandler
+  [<Obsolete("Renamed to homeFolder")>]
+  member x.home_folder = x.homeFolder
+  [<Obsolete("Renamed to listenTimeout")>]
+  member x.listen_timeout = x.listenTimeout
+  [<Obsolete("Renamed to maxOps")>]
+  member x.max_ops = x.maxOps
+  [<Obsolete("Renamed to mimeTypesMap")>]
+  member x.mime_types_map = x.mimeTypesMap
+
+
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module SuaveConfig =
   let toRuntime config contentFolder compressionFolder parsePostData =
