@@ -61,6 +61,12 @@ module Http =
   val choose : options : WebPart list -> WebPart
 
   /// Pipe the request through to a bird that can peck at it.
+  ///
+  /// Put another way, using 'warbler' lets you look at the first parameter and
+  /// then make a decision about what thing to return (it's most likely a
+  /// WebPart you'll be returning). (Remember, WebPart is
+  /// HttpContext -> Async<HttpContext option>) where HttpContext is 'a and
+  /// Async<_> is 'b.
   val inline warbler : f:('T -> 'T -> 'U) -> 'T -> 'U
 
   /// The constant function, which returns its constant, no matter
