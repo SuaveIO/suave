@@ -80,7 +80,7 @@ module Crypto =
     | TruncatedMessage of string
     | AlteredOrCorruptMessage of string
 
-  let private secretbox_init key iv =
+  let private secretboxInit key iv =
     let aes = new AesManaged()
     aes.KeySize   <- KeySize
     aes.BlockSize <- BlockSize
@@ -97,9 +97,9 @@ module Crypto =
       Choice2Of2 EmptyMessageGiven
     else
       let iv  = generateStdIV ()
-      use aes = secretbox_init key iv
+      use aes = secretboxInit key iv
 
-      let mk_cipher_text (msg : byte []) (key : byte []) (iv : byte []) =
+      let mkCipherText (msg : byte []) (key : byte []) (iv : byte []) =
         use enc      = aes.CreateEncryptor(key, iv)
         use cipher   = new MemoryStream()
         use crypto   = new CryptoStream(cipher, enc, CryptoStreamMode.Write)
@@ -112,7 +112,7 @@ module Crypto =
 
       let bw  = new BinaryWriter(cipher_text)
       bw.Write iv
-      bw.Write (mk_cipher_text msg key iv)
+      bw.Write (mkCipherText msg key iv)
       bw.Flush ()
 
       let hmac = hmacOfBytes key (cipher_text.ToArray())
@@ -124,30 +124,30 @@ module Crypto =
   let secretboxOfText (key : byte []) (msg : string) =
     secretbox key (msg |> UTF8.bytes)
 
-  let secretboxOpen (key : byte []) (cipher_text : byte []) =
-    let hmac_calc = hmacAtOffset key 0 (cipher_text.Length - HMACLength) cipher_text
-    let hmac_given = Array.zeroCreate<byte> HMACLength
-    Array.blit cipher_text (cipher_text.Length - HMACLength) // from
-               hmac_given  0                                 // to
+  let secretboxOpen (key : byte []) (cipherText : byte []) =
+    let hmacCalc = hmacAtOffset key 0 (cipherText.Length - HMACLength) cipherText
+    let hmacGiven = Array.zeroCreate<byte> HMACLength
+    Array.blit cipherText (cipherText.Length - HMACLength) // from
+               hmacGiven  0                                 // to
                HMACLength                                    // # bytes for hmac
 
-    if cipher_text.Length < HMACLength + IVLength then
+    if cipherText.Length < HMACLength + IVLength then
       Choice2Of2 (
         TruncatedMessage (
           sprintf "cipher text length was %d but expected >= %d"
-                  cipher_text.Length (HMACLength + IVLength)))
-    elif not (Bytes.constantTimeCompare hmac_calc hmac_given) then
+                  cipherText.Length (HMACLength + IVLength)))
+    elif not (Bytes.constantTimeCompare hmacCalc hmacGiven) then
       Choice2Of2 (AlteredOrCorruptMessage "calculated HMAC does not match expected/given")
     else
       let iv = Array.zeroCreate<byte> IVLength
-      Array.blit cipher_text 0
+      Array.blit cipherText 0
                  iv 0
                  IVLength
-      use aes     = secretbox_init key iv
+      use aes     = secretboxInit key iv
       use denc    = aes.CreateDecryptor(key, iv)
       use plain   = new MemoryStream()
       use crypto  = new CryptoStream(plain, denc, CryptoStreamMode.Write)
-      crypto.Write(cipher_text, IVLength, cipher_text.Length - IVLength - HMACLength)
+      crypto.Write(cipherText, IVLength, cipherText.Length - IVLength - HMACLength)
       crypto.FlushFinalBlock()
       Choice1Of2 (plain.ToArray() |> Encoding.gzipDecode)
 

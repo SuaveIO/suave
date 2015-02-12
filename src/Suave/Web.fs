@@ -367,8 +367,8 @@ module internal ParsingAndControl =
     let r = context.response
     let connection = context.connection
     do! asyncWriteLn connection (String.concat " " [ "HTTP/1.1"
-                                                     r.status.Code.ToString()
-                                                     r.status.Reason ])
+                                                     r.status.code.ToString()
+                                                     r.status.reason ])
     do! asyncWriteLn connection Internals.serverHeader
     do! asyncWriteLn connection (String.Concat( [| "Date: "; Globals.utc_now().ToString("R") |]))
 
@@ -502,7 +502,7 @@ let defaultErrorHandler (ex : Exception) msg (ctx : HttpContext) =
   if IPAddress.IsLoopback ctx.request.ipaddr then
     Response.response HTTP_500 (UTF8.bytes (sprintf "<h1>%s</h1><br/>%A" ex.Message ex)) ctx
   else 
-    Response.response HTTP_500 (UTF8.bytes HTTP_500.Message) ctx
+    Response.response HTTP_500 (UTF8.bytes HTTP_500.message) ctx
 
 /// Starts the web server asynchronously.
 ///

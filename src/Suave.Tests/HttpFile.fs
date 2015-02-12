@@ -24,24 +24,24 @@ let ``canonicalization attacks`` =
 
 [<Tests>]
 let compression =
-  let runWith' = runWith defaultConfig
+  let runWithConfig = runWith defaultConfig
 
   let testFileSize = (new FileInfo(Path.Combine(currentPath,"test-text-file.txt"))).Length
 
   testList "getting basic gzip/deflate responses" [
       testCase "200 OK returns 'Havana' with gzip " <| fun _ ->
-        Assert.Equal("expecting 'Havana'", "Havana", runWith' (OK "Havana") |> reqGZip HttpMethod.GET "/" None)
+        Assert.Equal("expecting 'Havana'", "Havana", runWithConfig (OK "Havana") |> reqGZip HttpMethod.GET "/" None)
 
       testCase "200 OK returns 'Havana' with deflate " <| fun _ ->
-        Assert.Equal("expecting 'Havana'", "Havana", runWith' (OK "Havana") |> reqDeflate HttpMethod.GET "/" None)
+        Assert.Equal("expecting 'Havana'", "Havana", runWithConfig (OK "Havana") |> reqDeflate HttpMethod.GET "/" None)
 
       testCase "verifiying we get the same size uncompressed" <| fun _ ->
         Assert.Equal("length should match"
         , testFileSize
-        , (runWith' (Files.browseFileInHomeDirectory "test-text-file.txt") |> reqBytes HttpMethod.GET "/" None).Length |> int64)
+        , (runWithConfig (Files.browseFileInHomeDirectory "test-text-file.txt") |> reqBytes HttpMethod.GET "/" None).Length |> int64)
 
       testCase "gzip static file" <| fun _ ->
         Assert.Equal("length should match"
         , testFileSize
-        , (runWith' (Files.browseFileInHomeDirectory "test-text-file.txt") |> reqGZipBytes HttpMethod.GET "/" None).Length |> int64)
+        , (runWithConfig (Files.browseFileInHomeDirectory "test-text-file.txt") |> reqGZipBytes HttpMethod.GET "/" None).Length |> int64)
     ]

@@ -15,7 +15,7 @@ open Suave.Testing
 
 [<Tests>]
 let cookies =
-  let runWith' = runWith defaultConfig
+  let runWithConfig = runWith defaultConfig
 
   let basic_cookie =
     { name      = "mycookie"
@@ -31,20 +31,20 @@ let cookies =
         Assert.Equal("expecting cookie value"
         , "42"
         , (reqCookies HttpMethod.GET "/" None
-          (runWith' (Cookie.setCookie basic_cookie >>= OK "test")))
+          (runWithConfig (Cookie.setCookie basic_cookie >>= OK "test")))
             .GetCookies(Uri("http://127.0.0.1")).[0].Value)
 
       testCase "cookie name makes round trip" <| fun _ ->
         Assert.Equal("expecting cookie name"
         , "mycookie"
         , (reqCookies HttpMethod.GET "/" None
-            (runWith' (Cookie.setCookie basic_cookie >>= OK "test")))
+            (runWithConfig (Cookie.setCookie basic_cookie >>= OK "test")))
             .GetCookies(Uri("http://127.0.0.1")).[0].Name)
 
       testCase "http_only cookie is http_only" <| fun _ ->
         Assert.Equal("expecting http_only"
         , true
         , (reqCookies HttpMethod.GET "/" None
-          (runWith' (Cookie.setCookie { basic_cookie with httpOnly = true } >>= OK "test")))
+          (runWithConfig (Cookie.setCookie { basic_cookie with httpOnly = true } >>= OK "test")))
             .GetCookies(Uri("http://127.0.0.1")).[0].HttpOnly)
     ]

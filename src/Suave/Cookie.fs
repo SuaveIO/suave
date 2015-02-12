@@ -25,7 +25,7 @@ module Cookie =
     |> Array.toList
     |> List.map (fun (cookie : string) ->
         let parts = cookie.Split('=')
-        HttpCookie.mkSimple (String.trim parts.[0]) (String.trim parts.[1]))
+        HttpCookie.mkKV (String.trim parts.[0]) (String.trim parts.[1]))
 
   let parseResultCookie (s : string) : HttpCookie =
     let parseExpires (str : string) =
@@ -73,7 +73,7 @@ module Cookie =
 
   let private clientCookieFrom (httpCookie : HttpCookie) =
     let ccn = String.Concat [ httpCookie.name; "-client" ]
-    { HttpCookie.mkSimple ccn httpCookie.name
+    { HttpCookie.mkKV ccn httpCookie.name
         with httpOnly = false
              secure    = httpCookie.secure
              expires   = httpCookie.expires }
@@ -109,7 +109,7 @@ module Cookie =
 
   let unsetCookie (cookieName : string) =
     let startEpoch = DateTimeOffset(1970, 1, 1, 0, 0, 1, TimeSpan.Zero) |> Some
-    let stringValue = HttpCookie.toHeader { HttpCookie.mkSimple cookieName "x" with expires = startEpoch }
+    let stringValue = HttpCookie.toHeader { HttpCookie.mkKV cookieName "x" with expires = startEpoch }
     Writers.setHeader "Set-Cookie" stringValue
 
   let setPair (httpCookie : HttpCookie) (clientCookie : HttpCookie) : WebPart =
@@ -125,9 +125,9 @@ module Cookie =
   type CookiesState =
     { serverKey      : ServerKey
       cookieName     : string
-      userStateKey  : string
+      userStateKey   : string
       relativeExpiry : CookieLife
-      secure          : bool }
+      secure         : bool }
 
   [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
   module CookiesState =
@@ -135,16 +135,16 @@ module Cookie =
     let mk serverKey cookieName userStateKey relativeExpiry secure =
       { serverKey      = serverKey
         cookieName     = cookieName
-        userStateKey  = userStateKey
+        userStateKey   = userStateKey
         relativeExpiry = relativeExpiry
-        secure          = secure }
+        secure         = secure }
 
   let generateCookies serverKey cookieName relativeExpiry secure plainData =
     let enc, _ = Bytes.cookieEncoding
     match Crypto.secretbox serverKey plainData with
     | Choice1Of2 cookieData ->
       let encodedData = enc cookieData
-      { HttpCookie.mkSimple cookieName encodedData
+      { HttpCookie.mkKV cookieName encodedData
           with httpOnly = true
                secure    = secure }
       |> slidingExpiry relativeExpiry

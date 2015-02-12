@@ -20,7 +20,7 @@ open Suave.Http.RequestErrors
 
 open Suave.Testing
 
-let runWith' = runWith { defaultConfig with logger = Loggers.saneDefaultsFor LogLevel.Debug }
+let runWithConfig = runWith { defaultConfig with logger = Loggers.saneDefaultsFor LogLevel.Debug }
 
 type Assert with
   static member Null (msg : string, o : obj) =
@@ -92,19 +92,19 @@ let sessionState f =
 let tests =
   testList "auth tests" [
     testCase "baseline, no auth cookie" <| fun _ ->
-      let ctx = runWith' (OK "ACK")
+      let ctx = runWithConfig (OK "ACK")
       let cookies = ctx |> reqCookies' HttpMethod.GET "/"  None
       Assert.Null("should not have auth cookie", cookies.[Auth.SessionAuthCookie])
       
     testCase "can set cookie" <| fun _ ->
-      let ctx = runWith' (Auth.authenticated Session false >>= OK "ACK")
+      let ctx = runWithConfig (Auth.authenticated Session false >>= OK "ACK")
       let cookies = ctx |> reqCookies' HttpMethod.GET "/"  None
       Assert.NotNull("should have auth cookie", cookies.[Auth.SessionAuthCookie])
 
     testCase "can access authenticated contents" <| fun _ ->
       // given
       let ctx =
-        runWith' (
+        runWithConfig (
           choose [
             url "/" >>= OK "root"
             url "/auth" >>= Auth.authenticated Session false >>= OK "authed"
@@ -147,7 +147,7 @@ let tests =
     testCase "test session is maintained across requests" <| fun _ ->
       // given
       let ctx =
-        runWith' ( 
+        runWithConfig ( 
           statefulForSession
           >>= sessionState (fun store ->
               match store.get "counter" with
@@ -174,7 +174,7 @@ let tests =
     testCase "set more than one variable in the session" <| fun _ ->
       // given
       let ctx =
-        runWith' ( 
+        runWithConfig ( 
           statefulForSession
           >>= choose [
             url "/a"     >>= sessionState (fun state -> state.set "a" "a" >>= OK "a" )
@@ -202,7 +202,7 @@ let tests =
     testCase "set two session values on the same request" <| fun _ ->
       // given
       let ctx =
-        runWith' ( 
+        runWithConfig ( 
           statefulForSession >>= choose [
             url "/ab"     >>= sessionState (fun state -> state.set "a" "a" >>= sessionState ( fun state' -> state'.set "b" "b" >>= OK "a" ))
             url "/get_a" >>= sessionState (fun state -> match state.get "a" with Some a -> OK a | None -> RequestErrors.BAD_REQUEST "fail")

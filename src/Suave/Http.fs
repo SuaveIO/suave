@@ -216,7 +216,7 @@ module Http =
       <a href=\"%s\">%s</a>
     </body>
   </html>"
-        url HTTP_302.Message))
+        url HTTP_302.message))
      
 
     let not_modified : WebPart =
@@ -244,7 +244,7 @@ module Http =
 
     let UNAUTHORIZED s = unauthorized (UTF8.bytes s)
 
-    let challenge = UNAUTHORIZED HTTP_401.Message
+    let challenge = UNAUTHORIZED HTTP_401.message
 
     let forbidden s = response HTTP_403 s
 
@@ -319,7 +319,7 @@ module Http =
 
     let invalid_http_version arr = response HTTP_505 arr
 
-    let INVALID_HTTP_VERSION = invalid_http_version (UTF8.bytes HTTP_505.Message)
+    let INVALID_HTTP_VERSION = invalid_http_version (UTF8.bytes HTTP_505.message)
 
   module Applicatives =
   
@@ -392,7 +392,7 @@ module Http =
         (string ctx.request.``method``)
         ctx.request.url.AbsolutePath
         ctx.request.httpVersion
-        ctx.response.status.Code
+        ctx.response.status.code
         "0"
 
     let log (logger : Logger) (formatter : HttpContext -> string) (ctx : HttpContext) =

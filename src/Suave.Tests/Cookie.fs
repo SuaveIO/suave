@@ -45,8 +45,8 @@ let tests =
 
     testCase "set cookie (same name) twice keeps last" <| fun _ ->
       let force = Async.RunSynchronously >> Option.get
-      let c1 = HttpCookie.mkSimple "a" "aa"
-      let c2 = HttpCookie.mkSimple "a" "bb"
+      let c1 = HttpCookie.mkKV "a" "aa"
+      let c2 = HttpCookie.mkKV "a" "bb"
       let subject =
         HttpContext.empty
         |> Cookie.setCookie c1 |> force

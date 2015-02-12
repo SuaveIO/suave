@@ -71,7 +71,7 @@ type HttpCode =
     | HTTP_500 | HTTP_501 | HTTP_502 | HTTP_503 | HTTP_504 | HTTP_505
 
 
-    member x.Code = 
+    member x.code = 
       match x with 
       | HTTP_100 -> 100 | HTTP_101 -> 101 | HTTP_200 -> 200 | HTTP_201 -> 201
       | HTTP_202 -> 202 | HTTP_203 -> 203 | HTTP_204 -> 204 | HTTP_205 -> 205
@@ -85,7 +85,7 @@ type HttpCode =
       | HTTP_429 -> 429 | HTTP_500 -> 500 | HTTP_501 -> 501 | HTTP_502 -> 502
       | HTTP_503 -> 503 | HTTP_504 -> 504 | HTTP_505 -> 505
 
-    member x.Reason = 
+    member x.reason = 
       match x with
       | HTTP_100 -> "Continue"
       | HTTP_101 -> "Switching Protocols"
@@ -131,7 +131,7 @@ type HttpCode =
       | HTTP_504 -> "Gateway Timeout"
       | HTTP_505 -> "HTTP Version Not Supported"
 
-    member x.Message = 
+    member x.message = 
       match x with 
       | HTTP_100 -> "Request received, please continue"
       | HTTP_101 -> "Switching to new protocol; obey Upgrade header"
@@ -178,7 +178,7 @@ type HttpCode =
       | HTTP_505 -> "Cannot fulfill request."
 
     member x.Describe () =
-      sprintf "%d %s: %s" x.Code x.Reason x.Message
+      sprintf "%d %s: %s" x.code x.reason x.message
 
     // TODO: replace with match code with | 100 -> HTTP_100 | ... when API is more set
     static member TryParse (code: int) =
@@ -192,8 +192,8 @@ and private HttpCodeStatics() =
           |> Map.ofArray
     
 module Codes =
-  let http_message (c: HttpCode) =  c.Message
-  let http_reason (c: HttpCode) =  c.Reason
+  let http_message (c: HttpCode) =  c.message
+  let http_reason (c: HttpCode) =  c.reason
 
   type X = HttpCode
   [<System.Obsolete("Use Suave.Types.HttpCode")>]
@@ -246,7 +246,7 @@ module HttpCookie =
   /// - http://www.nczonline.net/blog/2009/05/05/http-cookies-explained/
   /// - https://developer.mozilla.org/en-US/docs/Web/API/document.cookie
   ///
-  let mkSimple name value =
+  let mkKV name value =
     { name      = name
       value     = value
       expires   = None
@@ -256,7 +256,7 @@ module HttpCookie =
       httpOnly = true }
 
   /// An empty cookie value
-  let empty = mkSimple "" ""
+  let empty = mkKV "" ""
 
 
   /// Assumes only valid characters go in, see http://tools.ietf.org/html/rfc6265#section-4.1.1

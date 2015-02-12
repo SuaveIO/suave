@@ -34,10 +34,10 @@ type Bar =
 
 [<Tests>]
 let parsing_multipart =
-  let runWith' = runWith defaultConfig
+  let runWithConfig = runWith defaultConfig
 
   testList "map_json test" [
     testCase "simple test" <| fun _ ->
       Assert.Equal("returns correct json representation", "{\"bar\":\"foo\"}", 
-        runWith' (mapJson (fun (a:Foo) -> { bar = a.foo })) |> req HttpMethod.POST "/" (Some <| new ByteArrayContent(toJson { foo = "foo" }))) ]
+        runWithConfig (mapJson (fun (a:Foo) -> { bar = a.foo })) |> req HttpMethod.POST "/" (Some <| new ByteArrayContent(toJson { foo = "foo" }))) ]
 

@@ -9,13 +9,13 @@ Example:
 
   open Fuchu
 
-  let runWith' = run_with default_config
+  let runWithConfig = runWith defaultConfig
   
   testCase "parsing a large multipart form" <| fun _ ->
 
     let res =
-      runWith' test_multipart_form
-      |> req HttpMethod.POST "/" (Some <| byte_array_content)
+      runWithConfig testMultipartForm
+      |> req HttpMethod.POST "/" (Some byteArrayContent)
 
     Assert.Equal("", "Bob <bob@wishfulcoding.mailgun.org>", )
 

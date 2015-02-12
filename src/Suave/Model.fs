@@ -52,7 +52,7 @@ module Binding =
       | Choice1Of2 m   -> f_cont m
       | Choice2Of2 err -> f_err err)
 
-  let bind_req f f_cont f_err =
+  let bindReq f f_cont f_err =
     bind (HttpContext.request >> f) f_cont f_err
 
   let header key f (req : HttpRequest) =

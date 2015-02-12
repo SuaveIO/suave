@@ -40,9 +40,9 @@ module CookieStateStore =
       updateCookies
         { serverKey      = ctx.runtime.serverKey
           cookieName     = StateCookie
-          userStateKey  = StateStoreType
+          userStateKey   = StateStoreType
           relativeExpiry = relativeExpiry
-          secure          = false }
+          secure         = false }
         (function
          | None      ->
            log logger "Suave.State.CookieStateStore.write" LogLevel.Debug "in f_plain_text, no existing"
@@ -66,9 +66,9 @@ module CookieStateStore =
       cookieState
         { serverKey      = ctx.runtime.serverKey
           cookieName     = StateCookie
-          userStateKey  = StateStoreType
+          userStateKey   = StateStoreType
           relativeExpiry = relativeExpiry
-          secure          = secure }
+          secure         = secure }
         (fun () -> Choice1Of2(Map.empty<string, obj> |> encodeMap))
         cipherTextCorrupt
         setExpiry)

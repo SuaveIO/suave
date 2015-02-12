@@ -61,9 +61,9 @@ let authenticate relativeExpiry secure
     cookieState
       { serverKey      = ctx.runtime.serverKey
         cookieName     = SessionAuthCookie
-        userStateKey  = StateStoreType
+        userStateKey   = StateStoreType
         relativeExpiry = relativeExpiry
-        secure          = secure }
+        secure         = secure }
       missingCookie
       decryptionFailure
       f_success)
