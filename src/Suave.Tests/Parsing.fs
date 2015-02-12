@@ -29,7 +29,7 @@ let parsing_multipart =
 
   let test_url_encoded_form fieldName =
     request (fun r ->
-      match r.queryParam fieldName  with
+      match r.formDataItem fieldName  with
       | Some str -> OK str
       | None -> OK "field-does-not-exists")
 
