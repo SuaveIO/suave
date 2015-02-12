@@ -538,17 +538,17 @@ let startWebServer (config : SuaveConfig) (webpart : WebPart) =
 /// with a timeout of one minute for computations to run. Waiting for 2 seconds for the socket bind
 /// to succeed.
 let defaultConfig = 
-  { bindings           = [ HttpBinding.defaults ]
-    serverKey          = Utils.Crypto.generateKey HttpRuntime.ServerKeyLength
-    errorHandler       = defaultErrorHandler
-    listenTimeout      = TimeSpan.FromSeconds(2.)
-    cancellationToken  = Async.DefaultCancellationToken
-    bufferSize         = 8192 // 8 KiB
-    maxOps             = 100
-    mimeTypesMap       = Http.Writers.defaultMimeTypesMap
-    homeFolder         = None
+  { bindings              = [ HttpBinding.defaults ]
+    serverKey             = Utils.Crypto.generateKey HttpRuntime.ServerKeyLength
+    errorHandler          = defaultErrorHandler
+    listenTimeout         = TimeSpan.FromSeconds(2.)
+    cancellationToken     = Async.DefaultCancellationToken
+    bufferSize            = 8192 // 8 KiB
+    maxOps                = 100
+    mimeTypesMap          = Http.Writers.defaultMimeTypesMap
+    homeFolder            = None
     compressedFilesFolder = None
-    logger             = Loggers.saneDefaultsFor LogLevel.Info }
+    logger                = Loggers.saneDefaultsFor LogLevel.Info }
 
 [<Obsolete("Renamed to defaultErrorHandler")>]
 let default_error_handler ex msg ctx = defaultErrorHandler ex msg ctx

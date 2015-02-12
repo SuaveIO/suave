@@ -41,7 +41,7 @@ type Binder = Xml -> Xml
 /// for tags that can be parsed. Replace those tags with their values as defined
 /// in the 'bindings'.
 let extractTemplate (nsx : string) (bindings : Map<string,Binder>) (xml : Xml) =
-  let rec extractTemplateAux (Xml(nodelist)) (Xml(result)) : Xml =
+  let rec extractTemplate' (Xml(nodelist)) (Xml(result)) : Xml =
     let substitute = function
       | Element(Pat(ns, name), _, att), children
         when ns = nsx ->
@@ -57,7 +57,7 @@ let extractTemplate (nsx : string) (bindings : Map<string,Binder>) (xml : Xml) =
         invoke obj action children :?> Xml
 
       | elem, children ->
-        Xml([elem,extractTemplateAux children (Xml[])])
+        Xml([elem,extractTemplate' children (Xml[])])
 
     let rec loop (nl:Node list) (Xml(acc) as res) =
       match nl with
@@ -67,7 +67,7 @@ let extractTemplate (nsx : string) (bindings : Map<string,Binder>) (xml : Xml) =
         loop tail (Xml(acc @ (subst)))
 
     loop nodelist (Xml([]))
-  extractTemplateAux (xml) (Xml([]))
+  extractTemplate' (xml) (Xml([]))
 
 /// Bind the matching elements, given the namespace 'ns', a XML/HTML document 'node'
 /// and a 'bindings' map.
@@ -88,19 +88,19 @@ let writeCloseTag (s : string) n a (stream : StringWriter) =
   stream.Write("</{0}>", s)
 
 /// Recursively convert the Xml structure to text into the string writer
-let rec xmlToString1 (Xml(nodes)) (stream : StringWriter) =
+let rec writeXmlToStringWriter (Xml(nodes)) (stream : StringWriter) =
   for node in nodes do
     match node with
     | Element(s,n,a), children ->
       writeBeginTag s n a stream
-      xmlToString1 children stream
+      writeXmlToStringWriter children stream
       writeCloseTag s n a stream
     | Text(s), children ->
       stream.Write(s)
-      xmlToString1 children stream
+      writeXmlToStringWriter children stream
     | WhiteSpace(s), children ->
       stream.Write(s)
-      xmlToString1 children stream
+      writeXmlToStringWriter children stream
 
 open Suave.Types
 
@@ -145,7 +145,7 @@ let processTemplate (data : Map<string,Binder>) ({ request = http_request; runti
     let xml = extractTemplate "user" data transform
     let sb = new StringBuilder()
     let str = new StringWriter(sb)
-    xmlToString1 xml str
+    writeXmlToStringWriter xml str
     let output = sb.ToString()
     Successful.OK output ctx
   with

@@ -42,7 +42,7 @@ let buildCipherString (fipsMode:bool) (sslProtocols: SslProtocols) (sslStrength:
   // Now format the return string
   String.Format("{0}:!ADH:!aNULL:!eNULL:@STRENGTH", str)
 
-let create_ssl_server_context (cert : X509Certificate) (clientCertificateRequired : bool) (chain : X509Chain) (protocols : SslProtocols) (strenght : SslStrength) (checkCertificateRevocation : bool) =
+let createSslServerContext (cert : X509Certificate) (clientCertificateRequired : bool) (chain : X509Chain) (protocols : SslProtocols) (strenght : SslStrength) (checkCertificateRevocation : bool) =
   let p = SSLv23_server_method()
   let context = SSL_CTX_new(p)
 
@@ -77,7 +77,7 @@ open System.Security.Cryptography
 
 let crypt_random = System.Security.Cryptography.RandomNumberGenerator.Create()
 
-let init_open_ssl _ =
+let initOpenSsl _ =
   SSL_library_init() |> ignore
   ERR_load_crypto_strings()
   SSL_load_error_strings()
@@ -89,120 +89,120 @@ let init_open_ssl _ =
 
 open System.Runtime.InteropServices
 
-let authenticate_as_server (cert : X509Certificate) =
+let authenticateAsServer (cert : X509Certificate) =
   
-  let ssl_context = create_ssl_server_context cert false null SslProtocols.Tls SslStrength.High true
+  let ssl_context = createSslServerContext cert false null SslProtocols.Tls SslStrength.High true
   
   // Initialze read/write bios
   let a = BIO_s_mem()
   let b = BIO_s_mem()
-  let read_bio = BIO_new(a)
+  let readBio = BIO_new(a)
   let write_bio = BIO_new(b)
   
   let ssl = SSL_new(ssl_context)
   
   // Set the read/write bio's into the the Ssl object
-  SSL_set_bio (ssl, read_bio, write_bio)
+  SSL_set_bio (ssl, readBio, write_bio)
 
   //close 1 no-close 0
-  BIO_set_close read_bio 1 |> ignore
+  BIO_set_close readBio 1 |> ignore
   BIO_set_close write_bio 1 |> ignore
 
     // Set the Ssl object into server mode
   SSL_set_accept_state ssl
 
-  ssl,read_bio,write_bio
+  ssl,readBio,write_bio
 
 open Microsoft.FSharp.NativeInterop
 open Suave.Sockets
 open Suave.Sockets.Connection
 
-let read_to_bio (con : Connection) read_bio ssl = socket {
-  let bytes_pending = BIO_ctrl_pending read_bio
+let readToBio (con : Connection) readBio ssl = socket {
+  let bytes_pending = BIO_ctrl_pending readBio
   if bytes_pending = 0u then 
     let a = con.bufferManager.PopBuffer "read_to_bio"
-    let! bytes_read = receive con a
-    let buff = Array.zeroCreate bytes_read
-    Array.blit a.Array a.Offset buff 0 bytes_read
+    let! bytesRead = receive con a
+    let buff = Array.zeroCreate bytesRead
+    Array.blit a.Array a.Offset buff 0 bytesRead
     con.bufferManager.FreeBuffer( a, "read_to_bio")
-    BIO_write(read_bio, buff, bytes_read) |> ignore
+    BIO_write(readBio, buff, bytesRead) |> ignore
   }
 
-let write_from_bio  (con : Connection) write_bio = socket {
-  let bytes_pending = BIO_ctrl_pending write_bio
+let writeFromBio  (con : Connection) writeBio = socket {
+  let bytesPending = BIO_ctrl_pending writeBio
 
-  if bytes_pending > 0u  then 
-    let encrypted_buff = Array.zeroCreate SSL3_RT_MAX_PACKET_SIZE
-    let len = BIO_read(write_bio,encrypted_buff,encrypted_buff.Length)
-    do! send con  (new ArraySegment<_>(encrypted_buff,0,len))
+  if bytesPending > 0u  then 
+    let encryptedBuff = Array.zeroCreate SSL3_RT_MAX_PACKET_SIZE
+    let len = BIO_read(writeBio,encryptedBuff,encryptedBuff.Length)
+    do! send con  (new ArraySegment<_>(encryptedBuff,0,len))
   return ()
   }
 
-let rec accept conn (ssl, read_bio, write_bio) = socket{
+let rec accept conn (ssl, readBio, writeBio) = socket{
   let ret = SSL_accept ssl
   if(ret < 0) then 
 
-    let bytes_pending = BIO_ctrl_pending write_bio
+    let bytesPending = BIO_ctrl_pending writeBio
     
-    if bytes_pending > 0u  then do! write_from_bio conn write_bio
+    if bytesPending > 0u  then do! writeFromBio conn writeBio
     
     let error = SSL_get_error (ssl, ret)
     match error with 
     | x when x = SSL_ERROR_WANT_READ -> 
-      do! read_to_bio conn read_bio ssl
-      return! accept conn (ssl, read_bio, write_bio)
+      do! readToBio conn readBio ssl
+      return! accept conn (ssl, readBio, writeBio)
     | x when x = SSL_ERROR_WANT_WRITE -> 
-      do! read_to_bio conn read_bio ssl
-      return! accept conn (ssl, read_bio, write_bio)
+      do! readToBio conn readBio ssl
+      return! accept conn (ssl, readBio, writeBio)
     | d -> failwith "OpenSSL error accepting socket" 
   
   return ()
   }
 
-let ssl_receive (con : Connection) (context, read_bio, write_bio) (bu : ByteSegment) = socket {
+let sslReceive (con : Connection) (context, readBio, writeBio) (bu : ByteSegment) = socket {
 
-  let write_bytes_pending = BIO_ctrl_pending write_bio
-  if write_bytes_pending > 0u  then 
-    do! write_from_bio con write_bio
+  let writeBytesPending = BIO_ctrl_pending writeBio
+  if writeBytesPending > 0u  then 
+    do! writeFromBio con writeBio
 
   //we need to check if there is data in the read bio before asking for more to the socket
-  let bytes_pending = BIO_ctrl_pending read_bio
-  if bytes_pending = 0u then 
+  let bytesPending = BIO_ctrl_pending readBio
+  if bytesPending = 0u then 
     let a = con.bufferManager.PopBuffer "ssl_receive"
-    let! bytes_read = receive con a
+    let! bytesRead = receive con a
 
-    let buff = Array.zeroCreate bytes_read
-    Array.blit a.Array a.Offset buff 0 bytes_read
+    let buff = Array.zeroCreate bytesRead
+    Array.blit a.Array a.Offset buff 0 bytesRead
     
     //Copy encrypted data into the SSL read_bio
     con.bufferManager.FreeBuffer( a, "ssl_receive")
-    BIO_write(read_bio, buff, bytes_read) |> ignore
+    BIO_write(readBio, buff, bytesRead) |> ignore
 
-  let decrypted_bytes_read = 
-    let bytes_pending = BIO_ctrl_pending read_bio
+  let decryptedBytesRead = 
+    let bytesPending = BIO_ctrl_pending readBio
 
-    if bytes_pending > 0ul then
+    if bytesPending > 0ul then
       let buff = Array.zeroCreate SSL3_RT_MAX_PACKET_SIZE
       //SSL_read wants a 0 based array
-      let decrypted_bytes_read = SSL_read (context, buff, SSL3_RT_MAX_PACKET_SIZE)
-      if decrypted_bytes_read < 0  then 
-        let error = SSL_get_error (context, decrypted_bytes_read)
+      let decryptedBytesRead = SSL_read (context, buff, SSL3_RT_MAX_PACKET_SIZE)
+      if decryptedBytesRead < 0  then 
+        let error = SSL_get_error (context, decryptedBytesRead)
         failwith "SSL_get_error <- %d" error
       else
         //copy them to buf
-        Array.blit buff 0 bu.Array bu.Offset decrypted_bytes_read
-        decrypted_bytes_read
+        Array.blit buff 0 bu.Array bu.Offset decryptedBytesRead
+        decryptedBytesRead
     else 0
 
-  return decrypted_bytes_read
+  return decryptedBytesRead
   }
 
-let ssl_send (con : Connection)  (context, _ , write_bio)  (buf: ArraySegment<_>)= async {
+let sslSend (con : Connection)  (context, _ , writeBio)  (buf: ArraySegment<_>)= async {
 
   //SSL_write wants a 0 based array
   let e = SSL_write (context, Array.sub buf.Array buf.Offset buf.Count, buf.Count) 
   //let bytes_pending = BIO_ctrl_pending write_bio
   let encrypted_buff = Array.zeroCreate SSL3_RT_MAX_PACKET_SIZE
-  let len = BIO_read(write_bio,encrypted_buff,encrypted_buff.Length)
+  let len = BIO_read(writeBio,encrypted_buff,encrypted_buff.Length)
   return! send con  (new ArraySegment<_>(encrypted_buff,0,len))
   }

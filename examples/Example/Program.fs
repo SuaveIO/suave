@@ -108,16 +108,16 @@ let app =
 [<EntryPoint>]
 let main argv =
   startWebServer
-    { bindings         = [ HttpBinding.mk' HTTP "127.0.0.1" 8082 ]
-      serverKey       = Utils.Crypto.generateKey HttpRuntime.ServerKeyLength
-      errorHandler    = defaultErrorHandler
-      listenTimeout   = TimeSpan.FromMilliseconds 2000.
-      cancellationToken = Async.DefaultCancellationToken
-      bufferSize      = 2048
-      maxOps          = 100
-      mimeTypesMap   = mimeTypes
-      homeFolder      = None
+    { bindings              = [ HttpBinding.mk' HTTP "127.0.0.1" 8082 ]
+      serverKey             = Utils.Crypto.generateKey HttpRuntime.ServerKeyLength
+      errorHandler          = defaultErrorHandler
+      listenTimeout         = TimeSpan.FromMilliseconds 2000.
+      cancellationToken     = Async.DefaultCancellationToken
+      bufferSize            = 2048
+      maxOps                = 100
+      mimeTypesMap          = mimeTypes
+      homeFolder            = None
       compressedFilesFolder = None
-      logger           = logger }
+      logger                = logger }
     app
   0

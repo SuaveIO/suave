@@ -18,7 +18,7 @@ type Xml = Xml of Node list
 /// Each node has/is an element and then some other XML
 and Node = Element * Xml
 
-let tag tag attr (contents : Xml) = Xml [ (Element (tag,"", attr), contents) ]
+let tag tag attr (contents : Xml) = Xml [ (Element (tag,"", Array.ofList attr), contents) ]
 
 let empty = Xml[]
 
@@ -33,40 +33,40 @@ let emptyText = text ""
 let flatten xs = xs |> List.map (fun (Xml y) -> y) |> List.concat |> Xml
 
 
-let htmlAttr attr s = tag "html" (Array.ofList attr) s
+let htmlAttr attr s = tag "html" attr s
 let html xs = htmlAttr [ ] (flatten xs)
 
-let headAttr attr s = tag "head" (Array.ofList attr) s
+let headAttr attr s = tag "head" attr s
 let head xs = headAttr [ ] (flatten xs)
 
-let titleAttr attr s = tag "title" (Array.ofList attr) (Xml([Text s,Xml []]))
+let titleAttr attr s = tag "title" attr (Xml([Text s,Xml []]))
 let title  = titleAttr [ ]
 
-let linkAttr attr = tag "link" (Array.ofList attr) empty
+let linkAttr attr = tag "link" attr empty
 let link  = linkAttr [ ]
 
-let scriptAttr attr x = tag "script" (Array.ofList attr) (flatten x)
+let scriptAttr attr x = tag "script" attr (flatten x)
 let script  = scriptAttr [ ]
 
-let bodyAttr attr x = tag "body" (Array.ofList attr) (flatten x)
+let bodyAttr attr x = tag "body" attr (flatten x)
 let body  = bodyAttr [ ]
 
-let divAttr attr x = tag "div" (Array.ofList attr) (flatten x)
+let divAttr attr x = tag "div" attr (flatten x)
 let div  = divAttr [ ]
 
-let pAttr attr x = tag "p" (Array.ofList attr) (flatten x)
+let pAttr attr x = tag "p" attr (flatten x)
 let p  = pAttr [ ]
 
-let spanAttr attr x = tag "span" (Array.ofList attr) x
+let spanAttr attr x = tag "span" attr x
 let span  = spanAttr [ ]
 
-let imgAttr attr = tag "img" (Array.ofList attr) empty
+let imgAttr attr = tag "img" attr empty
 let img  = imgAttr [ ]
 
-let brAttr attr = tag "br" (Array.ofList attr) empty
+let brAttr attr = tag "br" attr empty
 let br = brAttr [ ]
 
-let inputAttr attr = tag "input" (Array.ofList attr) empty
+let inputAttr attr = tag "input" attr empty
 let input = inputAttr [ ]
 
 /// Example
