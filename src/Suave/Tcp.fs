@@ -63,21 +63,24 @@ let createPools logger maxOps bufferSize =
 
   for x = 0 to maxOps - 1 do
     //Pre-allocate a set of reusable SocketAsyncEventArgs
+    let readEventArg = new SocketAsyncEventArgs()
     let userToken =  new AsyncUserToken()
-    let readEventArg = new SocketAsyncEventArgs(UserToken=userToken)
-    readEventArg.Completed.Add userToken.Continuation
+    readEventArg.UserToken <- userToken
+    readEventArg.add_Completed(fun a b -> userToken.Continuation b)
 
     readAsyncArgsPool.Push readEventArg
 
+    let writeEventArg = new SocketAsyncEventArgs()
     let userToken =  new AsyncUserToken()
-    let writeEventArg = new SocketAsyncEventArgs(UserToken = userToken)
-    writeEventArg.Completed.Add userToken.Continuation
+    writeEventArg.UserToken <- userToken
+    writeEventArg.add_Completed(fun a b -> userToken.Continuation b)
 
     writeAsyncArgsPool.Push writeEventArg
 
+    let acceptArg = new SocketAsyncEventArgs()
     let userToken =  new AsyncUserToken()
-    let acceptArg = new SocketAsyncEventArgs(UserToken=userToken)
-    acceptArg.Completed.Add userToken.Continuation 
+    acceptArg.UserToken <- userToken
+    acceptArg.add_Completed(fun a b -> userToken.Continuation b)
 
     acceptAsyncArgsPool.Push(acceptArg)
 
@@ -122,7 +125,7 @@ let startTcpIpServerAsync
   // echo 5 > /proc/sys/net/ipv4/tcp_fin_timeout
   // echo 1 > /proc/sys/net/ipv4/tcp_tw_recycle
   // custom kernel with shorter TCP_TIMEWAIT_LEN in include/net/tcp.h
-  let inline job (acceptArgs : SocketAsyncEventArgs) = async {
+  let job (acceptArgs : SocketAsyncEventArgs) = async {
     let intern  = Log.intern logger "Suave.Tcp.tcp_ip_server.job"
     let socket = acceptArgs.AcceptSocket
     let ipaddr = (socket.RemoteEndPoint :?> IPEndPoint).Address

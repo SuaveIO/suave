@@ -472,7 +472,7 @@ module internal ParsingAndControl =
 
 
   /// Starts a new web worker, given the configuration and a web part to serve.
-  let createHttpServer (bufferSize, maxOps) (webpart : WebPart) (runtime : HttpRuntime) =
+  let startWebWorkerAsync (bufferSize, maxOps) (webpart : WebPart) (runtime : HttpRuntime) =
     startTcpIpServerAsync
         (bufferSize, maxOps) 
         runtime.logger 
@@ -523,7 +523,7 @@ let startWebServerAsync (config : SuaveConfig) (webpart : WebPart) =
   // spawn tcp listeners/web workers
   let servers = 
     config.bindings |> List.map (SuaveConfig.toRuntime config homeFolder compressionFolder true
-              >> ParsingAndControl.createHttpServer (config.bufferSize, config.maxOps) webpart)
+              >> ParsingAndControl.startWebWorkerAsync (config.bufferSize, config.maxOps) webpart)
               
   let listening = servers |> Seq.map fst |> Async.Parallel
   let server    = servers |> Seq.map snd |> Async.Parallel |> Async.Ignore

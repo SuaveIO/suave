@@ -23,9 +23,9 @@ open Suave.Testing
 let parsing_multipart =
   let runWith' = runWith defaultConfig
 
-  let post_data1 = read_bytes "request.txt"
-  let post_data2 = read_text "request-1.txt"
-  let post_data3 = read_text "request-2.txt"
+  let post_data1 = readBytes "request.txt"
+  let post_data2 = readText "request-1.txt"
+  let post_data3 = readText "request-2.txt"
 
   let test_url_encoded_form fieldName =
     request (fun r ->

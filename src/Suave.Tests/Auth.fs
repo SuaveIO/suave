@@ -43,14 +43,14 @@ let reqResp
   f_result
   ctx =
 
-  let log = Suave.Log.info ctx.suave_config.logger "Suave.Tests" TraceHeader.empty
+  let log = Suave.Log.info ctx.suaveConfig.logger "Suave.Tests" TraceHeader.empty
   log (sprintf "%A %s" methd resource)
 
   let default_timeout = TimeSpan.FromSeconds 5.
 
   use handler = mkHandler DecompressionMethods.None cookies
   use client = mkClient handler
-  use request = mkRequest methd resource "" None (endpointUri ctx.suave_config) |> f_request
+  use request = mkRequest methd resource "" None (endpointUri ctx.suaveConfig) |> f_request
 
   for h in request.Headers do
     log (sprintf "%s: %s" h.Key (String.Join(", ", h.Value)))
@@ -79,7 +79,7 @@ let interact methd resource container ctx =
   let response = req_cookies container ctx methd resource id
   match response.Headers.TryGetValues("Set-Cookie") with
   | false, _ -> ()
-  | true, values -> values |> Seq.iter (fun cookie -> container.SetCookies(endpointUri ctx.suave_config, cookie))
+  | true, values -> values |> Seq.iter (fun cookie -> container.SetCookies(endpointUri ctx.suaveConfig, cookie))
   response
 
 let sessionState f =
@@ -120,7 +120,7 @@ let tests =
       // mutability bonanza here:
       let container = CookieContainer()
       let interact methd resource = interact methd resource container ctx
-      let cookies = cookies ctx.suave_config container
+      let cookies = cookies ctx.suaveConfig container
 
       // when
       interaction ctx <| fun _ ->

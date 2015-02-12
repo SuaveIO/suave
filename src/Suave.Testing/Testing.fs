@@ -80,7 +80,7 @@ open Utilities
 /// (like the listening socket etc).
 type SuaveTestCtx =
   { cts          : CancellationTokenSource
-    suave_config : SuaveConfig }
+    suaveConfig : SuaveConfig }
 
 /// Cancels the cancellation token source and disposes the server's
 /// resources.
@@ -108,7 +108,7 @@ let runWithFactory factory config webParts : SuaveTestCtx =
   listening |> Async.RunSynchronously |> ignore // wait for the server to start listening
 
   { cts = cts
-    suave_config = config2 }
+    suaveConfig = config2 }
 
 /// Similar to run_with_factory, but uses the default suave factory.
 let runWith config webParts = runWithFactory startWebServerAsync config webParts
@@ -142,7 +142,7 @@ let mkClient handler =
 
 /// Send the request with the client - returning the result of the request
 let send (client : HttpClient) (timeout : TimeSpan) (ctx : SuaveTestCtx) (request : HttpRequestMessage) =
-  Log.intern ctx.suave_config.logger "Suave.Tests"
+  Log.intern ctx.suaveConfig.logger "Suave.Tests"
              (sprintf "%s %O"  request.Method.Method request.RequestUri)
   let send = client.SendAsync(request, HttpCompletionOption.ResponseContentRead, ctx.cts.Token)
 
@@ -176,16 +176,16 @@ let reqResp
   (query : string)
   data
   (cookies : CookieContainer option)
-  (decomp_method : DecompressionMethods)
+  (decompMethod : DecompressionMethods)
   (f_request : HttpRequestMessage -> HttpRequestMessage)
   f_result =
 
   let defaultTimeout = TimeSpan.FromSeconds 5.
 
   withContext <| fun ctx ->
-    use handler = mkHandler decomp_method cookies
+    use handler = mkHandler decompMethod cookies
     use client = mkClient handler
-    use request = mkRequest methd resource query data (endpointUri ctx.suave_config) |> f_request
+    use request = mkRequest methd resource query data (endpointUri ctx.suaveConfig) |> f_request
     use result = request |> send client defaultTimeout ctx
     f_result result
 
@@ -233,7 +233,7 @@ let reqCookies methd resource data ctx =
 let reqCookies' methd resource data ctx =
   reqCookies methd resource data ctx
   |> fun cookies ->
-    cookies.GetCookies(endpointUri ctx.suave_config)
+    cookies.GetCookies(endpointUri ctx.suaveConfig)
 
 
 

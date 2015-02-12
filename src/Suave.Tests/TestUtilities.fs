@@ -28,10 +28,10 @@ let fsCheckConfig = { Config.Default with Arbitrary = [ typeof<Arbs> ] }
 let currentPath =
   Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location)
 
-let read_text relative_path =
+let readText relative_path =
   File.ReadAllText(Path.Combine(currentPath, relative_path))
 
-let read_bytes relative_path =
+let readBytes relative_path =
   File.ReadAllBytes(Path.Combine(currentPath, relative_path))
 
 let defaultConfig =

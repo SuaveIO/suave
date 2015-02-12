@@ -37,10 +37,10 @@ let proxy =
 
   // let sslCert = X509Certificate.FromPKCS12(BIO.File("suave.p12","r"), "easy")
   // let proxy_config = { default_config with bindings = [ HttpBinding.Create(Protocol.HTTPS(sslCert), "127.0.0.1", 8084) ] }
-  let proxy_config =
+  let proxyConfig =
     { defaultConfig with
         bindings = [ HttpBinding.mk HTTP IPAddress.Loopback 8084us ] }
-  let proxy = runWithFactory createReverseProxyServerAsync proxy_config
+  let proxy = runWithFactory createReverseProxyServerAsync proxyConfig
 
   testList "creating proxy" [
     testPropertyWithConfig fsCheckConfig "GET / returns 200 OK with passed string" <| fun str ->

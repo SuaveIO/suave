@@ -10,7 +10,7 @@ module Parsing =
   /// Gets whether the passed ip is a local IPv4 or IPv6 address.
   /// Example: 127.0.0.1, ::1 return true. If the IP cannot be parsed,
   /// returns false.
-  let is_local_address (ip : string) =
+  let isLocalAddress (ip : string) =
     match IPAddress.TryParse ip with
     | false, _   -> false
     | true,  ip' -> IPAddress.IsLoopback ip'
