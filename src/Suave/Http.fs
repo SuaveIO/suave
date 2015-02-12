@@ -335,9 +335,6 @@ module Http =
       let iff b x =
         if b then Some x else None
 
-    let queryParam nm f : WebPart = request( fun x -> cond (x.queryParam nm) f never)
-    let formData nm f : WebPart = request( fun x -> cond (x.formDataItem nm) f never)
-
     let url s (x : HttpContext) =
       async.Return (Option.iff (s = x.request.url.AbsolutePath) x)
 

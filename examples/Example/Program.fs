@@ -65,7 +65,7 @@ let app =
     url "/guid" >>= OK (Guid.NewGuid().ToString())
     url "/hello" >>= OK "Hello World"
     (url "/apple" <|> url "/orange") >>= OK "Hello Fruit"
-    GET >>= url "/query" >>= queryParam "name" (fun y -> OK ("Hello " + y))
+    GET >>= url "/query" >>= request( fun x -> cond (x.queryParam "name") (fun y -> OK ("Hello " + y)) never)
     GET >>= url "/query" >>= OK "Hello beautiful"
     url "/redirect" >>= Redirection.redirect "/redirected"
     url "/redirected" >>=  OK "You have been redirected."

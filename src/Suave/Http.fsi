@@ -1063,12 +1063,6 @@ module Http =
     /// Match on the url
     val url : s:string -> WebPart
 
-    /// Match on the url
-    val queryParam: s:string -> consumer:(string -> WebPart) -> WebPart
-
-    /// Get form data
-    val formData : s:string -> consumer:(string -> WebPart) -> WebPart
-
     /// Match on the method
     val ``method`` : ``method``:HttpMethod -> WebPart
 
