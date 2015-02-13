@@ -60,7 +60,7 @@ module (* internal *) Bytes =
   /// The corresponding EOL array segment
   let eolArraySegment = new ArraySegment<_>(EOL, 0, 2)
 
-  let inline bytes_to_buffer (s : string) (buff : byte []) (offset : int) =
+  let inline bytesToBuffer (s : string) (buff : byte []) (offset : int) =
     Encoding.ASCII.GetBytes (s, 0, s.Length, buff, offset)
 
   /// Fully transform the input stream to a byte array.
@@ -122,7 +122,7 @@ module (* internal *) Bytes =
       done;
       if !j >= m then Some(!i - m) else None
 
-  let kmp_x p =
+  let kmpX p =
     let next = initNext p
     let m = Array.length p
     fun (s:ArraySegment<_>) ->
@@ -155,7 +155,7 @@ module (* internal *) Bytes =
         else loop (k + 1) (acc + a.length)
       loop 0 0
 
-  let kmp_y p =
+  let kmpY p =
     let next = initNext p
     let m = Array.length p
     fun (xs : ArraySegment<byte> list) ->
@@ -169,7 +169,7 @@ module (* internal *) Bytes =
       done;
       if !j >= m then Some(!i - m) else None
 
-  let kmp_z p =
+  let kmpZ p =
     let next = initNext p
     let m = Array.length p
     fun (xs : BufferSegment list) ->
@@ -190,7 +190,7 @@ module (* internal *) Bytes =
       elif i < a.Count + b.Count then b.Array.[b.Offset + (i - a.Count)]
       else failwith "invalid args"
 
-  let kmp_x_x p =
+  let kmpXX p =
     let next = initNext p
     let m = Array.length p
     fun (v:ArraySegment<_>) (w:ArraySegment<_>) ->
@@ -205,7 +205,7 @@ module (* internal *) Bytes =
       if !j >= m then Some(!i - m) else None
 
   /// Returns the index of the first CRLF in the buffer
-  let inline scan_crlf (b : ArraySegment<byte>) =
+  let inline scanCrlf (b : ArraySegment<byte>) =
     let a = b.Array
     let rec loop i =
       if i > b.Offset + b.Count - 1 then None
@@ -214,7 +214,7 @@ module (* internal *) Bytes =
     loop b.Offset
 
   /// Returns the index of the first CRLF in the union of two ArraySegment
-  let inline scan_crlf_x (c : ArraySegment<byte>) (d : ArraySegment<byte>) =
+  let inline scanCrlfX (c : ArraySegment<byte>) (d : ArraySegment<byte>) =
     let a = unite c d
     let rec loop i =
       if i > c.Count + d.Count - 1 then None

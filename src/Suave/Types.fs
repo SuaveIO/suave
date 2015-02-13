@@ -210,13 +210,13 @@ type HttpCookie =
     secure    : bool
     httpOnly  : bool }
 
-  static member nameP = (fun x -> x.name),    fun v x -> { x with name = v }
-  static member valueP = (fun x -> x.value), fun v x -> { x with value = v }
-  static member expiresP = (fun x -> x.expires), fun v x -> { x with expires = v }
-  static member pathP = (fun x -> x.path), fun v (x : HttpCookie) -> { x with path = v }
-  static member domainP = (fun x -> x.domain), fun v x -> { x with domain = v }
-  static member secureP = (fun x -> x.secure), fun v x -> { x with secure = v }
-  static member httpOnlyP = (fun x -> x.httpOnly), fun v x -> { x with httpOnly = v }
+  static member name_     = (fun x -> x.name),    fun v x -> { x with name = v }
+  static member value_    = (fun x -> x.value), fun v x -> { x with value = v }
+  static member expires_  = (fun x -> x.expires), fun v x -> { x with expires = v }
+  static member path_     = (fun x -> x.path), fun v (x : HttpCookie) -> { x with path = v }
+  static member domain_   = (fun x -> x.domain), fun v x -> { x with domain = v }
+  static member secure_   = (fun x -> x.secure), fun v x -> { x with secure = v }
+  static member httpOnly_ = (fun x -> x.httpOnly), fun v x -> { x with httpOnly = v }
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module HttpCookie =
@@ -376,17 +376,17 @@ module HttpRequest =
   open Suave.Utils
 
   let empty =
-    { httpVersion     = "1.1"
+    { httpVersion      = "1.1"
       url              = Uri("http://localhost/")
       host             = ClientOnly "localhost"
       ``method``       = HttpMethod.OTHER("")
       headers          = []
-      rawForm         = Array.empty
-      rawQuery        = ""
+      rawForm          = Array.empty
+      rawQuery         = ""
       files            = []
-      multiPartFields = []
+      multiPartFields  = []
       trace            = TraceHeader.empty
-      isSecure        = false
+      isSecure         = false
       ipaddr           = IPAddress.Loopback }
 
   [<System.Obsolete("Use request.queryParams")>]

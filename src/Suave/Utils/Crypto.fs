@@ -108,18 +108,18 @@ module Crypto =
         crypto.FlushFinalBlock()
         cipher.ToArray()
 
-      use cipher_text = new MemoryStream()
+      use cipherText = new MemoryStream()
 
-      let bw  = new BinaryWriter(cipher_text)
+      let bw  = new BinaryWriter(cipherText)
       bw.Write iv
       bw.Write (mkCipherText msg key iv)
       bw.Flush ()
 
-      let hmac = hmacOfBytes key (cipher_text.ToArray())
+      let hmac = hmacOfBytes key (cipherText.ToArray())
       bw.Write hmac
       bw.Dispose()
 
-      Choice1Of2 (cipher_text.ToArray())
+      Choice1Of2 (cipherText.ToArray())
 
   let secretboxOfText (key : byte []) (msg : string) =
     secretbox key (msg |> UTF8.bytes)

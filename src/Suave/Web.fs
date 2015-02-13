@@ -78,7 +78,7 @@ module internal ParsingAndControl =
   /// is sent to the function select and the corresponding buffers are released
   let scanMarker marker select connection = socket {
 
-    match kmp_z marker connection.segments with
+    match kmpZ marker connection.segments with
     | Some x -> 
       let! res, connection = liftAsync <| split x connection select marker.Length
       return Found res, connection

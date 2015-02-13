@@ -43,7 +43,7 @@ let asyncWrite (connection : Connection) (s : string) : SocketOp<unit> =
   async {
     if s.Length > 0 then
       let buff = connection.lineBuffer
-      let c = bytes_to_buffer s buff.Array buff.Offset
+      let c = bytesToBuffer s buff.Array buff.Offset
       return! send connection (new ArraySegment<_>(buff.Array, buff.Offset, c))
     else return Choice1Of2 ()
   }
