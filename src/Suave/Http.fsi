@@ -1372,7 +1372,7 @@ module Http =
     /// MIME-type/Content-Type header based on its extension. Will service from the
     /// current directory.
     /// </para></summary>
-    val browseFileInHomeDirectory : fileName:string -> WebPart
+    val browseFileHome : fileName:string -> WebPart
 
     /// <summary><para>
     /// 'browse' the file in the sense that the contents of the file are sent based on the
@@ -1388,7 +1388,7 @@ module Http =
     /// request's Url property. Will serve from the current as configured in directory.
     /// Suave's runtime.
     /// </para></summary>
-    val browseHomeDirectory : WebPart
+    val browseHome : WebPart
 
     /// <summary><para>
     /// Serve a 'file browser' for a rootPath
@@ -1401,13 +1401,13 @@ module Http =
     /// <summary><para>
     /// Serve a 'file browser' for the current directory
     /// </para></summary>
-    val dirHomeDirectory : WebPart
+    val dirHome : WebPart
 
-    [<System.Obsolete("Use dirHomeDirectory")>]
+    [<System.Obsolete("Use dirHome")>]
     val dir' : WebPart
-    [<System.Obsolete("Use browseHomeDirectory")>]
+    [<System.Obsolete("Use browseHome")>]
     val browse' : WebPart
-    [<System.Obsolete("Use browseFileInHomeDirectory")>]
+    [<System.Obsolete("Use browseFileHome")>]
     val browse_file' : fileName:string -> WebPart
     [<System.Obsolete("Use browseFile")>]
     val browse_file : rootPath:string -> fileName:string -> WebPart

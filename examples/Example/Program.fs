@@ -86,8 +86,8 @@ let app =
             >>= OK "First time")
     basicAuth // from here on it will require authentication
     GET >>= url "/events" >>= request (fun r -> EventSource.handShake (CounterDemo.counterDemo r))
-    GET >>= browseHomeDirectory //serves file if exists
-    GET >>= dirHomeDirectory //show directory listing
+    GET >>= browseHome //serves file if exists
+    GET >>= dirHome //show directory listing
     HEAD >>= url "/head" >>= sleep 100 "Nice sleep .."
     POST >>= url "/upload" >>= OK "Upload successful."
     PUT >>= url "/upload2"

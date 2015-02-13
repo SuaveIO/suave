@@ -544,7 +544,7 @@ module Http =
       fun ({request = r; runtime = q} as h) ->
         file (resolvePath rootPath fileName) h
 
-    let browseFileInHomeDirectory fileName =
+    let browseFileHome fileName =
       fun ({request = r; runtime = q} as h) ->
         browseFile q.homeDirectory fileName h
     
@@ -557,7 +557,7 @@ module Http =
             r.url.AbsolutePath rootPath)
         file (resolvePath rootPath r.url.AbsolutePath))
 
-    let browseHomeDirectory : WebPart =
+    let browseHome : WebPart =
       warbler (fun { runtime = q } -> browse q.homeDirectory)
 
     let dir rootPath (ctx : HttpContext) =
@@ -587,7 +587,7 @@ module Http =
         OK (result.ToString()) ctx
       else fail
 
-    let dirHomeDirectory ctx =
+    let dirHome ctx =
       dir ctx.runtime.homeDirectory ctx
 
     [<Obsolete("Use resolvePath")>]
@@ -598,12 +598,12 @@ module Http =
     let resolve_path rootPat fileName = resolvePath rootPat fileName
     [<Obsolete("Use browseFile")>]
     let browse_file rootPath fileName = browseFile rootPath fileName
-    [<Obsolete("Use browseFileInHomeDirectory")>]
-    let browse_file' fileName = browseFileInHomeDirectory fileName
-    [<Obsolete("Use browseHomeDirectory")>]
-    let browse' = browseHomeDirectory
-    [<Obsolete("Use dirHomeDirectory")>]
-    let dir' ctx = dirHomeDirectory ctx
+    [<Obsolete("Use browseFileHome")>]
+    let browse_file' fileName = browseFileHome fileName
+    [<Obsolete("Use browseHome")>]
+    let browse' = browseHome
+    [<Obsolete("Use dirHome")>]
+    let dir' ctx = dirHome ctx
 
   module Embedded =
     
