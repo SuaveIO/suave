@@ -29,7 +29,7 @@ let parsing_tests =
 
       // the server generates a new one with the client's as the parent?
       // is the semantics that client sends its SpanId and that
-      let expected = TraceHeader.create (Some 7654321UL) (Some 1234567UL)
+      let expected = TraceHeader.mk (Some 7654321UL) (Some 1234567UL)
       Assert.Equal("should parse trace id", expected.traceId, (parseTraceHeaders headers).traceId)
       Assert.Equal("should parse span id to parent span id", expected.reqParentId, (parseTraceHeaders headers).reqParentId)
     ]

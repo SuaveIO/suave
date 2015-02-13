@@ -39,7 +39,7 @@ type TraceHeader =
   /// field is defaulted to None, as suave cannot know the "origin span", so to
   /// speak.
 
-  static member create traceId spanParentId =
+  static member mk traceId spanParentId =
     let newId = Globals.random.NextUInt64()
     { traceId      = defaultArg traceId newId
       reqId        = newId

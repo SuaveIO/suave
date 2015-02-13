@@ -249,7 +249,7 @@ module internal ParsingAndControl =
         | false, _    -> None
     let parent = "x-b3-spanid"  |> getFirst headers |> Option.bind tryParseUint64
     let trace  = "x-b3-traceid" |> getFirst headers |> Option.bind tryParseUint64
-    TraceHeader.create trace parent
+    TraceHeader.mk trace parent
 
   /// Reads raw POST data
   let getRawPostData connection contentLength =
