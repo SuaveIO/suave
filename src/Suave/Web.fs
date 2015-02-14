@@ -327,12 +327,12 @@ module internal ParsingAndControl =
   /// Load a readable plain-text stream, based on the protocol in use. If plain HTTP
   /// is being used, the stream is returned as it, otherwise a new SslStream is created
   /// to decipher the stream, without client certificates.
-  let inline load_connection (logger : Logger) proto (connection : Connection) = socket{
+  let inline loadConnection (logger : Logger) proto (connection : Connection) = socket{
     match proto with
     | HTTP       ->
       return connection
-    | HTTPS ssl_provider -> 
-      return! ssl_provider.Wrap connection
+    | HTTPS sslProvider -> 
+      return! sslProvider.Wrap connection
     }
 
   open System.Net.Sockets
@@ -465,7 +465,7 @@ module internal ParsingAndControl =
     (connection : Connection) =
 
     socket {
-      let! connection = load_connection runtime.logger runtime.matchedBinding.scheme connection
+      let! connection = loadConnection runtime.logger runtime.matchedBinding.scheme connection
       do! httpLoop { HttpContext.empty with runtime = runtime; connection = connection } consumer
       return ()
     }
@@ -481,7 +481,7 @@ module internal ParsingAndControl =
 
   let resolveDirectory homeDirectory =
     match homeDirectory with
-    | None   -> System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location)
+    | None   -> Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location)
     | Some s -> s
 
 ////////////////////////////////////////////////////

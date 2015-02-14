@@ -19,7 +19,7 @@ module Connection =
 
   let empty : Connection =
     { ipaddr     = IPAddress.Loopback
-      transport       =  { socket = null; read_args = null; write_args   = null }
+      transport       =  { socket = null; readArgs = null; writeArgs   = null }
       bufferManager = null
       lineBuffer  =  ArraySegment<byte>()
       segments     = []  }

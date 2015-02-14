@@ -138,7 +138,7 @@ let startTcpIpServerAsync
       let writeArgs = c.Pop()
       let connection =
         { ipaddr       = ipaddr
-          transport    = { socket = socket; read_args = readArgs; write_args = writeArgs}
+          transport    = { socket = socket; readArgs = readArgs; writeArgs = writeArgs}
           bufferManager = bufferManager
           lineBuffer  = bufferManager.PopBuffer "Suave.Tcp.tcp_ip_server.job" // buf allocate
           segments     = []
