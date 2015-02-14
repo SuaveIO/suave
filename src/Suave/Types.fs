@@ -339,25 +339,26 @@ type HttpRequest =
   static member ipaddr_          = Property<HttpRequest,_> (fun x -> x.ipaddr) (fun v x -> { x with ipaddr = v })
 
   /// Gets the query string from the HttpRequest. Use
-  /// (^^) to try to fetch data from this.
-  member x.queryParams =
+  /// queryParam to try to fetch data for individual items.
+  member x.query =
     Parsing.parseData x.rawQuery
 
   /// Finds the key k from the query string in the HttpRequest
   member x.queryParam (k : string) =
-    getFirstOpt x.queryParams k
+    getFirstOpt x.query k
 
   /// Gets the header for the given key in the HttpRequest
   member x.header k =
-    x.headers %% k
+    getFirst x.headers k
 
-  /// Gets the form as a ((string*string option list) from the HttpRequest
-  member x.formData  =
+  /// Gets the form as a ((string*string option list) from the HttpRequest. Use formData to get 
+  /// the data for a particular key.
+  member x.form  =
     Parsing.parseData (ASCII.toString x.rawForm)
 
   /// Finds the key k from the form in the HttpRequest
-  member x.formDataItem (k : string) =
-    getFirstOpt x.formData k
+  member x.formData (k : string) =
+    getFirstOpt x.form k
 
   [<Obsolete("Renamed to httpVersion")>]
   member x.http_version = x.httpVersion
@@ -389,8 +390,8 @@ module HttpRequest =
       isSecure         = false
       ipaddr           = IPAddress.Loopback }
 
-  [<System.Obsolete("Use request.queryParams")>]
-  let query (x : HttpRequest) = x.queryParams
+  [<System.Obsolete("Use request.query")>]
+  let query (x : HttpRequest) = x.query
 
   [<System.Obsolete("Use request.queryParam key")>]
   let query' (x : HttpRequest) k = x.queryParam k
@@ -398,11 +399,11 @@ module HttpRequest =
   [<System.Obsolete("Use request.header")>]
   let header (x : HttpRequest) k = x.header
 
-  [<System.Obsolete("Use request.formData")>]
-  let form  (x : HttpRequest) = x.formData
+  [<System.Obsolete("Use request.form")>]
+  let form  (x : HttpRequest) = x.form
 
-  [<System.Obsolete("Use request.formDataItem key")>]
-  let form'   (x : HttpRequest) k = x.formDataItem k
+  [<System.Obsolete("Use request.formData key")>]
+  let form'   (x : HttpRequest) k = x.formData k
 
 type ITlsProvider =
   abstract member Wrap : Connection -> SocketOp<Connection>

@@ -51,7 +51,7 @@ let posts =
     request (fun x -> OK (x.rawForm |> Encoding.UTF8.GetString))
 
   let getFormValue name =
-    request (fun x -> let q = x.formDataItem name in OK (Option.get q))
+    request (fun x -> let q = x.formData name in OK (Option.get q))
 
   let assertion = "eyJhbGciOiJSUzI1NiJ9.eyJwdWJsaWMta2V5Ijp7ImFsZ29yaXRobSI6IkR"+
                   "TIiwieSI6Ijc1MDMyNGRmYzQwNGI0OGQ3ZDg0MDdlOTI0NWMxNGVkZmVlZTY"+

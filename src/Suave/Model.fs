@@ -61,7 +61,7 @@ module Binding =
     |> Choice.bind f
 
   let form formKey f (req : HttpRequest) =
-    req.formDataItem formKey
+    req.formData formKey
     |> Choice.from_option (sprintf "Missing form field '%s'" formKey)
     |> Choice.bind f
 
