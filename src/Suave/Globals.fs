@@ -15,7 +15,7 @@ let random = System.Random()
 /// If you are unit-testing
 /// you can set this, but as with all globals, you need to set it back afterwards
 /// or you will break subsequent unit tests.
-let mutable utc_now = fun () -> System.DateTimeOffset.UtcNow
+let mutable utcNow = fun () -> System.DateTimeOffset.UtcNow
 
 /// From the TCP module, keeps track of the number of clients
 let internal numberOfClients = ref 0L

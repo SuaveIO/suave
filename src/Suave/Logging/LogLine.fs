@@ -28,7 +28,7 @@ module LogLine =
       path          = path
       ``exception`` = ex
       trace         = trace
-      ts_utc_ticks  = Globals.utc_now().Ticks }
+      ts_utc_ticks  = Globals.utcNow().Ticks }
 
   let trace_ =
     (fun x -> x.trace),

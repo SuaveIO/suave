@@ -110,7 +110,7 @@ let startTcpIpServerAsync
        (binding            : SocketBinding) =
 
   let startData =
-    { startCalledUtc = Globals.utc_now ()
+    { startCalledUtc = Globals.utcNow ()
       socketBoundUtc = None
       binding        = binding }
 
@@ -167,7 +167,7 @@ let startTcpIpServerAsync
       use! dd = Async.OnCancel(fun () -> stopTcp logger "tcp_ip_server async cancelled" listenSocket)
       let! token = Async.CancellationToken
 
-      let startData = { startData with socketBoundUtc = Some(Globals.utc_now()) }
+      let startData = { startData with socketBoundUtc = Some(Globals.utcNow()) }
       acceptingConnections.Complete startData |> ignore
 
       logger.Log LogLevel.Info <| fun _ ->
@@ -176,7 +176,7 @@ let startTcpIpServerAsync
           message       = sprintf "listener started in %O%s" startData (if token.IsCancellationRequested then ", cancellation requested" else "")
           level         = LogLevel.Info
           ``exception`` = None
-          ts_utc_ticks  = Globals.utc_now().Ticks }
+          ts_utc_ticks  = Globals.utcNow().Ticks }
 
       while not (token.IsCancellationRequested) do
         try

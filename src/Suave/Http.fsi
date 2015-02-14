@@ -4,9 +4,6 @@
 /// The HTTP module has these main sub-modules:
 /// </para>
 /// <list>
-///   <item>Codes - simply hosts the HttpCode type.</item>
-///   <item>Internals - constants and version of suave library.</item>
-///   <item>Compression - Functions for compressing responses.</item>
 ///   <item>Response - response and response_f functions.</item>
 ///   <item>Writers - ways to modify the response.</item>
 ///   <item>Intermediate - 100 and 101 response codes.</item>

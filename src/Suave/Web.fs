@@ -370,7 +370,7 @@ module internal ParsingAndControl =
                                                      r.status.code.ToString()
                                                      r.status.reason ])
     do! asyncWriteLn connection Internals.serverHeader
-    do! asyncWriteLn connection (String.Concat( [| "Date: "; Globals.utc_now().ToString("R") |]))
+    do! asyncWriteLn connection (String.Concat( [| "Date: "; Globals.utcNow().ToString("R") |]))
 
     do! writeHeaders connection r.headers
     do! writeContentType connection r.headers

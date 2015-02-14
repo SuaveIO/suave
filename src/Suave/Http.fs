@@ -402,7 +402,7 @@ module Http =
           level         = LogLevel.Debug
           path          = "Suave.Http.web-requests"
           ``exception`` = None
-          ts_utc_ticks  = Globals.utc_now().Ticks }
+          ts_utc_ticks  = Globals.utcNow().Ticks }
 
       succeed ctx
 
