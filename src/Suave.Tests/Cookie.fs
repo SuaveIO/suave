@@ -51,7 +51,7 @@ let tests =
         HttpContext.empty
         |> Cookie.setCookie c1 |> force
         |> Cookie.setCookie c2 |> force
-        
+
       Assert.Equal("should keep bb-valued cookie",
                    "bb",
                    subject.response.cookies.["a"].value)

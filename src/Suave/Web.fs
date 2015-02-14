@@ -262,9 +262,9 @@ module internal ParsingAndControl =
 
   let parsePostData (ctx : HttpContext) = socket{
     let request = ctx.request
-    let contentEncoding = request.headers %% "content-type"
+    let contentEncoding = request.header "content-type"
 
-    match request.headers %% "content-length" with 
+    match request.header "content-length" with 
     | Some contentLengthString ->
       let contentLength = Convert.ToInt32(contentLengthString)
 
@@ -435,7 +435,7 @@ module internal ParsingAndControl =
         let! result = operate consumer ctx
         match result with
         | Some ctx ->
-          match ctx.request.headers %% "connection" with
+          match ctx.request.header "connection" with
           | Some (x : string) when x.ToLower().Equals("keep-alive") ->
             verbose "'Connection: keep-alive' recurse"
             return! loop (cleanResponse ctx)

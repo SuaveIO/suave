@@ -468,7 +468,7 @@ module Http =
         let mimes = ctx.runtime.mimeTypesMap <| getExtension key
         match mimes with
         | Some value ->
-          let modifiedSince = r.headers %% "if-modified-since"
+          let modifiedSince = r.header "if-modified-since"
           match modifiedSince with
           | Some v ->
             match Parse.date_time v with
@@ -784,8 +784,7 @@ module Http =
 
     let authenticateBasic f (ctx : HttpContext) =
       let p = ctx.request
-      let headers = p.headers
-      match headers %% "authorization" with
+      match p.header "authorization" with
       | Some header ->
         let (typ, username, password) = parseAuthenticationToken header
         if (typ.Equals("basic")) && f (username, password) then

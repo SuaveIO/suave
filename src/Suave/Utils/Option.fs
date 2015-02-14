@@ -1,5 +1,5 @@
 ﻿namespace Suave.Utils
 
 module Option =
-  let or_default value opt =
+  let orDefault value opt =
     opt |> Option.fold (fun s t -> t) value

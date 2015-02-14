@@ -47,7 +47,7 @@ let generateData (request : HttpRequest) =
   String.concat "\n"
     [ sessionId
       request.ipaddr.ToString()
-      request.headers %% "user-agent" |> Option.or_default ""
+      request.header "user-agent" |> Option.orDefault ""
     ]
 
 let authenticate relativeExpiry secure

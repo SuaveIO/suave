@@ -345,7 +345,7 @@ type HttpRequest =
 
   /// Finds the key k from the query string in the HttpRequest
   member x.queryParam (k : string) =
-    x.queryParams ^^ k
+    getFirstOpt x.queryParams k
 
   /// Gets the header for the given key in the HttpRequest
   member x.header k =
@@ -357,7 +357,7 @@ type HttpRequest =
 
   /// Finds the key k from the form in the HttpRequest
   member x.formDataItem (k : string) =
-    x.formData ^^ k
+    getFirstOpt x.formData k
 
   [<Obsolete("Renamed to httpVersion")>]
   member x.http_version = x.httpVersion

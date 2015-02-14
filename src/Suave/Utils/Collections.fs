@@ -16,19 +16,14 @@ type IDictionary<'b,'a> with
         | true, v  -> Some v
         | false, _ -> None
 
-let getFirst (target : NameValueList) key =
-  match List.tryFind (fun (a,b) -> a.Equals key) target with
-  | Some value -> snd value |> Some
-  | None -> None
+let getFirst (target : NameValueList) (key:string) =
+  target |> List.tryPick (fun (a,b) -> if a.Equals key then Some b else None) 
 
-let (%%) (target : NameValueList) key =
-  getFirst target key
+let getFirstOpt (target : NameOptionValueList) (key:string) =
+  target |> List.tryPick (fun (a,b) -> if a.Equals key then b else None) 
 
-let (^^) (target : NameOptionValueList) key =
-  match List.tryFind (fun (a,b) -> a.Equals key) target with
-  | Some value ->
-    snd value
-  | None -> None
+let (%%) target key = getFirst target key
+let (^^) target key = getFirstOpt target key
 
 
 type Property<'T,'P> = ('T -> 'P) * ('P -> 'T -> 'T) 

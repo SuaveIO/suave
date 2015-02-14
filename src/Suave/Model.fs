@@ -56,7 +56,7 @@ module Binding =
     bind (HttpContext.request >> f) f_cont f_err
 
   let header key f (req : HttpRequest) =
-    (req.headers %% key)
+    (getFirst req.headers key)
     |> Choice.from_option (sprintf "Missing header '%s'" key)
     |> Choice.bind f
 
