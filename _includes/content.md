@@ -36,21 +36,21 @@ open Suave                 // always open suave
 open Suave.Http.Successful // for OK-result
 open Suave.Web             // for config
 
-web_server default_config (OK "Hello World!")
+startWebServer defaultConfig (OK "Hello World!")
 {% endhighlight %}
 
 The above statement will start a web server on default port 8083 over HTTP.
-`web_server` takes a configuration record and the WebPart `(OK "Hello World")`
+`startWebServer` takes a configuration record and the WebPart `(OK "Hello World")`
 It's worth noting that with the above, your application will block on the
 function call, until you cancel the `Async.DefaultCancellationToken`. If you
 want to handle disposal of the async yourself, have a look at
-`web_server_async`.
+`startWebServerAsync`.
 
 In suave, we have opted to write a lot of documentation inside the code; so just
 hover the function in your IDE or use an assembly browser to bring out the XML
-docs. For the above reference to `web_server_async`, our code looks like this:
+docs. For the above reference to `startWebServerAsync`, our code looks like this:
 
-![web_server_async documentation](/images/web_server_async_code.png)
+![startWebServerAsync documentation](/images/web_server_async_code.png)
 
 Suave + Paket = ♥
 -----------------
@@ -78,7 +78,10 @@ Environment.CurrentDirectory <- __SOURCE_DIRECTORY__
 
 if not (File.Exists "paket.exe") then
     let url = "https://github.com/fsprojects/Paket/releases/download/0.26.3/paket.exe"
-    use wc = new Net.WebClient() in let tmp = Path.GetTempFileName() in wc.DownloadFile(url, tmp); File.Move(tmp,Path.GetFileName url)
+    use wc = new Net.WebClient() 
+	let tmp = Path.GetTempFileName() 
+	wc.DownloadFile(url, tmp); 
+	File.Move(tmp,Path.GetFileName url)
 
 // Step 1. Resolve and install the packages
 
@@ -86,26 +89,19 @@ if not (File.Exists "paket.exe") then
 
 Paket.Scripting.Install """
     source https://nuget.org/api/v2
-    nuget Suave 0.16.0
-    nuget FSharp.Data
-    nuget FSharp.Charting
+    nuget Suave
 """;;
 
 // Step 2. Use the packages
 
 #r "packages/Suave/lib/Suave.dll"
-#r "packages/FSharp.Data/lib/net40/FSharp.Data.dll"
-#r "packages/FSharp.Charting/lib/net40/FSharp.Charting.dll"
 
-let ctxt = FSharp.Data.WorldBankData.GetDataContext()
-
-let data = ctxt.Countries.Algeria.Indicators.``GDP (current US$)``
 
 open Suave                 // always open suave
 open Suave.Http.Successful // for OK-result
 open Suave.Web             // for config
 
-web_server default_config (OK (sprintf "Hello World! In 2010 Algeria earned %f " data.[2010]))
+startWebServer defaultConfig (OK "Hello World!")
 {% endhighlight %}
 
 A slightly more complex example: routing HTTP requests
@@ -141,7 +137,7 @@ let app =
         [ url "/hello" >>= OK "Hello POST"
           url "/goodbye" >>= OK "Good bye POST" ] ]
 
-web_server default_config app
+startWebServer defaultConfig app
 {% endhighlight %}
 
 By using `choose` we execute different logic depending on whether the request was a GET or a POST, and depending on whether the url was /hello or /goodbye. If a request matches a given path in the decision tree, `choose` will return `Some HttpContext`, if it doesn't, `choose` will return `None`. The end result is that when someone makes a request the server will walk down this tree looking for the first part that returns `Some HttpContext`, and then return it to the client. If no part of the tree returns `Some HttpContext` then the result is an exception. You can can also add a default route which returns a 404 page.
@@ -212,15 +208,15 @@ let sample : WebPart =
 
 You can similarly use `context` to gain access to the full `HttpContext` and connection.
 
-To protect a route with HTTP Basic Authentication the combinator `authenticate_basic` is used like in the following example.
+To protect a route with HTTP Basic Authentication the combinator `authenticateBasic` is used like in the following example.
 
 {% highlight fsharp %}
-let requires_authentication _ =
+let requiresAuthentication _ =
   choose
     [ GET >>= url "/public" >>= OK "Hello anonymous"
       // access to handlers after this one will require authentication
-      authenticate_basic (fun (user, pass) -> user = "foo" && pass = "bar")
-      GET >>= url "/protected" >>= context (fun x -> OK ("Hello " + x.user_state.["user_name"])) ]
+      authenticateBasic (fun (user, pass) -> user = "foo" && pass = "bar")
+      GET >>= url "/protected" >>= context (fun x -> OK ("Hello " + x.userState.["userName"])) ]
 {% endhighlight %}
 
 Your web parts are "values" in the sense that they evaluate
@@ -310,7 +306,7 @@ Typed routes
 {% highlight fsharp %}
 let testapp : WebPart =
   choose
-    [ url_scan "/add/%d/%d" (fun (a,b) -> OK((a + b).ToString()))
+    [ urlScan "/add/%d/%d" (fun (a,b) -> OK((a + b).ToString()))
       NOT_FOUND "Found no handlers" ]
 {% endhighlight %}
 
@@ -326,18 +322,18 @@ There is an OpenSSL implementation at [https://github.com/SuaveIO/suave/tree/mas
 
 open Suave.OpenSsl.Provider
 
-let ssl_cert = new X509Certificate("suave.pfx","easy");
+let sslCert = new X509Certificate("suave.pfx","easy");
 let cfg =
-  { default_config with
+  { defaultConfig with
       bindings =
         [ HttpBinding.mk HTTP IPAddress.Loopback 80us
-          HttpBinding.mk (HTTPS (open_ssl ssl_cert)) (IPAddress.Parse "0.0.0.0") 443us
+          HttpBinding.mk (HTTPS (openSsl sslCert)) (IPAddress.Parse "0.0.0.0") 443us
         ]
       timeout = TimeSpan.FromMilliseconds 3000. }
 choose
   [ url "/hello" >>= OK "Hello World"
     NOT_FOUND "Found no handlers" ]
-|> web_server cfg
+|> startWebServer cfg
 {% endhighlight %}
 
 The OpenSSL implementation comes with conditional bindings in
@@ -358,19 +354,19 @@ HttpContext
 type ErrorHandler = Exception -> String -> HttpContext -> HttpContext
 
 and HttpRuntime =
-  { protocol           : Protocol
-    error_handler      : ErrorHandler
-    mime_types_map     : MimeTypesMap
-    home_directory     : string
-    compression_folder : string
-    logger             : Log.Logger
-    session_provider   : ISessionProvider }
+  { protocol          : Protocol
+    errorHandler      : ErrorHandler
+    mimeTypesMap      : MimeTypesMap
+    homeDirectory     : string
+    compressionFolder : string
+    logger            : Log.Logger
+    sessionProvider   : ISessionProvider }
 
 and HttpContext =
-  { request    : HttpRequest
-    runtime    : HttpRuntime
-    user_state : Map<string, obj>
-    response   : HttpResult }
+  { request   : HttpRequest
+    runtime   : HttpRuntime
+    userState : Map<string, obj>
+    response  : HttpResult }
 
 and ISessionProvider =
   abstract member Generate : TimeSpan * HttpContext -> string
@@ -400,50 +396,50 @@ let OPTIONS (x : HttpRequest) = ``method`` "OPTIONS" x
 Server configuration
 --------------------
 
-The first argument to `web_server` is a configuration record with the following signature.
+The first argument to `startWebServer` is a configuration record with the following signature.
 
 {% highlight fsharp %}
-/// The core configuration of suave. See also Suave.Web.default_config which
+/// The core configuration of suave. See also Suave.Web.defaultConfig which
 /// you can use to bootstrap the configuration:
-/// <code>{ default_config with bindings = [ ... ] }</code>
+/// <code>{ defaultConfig with bindings = [ ... ] }</code>
 type SuaveConfig =
   { /// The bindings for the web server to launch with
-    bindings         : HttpBinding list
+    bindings          : HttpBinding list
 
     /// The server key used for creating cookies
-    server_key       : byte [] // should be 64 bytes (256 bits)
+    serverKey         : byte [] // should be 64 bytes (256 bits)
 
     /// An error handler to use for handling exceptions that are
     /// are thrown from the web parts
-    error_handler    : ErrorHandler
+    errorHandler      : ErrorHandler
 
     /// Timeout to wait for the socket bind to finish
-    listen_timeout   : TimeSpan
+    listenTimeout     : TimeSpan
 
     /// A cancellation token for the web server. Signalling this token
     /// means that the web server shuts down
-    ct               : CancellationToken
+    cancellationToken : CancellationToken
 
     /// buffer size for socket operations
-    buffer_size      : int
+    bufferSize        : int
 
     /// max number of concurrent socket operations
-    max_ops          : int
+    maxOps            : int
 
     /// MIME types
-    mime_types_map   : MimeTypesMap
+    mimeTypesMap      : MimeTypesMap
 
     /// Home or root directory
-    home_folder      : string option
+    homeFolder        : string option
 
     /// Folder for temporary compressed files
-    compressed_files_folder : string option
+    compressedFilesFolder : string option
 
     /// A logger to log with
     logger           : Log.Logger
 
     /// A http session provider
-    session_provider : ISessionProvider }
+    sessionProvider  : ISessionProvider }
 {% endhighlight %}
 
 With `Protocol` , `HttpBinding` and `MimeType` defined like follows:
@@ -484,19 +480,19 @@ compression is configured via the MIME types map in the server configuration
 record. By default Suave does not serve files with extensions not registered in
 the mime types map.
 
-The default mime types map `default_mime_types_map` looks like this.
+The default mime types map `defaultMimeTypesMap` looks like this.
 
 {% highlight fsharp %}
-let default_mime_types_map = function
-  | ".css" -> mk_mime_type "text/css" true
-  | ".gif" -> mk_mime_type "image/gif" false
-  | ".png" -> mk_mime_type "image/png" false
+let defaultMimeTypesMap = function
+  | ".css" -> mkMimeType "text/css" true
+  | ".gif" -> mkMimeType "image/gif" false
+  | ".png" -> mkMimeType "image/png" false
   | ".htm"
-  | ".html" -> mk_mime_type "text/html" true
+  | ".html" -> mkMimeType "text/html" true
   | ".jpe"
   | ".jpeg"
-  | ".jpg" -> mk_mime_type "image/jpeg" false
-  | ".js"  -> mk_mime_type "application/x-javascript" true
+  | ".jpg" -> mkMimeType "image/jpeg" false
+  | ".js"  -> mkMimeType "application/x-javascript" true
   | _      -> None
 {% endhighlight %}
 
@@ -505,10 +501,10 @@ You can register additional MIME extensions by creating a new mime map in the fo
 {% highlight fsharp %}
 // Adds a new mime type to the default map
 let mime_types =
-  default_mime_types_map
-    >=> (function | ".avi" -> mk_mime_type "video/avi" false | _ -> None)
+  defaultMimeTypesMap
+    >=> (function | ".avi" -> mkMimeType "video/avi" false | _ -> None)
 
-let web_config = { default_config with mime_types_map = mime_types }
+let webConfig = { defaultConfig with mimeTypesMap = mime_types }
 {% endhighlight %}
 
 ## Overview
@@ -554,12 +550,12 @@ set the propery `logger` in the configuration to an instance of your thread-safe
 logger. An example:
 
 {% highlight fsharp %}
-type MyHackLogger(min_level) =
+type MyHackLogger(minLevel) =
   interface Logger with
-    member x.Log level f_line =
-      if level >= min_level then
+    member x.Log level fLine =
+      if level >= minLevel then
         // don't do this for real ;)
-        System.Windows.Forms.MessageBox.Show((f_line ()).message)
+        System.Windows.Forms.MessageBox.Show((fLine ()).message)
 {% endhighlight %}
 
 You can use Logary for integrated logging:
@@ -587,8 +583,8 @@ Use the `SuaveAdapter` type to set the Logger in Suave's configuration:
       ]
     )
 
-  let web_config =
-    { default_config with
+  let webConfig =
+    { defaultConfig with
         logger   = SuaveAdapter(logary.GetLogger "suave")
     }
 {% endhighlight %}
