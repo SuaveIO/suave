@@ -31,7 +31,7 @@ with the string `"Hello World!"`
 open Suave // always open suave
 open Suave.Http.Successful // for OK-result
 open Suave.Web // for config
-web_server default_config (OK "Hello World!")
+startWebServer defaultConfig (OK "Hello World!")
 ```
 
 Now that you've discovered how to do "Hello World!", go read the
