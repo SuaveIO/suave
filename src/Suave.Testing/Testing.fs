@@ -9,13 +9,13 @@ Example:
 
   open Fuchu
 
-  let run_with' = run_with default_config
+  let runWithConfig = runWith defaultConfig
   
   testCase "parsing a large multipart form" <| fun _ ->
 
     let res =
-      run_with' test_multipart_form
-      |> req HttpMethod.POST "/" (Some <| byte_array_content)
+      runWithConfig testMultipartForm
+      |> req HttpMethod.POST "/" (Some byteArrayContent)
 
     Assert.Equal("", "Bob <bob@wishfulcoding.mailgun.org>", )
 
@@ -37,26 +37,26 @@ open Suave.Web
 
 [<AutoOpen>]
 module ResponseData =
-  let response_headers (response : HttpResponseMessage) =
+  let responseHeaders (response : HttpResponseMessage) =
     response.Headers
 
-  let content_headers (response : HttpResponseMessage) =
+  let contentHeaders (response : HttpResponseMessage) =
     response.Content.Headers
 
-  let status_code (response : HttpResponseMessage) =
+  let statusCode (response : HttpResponseMessage) =
     response.StatusCode
 
-  let content_string (response : HttpResponseMessage) =
+  let contentString (response : HttpResponseMessage) =
     response.Content.ReadAsStringAsync().Result
 
-  let content_byte_array (response : HttpResponseMessage) =
+  let contentByteArray (response : HttpResponseMessage) =
     response.Content.ReadAsByteArrayAsync().Result
 
 module Utilities =
     
   /// Utility function for mapping from Suave.Types.HttpMethod to
   /// System.Net.Http.HttpMethod.
-  let to_http_method = function
+  let toHttpMethod = function
     | HttpMethod.GET -> HttpMethod.Get
     | HttpMethod.POST -> HttpMethod.Post
     | HttpMethod.DELETE -> HttpMethod.Delete
@@ -80,11 +80,11 @@ open Utilities
 /// (like the listening socket etc).
 type SuaveTestCtx =
   { cts          : CancellationTokenSource
-    suave_config : SuaveConfig }
+    suaveConfig : SuaveConfig }
 
 /// Cancels the cancellation token source and disposes the server's
 /// resources.
-let dispose_context (ctx : SuaveTestCtx) =
+let disposeContext (ctx : SuaveTestCtx) =
   ctx.cts.Cancel()
   ctx.cts.Dispose()
 
@@ -97,52 +97,52 @@ let dispose_context (ctx : SuaveTestCtx) =
 /// async value of the running server. The listening async value will
 /// be awaited inside this function but the server async value will
 /// be run on the thread pool.
-let run_with_factory factory config web_parts : SuaveTestCtx =
+let runWithFactory factory config webParts : SuaveTestCtx =
   let binding = config.bindings.Head
-  let base_uri = binding.ToString()
+  let baseUri = binding.ToString()
   let cts = new CancellationTokenSource()
-  let config' = { config with ct = cts.Token; buffer_size = 128; max_ops = 10 }
+  let config2 = { config with cancellationToken = cts.Token; bufferSize = 128; maxOps = 10 }
 
-  let listening, server = factory config web_parts
+  let listening, server = factory config webParts
   Async.Start(server, cts.Token)
   listening |> Async.RunSynchronously |> ignore // wait for the server to start listening
 
   { cts = cts
-    suave_config = config' }
+    suaveConfig = config2 }
 
 /// Similar to run_with_factory, but uses the default suave factory.
-let run_with = run_with_factory web_server_async
+let runWith config webParts = runWithFactory startWebServerAsync config webParts
 
 /// Ensures the context is disposed after 'f ctx' is called.
-let with_context f ctx =
+let withContext f ctx =
   try
     f ctx
-  finally dispose_context ctx
+  finally disposeContext ctx
 
 /// Create a new HttpRequestMessage towards the endpoint
-let mk_request methd resource query data (endpoint : Uri) =
-  let uri_builder   = UriBuilder endpoint
-  uri_builder.Path  <- resource
-  uri_builder.Query <- query
+let mkRequest methd resource query data (endpoint : Uri) =
+  let uriBuilder   = UriBuilder endpoint
+  uriBuilder.Path  <- resource
+  uriBuilder.Query <- query
 
-  let request = new HttpRequestMessage(to_http_method methd, uri_builder.Uri)
+  let request = new HttpRequestMessage(toHttpMethod methd, uriBuilder.Uri)
   request.Headers.ConnectionClose <- Nullable(true)
   data |> Option.iter (fun data -> request.Content <- data)
   request
 
 /// Create a new disposable HttpClientHandler
-let mk_handler decomp_method cookies =
+let mkHandler decomp_method cookies =
   let handler = new Net.Http.HttpClientHandler(AllowAutoRedirect = false)
   handler.AutomaticDecompression <- decomp_method
   cookies |> Option.iter (fun cookies -> handler.CookieContainer <- cookies)
   handler
 
-let mk_client handler =
+let mkClient handler =
   new HttpClient(handler)
 
 /// Send the request with the client - returning the result of the request
 let send (client : HttpClient) (timeout : TimeSpan) (ctx : SuaveTestCtx) (request : HttpRequestMessage) =
-  Log.intern ctx.suave_config.logger "Suave.Tests"
+  Log.intern ctx.suaveConfig.logger "Suave.Tests"
              (sprintf "%s %O"  request.Method.Method request.RequestUri)
   let send = client.SendAsync(request, HttpCompletionOption.ResponseContentRead, ctx.cts.Token)
 
@@ -152,8 +152,8 @@ let send (client : HttpClient) (timeout : TimeSpan) (ctx : SuaveTestCtx) (reques
 
   send.Result
 
-let endpoint_uri (suave_config : SuaveConfig) =
-  Uri(suave_config.bindings.Head.ToString())
+let endpointUri (suaveConfig : SuaveConfig) =
+  Uri(suaveConfig.bindings.Head.ToString())
 
 /// This is the main function for the testing library; it lets you assert
 /// on the request/response values while ensuring deterministic
@@ -170,67 +170,108 @@ let endpoint_uri (suave_config : SuaveConfig) =
 ///    attached, otherwise asserts a failure of the timeout
 ///  - calls `f_result` with the HttpResponseMessage
 ///
-let req_resp
+let reqResp
   (methd : HttpMethod)
   (resource : string)
   (query : string)
   data
   (cookies : CookieContainer option)
-  (decomp_method : DecompressionMethods)
+  (decompMethod : DecompressionMethods)
   (f_request : HttpRequestMessage -> HttpRequestMessage)
   f_result =
 
-  let default_timeout = TimeSpan.FromSeconds 5.
+  let defaultTimeout = TimeSpan.FromSeconds 5.
 
-  with_context <| fun ctx ->
-    use handler = mk_handler decomp_method cookies
-    use client = mk_client handler
-    use request = mk_request methd resource query data (endpoint_uri ctx.suave_config) |> f_request
-    use result = request |> send client default_timeout ctx
+  withContext <| fun ctx ->
+    use handler = mkHandler decompMethod cookies
+    use client = mkClient handler
+    use request = mkRequest methd resource query data (endpointUri ctx.suaveConfig) |> f_request
+    use result = request |> send client defaultTimeout ctx
     f_result result
 
 let req methd resource data =
-  req_resp methd resource "" data None DecompressionMethods.None id content_string
+  reqResp methd resource "" data None DecompressionMethods.None id contentString
 
-let req_query methd resource query =
-  req_resp methd resource query None None DecompressionMethods.None id content_string
+let reqQuery methd resource query =
+  reqResp methd resource query None None DecompressionMethods.None id contentString
 
-let req_bytes methd resource data =
-  req_resp methd resource "" data None DecompressionMethods.None id content_byte_array
+let reqBytes methd resource data =
+  reqResp methd resource "" data None DecompressionMethods.None id contentByteArray
 
-let req_gzip methd resource data =
-  req_resp methd resource "" data None DecompressionMethods.GZip id content_string
+let reqGZip methd resource data =
+  reqResp methd resource "" data None DecompressionMethods.GZip id contentString
 
-let req_deflate methd resource data =
-  req_resp methd resource "" data None DecompressionMethods.Deflate id content_string
+let reqDeflate methd resource data =
+  reqResp methd resource "" data None DecompressionMethods.Deflate id contentString
 
-let req_gzip_bytes methd resource data =
-  req_resp methd resource "" data None DecompressionMethods.GZip id content_byte_array
+let reqGZipBytes methd resource data =
+  reqResp methd resource "" data None DecompressionMethods.GZip id contentByteArray
 
-let req_deflate_bytes methd resource data =
-  req_resp methd resource "" data None DecompressionMethods.Deflate id content_byte_array
+let reqDeflateBytes methd resource data =
+  reqResp methd resource "" data None DecompressionMethods.Deflate id contentByteArray
 
-let req_headers methd resource data =
-  req_resp methd resource "" data None DecompressionMethods.None id response_headers
+let reqHeaders methd resource data =
+  reqResp methd resource "" data None DecompressionMethods.None id responseHeaders
 
-let req_content_headers methd resource data =
-  req_resp methd resource "" data None DecompressionMethods.None id content_headers
+let reqContentHeaders methd resource data =
+  reqResp methd resource "" data None DecompressionMethods.None id contentHeaders
 
 /// Test a request by looking at the cookies alone.
-let req_cookies methd resource data ctx =
+let reqCookies methd resource data ctx =
   let cookies = new CookieContainer()
-  req_resp
+  reqResp
     methd resource "" data
     (Some cookies)
     DecompressionMethods.None
     id
-    content_string
+    contentString
     ctx
   |> ignore // places stuff in the cookie container
   cookies
 
 /// Returns the cookie collection for the default binding.
-let req_cookies' methd resource data ctx =
-  req_cookies methd resource data ctx
+let reqCookies' methd resource data ctx =
+  reqCookies methd resource data ctx
   |> fun cookies ->
-    cookies.GetCookies(endpoint_uri ctx.suave_config)
+    cookies.GetCookies(endpointUri ctx.suaveConfig)
+
+
+
+[<Obsolete("Renamed to runWithFactory")>]
+let run_with_factory factory config webParts = runWithFactory factory config webParts
+
+[<Obsolete("Renamed to runWith")>]
+let run_with config webParts = runWith config webParts
+[<Obsolete("Renamed to withContext")>]
+let with_context f ctx = withContext f ctx
+[<Obsolete("Renamed to mkRequest")>]
+let mk_request methd resource query data endpoint = mkRequest methd resource query data endpoint
+[<Obsolete("Renamed to mkHandler")>]
+let mk_handler decomp_method cookies = mkHandler decomp_method cookies 
+[<Obsolete("Renamed to mkClient")>]
+let mk_client handler = mkClient handler 
+[<Obsolete("Renamed to endpointUri")>]
+let endpoint_uri suave_config = endpointUri suave_config
+[<Obsolete("Renamed to reqResp")>]
+let req_resp methd resource query data cookies decomp_method f_request f_result = reqResp methd resource query data cookies decomp_method f_request f_result 
+[<Obsolete("Renamed to reqQuery")>]
+let req_query methd resource query = reqQuery methd resource query
+[<Obsolete("Renamed to reqBytes")>]
+let req_bytes methd resource data = reqBytes methd resource data 
+[<Obsolete("Renamed to reqGZip")>]
+let req_gzip methd resource data = reqGZip methd resource data
+[<Obsolete("Renamed to reqDeflate")>]
+let req_deflate methd resource data = reqDeflate methd resource data 
+[<Obsolete("Renamed to reqGZipBytes")>]
+let req_gzip_bytes methd resource data = reqGZipBytes methd resource data
+[<Obsolete("Renamed to reqDeflateBytes")>]
+let req_deflate_bytes methd resource data = reqDeflateBytes methd resource data
+[<Obsolete("Renamed to reqHeaders")>]
+let req_headers methd resource data = reqHeaders methd resource data 
+[<Obsolete("Renamed to reqContentHeaders")>]
+let req_content_headers methd resource data = reqContentHeaders methd resource data
+[<Obsolete("Renamed to reqCookies")>]
+let req_cookies methd resource data ctx = reqCookies methd resource data ctx
+[<Obsolete("Renamed to reqCookies'")>]
+let req_cookies' methd resource data ctx = reqCookies' methd resource data ctx
+

@@ -7,7 +7,7 @@ type Attribute = string * string
 /// Representation of the things that go into an HTML element
 type Element =
   /// The element itself; a name, a xml namespace and an array of attribute-value pairs.
-  | Element of string * string * (Attribute array)
+  | Element of string * string * Attribute[]
   /// A text element inside the HTML element
   | Text of string
   /// Whitespace for formatting
@@ -18,81 +18,79 @@ type Xml = Xml of Node list
 /// Each node has/is an element and then some other XML
 and Node = Element * Xml
 
-let tag tag attr (contents : Xml) = Xml [ (Element (tag,"", attr), contents) ]
+let tag tag attr (contents : Xml) = Xml [ (Element (tag,"", Array.ofList attr), contents) ]
 
 let empty = Xml[]
 
 let text s = Xml([Text s, Xml[]])
 
-let empty_text = text ""
+let emptyText = text ""
 
 /// HTML elements.
 /// If you need to pass attributes use the version sufixed by ` (funny quote symbol)
 
-let html' = tag "html"
-let html  = html' Array.empty<Attribute>
-
-let head' = tag "head"
-let head  = head' Array.empty<Attribute>
-
-let title' attr s = tag "title" attr (Xml([Text s,Xml []]))
-let title  = title' Array.empty<Attribute>
-
-let link' attr = tag "link" attr empty
-let link  = link' Array.empty<Attribute>
-
-let script' = tag "script"
-let script  = script' Array.empty<Attribute>
-
-let body' = tag "body"
-let body  = body' Array.empty<Attribute>
-
-let div' = tag "div"
-let div  = div' Array.empty<Attribute>
-
-let p' = tag "p"
-let p  = p' Array.empty<Attribute>
-
-let span' = tag "span"
-let span  = span' Array.empty<Attribute>
-
-let img' attr = tag "img" attr empty
-let img  = img' Array.empty<Attribute>
-
-let br' attr = tag "br" attr empty
-let br = br' Array.empty<Attribute>
-
-let input' attr = tag "input" attr empty
-let input = input' Array.empty<Attribute>
-
 /// Flattens an XML list
-let flatten = List.map (fun (Xml y) -> y) >> List.concat >> Xml
+let flatten xs = xs |> List.map (fun (Xml y) -> y) |> List.concat |> Xml
 
-/// `flatten` operator
-let (<%) f xxs = f (flatten xxs)
+
+let htmlAttr attr s = tag "html" attr s
+let html xs = htmlAttr [ ] (flatten xs)
+
+let headAttr attr s = tag "head" attr s
+let head xs = headAttr [ ] (flatten xs)
+
+let titleAttr attr s = tag "title" attr (Xml([Text s,Xml []]))
+let title  = titleAttr [ ]
+
+let linkAttr attr = tag "link" attr empty
+let link  = linkAttr [ ]
+
+let scriptAttr attr x = tag "script" attr (flatten x)
+let script  = scriptAttr [ ]
+
+let bodyAttr attr x = tag "body" attr (flatten x)
+let body  = bodyAttr [ ]
+
+let divAttr attr x = tag "div" attr (flatten x)
+let div  = divAttr [ ]
+
+let pAttr attr x = tag "p" attr (flatten x)
+let p  = pAttr [ ]
+
+let spanAttr attr x = tag "span" attr x
+let span  = spanAttr [ ]
+
+let imgAttr attr = tag "img" attr empty
+let img  = imgAttr [ ]
+
+let brAttr attr = tag "br" attr empty
+let br = brAttr [ ]
+
+let inputAttr attr = tag "input" attr empty
+let input = inputAttr [ ]
 
 /// Example
 
-let sample_page = 
-  html <% [ 
-    head <% [
+let samplePage = 
+  html [ 
+    head [
       title "Little HTML DSL"
-      link' [| "rel", "https://instabt.com/instaBT.ico" |]
-      script' [| "type", "text/javascript"; "src", "js/jquery-2.1.0.min.js" |] empty_text
-      script' [| "type", "text/javascript" |]
-       <| text "$().ready(function () { setup(); });"
+      linkAttr [ "rel", "https://instabt.com/instaBT.ico" ]
+      scriptAttr [ "type", "text/javascript"; "src", "js/jquery-2.1.0.min.js" ] []
+      scriptAttr [ "type", "text/javascript" ] [ text "$().ready(function () { setup(); });" ]
     ] 
-    body (
-      div' [|"id","content"|] <% [ 
-        p <| text "Hello world."
+    body [
+      divAttr ["id","content"] [ 
+        p [ text "Hello world." ]
         br
-        img' [| "src", "http://fsharp.org/img/logo/fsharp256.png"|]
-      ])
+        imgAttr [ "src", "http://fsharp.org/img/logo/fsharp256.png"]
+      ]
     ]
+ ]
 
 /// Rendering
 
-let leaf_element_to_string = function
+let internal leafElementToString = function
  | Text text -> text
  | WhiteSpace text -> text
  | Element (e,id, attributes) ->
@@ -104,7 +102,7 @@ let leaf_element_to_string = function
        |> String.Concat
      sprintf "<%s %s/>" e ats
 
-let begin_element_to_string = function
+let internal beginElementToString = function
  | Text text -> failwith "invalid option"
  | WhiteSpace text -> failwith "invalid option"
  | Element (e,id, attributes) ->
@@ -116,20 +114,21 @@ let begin_element_to_string = function
        |> String.Concat
      sprintf "<%s %s>" e ats
 
-let end_element_to_string = function
+let internal endElementToString = function
  | Text text -> failwith "invalid option"
  | WhiteSpace text -> failwith "invalid option"
  | Element (e,_, _) ->
    sprintf "</%s>" e
 
-let rec node_to_string (element : Element, xml) =
+let rec internal nodeToString (element : Element, xml) =
   match xml with
-  | Xml [] -> leaf_element_to_string element
+  | Xml [] -> leafElementToString element
   | _  ->
-    let inner = xml_to_string xml
-    (begin_element_to_string element) + inner + (end_element_to_string element)
-and xml_to_string (Xml xml) =
-  String.Concat (List.map node_to_string xml)
+    let inner = xmlToString xml
+    (beginElementToString element) + inner + (endElementToString element)
+
+and xmlToString (Xml xml) =
+  String.Concat (List.map nodeToString xml)
 
 ///
 /// let html = sample_page |> xml_to_string

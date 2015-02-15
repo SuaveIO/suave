@@ -9,45 +9,38 @@ open Suave.Utils.RandomExtensions
 /// of possible values, so you can be fairly certain a given request
 /// id is unique, given a good random number generator.
 type TraceHeader =
-  { /// if this is the 'first' traced request, then trace_id equals
+  { /// If this is the 'first' traced request, then trace_id equals
     /// req_id. If it's the second, then trace_id = req_parent_id
     /// or otherwise third or later then trace_id, req_id and req_parent_id
     /// are all disjunct
-    trace_id      : uint64
-    /// the request id assigned when suave received the http request
+    traceId      : uint64
+
+    /// The request id assigned when suave received the http request
     /// In ZipKin/Dapper-speak, this is the span id
-    req_id        : uint64
+    reqId        : uint64
+
     /// possibly a parent
     /// In ZipKin/Dapper-speak, this is the span parent id
-    req_parent_id : uint64 option }
+    reqParentId : uint64 option }
 
-[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
-module TraceHeader =
+  static member traceId_     = Property (fun x -> x.traceId) (fun v x -> { x with traceId = v })
+  static member reqId_       = Property (fun x -> x.reqId) (fun v x -> { x with reqId = v })
+  static member reqParentId_ = Property (fun x -> x.reqParentId) (fun v x -> { x with reqParentId = v })
+
   /// The empty trace header has zeroes for trace and request id.
-  let empty =
-    { trace_id      = 0UL
-      req_id        = 0UL
-      req_parent_id = None }
+  static member empty =
+    { traceId      = 0UL
+      reqId        = 0UL
+      reqParentId = None }
 
   /// Create a new `TraceHeader` with the given `trace_id` and `span_parent_id`.
   /// This generates a new id and places it in `trace_id` AND `req_id` if no
   /// `trace_id` parameter is supplied. Unless `span_parent_id` is given, that
   /// field is defaulted to None, as suave cannot know the "origin span", so to
   /// speak.
-  let mk trace_id span_parent_id =
-    let new_id = Globals.random.NextUInt64()
-    { trace_id      = trace_id |> Option.or_default new_id
-      req_id        = new_id
-      req_parent_id = span_parent_id }
 
-  let trace_id_ =
-    (fun x -> x.trace_id),
-    fun v x -> { x with trace_id = v }
-
-  let req_id_ =
-    (fun x -> x.req_id),
-    fun v x -> { x with req_id = v }
-
-  let req_parent_id_ =
-    (fun x -> x.req_parent_id),
-    fun v x -> { x with req_parent_id = v }
+  static member mk traceId spanParentId =
+    let newId = Globals.random.NextUInt64()
+    { traceId      = defaultArg traceId newId
+      reqId        = newId
+      reqParentId = spanParentId }

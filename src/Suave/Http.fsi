@@ -4,9 +4,6 @@
 /// The HTTP module has these main sub-modules:
 /// </para>
 /// <list>
-///   <item>Codes - simply hosts the HttpCode type.</item>
-///   <item>Internals - constants and version of suave library.</item>
-///   <item>Compression - Functions for compressing responses.</item>
 ///   <item>Response - response and response_f functions.</item>
 ///   <item>Writers - ways to modify the response.</item>
 ///   <item>Intermediate - 100 and 101 response codes.</item>
@@ -31,7 +28,7 @@ module Http =
   open Suave.Types
 
   /// Return success with some value
-  val inline succeed : item:'a -> Async<'a option>
+  val inline succeed : item:'T -> Async<'T option>
 
   /// Return failure without any value
   val fail : Async<HttpContext option> 
@@ -42,14 +39,14 @@ module Http =
   /// Compose (bind) two arguments, 'first' and 'second', so that the result of
   /// the composition can be applied to an argument of 'input' and then passed
   /// to 'second', if 'first' yields a value.
-  val inline (>>=) : first:('a -> Async<'b option>) -> second:('b -> Async<'c option>) -> input:'a -> Async<'c option>
+  val inline (>>=) : first:('T -> Async<'U option>) -> second:('U -> Async<'V option>) -> input:'T -> Async<'V option>
 
   /// Compose (bind) two web parts; see (>>=) -- note the different parameter
   /// ordering
-  val inline bind : second:('b -> Async<'c option>) -> first:('a -> Async<'b option>) -> input:'a -> Async<'c option>
+  val inline bind : second:('U -> Async<'V option>) -> first:('T -> Async<'U option>) -> input:'T -> Async<'V option>
 
   /// Left-to-right Kleisli composition of monads.
-  val inline (>=>) : first:('a -> 'b option) -> second:('a -> 'b option) -> input:'a -> 'b option
+  val inline (>=>) : first:('T -> 'U option) -> second:('T -> 'U option) -> input:'T -> 'U option
 
   /// Left-to-right Kleisli composition of web parts.
   val inline (<|>) : first:WebPart -> second:WebPart -> WebPart
@@ -61,27 +58,28 @@ module Http =
   val choose : options : WebPart list -> WebPart
 
   /// Pipe the request through to a bird that can peck at it.
+  ///
   /// Put another way, using 'warbler' lets you look at the first parameter and
   /// then make a decision about what thing to return (it's most likely a
   /// WebPart you'll be returning). (Remember, WebPart is
   /// HttpContext -> Async<HttpContext option>) where HttpContext is 'a and
   /// Async<_> is 'b.
-  val inline warbler : f:('a -> 'a -> 'b) -> 'a -> 'b
+  val inline warbler : f:('T -> 'T -> 'U) -> 'T -> 'U
 
   /// The constant function, which returns its constant, no matter
   /// its input.
   /// - theorem: identity = (cnst |> warbler)
   /// (warbler cnst) x = cnst x x = fun _ -> x
-  val inline cnst : x:'a -> 'b -> 'a
+  val inline cnst : x:'T -> 'U -> 'T
 
   /// The conditional function that applies f x a if there's a value in d,
   /// or otherwise, applies g a, if there is no value in d.
-  val cond : item:'a option -> f:('a -> 'b -> 'c) -> g:('b -> 'c) -> 'b -> 'c
+  val cond : item:'T option -> f:('T -> 'U -> 'V) -> g:('U -> 'V) -> 'U -> 'V
 
   /// general response functions
   module Response =
 
-    open Types.Codes
+    open Suave.Types
 
     /// Respond with a given status code, http message, content in the body to a http request.
     // val response_f : status_code:HttpCode -> ( Connection -> SocketOp<unit>) -> request:HttpContext -> (Connection -> SocketOp<unit>)
@@ -94,19 +92,19 @@ module Http =
   module Writers =
 
     /// Sets a header with the key and value specified
-    val set_header : key:string -> value:string -> WebPart
+    val setHeader : key:string -> value:string -> WebPart
 
     /// Sets a user data key-value pair with the key and value specified. Downstream
     /// web parts can read this.
-    val set_user_data : key:string -> value:'a -> WebPart
+    val setUserData : key:string -> value:'T -> WebPart
 
     /// Unset the user data by the given key
-    val unset_user_data : key : string -> WebPart
+    val unsetUserData : key : string -> WebPart
 
     /// <summary>
     /// Creates a MIME type record
     /// </summary>
-    val mk_mime_type : name:string -> compression:bool -> MimeType option
+    val mkMimeType : name:string -> compression:bool -> MimeType option
 
     /// <summary><para>
     /// Map a file ending to a mime-type
@@ -115,7 +113,7 @@ module Http =
     /// </para></summary>
     /// <remarks>
     /// </remarks>
-    val default_mime_types_map : ext:string -> MimeType option
+    val defaultMimeTypesMap : ext:string -> MimeType option
 
     /// <summary><para>
     /// Set the Content-Type header to the mime type given
@@ -124,7 +122,7 @@ module Http =
     /// </para></summary>
     /// <remarks>
     /// </remarks>
-    val set_mime_type : mime_type:string -> WebPart
+    val setMimeType : mime_type:string -> WebPart
 
 
   // http://www.web-cache.com/Writings/http-status-codes.html
@@ -1062,7 +1060,7 @@ module Http =
   /// Functions have signature f :: params... -> HttpContext -> HttpContext option.
   module Applicatives =
 
-    open Types
+    open Suave.Types
     open Suave.Logging
 
     /// Match on the url
@@ -1072,10 +1070,10 @@ module Http =
     val ``method`` : ``method``:HttpMethod -> WebPart
 
     /// Match on the protocol
-    val is_secure : WebPart
+    val isSecure : WebPart
 
     /// Applies the regex to the url and matches on the result
-    val url_regex : s:string -> WebPart
+    val urlRegex : s:string -> WebPart
 
     /// Match on the hostname (which is a required header for a Http client to send)
     /// -> allows you to have multiple sites with a single application.
@@ -1085,7 +1083,7 @@ module Http =
     /// <summary><para>
     /// Formats the HttpRequest as in the default manner
     /// </para></summary>
-    val log_format : ctx:HttpContext -> string
+    val logFormat : ctx:HttpContext -> string
 
     /// <summary><para>
     /// Log the HttpRequest to the given logger.
@@ -1113,10 +1111,10 @@ module Http =
     /// 'M', parse_decimal</para><para>
     /// 'c', char
     /// </para></summary>
-    val url_scan : pf:PrintfFormat<'a,'b,'c,'d,'t> -> h:('t -> WebPart) -> WebPart
+    val urlScan : pf:PrintfFormat<'a,'b,'c,'d,'t> -> h:('t -> WebPart) -> WebPart
 
     /// <summary> Fails the WebPart after x seconds</summary>
-    val timeout_webpart : x:System.TimeSpan -> WebPart -> WebPart
+    val timeoutWebPart : x:System.TimeSpan -> WebPart -> WebPart
 
     /// <summary>
     /// Match on GET requests.
@@ -1340,13 +1338,13 @@ module Http =
     /// </para></summary>
     /// <remarks>
     /// </remarks>
-    val send_file : file_name:string -> compression:bool -> WebPart
+    val sendFile : fileName:string -> compression:bool -> WebPart
 
     /// <summary><para>
     /// Send the embedded file by the filename given. Will search relative to the current assembly.
     /// Will also set the MIME type based on the file extension.
     /// </para></summary>
-    val file : file_name:string -> WebPart
+    val file : fileName:string -> WebPart
 
     /// <summary><para>
     /// Format a string with a local file path given a file name 'fileName'. You should
@@ -1356,26 +1354,22 @@ module Http =
     /// <remarks>
     /// The current implementation doesn't take kindly to relative paths.
     /// </remarks>
-    val resolve_path : root_path:string -> file_name:string -> string
+    val resolvePath : rootPath:string -> fileName:string -> string
 
-    /// Deprecated: use `resolve_path` and swap the arguments' positions. It
-    /// has been deprecated so that you can curry the root_path in your function
-    /// scope, with the root path.
-    val local_file : file_name:string -> root_path:string -> string
 
     /// <summary><para>
     /// 'browse' the file given as the filename, by sending it to the browser with a
     /// MIME-type/Content-Type header based on its extension. Will service from the
-    /// root_path.
+    /// rootPath.
     /// </para></summary>
-    val browse_file : root_path:string -> file_name:string -> WebPart
+    val browseFile : rootPath:string -> fileName:string -> WebPart
 
     /// <summary><para>
     /// 'browse' the file given as the filename, by sending it to the browser with a
     /// MIME-type/Content-Type header based on its extension. Will service from the
     /// current directory.
     /// </para></summary>
-    val browse_file' : file_name:string -> WebPart
+    val browseFileHome : fileName:string -> WebPart
 
     /// <summary><para>
     /// 'browse' the file in the sense that the contents of the file are sent based on the
@@ -1384,27 +1378,42 @@ module Http =
     /// <remarks>
     /// The current implementation doesn't take kindly to relative paths.
     /// </remarks>
-    val browse : root_path:string -> WebPart
+    val browse : rootPath:string -> WebPart
 
     /// <summary><para>
     /// 'browse' the file in the sense that the contents of the file are sent based on the
     /// request's Url property. Will serve from the current as configured in directory.
     /// Suave's runtime.
     /// </para></summary>
-    val browse' : WebPart
+    val browseHome : WebPart
 
     /// <summary><para>
-    /// Serve a 'file browser' for a root_path
+    /// Serve a 'file browser' for a rootPath
     /// </para></summary>
     /// <remarks>
     /// The current implementation doesn't take kindly to relative paths.
     /// </remarks>
-    val dir : root_path:string -> WebPart
+    val dir : rootPath:string -> WebPart
 
     /// <summary><para>
     /// Serve a 'file browser' for the current directory
     /// </para></summary>
+    val dirHome : WebPart
+
+    [<System.Obsolete("Use dirHome")>]
     val dir' : WebPart
+    [<System.Obsolete("Use browseHome")>]
+    val browse' : WebPart
+    [<System.Obsolete("Use browseFileHome")>]
+    val browse_file' : fileName:string -> WebPart
+    [<System.Obsolete("Use browseFile")>]
+    val browse_file : rootPath:string -> fileName:string -> WebPart
+    [<System.Obsolete("Use resolvePath")>]
+    val local_file : fileName:string -> rootPath:string -> string
+    [<System.Obsolete("Use resolvePath")>]
+    val resolve_path : rootPath:string -> fileName:string -> string
+    [<System.Obsolete("Use sendFile")>]
+    val send_file : fileName:string -> compression:bool -> WebPart
 
   module Embedded =
 
@@ -1416,7 +1425,7 @@ module Http =
     /// </para></summary>
     /// <remarks>
     /// </remarks>
-    val send_resource : source:Assembly -> resource_name:string -> compression:bool -> WebPart
+    val sendResource : source:Assembly -> resource_name:string -> compression:bool -> WebPart
 
     /// <summary><para>
     /// Send an embedded resource as a response to the request
@@ -1425,7 +1434,7 @@ module Http =
     /// </para></summary>
     /// <remarks>
     /// </remarks>
-    val send_resource' : resource_name:string -> compression:bool -> WebPart
+    val sendResourceFromDefaultAssembly : resource_name:string -> compression:bool -> WebPart
 
     /// <summary><para>
     /// Send the resource by the name given.
@@ -1441,7 +1450,7 @@ module Http =
     /// </para></summary>
     /// <remarks>
     /// </remarks>
-    val resource' : name:string -> WebPart
+    val resourceFromDefaultAssembly : name:string -> WebPart
 
     /// <summary><para>
     /// 'browse' the file in the sense that the contents of the file are sent based on the
@@ -1457,7 +1466,16 @@ module Http =
     /// </para></summary>
     /// <remarks>
     /// </remarks>
-    val browse' : WebPart
+    val browseDefaultAsssembly : WebPart
+
+    [<System.Obsolete("Use browseDefaultAsssembly")>]
+    val internal browse' : WebPart
+    [<System.Obsolete("Use resourceFromDefaultAssembly")>]
+    val resource' : name:string -> WebPart
+    [<System.Obsolete("Use sendResource")>]
+    val send_resource : source:Assembly -> resource_name:string -> compression:bool -> WebPart
+    [<System.Obsolete("Use sendResourceFromDefaultAssembly")>]
+    val send_resource' : resource_name:string -> compression:bool -> WebPart
 
   /// A module that implements the Server-Sent Event specification, which can be
   /// read at www.w3.org/TR/eventsource.
@@ -1501,8 +1519,8 @@ module Http =
     /// A container data type for the output events
     type Message =
       { id       : string
-      ; data     : string
-      ; ``type`` : string option }
+        data     : string
+        ``type`` : string option }
 
     ///
     val mk_message : id:string -> data:string -> Message
@@ -1514,6 +1532,9 @@ module Http =
 
     /// This function composes the passed function f with the hand-shake required
     /// to start a new event-stream protocol session with the browser.
+    val handShake : f_cont:(Connection -> SocketOp<unit>) -> WebPart
+
+    [<System.Obsolete("Use handShake")>]
     val hand_shake : f_cont:(Connection -> SocketOp<unit>) -> WebPart
 
   module Authentication =
@@ -1526,7 +1547,7 @@ module Http =
     /// </para></summary>
     /// <remarks>
     /// </remarks>
-    val internal parse_authentication_token : token:string -> string * string * string
+    val internal parseAuthenticationToken : token:string -> string * string * string
 
     /// <summary><para>
     /// Perform basic authentication on the request, applying a predicate
@@ -1537,4 +1558,8 @@ module Http =
     /// </para></summary>
     /// <remarks>
     /// </remarks>
+    val authenticateBasic : f:(string * string -> bool) -> WebPart
+
+    [<System.Obsolete("Use authenticateBasic")>]
     val authenticate_basic : f:(string * string -> bool) -> WebPart
+

@@ -33,7 +33,7 @@ module SystemUnderTest =
       NOT_FOUND "bad route" ]
 
   let conf =
-    { Web.default_config with
+    { Web.defaultConfig with
         logger = Loggers.sane_defaults_for Verbose
         error_handler =
           (fun ex reason ->

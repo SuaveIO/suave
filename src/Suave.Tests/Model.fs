@@ -21,12 +21,12 @@ open Suave.Testing
 
 [<Tests>]
 let tests =
-  let run_with' = run_with default_config
+  let runWithConfig = runWith defaultConfig
 
-  let post_data3 = read_text "request-2.txt"
+  let postData3 = readText "request-2.txt"
   
-  let test_url_encoded_form field_name : WebPart =
-    Binding.bind_req (Binding.form field_name Choice1Of2) OK BAD_REQUEST
+  let testUrlEncodedForm fieldName : WebPart =
+    Binding.bindReq (Binding.form fieldName Choice1Of2) OK BAD_REQUEST
 
   testList "Suave.Model" [
     testCase "header" <| fun _ ->
@@ -47,13 +47,13 @@ let tests =
       Assert.Equal(
         "should have read data",
         "identifier 123abc",
-        run_with' (test_url_encoded_form "body-plain")
-        |> req_gzip HttpMethod.POST "/" (Some <| new StringContent(post_data3, Encoding.UTF8, "application/x-www-form-urlencoded")))
+        runWithConfig (testUrlEncodedForm "body-plain")
+        |> reqGZip HttpMethod.POST "/" (Some <| new StringContent(postData3, Encoding.UTF8, "application/x-www-form-urlencoded")))
 
     testCase "200 OK returns 'a'" <| fun _ ->
       Assert.Equal(
         "expecting nilsson response",
         "nilsson",
-        run_with' (Binding.bind_req (Binding.query "apa" Choice1Of2) OK BAD_REQUEST)
-        |> req_query HttpMethod.GET "/" "apa=nilsson")
+        runWithConfig (Binding.bindReq (Binding.query "apa" Choice1Of2) OK BAD_REQUEST)
+        |> reqQuery HttpMethod.GET "/" "apa=nilsson")
     ]

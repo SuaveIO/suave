@@ -10,14 +10,14 @@ module Parsing =
   /// Gets whether the passed ip is a local IPv4 or IPv6 address.
   /// Example: 127.0.0.1, ::1 return true. If the IP cannot be parsed,
   /// returns false.
-  let is_local_address (ip : string) =
+  let isLocalAddress (ip : string) =
     match IPAddress.TryParse ip with
     | false, _   -> false
     | true,  ip' -> IPAddress.IsLoopback ip'
 
   /// Parse the data in the string to a dictionary, assuming k/v pairs are separated
   /// by the ampersand character.
-  let parse_data (s : string) =
+  let parseData (s : string) =
     let parse_arr (d : string array) =
       if d.Length = 2 then (d.[0], Some <| System.Web.HttpUtility.UrlDecode(d.[1]))
       else d.[0],None
@@ -27,7 +27,7 @@ module Parsing =
 
   /// parse the url into its constituents and fill out the passed dictionary with
   /// query string key-value pairs
-  let inline parse_url (line : string) =
+  let inline parseUrl (line : string) =
     let parts = line.Split(' ')
     if parts.Length < 2 || parts.Length > 3 then failwith (sprintf "invalid url: '%s'" line)
     let indexOfMark = parts.[1].IndexOf('?')
@@ -50,7 +50,7 @@ module Parsing =
 
   /// Parse the header parameters into key-value pairs, as a dictionary.
   /// Fails if the header is a None.
-  let header_params (header : string option) =
+  let headerParams (header : string option) =
     match header with
     | Some x ->
       let parts = x.Split(';') |> Array.map (fun x -> x.TrimStart())

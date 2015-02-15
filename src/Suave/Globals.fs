@@ -15,17 +15,21 @@ let random = System.Random()
 /// If you are unit-testing
 /// you can set this, but as with all globals, you need to set it back afterwards
 /// or you will break subsequent unit tests.
-let mutable utc_now = fun () -> System.DateTimeOffset.UtcNow
+let mutable utcNow = fun () -> System.DateTimeOffset.UtcNow
 
 /// From the TCP module, keeps track of the number of clients
-let internal number_of_clients = ref 0L
+let internal numberOfClients = ref 0L
 
 open System.Collections.Concurrent
 
 /// A map of compressed files:
 /// TODO - evaluate if we can't service requests
 /// by writing these to disk instead
-let internal compressed_files_map = new ConcurrentDictionary<string,string>()
+let internal compressedFilesMap = new ConcurrentDictionary<string,string>()
+
+[<assembly:System.Runtime.CompilerServices.InternalsVisibleToAttribute("Suave.Experimental")>]
+[<assembly:System.Runtime.CompilerServices.InternalsVisibleToAttribute("Suave.Tests")>]
+do()
 
 module Internals =
 
@@ -34,4 +38,7 @@ module Internals =
 
   let SUAVE_VERSION = Assembly.GetExecutingAssembly().GetName().Version.ToString()
 
-  let server_header = String.Concat [| "Server: Suave/"; SUAVE_VERSION; " (http://suave.io)" |]
+  let serverHeader = String.Concat [| "Server: Suave/"; SUAVE_VERSION; " (http://suave.io)" |]
+
+  [<Obsolete("Renamed to serverHeader'")>]
+  let server_header = serverHeader

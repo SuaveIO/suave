@@ -17,7 +17,7 @@ open Fuchu
 
 [<Tests>]
 let tests =
-  let run_with' = run_with default_config
+  let runWithConfig = runWith defaultConfig
 
   testList "primitives: Host applicative" [
     testCase "when not matching on Host" <| fun _ ->
@@ -26,7 +26,7 @@ let tests =
           match r.host with
           | ClientOnly h -> OK h
           | x -> INTERNAL_ERROR (sprintf "shouldn't match %A" x))
-      let res = run_with' app |> req HttpMethod.GET "/" None
+      let res = runWithConfig app |> req HttpMethod.GET "/" None
       Assert.Equal("should be IPv4 loopback", "127.0.0.1", res)
 
     testCase "when matching on Host" <| fun _ ->
@@ -36,7 +36,7 @@ let tests =
             match r.host with
             | ServerClient h -> OK h
             | x -> INTERNAL_ERROR (sprintf "shouldn't match %A" x))
-      let res = run_with' app |> req HttpMethod.GET "/" None
+      let res = runWithConfig app |> req HttpMethod.GET "/" None
       Assert.Equal("should be IPv4 loopback", "127.0.0.1", res)
 
     testCase "when matching on Host but is forwarded" <| fun _ ->
@@ -47,6 +47,6 @@ let tests =
           match r.host with
           | Forwarded (from, ServerClient h) -> OK h
           | x -> INTERNAL_ERROR (sprintf "shouldn't match %A" x))
-      let res = run_with' app |> req HttpMethod.GET "/" None
+      let res = runWithConfig app |> req HttpMethod.GET "/" None
       Assert.Equal("should be IPv4 loopback", "127.0.0.1", res)
     ]

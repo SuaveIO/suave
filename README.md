@@ -63,8 +63,8 @@ open Fuchu
 testCase "parsing a large multipart form" <| fun _ ->
 
   let res =
-    run_with' (OK "hi")
-    |> req HttpMethod.POST "/" (Some byte_array_content)
+    runWithConfig (OK "hi")
+    |> req HttpMethod.POST "/" (Some byteArrayContent)
 
   Assert.Equal("should get the correct result", "hi", res)
 ```

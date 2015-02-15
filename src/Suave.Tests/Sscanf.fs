@@ -45,11 +45,11 @@ open Suave.Testing
 
 [<Tests>]
 let more_scan_tests =
-  let run_with' = run_with default_config
+  let runWithConfig = runWith defaultConfig
   testList "when scanning via web server" [
     testCase "parse a long integer" <| fun _ ->
       Assert.Equal("returns 9223372036854775807",
                    "9223372036854775807",
-                   run_with' (url_scan "/%d" (fun (a:int64) -> OK(string a)))
+                   runWithConfig (urlScan "/%d" (fun (a:int64) -> OK(string a)))
                    |> req HttpMethod.GET "/9223372036854775807" None) 
     ]

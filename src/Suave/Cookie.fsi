@@ -5,8 +5,7 @@ module Cookie =
   open System.Text
   open System.Globalization
   open Suave.Utils
-
-  open Types
+  open Suave.Types
 
   type CookieLife =
     | Session
@@ -18,83 +17,109 @@ module Cookie =
     | DecryptionError of Crypto.SecretboxDecryptionError
 
   /// Parse the cookie's name and data in the string into a dictionary.
-  val parse_cookies : cookie_string:string -> HttpCookie list
+  val parseCookies : cookieString:string -> HttpCookie list
 
-  val parse_result_cookie : cookie_string:string -> HttpCookie
+  val parseResultCookie : cookieString:string -> HttpCookie
 
-  module HttpRequest =
+  type HttpRequest with
 
     /// Finds the cookies of the request, or an empty Map otherwise, if
     /// there are no cookies.
-    val cookies : request:HttpRequest -> Map<string, HttpCookie>
+    member cookies : Map<string, HttpCookie>
 
-  module HttpResult =
+  type HttpResult with
 
-    val cookies : result:HttpResult -> Map<string, HttpCookie>
+    member cookies : Map<string, HttpCookie>
 
-  val set_cookie : cookie:HttpCookie -> WebPart
-  val unset_cookie : name:string -> WebPart
+  val setCookie : cookie:HttpCookie -> WebPart
+  val unsetCookie : name:string -> WebPart
 
   /// Sets the cookies to the HttpResult
-  val set_pair   : http_cookie:HttpCookie -> client_cookie:HttpCookie -> WebPart
-  val unset_pair : http_cookie_name:string -> WebPart
+  val setPair   : httpCookie:HttpCookie -> clientCookie:HttpCookie -> WebPart
+  val unsetPair : httpCookieName:string -> WebPart
 
   /// A DTO structure for passing the right parameters to the XXX_cookies functions
   /// in this module.
   type CookiesState =
-    { server_key      : ServerKey
-      cookie_name     : string
-      user_state_key  : string
-      relative_expiry : CookieLife
-      secure          : bool }
+    { serverKey      : ServerKey
+      cookieName     : string
+      userStateKey   : string
+      relativeExpiry : CookieLife
+      secure         : bool }
 
   [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
   module CookiesState =
 
-    val mk : server_key:ServerKey ->
-             cookie_name:string ->
-             user_state_key:string ->
-             relative_expiry:CookieLife ->
+    val mk : serverKey:ServerKey ->
+             cookieName:string ->
+             userStateKey:string ->
+             relativeExpiry:CookieLife ->
              secure:bool ->
              CookiesState
 
-    val server_key_ : Lens<CookiesState, ServerKey>
-
-    val cookie_name_ : Lens<CookiesState, string>
-
-    val user_state_key_ : Lens<CookiesState, string>
-
-    val relative_expiry_ : Lens<CookiesState, CookieLife>
-
-    val secure_ : Lens<CookiesState, bool>
 
   /// Generate one server-side cookie, and another client-side cookie with
   /// name "${server-side-name}-client"
-  val generate_cookies : server_key:ServerKey ->
-                         cookie_name:string ->
-                         relative_expiry:CookieLife ->
-                         secure:bool ->
-                         plain_data:byte[] ->
-                         HttpCookie * HttpCookie
+  val generateCookies : serverKey:ServerKey ->
+                        cookieName:string ->
+                        relativeExpiry:CookieLife ->
+                        secure:bool ->
+                        plainData:byte[] ->
+                        HttpCookie * HttpCookie
 
   /// Tries to read the cookie of the given name from the HttpContext, and
   /// returns the cookie and its plaintext value if successful.
-  val read_cookies : key:ServerKey ->
-                     cookie_name:string ->
-                     cookies:Map<string, HttpCookie> ->
-                     Choice<HttpCookie * byte [], CookieError>
+  val readCookies : key:ServerKey ->
+                    cookieName:string ->
+                    cookies:Map<string, HttpCookie> ->
+                    Choice<HttpCookie * byte [], CookieError>
 
   /// Bumps the expiry dates for all the cookies.
-  val refresh_cookies : expiry:CookieLife ->
-                        cookie:HttpCookie ->
-                        WebPart
+  val refreshCookies : expiry:CookieLife ->
+                       cookie:HttpCookie ->
+                       WebPart
 
-  val update_cookies :  csctx:CookiesState ->
-                        f_plain_text : (byte [] option -> byte []) ->
-                        WebPart
+  val updateCookies :  csctx:CookiesState ->
+                       f_plain_text : (byte [] option -> byte []) ->
+                       WebPart
   
-  val cookie_state : csctx:CookiesState ->
-                     no_cookie :(unit -> Choice<byte [], WebPart>) ->
-                     decryption_failure:(Crypto.SecretboxDecryptionError -> Choice<byte [], WebPart>) ->
-                     f_success:WebPart ->
-                     WebPart
+  val cookieState : csctx:CookiesState ->
+                    noCookie :(unit -> Choice<byte [], WebPart>) ->
+                    decryptionFailure:(Crypto.SecretboxDecryptionError -> Choice<byte [], WebPart>) ->
+                    f_success:WebPart ->
+                    WebPart
+
+
+  [<Obsolete("Renamed to parseCookies'")>]
+  val parse_cookies : cookieString:string -> HttpCookie list
+  [<Obsolete("Renamed to parseResultCookie'")>]
+  val parse_result_cookie : cookieString:string -> HttpCookie
+
+  [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+  module HttpRequest =
+    [<Obsolete("Use the .cookies property instead'")>]
+    val cookies : HttpRequest -> Map<string, HttpCookie>
+
+  [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+  module HttpResult =
+    [<Obsolete("Use the .cookies property instead'")>]
+    val cookies : HttpResult -> Map<string, HttpCookie>
+
+  [<Obsolete("Renamed to setCookie'")>]
+  val set_cookie : cookie:HttpCookie -> WebPart
+  [<Obsolete("Renamed to unsetCookie'")>]
+  val unset_cookie : name:string -> WebPart
+  [<Obsolete("Renamed to setPair'")>]
+  val set_pair   : httpCookie:HttpCookie -> clientCookie:HttpCookie -> WebPart
+  [<Obsolete("Renamed to unsetPair'")>]
+  val unset_pair : httpCookieName:string -> WebPart
+  [<Obsolete("Renamed to generateCookies'")>]
+  val generate_cookies : serverKey:ServerKey -> cookieName:string -> relativeExpiry:CookieLife -> secure:bool -> plainData:byte[] -> HttpCookie * HttpCookie
+  [<Obsolete("Renamed to readCookies'")>]
+  val read_cookies : key:ServerKey -> cookieName:string -> cookies:Map<string, HttpCookie> -> Choice<HttpCookie * byte [], CookieError>
+  [<Obsolete("Renamed to refreshCookies'")>]
+  val refresh_cookies : expiry:CookieLife -> cookie:HttpCookie -> WebPart
+  [<Obsolete("Renamed to updateCookies'")>]
+  val update_cookies :  csctx:CookiesState -> f_plain_text : (byte [] option -> byte []) -> WebPart
+  [<Obsolete("Renamed to cookieState'")>]
+  val cookie_state : csctx:CookiesState -> noCookie :(unit -> Choice<byte [], WebPart>) -> decryptionFailure:(Crypto.SecretboxDecryptionError -> Choice<byte [], WebPart>) -> f_success:WebPart -> WebPart

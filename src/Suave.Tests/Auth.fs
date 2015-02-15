@@ -20,7 +20,7 @@ open Suave.Http.RequestErrors
 
 open Suave.Testing
 
-let run_with' = run_with { default_config with logger = Loggers.sane_defaults_for LogLevel.Debug }
+let runWithConfig = runWith { defaultConfig with logger = Loggers.saneDefaultsFor LogLevel.Debug }
 
 type Assert with
   static member Null (msg : string, o : obj) =
@@ -35,7 +35,7 @@ type Assert with
       // printfn "found %A" v
       ()
 
-let req_resp
+let reqResp
   (methd : HttpMethod)
   (resource : string)
   (cookies : CookieContainer option)
@@ -43,14 +43,14 @@ let req_resp
   f_result
   ctx =
 
-  let log = Suave.Log.info ctx.suave_config.logger "Suave.Tests" TraceHeader.empty
+  let log = Suave.Log.info ctx.suaveConfig.logger "Suave.Tests" TraceHeader.empty
   log (sprintf "%A %s" methd resource)
 
   let default_timeout = TimeSpan.FromSeconds 5.
 
-  use handler = mk_handler DecompressionMethods.None cookies
-  use client = mk_client handler
-  use request = mk_request methd resource "" None (endpoint_uri ctx.suave_config) |> f_request
+  use handler = mkHandler DecompressionMethods.None cookies
+  use client = mkClient handler
+  use request = mkRequest methd resource "" None (endpointUri ctx.suaveConfig) |> f_request
 
   for h in request.Headers do
     log (sprintf "%s: %s" h.Key (String.Join(", ", h.Value)))
@@ -59,30 +59,30 @@ let req_resp
   let result = request |> send client default_timeout ctx
   f_result result
 
-let set_connection_keep_alive (r : HttpRequestMessage) =
+let setConnectionKeepAlive (r : HttpRequestMessage) =
   r.Headers.ConnectionClose <- Nullable(false)
   r
 
 /// Test a request by looking at the cookies alone.
 let req_cookies cookies ctx methd resource f_req =
-  req_resp methd resource (Some cookies)
-           set_connection_keep_alive
+  reqResp methd resource (Some cookies)
+           setConnectionKeepAlive
            f_req
            ctx
 
-let cookies suave_config (container : CookieContainer) =
-  container.GetCookies(endpoint_uri suave_config)
+let cookies suaveConfig (container : CookieContainer) =
+  container.GetCookies(endpointUri suaveConfig)
 
-let interaction ctx f_ctx = with_context f_ctx ctx
+let interaction ctx f_ctx = withContext f_ctx ctx
 
 let interact methd resource container ctx =
   let response = req_cookies container ctx methd resource id
   match response.Headers.TryGetValues("Set-Cookie") with
   | false, _ -> ()
-  | true, values -> values |> Seq.iter (fun cookie -> container.SetCookies(endpoint_uri ctx.suave_config, cookie))
+  | true, values -> values |> Seq.iter (fun cookie -> container.SetCookies(endpointUri ctx.suaveConfig, cookie))
   response
 
-let session_state f =
+let sessionState f =
   context( fun r ->
     match HttpContext.state r with
     | None ->  RequestErrors.BAD_REQUEST "damn it"
@@ -92,19 +92,19 @@ let session_state f =
 let tests =
   testList "auth tests" [
     testCase "baseline, no auth cookie" <| fun _ ->
-      let ctx = run_with' (OK "ACK")
-      let cookies = ctx |> req_cookies' HttpMethod.GET "/"  None
+      let ctx = runWithConfig (OK "ACK")
+      let cookies = ctx |> reqCookies' HttpMethod.GET "/"  None
       Assert.Null("should not have auth cookie", cookies.[Auth.SessionAuthCookie])
       
     testCase "can set cookie" <| fun _ ->
-      let ctx = run_with' (Auth.authenticated Session false >>= OK "ACK")
-      let cookies = ctx |> req_cookies' HttpMethod.GET "/"  None
+      let ctx = runWithConfig (Auth.authenticated Session false >>= OK "ACK")
+      let cookies = ctx |> reqCookies' HttpMethod.GET "/"  None
       Assert.NotNull("should have auth cookie", cookies.[Auth.SessionAuthCookie])
 
     testCase "can access authenticated contents" <| fun _ ->
       // given
       let ctx =
-        run_with' (
+        runWithConfig (
           choose [
             url "/" >>= OK "root"
             url "/auth" >>= Auth.authenticated Session false >>= OK "authed"
@@ -120,36 +120,36 @@ let tests =
       // mutability bonanza here:
       let container = CookieContainer()
       let interact methd resource = interact methd resource container ctx
-      let cookies = cookies ctx.suave_config container
+      let cookies = cookies ctx.suaveConfig container
 
       // when
       interaction ctx <| fun _ ->
         use res = interact HttpMethod.GET "/"
-        Assert.Equal("should allow root request", "root", content_string res)
+        Assert.Equal("should allow root request", "root", contentString res)
 
         match cookies.[Auth.SessionAuthCookie] with
         | null -> ()
         | cookie -> Tests.failtestf "should not have auth cookie, but was %A" cookie
 
         use res' = interact HttpMethod.GET "/protected"
-        Assert.Equal("should not have access to protected", "please authenticate", content_string res')
-        Assert.Equal("code 403 FORBIDDEN", HttpStatusCode.Forbidden, status_code res')
+        Assert.Equal("should not have access to protected", "please authenticate", contentString res')
+        Assert.Equal("code 403 FORBIDDEN", HttpStatusCode.Forbidden, statusCode res')
 
         use res'' = interact HttpMethod.GET "/auth"
         Assert.Contains("after authentication", (fun (str : string) -> str.Contains("auth=")),
                                                 res''.Headers.GetValues "Set-Cookie")
-        Assert.Equal("after authentication", "authed", content_string res'')
+        Assert.Equal("after authentication", "authed", contentString res'')
 
         use res''' = interact HttpMethod.GET "/protected"
-        Assert.Equal("should have access to protected", "You have reached the place of your dreams!", content_string res''')
-        Assert.Equal("code 200 OK", HttpStatusCode.OK, status_code res''')
+        Assert.Equal("should have access to protected", "You have reached the place of your dreams!", contentString res''')
+        Assert.Equal("code 200 OK", HttpStatusCode.OK, statusCode res''')
 
     testCase "test session is maintained across requests" <| fun _ ->
       // given
       let ctx =
-        run_with' ( 
-          stateful'
-          >>= session_state (fun store ->
+        runWithConfig ( 
+          statefulForSession
+          >>= sessionState (fun store ->
               match store.get "counter" with
               | Some y ->
                 store.set "counter" (y + 1)
@@ -163,24 +163,24 @@ let tests =
 
       interaction ctx  (fun _ ->
         use res = interact HttpMethod.GET "/"
-        Assert.Equal("should return number zero", "0", content_string res)
+        Assert.Equal("should return number zero", "0", contentString res)
 
         use res' = interact HttpMethod.GET "/"
-        Assert.Equal("should return number one", "1", content_string res')
+        Assert.Equal("should return number one", "1", contentString res')
 
         use res'' = interact HttpMethod.GET "/"
-        Assert.Equal("should return number two", "2", content_string res''))
+        Assert.Equal("should return number two", "2", contentString res''))
 
     testCase "set more than one variable in the session" <| fun _ ->
       // given
       let ctx =
-        run_with' ( 
-          stateful'
+        runWithConfig ( 
+          statefulForSession
           >>= choose [
-            url "/a"     >>= session_state (fun state -> state.set "a" "a" >>= OK "a" )
-            url "/b"     >>= session_state (fun state -> state.set "b" "b" >>= OK "b" )
-            url "/get_a" >>= session_state (fun state -> match state.get "a" with Some a -> OK a | None -> RequestErrors.BAD_REQUEST "fail")
-            url "/get_b" >>= session_state (fun state -> match state.get "b" with Some a -> OK a | None -> RequestErrors.BAD_REQUEST "fail" )
+            url "/a"     >>= sessionState (fun state -> state.set "a" "a" >>= OK "a" )
+            url "/b"     >>= sessionState (fun state -> state.set "b" "b" >>= OK "b" )
+            url "/get_a" >>= sessionState (fun state -> match state.get "a" with Some a -> OK a | None -> RequestErrors.BAD_REQUEST "fail")
+            url "/get_b" >>= sessionState (fun state -> match state.get "b" with Some a -> OK a | None -> RequestErrors.BAD_REQUEST "fail" )
             ])
 
       let container = CookieContainer()
@@ -188,25 +188,25 @@ let tests =
 
       interaction ctx  (fun _ ->
         use res = interact HttpMethod.GET "/a"
-        Assert.Equal("should return a", "a", content_string res)
+        Assert.Equal("should return a", "a", contentString res)
 
         use res' = interact HttpMethod.GET "/b"
-        Assert.Equal("should return b", "b", content_string res')
+        Assert.Equal("should return b", "b", contentString res')
 
         use res'' = interact HttpMethod.GET "/get_a"
-        Assert.Equal("should return a", "a", content_string res'')
+        Assert.Equal("should return a", "a", contentString res'')
 
         use res''' = interact HttpMethod.GET "/get_b"
-        Assert.Equal("should return b", "b", content_string res'''))
+        Assert.Equal("should return b", "b", contentString res'''))
         
     testCase "set two session values on the same request" <| fun _ ->
       // given
       let ctx =
-        run_with' ( 
-          stateful' >>= choose [
-            url "/ab"     >>= session_state (fun state -> state.set "a" "a" >>= session_state ( fun state' -> state'.set "b" "b" >>= OK "a" ))
-            url "/get_a" >>= session_state (fun state -> match state.get "a" with Some a -> OK a | None -> RequestErrors.BAD_REQUEST "fail")
-            url "/get_b" >>= session_state (fun state -> match state.get "b" with Some a -> OK a | None -> RequestErrors.BAD_REQUEST "fail" )
+        runWithConfig ( 
+          statefulForSession >>= choose [
+            url "/ab"     >>= sessionState (fun state -> state.set "a" "a" >>= sessionState ( fun state' -> state'.set "b" "b" >>= OK "a" ))
+            url "/get_a" >>= sessionState (fun state -> match state.get "a" with Some a -> OK a | None -> RequestErrors.BAD_REQUEST "fail")
+            url "/get_b" >>= sessionState (fun state -> match state.get "b" with Some a -> OK a | None -> RequestErrors.BAD_REQUEST "fail" )
             ])
 
       let container = CookieContainer()
@@ -214,11 +214,11 @@ let tests =
 
       interaction ctx  (fun _ ->
         use res = interact HttpMethod.GET "/ab"
-        Assert.Equal("should return a", "a", content_string res)
+        Assert.Equal("should return a", "a", contentString res)
 
         use res''' = interact HttpMethod.GET "/get_b"
-        Assert.Equal("should return b", "b", content_string res''')
+        Assert.Equal("should return b", "b", contentString res''')
 
         use res'' = interact HttpMethod.GET "/get_a"
-        Assert.Equal("should return a", "a", content_string res''))
+        Assert.Equal("should return a", "a", contentString res''))
     ]

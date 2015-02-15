@@ -20,15 +20,15 @@ module Cookie =
     | NoCookieFound of string
     | DecryptionError of Crypto.SecretboxDecryptionError
 
-  let parse_cookies (s : string) : HttpCookie list =
+  let parseCookies (s : string) : HttpCookie list =
     s.Split(';')
     |> Array.toList
     |> List.map (fun (cookie : string) ->
         let parts = cookie.Split('=')
-        HttpCookie.mk' (String.trim parts.[0]) (String.trim parts.[1]))
+        HttpCookie.mkKV (String.trim parts.[0]) (String.trim parts.[1]))
 
-  let parse_result_cookie (s : string) : HttpCookie =
-    let parse_expires (str : string) =
+  let parseResultCookie (s : string) : HttpCookie =
+    let parseExpires (str : string) =
       DateTimeOffset.ParseExact(str, "R", CultureInfo.InvariantCulture)
     s.Split(';')
     |> Array.map (fun (x : string) ->
@@ -42,211 +42,224 @@ module Cookie =
                                                                value = value }
         | "Domain", domain          -> iter + 1, { cookie with domain = Some domain }
         | "Path", path              -> iter + 1, { cookie with path = Some path }
-        | "Expires", expires        -> iter + 1, { cookie with expires = Some (parse_expires expires) }
-        | "HttpOnly", _             -> iter + 1, { cookie with http_only = true }
+        | "Expires", expires        -> iter + 1, { cookie with expires = Some (parseExpires expires) }
+        | "HttpOnly", _             -> iter + 1, { cookie with httpOnly = true }
         | "Secure", _               -> iter + 1, { cookie with secure = true }
         | _                         -> iter + 1, cookie)
-        (0, { HttpCookie.empty with http_only = false }) // default when parsing
+        (0, { HttpCookie.empty with httpOnly = false }) // default when parsing
     |> snd
 
-  module HttpRequest =
+  type HttpRequest with
 
-    let cookies (x : HttpRequest) =
+    member x.cookies =
       x.headers
       |> List.filter (fun (name, _) -> name.Equals "cookie")
-      |> List.flat_map (snd >> parse_cookies)
+      |> List.collect (snd >> parseCookies)
       |> List.fold (fun cookies cookie ->
           cookies |> Map.add cookie.name cookie)
           Map.empty
 
-  module HttpResult =
+  type HttpResult with
 
-    let cookies (x : HttpResult) =
+    member x.cookies =
       x.headers
       |> List.filter (fst >> (String.eq_ord_ci "Set-Cookie"))
       /// duplicate headers are comma separated
-      |> List.flat_map (snd >> String.split ',' >> List.map String.trim)
-      |> List.map parse_result_cookie
+      |> List.collect (snd >> String.split ',' >> List.map String.trim)
+      |> List.map parseResultCookie
       |> List.fold (fun cookies cookie ->
           cookies |> Map.add cookie.name cookie)
           Map.empty
 
-  let private client_cookie_from (http_cookie : HttpCookie) =
-    let ccn = String.Concat [ http_cookie.name; "-client" ]
-    { HttpCookie.mk' ccn http_cookie.name
-        with http_only = false
-             secure    = http_cookie.secure
-             expires   = http_cookie.expires }
+  let private clientCookieFrom (httpCookie : HttpCookie) =
+    let ccn = String.Concat [ httpCookie.name; "-client" ]
+    { HttpCookie.mkKV ccn httpCookie.name
+        with httpOnly = false
+             secure    = httpCookie.secure
+             expires   = httpCookie.expires }
 
-  /// Set +relative_expiry time span on the expiry time of the http cookie
+  /// Set +relativeExpiry time span on the expiry time of the http cookie
   /// and generate a corresponding client-side cookie with the same expiry, that
   /// has as its data, the cookie name of the http cookie.
-  let private sliding_expiry (relative_expiry : CookieLife) (http_cookie : HttpCookie) =
-    let cookie_name = http_cookie.name
+  let private slidingExpiry (relativeExpiry : CookieLife) (httpCookie : HttpCookie) =
+    let cookieName = httpCookie.name
     let expiry =
-      match relative_expiry with
+      match relativeExpiry with
       | Session -> None
-      | MaxAge ts  -> Some (Globals.utc_now().Add ts)
-    let http_cookie = { http_cookie with expires = expiry }
-    http_cookie, client_cookie_from http_cookie
+      | MaxAge ts  -> Some (Globals.utcNow().Add ts)
+    let httpCookie = { httpCookie with expires = expiry }
+    httpCookie, clientCookieFrom httpCookie
 
-  let set_cookie (cookie : HttpCookie) (ctx : HttpContext) =
-    let not_set_cookie : string * string -> bool =
+  let setCookie (cookie : HttpCookie) (ctx : HttpContext) =
+    let notSetCookie : string * string -> bool =
       fst >> (String.eq_ord_ci "Set-Cookie" >> not)
-    let cookie_headers =
-      ctx.response
-      |> HttpResult.cookies // get current cookies
+    let cookieHeaders =
+      ctx.response.cookies
       |> Map.put cookie.name cookie // possibly overwrite
       |> Map.toList
       |> List.map snd // get HttpCookie-s
-      |> List.map HttpCookie.to_header
+      |> List.map HttpCookie.toHeader
     let headers' =
-      cookie_headers
+      cookieHeaders
       |> List.fold (fun headers header ->
           ("Set-Cookie", header) :: headers)
-          (ctx.response.headers |> List.filter not_set_cookie)
+          (ctx.response.headers |> List.filter notSetCookie)
     { ctx with response = { ctx.response with headers = headers' } }
     |> succeed
 
-  let unset_cookie (cookie_name : string) =
-    let start_epoch = DateTimeOffset(1970, 1, 1, 0, 0, 1, TimeSpan.Zero) |> Some
-    let string_value = HttpCookie.to_header { HttpCookie.mk' cookie_name "x" with expires = start_epoch }
-    Writers.set_header "Set-Cookie" string_value
+  let unsetCookie (cookieName : string) =
+    let startEpoch = DateTimeOffset(1970, 1, 1, 0, 0, 1, TimeSpan.Zero) |> Some
+    let stringValue = HttpCookie.toHeader { HttpCookie.mkKV cookieName "x" with expires = startEpoch }
+    Writers.setHeader "Set-Cookie" stringValue
 
-  let set_pair (http_cookie : HttpCookie) (client_cookie : HttpCookie) : WebPart =
+  let setPair (httpCookie : HttpCookie) (clientCookie : HttpCookie) : WebPart =
     context (fun { runtime = { logger = logger } } ->
       Log.log logger "Suave.Cookie.set_pair" LogLevel.Debug
-        (sprintf "setting cookie '%s' len '%d'" http_cookie.name http_cookie.value.Length)
+        (sprintf "setting cookie '%s' len '%d'" httpCookie.name httpCookie.value.Length)
       succeed)
-    >>= set_cookie http_cookie >>= set_cookie client_cookie
+    >>= setCookie httpCookie >>= setCookie clientCookie
 
-  let unset_pair http_cookie_name : WebPart =
-    unset_cookie http_cookie_name >>= unset_cookie (String.Concat [ http_cookie_name; "-client" ])
+  let unsetPair httpCookieName : WebPart =
+    unsetCookie httpCookieName >>= unsetCookie (String.Concat [ httpCookieName; "-client" ])
 
   type CookiesState =
-    { server_key      : ServerKey
-      cookie_name     : string
-      user_state_key  : string
-      relative_expiry : CookieLife
-      secure          : bool }
+    { serverKey      : ServerKey
+      cookieName     : string
+      userStateKey   : string
+      relativeExpiry : CookieLife
+      secure         : bool }
 
   [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
   module CookiesState =
 
-    let mk server_key cookie_name user_state_key relative_expiry secure =
-      { server_key      = server_key
-        cookie_name     = cookie_name
-        user_state_key  = user_state_key
-        relative_expiry = relative_expiry
-        secure          = secure }
+    let mk serverKey cookieName userStateKey relativeExpiry secure =
+      { serverKey      = serverKey
+        cookieName     = cookieName
+        userStateKey   = userStateKey
+        relativeExpiry = relativeExpiry
+        secure         = secure }
 
-    let server_key_ =
-      (fun x -> x.server_key),
-      fun v (x : CookiesState) -> { x with server_key = v }
-
-    let cookie_name_ =
-      (fun x -> x.cookie_name),
-      fun v (x : CookiesState) -> { x with cookie_name = v }
-
-    let user_state_key_ =
-      (fun x -> x.user_state_key),
-      fun v (x : CookiesState) -> { x with user_state_key = v }
-
-    let relative_expiry_ =
-      (fun x -> x.relative_expiry),
-      fun v (x : CookiesState) -> { x with relative_expiry = v }
-
-    let secure_ =
-      (fun x -> x.secure),
-      fun v (x : CookiesState) -> { x with secure = v }
-
-  let generate_cookies server_key cookie_name relative_expiry secure plain_data =
-    let enc, _ = Bytes.cookie_encoding
-    match Crypto.secretbox server_key plain_data with
-    | Choice1Of2 cookie_data ->
-      let encoded_data = enc cookie_data
-      { HttpCookie.mk' cookie_name encoded_data
-          with http_only = true
+  let generateCookies serverKey cookieName relativeExpiry secure plainData =
+    let enc, _ = Bytes.cookieEncoding
+    match Crypto.secretbox serverKey plainData with
+    | Choice1Of2 cookieData ->
+      let encodedData = enc cookieData
+      { HttpCookie.mkKV cookieName encodedData
+          with httpOnly = true
                secure    = secure }
-      |> sliding_expiry relative_expiry
+      |> slidingExpiry relativeExpiry
     | err -> failwithf "internal error on encryption %A" err
 
-  let read_cookies key cookie_name cookies =
-    let _, dec = Bytes.cookie_encoding
+  let readCookies key cookieName cookies =
+    let _, dec = Bytes.cookieEncoding
     let found =
       cookies
-      |> Map.tryFind cookie_name
-      |> Choice.from_option (NoCookieFound cookie_name)
-      |> Choice.map (fun c -> c, c |> (HttpCookie.value >> dec))
+      |> Map.tryFind cookieName
+      |> Choice.from_option (NoCookieFound cookieName)
+      |> Choice.map (fun c -> c, c.value |> dec)
     match found with
-    | Choice1Of2 (cookie, cipher_data) ->
-      cipher_data
-      |> Crypto.secretbox_open key
+    | Choice1Of2 (cookie, cipherData) ->
+      cipherData
+      |> Crypto.secretboxOpen key
       |> Choice.map_2 DecryptionError
-      |> Choice.map (fun plain_text -> cookie, plain_text)
+      |> Choice.map (fun plainText -> cookie, plainText)
     | Choice2Of2 x -> Choice2Of2 x
 
-  let refresh_cookies relative_expiry http_cookie : WebPart =
-    sliding_expiry relative_expiry http_cookie ||> set_pair
+  let refreshCookies relativeExpiry httpCookie : WebPart =
+    slidingExpiry relativeExpiry httpCookie ||> setPair
 
-  let update_cookies (csctx : CookiesState) f_plain_text : WebPart =
-    context (fun ({ runtime = { logger = logger }} as ctx) ->
-      let plain_text' =
-        match read_cookies csctx.server_key csctx.cookie_name (ctx.response |> HttpResult.cookies) with
-        | Choice1Of2 (_, plain_text) ->
-          Log.log logger "Suave.Cookie.update_cookies" LogLevel.Debug "update_cookies - existing"
-          f_plain_text (Some plain_text)
+  let updateCookies (csctx : CookiesState) f_plainText : WebPart =
+    context (fun ctx ->
+      let logger = ctx.runtime.logger
+      let plainText =
+        match readCookies csctx.serverKey csctx.cookieName ctx.response.cookies with
+        | Choice1Of2 (_, plainText) ->
+          Log.log logger "Suave.Cookie.updateCookies" LogLevel.Debug "updateCookies - existing"
+          f_plainText (Some plainText)
         | Choice2Of2 _ ->
-          Log.log logger "Suave.Cookie.update_cookies" LogLevel.Debug "update_cookies - first time"
-          f_plain_text None
+          Log.log logger "Suave.Cookie.updateCookies" LogLevel.Debug "updateCookies - first time"
+          f_plainText None
 
       /// Since the contents will completely change every write, we simply re-generate the cookie
-      generate_cookies csctx.server_key csctx.cookie_name
-                       csctx.relative_expiry csctx.secure
-                       plain_text'
-      ||> set_pair
-      >>= Writers.set_user_data csctx.user_state_key plain_text')
+      generateCookies csctx.serverKey csctx.cookieName
+                       csctx.relativeExpiry csctx.secure
+                       plainText
+      ||> setPair
+      >>= Writers.setUserData csctx.userStateKey plainText)
 
-  let cookie_state (csctx : CookiesState)
+  let cookieState (csctx : CookiesState)
                    // unit -> plain text to store OR something to run of your own!
-                   (no_cookie : unit -> Choice<byte [], WebPart>)
-                   (decryption_failure   : _ -> Choice<byte [], WebPart>)
+                   (noCookie : unit -> Choice<byte [], WebPart>)
+                   (decryptionFailure   : _ -> Choice<byte [], WebPart>)
                    (f_success : WebPart)
                    : WebPart =
     context (fun ({ runtime = { logger = logger }} as ctx) ->
 
       let log = Log.log logger "Suave.Cookie.cookie_state" LogLevel.Debug
 
-      let set_cookies plain_text =
-        let http_cookie, client_cookie =
-          generate_cookies csctx.server_key csctx.cookie_name
-                           csctx.relative_expiry csctx.secure
-                           plain_text
-        set_pair http_cookie client_cookie >>=
-          Writers.set_user_data csctx.user_state_key plain_text
+      let setCookies plainText =
+        let httpCookie, clientCookie =
+          generateCookies csctx.serverKey csctx.cookieName
+                           csctx.relativeExpiry csctx.secure
+                           plainText
+        setPair httpCookie clientCookie >>=
+          Writers.setUserData csctx.userStateKey plainText
 
-      match read_cookies csctx.server_key csctx.cookie_name (ctx.request |> HttpRequest.cookies) with
-      | Choice1Of2 (http_cookie, plain_text) ->
+      match readCookies csctx.serverKey csctx.cookieName ctx.request.cookies with
+      | Choice1Of2 (httpCookie, plainText) ->
         log "existing cookie"
-        refresh_cookies csctx.relative_expiry http_cookie
-          >>= Writers.set_user_data csctx.user_state_key plain_text
+        refreshCookies csctx.relativeExpiry httpCookie
+          >>= Writers.setUserData csctx.userStateKey plainText
           >>= f_success
 
       | Choice2Of2 (NoCookieFound _) ->
-        match no_cookie () with
-        | Choice1Of2 plain_text ->
+        match noCookie () with
+        | Choice1Of2 plainText ->
           log "no existing cookie, setting text"
-          set_cookies plain_text >>= f_success
+          setCookies plainText >>= f_success
         | Choice2Of2 wp_kont ->
           log "no existing cookie, calling app continuation"
           wp_kont
 
       | Choice2Of2 (DecryptionError err) ->
         log (sprintf "decryption error: %A" err)
-        match decryption_failure err with
-        | Choice1Of2 plain_text ->
+        match decryptionFailure err with
+        | Choice1Of2 plainText ->
           log "existing, broken cookie, setting cookie text anew"
-          set_cookies plain_text >>= f_success
+          setCookies plainText >>= f_success
         | Choice2Of2 wp_kont    ->
           log "existing, broken cookie, unsetting it, forwarding to given failure web part"
-          wp_kont >>= unset_pair csctx.cookie_name)
+          wp_kont >>= unsetPair csctx.cookieName)
+
+  [<Obsolete("Renamed to parseCookies'")>]
+  let parse_cookies s = parseCookies s
+  [<Obsolete("Renamed to parseResultCookie'")>]
+  let parse_result_cookie (s : string) : HttpCookie = parseResultCookie s 
+  [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+  module HttpRequest =
+    [<Obsolete("Use the .cookies property instead'")>]
+    let cookies (x:HttpRequest) = x.cookies
+
+  [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+  module HttpResult =
+    [<Obsolete("Use the .cookies property instead'")>]
+    let cookies (x:HttpResult) = x.cookies
+
+  [<Obsolete("Renamed to setCookie'")>]
+  let set_cookie cookie ctx = setCookie cookie ctx
+  [<Obsolete("Renamed to unsetCookie'")>]
+  let unset_cookie cookieName = unsetCookie cookieName
+  [<Obsolete("Renamed to setPair'")>]
+  let set_pair httpCookie clientCookie = setPair httpCookie clientCookie
+  [<Obsolete("Renamed to unsetPair'")>]
+  let unset_pair httpCookieName = unsetPair httpCookieName 
+  [<Obsolete("Renamed to generateCookies'")>]
+  let generate_cookies serverKey cookieName relativeExpiry secure plainData = generateCookies serverKey cookieName relativeExpiry secure plainData
+  [<Obsolete("Renamed to readCookies'")>]
+  let read_cookies key cookieName cookies = readCookies key cookieName cookies
+  [<Obsolete("Renamed to refreshCookies'")>]
+  let refresh_cookies relativeExpiry httpCookie = refreshCookies relativeExpiry httpCookie 
+  [<Obsolete("Renamed to updateCookies'")>]
+  let update_cookies relativeExpiry httpCookie = updateCookies relativeExpiry httpCookie 
+  [<Obsolete("Renamed to cookieState'")>]
+  let cookie_state csctx noCookie decryptionFailure f_success = cookieState csctx noCookie decryptionFailure f_success 

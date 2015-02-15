@@ -21,18 +21,18 @@ module Parse =
   open System
   open System.Globalization
 
-  let private parse_using<'a> (f:string -> bool * 'a) s =
+  let private parseUsing<'T> (f:string -> bool * 'T) s =
     match f s with
     | true, i -> Choice1Of2 i
-    | false, _ -> Choice2Of2 (sprintf "Cound not parse '%s' to %s" s typeof<'a>.Name)
+    | false, _ -> Choice2Of2 (sprintf "Cound not parse '%s' to %s" s typeof<'T>.Name)
 
-  let int32 = parse_using Int32.TryParse
-  let uint32 = parse_using UInt32.TryParse
-  let int64 = parse_using Int64.TryParse
-  let uint64 = parse_using UInt64.TryParse
-  let uri = parse_using (fun s -> Uri.TryCreate(s, UriKind.RelativeOrAbsolute))
-  let date_time = parse_using (fun s -> DateTime.TryParse(s, CultureInfo.InvariantCulture.DateTimeFormat, DateTimeStyles.RoundtripKind))
-  let decimal = parse_using (fun s -> Decimal.TryParse(s, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture))
+  let int32 = parseUsing Int32.TryParse
+  let uint32 = parseUsing UInt32.TryParse
+  let int64 = parseUsing Int64.TryParse
+  let uint64 = parseUsing UInt64.TryParse
+  let uri = parseUsing (fun s -> Uri.TryCreate(s, UriKind.RelativeOrAbsolute))
+  let date_time = parseUsing (fun s -> DateTime.TryParse(s, CultureInfo.InvariantCulture.DateTimeFormat, DateTimeStyles.RoundtripKind))
+  let decimal = parseUsing (fun s -> Decimal.TryParse(s, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture))
 
 let binding = ChoiceBuilder()
 
@@ -52,20 +52,20 @@ module Binding =
       | Choice1Of2 m   -> f_cont m
       | Choice2Of2 err -> f_err err)
 
-  let bind_req f_bind f_cont f_err =
-    bind (HttpContext.request >> f_bind) f_cont f_err
+  let bindReq f f_cont f_err =
+    bind (HttpContext.request >> f) f_cont f_err
 
-  let header key f_bind (req : HttpRequest) =
-    (req.headers %% key)
+  let header key f (req : HttpRequest) =
+    (getFirst req.headers key)
     |> Choice.from_option (sprintf "Missing header '%s'" key)
-    |> Choice.bind f_bind
+    |> Choice.bind f
 
-  let form form_key f_bind (req : HttpRequest) =
-    (HttpRequest.form req) ^^ form_key
-    |> Choice.from_option (sprintf "Missing form field '%s'" form_key)
-    |> Choice.bind f_bind
+  let form formKey f (req : HttpRequest) =
+    req.formData formKey
+    |> Choice.from_option (sprintf "Missing form field '%s'" formKey)
+    |> Choice.bind f
 
-  let query qs_key f_bind (req : HttpRequest) =
-    (HttpRequest.query req) ^^ qs_key
-    |> Choice.from_option (sprintf "Missing query string key '%s'" qs_key)
-    |> Choice.bind f_bind
+  let query queryKey f (req : HttpRequest) =
+    req.queryParam queryKey
+    |> Choice.from_option (sprintf "Missing query string key '%s'" queryKey)
+    |> Choice.bind f

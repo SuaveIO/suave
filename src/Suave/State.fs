@@ -7,95 +7,102 @@ open Suave.Cookie
 open Suave.Logging
 
 module CookieStateStore =
+
   open System
   open System.IO
   open System.Collections.Generic
-
   open Nessos.FsPickler
 
-  /// "Suave.State.CookieStateStore"
+  /// The user state key for the state store. Always "Suave.State.CookieStateStore". 
   [<Literal>]
   let StateStoreType = "Suave.State.CookieStateStore"
 
-  /// "st"
+  /// The cookie name for the state store. Always "st".
   [<Literal>]
   let StateCookie = "st"
 
-  let private encode_map (map : Map<string, obj>) =
+  let private encodeMap (map : Map<string, obj>) =
     let pickler = FsPickler.CreateBinary ()
     use ms = new MemoryStream()
     pickler.Serialize(ms, map)
     ms.ToArray()
 
-  let private decode_map bytes : Map<string, obj> =
+  let private decodeMap bytes : Map<string, obj> =
     let pickler = FsPickler.CreateBinary ()
     use ms = new MemoryStream()
     ms.Write (bytes, 0, bytes.Length)
     ms.Seek (0L, SeekOrigin.Begin) |> ignore
     pickler.Deserialize ms
 
-  let write relative_expiry (key : string) (value : 'a) =
+  let write relativeExpiry (key : string) (value : 'T) =
     context (fun ({ runtime = { logger = logger }} as ctx) ->
       log logger "Suave.State.CookieStateStore.write" LogLevel.Debug (sprintf "writing to key '%s'" key)
-      update_cookies
-        { server_key      = ctx.runtime.server_key
-          cookie_name     = StateCookie
-          user_state_key  = StateStoreType
-          relative_expiry = relative_expiry
-          secure          = false }
+      updateCookies
+        { serverKey      = ctx.runtime.serverKey
+          cookieName     = StateCookie
+          userStateKey   = StateStoreType
+          relativeExpiry = relativeExpiry
+          secure         = false }
         (function
          | None      ->
            log logger "Suave.State.CookieStateStore.write" LogLevel.Debug "in f_plain_text, no existing"
-           Map.empty |> Map.add key (box value) |> encode_map
+           Map.empty |> Map.add key (box value) |> encodeMap
          | Some data ->
-           let m = decode_map data
+           let m = decodeMap data
            log logger "Suave.State.CookieStateStore.write" LogLevel.Debug
              (sprintf "in f_plain_text, has existing %A" m)
-           m |> Map.add key (box value) |> encode_map))
+           m |> Map.add key (box value) |> encodeMap))
 
-  let stateful relative_expiry secure : WebPart =
+  let stateful relativeExpiry secure : WebPart =
     context (fun ({ runtime = { logger = logger }} as ctx) ->
       log logger "Suave.State.CookieStateStore.stateful" LogLevel.Debug "ensuring cookie state"
 
-      let cipher_text_corrupt =
+      let cipherTextCorrupt =
         sprintf "%A" >> RequestErrors.BAD_REQUEST >> Choice2Of2
 
-      let set_expiry : WebPart =
-        Writers.set_user_data (StateStoreType + "-expiry") relative_expiry
+      let setExpiry : WebPart =
+        Writers.setUserData (StateStoreType + "-expiry") relativeExpiry
 
-      cookie_state
-        { server_key      = ctx.runtime.server_key
-          cookie_name     = StateCookie
-          user_state_key  = StateStoreType
-          relative_expiry = relative_expiry
-          secure          = secure }
-        (fun () -> Choice1Of2(Map.empty<string, obj> |> encode_map))
-        cipher_text_corrupt
-        set_expiry)
+      cookieState
+        { serverKey      = ctx.runtime.serverKey
+          cookieName     = StateCookie
+          userStateKey   = StateStoreType
+          relativeExpiry = relativeExpiry
+          secure         = secure }
+        (fun () -> Choice1Of2(Map.empty<string, obj> |> encodeMap))
+        cipherTextCorrupt
+        setExpiry)
 
   ///
   ///
   /// Only save the state for the duration of the browser session.
-  let stateful' : WebPart =
+  let statefulForSession : WebPart =
     stateful Session false
+
+  [<Obsolete("Renamed to decodeMap")>]
+  let decode_map bytes = decodeMap bytes
+  [<Obsolete("Renamed to encodeMap")>]
+  let encode_map bytes = encodeMap bytes
+  [<Obsolete("Renamed to statefulForSession")>]
+  let stateful' = statefulForSession
 
   module HttpContext =
 
-    let private mk_state_store (user_state : Map<string, obj>) (ss : obj) =
+    let private mkStateStore (userState : Map<string, obj>) (ss : obj) =
       { new StateStore with
           member x.get key =
-            decode_map (ss :?> byte []) |> Map.tryFind key
-            |> Option.map (fun x -> Convert.ChangeType(x, typeof<'a>) :?> 'a)
+            decodeMap (ss :?> byte []) |> Map.tryFind key
+            |> Option.map (fun x -> Convert.ChangeType(x, typeof<'T>) :?> 'T)
           member x.set key value =
-            let expiry = user_state |> Map.find (StateStoreType + "-expiry") :?> CookieLife
+            let expiry = userState |> Map.find (StateStoreType + "-expiry") :?> CookieLife
             write expiry key value
           }
 
     /// Read the session store from the HttpContext.
     let state (ctx : HttpContext) =
-      ctx.user_state
+      ctx.userState
       |> Map.tryFind StateStoreType
-      |> Option.map (mk_state_store ctx.user_state)
+      |> Option.map (mkStateStore ctx.userState)
 
 /// This module contains the implementation for the memory-cache backed session
 /// state store, when the memory cache is global for the server.
@@ -104,7 +111,7 @@ module MemoryCacheStateStore =
   open System.Runtime.Caching
   open System.Collections.Concurrent
 
-  /// This key will be present in HttpContext.user_state and will contain the
+  /// This key will be present in HttpContext.userState and will contain the
   /// MemoryCache instance.
   [<Literal>]
   let StateStoreType = "Suave.State.MemoryCacheStateStore"
@@ -118,47 +125,50 @@ module MemoryCacheStateStore =
   module HttpContext =
 
     /// Try to find the state id of the HttpContext.
-    let state_id ctx =
-      ctx.user_state
+    let stateId ctx =
+      ctx.userState
       |> Map.tryFind UserStateIdKey
       |> Option.map (fun x -> x :?> string)
       |> Option.get
 
     /// Read the session store from the HttpContext.
     let state (ctx : HttpContext) =
-      ctx.user_state
+      ctx.userState
       |> Map.tryFind StateStoreType
       |> Option.map (fun ss -> ss :?> StateStore)
       |> Option.get
       
-  let private wrap (session_map : MemoryCache) relative_expiry session_id =
+    [<Obsolete("Renamed to stateId")>]
+    let state_id ctx = stateId ctx
+
+  let private wrap (sessionMap : MemoryCache) relativeExpiry sessionId =
     let exp = function
       | Session   -> CacheItemPolicy()
       | MaxAge ts -> CacheItemPolicy(SlidingExpiration = ts)
 
-    let state_bag =
-      lock session_map (fun _->
-        if session_map.Contains session_id then
-          session_map.Get session_id
+    let stateBag =
+      lock sessionMap (fun _->
+        if sessionMap.Contains sessionId then
+          sessionMap.Get sessionId
           :?> ConcurrentDictionary<string, obj>
         else
           let cd = new ConcurrentDictionary<string, obj>()
-          session_map.Set(CacheItem(session_id, cd), exp relative_expiry)
+          sessionMap.Set(CacheItem(sessionId, cd), exp relativeExpiry)
           cd)
 
     { new StateStore with
         member x.get key =
-          if state_bag.ContainsKey key then
-            Some (state_bag.[key] :?> 'a)
+          if stateBag.ContainsKey key then
+            Some (stateBag.[key] :?> 'T)
           else None
         member x.set key value =
-          state_bag.[key] <- value
+          stateBag.[key] <- value
           succeed }
 
-  let stateful relative_expiry : WebPart =
-    let state_store = wrap (MemoryCache.Default) relative_expiry
+  let stateful relativeExpiry : WebPart =
+    let stateStore = wrap (MemoryCache.Default) relativeExpiry
     context (fun ctx ->
-      let state_id = ctx |> HttpContext.state_id
-      Writers.set_user_data StateStoreType (state_store state_id))
+      let stateId = ctx |> HttpContext.stateId
+      Writers.setUserData StateStoreType (stateStore stateId))
 
   let DefaultExpiry = TimeSpan.FromMinutes 30. |> MaxAge

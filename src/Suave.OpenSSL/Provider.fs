@@ -10,15 +10,15 @@ open Suave.OpenSSL.Functions
 
 type TlsTransport(cn : Connection, ssl) =
   interface ITransport with
-    member this.read (buf : ByteSegment) = ssl_receive cn ssl buf
-    member this.write(buf : ByteSegment) = ssl_send cn  ssl buf
+    member this.read (buf : ByteSegment) = sslReceive cn ssl buf
+    member this.write(buf : ByteSegment) = sslSend cn  ssl buf
 
 type OpenSSLProvider(cert : X509Certificate) = 
 
   interface ITlsProvider with
 
     member this.Wrap(connection : Connection) = socket {
-      let ssl = authenticate_as_server cert
+      let ssl = authenticateAsServer cert
       do! accept connection ssl
       let tls_transport = new TlsTransport(connection, ssl)
       return { connection with transport = tls_transport}

@@ -26,7 +26,7 @@ open Suave.Utils
 
 open Helpers
 
-let counter_demo (req : HttpRequest) (out : Connection) =
+let counterDemo (req : HttpRequest) (out : Connection) =
 
   let write i =
     socket {
@@ -35,11 +35,10 @@ let counter_demo (req : HttpRequest) (out : Connection) =
       return! async {
         do! Async.Sleep 100
         return Choice1Of2 () } }
-  let q = HttpRequest.query req
   socket {
     let last_evt_id =
-      (req.headers %% "last-event-id" |> Option.bind muint32) <!>
-      ((q ^^ "lastEventId") |> Option.bind muint32) <.>
+      (req.header "last-event-id" |> Option.bind muint32) <!>
+      ((req.queryParam "lastEventId") |> Option.bind muint32) <.>
       100u
 
     let actions =

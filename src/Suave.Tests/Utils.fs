@@ -18,17 +18,17 @@ open TestUtilities
 let utilities =
   testList "trying some utility functions" [
     testCase "loopback ipv4" <| fun _ ->
-      Assert.Equal("127.0.0.1 is a local address", true, is_local_address "127.0.0.1")
+      Assert.Equal("127.0.0.1 is a local address", true, isLocalAddress "127.0.0.1")
 
     testCase "loopback ipv6" <| fun _ ->
-      Assert.Equal("::0 is a local address", true, is_local_address "::1")
+      Assert.Equal("::0 is a local address", true, isLocalAddress "::1")
 
-    testPropertyWithConfig fscheck_config "gzip_encode/gzip_decode" <| fun str ->
+    testPropertyWithConfig fsCheckConfig "gzip_encode/gzip_decode" <| fun str ->
       let get_bytes  = Encoding.UTF8.GetBytes  : string -> byte []
       let from_bytes = Encoding.UTF8.GetString : byte [] -> string
       Assert.Equal(
         "compress >> decompress == identity",
-        str, (get_bytes >> gzip_encode >> gzip_decode >> from_bytes) str)
+        str, (get_bytes >> gzipEncode >> gzipDecode >> from_bytes) str)
 
     testCase "str eql" <| fun _ ->
       for (str1, str2) in
@@ -46,31 +46,31 @@ let utilities =
     testCase "crypto hello world" <| fun _ ->
       let str = "Hello World"
       let ca (str : string) = str.ToCharArray() |> Array.map (string<<int) |> String.concat ","
-      let key = Crypto.generate_key' ()
-      let (Choice1Of2 cipher) = Crypto.secretbox' key str
-      let (Choice1Of2 plain) = Crypto.secretbox_open' key cipher
+      let key = Crypto.generateStdKey ()
+      let (Choice1Of2 cipher) = Crypto.secretboxOfText key str
+      let (Choice1Of2 plain) = Crypto.secretboxOpenAsString key cipher
       Assert.Equal(sprintf "'%s':%s = D(k, E(k, '%s':%s))" plain (ca plain) str (ca str), str, plain)
 
     testCase "crypto hello world - avoid padding oracle" <| fun _ ->
       let str = "Hello World"
       let ca (str : string) = str.ToCharArray() |> Array.map (string<<int) |> String.concat ","
-      let key = Crypto.generate_key' ()
-      let (Choice1Of2 cipher) = Crypto.secretbox' key str
+      let key = Crypto.generateStdKey ()
+      let (Choice1Of2 cipher) = Crypto.secretboxOfText key str
       cipher.[cipher.Length - Crypto.HMACLength - 1] <- 0uy
-      match Crypto.secretbox_open key cipher with
+      match Crypto.secretboxOpen key cipher with
       | Choice1Of2 _ -> Tests.failtest "should not decrypt successfully"
       | Choice2Of2 (Crypto.AlteredOrCorruptMessage(msg) as aocm) -> ()
       | x -> Tests.failtestf "got %A" x
 
-    testPropertyWithConfig fscheck_config "can encrypt and then decrypt any string" <| fun (str : string) ->
+    testPropertyWithConfig fsCheckConfig "can encrypt and then decrypt any string" <| fun (str : string) ->
       let ca (str : string) = str.ToCharArray() |> Array.map (string<<int) |> String.concat ","
       if not <| String.IsNullOrWhiteSpace str then
-        let key = Crypto.generate_key' ()
-        let (Choice1Of2 cipher) = Crypto.secretbox' key str
-        let (Choice1Of2 plain) = Crypto.secretbox_open' key cipher
+        let key = Crypto.generateStdKey ()
+        let (Choice1Of2 cipher) = Crypto.secretboxOfText key str
+        let (Choice1Of2 plain) = Crypto.secretboxOpenAsString key cipher
         Assert.Equal(sprintf "'%s':%s = D(k, E(k, '%s':%s))" plain (ca plain) str (ca str), str, plain)
 
-    testPropertyWithConfig fscheck_config "Bytes.encode_safe_base64 encoded <-> decoded" <| fun (str : string) ->
-      let enc, dec = Bytes.cookie_encoding
-      Assert.Equal("roundtrip", str, UTF8.to_string' (dec (enc (UTF8.bytes str))))
+    testPropertyWithConfig fsCheckConfig "Bytes.encode_safe_base64 encoded <-> decoded" <| fun (str : string) ->
+      let enc, dec = Bytes.cookieEncoding
+      Assert.Equal("roundtrip", str, Encoding.UTF8.GetString (dec (enc (Encoding.UTF8.GetBytes str))))
   ]

@@ -21,12 +21,12 @@ let set_connection_keep_alive (r : HttpRequestMessage) =
 let tests =
   testList "connecting" [
     testCase "connect with keep-alive default" <| fun _ ->
-      let context = run_with default_config (OK "ACK")
+      let context = runWith defaultConfig (OK "ACK")
       let res =
-        req_resp HttpMethod.GET "/"  "" None
+        reqResp HttpMethod.GET "/"  "" None
                  None DecompressionMethods.None
                  set_connection_keep_alive
-                 content_string
+                 contentString
                  context
       Assert.Equal("should ACK", "ACK", res)
     ]

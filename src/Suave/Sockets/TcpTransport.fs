@@ -4,12 +4,12 @@ open System
 open System.Net.Sockets
 
 type TcpTransport =
-  { socket       : Socket
-    read_args    : SocketAsyncEventArgs
-    write_args   : SocketAsyncEventArgs
+  { socket      : Socket
+    readArgs    : SocketAsyncEventArgs
+    writeArgs   : SocketAsyncEventArgs
   }
   interface ITransport with
     member this.read(buf : ByteSegment) =
-      async_do this.socket.ReceiveAsync (set_buffer buf)  (fun a -> a.BytesTransferred) this.read_args
+      asyncDo this.socket.ReceiveAsync (setBuffer buf)  (fun a -> a.BytesTransferred) this.readArgs
     member this.write(buf : ByteSegment) =
-      async_do this.socket.SendAsync (set_buffer buf) ignore this.write_args
+      asyncDo this.socket.SendAsync (setBuffer buf) ignore this.writeArgs

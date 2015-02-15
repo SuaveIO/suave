@@ -1,14 +1,17 @@
 ﻿namespace Suave.Utils
 
-module Bytes =
-  open System
-  open System.IO
-  open System.Text
-  open Suave.Async
+open System
+open System.IO
+open System.Text
+open Suave.Utils.Async
+
+
+
+module (* internal *) Bytes =
  
   /// Ordinally compare two strings in constant time, bounded by the length of the
   /// longest string.
-  let cnst_time_cmp (bits : byte []) (bobs : byte []) =
+  let constantTimeCompare (bits : byte []) (bobs : byte []) =
     let mutable xx = uint32 bits.Length ^^^ uint32 bobs.Length
     let mutable i = 0
     while i < bits.Length && i < bobs.Length do
@@ -21,10 +24,16 @@ module Bytes =
       offset : int
       length : int }
 
+  [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+  module BufferSegment =
+    
+    let inline mk buffer offset length =
+      if length < 0 then failwith (sprintf "BufferSegment.mk: length = %d < 0" length)
+      { buffer = buffer; offset = offset; length = length }
 
   // for ci in (int '!')..(int '~') do printfn "%c" (char ci);;
   // https://en.wikipedia.org/wiki/HTTP_cookie#Setting_a_cookie
-  let cookie_encoding =
+  let cookieEncoding =
     let repls =
       [ '+', '_'
         '/', '!'
@@ -42,13 +51,6 @@ module Bytes =
 
     enc, dec
 
-  [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
-  module BufferSegment =
-    
-    let inline mk buffer offset length =
-      if length < 0 then failwith (sprintf "BufferSegment.mk: length = %d < 0" length)
-      { buffer = buffer; offset = offset; length = length }
-
   /// The end-of-line literal, \r\n (CRLF)
   let [<Literal>] eol = "\r\n"
 
@@ -56,48 +58,48 @@ module Bytes =
   let EOL = ASCII.bytes eol
 
   /// The corresponding EOL array segment
-  let eol_array_segment = new ArraySegment<_>(EOL, 0, 2)
+  let eolArraySegment = new ArraySegment<_>(EOL, 0, 2)
 
-  let inline bytes_to_buffer (s : string) (buff : byte []) (offset : int) =
+  let inline bytesToBuffer (s : string) (buff : byte []) (offset : int) =
     Encoding.ASCII.GetBytes (s, 0, s.Length, buff, offset)
 
   /// Fully transform the input stream to a byte array.
-  let read_fully (input : Stream) =
+  let readFully (input : Stream) =
     use ms = new MemoryStream()
     input.CopyTo ms
     ms.ToArray()
 
   /// Asynchronously write from the 'from' stream to the 'to' stream, with an upper bound on
   /// amount to transfer by len
-  let transfer_len (to_stream : Stream) (from : Stream) len =
+  let transferBounded (toStream : Stream) (from : Stream) len =
     let buf_size = 0x2000
     let buf = Array.zeroCreate<byte> 0x2000
     let rec do_block left = async {
       let! read = from.AsyncRead(buf, 0, Math.Min(buf_size, left))
       if read <= 0 || left - read = 0 then
-        do! to_stream.FlushAsync()
+        do! toStream.FlushAsync()
         return ()
       else
-        do! to_stream.AsyncWrite(buf, 0, read)
+        do! toStream.AsyncWrite(buf, 0, read)
         return! do_block (left - read) }
     do_block len
 
   /// Asynchronously write from the 'from' stream to the 'to' stream.
-  let transfer (to_stream : Stream) (from : Stream) =
+  let transfer (toStream : Stream) (from : Stream) =
     let buf = Array.zeroCreate<byte> 0x2000
-    let rec do_block () = async {
+    let rec doBlock () = async {
       let! read = from.AsyncRead buf
       if read <= 0 then
-        do! to_stream.FlushAsync()
+        do! toStream.FlushAsync()
         return ()
       else
-        do! to_stream.AsyncWrite(buf, 0, read)
-        return! do_block () }
-    do_block ()
+        do! toStream.AsyncWrite(buf, 0, read)
+        return! doBlock () }
+    doBlock ()
 
   /// Knuth-Morris-Pratt algorithm
   /// http://caml.inria.fr/pub/old_caml_site/Examples/oc/basics/kmp.ml
-  let init_next p =
+  let initNext p =
     let m = Array.length p
     let next = Array.create m 0
     let i = ref 1
@@ -108,7 +110,7 @@ module Bytes =
     next
 
   let kmp p =
-    let next = init_next p
+    let next = initNext p
     let m = Array.length p
     fun s ->
       let n = Array.length s
@@ -120,8 +122,8 @@ module Bytes =
       done;
       if !j >= m then Some(!i - m) else None
 
-  let kmp_x p =
-    let next = init_next p
+  let kmpX p =
+    let next = initNext p
     let m = Array.length p
     fun (s:ArraySegment<_>) ->
       let n = s.Count
@@ -133,7 +135,7 @@ module Bytes =
       done;
       if !j >= m then Some(!i - m) else None
 
-  let inline unite_array_segment (aas : ArraySegment<byte> list) =
+  let inline uniteArraySegment (aas : ArraySegment<byte> list) =
     fun (i : int) ->
       if   i < 0 then failwith "invalid args"
       let rec loop k acc =
@@ -143,7 +145,7 @@ module Bytes =
         else loop (k + 1) (acc + a.Count)
       loop 0 0
 
-  let inline unite_array_buffer_segment (aas : BufferSegment list) =
+  let inline uniteArrayBufferSegment (aas : BufferSegment list) =
     fun (i : int) ->
       if   i < 0 then failwith "invalid args"
       let rec loop k acc =
@@ -153,11 +155,11 @@ module Bytes =
         else loop (k + 1) (acc + a.length)
       loop 0 0
 
-  let kmp_y p =
-    let next = init_next p
+  let kmpY p =
+    let next = initNext p
     let m = Array.length p
     fun (xs : ArraySegment<byte> list) ->
-      let a = unite_array_segment xs
+      let a = uniteArraySegment xs
       let n = List.fold (fun acc (x :  ArraySegment<byte>) -> acc + x.Count) 0 xs
       let  i = ref 0
       let j = ref 0 in
@@ -167,11 +169,11 @@ module Bytes =
       done;
       if !j >= m then Some(!i - m) else None
 
-  let kmp_z p =
-    let next = init_next p
+  let kmpZ p =
+    let next = initNext p
     let m = Array.length p
     fun (xs : BufferSegment list) ->
-      let a = unite_array_buffer_segment xs
+      let a = uniteArrayBufferSegment xs
       let n = List.fold (fun acc (x :  BufferSegment) -> acc + x.length) 0 xs
       let  i = ref 0
       let j = ref 0 in
@@ -188,8 +190,8 @@ module Bytes =
       elif i < a.Count + b.Count then b.Array.[b.Offset + (i - a.Count)]
       else failwith "invalid args"
 
-  let kmp_x_x p =
-    let next = init_next p
+  let kmpXX p =
+    let next = initNext p
     let m = Array.length p
     fun (v:ArraySegment<_>) (w:ArraySegment<_>) ->
       let n = v.Count + w.Count
@@ -203,7 +205,7 @@ module Bytes =
       if !j >= m then Some(!i - m) else None
 
   /// Returns the index of the first CRLF in the buffer
-  let inline scan_crlf (b : ArraySegment<byte>) =
+  let inline scanCrlf (b : ArraySegment<byte>) =
     let a = b.Array
     let rec loop i =
       if i > b.Offset + b.Count - 1 then None
@@ -212,7 +214,7 @@ module Bytes =
     loop b.Offset
 
   /// Returns the index of the first CRLF in the union of two ArraySegment
-  let inline scan_crlf_x (c : ArraySegment<byte>) (d : ArraySegment<byte>) =
+  let inline scanCrlfX (c : ArraySegment<byte>) (d : ArraySegment<byte>) =
     let a = unite c d
     let rec loop i =
       if i > c.Count + d.Count - 1 then None
