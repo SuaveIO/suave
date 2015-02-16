@@ -541,8 +541,8 @@ type ErrorHandler = Exception -> String -> WebPart
 {% endhighlight %}
 
 
-Replacing Suave's logging
--------------------------
+Getting Hold of Suave's Logs
+----------------------------
 
 When you are using suave you will probably want to funnel all logs from the
 output to your own log sink. We provide the interface `Logger` to do that; just
@@ -561,20 +561,22 @@ type MyHackLogger(minLevel) =
 You can use Logary for integrated logging:
 
 {% highlight dosbatch %}
-Install-Package Intelliplan.Logary.Suave -Pre
+Install-Package Logary.Adapters.Suave
 {% endhighlight %}
 
 Use the `SuaveAdapter` type to set the Logger in Suave's configuration:
 
 {% highlight fsharp %}
-  use logary =
-    withLogary' "logibit.web" (
-      withTargets [
-        Console.create Console.empty "console"
-        Debugger.create Debugger.empty "debugger"
-      ] >>
-      withMetrics (Duration.FromMilliseconds 5000L) [
-        WinPerfCounters.create (WinPerfCounters.Common.cpuTimeConf) "wperf"
+open Suave.Logging
+
+use logary =
+  withLogary' "logibit.web" (
+    withTargets [
+      Console.create Console.empty "console"
+      Debugger.create Debugger.empty "debugger"
+    ] >>
+    withMetrics (Duration.FromMilliseconds 5000L) [
+      WinPerfCounters.create (WinPerfCounters.Common.cpuTimeConf) "wperf"
 (Duration.FromMilliseconds 300L)
       ] >>
       withRules [
@@ -583,8 +585,8 @@ Use the `SuaveAdapter` type to set the Logger in Suave's configuration:
       ]
     )
 
-  let webConfig =
-    { defaultConfig with
-        logger   = SuaveAdapter(logary.GetLogger "suave")
-    }
+let webConfig =
+  { defaultConfig with
+      logger   = SuaveAdapter(logary.GetLogger "suave")
+  }
 {% endhighlight %}
