@@ -106,9 +106,9 @@ let tests =
       let ctx =
         runWithConfig (
           choose [
-            url "/" >>= OK "root"
-            url "/auth" >>= Auth.authenticated Session false >>= OK "authed"
-            url "/protected"
+            path "/" >>= OK "root"
+            path "/auth" >>= Auth.authenticated Session false >>= OK "authed"
+            path "/protected"
               >>= Auth.authenticate Session false
                                     (fun () ->
                                       Choice2Of2(FORBIDDEN "please authenticate"))
@@ -177,10 +177,10 @@ let tests =
         runWithConfig ( 
           statefulForSession
           >>= choose [
-            url "/a"     >>= sessionState (fun state -> state.set "a" "a" >>= OK "a" )
-            url "/b"     >>= sessionState (fun state -> state.set "b" "b" >>= OK "b" )
-            url "/get_a" >>= sessionState (fun state -> match state.get "a" with Some a -> OK a | None -> RequestErrors.BAD_REQUEST "fail")
-            url "/get_b" >>= sessionState (fun state -> match state.get "b" with Some a -> OK a | None -> RequestErrors.BAD_REQUEST "fail" )
+            path "/a"     >>= sessionState (fun state -> state.set "a" "a" >>= OK "a" )
+            path "/b"     >>= sessionState (fun state -> state.set "b" "b" >>= OK "b" )
+            path "/get_a" >>= sessionState (fun state -> match state.get "a" with Some a -> OK a | None -> RequestErrors.BAD_REQUEST "fail")
+            path "/get_b" >>= sessionState (fun state -> match state.get "b" with Some a -> OK a | None -> RequestErrors.BAD_REQUEST "fail" )
             ])
 
       let container = CookieContainer()
@@ -204,9 +204,9 @@ let tests =
       let ctx =
         runWithConfig ( 
           statefulForSession >>= choose [
-            url "/ab"     >>= sessionState (fun state -> state.set "a" "a" >>= sessionState ( fun state' -> state'.set "b" "b" >>= OK "a" ))
-            url "/get_a" >>= sessionState (fun state -> match state.get "a" with Some a -> OK a | None -> RequestErrors.BAD_REQUEST "fail")
-            url "/get_b" >>= sessionState (fun state -> match state.get "b" with Some a -> OK a | None -> RequestErrors.BAD_REQUEST "fail" )
+            path "/ab"     >>= sessionState (fun state -> state.set "a" "a" >>= sessionState ( fun state' -> state'.set "b" "b" >>= OK "a" ))
+            path "/get_a" >>= sessionState (fun state -> match state.get "a" with Some a -> OK a | None -> RequestErrors.BAD_REQUEST "fail")
+            path "/get_b" >>= sessionState (fun state -> match state.get "b" with Some a -> OK a | None -> RequestErrors.BAD_REQUEST "fail" )
             ])
 
       let container = CookieContainer()

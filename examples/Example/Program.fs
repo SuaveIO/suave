@@ -23,22 +23,22 @@ let logger = Loggers.ConsoleWindowLogger LogLevel.Verbose
 let myApp =
   choose [
     GET >>= choose
-      [ url "/hello" >>= OK "Hello GET" ; url "/goodbye" >>= OK "Good bye GET" ];
+      [ path "/hello" >>= OK "Hello GET" ; path "/goodbye" >>= OK "Good bye GET" ];
     POST >>= choose
-      [ url "/hello" >>= OK "Hello POST" ; url "/goodbye" >>= OK "Good bye POST" ];
+      [ path "/hello" >>= OK "Hello POST" ; path "/goodbye" >>= OK "Good bye POST" ];
     DELETE >>= choose
-      [ url "/hello" >>= OK "Hello DELETE" ; url "/goodbye" >>= OK "Good bye DELETE" ];
+      [ path "/hello" >>= OK "Hello DELETE" ; path "/goodbye" >>= OK "Good bye DELETE" ];
     PUT >>= choose
-      [ url "/hello" >>= OK "Hello PUT" ; url "/goodbye" >>= OK "Good bye PUT" ];
+      [ path "/hello" >>= OK "Hello PUT" ; path "/goodbye" >>= OK "Good bye PUT" ];
   ]
 
 // typed routes
 let testApp =
   choose [
     log logger logFormat >>= never
-    urlScan "/add/%d/%d"   (fun (a,b) -> OK((a + b).ToString()))
-    urlScan "/minus/%d/%d" (fun (a,b) -> OK((a - b).ToString()))
-    urlScan "/divide/%d/%d" (fun (a,b) -> OK((a / b).ToString()))
+    pathScan "/add/%d/%d"   (fun (a,b) -> OK((a + b).ToString()))
+    pathScan "/minus/%d/%d" (fun (a,b) -> OK((a - b).ToString()))
+    pathScan "/divide/%d/%d" (fun (a,b) -> OK((a / b).ToString()))
     RequestErrors.NOT_FOUND "Found no handlers"
   ]
 
@@ -59,19 +59,19 @@ let mimeTypes =
 
 let app =
   choose [
-    GET >>= url "/hello" >>= never
-    urlRegex "(.*?)\.(dll|mdb|log)$" >>= RequestErrors.FORBIDDEN "Access denied."
-    url "/neverme" >>= never >>= OK (Guid.NewGuid().ToString())
-    url "/guid" >>= OK (Guid.NewGuid().ToString())
-    url "/hello" >>= OK "Hello World"
-    (url "/apple" <|> url "/orange") >>= OK "Hello Fruit"
-    GET >>= url "/query" >>= request( fun x -> cond (x.queryParam "name") (fun y -> OK ("Hello " + y)) never)
-    GET >>= url "/query" >>= OK "Hello beautiful"
-    url "/redirect" >>= Redirection.redirect "/redirected"
-    url "/redirected" >>=  OK "You have been redirected."
-    url "/date" >>= warbler (fun _ -> OK (DateTimeOffset.UtcNow.ToString("o")))
-    url "/timeout" >>= timeoutWebPart (TimeSpan.FromSeconds 1.) (sleep 120000 "Did not timed out")
-    url "/session"
+    GET >>= path "/hello" >>= never
+    pathRegex "(.*?)\.(dll|mdb|log)$" >>= RequestErrors.FORBIDDEN "Access denied."
+    path "/neverme" >>= never >>= OK (Guid.NewGuid().ToString())
+    path "/guid" >>= OK (Guid.NewGuid().ToString())
+    path "/hello" >>= OK "Hello World"
+    (path "/apple" <|> path "/orange") >>= OK "Hello Fruit"
+    GET >>= path "/query" >>= request( fun x -> cond (x.queryParam "name") (fun y -> OK ("Hello " + y)) never)
+    GET >>= path "/query" >>= OK "Hello beautiful"
+    path "/redirect" >>= Redirection.redirect "/redirected"
+    path "/redirected" >>=  OK "You have been redirected."
+    path "/date" >>= warbler (fun _ -> OK (DateTimeOffset.UtcNow.ToString("o")))
+    path "/timeout" >>= timeoutWebPart (TimeSpan.FromSeconds 1.) (sleep 120000 "Did not timed out")
+    path "/session"
       >>= statefulForSession // Session.State.CookieStateStore
       >>= context (fun x ->
         match x |> HttpContext.state with
@@ -85,12 +85,12 @@ let app =
             store.set "counter" 1
             >>= OK "First time")
     basicAuth // from here on it will require authentication
-    GET >>= url "/events" >>= request (fun r -> EventSource.handShake (CounterDemo.counterDemo r))
+    GET >>= path "/events" >>= request (fun r -> EventSource.handShake (CounterDemo.counterDemo r))
     GET >>= browseHome //serves file if exists
     GET >>= dirHome //show directory listing
-    HEAD >>= url "/head" >>= sleep 100 "Nice sleep .."
-    POST >>= url "/upload" >>= OK "Upload successful."
-    PUT >>= url "/upload2"
+    HEAD >>= path "/head" >>= sleep 100 "Nice sleep .."
+    POST >>= path "/upload" >>= OK "Upload successful."
+    PUT >>= path "/upload2"
       >>= request (fun x ->
          let files =
            x.files 
@@ -99,7 +99,7 @@ let app =
          OK (sprintf "Upload successful.<br>POST data: %A<br>Uploaded files (%d): %s" x.multiPartFields (List.length x.files) files))
     POST >>= request (fun x -> OK (sprintf "POST data: %s" (System.Text.Encoding.ASCII.GetString x.rawForm)))
     GET
-      >>= url "/custom_header"
+      >>= path "/custom_header"
       >>= setHeader "X-Doge-Location" "http://www.elregalista.com/wp-content/uploads/2014/02/46263312.jpg"
       >>= OK "Doooooge"
     RequestErrors.NOT_FOUND "Found no handlers"
