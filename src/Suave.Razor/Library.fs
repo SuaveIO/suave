@@ -6,6 +6,7 @@ open Suave.Types
 open Suave.Types.Codes
 open Suave.Http
 open Suave.Http.Files
+open Suave.Utils
 
 open RazorEngine
 
@@ -47,7 +48,7 @@ module Razor =
     fun r ->
       async {
         try
-          let template_path = local_file path r.runtime.home_directory
+          let template_path = resolvePath r.runtime.homeDirectory path
           let! razorTemplate = load_template template_path
           let content = Razor.Parse(razorTemplate, model, template_path)
           return! Response.response HTTP_200 (UTF8.bytes content) r
