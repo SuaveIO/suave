@@ -335,8 +335,10 @@ module Http =
       let iff b x =
         if b then Some x else None
 
-    let url s (x : HttpContext) =
+    let path s (x : HttpContext) =
       async.Return (Option.iff (s = x.request.url.AbsolutePath) x)
+
+    let url x = path x
 
     let ``method`` (m : HttpMethod) (x : HttpContext) =
       async.Return (Option.iff (m = x.request.``method``) x)
@@ -344,8 +346,10 @@ module Http =
     let isSecure (x : HttpContext) =
       async.Return (Option.iff x.request.isSecure x)
 
-    let urlRegex regex (x : HttpContext) =
+    let pathRegex regex (x : HttpContext) =
       async.Return (Option.iff (Regex.IsMatch(x.request.url.AbsolutePath, regex)) x)
+
+    let urlRegex x = pathRegex x
 
     let host hostname (x : HttpContext) = async {
       if x.request.host.value = hostname then
@@ -409,7 +413,7 @@ module Http =
     open Suave.Sscanf
     open ServerErrors
 
-    let urlScan (pf : PrintfFormat<_,_,_,_,'t>) (h : 't ->  WebPart) : WebPart =
+    let pathScan (pf : PrintfFormat<_,_,_,_,'t>) (h : 't ->  WebPart) : WebPart =
       
       let scan url =
         try 
@@ -425,6 +429,8 @@ module Http =
         | None -> 
           fail
       F
+
+    let urlScan s x = pathScan s x
           
     let timeoutWebPart (timeSpan : TimeSpan) (webPart : WebPart) : WebPart =
       fun (ctx : HttpContext) -> async {

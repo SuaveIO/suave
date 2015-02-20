@@ -1063,7 +1063,10 @@ module Http =
     open Suave.Types
     open Suave.Logging
 
-    /// Match on the url
+    /// Match on the path
+    val path : s:string -> WebPart
+
+    [<System.Obsolete("Use path")>]
     val url : s:string -> WebPart
 
     /// Match on the method
@@ -1072,7 +1075,10 @@ module Http =
     /// Match on the protocol
     val isSecure : WebPart
 
-    /// Applies the regex to the url and matches on the result
+    /// Applies the regex to the path and matches on the result
+    val pathRegex : s:string -> WebPart
+    
+    [<System.Obsolete("Use pathRegex")>]
     val urlRegex : s:string -> WebPart
 
     /// Match on the hostname (which is a required header for a Http client to send)
@@ -1111,6 +1117,9 @@ module Http =
     /// 'M', parse_decimal</para><para>
     /// 'c', char
     /// </para></summary>
+    val pathScan : pf:PrintfFormat<'a,'b,'c,'d,'t> -> h:('t -> WebPart) -> WebPart
+
+    [<System.Obsolete("Use pathScan")>]
     val urlScan : pf:PrintfFormat<'a,'b,'c,'d,'t> -> h:('t -> WebPart) -> WebPart
 
     /// <summary> Fails the WebPart after x seconds</summary>
