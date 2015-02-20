@@ -49,7 +49,7 @@ let proxy =
           proxy toTarget |> req HttpMethod.GET "/" None)
 
     testCase "GET /redirect returns 'redirect'" <| fun _ ->
-      runInContext (runTarget (url "/secret" >>= redirect "https://sts.example.se")) disposeContext <| fun _ ->
+      runInContext (runTarget (path "/secret" >>= redirect "https://sts.example.se")) disposeContext <| fun _ ->
         let headers, stat =
           proxy toTarget |> reqResp HttpMethod.GET "/secret" "" None None DecompressionMethods.None id
             (fun r -> r.Headers, r.StatusCode)

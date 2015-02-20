@@ -22,7 +22,7 @@ let fib n =
   }
 
 let app =
-  urlScan "/%d" (fun (n : int) -> fun x -> async{ let! r = fib (bigint n) in return! OK (r.ToString()) x })
+  pathScan "/%d" (fun (n : int) -> fun x -> async{ let! r = fib (bigint n) in return! OK (r.ToString()) x })
 
 let config =
   { defaultConfig with

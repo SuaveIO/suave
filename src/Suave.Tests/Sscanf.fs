@@ -50,6 +50,6 @@ let more_scan_tests =
     testCase "parse a long integer" <| fun _ ->
       Assert.Equal("returns 9223372036854775807",
                    "9223372036854775807",
-                   runWithConfig (urlScan "/%d" (fun (a:int64) -> OK(string a)))
+                   runWithConfig (pathScan "/%d" (fun (a:int64) -> OK(string a)))
                    |> req HttpMethod.GET "/9223372036854775807" None) 
     ]
