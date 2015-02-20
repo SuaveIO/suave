@@ -74,8 +74,10 @@ let forward (ip : IPAddress) (port : uint16) (ctx : HttpContext) =
 
   fun ctx -> socket {
     if p.``method`` = HttpMethod.POST || p.``method`` = HttpMethod.PUT then
-      let contentLength = Convert.ToInt32(p.headers %% "content-length")
-      do! transferStreamBounded ctx.connection (q.GetRequestStream()) contentLength
+      match p.headers %% "content-length" with
+      | Some contentLength ->
+        do! transferStreamBounded ctx.connection (q.GetRequestStream()) (int32 contentLength)
+      | None -> ()
     try
       let! data = liftAsync <| q.AsyncGetResponse()
       let! res = liftAsync <| sendWebResponse ((data : WebResponse) :?> HttpWebResponse) ctx
