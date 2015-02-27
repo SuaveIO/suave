@@ -70,38 +70,42 @@ the script.
 
 {% highlight fsharp %}
 // Step 0. Boilerplate to get the paket.exe tool
-
+ 
 open System
 open System.IO
-
+ 
 Environment.CurrentDirectory <- __SOURCE_DIRECTORY__
-
+ 
 if not (File.Exists "paket.exe") then
-    let url = "https://github.com/fsprojects/Paket/releases/download/0.26.3/paket.exe"
-    use wc = new Net.WebClient() 
-	let tmp = Path.GetTempFileName() 
-	wc.DownloadFile(url, tmp); 
-	File.Move(tmp,Path.GetFileName url)
-
+let url = "https://github.com/fsprojects/Paket/releases/download/0.31.5/paket.exe"
+use wc = new Net.WebClient() in let tmp = Path.GetTempFileName() in wc.DownloadFile(url, tmp); File.Move(tmp,Path.GetFileName url)
+ 
 // Step 1. Resolve and install the packages
-
+ 
 #r "paket.exe"
-
-Paket.Scripting.Install """
-    source https://nuget.org/api/v2
-    nuget Suave
+ 
+Paket.Dependencies.Install """
+source https://nuget.org/api/v2
+nuget Suave 0.16.0
+nuget FSharp.Data
+nuget FSharp.Charting
 """;;
-
+ 
 // Step 2. Use the packages
-
+ 
 #r "packages/Suave/lib/Suave.dll"
-
-
-open Suave                 // always open suave
+#r "packages/FSharp.Data/lib/net40/FSharp.Data.dll"
+#r "packages/FSharp.Charting/lib/net40/FSharp.Charting.dll"
+ 
+let ctxt = FSharp.Data.WorldBankData.GetDataContext()
+ 
+let data = ctxt.Countries.Algeria.Indicators.``GDP (current US$)``
+ 
+open Suave // always open suave
 open Suave.Http.Successful // for OK-result
-open Suave.Web             // for config
-
-startWebServer defaultConfig (OK "Hello World!")
+open Suave.Web // for config
+ 
+web_server default_config (OK (sprintf "Hello World! In 2010 Algeria earned %f " data.[2010]))
 {% endhighlight %}
 
 A slightly more complex example: routing HTTP requests
