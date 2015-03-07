@@ -12,7 +12,7 @@ open RazorEngine
 
 module Razor =
 
-  let private async_memoize f =
+  let private asyncMemoize f =
     let cache = Collections.Concurrent.ConcurrentDictionary<_ , _>()
     fun x ->
       async {
@@ -26,7 +26,7 @@ module Razor =
           return res
       }
 
-  let private load_template template_path =
+  let private loadTemplate template_path =
     async {
       use file = new FileStream(template_path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite)
       use reader = new StreamReader(file)
@@ -34,7 +34,7 @@ module Razor =
       return razorTemplate
     }
 
-  let load_template_cached = async_memoize load_template
+  let loadTemplateCached = asyncMemoize loadTemplate
 
   /// razor WebPart
   ///
@@ -48,7 +48,7 @@ module Razor =
       async {
         try
           let template_path = resolvePath r.runtime.homeDirectory path
-          let! razorTemplate = load_template_cached template_path
+          let! razorTemplate = loadTemplateCached template_path
           let content = Razor.Parse(razorTemplate, model, template_path)
           return! Response.response HTTP_200 (UTF8.bytes content) r
         with 
