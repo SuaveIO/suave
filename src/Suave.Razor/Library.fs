@@ -34,6 +34,8 @@ module Razor =
       return razorTemplate
     }
 
+  let load_template_cached = async_memoize load_template
+
   /// razor WebPart
   ///
   /// type Bar = { foo : string }
@@ -42,14 +44,11 @@ module Razor =
   ///   url "/home" >>= razor "/home.chtml" { foo = "Bar" }
   ///
   let razor<'a> path (model : 'a) =
-
-    let load_template = async_memoize load_template
-
     fun r ->
       async {
         try
           let template_path = resolvePath r.runtime.homeDirectory path
-          let! razorTemplate = load_template template_path
+          let! razorTemplate = load_template_cached template_path
           let content = Razor.Parse(razorTemplate, model, template_path)
           return! Response.response HTTP_200 (UTF8.bytes content) r
         with 
