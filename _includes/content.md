@@ -86,14 +86,14 @@ use wc = new Net.WebClient() in let tmp = Path.GetTempFileName() in wc.DownloadF
  
 Paket.Dependencies.Install """
 source https://nuget.org/api/v2
-nuget Suave 0.16.0
+nuget Suave
 nuget FSharp.Data
 nuget FSharp.Charting
 """;;
  
 // Step 2. Use the packages
  
-#r "packages/Suave/lib/Suave.dll"
+#r "packages/Suave/lib/net40/Suave.dll"
 #r "packages/FSharp.Data/lib/net40/FSharp.Data.dll"
 #r "packages/FSharp.Charting/lib/net40/FSharp.Charting.dll"
  
@@ -105,7 +105,7 @@ open Suave // always open suave
 open Suave.Http.Successful // for OK-result
 open Suave.Web // for config
  
-web_server default_config (OK (sprintf "Hello World! In 2010 Algeria earned %f " data.[2010]))
+startWebServer defaultConfig (OK (sprintf "Hello World! In 2010 Algeria earned %f " data.[2010]))
 {% endhighlight %}
 
 A slightly more complex example: routing HTTP requests
@@ -135,11 +135,11 @@ open Suave.Web
 let app =
   choose
     [ GET >>= choose
-        [ url "/hello" >>= OK "Hello GET"
-          url "/goodbye" >>= OK "Good bye GET" ]
+        [ path "/hello" >>= OK "Hello GET"
+          path "/goodbye" >>= OK "Good bye GET" ]
       POST >>= choose
-        [ url "/hello" >>= OK "Hello POST"
-          url "/goodbye" >>= OK "Good bye POST" ] ]
+        [ path "/hello" >>= OK "Hello POST"
+          path "/goodbye" >>= OK "Good bye POST" ] ]
 
 startWebServer defaultConfig app
 {% endhighlight %}
