@@ -31,7 +31,7 @@ module Xsp =
     member this.StatusCode
        with get() = _statusCode
     override this.MapPath(path : string) =
-        Path.Combine(homeDirectory,path)
+        Path.Combine(homeDirectory, path.TrimStart([| '/'|]))
 
   type ProcessRequestResult =
       { data : byte[]; status : int }
@@ -43,9 +43,8 @@ module Xsp =
       HttpRuntime.ProcessRequest(worker)
       { data = worker.Data; status = worker.StatusCode }
 
-  // using an application host requires deployin the dll into the bin directory of the ASPX application 
+  // NOTE: using an application host requires deploying the dll into the bin directory of the ASPX application 
   // or registering Suave.Xsp in the GAC
-
   let appHost = 
     ApplicationHost.CreateApplicationHost(typeof<SuaveHost>, "/", Directory.GetCurrentDirectory())
     :?> SuaveHost
