@@ -6,6 +6,7 @@ open Suave.Http.Applicatives
 open Suave.Http.Successful
 open Suave.Logging
 
+open System.IO
 open System.Net
 
 let config =
@@ -14,5 +15,6 @@ let config =
 
 [<EntryPoint>]
 let main _ =
-  startWebServer defaultConfig Xsp.run
+  let appHost = Xsp.createApplication <| Directory.GetCurrentDirectory()
+  startWebServer defaultConfig (Xsp.run appHost)
   0

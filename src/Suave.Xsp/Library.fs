@@ -43,13 +43,18 @@ module Xsp =
       HttpRuntime.ProcessRequest(worker)
       { data = worker.Data; status = worker.StatusCode }
 
-  // NOTE: using an application host requires deploying the dll into the bin directory of the ASPX application 
-  // or registering Suave.Xsp in the GAC
-  let appHost = 
-    ApplicationHost.CreateApplicationHost(typeof<SuaveHost>, "/", Directory.GetCurrentDirectory())
+  let createApplication directory =
+    // NOTE: using an application host requires deploying the dll into the bin directory of the ASPX application 
+    // or registering Suave.Xsp in the GAC
+    let binDir = Path.Combine(directory,"bin")
+    if not(Directory.Exists(binDir)) then
+      Directory.CreateDirectory(binDir) |> ignore
+    File.Copy(Directory.GetCurrentDirectory() + "/Suave.dll",binDir + "/Suave.dll", true)
+    File.Copy(Directory.GetCurrentDirectory() + "/Suave.Xsp.dll",binDir + "/Suave.Xsp.dll", true)
+    ApplicationHost.CreateApplicationHost(typeof<SuaveHost>, "/", directory)
     :?> SuaveHost
 
-  let run : WebPart = fun ctx ->
+  let run (appHost : SuaveHost) : WebPart = fun ctx ->
     async {
       let page = ctx.request.url.AbsolutePath.TrimStart([| '/'|])
       let result = appHost.ProcessRequest(ctx.runtime.homeDirectory, page, ctx.request.rawQuery)
