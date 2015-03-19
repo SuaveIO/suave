@@ -20,7 +20,8 @@ Configuration = ENV['CONFIGURATION'] || 'Release'
 
 desc "Restore paket.exe"
 task :restore_paket do
-  system 'tools/paket.bootstrapper.exe', clr_command: true
+  system 'tools/paket.bootstrapper.exe', clr_command: true unless
+    File.exists? 'tools/paket.exe'
 end
 
 desc "Restore all packages"
