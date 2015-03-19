@@ -139,6 +139,10 @@ module Http =
       | ".js"  -> mkMimeType "application/x-javascript" true
       | ".exe" -> mkMimeType "application/exe" false
       | ".txt" -> mkMimeType "text/plain" true
+      | ".ttf" -> mkMimeType "application/x-font-ttf" false
+      | ".otf" -> mkMimeType "application/font-sfnt" false
+      | ".woff" -> mkMimeType "application/font-woff" false
+      | ".eot" -> mkMimeType "application/vnd.ms-fontobject" false
       | _      -> None
 
     let setMimeType t = setHeader "Content-Type" t
