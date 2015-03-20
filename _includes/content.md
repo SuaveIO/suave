@@ -598,47 +598,48 @@ let webConfig =
 Deploying Suave to Heroku
 ----------------------------
 
+Suave web sites can be as simple as a single F# script whcih starts a web server, or a full project.  
+
+
 1. [Install the Heroku Toolbelt](https://toolbelt.heroku.com/)
 
-2. Login to Heroku and push your project:
+2. Login to Heroku using the command-line tools:
 
-{% highlight bash %}
-heroku login
-{% endhighlight %}
+       heroku login
 
 3. Your application needs to be either
 
    - a single script app.fsx (plus an heroku Procfile and dummy.sln file) OR 
-   - a directory with a .sln solution
+
+   - a directory with a .sln solution  (plus an heroku Procfile)
 	
    Optionally, you can have a paket.dependencies OR packages.config files
 
-   If using an app.fsx then it must start a web server that binds to 0.0.0.0:$PORT.
+   Either way, your application  must start a web server that binds to 0.0.0.0:$PORT.
+   
+   Your Procfile must specify how the application starts.
    
 If you don't have an app.fsx already that implements your website, then clone an example, putting it in a new directory (replace myproj by a unique project name)
 
-{% highlight bash %}
-git clone https://github.com/dsyme/heroku-getting-started.git -d myproj
-cd myproj
-{% endhighlight %}
+       git clone https://github.com/dsyme/heroku-getting-started.git -d myproj
+       cd myproj
 
 4. Create a new heroku web app and register "heroku" as a remote you can push to:
 
-{% highlight bash %}
-heroku create myproj --buildpack https://github.com/dsyme/mono-script-buildpack.git 
-heroku git:remote -a myproj
-{% endhighlight %}
+       heroku create myproj --buildpack https://github.com/dsyme/mono-script-buildpack.git 
+       heroku git:remote -a myproj
 
 5. Push!
 
-Use an empty user name. You may need to use ``git auth:token`` to get a app token to use as a password here.
+   Use an empty user name. You may need to use ``git auth:token`` to get a app token to use as a password here.
 
-{% highlight bash %}
-git push heroku master  
-{% endhighlight %}
+       git push heroku master  
 
+   You can change the buildpack being used at a later date (e.g. to update to a later version of Mono) using 
 
-- If using github or bitbucket, find your app on Heroku and enable automatic deploy so you don't need to push explciitly.
+       heroku buildpack:set https://github.com/your-build-pack-repo``
 
-- You can look at logs from your web server script using ``heroku logs``.
+   - If using github or bitbucket, find your app on Heroku and enable automatic deploy so you don't need to push explciitly.
+
+   - You can look at logs from your web server script using ``heroku logs``.
 
