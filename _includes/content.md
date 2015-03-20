@@ -637,7 +637,7 @@ If you don't have an app.fsx already that implements your website, then clone an
 
    You can change the buildpack being used at a later date (e.g. to update to a later version of Mono) using 
 
-       heroku buildpack:set https://github.com/your-build-pack-repo``
+       heroku buildpack:set https://github.com/your-build-pack-repo
 
    - If using github or bitbucket, find your app on Heroku and enable automatic deploy so you don't need to push explciitly.
 
