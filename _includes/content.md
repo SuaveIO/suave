@@ -627,7 +627,6 @@ If you don't have an app.fsx already that implements your website, then clone an
 4. Create a new heroku web app and register "heroku" as a remote you can push to:
 
        heroku create myproj --buildpack https://github.com/SuaveIO/mono-script-buildpack.git 
-       heroku git:remote -a myproj
 
 5. Push!
 
