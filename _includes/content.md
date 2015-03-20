@@ -618,8 +618,8 @@ Suave web sites can be as simple as a single F# script whcih starts a web server
    Either way, your application  must start a web server that binds to 0.0.0.0:$PORT.
    
    Your Procfile must specify how the application starts.
-   
-If you don't have an app.fsx already that implements your website, then clone an example, putting it in a new directory (replace myproj by a unique project name)
+
+   If you don't have an app.fsx already that implements your website, then clone an example, putting it in a new directory (replace myproj by a unique project name)
 
        git clone https://github.com/SuaveIO/heroku-getting-started.git myproj
        cd myproj
