@@ -621,12 +621,12 @@ Suave web sites can be as simple as a single F# script whcih starts a web server
    
 If you don't have an app.fsx already that implements your website, then clone an example, putting it in a new directory (replace myproj by a unique project name)
 
-       git clone https://github.com/dsyme/heroku-getting-started.git -d myproj
+       git clone https://github.com/SuaveIO/heroku-getting-started.git -d myproj
        cd myproj
 
 4. Create a new heroku web app and register "heroku" as a remote you can push to:
 
-       heroku create myproj --buildpack https://github.com/dsyme/mono-script-buildpack.git 
+       heroku create myproj --buildpack https://github.com/SuaveIO/mono-script-buildpack.git 
        heroku git:remote -a myproj
 
 5. Push!
