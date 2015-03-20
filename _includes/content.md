@@ -504,11 +504,11 @@ You can register additional MIME extensions by creating a new mime map in the fo
 
 {% highlight fsharp %}
 // Adds a new mime type to the default map
-let mime_types =
+let mimeTypes =
   defaultMimeTypesMap
     >=> (function | ".avi" -> mkMimeType "video/avi" false | _ -> None)
 
-let webConfig = { defaultConfig with mimeTypesMap = mime_types }
+let webConfig = { defaultConfig with mimeTypesMap = mimeTypes }
 {% endhighlight %}
 
 ## Overview
@@ -598,47 +598,46 @@ let webConfig =
 Deploying Suave to Heroku
 ----------------------------
 
-Suave web sites can be as simple as a single F# script whcih starts a web server, or a full project.  
+Suave web sites can be as simple as a single F# script which starts a web server, or a full project.  
 
+Your application needs to be either a single script ``app.fsx`` (plus an heroku ``Procfile`` and ``dummy.sln`` file) OR 
+a directory with a ``.sln`` solution  (plus an heroku ``Procfile``)
+	
+Optionally, you can have a ``paket.dependencies`` OR ``packages.config`` files
 
-1. [Install the Heroku Toolbelt](https://toolbelt.heroku.com/)
+Either way, your application  must start a web server that binds to 0.0.0.0:$PORT.
+   
+Your ``Procfile`` must specify how the application starts.
 
-2. Login to Heroku using the command-line tools:
+If you don't have an app.fsx already that implements your website, then clone an example, putting it in a new directory (replace myproj by a unique project name)
+
+```
+1. [Install the Heroku Toolbelt](https://toolbelt.heroku.com/) and login to Heroku using the command-line tools:
 
        heroku login
 
-3. Your application needs to be either
-
-   - a single script app.fsx (plus an heroku Procfile and dummy.sln file) OR 
-
-   - a directory with a .sln solution  (plus an heroku Procfile)
-	
-   Optionally, you can have a paket.dependencies OR packages.config files
-
-   Either way, your application  must start a web server that binds to 0.0.0.0:$PORT.
-   
-   Your Procfile must specify how the application starts.
-
-   If you don't have an app.fsx already that implements your website, then clone an example, putting it in a new directory (replace myproj by a unique project name)
+2. Clone the sample:
 
        git clone https://github.com/SuaveIO/heroku-getting-started.git myproj
        cd myproj
 
-4. Create a new heroku web app and register "heroku" as a remote you can push to:
+3. Create a new heroku web app and register "heroku" as a remote you can push to:
 
        heroku create myproj --buildpack https://github.com/SuaveIO/mono-script-buildpack.git 
 
-5. Push!
+4. Push!
 
-   Use an empty user name. You may need to use ``git auth:token`` to get a app token to use as a password here.
+      git push heroku master  
 
-       git push heroku master  
+```
 
-   You can change the buildpack being used at a later date (e.g. to update to a later version of Mono) using 
+When pushing, use an empty user name. You may need to use ``git auth:token`` to get a app token to use as a password here.
 
-       heroku buildpack:set https://github.com/your-build-pack-repo
+You can change the buildpack being used at a later date (e.g. to update to a later version of Mono) using 
 
-   - If using github or bitbucket, find your app on Heroku and enable automatic deploy so you don't need to push explciitly.
+    heroku buildpack:set https://github.com/your-build-pack-repo
 
-   - You can look at logs from your web server script using ``heroku logs``.
+If using github or bitbucket, find your app on Heroku and enable automatic deploy so you don't need to push explciitly.
+
+You can look at logs from your web server script using ``heroku logs``.
 
