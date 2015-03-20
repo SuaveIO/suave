@@ -1,0 +1,21 @@
+@{
+  Layout = "template";
+  Title = "Namespaces - " + Properties["project-name"];
+}
+
+<h1>@Model.Name</h1>
+
+@foreach (var ns in Model.Namespaces)
+{
+  if (ns.Types.Length + ns.Modules.Length > 0)
+  {
+    <h2>@ns.Name Namespace</h2>
+    <div>
+      @RenderPart("part-nested", new {
+         Types = ns.Types,
+         Modules = ns.Modules
+      })
+    </div>
+  }
+}
+

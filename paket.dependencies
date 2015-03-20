@@ -7,3 +7,5 @@ nuget FsPickler
 nuget Fuchu-suave.FsCheck
 nuget Fuchu-suave.PerfUtil ~> 0.6
 nuget openssl.redist
+nuget FAKE
+nuget FSharp.Formatting 2.7.4
