@@ -611,7 +611,7 @@ Your ``Procfile`` must specify how the application starts.
 
 If you don't have an app.fsx already that implements your website, then clone an example, putting it in a new directory (replace myproj by a unique project name)
 
-```
+
 1. [Install the Heroku Toolbelt](https://toolbelt.heroku.com/) and login to Heroku using the command-line tools:
 
        heroku login
@@ -627,9 +627,7 @@ If you don't have an app.fsx already that implements your website, then clone an
 
 4. Push!
 
-      git push heroku master  
-
-```
+        git push heroku master  
 
 When pushing, use an empty user name. You may need to use ``git auth:token`` to get a app token to use as a password here.
 
