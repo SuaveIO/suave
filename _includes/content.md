@@ -48,9 +48,7 @@ want to handle disposal of the async yourself, have a look at
 
 In suave, we have opted to write a lot of documentation inside the code; so just
 hover the function in your IDE or use an assembly browser to bring out the XML
-docs. For the above reference to `startWebServerAsync`, our code looks like this:
-
-![startWebServerAsync documentation](/images/web_server_async_code.png)
+docs. 
 
 Suave + Paket = ♥
 -----------------
