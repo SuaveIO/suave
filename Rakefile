@@ -141,7 +141,7 @@ desc 'compile, gen versions, test and create nuget'
 task :appveyor => [:compile, :'tests:unit', :nugets]
 
 desc 'compile, gen versions, test'
-task :default => [:compile, :'tests:unit']
+task :default => [:compile, :'tests:unit', :'docs:build']
 
 task :increase_version_number do
   # inc patch version in .semver
@@ -164,8 +164,14 @@ namespace :docs do
   end
 
   desc 'build documentation'
-  task :compile => :clean do
-    system 'git clone https://github.com/SuaveIO/suave.git -b gh-pages gh-pages' unless Dir.exists? 'gh-pages'
+  task :build => :clean do
+    Dir.chdir 'docs/tools' do
+      system '../../paket.exe install'
+      system 'fsharpi generate.fsx'
+    end
+	system 'git clone https://github.com/SuaveIO/suave.git -b gh-pages gh-pages' unless Dir.exists? 'gh-pages'
+	system 'rm -fr gh-pages/*' 
+	system 'cp -pr docs/output/* gh-pages/' 
     Dir.chdir 'gh-pages' do
       Bundler.with_clean_env do
         system 'bundle'
