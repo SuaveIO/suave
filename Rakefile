@@ -127,7 +127,7 @@ namespace :docs do
   desc 'build documentation'
   task :build => :clean do
     Dir.chdir 'docs/tools' do
-      system '../../paket.exe install'
+      system '../../tools/paket.exe', 'restore', clr_command: true
       system 'fsharpi generate.fsx'
     end
 	system 'git clone https://github.com/SuaveIO/suave.git -b gh-pages gh-pages' unless Dir.exists? 'gh-pages'
