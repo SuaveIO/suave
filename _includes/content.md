@@ -202,7 +202,7 @@ let greetings q =
   defaultArg (q ^^ "name") "World" |> sprintf "Hello %s"
 
 let sample : WebPart = 
-    url "/hello" >>= choose [
+    path "/hello" >>= choose [
       GET  >>= request(fun r -> OK <| greetings (query r))
       POST >>= request(fun r -> OK <| greetings (form r))
       NOT_FOUND "Found no handlers" ]
@@ -215,10 +215,10 @@ To protect a route with HTTP Basic Authentication the combinator `authenticateBa
 {% highlight fsharp %}
 let requiresAuthentication _ =
   choose
-    [ GET >>= url "/public" >>= OK "Hello anonymous"
+    [ GET >>= path "/public" >>= OK "Hello anonymous"
       // access to handlers after this one will require authentication
       authenticateBasic (fun (user, pass) -> user = "foo" && pass = "bar")
-      GET >>= url "/protected" >>= context (fun x -> OK ("Hello " + x.userState.["userName"])) ]
+      GET >>= path "/protected" >>= context (fun x -> OK ("Hello " + x.userState.["userName"])) ]
 {% endhighlight %}
 
 Your web parts are "values" in the sense that they evaluate
@@ -333,7 +333,7 @@ let cfg =
         ]
       timeout = TimeSpan.FromMilliseconds 3000. }
 choose
-  [ url "/hello" >>= OK "Hello World"
+  [ path "/hello" >>= OK "Hello World"
     NOT_FOUND "Found no handlers" ]
 |> startWebServer cfg
 {% endhighlight %}
