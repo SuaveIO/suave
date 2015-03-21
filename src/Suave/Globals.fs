@@ -41,4 +41,5 @@ module Internals =
   let serverHeader = String.Concat [| "Server: Suave/"; SUAVE_VERSION; " (http://suave.io)" |]
 
   [<Obsolete("Renamed to serverHeader'")>]
+  /// Obsolete
   let server_header = serverHeader

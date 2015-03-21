@@ -35,9 +35,12 @@ let mapJson f =
       |> Successful.ok 
       >>= Writers.setMimeType "application/json") 
 
+/// Obsolete
 [<System.Obsolete("Use toJson")>]
 let to_json o = toJson o
+/// Obsolete
 [<System.Obsolete("Use fromJson")>]
 let from_json  bytes  = fromJson bytes
+/// Obsolete
 [<System.Obsolete("Use mapJson")>]
 let map_json f = mapJson f

@@ -79,10 +79,13 @@ module CookieStateStore =
   let statefulForSession : WebPart =
     stateful Session false
 
+  /// Obsolete
   [<Obsolete("Renamed to decodeMap")>]
   let decode_map bytes = decodeMap bytes
+  /// Obsolete
   [<Obsolete("Renamed to encodeMap")>]
   let encode_map bytes = encodeMap bytes
+  /// Obsolete
   [<Obsolete("Renamed to statefulForSession")>]
   let stateful' = statefulForSession
 
@@ -138,6 +141,7 @@ module MemoryCacheStateStore =
       |> Option.map (fun ss -> ss :?> StateStore)
       |> Option.get
       
+    /// Obsolete
     [<Obsolete("Renamed to stateId")>]
     let state_id ctx = stateId ctx
 

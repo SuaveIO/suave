@@ -125,13 +125,18 @@ module Compression =
 
 
   [<Obsolete("Renamed to loadEncoder'")>]
+  /// Obsolete
   let load_encoder s = loadEncoder s
   [<Obsolete("Renamed to getEncoder'")>]
+  /// Obsolete
   let get_encoder request = getEncoder  request
   [<Obsolete("Renamed to parseEncoder'")>]
+  /// Obsolete
   let parse_encoder request = parseEncoder request
   [<Obsolete("Renamed to compressFile'")>]
+  /// Obsolete
   let compress_file n stream compressionFolder = compressFile stream compressionFolder
   [<Obsolete("Renamed to transformStream'")>]
+  /// Obsolete
   let transform_x key getData getLast compression compressionFolder ctx connection = transformStream key getData getLast compression compressionFolder ctx connection
 

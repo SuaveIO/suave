@@ -28,10 +28,14 @@ module ASCII =
     Encoding.ASCII.GetString bytes
 
   [<Obsolete("Renamed to toStringAtOffset")>]
+  /// Obsolete
   let to_string  buff index count = toStringAtOffset buff index count
   [<Obsolete("Renamed to toString")>]
+  /// Obsolete
   let to_string'  b = toString b
   [<Obsolete("Renamed to encodeBase64")>]
+  /// Obsolete
   let base64_encode  s = encodeBase64 s
   [<Obsolete("Renamed to decodeBase64")>]
+  /// Obsolete
   let base64_decode  s =  decodeBase64 s

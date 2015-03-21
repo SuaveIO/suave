@@ -237,41 +237,75 @@ let reqCookies' methd resource data ctx =
 
 
 
+/// Obsolete
 [<Obsolete("Renamed to runWithFactory")>]
 let run_with_factory factory config webParts = runWithFactory factory config webParts
 
+/// Obsolete
 [<Obsolete("Renamed to runWith")>]
 let run_with config webParts = runWith config webParts
+
+/// Obsolete
 [<Obsolete("Renamed to withContext")>]
 let with_context f ctx = withContext f ctx
+
+/// Obsolete
 [<Obsolete("Renamed to mkRequest")>]
 let mk_request methd resource query data endpoint = mkRequest methd resource query data endpoint
+
+/// Obsolete
 [<Obsolete("Renamed to mkHandler")>]
 let mk_handler decomp_method cookies = mkHandler decomp_method cookies 
+
+/// Obsolete
 [<Obsolete("Renamed to mkClient")>]
 let mk_client handler = mkClient handler 
+
+/// Obsolete
 [<Obsolete("Renamed to endpointUri")>]
 let endpoint_uri suave_config = endpointUri suave_config
+
+/// Obsolete
 [<Obsolete("Renamed to reqResp")>]
 let req_resp methd resource query data cookies decomp_method f_request f_result = reqResp methd resource query data cookies decomp_method f_request f_result 
+
+/// Obsolete
 [<Obsolete("Renamed to reqQuery")>]
 let req_query methd resource query = reqQuery methd resource query
+
+/// Obsolete
 [<Obsolete("Renamed to reqBytes")>]
 let req_bytes methd resource data = reqBytes methd resource data 
+
+/// Obsolete
 [<Obsolete("Renamed to reqGZip")>]
 let req_gzip methd resource data = reqGZip methd resource data
+
+/// Obsolete
 [<Obsolete("Renamed to reqDeflate")>]
 let req_deflate methd resource data = reqDeflate methd resource data 
+
+/// Obsolete
 [<Obsolete("Renamed to reqGZipBytes")>]
 let req_gzip_bytes methd resource data = reqGZipBytes methd resource data
+
+/// Obsolete
 [<Obsolete("Renamed to reqDeflateBytes")>]
 let req_deflate_bytes methd resource data = reqDeflateBytes methd resource data
+
+/// Obsolete
 [<Obsolete("Renamed to reqHeaders")>]
 let req_headers methd resource data = reqHeaders methd resource data 
+
+/// Obsolete
 [<Obsolete("Renamed to reqContentHeaders")>]
 let req_content_headers methd resource data = reqContentHeaders methd resource data
+
+/// Obsolete
 [<Obsolete("Renamed to reqCookies")>]
 let req_cookies methd resource data ctx = reqCookies methd resource data ctx
+
+/// Obsolete
 [<Obsolete("Renamed to reqCookies'")>]
 let req_cookies' methd resource data ctx = reqCookies' methd resource data ctx
 
