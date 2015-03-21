@@ -34,7 +34,7 @@ let private sendWebResponse (data : HttpWebResponse) ({ request = { trace = t };
   let bytes = data.GetResponseStream() |> readFully
   "<- readFully" |> Log.verbose ctx.runtime.logger "Suave.Proxy.sendWebResponse:GetResponseStream" ctx.request.trace
   response (HttpCode.TryParse(int data.StatusCode) |> Option.get) bytes { ctx with response = { resp with headers = resp.headers @ headers } }
-  
+
 /// Forward the HttpRequest 'p' to the 'ip':'port'
 let forward (ip : IPAddress) (port : uint16) (ctx : HttpContext) =
   let p = ctx.request
@@ -119,7 +119,7 @@ let createReverseProxyServerAsync (config : SuaveConfig) resolver =
         let reqLoop = ParsingAndControl.requestLoop (SuaveConfig.toRuntime config homeFolder compressionFolder false binding )  (SocketPart (proxy resolver))
         let server = startTcpIpServerAsync (config.bufferSize, config.maxOps) config.logger reqLoop binding.socketBinding
         yield server ]
-      
+
   let listening = all |> List.map fst |> Async.Parallel |> Async.Ignore
   let server    = all |> List.map snd |> Async.Parallel |> Async.Ignore
   listening, server

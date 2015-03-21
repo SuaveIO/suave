@@ -1,4 +1,4 @@
-﻿module Suave.Json
+module Suave.Json
 
 open System.IO
 open System.Runtime.Serialization.Json
@@ -27,10 +27,9 @@ let fromJson<'T> (bytes : byte []) =
 /// let app =
 ///   url "/path"  >>= map_json some_function;
 ///
-
 let mapJson f =
   Types.request(fun r ->
-    f (fromJson r.rawForm) 
+    f (fromJson r.rawForm)
     |> toJson
-    |> Successful.ok 
+    |> Successful.ok
     >>= Writers.setMimeType "application/json")

@@ -1,4 +1,4 @@
-﻿namespace Suave.Logging
+namespace Suave.Logging
 
 open System
 
@@ -56,7 +56,7 @@ module Loggers =
       member x.Log level f =
         if level >= minLevel then
           log (toColor level) (f ())
-      
+
   type OutputWindowLogger(minLevel, ?formatter) =
     let formatter = defaultArg formatter defaultFormatter
     let log line = System.Diagnostics.Debug.WriteLine(formatter line)

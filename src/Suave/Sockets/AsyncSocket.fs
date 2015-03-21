@@ -1,4 +1,4 @@
-﻿[<AutoOpen>]
+[<AutoOpen>]
 module Suave.Sockets.AsyncSocket
 
 open Suave.Utils.Bytes

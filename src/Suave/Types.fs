@@ -186,11 +186,6 @@ and private HttpCodeStatics() =
       Microsoft.FSharp.Reflection.FSharpType.GetUnionCases(typeof<HttpCode>)
       |> Array.map (fun case -> case.Name, Microsoft.FSharp.Reflection.FSharpValue.MakeUnion(case, [||]) :?> HttpCode)
       |> Map.ofArray
-  
-module Codes =
-  type X = HttpCode
-  [<System.Obsolete("Use Suave.Types.HttpCode")>]
-  type HttpCode = X
 
 /// HTTP cookie
 type HttpCookie =
@@ -370,8 +365,8 @@ type HttpRequest =
     getFirstOpt x.form k
 
   /// Syntactic Sugar to retrieve query string, form or multi-field values from HttpRequest 
-  member this.Item     
-    with get(x) =    
+  member this.Item
+    with get(x) =
 
       let inline (>>=) f1 f2 x =
         match f1 x with
@@ -382,7 +377,7 @@ type HttpRequest =
         (tryGetChoice1 this.queryParam) 
           >>= (tryGetChoice1 this.formData) 
           >>= (tryGetChoice1 <| getFirst this.multiPartFields)
-      
+
       params' x
 
   /// Get the client's view of what host is being called. If you trust your

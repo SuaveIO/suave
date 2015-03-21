@@ -427,7 +427,7 @@ module Http =
       F
 
     let urlScan s x = pathScan s x
-          
+
     let timeoutWebPart (timeSpan : TimeSpan) (webPart : WebPart) : WebPart =
       fun (ctx : HttpContext) -> async {
         try
@@ -589,7 +589,7 @@ module Http =
       dir ctx.runtime.homeDirectory ctx
 
   module Embedded =
-    
+
     open System
     open System.IO
     open System.Reflection
@@ -600,7 +600,7 @@ module Http =
 
     open Response
     open ServeResource
-    
+
     let defaultSourceAssembly =
       if Assembly.GetEntryAssembly() = null
       then Assembly.GetCallingAssembly()
@@ -611,7 +611,7 @@ module Http =
 
     let lastModified (assembly : Assembly) =
       FileInfo(assembly.Location).CreationTime
-    
+
     let sendResource (assembly : Assembly)
                       resourceName
                       (compression : bool)

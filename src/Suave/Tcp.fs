@@ -1,4 +1,4 @@
-﻿module Suave.Tcp
+module Suave.Tcp
 
 open System
 open System.Collections.Generic

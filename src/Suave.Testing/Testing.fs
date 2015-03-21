@@ -1,4 +1,4 @@
-﻿(** For testing suave applications easily
+(** For testing suave applications easily
 
 Example:
 
@@ -10,7 +10,7 @@ Example:
   open Fuchu
 
   let runWithConfig = runWith defaultConfig
-  
+
   testCase "parsing a large multipart form" <| fun _ ->
 
     let res =
@@ -53,7 +53,7 @@ module ResponseData =
     response.Content.ReadAsByteArrayAsync().Result
 
 module Utilities =
-    
+
   /// Utility function for mapping from Suave.Types.HttpMethod to
   /// System.Net.Http.HttpMethod.
   let toHttpMethod = function
@@ -79,7 +79,7 @@ open Utilities
 /// cancel the token and dispose the server's runtime artifacts
 /// (like the listening socket etc).
 type SuaveTestCtx =
-  { cts          : CancellationTokenSource
+  { cts         : CancellationTokenSource
     suaveConfig : SuaveConfig }
 
 /// Cancels the cancellation token source and disposes the server's

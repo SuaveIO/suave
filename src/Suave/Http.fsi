@@ -1,4 +1,4 @@
-﻿namespace Suave
+namespace Suave
 
 /// <summary><para>
 /// The HTTP module has these main sub-modules:
@@ -1502,11 +1502,11 @@ module Http =
 
     /// Same as `async_write`; convenience function.
     val (<<.) : out:Connection -> data:string -> SocketOp<unit>
-    
+
     /// "If the line is empty (a blank line) - dispatch the event."
     /// Dispatches the event properly to the browser.
     val dispatch : out:Connection -> SocketOp<unit>
-    
+
     /// "If the line starts with a U+003A COLON character (:) - Ignore the line."
     /// Writes a comment to the stream
     val comment : out:Connection -> cmt:string -> SocketOp<unit>
