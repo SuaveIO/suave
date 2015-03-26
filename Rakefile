@@ -84,7 +84,7 @@ task :tests => [:'tests:stress', :'tests:unit']
 
 directory 'build/pkg'
 
-nugets_pack :create_nuget_quick => [:versioning] do |p|
+nugets_pack :create_nuget_quick => [:versioning, 'build/pkg'] do |p|
   p.configuration = Configuration
   p.files   = FileList['src/**/*.fsproj'].exclude(/Tests/)
   p.out     = 'build/pkg'
