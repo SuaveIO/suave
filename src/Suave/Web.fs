@@ -348,6 +348,17 @@ module internal ParsingAndControl =
         do! asyncWriteLn connection (String.Concat [| x; ": "; y |])
     }
 
+  let writePreamble (context: HttpContext) = socket{
+    let r = context.response
+    let connection = context.connection
+
+    do! asyncWriteLn connection (String.concat " " [ "HTTP/1.1"; r.status.code.ToString(); r.status.reason ])
+    do! asyncWriteLn connection Internals.serverHeader
+    do! asyncWriteLn connection (String.Concat( [| "Date: "; Globals.utcNow().ToString("R") |]))
+
+    do! writeHeaders connection r.headers
+    do! writeContentType connection r.headers
+    }
 
   let writeContent context = function
     | Bytes b -> socket {
@@ -359,41 +370,37 @@ module internal ParsingAndControl =
       if content.Length > 0 then
         do! send connection (new ArraySegment<_>(content, 0, content.Length))
       }
-    | SocketTask f -> f context.connection
-    | NullContent -> failwith "TODO: unexpected NullContent value for 'write_content'"
+    | SocketTask f -> socket{ 
+      return! f context.connection
+      }
+    | NullContent -> socket.Return()
 
+  /// response_f writes the HTTP headers regardles of the setting of context.writePreamble
+  /// it is currently only used in Proxy.fs
   let response_f (context: HttpContext) = socket {
-    
-    let r = context.response
-    let connection = context.connection
-    do! asyncWriteLn connection (String.concat " " [ "HTTP/1.1"
-                                                     r.status.code.ToString()
-                                                     r.status.reason ])
-    do! asyncWriteLn connection Internals.serverHeader
-    do! asyncWriteLn connection (String.Concat( [| "Date: "; Globals.utcNow().ToString("R") |]))
+    do! writePreamble context
+    do! writeContent context context.response.content
+    }
 
-    do! writeHeaders connection r.headers
-    do! writeContentType connection r.headers
-
-    return! writeContent context r.content
+  let executeTask ctx r errorHandler = async {
+    try
+      let! q  = r
+      return q
+    with ex ->
+      return! errorHandler ex "request failed" ctx
   }
 
   /// Check if the web part can perform its work on the current request. If it
   /// can't it will return None and the run method will return.
   let internal run ctx (webPart : WebPart) = 
-    let execute _ = async {
-      try  
-          let! q  = webPart ctx
-          return q
-        with ex ->
-          return! ctx.runtime.errorHandler ex "request failed" ctx
-    }
     socket {
-      let! result = liftAsync <| execute ()
+      let! result = liftAsync <| executeTask ctx (webPart ctx) ctx.runtime.errorHandler
       match result with 
-      | Some executedPart ->
-        do! response_f executedPart
-        return Some <| executedPart
+      | Some newCtx ->
+        if newCtx.response.writePreamble then
+          do! writePreamble newCtx
+        do! writeContent newCtx newCtx.response.content
+        return Some newCtx
       | None -> return None
   }
 

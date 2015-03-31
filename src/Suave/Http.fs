@@ -183,7 +183,7 @@ module Http =
     let ACCEPTED s = accepted (UTF8.bytes s)
 
     let no_content : WebPart =
-      fun ctx -> { ctx with response = { status = HTTP_204; headers = ctx.response.headers; content = Bytes [||] }} |> succeed
+      fun ctx -> { ctx with response = { status = HTTP_204; headers = ctx.response.headers; content = Bytes [||]; writePreamble = true }} |> succeed
 
     let NO_CONTENT = no_content
 
@@ -220,7 +220,7 @@ module Http =
      
 
     let not_modified : WebPart =
-      fun ctx -> { ctx with response = {status = HTTP_304; headers = []; content = Bytes [||] }} |> succeed
+      fun ctx -> { ctx with response = {status = HTTP_304; headers = []; content = Bytes [||]; writePreamble = true }} |> succeed
 
     let NOT_MODIFIED : WebPart =
       not_modified
