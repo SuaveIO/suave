@@ -2,6 +2,10 @@
 
 This module allows to run ASP.NET applications in Suave.
 
+```fsharp
+startWebServer defaultConfig (Xsp.createApplication "/mnt/myapp/" |> Xsp.run)
+```
+
 
 # Gotchas
 
