@@ -105,7 +105,7 @@ module Xsp =
   open System.Reflection
   open System.Globalization
 
-  let createWorkerAppDomainWithHost (hostType : Type) (virtualPath : string ) (physicalPath : string ) : obj =
+  let private createWorkerAppDomainWithHost (hostType : Type) (virtualPath : string ) (physicalPath : string ) : obj =
     // this creates worker app domain in a way that host doesn't need to be in GAC or bin
     // using BuildManagerHost via private reflection
     let uniqueAppString = String.Concat(virtualPath, physicalPath).ToLowerInvariant()
@@ -129,7 +129,7 @@ module Xsp =
     // create Host in the worker app domain
     appManager.CreateObject(appId, hostType, virtualPath, physicalPath, false) :> obj
 
-  let createApplicationHost (hostType : Type, virtualDir : string, physicalDir : string) =
+  let private createApplicationHost (hostType : Type, virtualDir : string, physicalDir : string) =
     let physicalDir = if physicalDir.EndsWith("\\") then physicalDir else physicalDir + "\\"
     let aspDir = HttpRuntime.AspInstallDirectory
     let domainId = DateTime.Now.ToString(Globalization.DateTimeFormatInfo.InvariantInfo).GetHashCode().ToString("x")
