@@ -175,4 +175,5 @@ module Xsp =
       let result = appHost.ProcessRequest( page, ctx.request.rawQuery, new Connection(ctx.connection.transport))
       return 
         { ctx with 
+            response = { ctx.response with content = NullContent; writePreamble = false }
             request = { ctx.request with headers = [ "connection","close"]}} |> Some }
