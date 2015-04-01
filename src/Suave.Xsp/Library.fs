@@ -146,8 +146,6 @@ module Xsp =
     let oh = ad.CreateInstance(hostType.Module.Assembly.FullName, hostType.FullName)
     oh.Unwrap()
 
-  open System.Threading
-
   let createApplication directory =
     // NOTE: using an application host requires deploying the dll into the bin directory of the ASPX application 
     // or registering Suave.Xsp in the GAC
