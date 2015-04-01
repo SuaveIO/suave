@@ -1,3 +1,13 @@
+# Suave.Xsp
+
+This module allows to run ASP.NET applications in Suave.
+
+
+# Gotchas
+
+.NET and Mono's implementation of the HttpRuntime class differs in small and subtles ways that need to be accounted for when running ASP.NET apps in Mono.
+
+## Common Linux error
 
 System.UnauthorizedAccessException
 Access to the path "/etc/mono/registry" is denied.
