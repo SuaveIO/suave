@@ -15,7 +15,7 @@ open Suave.Utils
 open Suave.Sockets
 
 /// The Xsp module allows to host ASP.NET applications in Suave.
-/// NOTE: This implentation is incomplete and experimental.
+/// NOTE: This implementation is incomplete and experimental.
 /// The name Suave.Xsp is inspired by Mono's ASP.NET hosting server https://github.com/mono/xsp
 module Xsp =
 
