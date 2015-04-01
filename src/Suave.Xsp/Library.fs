@@ -89,9 +89,6 @@ module Xsp =
         use  f = new FileStream(filename, FileMode.Open, FileAccess.Read, FileShare.Read)
         this.SendResponseFromFileStream(f, offset, length)
 
-  type ProcessRequestResult =
-      { data : byte[]; status : int }
-
   type SuaveHost() =
     
     inherit MarshalByRefObject()
