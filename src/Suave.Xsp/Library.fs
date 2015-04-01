@@ -14,9 +14,15 @@ open Suave.Utils
 
 open Suave.Sockets
 
+/// The Xsp module allows to host ASP.NET applications in Suave.
+/// NOTE: This implentation is incomplete and experimental.
+/// The name Suave.Xsp is inspired by Mono's ASP.NET hosting server https://github.com/mono/xsp
 module Xsp =
 
+  /// This class acts as broker between application domains and allows the ASP.NET host
+  /// to write to the underliying socket connection that lives in the program application domain.
   type Connection(transport : ITransport) =
+    /// Inheriting from MarshalByRefObject enables access to objects across application domain boundaries.
     inherit MarshalByRefObject()
     member this.write bs =
       let res = Async.RunSynchronously <| transport.write bs
@@ -30,6 +36,7 @@ module Xsp =
 
   open System.IO
 
+  /// This class implements the methods used by the ASP.NET runtime to process HTTP requests
   type SuaveWorkerRequest(homeDirectory : string, page : string, query : string, connection: Connection) =
     inherit SimpleWorkerRequest(page, query, null)
     let mutable _data : byte [] = Array.empty
@@ -89,8 +96,9 @@ module Xsp =
         use  f = new FileStream(filename, FileMode.Open, FileAccess.Read, FileShare.Read)
         this.SendResponseFromFileStream(f, offset, length)
 
+  /// This class will host the execution of HTTP requests in a new application domain
   type SuaveHost() =
-    
+    /// Inheriting from MarshalByRefObject enables access to objects across application domain boundaries.
     inherit MarshalByRefObject()
     let mutable rootDir = Path.DirectorySeparatorChar.ToString()
     member this.ProcessRequest(page : string, query : string, connection: Connection) =
@@ -146,6 +154,7 @@ module Xsp =
     let oh = ad.CreateInstance(hostType.Module.Assembly.FullName, hostType.FullName)
     oh.Unwrap()
 
+  /// Creates and configures an application domain for hosting ASP.NET.
   let createApplication directory =
     // NOTE: using an application host requires deploying the dll into the bin directory of the ASPX application 
     // or registering Suave.Xsp in the GAC
@@ -156,14 +165,17 @@ module Xsp =
     File.Copy(Path.Combine(asmDir, "Suave.dll"), Path.Combine(binDir, "Suave.dll"), true)
     File.Copy(Path.Combine(asmDir, "Suave.Xsp.dll"), Path.Combine(binDir, "Suave.Xsp.dll"), true)
 
-    // three ways of creating the application path
-    //let appHost = ApplicationHost.CreateApplicationHost(typeof<SuaveHost>, "/", directory) :?> SuaveHost
-    //let appHost = createApplicationHost(typeof<SuaveHost>, "/", directory) :?> SuaveHost
+    // Three ways of creating the application domain, we have experimented with these and settled on the last option.
+
+    // let appHost = ApplicationHost.CreateApplicationHost(typeof<SuaveHost>, "/", directory) :?> SuaveHost
+    // let appHost = createApplicationHost(typeof<SuaveHost>, "/", directory) :?> SuaveHost
+
     let appHost =  (createWorkerAppDomainWithHost typeof<SuaveHost>  "/"  directory ) :?> SuaveHost
 
     appHost.RootDir <- directory
     appHost
 
+  /// Run an ASP.NET application
   let run (appHost : SuaveHost) : WebPart = fun ctx ->
     async {
       let page = ctx.request.url.AbsolutePath
