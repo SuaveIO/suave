@@ -37,11 +37,11 @@ module Xsp =
   open System.IO
 
   /// This class implements the methods used by the ASP.NET runtime to process HTTP requests
-  type SuaveWorkerRequest(homeDirectory : string, page : string, query : string, connection: Connection) =
-    inherit SimpleWorkerRequest(page, query, null)
-    let mutable _data : byte [] = Array.empty
-    let mutable _statusCode : int = 0
-    let mutable preambleSent = false
+  type SuaveWorkerRequest(homeDirectory : string, request : HttpRequest, connection: Connection) =
+    inherit SimpleWorkerRequest(request.url.AbsolutePath, request.rawQuery, null)
+    let page = request.url.AbsolutePath
+    let httpVerb = request.``method``.ToString()
+    let postData = request.rawForm
     member this.Write (bytes, len) =
       connection.write (ByteSegment(bytes,0,len))
     override this.SendStatus(statusCode : int, statusDescription : string) =
@@ -60,6 +60,17 @@ module Xsp =
       let bytes = UTF8.bytes  "\r\n"
       this.Write(bytes, bytes.Length)
       this.Write(data, lenght)
+    override this.GetHttpVerbName() = httpVerb
+    override this.GetKnownRequestHeader(index : int) : string =
+      match index with
+      | HttpWorkerRequest.HeaderContentLength ->
+        if postData <> null then postData.Length.ToString() else "0"
+      | HttpWorkerRequest.HeaderContentType ->
+        match request.header "content-type" with
+        | Some v -> v
+        | None -> base.GetKnownRequestHeader(index)
+      | _ -> base.GetKnownRequestHeader(index)
+    override this.GetPreloadedEntityBody() = postData
     override this.GetAppPath() = "/"
     override this.GetAppPathTranslated() = homeDirectory
     override this.GetFilePath() = page
@@ -74,7 +85,6 @@ module Xsp =
       this.SendUnknownResponseHeader("Content-length",fileSize.ToString())
       let lenght = if (length = -1L) then fileSize - offset else length
       if not (length = 0L || offset < 0L || length > fileSize - offset) then
-         
         if (offset > 0L) then 
           f.Seek(offset, SeekOrigin.Begin) |> ignore
         if (length <= (int64(maxChunkLength))) then
@@ -87,7 +97,6 @@ module Xsp =
             if (bytesRemaining > 0) then
               let bytesToRead = if (bytesRemaining < maxChunkLength) then bytesRemaining else maxChunkLength
               let bytesRead = f.Read(chunk, 0, bytesToRead);
-
               this.SendResponseFromMemory(chunk, bytesRead);
               loop (bytesRemaining - bytesRead)
           loop (int(length))
@@ -101,8 +110,8 @@ module Xsp =
     /// Inheriting from MarshalByRefObject enables access to objects across application domain boundaries.
     inherit MarshalByRefObject()
     let mutable rootDir = Path.DirectorySeparatorChar.ToString()
-    member this.ProcessRequest(page : string, query : string, connection: Connection) =
-      let worker = new SuaveWorkerRequest(rootDir, page, query, connection)
+    member this.ProcessRequest(request : HttpRequest, connection: Connection) =
+      let worker = new SuaveWorkerRequest(rootDir, request, connection)
       HttpRuntime.ProcessRequest(worker)
     interface IRegisteredObject with
       member this.Stop(b : bool) = ()
@@ -178,9 +187,8 @@ module Xsp =
   /// Run an ASP.NET application
   let run (appHost : SuaveHost) : WebPart = fun ctx ->
     async {
-      let page = ctx.request.url.AbsolutePath
-      let result = appHost.ProcessRequest( page, ctx.request.rawQuery, new Connection(ctx.connection.transport))
-      return 
-        { ctx with 
+      do appHost.ProcessRequest( ctx.request, new Connection(ctx.connection.transport))
+      return
+        { ctx with
             response = { ctx.response with content = NullContent; writePreamble = false }
-            request = { ctx.request with headers = [ "connection","close"]}} |> Some }
+            request  = { ctx.request  with headers = [ "connection","close"] }} |> Some }
