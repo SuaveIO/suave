@@ -470,8 +470,6 @@ module HttpBinding =
     { scheme  = scheme 
       socketBinding = SocketBinding.mk (IPAddress.Parse ip) (uint16 port) } 
 
-
-
 type HttpContent =
   | NullContent
   | Bytes of byte []
@@ -483,17 +481,20 @@ type HttpContent =
 type HttpResult =
   { status  : HttpCode
     headers : (string * string) list
-    content : HttpContent }
+    content : HttpContent
+    writePreamble : bool }
 
   /// The empty HttpResult, with a 404 and a HttpContent.NullContent content
   static member empty =
     { status  = HTTP_404
       headers = []
-      content = HttpContent.NullContent }
+      content = HttpContent.NullContent
+      writePreamble = true }
 
   static member status_ = Property<HttpResult,_> (fun x -> x.status) (fun v x -> { x with status = v })
   static member headers_ = Property<HttpResult,_> (fun x -> x.headers) (fun v x -> { x with headers = v })
   static member content_ = Property<HttpResult,_> (fun x -> x.content) (fun v x -> { x with content = v })
+  static member writePreamble_ = Property<HttpResult,_> (fun x -> x.writePreamble) (fun v x -> { x with writePreamble = v })
 
 
 /// A server-key is a 256 bit key with high entropy
@@ -620,14 +621,15 @@ module HttpContext =
       connection = Connection.empty
       response   = HttpResult.empty }
 
-  let mk request runtime connection =
+  let mk request runtime connection writePreamble =
     { request    = request
       userState = Map.empty
       runtime    = runtime
       connection = connection
       response   = { status = HTTP_404
                      headers = []
-                     content = NullContent } }
+                     content = NullContent
+                     writePreamble = writePreamble } }
 
   let request x = x.request
 
