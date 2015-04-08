@@ -555,6 +555,11 @@ and HttpContext =
     /// The response for the request being processed
     response   : HttpResult }
 
+  static member request_ = Property (fun x -> x.request) (fun v x -> { x with request = v })
+  static member user_state_ = Property (fun x -> x.userState) (fun v x -> { x with userState = v })
+  static member runtime_ = Property (fun x -> x.runtime) (fun v x -> { x with runtime = v })
+  static member response_ = Property (fun x -> x.response) (fun v x -> { x with response = v })
+
   [<Obsolete("Renamed to userState")>]
   member x.user_state = x.userState
 
@@ -632,28 +637,9 @@ module HttpContext =
                      writePreamble = writePreamble } }
 
   let request x = x.request
-
-  let request_ =
-    (fun x -> x.request),
-    fun v x -> { x with request = v }
-
   let user_state x = x.userState
-
-  let user_state_ =
-    (fun x -> x.userState),
-    fun v x -> { x with userState = v }
-
   let runtime x = x.runtime
-
-  let runtime_ =
-    (fun x -> x.runtime),
-    fun v x -> { x with runtime = v }
-
   let response x = x.response
-
-  let response_ =
-    (fun x -> x.response),
-    fun v x -> { x with response = v }
 
 let request f (a : HttpContext) = f a.request a
 
