@@ -9,4 +9,4 @@ echo 'Building'
 xbuild src/Suave.sln
 
 echo 'Running tests'
-mono src/Tests/bin/Debug/Tests.exe
+mono src/Suave.Tests/bin/Debug/Suave.Tests.exe
