@@ -5,6 +5,7 @@ open Microsoft.FSharp.Quotations
 open Microsoft.FSharp.Quotations.Patterns
 
 open System
+open System.Net.Mail
 open System.Text.RegularExpressions
 
 open Suave.Html
@@ -12,14 +13,11 @@ open Suave.Utils
 open Suave.Types
 open Suave.Model
 
-[<Literal>]
-let emailPattern = @"\A(?:[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)\Z"
-
-type Email = Email of string with 
-  static member Create s = 
-    if Regex.IsMatch(s, emailPattern, RegexOptions.IgnoreCase) then
-      Choice1Of2 (Email s)
-    else
+type MailAddress with
+  static member Create s =
+    try
+      Choice1Of2 (MailAddress(s))
+    with :? FormatException ->
       Choice2Of2 (sprintf "%s is not a valid email" s)
 
 type Password = Password of string
@@ -53,13 +51,13 @@ let private parse = function
   | t, value when t = typeof<String> -> Choice1Of2 value |> Choice.map (Some >> box)
   | t, value when t = typeof<Password> -> Password value |> Choice1Of2 |> Choice.map (Some >> box)
   | t, value when t = typeof<Decimal> -> Suave.Model.Parse.decimal value |> Choice.map (Some >> box)
-  | t, value when t = typeof<Email> -> Email.Create value |> Choice.map (Some >> box)
+  | t, value when t = typeof<MailAddress> -> MailAddress.Create value |> Choice.map (Some >> box)
   | t, _ -> failwithf "not supported type: %s" t.FullName
 
 | t, value when t = typeof<String> -> Choice1Of2 value |> Choice.map box
 | t, value when t = typeof<Password> -> Password value |> Choice1Of2 |> Choice.map box
 | t, value when t = typeof<Decimal> -> Suave.Model.Parse.decimal value |> Choice.map box
-| t, value when t = typeof<Email> -> Email.Create value |> Choice.map box
+| t, value when t = typeof<MailAddress> -> MailAddress.Create value |> Choice.map box
 | t, _ -> failwithf "not supported type: %s" t.FullName
 
 let private validateSingle ((quotF, ((test, msg, _) : Validation<'b>)), value : 'a) =
@@ -174,7 +172,7 @@ let option value txt selected =
 let private inputType = function
   | t when t = typeof<String> -> "text"
   | t when t = typeof<Password> -> "password"
-  | t when t = typeof<Email> -> "email"
+  | t when t = typeof<MailAddress> -> "email"
   | t when t = typeof<Decimal> -> "number"
   | t -> failwithf "not supported type: %s" t.FullName
 
