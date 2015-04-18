@@ -228,7 +228,7 @@ example:
 
 type Register = {
   Username : string
-  Email : Email
+  Email : MailAddress
   Password : Password
   ConfirmPassword : Password
 }
