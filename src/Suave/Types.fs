@@ -16,6 +16,7 @@ open Suave.Log
 open Suave.Logging
 
 [<System.Obsolete("Renamed to Property")>]
+/// Obsolete
 type Lens<'T,'P> = Property<'T,'P>
 
 /// <summary>
@@ -196,6 +197,7 @@ module Codes =
   let http_reason (c: HttpCode) =  c.reason
 
   type X = HttpCode
+  /// Obsolete
   [<System.Obsolete("Use Suave.Types.HttpCode")>]
   type HttpCode = X
 
@@ -361,14 +363,19 @@ type HttpRequest =
     getFirstOpt x.form k
 
   [<Obsolete("Renamed to httpVersion")>]
+  /// Obsolete
   member x.http_version = x.httpVersion
   [<Obsolete("Renamed to isSecure")>]
+  /// Obsolete
   member x.is_secure = x.isSecure
   [<Obsolete("Renamed to multiPartFields")>]
+  /// Obsolete
   member x.multi_part_fields = x.multiPartFields
   [<Obsolete("Renamed to rawForm")>]
+  /// Obsolete
   member x.raw_form = x.rawForm
   [<Obsolete("Renamed to rawQuery")>]
+  /// Obsolete
   member x.raw_query = x.rawQuery
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
@@ -391,18 +398,23 @@ module HttpRequest =
       ipaddr           = IPAddress.Loopback }
 
   [<System.Obsolete("Use request.query")>]
+  /// Obsolete
   let query (x : HttpRequest) = x.query
 
   [<System.Obsolete("Use request.queryParam key")>]
+  /// Obsolete
   let query' (x : HttpRequest) k = x.queryParam k
 
   [<System.Obsolete("Use request.header")>]
+  /// Obsolete
   let header (x : HttpRequest) k = x.header
 
   [<System.Obsolete("Use request.form")>]
+  /// Obsolete
   let form  (x : HttpRequest) = x.form
 
   [<System.Obsolete("Use request.formData key")>]
+  /// Obsolete
   let form'   (x : HttpRequest) k = x.formData k
 
 type ITlsProvider =
@@ -447,6 +459,7 @@ type HttpBinding =
   static member socketBinding_ = Property<HttpBinding,_> (fun x -> x.socketBinding) (fun v x -> { x with socketBinding=v })
 
   [<Obsolete("Renamed to socketBinding")>]
+  /// Obsolete
   member x.socket_binding = x.socketBinding
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
@@ -523,18 +536,25 @@ type HttpRuntime =
   static member parsePostData_ = Property (fun x -> x.parsePostData) (fun v x -> { x with parsePostData = v })
 
   [<Obsolete("Renamed to compressionFolder")>]
+  /// Obsolete
   member x.compression_folder = x.compressionFolder
   [<Obsolete("Renamed to errorHandler")>]
+  /// Obsolete
   member x.error_handler = x.errorHandler
   [<Obsolete("Renamed to homeDirectory")>]
+  /// Obsolete
   member x.home_directory = x.homeDirectory
   [<Obsolete("Renamed to matchedBinding")>]
+  /// Obsolete
   member x.matched_binding = x.matchedBinding
   [<Obsolete("Renamed to mimeTypesMap")>]
+  /// Obsolete
   member x.mime_types_map = x.mimeTypesMap
   [<Obsolete("Renamed to parsePostData")>]
+  /// Obsolete
   member x.parse_post_data = x.parsePostData
   [<Obsolete("Renamed to serverKey")>]
+  /// Obsolete
   member x.server_key = x.serverKey
 
 /// The HttpContext is the container of the request, runtime, user-state and
@@ -701,22 +721,31 @@ type SuaveConfig =
   static member logger_                = Property<SuaveConfig,_> (fun x -> x.logger)                (fun v x -> { x with logger = v })
 
   [<Obsolete("Renamed to serverKey")>]
+  /// Obsolete
   member x.server_key = x.serverKey
   [<Obsolete("Renamed to bufferSize")>]
+  /// Obsolete
   member x.buffer_size = x.bufferSize
   [<Obsolete("Renamed to cancellationToken")>]
+  /// Obsolete
   member x.ct = x.cancellationToken
   [<Obsolete("Renamed to compressedFilesFolder")>]
+  /// Obsolete
   member x.compressed_files_folder = x.compressedFilesFolder
   [<Obsolete("Renamed to errorHandler")>]
+  /// Obsolete
   member x.error_handler = x.errorHandler
   [<Obsolete("Renamed to homeFolder")>]
+  /// Obsolete
   member x.home_folder = x.homeFolder
   [<Obsolete("Renamed to listenTimeout")>]
+  /// Obsolete
   member x.listen_timeout = x.listenTimeout
   [<Obsolete("Renamed to maxOps")>]
+  /// Obsolete
   member x.max_ops = x.maxOps
   [<Obsolete("Renamed to mimeTypesMap")>]
+  /// Obsolete
   member x.mime_types_map = x.mimeTypesMap
 
 

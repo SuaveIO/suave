@@ -600,18 +600,25 @@ module Http =
     let dirHome ctx =
       dir ctx.runtime.homeDirectory ctx
 
+    /// Obsolete
     [<Obsolete("Use resolvePath")>]
     let local_file fileName rootPath = resolvePath rootPath fileName
+    /// Obsolete
     [<Obsolete("Use sendFile")>]
     let send_file fileName compression ctx = sendFile fileName compression ctx
+    /// Obsolete
     [<Obsolete("Use resolvePath")>]
     let resolve_path rootPat fileName = resolvePath rootPat fileName
+    /// Obsolete
     [<Obsolete("Use browseFile")>]
     let browse_file rootPath fileName = browseFile rootPath fileName
+    /// Obsolete
     [<Obsolete("Use browseFileHome")>]
     let browse_file' fileName = browseFileHome fileName
+    /// Obsolete
     [<Obsolete("Use browseHome")>]
     let browse' = browseHome
+    /// Obsolete
     [<Obsolete("Use dirHome")>]
     let dir' ctx = dirHome ctx
 
@@ -680,16 +687,22 @@ module Http =
     let browseDefaultAsssembly =
       browse defaultSourceAssembly
 
+    /// Obsolete
     [<Obsolete("Use browseDefaultAsssembly")>]
     let browse' = browseDefaultAsssembly 
+    /// Obsolete
     [<Obsolete("Use resourceFromDefaultAssembly")>]
     let resource' name = resourceFromDefaultAssembly name
+    /// Obsolete
     [<Obsolete("Use sendResourceFromDefaultAssembly")>]
     let send_resource' resourceName compression = sendResourceFromDefaultAssembly resourceName compression
+    /// Obsolete
     [<Obsolete("Use sendResource")>]
     let send_resource assembly resourceName compression ctx = sendResource assembly resourceName compression ctx
+    /// Obsolete
     [<Obsolete("Use lastModified")>]
     let last_modified assembly = lastModified assembly
+    /// Obsolete
     [<Obsolete("Use defaultSourceAssembly")>]
     let default_source_assembly = defaultSourceAssembly
 
@@ -777,6 +790,7 @@ module Http =
       }
       |> succeed
 
+    /// Obsolete
     [<Obsolete("Use handShake")>]
     let hand_shake f ctx = handShake f ctx
 
@@ -804,5 +818,6 @@ module Http =
       | None ->
         challenge ctx
 
+    /// Obsolete
     [<System.Obsolete("Use authenticateBasic")>]
     let authenticate_basic f ctx = authenticateBasic f ctx

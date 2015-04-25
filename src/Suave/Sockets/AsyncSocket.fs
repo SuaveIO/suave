@@ -90,20 +90,29 @@ let transferStreamBounded (toStream : Connection) (from : Stream) len =
   doBlock len
 
 [<System.Obsolete("Use liftAsync")>]
+/// Obsolete
 let lift_async a = liftAsync a
 [<System.Obsolete("Use liftTask")>]
+/// Obsolete
 let lift_task a = liftTask a
 [<System.Obsolete("Use toAsync")>]
+/// Obsolete
 let to_async f = toAsync f
 [<System.Obsolete("Use asyncWrite")>]
+/// Obsolete
 let async_write connection s = asyncWrite connection s
 [<System.Obsolete("Use asyncWriteNewLine")>]
+/// Obsolete
 let async_write_nl connection = asyncWriteNewLine connection
 [<System.Obsolete("Use asyncWriteLn")>]
+/// Obsolete
 let async_writeln  connection s = asyncWriteLn connection s
 [<System.Obsolete("Use asyncWriteBytes")>]
+/// Obsolete
 let async_writebytes  connection b = asyncWriteBytes connection b
 [<System.Obsolete("Use transferStream")>]
+/// Obsolete
 let transfer_x toStream from = transferStream toStream from
 [<System.Obsolete("Use transferStreamBounded")>]
+/// Obsolete
 let transfer_len_x toStream from len = transferStreamBounded toStream from len

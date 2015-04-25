@@ -4,7 +4,7 @@ NUGET
     FsCheck (1.0.4)
     FSharp.Charting (0.90.9)
     FSharp.Core (3.1.2.1)
-    FsPickler (1.0.7)
+    FsPickler (1.0.15)
     Fuchu-suave (0.6.1)
       FSharp.Core (>= 3.1.2.1)
     Fuchu-suave.FsCheck (0.6.1)
@@ -15,9 +15,10 @@ NUGET
       FSharp.Core (>= 3.1.2.1)
       Fuchu-suave (>= 0.6.1)
       PerfUtil (>= 0.1.8)
-    Microsoft.AspNet.Razor (2.0.30506.0) - >= net40 < net45
+    Microsoft.AspNet.Razor (3.2.3) - framework: >= net45
     NuGet.CommandLine (2.8.3)
     openssl.redist (1.0.1.25)
     PerfUtil (0.1.8)
-    RazorEngine (3.3.0)
-      Microsoft.AspNet.Razor (>= 2.0.30506.0)
+    RazorEngine (3.6.1)
+      Microsoft.AspNet.Razor (>= 3.0.0) - framework: >= net45
+      Microsoft.AspNet.Razor (2.0.30506.0) - framework: >= net40 < net45

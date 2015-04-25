@@ -557,11 +557,15 @@ let defaultConfig =
     compressedFilesFolder = None
     logger                = Loggers.saneDefaultsFor LogLevel.Info }
 
+/// Obsolete
 [<Obsolete("Renamed to defaultErrorHandler")>]
 let default_error_handler ex msg ctx = defaultErrorHandler ex msg ctx
+/// Obsolete
 [<Obsolete("Renamed to startWebServerAsync")>]
 let web_server_async config webpart  = startWebServerAsync config webpart
+/// Obsolete
 [<Obsolete("Renamed to startWebServer")>]
 let web_server config webpart = startWebServer config webpart
+/// Obsolete
 [<Obsolete("Renamed to defaultConfig")>]
 let default_config = defaultConfig

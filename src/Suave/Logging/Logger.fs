@@ -70,4 +70,5 @@ module Loggers =
           OutputWindowLogger(level) ]) :> Logger
 
   [<System.Obsolete("Use saneDefaultsFor")>]
+  /// Obsolete
   let sane_defaults_for level = saneDefaultsFor level

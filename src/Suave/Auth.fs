@@ -103,12 +103,16 @@ module HttpContext =
     |> Map.tryFind StateStoreType
     |> Option.map (fun x -> x :?> string |> parseData)
 
+  /// Obsolete
   [<Obsolete("Renamed to sessionId'")>]
   let session_id x = sessionId x
 
+/// Obsolete
 [<Obsolete("Renamed to parseData'")>]
 let parse_data textBlob = parseData textBlob 
+/// Obsolete
 [<Obsolete("Renamed to generateData'")>]
 let generate_data request = generateData request
+/// Obsolete
 [<Obsolete("Renamed to authenticateWithLogin'")>]
 let authenticate' relativeExpiry login_page f_success = authenticateWithLogin relativeExpiry login_page f_success

@@ -1067,6 +1067,7 @@ module Http =
     val path : s:string -> WebPart
 
     [<System.Obsolete("Use path")>]
+    /// Obsolete
     val url : s:string -> WebPart
 
     /// Match on the method
@@ -1076,15 +1077,18 @@ module Http =
     val isSecure : WebPart
 
     [<System.Obsolete("Use isSecure")>]
+    /// Obsolete
     val is_secure : WebPart
 
     /// Applies the regex to the path and matches on the result
     val pathRegex : s:string -> WebPart
     
     [<System.Obsolete("Use pathRegex")>]
+    /// Obsolete
     val urlRegex : s:string -> WebPart
 
     [<System.Obsolete("Use pathRegex")>]
+    /// Obsolete
     val url_regex : s:string -> WebPart
 
     /// Match on the hostname (which is a required header for a Http client to send)
@@ -1092,17 +1096,14 @@ module Http =
     /// TODO: support SNI #177
     val host : hostname:string -> WebPart
 
-    /// <summary><para>
     /// Formats the HttpRequest as in the default manner
-    /// </para></summary>
     val logFormat : ctx:HttpContext -> string
 
     [<System.Obsolete("Use logFormat")>]
+    /// Obsolete
     val log_format : ctx:HttpContext -> string
 
-    /// <summary><para>
     /// Log the HttpRequest to the given logger.
-    /// </para></summary>
     val log : Logger -> (HttpContext -> string) -> WebPart
 
     /// <summary><para>
@@ -1128,9 +1129,11 @@ module Http =
     /// </para></summary>
     val pathScan : pf:PrintfFormat<'a,'b,'c,'d,'t> -> h:('t -> WebPart) -> WebPart
 
+    /// Obsolete
     [<System.Obsolete("Use pathScan")>]
     val urlScan : pf:PrintfFormat<'a,'b,'c,'d,'t> -> h:('t -> WebPart) -> WebPart
 
+    /// Obsolete
     [<System.Obsolete("Use pathScan")>]
     val url_scan : pf:PrintfFormat<'a,'b,'c,'d,'t> -> h:('t -> WebPart) -> WebPart
 
@@ -1421,18 +1424,25 @@ module Http =
     /// </para></summary>
     val dirHome : WebPart
 
+    /// Obsolete
     [<System.Obsolete("Use dirHome")>]
     val dir' : WebPart
+    /// Obsolete
     [<System.Obsolete("Use browseHome")>]
     val browse' : WebPart
+    /// Obsolete
     [<System.Obsolete("Use browseFileHome")>]
     val browse_file' : fileName:string -> WebPart
+    /// Obsolete
     [<System.Obsolete("Use browseFile")>]
     val browse_file : rootPath:string -> fileName:string -> WebPart
+    /// Obsolete
     [<System.Obsolete("Use resolvePath")>]
     val local_file : fileName:string -> rootPath:string -> string
+    /// Obsolete
     [<System.Obsolete("Use resolvePath")>]
     val resolve_path : rootPath:string -> fileName:string -> string
+    /// Obsolete
     [<System.Obsolete("Use sendFile")>]
     val send_file : fileName:string -> compression:bool -> WebPart
 
@@ -1489,12 +1499,16 @@ module Http =
     /// </remarks>
     val browseDefaultAsssembly : WebPart
 
+    /// Obsolete
     [<System.Obsolete("Use browseDefaultAsssembly")>]
     val internal browse' : WebPart
+    /// Obsolete
     [<System.Obsolete("Use resourceFromDefaultAssembly")>]
     val resource' : name:string -> WebPart
+    /// Obsolete
     [<System.Obsolete("Use sendResource")>]
     val send_resource : source:Assembly -> resource_name:string -> compression:bool -> WebPart
+    /// Obsolete
     [<System.Obsolete("Use sendResourceFromDefaultAssembly")>]
     val send_resource' : resource_name:string -> compression:bool -> WebPart
 
@@ -1555,6 +1569,7 @@ module Http =
     /// to start a new event-stream protocol session with the browser.
     val handShake : f_cont:(Connection -> SocketOp<unit>) -> WebPart
 
+    /// Obsolete
     [<System.Obsolete("Use handShake")>]
     val hand_shake : f_cont:(Connection -> SocketOp<unit>) -> WebPart
 
@@ -1581,6 +1596,7 @@ module Http =
     /// </remarks>
     val authenticateBasic : f:(string * string -> bool) -> WebPart
 
+    /// Obsolete
     [<System.Obsolete("Use authenticateBasic")>]
     val authenticate_basic : f:(string * string -> bool) -> WebPart
 

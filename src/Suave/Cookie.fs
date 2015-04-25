@@ -231,35 +231,48 @@ module Cookie =
           log "existing, broken cookie, unsetting it, forwarding to given failure web part"
           wp_kont >>= unsetPair csctx.cookieName)
 
+  /// Obsolete
   [<Obsolete("Renamed to parseCookies'")>]
   let parse_cookies s = parseCookies s
+  /// Obsolete
   [<Obsolete("Renamed to parseResultCookie'")>]
   let parse_result_cookie (s : string) : HttpCookie = parseResultCookie s 
   [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
   module HttpRequest =
+    /// Obsolete
     [<Obsolete("Use the .cookies property instead'")>]
     let cookies (x:HttpRequest) = x.cookies
 
   [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
   module HttpResult =
+    /// Obsolete
     [<Obsolete("Use the .cookies property instead'")>]
     let cookies (x:HttpResult) = x.cookies
 
+  /// Obsolete
   [<Obsolete("Renamed to setCookie'")>]
   let set_cookie cookie ctx = setCookie cookie ctx
+  /// Obsolete
   [<Obsolete("Renamed to unsetCookie'")>]
   let unset_cookie cookieName = unsetCookie cookieName
+  /// Obsolete
   [<Obsolete("Renamed to setPair'")>]
   let set_pair httpCookie clientCookie = setPair httpCookie clientCookie
+  /// Obsolete
   [<Obsolete("Renamed to unsetPair'")>]
   let unset_pair httpCookieName = unsetPair httpCookieName 
+  /// Obsolete
   [<Obsolete("Renamed to generateCookies'")>]
   let generate_cookies serverKey cookieName relativeExpiry secure plainData = generateCookies serverKey cookieName relativeExpiry secure plainData
+  /// Obsolete
   [<Obsolete("Renamed to readCookies'")>]
   let read_cookies key cookieName cookies = readCookies key cookieName cookies
+  /// Obsolete
   [<Obsolete("Renamed to refreshCookies'")>]
   let refresh_cookies relativeExpiry httpCookie = refreshCookies relativeExpiry httpCookie 
+  /// Obsolete
   [<Obsolete("Renamed to updateCookies'")>]
   let update_cookies relativeExpiry httpCookie = updateCookies relativeExpiry httpCookie 
+  /// Obsolete
   [<Obsolete("Renamed to cookieState'")>]
   let cookie_state csctx noCookie decryptionFailure f_success = cookieState csctx noCookie decryptionFailure f_success 

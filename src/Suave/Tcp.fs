@@ -191,12 +191,17 @@ let startTcpIpServerAsync
   }
 
 [<Obsolete("Renamed to closeSocket")>]
+/// Obsolete
 let close_socket s = closeSocket s
 [<Obsolete("Renamed to shutdownSocket")>]
+/// Obsolete
 let shutdown_socket s = shutdownSocket s
 [<Obsolete("Renamed to stopTcp")>]
+/// Obsolete
 let stop_tcp logger reason socket = stopTcp logger reason socket
 [<Obsolete("Renamed to createPools")>]
+/// Obsolete
 let create_pools  logger maxOps bufferSize = createPools logger maxOps bufferSize
 [<Obsolete("Renamed to startTcpIpServerAsync")>]
+/// Obsolete
 let tcp_ip_server  (bufferSize, maxConcurrentOps) logger serveClient binding = startTcpIpServerAsync (bufferSize, maxConcurrentOps) logger serveClient binding
