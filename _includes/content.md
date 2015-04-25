@@ -4,7 +4,7 @@ Introduction
 Suave is a lightweight, non-blocking web server. The non-blocking I/O model is efficient and suitable for building fast, scalable network applications. In fact, Suave is written in a **completely non-blocking** fashion throughout. Suave **runs on Linux**, OS X and Windows flawlessly.
 
 Suave is inspired in the simplicity of Happstack and born out of the necessity
-of embedding web server capabilities in my own applications.  Still in its early
+of embedding web server capabilities in my own applications. Still in its early
 stages Suave supports HTTPS, multiple TCP/IP bindings, Basic Access
 Authentication, Keep-Alive and HTTP compression.
 
@@ -59,7 +59,7 @@ Note you don't need to have _anything_ installed before starting with this
 script. Nothing but F# Interactive and this script.
 
 This script fetches the Paket.exe component which is referenced later in the
-script.  Initially the #r "paket.exe" reference is shown as unresolved. Once it
+script. Initially the #r "paket.exe" reference is shown as unresolved. Once it
 has been downloaded by the user (by executing the first part of the script) the
 reference shows as resolved and can be used.
 
@@ -477,7 +477,7 @@ type MimeType =
 
 ## Serving static files, HTTP Compression and MIME types
 
-Suave supports **gzip** and **deflate** http compression encodings.  Http
+Suave supports **gzip** and **deflate** http compression encodings. Http
 compression is configured via the MIME types map in the server configuration
 record. By default Suave does not serve files with extensions not registered in
 the mime types map.
@@ -596,15 +596,15 @@ let webConfig =
 Deploying Suave to Heroku
 ----------------------------
 
-Suave web sites can be as simple as a single F# script which starts a web server, or a full project.  
+Suave web sites can be as simple as a single F# script which starts a web server, or a full project.
 
-Your application needs to be either a single script ``app.fsx`` (plus an heroku ``Procfile`` and ``dummy.sln`` file) OR 
-a directory with a ``.sln`` solution  (plus an heroku ``Procfile``)
+Your application needs to be either a single script ``app.fsx`` (plus a Heroku ``Procfile`` and ``dummy.sln`` file) OR 
+a directory with a ``.sln`` solution (plus an Heroku ``Procfile``)
 	
 Optionally, you can have a ``paket.dependencies`` OR ``packages.config`` files
 
-Either way, your application  must start a web server that binds to 0.0.0.0:$PORT.
-   
+Either way, your application must start a web server that binds to 0.0.0.0:$PORT.
+
 Your ``Procfile`` must specify how the application starts.
 
 If you don't have an app.fsx already that implements your website, then clone an example, putting it in a new directory (replace myproj by a unique project name)
@@ -625,7 +625,7 @@ If you don't have an app.fsx already that implements your website, then clone an
 
 4. Push!
 
-        git push heroku master  
+        git push heroku master
 
 When pushing, use an empty user name. You may need to use ``git auth:token`` to get a app token to use as a password here.
 
