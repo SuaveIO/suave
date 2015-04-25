@@ -1,3 +1,5 @@
+# Encoding: utf-8
+
 require 'bundler/setup'
 
 require 'albacore'
@@ -128,11 +130,11 @@ namespace :docs do
   task :build => [:clean, :restore_paket] do
     Dir.chdir 'docs/tools' do
       system '../../tools/paket.exe', 'restore', clr_command: true
-      system 'fsharpi generate.fsx'
+      system "fsharp#{Albacore.windows? ? '' : 'i'} generate.fsx" # pricken över i
     end
-	system 'git clone https://github.com/SuaveIO/suave.git -b gh-pages gh-pages' unless Dir.exists? 'gh-pages'
-	system 'rm -fr gh-pages/*' 
-	system 'cp -pr docs/output/* gh-pages/' 
+    system 'git clone https://github.com/SuaveIO/suave.git -b gh-pages gh-pages' unless Dir.exists? 'gh-pages'
+    system 'rm -fr gh-pages/*' 
+    system 'cp -pr docs/output/* gh-pages/' 
     Dir.chdir 'gh-pages' do
       Bundler.with_clean_env do
         system 'bundle'
