@@ -1,3 +1,5 @@
+#!/usr/bin/env fsharpi
+
 // --------------------------------------------------------------------------------------
 // Builds the documentation from `.fsx` and `.md` files in the 'docs/content' directory
 // (the generated documentation is stored in the 'docs/output' directory)
