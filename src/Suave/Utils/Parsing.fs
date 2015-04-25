@@ -56,4 +56,4 @@ module Parsing =
       let parts = x.Split(';') |> Array.map (fun x -> x.TrimStart())
       parse_key_value_pairs (Array.sub parts 1 (parts.Length - 1))
     | None ->
-      failwith "did not find header, because header_params received None"
+      failwith "did not find header, because headerParams received None"

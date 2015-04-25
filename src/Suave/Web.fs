@@ -185,7 +185,7 @@ module internal ParsingAndControl =
             return { connection with segments = { buffer = segment.buffer; offset = segment.offset + n; length = segment.length - n } :: tail }
           else
             do! liftAsync <| select (arraySegmentFromBufferSegment segment) segment.length
-            do connection.bufferManager.FreeBuffer(segment.buffer,"Suave.Web.read_post_data:loop")
+            do connection.bufferManager.FreeBuffer(segment.buffer,"Suave.Web.readPostData:loop")
             return! loop (n - segment.length) { connection with segments = tail }
         | [] ->
           if n = 0 then
@@ -204,7 +204,7 @@ module internal ParsingAndControl =
       let! firstLine, connection = readLine ctx.connection
       if not(firstLine.Equals("--")) then
         let! partHeaders, connection = readHeaders connection
-        let contentDisposition =  partHeaders %% "content-disposition"
+        let contentDisposition = partHeaders %% "content-disposition"
         let fieldname = 
           (headerParams contentDisposition).TryLookup "name"
           |> Option.get
