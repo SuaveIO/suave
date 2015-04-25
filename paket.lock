@@ -3,7 +3,13 @@ NUGET
   specs:
     FsCheck (1.0.4)
     FSharp.Charting (0.90.9)
+    FSharp.Compiler.Service (0.0.87)
     FSharp.Core (3.1.2.1)
+    FSharp.Formatting (2.9.2)
+      FSharp.Compiler.Service (0.0.87)
+      FSharpVSPowerTools.Core (1.8.0)
+    FSharpVSPowerTools.Core (1.8.0)
+      FSharp.Compiler.Service (>= 0.0.87)
     FsPickler (1.0.15)
     Fuchu-suave (0.6.1)
       FSharp.Core (>= 3.1.2.1)

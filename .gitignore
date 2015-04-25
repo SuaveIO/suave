@@ -18,3 +18,4 @@ Backup/
 paket.exe
 !paket.lock
 **.suo
+docs/output/
