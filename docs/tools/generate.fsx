@@ -8,7 +8,6 @@
 // Binaries that have XML documentation (in a corresponding generated XML file)
 let referenceBinaries = [ "Suave.dll" ; "Suave.Testing.dll" ; "Suave.Razor.dll" ; "Suave.OpenSSL.dll" ]
 // Web site location for the generated documentation
-//let website = "http://nessos.github.io/MBrace"
 let website = "http://suave.io"
 
 let githubLink = "http://github.com/suaveio/suave"
@@ -30,8 +29,8 @@ let info =
 #I "../../src/Suave.Testing/bin/Debug"
 //#I "../../src/Suave.Razor/bin/Debug"
 #I "packages/FSharp.Compiler.Service/lib/net40"
-#I "packages/FSharp.Formatting/lib/net40"
 #I "packages/FAKE/tools"
+#load "../../packages/FSharp.Formatting/FSharp.Formatting.fsx"
 #r "FakeLib.dll"
 #r "FSharp.Markdown.dll"
 #r "FSharp.Literate.dll"
