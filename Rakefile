@@ -125,7 +125,7 @@ namespace :docs do
   end
 
   desc 'build documentation'
-  task :build => :clean do
+  task :build => [:clean, :restore_paket] do
     Dir.chdir 'docs/tools' do
       system '../../tools/paket.exe', 'restore', clr_command: true
       system 'fsharpi generate.fsx'
