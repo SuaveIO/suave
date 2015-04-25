@@ -10,7 +10,7 @@ let referenceBinaries = [ "Suave.dll" ; "Suave.Testing.dll" ; "Suave.Razor.dll" 
 // Web site location for the generated documentation
 let website = "http://suave.io"
 
-let githubLink = "http://github.com/suaveio/suave"
+let githubLink = "http://github.com/SuaveIO/suave"
 
 // Specify more information about your project
 let info =
