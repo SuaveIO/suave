@@ -15,7 +15,7 @@ non-blocking fashion throughout.
 
 | Platform | Status         |
 | -------- | -------------- |
-| Windows  | [![Build status](https://ci.appveyor.com/api/projects/status/g0lum9qndwb018sy?svg=true)](https://ci.appveyor.com/project/AdemarGonzalez/suave) |
+| Windows  | [![Build status](https://ci.appveyor.com/api/projects/status/g0lum9qndwb018sy/branch/master?svg=true)](https://ci.appveyor.com/project/AdemarGonzalez/suave/branch/master) |
 | Mono/Linux     | [![Build status](https://tc-oss.intelliplan.net/app/rest/builds/buildType:(id:Suave_BuildIt)/statusIcon)](https://tc-oss.intelliplan.net/viewType.html?buildTypeId=Suave_BuildIt&guest=1) |
 | Mono/OSX     | [![Build status](https://travis-ci.org/SuaveIO/suave.svg?branch=master)](https://travis-ci.org/SuaveIO/suave) |
 
