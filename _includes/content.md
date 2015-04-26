@@ -599,7 +599,7 @@ Deploying Suave to Heroku
 Suave web sites can be as simple as a single F# script which starts a web server, or a full project.
 
 Your application needs to be either a single script ``app.fsx`` (plus a Heroku ``Procfile`` and ``dummy.sln`` file) OR 
-a directory with a ``.sln`` solution (plus an Heroku ``Procfile``)
+a directory with a ``.sln`` solution (plus a Heroku ``Procfile``)
 	
 Optionally, you can have a ``paket.dependencies`` OR ``packages.config`` files
 
