@@ -609,6 +609,12 @@ Your ``Procfile`` must specify how the application starts.
 
 If you don't have an app.fsx already that implements your website, then clone an example, putting it in a new directory (replace myproj by a unique project name)
 
+You can one-click-deploy the Suave sample to Heroku by clicking the button below.
+
+[![Deploy](https://www.herokucdn.com/deploy/button.png)](https://heroku.com/deploy?template=https://github.com/SuaveIO/heroku-getting-started)
+
+Or deploy the sample from the CLI.
+
 
 1. [Install the Heroku Toolbelt](https://toolbelt.heroku.com/) and login to Heroku using the command-line tools:
 
