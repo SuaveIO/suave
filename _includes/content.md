@@ -63,7 +63,7 @@ script. Initially the #r "paket.exe" reference is shown as unresolved. Once it
 has been downloaded by the user (by executing the first part of the script) the
 reference shows as resolved and can be used.
 
-Paket is then used to fetch a set of F# packages, which are then used later inn
+Paket is then used to fetch a set of F# packages, which are then used later in
 the script.
 
 {% highlight fsharp %}
