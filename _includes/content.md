@@ -76,7 +76,10 @@ Environment.CurrentDirectory <- __SOURCE_DIRECTORY__
  
 if not (File.Exists "paket.exe") then
     let url = "https://github.com/fsprojects/Paket/releases/download/0.31.5/paket.exe"
-    use wc = new Net.WebClient() in let tmp = Path.GetTempFileName() in wc.DownloadFile(url, tmp); File.Move(tmp,Path.GetFileName url)
+    use wc = new Net.WebClient()
+    let tmp = Path.GetTempFileName()
+    wc.DownloadFile(url, tmp)
+    File.Move(tmp,Path.GetFileName url)
  
 // Step 1. Resolve and install the packages
  
