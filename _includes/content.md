@@ -245,7 +245,7 @@ More Applicatives and HTTP combinators
 ---------------------------------
 
 The documentation for applicates is written in
-[Https.fsi](https://github.com/SuaveIO/suave/blob/master/Suave/Http.fsi) - so
+[Http.fsi](https://github.com/SuaveIO/suave/blob/master/src/Suave/Http.fsi) - so
 it's recommended you explore the module using the code-completion of your IDE,
 or by looking at the linked file.
 
