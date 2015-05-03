@@ -130,7 +130,7 @@ namespace :docs do
   task :build => [:clean, :restore_paket] do
     Dir.chdir 'docs/tools' do
       system '../../tools/paket.exe', 'restore', clr_command: true
-      system "fsharp#{Albacore.windows? ? '' : 'i'} generate.fsx" # pricken över i
+      system "#{Albacore.windows? ? 'fsi' : 'fsharpi'} generate.fsx" # pricken över i
     end
     system 'git clone https://github.com/SuaveIO/suave.git -b gh-pages gh-pages' unless Dir.exists? 'gh-pages'
     system 'rm -fr gh-pages/*' 
