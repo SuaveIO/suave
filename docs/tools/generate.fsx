@@ -1,4 +1,4 @@
-#!/usr/bin/env fsharpi
+
 
 // --------------------------------------------------------------------------------------
 // Builds the documentation from `.fsx` and `.md` files in the 'docs/content' directory
@@ -24,10 +24,10 @@ let info =
 // For typical project, no changes are needed below
 // --------------------------------------------------------------------------------------
 
-#I "../../src/Suave/bin/Debug"
-#I "../../src/Suave.OpenSSL/bin/Debug"
-#I "../../src/Suave.Testing/bin/Debug"
-//#I "../../src/Suave.Razor/bin/Debug"
+#I "../../src/Suave/bin/Release"
+#I "../../src/Suave.OpenSSL/bin/Release"
+#I "../../src/Suave.Testing/bin/Release"
+
 #I "packages/FSharp.Compiler.Service/lib/net40"
 #I "packages/FAKE/tools"
 #load "../../packages/FSharp.Formatting/FSharp.Formatting.fsx"
@@ -72,11 +72,11 @@ let buildReference () =
   ensureDirectory output 
   let binaries =
     referenceBinaries
-    |> List.map (fun lib-> __SOURCE_DIRECTORY__ @@ ".." @@ ".." @@ "src" @@ Path.GetFileNameWithoutExtension lib @@ "bin" @@ "Debug" @@ lib)
+    |> List.map (fun lib-> __SOURCE_DIRECTORY__ @@ ".." @@ ".." @@ "src" @@ Path.GetFileNameWithoutExtension lib @@ "bin" @@ "Release" @@ lib)
 
   let dirs =
     referenceBinaries
-    |> List.map (fun lib-> __SOURCE_DIRECTORY__ @@ ".." @@ ".." @@ "src" @@ Path.GetFileNameWithoutExtension lib @@ "bin" @@ "Debug")
+    |> List.map (fun lib-> __SOURCE_DIRECTORY__ @@ ".." @@ ".." @@ "src" @@ Path.GetFileNameWithoutExtension lib @@ "bin" @@ "Release")
     
   MetadataFormat.Generate
     ( binaries , output @@ "reference", layoutRoots, 
