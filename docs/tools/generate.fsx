@@ -14,11 +14,11 @@ let githubLink = "http://github.com/SuaveIO/suave"
 
 // Specify more information about your project
 let info =
-  [ "project-name", "SuaveIO"
+  [ "project-name", "Suave.IO"
     "project-author", "Henrik Feldt, Ademar Gonzalez"
     "project-summary", "An lightweight web framework in F#."
     "project-github", githubLink
-    "project-nuget", "http://www.nuget.org/packages/SuaveIO" ]
+    "project-nuget", "http://www.nuget.org/packages/Suave" ]
 
 // --------------------------------------------------------------------------------------
 // For typical project, no changes are needed below
@@ -51,12 +51,11 @@ let root = website
 let content    = __SOURCE_DIRECTORY__ @@ ".." @@ "content"
 let output     = __SOURCE_DIRECTORY__ @@ ".." @@ "output"
 let files      = __SOURCE_DIRECTORY__ @@ ".." @@ "files"
-let templates  = __SOURCE_DIRECTORY__ @@ ".." @@ "templates"
 let formatting = __SOURCE_DIRECTORY__ @@ "packages/FSharp.Formatting/"
 
 let layoutRoots =
-  [ formatting @@ "templates"
-    formatting @@ "templates/reference" ]
+  [ files @@ "_fs_formatting"
+    files @@ "_fs_formatting/reference" ]
 
 // Copy static files and CSS + JS from F# Formatting
 let copyFiles () =
