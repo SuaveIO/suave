@@ -12,29 +12,30 @@ open RazorEngine
 
 module Razor =
 
-  let private asyncMemoize f =
+  let private asyncMemoize isValid f =
     let cache = Collections.Concurrent.ConcurrentDictionary<_ , _>()
     fun x ->
       async {
-        let mutable res = Unchecked.defaultof<_>
-        let ok = cache.TryGetValue(x,&res)
-        if ok then 
-          return res
-        else 
-          let! res = f x
-          cache.[x] <- res
-          return res
+        match cache.TryGetValue(x) with
+        | true, res when isValid x res -> return res
+        | _ ->
+            let! res = f x
+            cache.[x] <- res
+            return res
       }
 
   let private loadTemplate template_path =
     async {
+      let writeTime = File.GetLastWriteTime(template_path)
       use file = new FileStream(template_path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite)
       use reader = new StreamReader(file)
       let! razorTemplate = reader.ReadToEndAsync()
-      return razorTemplate
+      return writeTime, razorTemplate
     }
 
-  let loadTemplateCached = asyncMemoize loadTemplate
+  let loadTemplateCached = 
+    loadTemplate |> asyncMemoize (fun templatePath (lastWrite, _) -> 
+      File.GetLastWriteTime(templatePath) <= lastWrite )
 
   /// razor WebPart
   ///
@@ -48,8 +49,9 @@ module Razor =
       async {
         try
           let template_path = resolvePath r.runtime.homeDirectory path
-          let! razorTemplate = loadTemplateCached template_path
-          let content = Razor.Parse(razorTemplate, model, template_path)
+          let! writeTime, razorTemplate = loadTemplateCached template_path
+          let cacheKey = writeTime.Ticks.ToString() + "_" + template_path
+          let content = Razor.Parse(razorTemplate, model, cacheKey)
           return! Response.response HTTP_200 (UTF8.bytes content) r
         with 
           ex ->
