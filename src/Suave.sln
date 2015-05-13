@@ -32,6 +32,8 @@ Project("{f2a71f9b-5d33-465a-a702-920d77279786}") = "Fibonacci", "..\examples\Fi
 EndProject
 Project("{f2a71f9b-5d33-465a-a702-920d77279786}") = "Asp.NET", "..\examples\Asp.NET\Asp.NET.fsproj", "{7AB086FA-C3F6-42E4-B03B-27AD81974735}"
 EndProject
+Project("{f2a71f9b-5d33-465a-a702-920d77279786}") = "WebSocket", "..\examples\WebSocket\WebSocket.fsproj", "{34062010-BC9D-4DEB-804D-CC8D1D109876}"
+EndProject
 Project("{f2a71f9b-5d33-465a-a702-920d77279786}") = "Suave.Testing", "Suave.Testing\Suave.Testing.fsproj", "{4BB79AAC-0D6D-4E0E-BB6E-8F61B3C6D99C}"
 EndProject
 Project("{f2a71f9b-5d33-465a-a702-920d77279786}") = "Suave.Razor", "Suave.Razor\Suave.Razor.fsproj", "{C1DC691B-1019-4A15-AA17-0C5CB0E0909C}"
@@ -44,6 +46,10 @@ Global
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{34062010-BC9D-4DEB-804D-CC8D1D109876}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{34062010-BC9D-4DEB-804D-CC8D1D109876}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{34062010-BC9D-4DEB-804D-CC8D1D109876}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{34062010-BC9D-4DEB-804D-CC8D1D109876}.Release|Any CPU.Build.0 = Release|Any CPU
 		{3BE234C3-2BD4-4E53-9D11-7C134374500D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{3BE234C3-2BD4-4E53-9D11-7C134374500D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{3BE234C3-2BD4-4E53-9D11-7C134374500D}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -99,6 +105,7 @@ Global
 		{F7E7DAB3-1823-4038-96D8-3A29A82D3AAC} = {E05A9F83-E283-4258-AB0E-AF626002B6EF}
 		{616F83DA-1EFA-436B-8E7F-8624C7606547} = {E05A9F83-E283-4258-AB0E-AF626002B6EF}
 		{7AB086FA-C3F6-42E4-B03B-27AD81974735} = {E05A9F83-E283-4258-AB0E-AF626002B6EF}
+		{34062010-BC9D-4DEB-804D-CC8D1D109876} = {E05A9F83-E283-4258-AB0E-AF626002B6EF}
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
