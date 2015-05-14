@@ -113,19 +113,22 @@ module WebSocket =
 
   type WebSocket(connection : Connection) =
     member this.read () = async {
+      assert (List.length connection.segments = 0)
       let bs = connection.bufferManager.PopBuffer()
       let! res = connection.transport.read bs
       match res with
       | Choice1Of2 x ->
+        // TODO: we are asuming here the buffer can hold the entire frame
         let header = exctractHeader bs x
         let headerSize = calcOffset header
-        let frameOffset = bs.Offset + headerSize 
+        let frameOffset = bs.Offset + headerSize
         let frame = [| for i = frameOffset to frameOffset + header.length - 1 do yield bs.Array.[i]|]
         // Messages from the client MUST be masked
         let data = if header.hasmask then frame |> Array.mapi (fun i x -> x ^^^ header.mask.[i % 4]) else frame
         connection.bufferManager.FreeBuffer bs
         return (header.opcode, data, header.fin)
       | _ ->
+        connection.bufferManager.FreeBuffer bs
         return failwith "WebSocket: read failed."
       }
     member this.send bs opcode fin = async{
