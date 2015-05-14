@@ -111,6 +111,7 @@ module WebSocket =
 
     [| yield firstByte; yield secondByte; yield! data |]
 
+  /// This class represents a WebSocket connection, it provides an interface to read and write to a WebSocket.
   type WebSocket(connection : Connection) =
     member this.read () = async {
       assert (List.length connection.segments = 0)
@@ -153,6 +154,7 @@ module WebSocket =
         return failwith "handShakeAux: disconnected."
     }
 
+  /// The handShake combinator captures a WebSocket and pass it to the provided `continuation`
   let handShake continuation (ctx : HttpContext) = async{
     let r = ctx.request
     if r.``method`` <> HttpMethod.GET then
