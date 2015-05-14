@@ -806,3 +806,12 @@ module Http =
 
     [<System.Obsolete("Use authenticateBasic")>]
     let authenticate_basic f ctx = authenticateBasic f ctx
+
+  module Control =
+
+    let CLOSE (ctx: HttpContext) = 
+      async{
+        return
+          { ctx with
+              response = { ctx.response with content = NullContent; writePreamble = false }
+              request  = { ctx.request  with headers = [ "connection","close"] }} |> Some }

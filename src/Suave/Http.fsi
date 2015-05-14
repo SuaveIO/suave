@@ -1584,3 +1584,14 @@ module Http =
     [<System.Obsolete("Use authenticateBasic")>]
     val authenticate_basic : f:(string * string -> bool) -> WebPart
 
+  module Control =
+
+    /// <summary><para>
+    /// This webpart closes the conection
+    /// the token string
+    /// </para><para>
+    /// </para><para>
+    /// </para></summary>
+    /// <remarks>
+    /// </remarks>
+    val CLOSE : WebPart
