@@ -7,7 +7,9 @@ and a set of combinators to manipulate route flow and task composition. Suave
 is inspired in the simplicity of Happstack and born out of the necessity of
 embedding web server capabilities in my own applications.  Still in its early
 stages Suave supports Websocket, HTTPS, multiple TCP/IP bindings, Basic Access
-Authentication, Keep-Alive. Suave also takes advantage of F# asynchronous
+Authentication, Keep-Alive.
+
+Suave also takes advantage of F# asynchronous
 workflows to perform non-blocking IO. In fact, Suave is written in a completely
 non-blocking fashion throughout.
 
