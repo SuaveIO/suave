@@ -16,7 +16,6 @@ non-blocking fashion throughout.
 | Platform | Status         |
 | -------- | -------------- |
 | Windows  | [![Build status](https://ci.appveyor.com/api/projects/status/g0lum9qndwb018sy/branch/master?svg=true)](https://ci.appveyor.com/project/AdemarGonzalez/suave/branch/master) |
-| Mono/Linux     | [![Build status](https://tc-oss.intelliplan.net/app/rest/builds/buildType:(id:Suave_BuildIt)/statusIcon)](https://tc-oss.intelliplan.net/viewType.html?buildTypeId=Suave_BuildIt&guest=1) |
 | Mono/OSX     | [![Build status](https://travis-ci.org/SuaveIO/suave.svg?branch=master)](https://travis-ci.org/SuaveIO/suave) |
 
 What follows is a tutorial on how to create applications. Scroll past the
@@ -104,12 +103,6 @@ Suave.X where X is a module is where we expect users to look. We don't expect us
 of the library to have to look at Y in Suave.X.Y, so for server-specific code, please
 stick to the Y module/namespace. That way we make the API discoverable.
 
-We have a [TeamCity CI server](https://tc-oss.intelliplan.net/overview.html) set
-up to provide continuous integration for Suave. You can pull nugets from this
-server, by adding
-https://tc-oss.intelliplan.net/guestAuth/app/nuget/v1/FeedService.svc/
-to your list of nuget sources; this allows you to get pre-release nugets of
-suave directly into your development environment.
 
 ## Style Guide
 
