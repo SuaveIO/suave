@@ -45,7 +45,7 @@ module WebSocket =
     rsv2 : byte
     rsv3 : byte
     opcode : Opcode
-    hasmask : bool
+    hasMask : bool
     length : int
     mask : byte[]
     }
@@ -75,7 +75,7 @@ module WebSocket =
         rsv2 = firstByte &&& 32uy
         rsv3 = firstByte &&& 16uy
         opcode = firstByte &&& 15uy |> toOpcode
-        hasmask = secondByte &&& 128uy <> 0uy
+        hasMask = secondByte &&& 128uy <> 0uy
         length = length
         mask = mask
       }
@@ -83,7 +83,7 @@ module WebSocket =
 
   let internal calcOffset (header : FrameHeader) =
     let mutable offset = 2
-    if header.hasmask then  offset <- offset + 4
+    if header.hasMask then  offset <- offset + 4
     if header.length > 65535 then offset <- offset + 8
     elif header.length > 125 then offset <- offset + 2
     offset
@@ -125,7 +125,7 @@ module WebSocket =
         let frameOffset = bs.Offset + headerSize
         let frame = [| for i = frameOffset to frameOffset + header.length - 1 do yield bs.Array.[i]|]
         // Messages from the client MUST be masked
-        let data = if header.hasmask then frame |> Array.mapi (fun i x -> x ^^^ header.mask.[i % 4]) else frame
+        let data = if header.hasMask then frame |> Array.mapi (fun i x -> x ^^^ header.mask.[i % 4]) else frame
         connection.bufferManager.FreeBuffer bs
         return (header.opcode, data, header.fin)
       | _ ->
