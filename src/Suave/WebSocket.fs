@@ -162,6 +162,8 @@ module WebSocket =
       return! RequestErrors.BAD_REQUEST "Bad Request" ctx
     else
       match r.header "connection" with
+      // rfc 6455 - Section 4.1.6 : The request MUST contain a |Connection| header field whose value
+      // MUST include the "Upgrade" token.
       | Some str when str.Contains "Upgrade" -> 
         match r.header "sec-websocket-key" with
         | Some webSocketKey ->
