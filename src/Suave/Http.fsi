@@ -1588,7 +1588,6 @@ module Http =
 
     /// <summary><para>
     /// This webpart closes the conection
-    /// the token string
     /// </para><para>
     /// </para><para>
     /// </para></summary>
