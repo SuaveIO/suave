@@ -39,16 +39,15 @@ module WebSocket =
     | 11uy | 12uy | 13uy | 14uy | 15uy -> Reserved
     | _ -> failwith "Invalid opcode."
 
-  type FrameHeader = {
-    fin  : bool
-    rsv1 : byte
-    rsv2 : byte
-    rsv3 : byte
-    opcode : Opcode
-    hasMask : bool
-    length : int
-    mask : byte[]
-    }
+  type FrameHeader =
+    { fin     : bool
+      rsv1    : byte
+      rsv2    : byte
+      rsv3    : byte
+      opcode  : Opcode
+      hasMask : bool
+      length  : int
+      mask    : byte[] }
 
   let internal exctractHeader (buffer: ByteSegment) n =
     let bytes x = buffer.Array.[buffer.Offset + x]
