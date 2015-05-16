@@ -46,28 +46,13 @@ module WebSocket =
       rsv3    : byte
       opcode  : Opcode
       hasMask : bool
-      length  : int
-      mask    : byte[] }
+      length  : int }
 
-  let internal exctractHeader (buffer: ByteSegment) n =
-    let bytes x = buffer.Array.[buffer.Offset + x]
+  let internal exctractHeader (arr: byte array) =
+    let bytes x = arr.[x]
     let firstByte = bytes 0
     let secondByte = bytes 1
-    let length = int <| if secondByte >= 129uy then secondByte - 128uy else secondByte
-    let lenght, mask =
-      if length = 126 then 
-        int(bytes 2) * 256 + int(bytes 3), [| bytes 4; bytes 5; bytes 6; bytes 7|]
-      elif length = 127 then
-        int(bytes 2) * 65536 * 65536 * 65536 * 256 +
-        int(bytes 3) * 65536 * 65536 * 65536 +
-        int(bytes 4) * 65536 * 65536 * 256 +
-        int(bytes 5) * 65536 * 65536 +
-        int(bytes 6) * 65536 * 256 +
-        int(bytes 7) * 65536 +
-        int(bytes 8) * 256 +
-        int(bytes 9), [| bytes 10; bytes 11; bytes 12; bytes 13|]
-      else
-        length, [| bytes 2; bytes 3; bytes 4; bytes 5|]
+    let length = int <| if secondByte >= 128uy then secondByte - 128uy else secondByte
     let header =
       { fin  = firstByte &&& 128uy <> 0uy
         rsv1 = firstByte &&& 64uy
@@ -76,7 +61,6 @@ module WebSocket =
         opcode = firstByte &&& 15uy |> toOpcode
         hasMask = secondByte &&& 128uy <> 0uy
         length = length
-        mask = mask
       }
     header
 
@@ -110,34 +94,67 @@ module WebSocket =
 
     [| yield firstByte; yield secondByte; yield! data |]
 
+  let readBytes (transport : ITransport) (n : int) = 
+    let arr = Array.zeroCreate n
+    let rec loop i = socket {
+      if i = n then
+        return arr
+      else
+        let! read = transport.read <| ArraySegment(arr,i,n - i)
+        return! loop (i+read)
+      }
+    loop 0
+
   /// This class represents a WebSocket connection, it provides an interface to read and write to a WebSocket.
   type WebSocket(connection : Connection) =
-    member this.read () = async {
+
+    let readExtendedLength header = socket {
+      if header.length = 126 then
+          let! bytes = readBytes connection.transport 2
+          return int(bytes.[0]) * 256 + int(bytes.[1])
+        elif header.length = 127 then
+          let! bytes = readBytes connection.transport 8
+          return int(bytes.[0]) * 65536 * 65536 * 65536 * 256 +
+          int(bytes.[1]) * 65536 * 65536 * 65536 +
+          int(bytes.[2]) * 65536 * 65536 * 256 +
+          int(bytes.[3]) * 65536 * 65536 +
+          int(bytes.[4]) * 65536 * 256 +
+          int(bytes.[5]) * 65536 +
+          int(bytes.[6]) * 256 +
+          int(bytes.[7])
+        else
+          return header.length
+      }
+
+    let readFrame () = socket {
       assert (List.length connection.segments = 0)
-      let bs = connection.bufferManager.PopBuffer()
-      let! res = connection.transport.read bs
+      let! arr = readBytes connection.transport 2
+      let header = exctractHeader arr
+      let! extendedLenght = readExtendedLength header
+      
+      assert(header.hasMask)
+      let! mask = readBytes connection.transport 4
+
+      let! frame = readBytes connection.transport extendedLenght
+      // Messages from the client MUST be masked
+      let data = if header.hasMask then frame |> Array.mapi (fun i x -> x ^^^ mask.[i % 4]) else frame
+      return (header.opcode, data, header.fin)
+      }
+
+    member this.read () = async{
+      let! res = readFrame ()
       match res with
-      | Choice1Of2 x ->
-        // TODO: we are asuming here the buffer can hold the entire frame
-        let header = exctractHeader bs x
-        let headerSize = calcOffset header
-        let frameOffset = bs.Offset + headerSize
-        let frame = [| for i = frameOffset to frameOffset + header.length - 1 do yield bs.Array.[i]|]
-        // Messages from the client MUST be masked
-        let data = if header.hasMask then frame |> Array.mapi (fun i x -> x ^^^ header.mask.[i % 4]) else frame
-        connection.bufferManager.FreeBuffer bs
-        return (header.opcode, data, header.fin)
+      | Choice1Of2 ((a,b,c) as x) -> return x
       | _ ->
-        connection.bufferManager.FreeBuffer bs
         return failwith "WebSocket: read failed."
       }
     member this.send bs opcode fin = async{
       let frame = frame opcode bs fin
       let! res = connection.transport.write <| ArraySegment (frame,0,frame.Length)
       match res with
-      | Choice1Of2 x -> ()
+      | Choice1Of2 x -> return ()
       | _ ->
-        failwith "WebSocket: write failed."
+        return failwith "WebSocket: write failed."
       }
 
   let internal handShakeAux webSocketKey continuation (ctx : HttpContext) =
