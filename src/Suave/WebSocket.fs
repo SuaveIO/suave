@@ -82,13 +82,6 @@ module WebSocket =
       }
     header
 
-  let internal calcOffset (header : FrameHeader) =
-    let mutable offset = 2
-    if header.hasMask then  offset <- offset + 4
-    if header.length > 65535 then offset <- offset + 8
-    elif header.length > 125 then offset <- offset + 2
-    offset
-
   let internal frame (data : byte[]) (opcode : Opcode) (fin : bool) =
 
     let firstByte = 
