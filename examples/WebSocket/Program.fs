@@ -27,6 +27,7 @@ let echo (webSocket : WebSocket) =
       | (Ping, _, _) ->
         do! webSocket.send Pong [||] true
       | (Close, _, _) ->
+        do! webSocket.send Close [||] true
         loop := false
       | _ -> ()
     return! Control.CLOSE cx
