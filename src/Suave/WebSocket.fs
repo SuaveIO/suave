@@ -46,6 +46,7 @@ module WebSocket =
     | CLOSE_UNSUPPORTED
     | CLOSE_NO_STATUS
     | CLOSE_ABNORMAL
+    | CLOSE_TOO_LARGE
     member x.code = 
       match x with
       | CLOSE_NORMAL -> 1000
@@ -54,6 +55,7 @@ module WebSocket =
       | CLOSE_UNSUPPORTED -> 1003
       | CLOSE_NO_STATUS -> 1005
       | CLOSE_ABNORMAL -> 1006
+      | CLOSE_TOO_LARGE -> 1009
 
   type FrameHeader =
     { fin     : bool
@@ -160,6 +162,7 @@ module WebSocket =
       if extendedLenght > uint64 Int32.MaxValue then
         let reason = sprintf "Frame size of %d bytes exceeds maximun accepted frame size (2 GB)" extendedLenght
         let data = 
+          [| yield! BitConverter.GetBytes (CloseCode.CLOSE_TOO_LARGE.code)
            ; yield! UTF8.bytes reason |]
         do! sendFrame Close data true
         return! abort (OtherError reason)
