@@ -39,6 +39,22 @@ module WebSocket =
     | 11uy | 12uy | 13uy | 14uy | 15uy -> Reserved
     | _ -> failwith "Invalid opcode."
 
+  type CloseCode =
+    | CLOSE_NORMAL
+    | CLOSE_GOING_AWAY
+    | CLOSE_PROTOCO_ERROR
+    | CLOSE_UNSUPPORTED
+    | CLOSE_NO_STATUS
+    | CLOSE_ABNORMAL
+    member x.code = 
+      match x with
+      | CLOSE_NORMAL -> 1000
+      | CLOSE_GOING_AWAY -> 1001
+      | CLOSE_PROTOCO_ERROR -> 1002
+      | CLOSE_UNSUPPORTED -> 1003
+      | CLOSE_NO_STATUS -> 1005
+      | CLOSE_ABNORMAL -> 1006
+
   type FrameHeader =
     { fin     : bool
       rsv1    : byte
@@ -111,19 +127,25 @@ module WebSocket =
     let readExtendedLength header = socket {
       if header.length = 126 then
           let! bytes = readBytes connection.transport 2
-          return int(bytes.[0]) * 256 + int(bytes.[1])
+          return uint64(bytes.[0]) * 256UL + uint64(bytes.[1])
         elif header.length = 127 then
           let! bytes = readBytes connection.transport 8
-          return int(bytes.[0]) * 65536 * 65536 * 65536 * 256 +
-          int(bytes.[1]) * 65536 * 65536 * 65536 +
-          int(bytes.[2]) * 65536 * 65536 * 256 +
-          int(bytes.[3]) * 65536 * 65536 +
-          int(bytes.[4]) * 65536 * 256 +
-          int(bytes.[5]) * 65536 +
-          int(bytes.[6]) * 256 +
-          int(bytes.[7])
+          return uint64(bytes.[0]) * 65536UL * 65536UL * 65536UL * 256UL +
+          uint64(bytes.[1]) * 65536UL * 65536UL * 65536UL +
+          uint64(bytes.[2]) * 65536UL * 65536UL * 256UL +
+          uint64(bytes.[3]) * 65536UL * 65536UL +
+          uint64(bytes.[4]) * 65536UL * 256UL +
+          uint64(bytes.[5]) * 65536UL +
+          uint64(bytes.[6]) * 256UL +
+          uint64(bytes.[7])
         else
-          return header.length
+          return uint64(header.length)
+      }
+
+    let sendFrame bs opcode fin = socket{
+      let frame = frame opcode bs fin
+      let! _ = connection.transport.write <| ArraySegment (frame,0,frame.Length)
+      return ()
       }
 
     let readFrame () = socket {
@@ -131,14 +153,21 @@ module WebSocket =
       let! arr = readBytes connection.transport 2
       let header = exctractHeader arr
       let! extendedLenght = readExtendedLength header
-      
+
       assert(header.hasMask)
       let! mask = readBytes connection.transport 4
 
-      let! frame = readBytes connection.transport extendedLenght
-      // Messages from the client MUST be masked
-      let data = if header.hasMask then frame |> Array.mapi (fun i x -> x ^^^ mask.[i % 4]) else frame
-      return (header.opcode, data, header.fin)
+      if extendedLenght > uint64 Int32.MaxValue then
+        let reason = sprintf "Frame size of %d bytes exceeds maximun accepted frame size (2 GB)" extendedLenght
+        let data = 
+           ; yield! UTF8.bytes reason |]
+        do! sendFrame Close data true
+        return! abort (OtherError reason)
+      else
+        let! frame = readBytes connection.transport (int extendedLenght)
+        // Messages from the client MUST be masked
+        let data = if header.hasMask then frame |> Array.mapi (fun i x -> x ^^^ mask.[i % 4]) else frame
+        return (header.opcode, data, header.fin)
       }
 
     member this.read () = async{
