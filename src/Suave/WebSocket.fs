@@ -82,7 +82,7 @@ module WebSocket =
       }
     header
 
-  let internal frame (data : byte[]) (opcode : Opcode) (fin : bool) =
+  let internal frame (opcode : Opcode) (data : byte[])  (fin : bool) =
 
     let firstByte = 
       match opcode with
@@ -137,7 +137,7 @@ module WebSocket =
           return uint64(header.length)
       }
 
-    let sendFrame bs opcode fin = socket{
+    let sendFrame opcode bs fin = socket{
       let frame = frame opcode bs fin
       let! _ = connection.transport.write <| ArraySegment (frame,0,frame.Length)
       return ()
@@ -173,9 +173,8 @@ module WebSocket =
       | _ ->
         return failwith "WebSocket: read failed."
       }
-    member this.send bs opcode fin = async{
-      let frame = frame opcode bs fin
-      let! res = connection.transport.write <| ArraySegment (frame,0,frame.Length)
+    member this.send opcode bs fin = async{
+      let! res = sendFrame  opcode bs fin
       match res with
       | Choice1Of2 x -> return ()
       | _ ->
