@@ -153,7 +153,7 @@ let min min : Validation<decimal> =
 let max max : Validation<decimal> =
   (fun d -> d <= max),
   (sprintf "must be at most %M" max),
-  ("min", formatDec max)
+  ("max", formatDec max)
 
 let step step : Validation<decimal> = 
   (fun d -> d % step = 0.0M), 
