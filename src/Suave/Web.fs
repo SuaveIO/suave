@@ -429,8 +429,8 @@ module internal ParsingAndControl =
     let connection = ctxOuter.connection
     let rec loop (ctx : HttpContext) = socket {
 
-      let verbose  = Log.verbose runtime.logger "Suave.Web.request_loop.loop" TraceHeader.empty
-      let verbosef = Log.verbosef runtime.logger "Suave.Web.request_loop.loop" TraceHeader.empty
+      let verbose  = Log.verbose runtime.logger "Suave.Web.httpLoop.loop" TraceHeader.empty
+      let verbosef = Log.verbosef runtime.logger "Suave.Web.httpLoop.loop" TraceHeader.empty
 
       verbose "-> processor"
       let! result = processRequest ctx
@@ -447,7 +447,7 @@ module internal ParsingAndControl =
             verbose "'Connection: keep-alive' recurse"
             return! loop (cleanResponse ctx)
           | Some _ ->
-            free "Suave.Web.http_loop.loop (case Some _)" connection
+            free "Suave.Web.httpLoop.loop (case Some _)" connection
             verbose "'Connection: close', exiting"
             return ()
           | None ->
@@ -455,7 +455,7 @@ module internal ParsingAndControl =
               verbose "'Connection: keep-alive' recurse (!)"
               return! loop (cleanResponse ctx)
             else
-              free "Suave.Web.http_loop.loop (case None, else branch)" connection
+              free "Suave.Web.httpLoop.loop (case None, else branch)" connection
               verbose "'Connection: close', exiting"
               return ()
         | None -> return ()
@@ -505,7 +505,7 @@ open Suave.Logging
 /// thrown exceptions.
 let defaultErrorHandler (ex : Exception) msg (ctx : HttpContext) =
   let request = ctx.request
-  msg |> Log.infoe ctx.runtime.logger "Suave.Web.default_error_handler" ctx.request.trace ex
+  msg |> Log.infoe ctx.runtime.logger "Suave.Web.defaultErrorHandler" ctx.request.trace ex
   if IPAddress.IsLoopback ctx.request.ipaddr then
     Response.response HTTP_500 (UTF8.bytes (sprintf "<h1>%s</h1><br/>%A" ex.Message ex)) ctx
   else 
