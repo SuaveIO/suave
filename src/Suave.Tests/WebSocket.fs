@@ -12,6 +12,7 @@ open System.Threading
 open Suave
 open Suave.Types
 open Suave.Http
+open Suave.Sockets
 open Suave.WebSocket
 open Suave.Utils
 open Suave.Tests.TestUtilities
@@ -23,7 +24,7 @@ let websocket_tests =
   let runWithConfig = runWith defaultConfig
 
   let websocketApp (webSocket : WebSocket) =
-    fun cx -> async{
+    fun cx -> socket{
       let loop = ref true
       while !loop do
         let! msg = webSocket.read()
@@ -37,7 +38,6 @@ let websocket_tests =
           do! webSocket.send Close [||] true
           loop := false
         | _ -> ()
-      return! Control.CLOSE cx
       }
 
   let webPart =  Applicatives.path "/websocket" >>= handShake websocketApp
