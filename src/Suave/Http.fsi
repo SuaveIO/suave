@@ -74,7 +74,7 @@ module Http =
 
   /// The conditional function that applies f x a if there's a value in d,
   /// or otherwise, applies g a, if there is no value in d.
-  val cond : item:'T option -> f:('T -> 'U -> 'V) -> g:('U -> 'V) -> 'U -> 'V
+  val cond : item:Choice<'T, _> -> f:('T -> 'U -> 'V) -> g:('U -> 'V) -> 'U -> 'V
 
   /// general response functions
   module Response =
@@ -1501,6 +1501,10 @@ module Http =
   /// A module that implements the Server-Sent Event specification, which can be
   /// read at www.w3.org/TR/eventsource.
   module EventSource =
+
+    [<System.Obsolete("Use asyncWrite")>]
+    val async_write : out:Connection -> data:string -> SocketOp<unit>
+
     /// Helper function that writes a string of data. Most often you are better
     /// off using the `send` function and give it a message, as this will ensure
     /// the proper framing is used. However, if you have a desire to write raw
@@ -1519,9 +1523,12 @@ module Http =
     /// Writes a comment to the stream
     val comment : out:Connection -> cmt:string -> SocketOp<unit>
 
+    [<System.Obsolete("Use esId")>]
+    val event_type : out:Connection -> event_type:string -> SocketOp<unit>
+
     /// "If the field name is 'event' - Set the event type buffer to field value."
     /// Writes the event type to the stream
-    val event_type : out:Connection -> event_type:string -> SocketOp<unit>
+    val eventType : out:Connection -> event_type:string -> SocketOp<unit>
 
     /// "If the field name is 'data' -
     /// Append the field value to the data buffer, then append a single
@@ -1529,9 +1536,12 @@ module Http =
     /// Write a piece of data as part of the event
     val data : out:Connection -> data:string -> SocketOp<unit>
 
+    [<System.Obsolete("Use esId")>]
+    val es_id : out:Connection -> last_event_id:string -> SocketOp<unit>
+
     /// "If the field name is 'id' - Set the last event ID buffer to the field value."
     /// Sets the last event id in the stream.
-    val es_id : out:Connection -> last_event_id:string -> SocketOp<unit>
+    val esId : out:Connection -> last_event_id:string -> SocketOp<unit>
 
     /// Sets the option for the EventSource instance, of how long to wait in ms
     /// until a new connection is spawned as a retry.
@@ -1543,10 +1553,17 @@ module Http =
         data     : string
         ``type`` : string option }
 
-    ///
+    [<System.Obsolete("Use mkMessage")>]
     val mk_message : id:string -> data:string -> Message
 
+    /// Create a new message to send over SSE
+    val mkMessage : id:string -> data:string -> Message
+
+    [<System.Obsolete("Use mkMessageType")>]
     val mk_message' : id:string -> data:string -> typ:string -> Message
+
+    /// Create a new message with a given type to send over SSE
+    val mkMessageType : id:string -> data:string -> typ:string -> Message
 
     /// send a message containing data to the output stream
     val send : out:Connection -> msg:Message -> SocketOp<unit>

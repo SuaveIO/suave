@@ -86,8 +86,8 @@ module Http =
 
   let cond d f g a =
     match d with
-    | Some x -> f x a
-    | None   -> g a
+    | Choice1Of2 x -> f x a
+    | Choice2Of2 _ -> g a
 
   module Response =
 
@@ -475,18 +475,18 @@ module Http =
         >>= send key compression
 
       if exists key then
-        let mimes = ctx.runtime.mimeTypesMap <| getExtension key
+        let mimes = ctx.runtime.mimeTypesMap (getExtension key)
         match mimes with
         | Some value ->
-          let modifiedSince = r.header "if-modified-since"
-          match modifiedSince with
-          | Some v ->
+          match r.header "if-modified-since" with
+          | Choice1Of2 v ->
             match Parse.date_time v with
             | Choice1Of2 date ->
               if getLast key > date then sendIt value.name value.compression ctx
               else NOT_MODIFIED ctx
             | Choice2Of2 parse_error -> bad_request [||] ctx
-          | None -> sendIt value.name value.compression ctx
+          | Choice2Of2 _ ->
+            sendIt value.name value.compression ctx
         | None ->
           let ext = getExtension key
           log (sprintf "failed to find matching mime for ext '%s'" ext)
@@ -696,8 +696,6 @@ module Http =
   // See www.w3.org/TR/eventsource/#event-stream-interpretation
   module EventSource =
     open System
-    
-
     open Suave
     open Suave.Sockets
     open Suave.Sockets.Connection
@@ -709,9 +707,11 @@ module Http =
 
     let private ES_EOL_S = ArraySegment<_>(UTF8.bytes ES_EOL, 0, 1)
 
-    let async_write (out : Connection) (data : string) =
+    let asyncWrite (out : Connection) (data : string) =
       asyncWriteBytes out (UTF8.bytes data)
 
+    let async_write (out : Connection) (data : string) = asyncWrite out data
+      
     let (<<.) (out : Connection) (data : string) =
       asyncWriteBytes out (UTF8.bytes data)
 
@@ -721,14 +721,18 @@ module Http =
     let comment (out : Connection) (cmt : string) =
       out <<. ": " + cmt + ES_EOL
 
-    let event_type (out : Connection) (evType : string) =
+    let eventType (out : Connection) (evType : string) =
       out <<. "event: " + evType + ES_EOL
+
+    let event_type out evType = eventType out evType
 
     let data (out : Connection) (text : string) =
       out <<. "data: " + text + ES_EOL
 
-    let es_id (out : Connection) (lastEventId : string) =
+    let esId (out : Connection) (lastEventId : string) =
       out <<. "id: " + lastEventId + ES_EOL
+
+    let es_id out lastEventId = esId out lastEventId
 
     let retry (out : Connection) (retry : uint32) =
       out <<. "retry: " + (string retry) + ES_EOL
@@ -738,12 +742,16 @@ module Http =
         data     : string
         ``type`` : string option }
 
-    let mk_message id data =
+    let mkMessage id data =
       { id = id; data = data; ``type`` = None }
 
-    let mk_message' id data typ =
+    let mk_message id data = mkMessage id data
+
+    let mkMessageType id data typ =
       { id = id; data = data; ``type`` = Some typ }
 
+    let mk_message' id data typ = mkMessageType id data typ
+      
     let send (out : Connection) (msg : Message) =
       socket {
         do! msg.id |> es_id out
@@ -777,9 +785,8 @@ module Http =
       }
       |> succeed
 
-    [<Obsolete("Use handShake")>]
     let hand_shake f ctx = handShake f ctx
-
+      
   module Authentication =
 
     open RequestErrors
@@ -795,13 +802,13 @@ module Http =
     let authenticateBasic f (ctx : HttpContext) =
       let p = ctx.request
       match p.header "authorization" with
-      | Some header ->
+      | Choice1Of2 header ->
         let (typ, username, password) = parseAuthenticationToken header
         if (typ.Equals("basic")) && f (username, password) then
           fail
         else
-          challenge { ctx with userState = ctx.userState.Add("user_name",username) }
-      | None ->
+          challenge { ctx with userState = ctx.userState |> Map.add "user_name" (box username) }
+      | Choice2Of2 _ ->
         challenge ctx
 
     [<System.Obsolete("Use authenticateBasic")>]
@@ -814,4 +821,4 @@ module Http =
         return
           { ctx with
               response = { ctx.response with content = NullContent; writePreamble = false }
-              request  = { ctx.request  with headers = [ "connection","close"] }} |> Some }
+              request  = { ctx.request  with headers = [ "connection", "close"] }} |> Some }

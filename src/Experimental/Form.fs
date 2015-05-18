@@ -100,7 +100,10 @@ let bindForm<'a> (form : Form<'a>) (req : HttpRequest) =
 
   let getValue (prop : Reflection.PropertyInfo) =
     match prop.PropertyType with
-    | Optional(_) -> defaultArg (req.formData prop.Name) "" |> Choice1Of2
+    | Optional (_) ->
+      match req.formData prop.Name with
+      | Choice1Of2 x -> Choice1Of2 x
+      | Choice2Of2 _ -> Choice1Of2 ""
     | _ -> req |> bindForm prop.Name
 
   let bindFold s f = List.fold (fun x next -> x |> Choice.bind (f next)) (Choice1Of2 s)

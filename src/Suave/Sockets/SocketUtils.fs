@@ -9,13 +9,14 @@ module SocketUtils =
   type Error = 
     | SocketError of SocketError
     | OtherError of string
-  
+
   type ByteSegment = System.ArraySegment<byte>
+
   // Async is already a delayed type
   type SocketOp<'a> = Async<Choice<'a,Error>>
   
   let abort x = async { return Choice2Of2 x }
-  
+
   /// Wraps the Socket.xxxAsync logic into F# async logic.
   let asyncDo (op : SocketAsyncEventArgs -> bool) (prepare : SocketAsyncEventArgs -> unit) (select: SocketAsyncEventArgs -> 'T) (args : SocketAsyncEventArgs) =
     Async.FromContinuations <| fun (ok, error, _) ->
@@ -39,4 +40,8 @@ module SocketUtils =
   
   let trans (a : SocketAsyncEventArgs) =
     new ArraySegment<_>(a.Buffer, a.Offset, a.BytesTransferred)
-  
+
+  let internal (@|!) c errorMsg =
+    match c with
+    | Choice1Of2 x -> async.Return (Choice1Of2 x)
+    | Choice2Of2 (y : string) -> async.Return (Choice2Of2 (OtherError y))

@@ -40,7 +40,7 @@ module Parsing =
 
   /// Parse a string array of key-value-pairs, combined using the equality character '='
   /// into a dictionary
-  let parse_key_value_pairs arr =
+  let parseKVPairs arr =
     let dict = new Dictionary<string,string>()
     arr
     |> Array.iter (fun (x : String) ->
@@ -50,10 +50,6 @@ module Parsing =
 
   /// Parse the header parameters into key-value pairs, as a dictionary.
   /// Fails if the header is a None.
-  let headerParams (header : string option) =
-    match header with
-    | Some x ->
-      let parts = x.Split(';') |> Array.map (fun x -> x.TrimStart())
-      parse_key_value_pairs (Array.sub parts 1 (parts.Length - 1))
-    | None ->
-      failwith "did not find header, because headerParams received None"
+  let headerParams (header : string) =
+    let parts = header |> String.splita ';' |> Array.map String.trimStart
+    parseKVPairs (Array.sub parts 1 (parts.Length - 1))

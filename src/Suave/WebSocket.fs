@@ -199,15 +199,15 @@ module WebSocket =
     let r = ctx.request
     if r.``method`` <> HttpMethod.GET then
       return! RequestErrors.METHOD_NOT_ALLOWED "Method not allowed" ctx
-    elif r.header "upgrade"  <> Some "websocket" then 
+    elif r.header "upgrade"  <> Choice1Of2 "websocket" then 
       return! RequestErrors.BAD_REQUEST "Bad Request" ctx
     else
       match r.header "connection" with
       // rfc 6455 - Section 4.1.6 : The request MUST contain a |Connection| header field whose value
       // MUST include the "Upgrade" token.
-      | Some str when str.Contains "Upgrade" -> 
+      | Choice1Of2 str when String.contains "Upgrade" str -> 
         match r.header "sec-websocket-key" with
-        | Some webSocketKey ->
+        | Choice1Of2 webSocketKey ->
           return! handShakeAux webSocketKey continuation ctx
         | _ ->
           return! RequestErrors.BAD_REQUEST "Missing 'sec-websocket-key' header" ctx

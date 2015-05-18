@@ -63,7 +63,7 @@ module Cookie =
 
     member x.cookies =
       x.headers
-      |> List.filter (fst >> (String.eq_ord_ci "Set-Cookie"))
+      |> List.filter (fst >> (String.eqOrdCi "Set-Cookie"))
       /// duplicate headers are comma separated
       |> List.collect (snd >> String.split ',' >> List.map String.trim)
       |> List.map parseResultCookie
@@ -92,7 +92,7 @@ module Cookie =
 
   let setCookie (cookie : HttpCookie) (ctx : HttpContext) =
     let notSetCookie : string * string -> bool =
-      fst >> (String.eq_ord_ci "Set-Cookie" >> not)
+      fst >> (String.eqOrdCi "Set-Cookie" >> not)
     let cookieHeaders =
       ctx.response.cookies
       |> Map.put cookie.name cookie // possibly overwrite
@@ -155,13 +155,13 @@ module Cookie =
     let found =
       cookies
       |> Map.tryFind cookieName
-      |> Choice.from_option (NoCookieFound cookieName)
+      |> Choice.fromOption (NoCookieFound cookieName)
       |> Choice.map (fun c -> c, c.value |> dec)
     match found with
     | Choice1Of2 (cookie, cipherData) ->
       cipherData
       |> Crypto.secretboxOpen key
-      |> Choice.map_2 DecryptionError
+      |> Choice.mapError DecryptionError
       |> Choice.map (fun plainText -> cookie, plainText)
     | Choice2Of2 x -> Choice2Of2 x
 

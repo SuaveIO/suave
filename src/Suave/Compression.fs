@@ -37,26 +37,23 @@ module Compression =
     | _         -> None
 
   let getEncoder (request : HttpRequest) =
-    let encondings = request.header "accept-encoding"
-    match encondings with
-    | Some (value : string) ->
-      value.Split ','
-      |> Array.map (fun s -> s.Trim())
-      |> Array.tryPick (fun s -> loadEncoder s)
+    match request.header "accept-encoding" with
+    | Choice1Of2 value ->
+      String.splita ',' value
+      |> Array.map String.trim
+      |> Array.tryPick loadEncoder
     | _ -> None
 
   let parseEncoder (request : HttpRequest) =
-    let encondings = request.header "accept-encoding"
-    match encondings with
-    | Some (value : string) ->
-      value.Split ','
-      |> Array.map (fun s -> s.Trim())
+    match request.header "accept-encoding" with
+    | Choice1Of2 value ->
+      String.splita ',' value
+      |> Array.map String.trim
       |> Array.tryPick
-        (fun s ->
-          match s with
-          | "gzip"    -> Some GZIP
-          | "deflate" -> Some Deflate
-          | _         -> None)
+        (function
+         | "gzip"    -> Some GZIP
+         | "deflate" -> Some Deflate
+         | _         -> None)
     | _ -> None
 
   let transform (content : byte []) (ctx : HttpContext) connection : SocketOp<byte []> =

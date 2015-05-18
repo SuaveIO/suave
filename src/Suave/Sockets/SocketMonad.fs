@@ -10,7 +10,7 @@ type SocketMonad() =
   member this.ReturnFrom(x : SocketOp<'a>) : SocketOp<'a> = x
   member this.Delay(f: unit ->  SocketOp<'a>) = async { return! f () }
 
-  member this.Bind(x : SocketOp<'a>,f : 'a -> SocketOp<'b>) : SocketOp<'b> = async{
+  member this.Bind(x : SocketOp<'a>,f : 'a -> SocketOp<'b>) : SocketOp<'b> = async {
     let! result = x
     match result with
     | Choice1Of2 a -> return! f a
@@ -29,7 +29,7 @@ type SocketMonad() =
         return result
     else
       return! this.Zero()
-      }
+    }
 
   member this.TryWith(body, handler) = async {
     try

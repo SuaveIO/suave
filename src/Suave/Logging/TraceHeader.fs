@@ -41,6 +41,6 @@ type TraceHeader =
 
   static member mk traceId spanParentId =
     let newId = Globals.random.NextUInt64()
-    { traceId      = defaultArg traceId newId
-      reqId        = newId
+    { traceId     = defaultArg traceId newId
+      reqId       = newId
       reqParentId = spanParentId }
