@@ -13,10 +13,11 @@ open Suave.Utils
 open System
 open System.Net
 
+open Suave.Sockets
 open Suave.WebSocket
 
 let echo (webSocket : WebSocket) =
-  fun cx -> async{
+  fun cx -> socket{
     let loop = ref true
     while !loop do
       let! msg = webSocket.read()
@@ -30,7 +31,6 @@ let echo (webSocket : WebSocket) =
         do! webSocket.send Close [||] true
         loop := false
       | _ -> ()
-    return! Control.CLOSE cx
   }
 
 let app : WebPart =

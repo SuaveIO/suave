@@ -7,6 +7,7 @@ module WebSocket =
   open Suave.Http
   open Suave.Utils
   open Suave.Web
+  open Suave.Logging
 
   open System
   open System.Security.Cryptography
@@ -166,36 +167,20 @@ module WebSocket =
         return (header.opcode, data, header.fin)
       }
 
-    member this.read () = async{
-      let! res = readFrame ()
-      match res with
-      | Choice1Of2 ((a,b,c) as x) -> return x
-      | _ ->
-        return failwith "WebSocket: read failed."
-      }
-    member this.send opcode bs fin = async{
-      let! res = sendFrame  opcode bs fin
-      match res with
-      | Choice1Of2 x -> return ()
-      | _ ->
-        return failwith "WebSocket: write failed."
-      }
+    member this.read () = readFrame ()
+    member this.send opcode bs fin = sendFrame  opcode bs fin
 
   let internal handShakeAux webSocketKey continuation (ctx : HttpContext) =
-    async{
+    socket{
       let webSocketHash = sha1 <| webSocketKey + magicGUID
       let handShakeToken = Convert.ToBase64String webSocketHash
       let! something = ParsingAndControl.run ctx <| handShakeResponse handShakeToken
-      match something with
-      | Choice1Of2 _ ->
-        let webSocket = new WebSocket(ctx.connection)
-        return! continuation webSocket ctx
-      | _ ->
-        return failwith "handShakeAux: disconnected."
+      let webSocket = new WebSocket(ctx.connection)
+      do! continuation webSocket ctx
     }
 
   /// The handShake combinator captures a WebSocket and pass it to the provided `continuation`
-  let handShake continuation (ctx : HttpContext) = async{
+  let handShake (continuation : WebSocket -> HttpContext -> SocketOp<unit>) (ctx : HttpContext) = async{
     let r = ctx.request
     if r.``method`` <> HttpMethod.GET then
       return! RequestErrors.METHOD_NOT_ALLOWED "Method not allowed" ctx
@@ -208,7 +193,13 @@ module WebSocket =
       | Some str when str.Contains "Upgrade" -> 
         match r.header "sec-websocket-key" with
         | Some webSocketKey ->
-          return! handShakeAux webSocketKey continuation ctx
+          let! a = handShakeAux webSocketKey continuation ctx
+          match a with
+          | Choice1Of2 _ ->
+            do ()
+          | Choice2Of2 err ->
+            Log.log ctx.runtime.logger "Suave.Websocket.handShake" LogLevel.Error (sprintf "websocket disconnected: %A" err)
+          return! Control.CLOSE ctx
         | _ ->
           return! RequestErrors.BAD_REQUEST "Missing 'sec-websocket-key' header" ctx
       | _ ->
