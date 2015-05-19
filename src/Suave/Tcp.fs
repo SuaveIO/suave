@@ -101,12 +101,10 @@ let private aFewTimes f =
 /// listening to its address/port combination), and an asynchronous workflow that
 /// yields when the full server is cancelled. If the 'has started listening' workflow
 /// returns None, then the start timeout expired.
-let startTcpIpServerAsync 
-       (bufferSize        : int, 
-        maxConcurrentOps : int) 
-       (logger             : Logger)
-       (serveClient        : TcpWorker<unit>)
-       (binding            : SocketBinding) =
+let startTcpIpServerAsync (bufferSize  : int, maxConcurrentOps : int)
+                          (logger      : Logger)
+                          (serveClient : TcpWorker<unit>)
+                          (binding     : SocketBinding) =
 
   let startData =
     { startCalledUtc = Globals.utcNow ()
@@ -167,7 +165,7 @@ let startTcpIpServerAsync
       use! dd = Async.OnCancel(fun () -> stopTcp logger "tcpIpServer async cancelled" listenSocket)
       let! token = Async.CancellationToken
 
-      let startData = { startData with socketBoundUtc = Some(Globals.utcNow()) }
+      let startData = { startData with socketBoundUtc = Some (Globals.utcNow()) }
       acceptingConnections.Complete startData |> ignore
 
       logger.Log LogLevel.Info <| fun _ ->

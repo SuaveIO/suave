@@ -5,6 +5,7 @@ module Compression =
   open Suave.Types
   open Suave.Utils
   open Suave.Sockets
+  open Suave.Sockets.Control
 
   open System
   open System.IO
@@ -76,11 +77,11 @@ module Compression =
     match encoding with
     | GZIP ->
       use gzip = new GZipStream(newFileStream, CompressionMode.Compress)
-      do! liftTask (fs.CopyToAsync gzip)
+      do! SocketOp.ofTask (fs.CopyToAsync gzip)
       gzip.Close()
     | Deflate ->
       use deflate = new DeflateStream(newFileStream, CompressionMode.Compress)
-      do! liftTask (fs.CopyToAsync deflate)
+      do! SocketOp.ofTask (fs.CopyToAsync deflate)
       deflate.Close()
     | _ ->
       return failwith "invalid case."

@@ -3,6 +3,7 @@
 module WebSocket =
 
   open Suave.Sockets
+  open Suave.Sockets.Control
   open Suave.Types
   open Suave.Http
   open Suave.Utils
@@ -156,9 +157,9 @@ module WebSocket =
         let reason = sprintf "Frame size of %d bytes exceeds maximun accepted frame size (2 GB)" extendedLenght
         let data = 
           [| yield! BitConverter.GetBytes (CloseCode.CLOSE_TOO_LARGE.code)
-           ; yield! UTF8.bytes reason |]
+             yield! UTF8.bytes reason |]
         do! sendFrame Close data true
-        return! abort (InputDataError reason)
+        return! SocketOp.abort (InputDataError reason)
       else
         let! frame = readBytes connection.transport (int extendedLenght)
         // Messages from the client MUST be masked

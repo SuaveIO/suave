@@ -10,6 +10,7 @@ open Suave.Utils
 open Suave.Utils.Bytes
 
 open Suave.Sockets
+open Suave.Sockets.Control
 open Suave.Types
 open Suave.Web
 open Suave.Tcp
@@ -77,8 +78,8 @@ let forward (ip : IPAddress) (port : uint16) (ctx : HttpContext) =
         do! transferStreamBounded ctx.connection (q.GetRequestStream()) (int32 contentLength)
       | _ -> ()
     try
-      let! data = liftAsync <| q.AsyncGetResponse()
-      let! res = liftAsync <| sendWebResponse ((data : WebResponse) :?> HttpWebResponse) ctx
+      let! data = SocketOp.ofAsync <| q.AsyncGetResponse()
+      let! res = SocketOp.ofAsync <| sendWebResponse ((data : WebResponse) :?> HttpWebResponse) ctx
       match res with
       | Some newCtx ->
         do! response_f newCtx
@@ -86,14 +87,14 @@ let forward (ip : IPAddress) (port : uint16) (ctx : HttpContext) =
       | None -> return None
     with
     | :? WebException as ex when ex.Response <> null ->
-      let! res = liftAsync <| sendWebResponse (ex.Response :?> HttpWebResponse) ctx
+      let! res = SocketOp.ofAsync <| sendWebResponse (ex.Response :?> HttpWebResponse) ctx
       match res with
       | Some newCtx ->
         do! response_f newCtx
         return Some newCtx
       | _ -> return None
     | :? WebException as ex when ex.Response = null ->
-      let! res = liftAsync <|response HTTP_502 (UTF8.bytes "suave proxy: Could not connect to upstream") ctx
+      let! res = SocketOp.ofAsync <|response HTTP_502 (UTF8.bytes "suave proxy: Could not connect to upstream") ctx
       match res with
       | Some newCtx ->
         do! response_f newCtx

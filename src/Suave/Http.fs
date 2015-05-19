@@ -505,6 +505,7 @@ module Http =
     open Suave.Utils
     open Suave.Logging
     open Suave.Types
+    open Suave.Sockets.Control
 
     open Response
     open Writers
@@ -624,6 +625,7 @@ module Http =
 
     open Suave.Utils
     open Suave.Types
+    open Suave.Sockets.Control
 
     open Response
     open ServeResource
@@ -699,6 +701,7 @@ module Http =
     open System
     open Suave
     open Suave.Sockets
+    open Suave.Sockets.Control
     open Suave.Sockets.Connection
     open Suave.Types
     open Suave.Utils
@@ -760,7 +763,8 @@ module Http =
         | Some x -> do! x |> eventType out
         | None   -> ()
         do! msg.data |> data out
-        return! dispatch out }
+        return! dispatch out
+      }
 
     let private handShakeAux f (out : Connection) =
       socket {
@@ -768,7 +772,8 @@ module Http =
         // Buggy Internet Explorer; 2kB of comment padding for IE
         do! String.replicate 2000 " " |> comment out
         do! 2000u |> retry out
-        return! f out }
+        return! f out
+      }
 
     let handShake f (ctx : HttpContext) =
       { ctx with

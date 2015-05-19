@@ -19,6 +19,7 @@ module private Helpers =
 
 open Suave
 open Suave.Sockets
+open Suave.Sockets.Control
 open Suave.Types
 open Suave.Http
 open Suave.Http.EventSource
@@ -32,9 +33,9 @@ let counterDemo (req : HttpRequest) (out : Connection) =
     socket {
       let msg = { id = i; data = string i; ``type`` = None }
       do! msg |> send out
-      return! async {
-        do! Async.Sleep 100
-        return Choice1Of2 () } }
+      return! SocketOp.ofAsync (Async.Sleep 100)
+    }
+
   socket {
     let last_evt_id =
       (req.header "last-event-id" |> Choice.bind muint32) <!>

@@ -15,11 +15,13 @@ module internal ParsingAndControl =
   open System.Collections.Generic
 
   open Suave.Http
-  open Suave.Sockets
   open Suave.Types
   open Suave.Globals
   open Suave.Compression
+  open Suave.Sockets
   open Suave.Sockets.Connection
+  open Suave.Sockets.Control
+  open Suave.Sockets.SocketOpOperators
   open Suave.Tcp
   
   open Suave.Utils
@@ -82,7 +84,7 @@ module internal ParsingAndControl =
 
     match kmpZ marker connection.segments with
     | Some x -> 
-      let! res, connection = liftAsync <| split x connection select marker.Length
+      let! res, connection = SocketOp.ofAsync <| split x connection select marker.Length
       return Found res, connection
     | None   ->
       let rec loop (xs : BufferSegment list) (acc,n) =
@@ -93,20 +95,20 @@ module internal ParsingAndControl =
           | x :: tail -> loop tail (acc @ [x],n + x.length)
           | []  -> acc,[]
       let rev = List.rev connection.segments
-      let ret,free = loop rev ([],0)
+      let ret, free = loop rev ([],0)
       for b in free do
         assert (b.length >= 0)
-        do! liftAsync <| select (ArraySegment(b.buffer.Array, b.offset, b.length)) b.length
+        do! SocketOp.ofAsync <| select (ArraySegment(b.buffer.Array, b.offset, b.length)) b.length
         do connection.bufferManager.FreeBuffer( b.buffer,"Suave.Web.scanMarker" )
-      return NeedMore,{ connection with segments = ret }
+      return NeedMore, { connection with segments = ret }
     }
 
   let readData (connection : Connection) buff = socket {
-    let! b = receive connection buff 
+    let! b = receive connection buff
     if b > 0 then
       return { buffer = buff; offset = buff.Offset; length = b }
     else
-      return! abort (Error.SocketError SocketError.Shutdown)
+      return! SocketOp.abort (Error.SocketError SocketError.Shutdown)
     }
 
   let readMoreData connection = async {
@@ -188,10 +190,10 @@ module internal ParsingAndControl =
         match connection.segments with
         | segment :: tail ->
           if segment.length > n then
-            do! liftAsync <| select (arraySegmentFromBufferSegment { segment with offset = n }) n
+            do! SocketOp.ofAsync <| select (arraySegmentFromBufferSegment { segment with offset = n }) n
             return { connection with segments = { buffer = segment.buffer; offset = segment.offset + n; length = segment.length - n } :: tail }
           else
-            do! liftAsync <| select (arraySegmentFromBufferSegment segment) segment.length
+            do! SocketOp.ofAsync <| select (arraySegmentFromBufferSegment segment) segment.length
             do connection.bufferManager.FreeBuffer(segment.buffer, "Suave.Web.readPostData:loop")
             return! loop (n - segment.length) { connection with segments = tail }
         | [] ->
@@ -425,7 +427,7 @@ module internal ParsingAndControl =
   /// can't it will return None and the run method will return.
   let internal run ctx (webPart : WebPart) = 
     socket {
-      let! result = liftAsync <| executeTask ctx (webPart ctx) ctx.runtime.errorHandler
+      let! result = SocketOp.ofAsync <| executeTask ctx (webPart ctx) ctx.runtime.errorHandler
       match result with 
       | Some newCtx ->
         if newCtx.response.writePreamble then
@@ -444,7 +446,7 @@ module internal ParsingAndControl =
     | WebPart webPart ->
       return! run ctx webPart
     | SocketPart writer ->
-      let! intermediate = liftAsync <| writer ctx
+      let! intermediate = SocketOp.ofAsync <| writer ctx
       match intermediate with
       | Some task ->
         return! task ctx
@@ -511,11 +513,10 @@ module internal ParsingAndControl =
 
   /// Starts a new web worker, given the configuration and a web part to serve.
   let startWebWorkerAsync (bufferSize, maxOps) (webpart : WebPart) (runtime : HttpRuntime) =
-    startTcpIpServerAsync
-        (bufferSize, maxOps) 
-        runtime.logger 
-        (requestLoop runtime (WebPart webpart)) 
-        runtime.matchedBinding.socketBinding
+    startTcpIpServerAsync (bufferSize, maxOps)
+                          runtime.logger
+                          (requestLoop runtime (WebPart webpart))
+                          runtime.matchedBinding.socketBinding
 
   let resolveDirectory homeDirectory =
     match homeDirectory with

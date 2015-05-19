@@ -4,6 +4,7 @@ open OpenSSL.X509
 open OpenSSL.Core
 
 open Suave.Sockets
+open Suave.Sockets.Control
 open Suave.Types
 
 open Suave.OpenSSL.Functions

@@ -1,7 +1,8 @@
-﻿namespace Suave.Sockets
+﻿namespace Suave.Sockets.Control
 
 open System
 open System.Collections.Generic
+open Suave.Sockets
 
 /// Workflow builder to read/write to async sockets with fail/success semantics
 type SocketMonad() =
