@@ -117,12 +117,10 @@ module internal ParsingAndControl =
     match result with
     | Choice1Of2 data ->
       return { connection with segments = connection.segments @ [data] } |> Choice1Of2
-
     | Choice2Of2 error ->
       for b in connection.segments do
-        do connection.bufferManager.FreeBuffer(b.buffer, "Suave.Web.readMoreData.loop")
-
-      do connection.bufferManager.FreeBuffer(buff, "Suave.Web.readMoreData.loop")
+        do connection.bufferManager.FreeBuffer( b.buffer, "Suave.Web.readMoreData.loop")
+      do connection.bufferManager.FreeBuffer( buff, "Suave.Web.readMoreData.loop")
       return Choice2Of2 error
     }
 
@@ -362,7 +360,7 @@ module internal ParsingAndControl =
   /// Load a readable plain-text stream, based on the protocol in use. If plain HTTP
   /// is being used, the stream is returned as it, otherwise a new SslStream is created
   /// to decipher the stream, without client certificates.
-  let inline loadConnection (logger : Logger) proto (connection : Connection) = socket{
+  let inline loadConnection (logger : Logger) proto (connection : Connection) = async{
     match proto with
     | HTTP       ->
       return connection
@@ -461,41 +459,54 @@ module internal ParsingAndControl =
   let httpLoop (ctxOuter : HttpContext) (consumer : HttpConsumer) =
 
     let runtime = ctxOuter.runtime
-    let connection = ctxOuter.connection
-    let rec loop (ctx : HttpContext) = socket {
+
+    let rec loop (ctx : HttpContext) = async {
 
       let verbose  = Log.verbose runtime.logger "Suave.Web.httpLoop.loop" TraceHeader.empty
       let verbosef = Log.verbosef runtime.logger "Suave.Web.httpLoop.loop" TraceHeader.empty
 
       verbose "-> processor"
-      let! result =
-        processRequest ctx
-        @|> (function
-            | InputDataError msg -> SocketOp.ofAsync (RequestErrors.BAD_REQUEST msg ctx)
-            | x                  -> SocketOp.abort x)
+      let! result' = processRequest ctx
       verbose "<- processor"
-
-      match result with
-      | None -> verbose "'result = None', exiting"
-      | Some ctx ->
-        let! result = operate consumer ctx
+      match result' with
+      | Choice1Of2 result ->
         match result with
-        | None -> ()
+        | None -> verbose "'result = None', exiting"
         | Some ctx ->
-          match ctx.request.header "connection" with
-          | Choice1Of2 conn when String.eqOrdCi conn "keep-alive" ->
-            verbose "'Connection: keep-alive' recurse"
-            return! loop (cleanResponse ctx)
-
+          let! result'' = operate consumer ctx
+          match result'' with
+          | Choice1Of2 result -> 
+            match result with
+            | None -> ()
+            | Some ctx ->
+              match ctx.request.header "connection" with
+              | Choice1Of2 conn when String.eqOrdCi conn "keep-alive" ->
+                verbose "'Connection: keep-alive' recurse"
+                return! loop (cleanResponse ctx)
+              | Choice1Of2 _ ->
+                free "Suave.Web.httpLoop.loop (case Choice1Of2 _)" ctx.connection
+              | Choice2Of2 _ ->
+                if ctx.request.httpVersion.Equals("HTTP/1.1") then
+                  verbose "'Connection: keep-alive' recurse (!)"
+                  return! loop (cleanResponse ctx)
+                else
+                  free "Suave.Web.httpLoop.loop (case Choice2Of2, else branch)" ctx.connection
+                  return ()
+          | Choice2Of2 err ->
+            verbose (sprintf "Socket error while running webpart, exiting: %A" err)
+      | Choice2Of2 err ->
+        match err with
+        | InputDataError msg ->
+          verbose (sprintf "Error parsing http request: %s" msg)
+          let! result''' = run ctx (RequestErrors.BAD_REQUEST msg)
+          match result''' with
           | Choice1Of2 _ ->
-            free "Suave.Web.httpLoop.loop (case Choice1Of2 _)" connection
+            verbose "Exiting http loop"
+          | Choice2Of2 err ->
+            verbose (sprintf "Socket error while sending BAD_REQUEST, exiting: %A" err)
 
-          | Choice2Of2 _ ->
-            if ctx.request.httpVersion.Equals("HTTP/1.1") then
-              verbose "'Connection: keep-alive' recurse (!)"
-              return! loop (cleanResponse ctx)
-            else
-              free "Suave.Web.httpLoop.loop (case Choice2Of2, else branch)" connection
+        | err ->
+          verbose (sprintf "Socket error while sending BAD_REQUEST, exiting: %A" err)
     }
     loop ctxOuter
 
@@ -508,7 +519,7 @@ module internal ParsingAndControl =
     (consumer   : HttpConsumer)
     (connection : Connection) =
 
-    socket {
+    async {
       let! connection = loadConnection runtime.logger runtime.matchedBinding.scheme connection
       do! httpLoop { HttpContext.empty with runtime = runtime; connection = connection } consumer
       return ()

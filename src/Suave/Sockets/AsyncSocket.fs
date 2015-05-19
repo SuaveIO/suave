@@ -16,7 +16,7 @@ open System.Threading.Tasks
 
 /// A TCP Worker is a thing that takes a TCP client and returns an asynchronous
 /// workflow thereof.
-type TcpWorker<'a> = Connection -> SocketOp<'a>
+type TcpWorker<'a> = Connection -> Async<'a>
 
 /// Write the string s to the stream asynchronously as ASCII encoded text
 let asyncWrite (connection : Connection) (s : string) : SocketOp<unit> = 

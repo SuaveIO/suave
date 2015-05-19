@@ -402,7 +402,7 @@ module HttpRequest =
   let form'   (x : HttpRequest) k = x.formData k
 
 type ITlsProvider =
-  abstract member Wrap : Connection -> SocketOp<Connection>
+  abstract member Wrap : Connection -> Async<Connection>
 
 /// Gets the supported protocols, HTTP and HTTPS with a certificate
 type Protocol = 
