@@ -107,7 +107,7 @@ let parsingMultipart2 =
 
     let respBuf = Array.zeroCreate<byte> 0x100
     let resp = sender.Receive respBuf
-    ASCII.toString respBuf
+    ASCII.toStringAtOffset respBuf 0 resp
 
   testList "sending funky multiparts" [
     testCase "sending two files under same form name" <| fun _ ->
@@ -115,7 +115,7 @@ let parsingMultipart2 =
       try
         let data = readBytes "request-multipartmixed-twofiles.txt"
         let subject = sendRecv data
-        Assert.Equal("", "", subject)
+        Assert.Equal("Expecting 200 OK", "HTTP/1.1 200 OK", subject)
       finally
         disposeContext ctx
     ]

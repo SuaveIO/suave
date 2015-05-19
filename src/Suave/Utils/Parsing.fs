@@ -45,11 +45,14 @@ module Parsing =
     arr
     |> Array.iter (fun (x : String) ->
                    let parts = x.Split('=')
-                   dict.Add(parts.[0], parts.[1]))
+                   if parts.Length = 1 then
+                     dict.Add(parts.[0], "")
+                   else
+                     dict.Add(parts.[0], parts.[1]))
     dict
 
   /// Parse the header parameters into key-value pairs, as a dictionary.
   /// Fails if the header is a None.
   let headerParams (header : string) =
     let parts = header |> String.splita ';' |> Array.map String.trimStart
-    parseKVPairs (Array.sub parts 1 (parts.Length - 1))
+    parseKVPairs parts

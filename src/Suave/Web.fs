@@ -205,22 +205,103 @@ module internal ParsingAndControl =
       }
     loop bytes connection
 
-  /// Parses multipart data from the stream, feeding it into the HttpRequest's property Files.
-  let parseMultipart boundary (context : HttpContext) : SocketOp<HttpContext> =
+  let readFilePart boundary ctx (headerParams : Dictionary<string,string>) fieldName contentType = socket {
+    let tempFilePath = Path.GetTempFileName()
+    use tempFile = new FileStream(tempFilePath, FileMode.Truncate)
+    let! a, connection =
+      readUntil (ASCII.bytes (eol + boundary)) (fun x y -> async {
+          do! tempFile.AsyncWrite(x.Array, x.Offset, y)
+          }) ctx.connection
+    let fileLength = tempFile.Length
+    tempFile.Close()
+
+    if fileLength > 0L then
+      let! filename =
+          (headerParams.TryLookup "filename" |> Choice.map (String.trimc '"'))
+          @|! "Key 'filename' was not present in 'content-disposition'"
+
+      let upload =
+          { fieldName    = fieldName
+            fileName     = filename
+            mimeType     = contentType
+            tempFilePath = tempFilePath }
+
+      return connection, Some upload
+    else
+      File.Delete tempFilePath
+      return connection, None
+      
+    }
+
+  let parseMultipartMixed fieldName boundary (context : HttpContext) : SocketOp<HttpContext> =
+
     let verbose str =
       let logger = context.runtime.logger
-      Log.verbose logger "Suave.Web.parseMultipart" context.request.trace str
+      Log.verbose logger "Suave.Web.parseMultipartMixed" context.request.trace str
 
-    let rec loop boundary (ctx : HttpContext) = socket {
+    let rec loop (ctx : HttpContext) = socket {
+
       let! firstLine, connection = readLine ctx.connection
 
       if not (firstLine.Equals("--")) then
+
         let! partHeaders, connection = readHeaders connection
+
         let! (contentDisposition : string) =
           (partHeaders %% "content-disposition")
           @|! "Missing 'content-disposition'"
 
         let headerParams = headerParams contentDisposition
+        let contentType = partHeaders %% "content-type"
+
+        match contentType with
+        | Choice1Of2 contentType ->
+          let! res = readFilePart  boundary ctx headerParams fieldName contentType
+          match res with
+          | connection, Some upload -> 
+            return! loop { ctx with request = { ctx.request with files = upload :: ctx.request.files }; connection = connection }
+          | connection, None ->
+            return! loop { ctx with connection = connection }
+        | Choice2Of2 _ ->
+          use mem = new MemoryStream()
+          let! a, connection =
+            readUntil (ASCII.bytes(eol + boundary)) (fun x y -> async {
+                do! mem.AsyncWrite(x.Array, x.Offset, y)
+              }) connection
+          let byts = mem.ToArray()
+          return! loop { ctx with request = { ctx.request with multiPartFields = (fieldName, ASCII.toStringAtOffset byts 0 byts.Length)::(ctx.request.multiPartFields) }; connection = connection}
+      else
+        return { ctx with connection = connection }
+      }
+
+    loop context
+
+  /// Parses multipart data from the stream, feeding it into the HttpRequest's property Files.
+  let parseMultipart boundary (context : HttpContext) : SocketOp<HttpContext> =
+
+    let verbose str =
+      let logger = context.runtime.logger
+      Log.verbose logger "Suave.Web.parseMultipart" context.request.trace str
+
+    let rec loop (ctx : HttpContext) = socket {
+
+      let! firstLine, connection = readLine ctx.connection
+
+      if firstLine.Equals("--") || firstLine.Equals(boundary + "--") then
+        return { ctx with connection = connection }
+      else
+        let! partHeaders, connection = readHeaders connection
+
+        let! (contentDisposition : string) =
+          (partHeaders %% "content-disposition")
+          @|! "Missing 'content-disposition'"
+
+        let headerParams = headerParams contentDisposition
+
+        let! _ =
+          (headerParams.TryLookup "form-data" |> Choice.map (String.trimc '"'))
+          @|! "Key 'form-data' was not present in 'content-disposition'"
+        
         let! fieldName =
           (headerParams.TryLookup "name" |> Choice.map (String.trimc '"'))
           @|! "Key 'name' was not present in 'content-disposition'"
@@ -230,33 +311,17 @@ module internal ParsingAndControl =
         match contentType with
         | Choice1Of2 x when String.startsWith "multipart/mixed" x ->
           let subboundary = "--" + x.Substring(x.IndexOf('=') + 1).TrimStart()
-          return! loop subboundary { ctx with connection = connection }
+          let! ctx = parseMultipartMixed fieldName subboundary { ctx with connection = connection }
+
+          return! loop ctx
 
         | Choice1Of2 contentType ->
-          let tempFilePath = Path.GetTempFileName()
-          use tempFile = new FileStream(tempFilePath, FileMode.Truncate)
-          let! a, connection =
-            readUntil (ASCII.bytes (eol + boundary)) (fun x y -> async {
-                do! tempFile.AsyncWrite(x.Array, x.Offset, y)
-              }) connection
-          let fileLength = tempFile.Length
-          tempFile.Close()
-
-          if fileLength > 0L then
-            let! filename =
-              (headerParams.TryLookup "filename" |> Choice.map (String.trimc '"'))
-              @|! "Key 'filename' was not present in 'content-disposition'"
-
-            let upload =
-              { fieldName    = fieldName
-                fileName     = filename
-                mimeType     = contentType
-                tempFilePath = tempFilePath }
-            return! loop boundary { ctx with request = { ctx.request with files = upload :: ctx.request.files }
-                                             connection = connection }
-          else
-            File.Delete tempFilePath
-            return! loop boundary { ctx with connection = connection }
+          let! res = readFilePart  boundary ctx headerParams fieldName contentType
+          match res with
+          | connection, Some upload -> 
+            return! loop { ctx with request = { ctx.request with files = upload :: ctx.request.files }; connection = connection }
+          | connection, None ->
+            return! loop { ctx with connection = connection }
 
         | Choice2Of2 _ ->
           use mem = new MemoryStream()
@@ -265,13 +330,10 @@ module internal ParsingAndControl =
                 do! mem.AsyncWrite(x.Array, x.Offset, y)
               }) connection
           let byts = mem.ToArray()
-          return! loop boundary { ctx with request = { ctx.request with multiPartFields = (fieldName, ASCII.toStringAtOffset byts 0 byts.Length)::(ctx.request.multiPartFields) }
-                                           connection = connection}
-      else
-        return { ctx with connection = connection }
+          return! loop { ctx with request = { ctx.request with multiPartFields = (fieldName, ASCII.toStringAtOffset byts 0 byts.Length)::(ctx.request.multiPartFields) }; connection = connection}
       }
 
-    loop boundary context
+    loop context
 
   let parseTraceHeaders (headers : NameValueList) =
     let tryParseUint64 x = 
