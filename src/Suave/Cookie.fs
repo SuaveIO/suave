@@ -114,7 +114,7 @@ module Cookie =
 
   let setPair (httpCookie : HttpCookie) (clientCookie : HttpCookie) : WebPart =
     context (fun { runtime = { logger = logger } } ->
-      Log.log logger "Suave.Cookie.set_pair" LogLevel.Debug
+      Log.log logger "Suave.Cookie.setPair" LogLevel.Debug
         (sprintf "setting cookie '%s' len '%d'" httpCookie.name httpCookie.value.Length)
       succeed)
     >>= setCookie httpCookie >>= setCookie clientCookie
@@ -168,17 +168,17 @@ module Cookie =
   let refreshCookies relativeExpiry httpCookie : WebPart =
     slidingExpiry relativeExpiry httpCookie ||> setPair
 
-  let updateCookies (csctx : CookiesState) f_plainText : WebPart =
+  let updateCookies (csctx : CookiesState) fPlainText : WebPart =
     context (fun ctx ->
       let logger = ctx.runtime.logger
       let plainText =
         match readCookies csctx.serverKey csctx.cookieName ctx.response.cookies with
         | Choice1Of2 (_, plainText) ->
           Log.log logger "Suave.Cookie.updateCookies" LogLevel.Debug "updateCookies - existing"
-          f_plainText (Some plainText)
+          fPlainText (Some plainText)
         | Choice2Of2 _ ->
           Log.log logger "Suave.Cookie.updateCookies" LogLevel.Debug "updateCookies - first time"
-          f_plainText None
+          fPlainText None
 
       /// Since the contents will completely change every write, we simply re-generate the cookie
       generateCookies csctx.serverKey csctx.cookieName
@@ -191,11 +191,11 @@ module Cookie =
                    // unit -> plain text to store OR something to run of your own!
                    (noCookie : unit -> Choice<byte [], WebPart>)
                    (decryptionFailure   : _ -> Choice<byte [], WebPart>)
-                   (f_success : WebPart)
+                   (fSuccess : WebPart)
                    : WebPart =
-    context (fun ({ runtime = { logger = logger }} as ctx) ->
+    context (fun ctx ->
 
-      let log = Log.log logger "Suave.Cookie.cookie_state" LogLevel.Debug
+      let log = Log.log ctx.runtime.logger "Suave.Cookie.cookieState" LogLevel.Debug
 
       let setCookies plainText =
         let httpCookie, clientCookie =
@@ -210,13 +210,13 @@ module Cookie =
         log "existing cookie"
         refreshCookies csctx.relativeExpiry httpCookie
           >>= Writers.setUserData csctx.userStateKey plainText
-          >>= f_success
+          >>= fSuccess
 
       | Choice2Of2 (NoCookieFound _) ->
         match noCookie () with
         | Choice1Of2 plainText ->
           log "no existing cookie, setting text"
-          setCookies plainText >>= f_success
+          setCookies plainText >>= fSuccess
         | Choice2Of2 wp_kont ->
           log "no existing cookie, calling app continuation"
           wp_kont
@@ -226,10 +226,10 @@ module Cookie =
         match decryptionFailure err with
         | Choice1Of2 plainText ->
           log "existing, broken cookie, setting cookie text anew"
-          setCookies plainText >>= f_success
-        | Choice2Of2 wp_kont    ->
+          setCookies plainText >>= fSuccess
+        | Choice2Of2 wpKont    ->
           log "existing, broken cookie, unsetting it, forwarding to given failure web part"
-          wp_kont >>= unsetPair csctx.cookieName)
+          wpKont >>= unsetPair csctx.cookieName)
 
   [<Obsolete("Renamed to parseCookies'")>]
   let parse_cookies s = parseCookies s

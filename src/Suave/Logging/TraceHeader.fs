@@ -9,9 +9,9 @@ open Suave.Utils.RandomExtensions
 /// of possible values, so you can be fairly certain a given request
 /// id is unique, given a good random number generator.
 type TraceHeader =
-  { /// If this is the 'first' traced request, then trace_id equals
-    /// req_id. If it's the second, then trace_id = req_parent_id
-    /// or otherwise third or later then trace_id, req_id and req_parent_id
+  { /// If this is the 'first' traced request, then traceId equals
+    /// reqId. If it's the second, then traceId = reqParentId
+    /// or otherwise third or later then traceId, reqId and reqParentId
     /// are all disjunct
     traceId      : uint64
 
@@ -33,9 +33,9 @@ type TraceHeader =
       reqId        = 0UL
       reqParentId = None }
 
-  /// Create a new `TraceHeader` with the given `trace_id` and `span_parent_id`.
-  /// This generates a new id and places it in `trace_id` AND `req_id` if no
-  /// `trace_id` parameter is supplied. Unless `span_parent_id` is given, that
+  /// Create a new `TraceHeader` with the given `traceId` and `spanParentId`.
+  /// This generates a new id and places it in `traceId` AND `reqId` if no
+  /// `traceId` parameter is supplied. Unless `spanParentId` is given, that
   /// field is defaulted to None, as suave cannot know the "origin span", so to
   /// speak.
 

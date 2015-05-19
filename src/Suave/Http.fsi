@@ -85,7 +85,7 @@ module Http =
     // val response_f : status_code:HttpCode -> ( Connection -> SocketOp<unit>) -> request:HttpContext -> (Connection -> SocketOp<unit>)
 
     /// Respond with a given status code, http reason phrase, content in the body to a http request.
-    val response : status_code:HttpCode -> content:byte [] -> WebPart
+    val response : statusCode:HttpCode -> content:byte [] -> WebPart
 
   /// Module that allows changing the output response in different ways.
   /// Functions have signature f :: params... -> HttpContext -> HttpContext.
@@ -122,7 +122,7 @@ module Http =
     /// </para></summary>
     /// <remarks>
     /// </remarks>
-    val setMimeType : mime_type:string -> WebPart
+    val setMimeType : mimeType:string -> WebPart
 
 
   // http://www.web-cache.com/Writings/http-status-codes.html
@@ -1446,7 +1446,7 @@ module Http =
     /// </para></summary>
     /// <remarks>
     /// </remarks>
-    val sendResource : source:Assembly -> resource_name:string -> compression:bool -> WebPart
+    val sendResource : source:Assembly -> resourceName:string -> compression:bool -> WebPart
 
     /// <summary><para>
     /// Send an embedded resource as a response to the request
@@ -1455,7 +1455,7 @@ module Http =
     /// </para></summary>
     /// <remarks>
     /// </remarks>
-    val sendResourceFromDefaultAssembly : resource_name:string -> compression:bool -> WebPart
+    val sendResourceFromDefaultAssembly : resourceName:string -> compression:bool -> WebPart
 
     /// <summary><para>
     /// Send the resource by the name given.
@@ -1528,7 +1528,7 @@ module Http =
 
     /// "If the field name is 'event' - Set the event type buffer to field value."
     /// Writes the event type to the stream
-    val eventType : out:Connection -> event_type:string -> SocketOp<unit>
+    val eventType : out:Connection -> eventType:string -> SocketOp<unit>
 
     /// "If the field name is 'data' -
     /// Append the field value to the data buffer, then append a single
@@ -1541,7 +1541,7 @@ module Http =
 
     /// "If the field name is 'id' - Set the last event ID buffer to the field value."
     /// Sets the last event id in the stream.
-    val esId : out:Connection -> last_event_id:string -> SocketOp<unit>
+    val esId : out:Connection -> lastEventId:string -> SocketOp<unit>
 
     /// Sets the option for the EventSource instance, of how long to wait in ms
     /// until a new connection is spawned as a retry.
@@ -1570,12 +1570,15 @@ module Http =
 
     /// This function composes the passed function f with the hand-shake required
     /// to start a new event-stream protocol session with the browser.
-    val handShake : f_cont:(Connection -> SocketOp<unit>) -> WebPart
+    val handShake : fCont:(Connection -> SocketOp<unit>) -> WebPart
 
     [<System.Obsolete("Use handShake")>]
     val hand_shake : f_cont:(Connection -> SocketOp<unit>) -> WebPart
 
   module Authentication =
+
+    /// The key of the username placed in the userState map if present in the request
+    val UserNameKey : string
 
     /// <summary><para>
     /// Parse the authentication type, the user name and the password from

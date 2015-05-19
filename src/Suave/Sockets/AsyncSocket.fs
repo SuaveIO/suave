@@ -66,22 +66,22 @@ let asyncWriteBytes (connection : Connection) (b : byte[]) : SocketOp<unit> = as
 /// Asynchronously write from the 'from' stream to the 'to' stream.
 let transferStream (toStream : Connection) (from : Stream) : SocketOp<unit> =
   let buf = Array.zeroCreate<byte> 0x2000
-  let rec do_block () = socket {
+  let rec doBlock () = socket {
     let! read = liftAsync <| from.AsyncRead buf
     if read <= 0 then
       return ()
     else
       do! send toStream (new ArraySegment<_>(buf,0,read))
-      return! do_block () }
-  do_block ()
+      return! doBlock () }
+  doBlock ()
 
 /// Asynchronously write from the 'from' stream to the 'to' stream, with an upper bound on
 /// amount to transfer by len
 let transferStreamBounded (toStream : Connection) (from : Stream) len =
-  let buf_size = 0x2000
-  let buf = Array.zeroCreate<byte> 0x2000
+  let bufSize = 0x2000
+  let buf = Array.zeroCreate<byte> bufSize
   let rec doBlock left = socket {
-    let! read = liftAsync <| from.AsyncRead(buf, 0, Math.Min(buf_size, left))
+    let! read = liftAsync <| from.AsyncRead(buf, 0, Math.Min(bufSize, left))
     if read <= 0 || left - read = 0 then
       return ()
     else

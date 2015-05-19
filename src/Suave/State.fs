@@ -35,8 +35,8 @@ module CookieStateStore =
     pickler.Deserialize ms
 
   let write relativeExpiry (key : string) (value : 'T) =
-    context (fun ({ runtime = { logger = logger }} as ctx) ->
-      log logger "Suave.State.CookieStateStore.write" LogLevel.Debug (sprintf "writing to key '%s'" key)
+    context (fun ctx ->
+      log ctx.runtime.logger "Suave.State.CookieStateStore.write" LogLevel.Debug (sprintf "writing to key '%s'" key)
       updateCookies
         { serverKey      = ctx.runtime.serverKey
           cookieName     = StateCookie
@@ -45,17 +45,17 @@ module CookieStateStore =
           secure         = false }
         (function
          | None      ->
-           log logger "Suave.State.CookieStateStore.write" LogLevel.Debug "in f_plain_text, no existing"
+           log ctx.runtime.logger "Suave.State.CookieStateStore.write" LogLevel.Debug "in fPlainText, no existing"
            Map.empty |> Map.add key (box value) |> encodeMap
          | Some data ->
            let m = decodeMap data
-           log logger "Suave.State.CookieStateStore.write" LogLevel.Debug
-             (sprintf "in f_plain_text, has existing %A" m)
+           log ctx.runtime.logger "Suave.State.CookieStateStore.write" LogLevel.Debug
+             (sprintf "in fPlainText, has existing %A" m)
            m |> Map.add key (box value) |> encodeMap))
 
   let stateful relativeExpiry secure : WebPart =
-    context (fun ({ runtime = { logger = logger }} as ctx) ->
-      log logger "Suave.State.CookieStateStore.stateful" LogLevel.Debug "ensuring cookie state"
+    context (fun ctx ->
+      log ctx.runtime.logger "Suave.State.CookieStateStore.stateful" LogLevel.Debug "ensuring cookie state"
 
       let cipherTextCorrupt =
         sprintf "%A" >> RequestErrors.BAD_REQUEST >> Choice2Of2

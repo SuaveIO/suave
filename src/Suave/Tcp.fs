@@ -29,7 +29,7 @@ let closeSocket (s : Socket) =
   try
     if s <> null then
       if s.Connected || s.IsBound then 
-        s.Disconnect(true)
+        s.Disconnect true
   with _ -> ()
 
 /// Shoots down a socket for good
@@ -46,11 +46,11 @@ let shutdownSocket (s : Socket) =
 /// Stop the TCP listener server
 let stopTcp (logger : Logger) reason (socket : Socket) =
   try
-    Log.internf logger "Tcp.stop_tcp" (fun fmt -> fmt "stopping tcp server, reason: '%s'" reason)
+    Log.internf logger "Tcp.stopTcp" (fun fmt -> fmt "stopping tcp server, reason: '%s'" reason)
     socket.Close()
-    "stopped tcp server" |> Log.intern logger "Tcp.stop_tcp"
+    "stopped tcp server" |> Log.intern logger "Tcp.stopTcp"
   with ex ->
-    "failure stopping tcp server" |> Log.interne logger "Tcp.stop_tcp" ex
+    "failure stopping tcp server" |> Log.interne logger "Tcp.stopTcp" ex
 
 let createPools logger maxOps bufferSize =
 
@@ -64,21 +64,21 @@ let createPools logger maxOps bufferSize =
   for x = 0 to maxOps - 1 do
     //Pre-allocate a set of reusable SocketAsyncEventArgs
     let readEventArg = new SocketAsyncEventArgs()
-    let userToken =  new AsyncUserToken()
+    let userToken = new AsyncUserToken()
     readEventArg.UserToken <- userToken
     readEventArg.add_Completed(fun a b -> userToken.Continuation b)
 
     readAsyncArgsPool.Push readEventArg
 
     let writeEventArg = new SocketAsyncEventArgs()
-    let userToken =  new AsyncUserToken()
+    let userToken = new AsyncUserToken()
     writeEventArg.UserToken <- userToken
     writeEventArg.add_Completed(fun a b -> userToken.Continuation b)
 
     writeAsyncArgsPool.Push writeEventArg
 
     let acceptArg = new SocketAsyncEventArgs()
-    let userToken =  new AsyncUserToken()
+    let userToken = new AsyncUserToken()
     acceptArg.UserToken <- userToken
     acceptArg.add_Completed(fun a b -> userToken.Continuation b)
 
@@ -90,7 +90,7 @@ let createPools logger maxOps bufferSize =
 // i.e: export MONO_GC_PARAMS=nursery-size=128m
 // The nursery size must be a power of two in bytes
 
-let private a_few_times f =
+let private aFewTimes f =
   let s ms = System.Threading.Thread.Sleep (ms : int)
   let rec run = function
     | 0us | 1us -> f ()
@@ -118,7 +118,7 @@ let startTcpIpServerAsync
   let a, b, c, bufferManager = createPools logger maxConcurrentOps bufferSize
 
   let listenSocket = new Socket(binding.endpoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp)
-  a_few_times (fun () -> listenSocket.Bind binding.endpoint)
+  aFewTimes (fun () -> listenSocket.Bind binding.endpoint)
   listenSocket.Listen MaxBacklog
 
   // consider:
@@ -126,7 +126,7 @@ let startTcpIpServerAsync
   // echo 1 > /proc/sys/net/ipv4/tcp_tw_recycle
   // custom kernel with shorter TCP_TIMEWAIT_LEN in include/net/tcp.h
   let job (acceptArgs : SocketAsyncEventArgs) = async {
-    let intern  = Log.intern logger "Suave.Tcp.tcpIpServer.job"
+    let intern = Log.intern logger "Suave.Tcp.tcpIpServer.job"
     let socket = acceptArgs.AcceptSocket
     let ipaddr = (socket.RemoteEndPoint :?> IPEndPoint).Address
     Interlocked.Increment Globals.numberOfClients |> ignore
@@ -177,7 +177,7 @@ let startTcpIpServerAsync
           message       = sprintf "listener started in %O%s" startData (if token.IsCancellationRequested then ", cancellation requested" else "")
           level         = LogLevel.Info
           ``exception`` = None
-          ts_utc_ticks  = Globals.utcNow().Ticks }
+          tsUTCTicks    = Globals.utcNow().Ticks }
 
       while not (token.IsCancellationRequested) do
         try

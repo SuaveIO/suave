@@ -80,13 +80,13 @@ module Cookie =
                        WebPart
 
   val updateCookies :  csctx:CookiesState ->
-                       f_plain_text : (byte [] option -> byte []) ->
+                       fPlainText : (byte [] option -> byte []) ->
                        WebPart
   
   val cookieState : csctx:CookiesState ->
-                    noCookie :(unit -> Choice<byte [], WebPart>) ->
+                    noCookie:(unit -> Choice<byte [], WebPart>) ->
                     decryptionFailure:(Crypto.SecretboxDecryptionError -> Choice<byte [], WebPart>) ->
-                    f_success:WebPart ->
+                    fSuccess:WebPart ->
                     WebPart
 
 

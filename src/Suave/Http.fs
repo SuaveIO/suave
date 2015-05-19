@@ -391,11 +391,12 @@ module Http =
       
       let dash = function | "" | null -> "-" | x -> x
       let ci = Globalization.CultureInfo("en-US")
-      let process_id = System.Diagnostics.Process.GetCurrentProcess().Id.ToString()
+      let processId = System.Diagnostics.Process.GetCurrentProcess().Id.ToString()
       sprintf "%O %s %s [%s] \"%s %s %s\" %d %s"
         ctx.request.ipaddr
-        process_id //TODO: obtain connection owner via Ident protocol
-        (match Map.tryFind "user_name" ctx.userState with Some x -> x :?> string | None -> "-")
+        processId //TODO: obtain connection owner via Ident protocol
+                         // Authentication.UserNameKey
+        (match Map.tryFind "userName" ctx.userState with Some x -> x :?> string | None -> "-")
         (DateTime.UtcNow.ToString("dd/MMM/yyyy:hh:mm:ss %K", ci))
         (string ctx.request.``method``)
         ctx.request.url.AbsolutePath
@@ -410,7 +411,7 @@ module Http =
           level         = LogLevel.Debug
           path          = "Suave.Http.web-requests"
           ``exception`` = None
-          ts_utc_ticks  = Globals.utcNow().Ticks }
+          tsUTCTicks    = Globals.utcNow().Ticks }
 
       succeed ctx
 
@@ -465,9 +466,9 @@ module Http =
     // 'Cache-Control' and 'Expires' headers should be left up to the user
     let resource key exists getLast getExtension
                  (send : string -> bool -> WebPart)
-                 ({ request = r; runtime = rt } as ctx) =
+                 ctx =
       let log =
-        Log.verbose rt.logger "Suave.Http.ServeResource.resource" TraceHeader.empty
+        Log.verbose ctx.runtime.logger "Suave.Http.ServeResource.resource" TraceHeader.empty
 
       let sendIt name compression =
         setHeader "Last-Modified" ((getLast key : DateTime).ToString("R"))
@@ -478,9 +479,9 @@ module Http =
         let mimes = ctx.runtime.mimeTypesMap (getExtension key)
         match mimes with
         | Some value ->
-          match r.header "if-modified-since" with
+          match ctx.request.header "if-modified-since" with
           | Choice1Of2 v ->
-            match Parse.date_time v with
+            match Parse.dateTime v with
             | Choice1Of2 date ->
               if getLast key > date then sendIt value.name value.compression ctx
               else NOT_MODIFIED ctx
@@ -513,9 +514,9 @@ module Http =
 
     let sendFile fileName (compression : bool) (ctx : HttpContext) =
       let writeFile file conn = socket {
-        let get_fs = fun path -> new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read) :> Stream
-        let get_lm = fun path -> FileInfo(path).LastWriteTime
-        use! fs = Compression.transformStream file get_fs get_lm compression ctx.runtime.compressionFolder ctx conn
+        let getFs = fun path -> new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read) :> Stream
+        let getLm = fun path -> FileInfo(path).LastWriteTime
+        use! fs = Compression.transformStream file getFs getLm compression ctx.runtime.compressionFolder ctx conn
 
         do! asyncWriteLn conn (sprintf "Content-Length: %d" (fs : Stream).Length)
         do! asyncWriteLn conn ""
@@ -563,7 +564,7 @@ module Http =
         Log.verbose l
           "Suave.Http.Files.browse"
           TraceHeader.empty
-          (sprintf "Files.browse trying file (local_file url:'%s' root:'%s')"
+          (sprintf "Files.browse trying file (local file url:'%s' root:'%s')"
             r.url.AbsolutePath rootPath)
         file (resolvePath rootPath r.url.AbsolutePath))
 
@@ -642,10 +643,10 @@ module Http =
                       resourceName
                       (compression : bool)
                       (ctx : HttpContext) =
-      let write_resource name conn = socket {
-        let get_fs = fun name -> assembly.GetManifestResourceStream(name)
-        let get_lm = fun _ -> lastModified assembly
-        use! fs = Compression.transformStream name get_fs get_lm compression ctx.runtime.compressionFolder ctx conn
+      let writeResource name conn = socket {
+        let getFs = fun name -> assembly.GetManifestResourceStream(name)
+        let getLm = fun _ -> lastModified assembly
+        use! fs = Compression.transformStream name getFs getLm compression ctx.runtime.compressionFolder ctx conn
 
         do! asyncWriteLn conn (sprintf "Content-Length: %d" (fs: Stream).Length)
         do! asyncWriteLn conn ""
@@ -657,7 +658,7 @@ module Http =
           response =
             { ctx.response with
                 status = HTTP_200
-                content = SocketTask (write_resource resourceName) }}
+                content = SocketTask (writeResource resourceName) }}
       |> succeed
 
     let sendResourceFromDefaultAssembly resourceName compression =
@@ -754,9 +755,9 @@ module Http =
       
     let send (out : Connection) (msg : Message) =
       socket {
-        do! msg.id |> es_id out
+        do! msg.id |> esId out
         match msg.``type`` with
-        | Some x -> do! x |> event_type out
+        | Some x -> do! x |> eventType out
         | None   -> ()
         do! msg.data |> data out
         return! dispatch out }
@@ -792,6 +793,8 @@ module Http =
     open RequestErrors
     open Suave.Utils
 
+    let UserNameKey = "userName"
+
     let internal parseAuthenticationToken (token : string) =
       let parts = token.Split (' ')
       let enc = parts.[1].Trim()
@@ -807,7 +810,7 @@ module Http =
         if (typ.Equals("basic")) && f (username, password) then
           fail
         else
-          challenge { ctx with userState = ctx.userState |> Map.add "user_name" (box username) }
+          challenge { ctx with userState = ctx.userState |> Map.add UserNameKey (box username) }
       | Choice2Of2 _ ->
         challenge ctx
 

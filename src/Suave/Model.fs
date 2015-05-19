@@ -31,7 +31,7 @@ module Parse =
   let int64 = parseUsing Int64.TryParse
   let uint64 = parseUsing UInt64.TryParse
   let uri = parseUsing (fun s -> Uri.TryCreate(s, UriKind.RelativeOrAbsolute))
-  let date_time = parseUsing (fun s -> DateTime.TryParse(s, CultureInfo.InvariantCulture.DateTimeFormat, DateTimeStyles.RoundtripKind))
+  let dateTime = parseUsing (fun s -> DateTime.TryParse(s, CultureInfo.InvariantCulture.DateTimeFormat, DateTimeStyles.RoundtripKind))
   let decimal = parseUsing (fun s -> Decimal.TryParse(s, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture))
 
 let binding = ChoiceBuilder()
@@ -43,14 +43,14 @@ module Binding =
   open Suave.Types
   open Suave.Utils
 
-  let bind f_bind
-           (f_cont : 'a -> (HttpContext -> 'c))
-           (f_err  : 'b -> (HttpContext -> 'c))
+  let bind fBind
+           (fCont : 'a -> (HttpContext -> 'c))
+           (fErr  : 'b -> (HttpContext -> 'c))
            : (HttpContext -> 'c) =
     context (fun c ->
-      match f_bind c with
-      | Choice1Of2 m   -> f_cont m
-      | Choice2Of2 err -> f_err err)
+      match fBind c with
+      | Choice1Of2 m   -> fCont m
+      | Choice2Of2 err -> fErr err)
 
   let bindReq f fCont fErr =
     bind (HttpContext.request >> f) fCont fErr

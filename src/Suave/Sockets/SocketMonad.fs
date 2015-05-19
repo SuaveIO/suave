@@ -5,7 +5,7 @@ open System.Collections.Generic
 
 /// Workflow builder to read/write to async sockets with fail/success semantics
 type SocketMonad() =
-  member this.Return(x:'a) : SocketOp<'a> = async{ return Choice1Of2 x }
+  member this.Return(x:'a) : SocketOp<'a> = async { return Choice1Of2 x }
   member this.Zero() : SocketOp<unit> = this.Return()
   member this.ReturnFrom(x : SocketOp<'a>) : SocketOp<'a> = x
   member this.Delay(f: unit ->  SocketOp<'a>) = async { return! f () }

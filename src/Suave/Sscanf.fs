@@ -8,7 +8,7 @@ open Microsoft.FSharp.Reflection
 /// Verify that f x, and then return x, otherwise fail witha 'format failure' message
 let private check f x = if f x then x else failwithf "format failure \"%s\"" x
 
-let private parse_decimal x = Decimal.Parse(x, System.Globalization.CultureInfo.InvariantCulture)
+let private parseDecimal x = Decimal.Parse(x, System.Globalization.CultureInfo.InvariantCulture)
 
 /// The supported characters for the formatter
 let parsers =
@@ -27,7 +27,7 @@ let parsers =
     'F', float >> box
     'g', float >> box
     'G', float >> box
-    'M', parse_decimal >> box
+    'M', parseDecimal >> box
     'c', char >> box
   ]
 

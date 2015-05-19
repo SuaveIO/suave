@@ -23,10 +23,10 @@ type BufferManager(totalBytes, bufferSize, logger) =
 
   /// Pops a buffer from the buffer pool
   member x.PopBuffer(?context : string) : ArraySegment<byte> =
-    let offset, free_count = lock freeOffsets (fun _ ->
+    let offset, freeCount = lock freeOffsets (fun _ ->
       freeOffsets.Pop(), freeOffsets.Count)
     Log.internf logger "Suave.Socket.BufferManager" (fun fmt ->
-      fmt "reserving buffer: %d, free count: %d [%s]" offset free_count (defaultArg context "no-ctx"))
+      fmt "reserving buffer: %d, free count: %d [%s]" offset freeCount (defaultArg context "no-ctx"))
     ArraySegment(buffer, offset, bufferSize)
 
   /// Initialise the memory required to use this BufferManager

@@ -18,10 +18,8 @@ open Suave.Http
 open Suave.Http.Response
 open Suave.Web.ParsingAndControl
 
-
 /// Copies the headers from 'headers1' to 'headers2'
 let private toHeaderList (headers : WebHeaderCollection) =
-  
   headers.AllKeys
   |> Seq.map (fun key -> key, headers.[key])
   |> List.ofSeq
@@ -31,9 +29,9 @@ let private sendWebResponse (data : HttpWebResponse) ({ request = { trace = t };
   let headers = toHeaderList data.Headers 
   // TODO: if downstream sends a Content-Length header copy from one stream
   // to the other asynchronously
-  "-> read_fully" |> Log.verbose ctx.runtime.logger "Suave.Proxy.send_web_response:GetResponseStream" t
+  "-> readFully" |> Log.verbose ctx.runtime.logger "Suave.Proxy.sendWebResponse:GetResponseStream" ctx.request.trace
   let bytes = data.GetResponseStream() |> readFully
-  "<- read_fully" |> Log.verbose ctx.runtime.logger "Suave.Proxy.send_web_response:GetResponseStream" t
+  "<- readFully" |> Log.verbose ctx.runtime.logger "Suave.Proxy.sendWebResponse:GetResponseStream" ctx.request.trace
   response (HttpCode.TryParse(int data.StatusCode) |> Option.get) bytes { ctx with response = { resp with headers = resp.headers @ headers } }
   
 /// Forward the HttpRequest 'p' to the 'ip':'port'
@@ -90,16 +88,16 @@ let forward (ip : IPAddress) (port : uint16) (ctx : HttpContext) =
     | :? WebException as ex when ex.Response <> null ->
       let! res = liftAsync <| sendWebResponse (ex.Response :?> HttpWebResponse) ctx
       match res with
-      | Some new_ctx ->
-        do! response_f new_ctx
-        return Some new_ctx
+      | Some newCtx ->
+        do! response_f newCtx
+        return Some newCtx
       | _ -> return None
     | :? WebException as ex when ex.Response = null ->
       let! res = liftAsync <|response HTTP_502 (UTF8.bytes "suave proxy: Could not connect to upstream") ctx
       match res with
-      | Some new_ctx ->
-        do! response_f new_ctx
-        return Some new_ctx
+      | Some newCtx ->
+        do! response_f newCtx
+        return Some newCtx
       | _ -> return None
   } |> succeed
 
