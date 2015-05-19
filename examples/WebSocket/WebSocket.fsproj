@@ -3,8 +3,7 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <SchemaVersion>2.0</SchemaVersion>
-    <ProjectGuid>34062010-bc9d-4deb-804d-cc8d1d109876</ProjectGuid>
+    <ProjectGuid>{34062010-BC9D-4DEB-804D-CC8D1D109876}</ProjectGuid>
     <OutputType>Exe</OutputType>
     <RootNamespace>WebSocket</RootNamespace>
     <AssemblyName>WebSocket</AssemblyName>
@@ -13,7 +12,6 @@
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
-    <DebugType>full</DebugType>
     <Optimize>false</Optimize>
     <Tailcalls>false</Tailcalls>
     <OutputPath>bin\Debug\</OutputPath>
@@ -33,6 +31,7 @@
     <PlatformTarget>AnyCPU</PlatformTarget>
     <DocumentationFile>bin\Release\WebSocket.XML</DocumentationFile>
     <Prefer32Bit>true</Prefer32Bit>
+    <DebugSymbols>true</DebugSymbols>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="FSharp.Core">
@@ -53,8 +52,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Suave\Suave.fsproj">
       <Name>Suave</Name>
-      <Project>{3dc9193e-bd0c-4486-9c58-56b630c36623}</Project>
-      <Private>True</Private>
+      <Project>{3DC9193E-BD0C-4486-9C58-56B630C36623}</Project>
     </ProjectReference>
   </ItemGroup>
   <PropertyGroup>

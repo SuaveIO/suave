@@ -30,14 +30,14 @@ let parsing_multipart =
   let testUrlEncodedForm fieldName =
     request (fun r ->
       match r.formData fieldName  with
-      | Some str -> OK str
-      | None -> OK "field-does-not-exists")
+      | Choice1Of2 str -> OK str
+      | Choice2Of2 _ -> OK "field-does-not-exists")
 
   let test_multipart_form =
     request (fun r ->
       match getFirst r.multiPartFields "From" with
-      | Some str -> OK str
-      | None -> OK "field-does-not-exists")
+      | Choice1Of2 str -> OK str
+      | Choice2Of2 _ -> OK "field-does-not-exists")
 
   let byte_array_content = new ByteArrayContent(post_data1)
   byte_array_content.Headers.TryAddWithoutValidation("Content-Type","multipart/form-data; boundary=99233d57-854a-4b17-905b-ae37970e8a39") |> ignore

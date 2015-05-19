@@ -1,6 +1,6 @@
 ﻿namespace Suave.Utils
 
-module RandomExtensions =
+module internal RandomExtensions =
   open System
 
   type internal Random with

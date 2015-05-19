@@ -9,11 +9,11 @@ open System.Threading
 /// Helper to just invoke the three 'funcs' once.
 let internal invokeOnce funcs =
   let counter = ref 0
-  let invoke_once' f x =
+  let invokeOnce' f x =
     if (Interlocked.CompareExchange (counter, 1, 0) = 0) then
       f x
   let (a, b, c) = funcs
-  (invoke_once' a, invoke_once' b, invoke_once' c)
+  (invokeOnce' a, invokeOnce' b, invokeOnce' c)
 
 type Microsoft.FSharp.Control.Async with
   /// Spawn an async with a timeout, throwing <see cref="System.TimeoutException" /> after
@@ -86,9 +86,5 @@ type AsyncResultCell<'T>() =
         return Some res
       with
       | :? TimeoutException as e ->
-        return None }
-
-  /// WARNING: do not use, will block the event loop.
-  /// Await the result synchronously.
-  [<Obsolete("Do not use, will block the event loop")>]
-  member x.Result () = source.Task.Result
+        return None
+    }

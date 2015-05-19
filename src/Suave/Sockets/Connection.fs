@@ -38,11 +38,11 @@ module Connection =
     (fun x -> x.transport),
     fun v x -> { x with transport = v }
 
-  let buffer_manager_ =
+  let bufferManager_ =
     (fun x -> x.bufferManager),
     fun v x -> { x with bufferManager = v }
 
-  let line_buffer_ =
+  let lineBuffer_ =
     (fun x -> x.lineBuffer),
     fun v x -> { x with lineBuffer = v }
 

@@ -23,13 +23,12 @@ type StartedData =
       ((x.socketBoundUtc |> Option.fold (fun _ t -> t) x.startCalledUtc) - x.startCalledUtc).TotalMilliseconds
       x.binding.ip x.binding.port
 
-
 /// Disconnect a socket for reuse
 let closeSocket (s : Socket) =
   try
     if s <> null then
       if s.Connected || s.IsBound then 
-        s.Disconnect(true)
+        s.Disconnect true
   with _ -> ()
 
 /// Shoots down a socket for good
@@ -46,11 +45,11 @@ let shutdownSocket (s : Socket) =
 /// Stop the TCP listener server
 let stopTcp (logger : Logger) reason (socket : Socket) =
   try
-    Log.internf logger "Tcp.stop_tcp" (fun fmt -> fmt "stopping tcp server, reason: '%s'" reason)
+    Log.internf logger "Tcp.stopTcp" (fun fmt -> fmt "stopping tcp server, reason: '%s'" reason)
     socket.Close()
-    "stopped tcp server" |> Log.intern logger "Tcp.stop_tcp"
+    "stopped tcp server" |> Log.intern logger "Tcp.stopTcp"
   with ex ->
-    "failure stopping tcp server" |> Log.interne logger "Tcp.stop_tcp" ex
+    "failure stopping tcp server" |> Log.interne logger "Tcp.stopTcp" ex
 
 let createPools logger maxOps bufferSize =
 
@@ -64,21 +63,21 @@ let createPools logger maxOps bufferSize =
   for x = 0 to maxOps - 1 do
     //Pre-allocate a set of reusable SocketAsyncEventArgs
     let readEventArg = new SocketAsyncEventArgs()
-    let userToken =  new AsyncUserToken()
+    let userToken = new AsyncUserToken()
     readEventArg.UserToken <- userToken
     readEventArg.add_Completed(fun a b -> userToken.Continuation b)
 
     readAsyncArgsPool.Push readEventArg
 
     let writeEventArg = new SocketAsyncEventArgs()
-    let userToken =  new AsyncUserToken()
+    let userToken = new AsyncUserToken()
     writeEventArg.UserToken <- userToken
     writeEventArg.add_Completed(fun a b -> userToken.Continuation b)
 
     writeAsyncArgsPool.Push writeEventArg
 
     let acceptArg = new SocketAsyncEventArgs()
-    let userToken =  new AsyncUserToken()
+    let userToken = new AsyncUserToken()
     acceptArg.UserToken <- userToken
     acceptArg.add_Completed(fun a b -> userToken.Continuation b)
 
@@ -90,7 +89,7 @@ let createPools logger maxOps bufferSize =
 // i.e: export MONO_GC_PARAMS=nursery-size=128m
 // The nursery size must be a power of two in bytes
 
-let private a_few_times f =
+let private aFewTimes f =
   let s ms = System.Threading.Thread.Sleep (ms : int)
   let rec run = function
     | 0us | 1us -> f ()
@@ -102,12 +101,10 @@ let private a_few_times f =
 /// listening to its address/port combination), and an asynchronous workflow that
 /// yields when the full server is cancelled. If the 'has started listening' workflow
 /// returns None, then the start timeout expired.
-let startTcpIpServerAsync 
-       (bufferSize        : int, 
-        maxConcurrentOps : int) 
-       (logger             : Logger)
-       (serveClient        : TcpWorker<unit>)
-       (binding            : SocketBinding) =
+let startTcpIpServerAsync (bufferSize  : int, maxConcurrentOps : int)
+                          (logger      : Logger)
+                          (serveClient : TcpWorker<unit>)
+                          (binding     : SocketBinding) =
 
   let startData =
     { startCalledUtc = Globals.utcNow ()
@@ -118,7 +115,7 @@ let startTcpIpServerAsync
   let a, b, c, bufferManager = createPools logger maxConcurrentOps bufferSize
 
   let listenSocket = new Socket(binding.endpoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp)
-  a_few_times (fun () -> listenSocket.Bind binding.endpoint)
+  aFewTimes (fun () -> listenSocket.Bind binding.endpoint)
   listenSocket.Listen MaxBacklog
 
   // consider:
@@ -126,12 +123,12 @@ let startTcpIpServerAsync
   // echo 1 > /proc/sys/net/ipv4/tcp_tw_recycle
   // custom kernel with shorter TCP_TIMEWAIT_LEN in include/net/tcp.h
   let job (acceptArgs : SocketAsyncEventArgs) = async {
-    let intern  = Log.intern logger "Suave.Tcp.tcp_ip_server.job"
+    let intern = Log.intern logger "Suave.Tcp.tcpIpServer.job"
     let socket = acceptArgs.AcceptSocket
     let ipaddr = (socket.RemoteEndPoint :?> IPEndPoint).Address
     Interlocked.Increment Globals.numberOfClients |> ignore
 
-    Log.internf logger "Suave.Tcp.tcp_ip_server.job" (fun fmt -> fmt "%O connected, total: %d clients" ipaddr !Globals.numberOfClients)
+    Log.internf logger "Suave.Tcp.tcpIpServer.job" (fun fmt -> fmt "%O connected, total: %d clients" ipaddr !Globals.numberOfClients)
 
     try
       let readArgs = b.Pop()
@@ -140,7 +137,7 @@ let startTcpIpServerAsync
         { ipaddr       = ipaddr
           transport    = { socket = socket; readArgs = readArgs; writeArgs = writeArgs}
           bufferManager = bufferManager
-          lineBuffer  = bufferManager.PopBuffer "Suave.Tcp.tcp_ip_server.job" // buf allocate
+          lineBuffer  = bufferManager.PopBuffer "Suave.Tcp.tcpIpServer.job" // buf allocate
           segments     = []
         }
       use! oo = Async.OnCancel (fun () -> intern "disconnected client (async cancel)"
@@ -152,41 +149,42 @@ let startTcpIpServerAsync
       a.Push acceptArgs
       b.Push readArgs
       c.Push writeArgs
-      bufferManager.FreeBuffer(connection.lineBuffer, "Suave.Tcp.tcp_ip_server.job") // buf free OK
+      bufferManager.FreeBuffer(connection.lineBuffer, "Suave.Tcp.tcpIpServer.job") // buf free OK
       Interlocked.Decrement(Globals.numberOfClients) |> ignore
-      Log.internf logger "Suave.Tcp.tcp_ip_server.job" (fun fmt -> fmt "%O disconnected, total: %d clients" ipaddr !Globals.numberOfClients)
+      Log.internf logger "Suave.Tcp.tcpIpServer.job" (fun fmt -> fmt "%O disconnected, total: %d clients" ipaddr !Globals.numberOfClients)
     with 
     | :? System.IO.EndOfStreamException ->
       intern "disconnected client (end of stream)"
-    | ex -> "tcp request processing failed" |> Log.interne logger "Suave.Tcp.tcp_ip_server.job" ex
+    | ex ->
+      "tcp request processing failed" |> Log.interne logger "Suave.Tcp.tcpIpServer.job" ex
   }
 
   // start a new async worker for each accepted TCP client
   acceptingConnections.AwaitResult(), async {
     try
-      use! dd = Async.OnCancel(fun () -> stopTcp logger "tcp_ip_server async cancelled" listenSocket)
+      use! dd = Async.OnCancel(fun () -> stopTcp logger "tcpIpServer async cancelled" listenSocket)
       let! token = Async.CancellationToken
 
-      let startData = { startData with socketBoundUtc = Some(Globals.utcNow()) }
+      let startData = { startData with socketBoundUtc = Some (Globals.utcNow()) }
       acceptingConnections.Complete startData |> ignore
 
       logger.Log LogLevel.Info <| fun _ ->
-        { path          = "Suave.Tcp.tcp_ip_server"
+        { path          = "Suave.Tcp.tcpIpServer"
           trace         = TraceHeader.empty
           message       = sprintf "listener started in %O%s" startData (if token.IsCancellationRequested then ", cancellation requested" else "")
           level         = LogLevel.Info
           ``exception`` = None
-          ts_utc_ticks  = Globals.utcNow().Ticks }
+          tsUTCTicks    = Globals.utcNow().Ticks }
 
       while not (token.IsCancellationRequested) do
         try
           let acceptArgs = a.Pop()
           let! _ = accept listenSocket acceptArgs
           Async.Start (job acceptArgs, token)
-        with ex -> "failed to accept a client" |> Log.interne logger "Suave.Tcp.tcp_ip_server" ex
+        with ex -> "failed to accept a client" |> Log.interne logger "Suave.Tcp.tcpIpServer" ex
       return ()
     with ex ->
-      "tcp server failed" |> Log.interne logger "Suave.Tcp.tcp_ip_server" ex
+      "tcp server failed" |> Log.interne logger "Suave.Tcp.tcpIpServer" ex
       return ()
   }
 

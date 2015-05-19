@@ -67,8 +67,8 @@ module Xsp =
         if postData <> null then postData.Length.ToString() else "0"
       | HttpWorkerRequest.HeaderContentType ->
         match request.header "content-type" with
-        | Some v -> v
-        | None -> base.GetKnownRequestHeader(index)
+        | Choice1Of2 v -> v
+        | Choice2Of2 _ -> base.GetKnownRequestHeader(index)
       | _ -> base.GetKnownRequestHeader(index)
     override this.GetPreloadedEntityBody() = postData
     override this.GetAppPath() = "/"

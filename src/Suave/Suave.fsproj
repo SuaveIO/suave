@@ -13,7 +13,6 @@
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
-    <DebugType>full</DebugType>
     <Optimize>false</Optimize>
     <OutputPath>bin\Debug\</OutputPath>
     <DefineConstants>DEBUG</DefineConstants>
@@ -33,6 +32,8 @@
     <ConsolePause>false</ConsolePause>
     <WarningLevel>3</WarningLevel>
     <DocumentationFile>bin\Release\Suave.xml</DocumentationFile>
+    <DefineConstants>
+    </DefineConstants>
   </PropertyGroup>
   <PropertyGroup>
     <MinimumVisualStudioVersion Condition="'$(MinimumVisualStudioVersion)' == ''">11</MinimumVisualStudioVersion>
@@ -72,9 +73,8 @@
     <Compile Include="Log.fs" />
     <Compile Include="Sockets\BufferManager.fs" />
     <Compile Include="Sockets\SocketEventArgsPool.fs" />
-    <Compile Include="Sockets\SocketIssue.fs" />
     <Compile Include="Sockets\AsyncUserToken.fs" />
-    <Compile Include="Sockets\SocketUtils.fs" />
+    <Compile Include="Sockets\SocketOp.fs" />
     <Compile Include="Sockets\ITransport.fs" />
     <Compile Include="Sockets\TcpTransport.fs" />
     <Compile Include="Sockets\Connection.fs" />

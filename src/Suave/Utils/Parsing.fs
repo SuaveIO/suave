@@ -18,12 +18,12 @@ module Parsing =
   /// Parse the data in the string to a dictionary, assuming k/v pairs are separated
   /// by the ampersand character.
   let parseData (s : string) =
-    let parse_arr (d : string array) =
+    let parseArr (d : string array) =
       if d.Length = 2 then (d.[0], Some <| System.Web.HttpUtility.UrlDecode(d.[1]))
       else d.[0],None
     s.Split('&')
     |> Array.toList
-    |> List.map (fun (k : string) -> k.Split('=') |> parse_arr)
+    |> List.map (fun (k : string) -> k.Split('=') |> parseArr)
 
   /// parse the url into its constituents and fill out the passed dictionary with
   /// query string key-value pairs
@@ -33,14 +33,14 @@ module Parsing =
     let indexOfMark = parts.[1].IndexOf('?')
 
     if indexOfMark > 0 then
-      let raw_query = parts.[1].Substring(indexOfMark + 1)
-      (parts.[0], parts.[1].Substring(0,indexOfMark), raw_query, parts.[2])
+      let rawQuery = parts.[1].Substring(indexOfMark + 1)
+      (parts.[0], parts.[1].Substring(0,indexOfMark), rawQuery, parts.[2])
     else
       (parts.[0], parts.[1], String.Empty, parts.[2])
 
   /// Parse a string array of key-value-pairs, combined using the equality character '='
   /// into a dictionary
-  let parse_key_value_pairs arr =
+  let parseKVPairs arr =
     let dict = new Dictionary<string,string>()
     arr
     |> Array.iter (fun (x : String) ->
@@ -50,10 +50,6 @@ module Parsing =
 
   /// Parse the header parameters into key-value pairs, as a dictionary.
   /// Fails if the header is a None.
-  let headerParams (header : string option) =
-    match header with
-    | Some x ->
-      let parts = x.Split(';') |> Array.map (fun x -> x.TrimStart())
-      parse_key_value_pairs (Array.sub parts 1 (parts.Length - 1))
-    | None ->
-      failwith "did not find header, because headerParams received None"
+  let headerParams (header : string) =
+    let parts = header |> String.splita ';' |> Array.map String.trimStart
+    parseKVPairs (Array.sub parts 1 (parts.Length - 1))

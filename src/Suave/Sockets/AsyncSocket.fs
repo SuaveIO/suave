@@ -1,10 +1,11 @@
 ﻿[<AutoOpen>]
-module Suave.AsyncSocket
+module Suave.Sockets.AsyncSocket
 
 open Suave.Utils.Bytes
 open Suave.Utils.Async
 open Suave.Sockets
 open Suave.Sockets.Connection
+open Suave.Sockets.Control
 
 open System
 open System.Collections.Generic
@@ -15,28 +16,6 @@ open System.Threading.Tasks
 
 /// A TCP Worker is a thing that takes a TCP client and returns an asynchronous workflow thereof
 type TcpWorker<'a> = Connection -> SocketOp<'a>
-
-/// lift a Async<'a> type to the Socket monad
-let liftAsync (a : Async<'a>) : SocketOp<'a> = 
-  async { 
-    let! s = a
-    return Choice1Of2 s 
-  }
-
-/// lift a Task type to the Socket monad
-let liftTask (a : Task) : SocketOp<unit>  = 
-  async {
-    let! s = a
-    return Choice1Of2 s 
-  }
-
-/// from the Socket monad to Async
-let toAsync f = fun ctx -> async {
-  let! o = f ctx
-  match o with
-  | Choice1Of2 option -> return option
-  | Choice2Of2 error -> return failwith (sprintf "socket error: %A" error)
- }
 
 /// Write the string s to the stream asynchronously as ASCII encoded text
 let asyncWrite (connection : Connection) (s : string) : SocketOp<unit> = 
@@ -66,22 +45,22 @@ let asyncWriteBytes (connection : Connection) (b : byte[]) : SocketOp<unit> = as
 /// Asynchronously write from the 'from' stream to the 'to' stream.
 let transferStream (toStream : Connection) (from : Stream) : SocketOp<unit> =
   let buf = Array.zeroCreate<byte> 0x2000
-  let rec do_block () = socket {
-    let! read = liftAsync <| from.AsyncRead buf
+  let rec doBlock () = socket {
+    let! read = SocketOp.ofAsync <| from.AsyncRead buf
     if read <= 0 then
       return ()
     else
       do! send toStream (new ArraySegment<_>(buf,0,read))
-      return! do_block () }
-  do_block ()
+      return! doBlock () }
+  doBlock ()
 
 /// Asynchronously write from the 'from' stream to the 'to' stream, with an upper bound on
 /// amount to transfer by len
 let transferStreamBounded (toStream : Connection) (from : Stream) len =
-  let buf_size = 0x2000
-  let buf = Array.zeroCreate<byte> 0x2000
+  let bufSize = 0x2000
+  let buf = Array.zeroCreate<byte> bufSize
   let rec doBlock left = socket {
-    let! read = liftAsync <| from.AsyncRead(buf, 0, Math.Min(buf_size, left))
+    let! read = SocketOp.ofAsync <| from.AsyncRead(buf, 0, Math.Min(bufSize, left))
     if read <= 0 || left - read = 0 then
       return ()
     else
@@ -89,12 +68,10 @@ let transferStreamBounded (toStream : Connection) (from : Stream) len =
       return! doBlock (left - read) }
   doBlock len
 
-[<System.Obsolete("Use liftAsync")>]
-let lift_async a = liftAsync a
+[<System.Obsolete("Use SocketOp.ofAsync")>]
+let lift_async a = SocketOp.ofAsync a
 [<System.Obsolete("Use liftTask")>]
-let lift_task a = liftTask a
-[<System.Obsolete("Use toAsync")>]
-let to_async f = toAsync f
+let lift_task a = SocketOp.ofTask a
 [<System.Obsolete("Use asyncWrite")>]
 let async_write connection s = asyncWrite connection s
 [<System.Obsolete("Use asyncWriteNewLine")>]

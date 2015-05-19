@@ -86,8 +86,8 @@ module Http =
 
   let cond d f g a =
     match d with
-    | Some x -> f x a
-    | None   -> g a
+    | Choice1Of2 x -> f x a
+    | Choice2Of2 _ -> g a
 
   module Response =
 
@@ -391,11 +391,12 @@ module Http =
       
       let dash = function | "" | null -> "-" | x -> x
       let ci = Globalization.CultureInfo("en-US")
-      let process_id = System.Diagnostics.Process.GetCurrentProcess().Id.ToString()
+      let processId = System.Diagnostics.Process.GetCurrentProcess().Id.ToString()
       sprintf "%O %s %s [%s] \"%s %s %s\" %d %s"
         ctx.request.ipaddr
-        process_id //TODO: obtain connection owner via Ident protocol
-        (match Map.tryFind "user_name" ctx.userState with Some x -> x :?> string | None -> "-")
+        processId //TODO: obtain connection owner via Ident protocol
+                         // Authentication.UserNameKey
+        (match Map.tryFind "userName" ctx.userState with Some x -> x :?> string | None -> "-")
         (DateTime.UtcNow.ToString("dd/MMM/yyyy:hh:mm:ss %K", ci))
         (string ctx.request.``method``)
         ctx.request.url.AbsolutePath
@@ -410,7 +411,7 @@ module Http =
           level         = LogLevel.Debug
           path          = "Suave.Http.web-requests"
           ``exception`` = None
-          ts_utc_ticks  = Globals.utcNow().Ticks }
+          tsUTCTicks    = Globals.utcNow().Ticks }
 
       succeed ctx
 
@@ -465,9 +466,9 @@ module Http =
     // 'Cache-Control' and 'Expires' headers should be left up to the user
     let resource key exists getLast getExtension
                  (send : string -> bool -> WebPart)
-                 ({ request = r; runtime = rt } as ctx) =
+                 ctx =
       let log =
-        Log.verbose rt.logger "Suave.Http.ServeResource.resource" TraceHeader.empty
+        Log.verbose ctx.runtime.logger "Suave.Http.ServeResource.resource" TraceHeader.empty
 
       let sendIt name compression =
         setHeader "Last-Modified" ((getLast key : DateTime).ToString("R"))
@@ -475,18 +476,18 @@ module Http =
         >>= send key compression
 
       if exists key then
-        let mimes = ctx.runtime.mimeTypesMap <| getExtension key
+        let mimes = ctx.runtime.mimeTypesMap (getExtension key)
         match mimes with
         | Some value ->
-          let modifiedSince = r.header "if-modified-since"
-          match modifiedSince with
-          | Some v ->
-            match Parse.date_time v with
+          match ctx.request.header "if-modified-since" with
+          | Choice1Of2 v ->
+            match Parse.dateTime v with
             | Choice1Of2 date ->
               if getLast key > date then sendIt value.name value.compression ctx
               else NOT_MODIFIED ctx
             | Choice2Of2 parse_error -> bad_request [||] ctx
-          | None -> sendIt value.name value.compression ctx
+          | Choice2Of2 _ ->
+            sendIt value.name value.compression ctx
         | None ->
           let ext = getExtension key
           log (sprintf "failed to find matching mime for ext '%s'" ext)
@@ -504,6 +505,7 @@ module Http =
     open Suave.Utils
     open Suave.Logging
     open Suave.Types
+    open Suave.Sockets.Control
 
     open Response
     open Writers
@@ -513,9 +515,9 @@ module Http =
 
     let sendFile fileName (compression : bool) (ctx : HttpContext) =
       let writeFile file conn = socket {
-        let get_fs = fun path -> new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read) :> Stream
-        let get_lm = fun path -> FileInfo(path).LastWriteTime
-        use! fs = Compression.transformStream file get_fs get_lm compression ctx.runtime.compressionFolder ctx conn
+        let getFs = fun path -> new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read) :> Stream
+        let getLm = fun path -> FileInfo(path).LastWriteTime
+        use! fs = Compression.transformStream file getFs getLm compression ctx.runtime.compressionFolder ctx conn
 
         do! asyncWriteLn conn (sprintf "Content-Length: %d" (fs : Stream).Length)
         do! asyncWriteLn conn ""
@@ -563,7 +565,7 @@ module Http =
         Log.verbose l
           "Suave.Http.Files.browse"
           TraceHeader.empty
-          (sprintf "Files.browse trying file (local_file url:'%s' root:'%s')"
+          (sprintf "Files.browse trying file (local file url:'%s' root:'%s')"
             r.url.AbsolutePath rootPath)
         file (resolvePath rootPath r.url.AbsolutePath))
 
@@ -623,6 +625,7 @@ module Http =
 
     open Suave.Utils
     open Suave.Types
+    open Suave.Sockets.Control
 
     open Response
     open ServeResource
@@ -642,10 +645,10 @@ module Http =
                       resourceName
                       (compression : bool)
                       (ctx : HttpContext) =
-      let write_resource name conn = socket {
-        let get_fs = fun name -> assembly.GetManifestResourceStream(name)
-        let get_lm = fun _ -> lastModified assembly
-        use! fs = Compression.transformStream name get_fs get_lm compression ctx.runtime.compressionFolder ctx conn
+      let writeResource name conn = socket {
+        let getFs = fun name -> assembly.GetManifestResourceStream(name)
+        let getLm = fun _ -> lastModified assembly
+        use! fs = Compression.transformStream name getFs getLm compression ctx.runtime.compressionFolder ctx conn
 
         do! asyncWriteLn conn (sprintf "Content-Length: %d" (fs: Stream).Length)
         do! asyncWriteLn conn ""
@@ -657,7 +660,7 @@ module Http =
           response =
             { ctx.response with
                 status = HTTP_200
-                content = SocketTask (write_resource resourceName) }}
+                content = SocketTask (writeResource resourceName) }}
       |> succeed
 
     let sendResourceFromDefaultAssembly resourceName compression =
@@ -696,10 +699,9 @@ module Http =
   // See www.w3.org/TR/eventsource/#event-stream-interpretation
   module EventSource =
     open System
-    
-
     open Suave
     open Suave.Sockets
+    open Suave.Sockets.Control
     open Suave.Sockets.Connection
     open Suave.Types
     open Suave.Utils
@@ -709,9 +711,11 @@ module Http =
 
     let private ES_EOL_S = ArraySegment<_>(UTF8.bytes ES_EOL, 0, 1)
 
-    let async_write (out : Connection) (data : string) =
+    let asyncWrite (out : Connection) (data : string) =
       asyncWriteBytes out (UTF8.bytes data)
 
+    let async_write (out : Connection) (data : string) = asyncWrite out data
+      
     let (<<.) (out : Connection) (data : string) =
       asyncWriteBytes out (UTF8.bytes data)
 
@@ -721,14 +725,18 @@ module Http =
     let comment (out : Connection) (cmt : string) =
       out <<. ": " + cmt + ES_EOL
 
-    let event_type (out : Connection) (evType : string) =
+    let eventType (out : Connection) (evType : string) =
       out <<. "event: " + evType + ES_EOL
+
+    let event_type out evType = eventType out evType
 
     let data (out : Connection) (text : string) =
       out <<. "data: " + text + ES_EOL
 
-    let es_id (out : Connection) (lastEventId : string) =
+    let esId (out : Connection) (lastEventId : string) =
       out <<. "id: " + lastEventId + ES_EOL
+
+    let es_id out lastEventId = esId out lastEventId
 
     let retry (out : Connection) (retry : uint32) =
       out <<. "retry: " + (string retry) + ES_EOL
@@ -738,20 +746,25 @@ module Http =
         data     : string
         ``type`` : string option }
 
-    let mk_message id data =
+    let mkMessage id data =
       { id = id; data = data; ``type`` = None }
 
-    let mk_message' id data typ =
+    let mk_message id data = mkMessage id data
+
+    let mkMessageType id data typ =
       { id = id; data = data; ``type`` = Some typ }
 
+    let mk_message' id data typ = mkMessageType id data typ
+      
     let send (out : Connection) (msg : Message) =
       socket {
-        do! msg.id |> es_id out
+        do! msg.id |> esId out
         match msg.``type`` with
-        | Some x -> do! x |> event_type out
+        | Some x -> do! x |> eventType out
         | None   -> ()
         do! msg.data |> data out
-        return! dispatch out }
+        return! dispatch out
+      }
 
     let private handShakeAux f (out : Connection) =
       socket {
@@ -759,7 +772,8 @@ module Http =
         // Buggy Internet Explorer; 2kB of comment padding for IE
         do! String.replicate 2000 " " |> comment out
         do! 2000u |> retry out
-        return! f out }
+        return! f out
+      }
 
     let handShake f (ctx : HttpContext) =
       { ctx with
@@ -777,13 +791,14 @@ module Http =
       }
       |> succeed
 
-    [<Obsolete("Use handShake")>]
     let hand_shake f ctx = handShake f ctx
-
+      
   module Authentication =
 
     open RequestErrors
     open Suave.Utils
+
+    let UserNameKey = "userName"
 
     let internal parseAuthenticationToken (token : string) =
       let parts = token.Split (' ')
@@ -795,13 +810,13 @@ module Http =
     let authenticateBasic f (ctx : HttpContext) =
       let p = ctx.request
       match p.header "authorization" with
-      | Some header ->
+      | Choice1Of2 header ->
         let (typ, username, password) = parseAuthenticationToken header
         if (typ.Equals("basic")) && f (username, password) then
           fail
         else
-          challenge { ctx with userState = ctx.userState.Add("user_name",username) }
-      | None ->
+          challenge { ctx with userState = ctx.userState |> Map.add UserNameKey (box username) }
+      | Choice2Of2 _ ->
         challenge ctx
 
     [<System.Obsolete("Use authenticateBasic")>]
@@ -814,4 +829,4 @@ module Http =
         return
           { ctx with
               response = { ctx.response with content = NullContent; writePreamble = false }
-              request  = { ctx.request  with headers = [ "connection","close"] }} |> Some }
+              request  = { ctx.request  with headers = [ "connection", "close"] }} |> Some }

@@ -180,21 +180,17 @@ type HttpCode =
     member x.Describe () =
       sprintf "%d %s: %s" x.code x.reason x.message
 
-    // TODO: replace with match code with | 100 -> HTTP_100 | ... when API is more set
     static member TryParse (code: int) =
       HttpCodeStatics.mapCases.Force() |> Map.tryFind ("HTTP_" + string code)
 
 and private HttpCodeStatics() =
-    static member val mapCases : Lazy<Map<string,HttpCode>> =
-        lazy
-          Microsoft.FSharp.Reflection.FSharpType.GetUnionCases(typeof<HttpCode>)
-          |> Array.map (fun case -> case.Name, Microsoft.FSharp.Reflection.FSharpValue.MakeUnion(case, [||]) :?> HttpCode)
-          |> Map.ofArray
-    
+  static member val mapCases : Lazy<Map<string,HttpCode>> =
+    lazy
+      Microsoft.FSharp.Reflection.FSharpType.GetUnionCases(typeof<HttpCode>)
+      |> Array.map (fun case -> case.Name, Microsoft.FSharp.Reflection.FSharpValue.MakeUnion(case, [||]) :?> HttpCode)
+      |> Map.ofArray
+  
 module Codes =
-  let http_message (c: HttpCode) =  c.message
-  let http_reason (c: HttpCode) =  c.reason
-
   type X = HttpCode
   [<System.Obsolete("Use Suave.Types.HttpCode")>]
   type HttpCode = X

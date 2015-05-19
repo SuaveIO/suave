@@ -1,5 +1,8 @@
-﻿namespace Suave.Utils
+﻿module Suave.Utils.Option
 
-module Option =
-  let orDefault value opt =
-    opt |> Option.fold (fun s t -> t) value
+let orDefault value opt =
+  opt |> Option.fold (fun s t -> t) value
+
+let ofChoice = function
+  | Choice1Of2 x -> Some x
+  | Choice2Of2 _ -> None
