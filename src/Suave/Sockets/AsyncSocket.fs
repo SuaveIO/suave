@@ -14,7 +14,8 @@ open System.Net
 open System.Net.Sockets
 open System.Threading.Tasks
 
-/// A TCP Worker is a thing that takes a TCP client and returns an asynchronous workflow thereof
+/// A TCP Worker is a thing that takes a TCP client and returns an asynchronous
+/// workflow thereof.
 type TcpWorker<'a> = Connection -> SocketOp<'a>
 
 /// Write the string s to the stream asynchronously as ASCII encoded text

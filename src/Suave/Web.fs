@@ -117,10 +117,12 @@ module internal ParsingAndControl =
     match result with
     | Choice1Of2 data ->
       return { connection with segments = connection.segments @ [data] } |> Choice1Of2
+
     | Choice2Of2 error ->
       for b in connection.segments do
-        do connection.bufferManager.FreeBuffer( b.buffer, "Suave.Web.readMoreData.loop")
-      do connection.bufferManager.FreeBuffer( buff, "Suave.Web.readMoreData.loop")
+        do connection.bufferManager.FreeBuffer(b.buffer, "Suave.Web.readMoreData.loop")
+
+      do connection.bufferManager.FreeBuffer(buff, "Suave.Web.readMoreData.loop")
       return Choice2Of2 error
     }
 
@@ -194,7 +196,7 @@ module internal ParsingAndControl =
             return { connection with segments = { buffer = segment.buffer; offset = segment.offset + n; length = segment.length - n } :: tail }
           else
             do! SocketOp.ofAsync <| select (arraySegmentFromBufferSegment segment) segment.length
-            do connection.bufferManager.FreeBuffer(segment.buffer, "Suave.Web.readPostData:loop")
+            do connection.bufferManager.FreeBuffer(segment.buffer, "Suave.Web.readPostData.loop")
             return! loop (n - segment.length) { connection with segments = tail }
         | [] ->
           if n = 0 then
@@ -580,9 +582,9 @@ let startWebServer (config : SuaveConfig) (webpart : WebPart) =
 /// to succeed.
 let defaultConfig = 
   { bindings              = [ HttpBinding.defaults ]
-    serverKey             = Utils.Crypto.generateKey HttpRuntime.ServerKeyLength
+    serverKey             = Crypto.generateKey HttpRuntime.ServerKeyLength
     errorHandler          = defaultErrorHandler
-    listenTimeout         = TimeSpan.FromSeconds(2.)
+    listenTimeout         = TimeSpan.FromSeconds 2.
     cancellationToken     = Async.DefaultCancellationToken
     bufferSize            = 8192 // 8 KiB
     maxOps                = 100
