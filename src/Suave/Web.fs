@@ -466,7 +466,11 @@ module internal ParsingAndControl =
       let verbosef = Log.verbosef runtime.logger "Suave.Web.httpLoop.loop" TraceHeader.empty
 
       verbose "-> processor"
-      let! result = processRequest ctx
+      let! result =
+        processRequest ctx
+        @|> (function
+            | InputDataError msg -> SocketOp.ofAsync (RequestErrors.BAD_REQUEST msg ctx)
+            | x                  -> SocketOp.abort x)
       verbose "<- processor"
 
       match result with
@@ -474,24 +478,22 @@ module internal ParsingAndControl =
       | Some ctx ->
         let! result = operate consumer ctx
         match result with
+        | None -> ()
         | Some ctx ->
           match ctx.request.header "connection" with
           | Choice1Of2 conn when String.eqOrdCi conn "keep-alive" ->
             verbose "'Connection: keep-alive' recurse"
             return! loop (cleanResponse ctx)
+
           | Choice1Of2 _ ->
             free "Suave.Web.httpLoop.loop (case Choice1Of2 _)" connection
-            verbose "'Connection: close', exiting"
-            return ()
+
           | Choice2Of2 _ ->
             if ctx.request.httpVersion.Equals("HTTP/1.1") then
               verbose "'Connection: keep-alive' recurse (!)"
               return! loop (cleanResponse ctx)
             else
               free "Suave.Web.httpLoop.loop (case Choice2Of2, else branch)" connection
-              verbose "'Connection: close', exiting"
-              return ()
-        | None -> return ()
     }
     loop ctxOuter
 

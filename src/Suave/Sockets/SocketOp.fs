@@ -27,32 +27,71 @@ module SocketOp =
   open Suave.Utils
   open System.Threading.Tasks
 
-  let abort (x : Error) =
+  let mreturn (x : 'T) : SocketOp<'T> =
+    async.Return (Choice1Of2 x)
+
+  let abort (x : Error) : SocketOp<_> =
     async.Return (Choice2Of2 x)
 
-  let orInputError c errorMsg =
-    match c with
+  let orInputError errorMsg : _ -> SocketOp<_> = function
     | Choice1Of2 x -> async.Return (Choice1Of2 x)
-    | Choice2Of2 (y : string) -> async.Return (Choice2Of2 (InputDataError y))
+    | Choice2Of2 _ -> async.Return (Choice2Of2 (InputDataError errorMsg))
+
+  let orInputErrorf fErrorMsg : _ -> SocketOp<_> = function
+    | Choice1Of2 x -> async.Return (Choice1Of2 x)
+    | Choice2Of2 (y : string) -> async.Return (Choice2Of2 (InputDataError (fErrorMsg y)))
+
+  let bind (fMapper : _ -> SocketOp<_>) (value : SocketOp<_>) : SocketOp<_> = async {
+    let! x = value
+    match x with
+    | Choice1Of2 x -> return! fMapper x
+    | Choice2Of2 (err : Error) -> return Choice2Of2 err
+    }
+
+  let bindError (fMapper : _ -> SocketOp<_>) (value : SocketOp<_>) : SocketOp<_> = async {
+    let! x = value
+    match x with
+    | Choice1Of2 x -> return Choice1Of2 x
+    | Choice2Of2 (err : Error) -> return! fMapper err
+    }
+
+  let map f (value : SocketOp<_>) : SocketOp<_> = async {
+    let! x = value
+    match x with
+    | Choice1Of2 x -> return Choice1Of2 (f x)
+    | Choice2Of2 (err : Error) -> return Choice2Of2 err 
+    }
+
+  let mapError f (value : SocketOp<_>) : SocketOp<_> = async {
+    let! x = value
+    match x with
+    | Choice1Of2 x -> return Choice1Of2 x
+    | Choice2Of2 (err : Error) -> return Choice2Of2 (f err)
+    }
 
   /// lift a Async<'a> type to the Socket monad
-  let ofAsync (a : Async<'a>) : SocketOp<'a> =
-    async {
-      let! s = a
-      return Choice1Of2 s
+  let ofAsync (a : Async<'a>) : SocketOp<'a> = async {
+    let! s = a
+    return Choice1Of2 s
     }
 
   /// lift a Task type to the Socket monad
-  let ofTask (a : Task) : SocketOp<unit> =
-    async {
-      let! s = a
-      return Choice1Of2 s
+  let ofTask (a : Task) : SocketOp<unit> = async {
+    let! s = a
+    return Choice1Of2 s
     }
 
 module SocketOpOperators =
 
-  let internal (@|!) c errorMsg =
-    SocketOp.orInputError c errorMsg
+  let (@|!) c errorMsg =
+    SocketOp.orInputError errorMsg c
+
+  let (@|!!) c fErrorMsg =
+    SocketOp.orInputErrorf fErrorMsg c
+
+  let (@|>) c fError =
+    SocketOp.bindError fError c
+
 
 [<AutoOpen>]
 module Utils =

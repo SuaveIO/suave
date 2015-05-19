@@ -4,7 +4,7 @@ open System
 
 module Choice =
 
-  let mk x = Choice1Of2 x
+  let mreturn x = Choice1Of2 x
 
   let map f = function
     | Choice1Of2 v   -> Choice1Of2 (f v)
