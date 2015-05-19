@@ -5,8 +5,6 @@ open System.IO
 open System.Text
 open Suave.Utils.Async
 
-
-
 module (* internal *) Bytes =
  
   /// Ordinally compare two strings in constant time, bounded by the length of the

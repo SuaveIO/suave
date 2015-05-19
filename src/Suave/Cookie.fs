@@ -155,7 +155,7 @@ module Cookie =
     let found =
       cookies
       |> Map.tryFind cookieName
-      |> Choice.fromOption (NoCookieFound cookieName)
+      |> Choice.ofOption (NoCookieFound cookieName)
       |> Choice.map (fun c -> c, c.value |> dec)
     match found with
     | Choice1Of2 (cookie, cipherData) ->

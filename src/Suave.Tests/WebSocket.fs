@@ -23,7 +23,7 @@ let websocket_tests =
   let runWithConfig = runWith defaultConfig
 
   let websocketApp (webSocket : WebSocket) =
-    fun cx -> async{
+    fun cx -> async {
       let loop = ref true
       while !loop do
         let! msg = webSocket.read()
@@ -38,9 +38,9 @@ let websocket_tests =
           loop := false
         | _ -> ()
       return! Control.CLOSE cx
-      }
+    }
 
-  let webPart =  Applicatives.path "/websocket" >>= handShake websocketApp
+  let webPart = Applicatives.path "/websocket" >>= handShake websocketApp
 
   testList "websocket tests" [
     testCase "echo test" <| fun _ ->

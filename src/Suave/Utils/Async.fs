@@ -86,9 +86,5 @@ type AsyncResultCell<'T>() =
         return Some res
       with
       | :? TimeoutException as e ->
-        return None }
-
-  /// WARNING: do not use, will block the event loop.
-  /// Await the result synchronously.
-  [<Obsolete("Do not use, will block the event loop")>]
-  member x.Result () = source.Task.Result
+        return None
+    }

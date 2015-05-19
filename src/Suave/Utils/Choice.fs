@@ -1,5 +1,7 @@
 ﻿namespace Suave.Utils
 
+open System
+
 module Choice =
 
   let mk x = Choice1Of2 x
@@ -17,9 +19,12 @@ module Choice =
     | Choice1Of2 v -> f v
     | Choice2Of2 c -> Choice2Of2 c
 
-  let fromOption onMissing = function
+  let ofOption onMissing = function
     | Some x -> Choice1Of2 x
     | None   -> Choice2Of2 onMissing
+
+  [<Obsolete "use Choice.ofOption instead - for consistency w/ F# naming stds">]
+  let fromOption onMissing = ofOption onMissing
 
   let orDefault onMissing = function
     | Choice1Of2 x -> x
@@ -29,8 +34,7 @@ module Choice =
     | Choice1Of2 x -> f x
     | Choice2Of2 _ -> ()
 
-[<AutoOpen>]
-module internal ChoiceOperators =
+module ChoiceOperators =
 
   let (|@) opt errorMsg =
     match opt with
