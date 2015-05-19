@@ -103,6 +103,9 @@
     <Content Include="request-2.txt">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <None Include="request-multipartmixed-twofiles.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Include="App.config" />
   </ItemGroup>
   <ItemGroup>
@@ -259,7 +262,6 @@
   <ItemGroup>
     <Reference Include="websocket-sharp">
       <HintPath>..\..\packages\WebSocketSharp\lib\websocket-sharp.dll</HintPath>
-      <Private>True</Private>
       <Paket>True</Paket>
     </Reference>
   </ItemGroup>
