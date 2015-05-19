@@ -23,7 +23,6 @@ type StartedData =
       ((x.socketBoundUtc |> Option.fold (fun _ t -> t) x.startCalledUtc) - x.startCalledUtc).TotalMilliseconds
       x.binding.ip x.binding.port
 
-
 /// Disconnect a socket for reuse
 let closeSocket (s : Socket) =
   try

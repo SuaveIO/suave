@@ -158,7 +158,7 @@ module WebSocket =
           [| yield! BitConverter.GetBytes (CloseCode.CLOSE_TOO_LARGE.code)
            ; yield! UTF8.bytes reason |]
         do! sendFrame Close data true
-        return! abort (OtherError reason)
+        return! abort (InputDataError reason)
       else
         let! frame = readBytes connection.transport (int extendedLenght)
         // Messages from the client MUST be masked
