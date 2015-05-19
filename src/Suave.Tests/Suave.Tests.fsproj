@@ -106,6 +106,9 @@
     <None Include="request-multipartmixed-twofiles.txt">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <Content Include="request-no-host-header.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <None Include="App.config" />
   </ItemGroup>
   <ItemGroup>

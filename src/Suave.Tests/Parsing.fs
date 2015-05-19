@@ -118,4 +118,13 @@ let parsingMultipart2 =
         Assert.Equal("Expecting 200 OK", "HTTP/1.1 200 OK", subject)
       finally
         disposeContext ctx
+
+    testCase "no host header" <| fun _ ->
+      let ctx = runWithConfig app
+      try
+        let data = readBytes "request-no-host-header.txt"
+        let subject = sendRecv data
+        Assert.Equal("Expecting 400 Bad Request", "HTTP/1.1 400 Bad Request", subject)
+      finally
+        disposeContext ctx
     ]

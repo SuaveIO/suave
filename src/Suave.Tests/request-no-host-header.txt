@@ -1,0 +1,26 @@
+POST /filenames HTTP/1.1
+Content-Type: multipart/form-data; boundary=/tkQKiFqMgZt:mHzua_JFrUFWHgNid
+Content-Length: 587
+Connection: keep-alive
+
+--/tkQKiFqMgZt:mHzua_JFrUFWHgNid
+Content-Disposition: form-data; name="submit-name"
+
+Larry
+--/tkQKiFqMgZt:mHzua_JFrUFWHgNid
+Content-Type: multipart/mixed; boundary=-idczlATz:FmvuIs'aHQSrGltky:Td
+Content-Disposition: form-data; name="files"
+
+---idczlATz:FmvuIs'aHQSrGltky:Td
+Content-Disposition: file; filename="file1.txt"
+Content-Type: text/plain
+
+Hello World
+---idczlATz:FmvuIs'aHQSrGltky:Td
+Content-Disposition: file; filename="file2.gif"
+Content-Type: text/plain
+
+...contents of file2.gif...
+---idczlATz:FmvuIs'aHQSrGltky:Td--
+--/tkQKiFqMgZt:mHzua_JFrUFWHgNid--
+
