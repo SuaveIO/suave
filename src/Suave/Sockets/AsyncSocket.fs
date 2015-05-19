@@ -1,5 +1,5 @@
 ﻿[<AutoOpen>]
-module Suave.AsyncSocket
+module Suave.Sockets.AsyncSocket
 
 open Suave.Utils.Bytes
 open Suave.Utils.Async
@@ -29,14 +29,6 @@ let liftTask (a : Task) : SocketOp<unit>  =
     let! s = a
     return Choice1Of2 s 
   }
-
-/// from the Socket monad to Async
-let toAsync f = fun ctx -> async {
-  let! o = f ctx
-  match o with
-  | Choice1Of2 option -> return option
-  | Choice2Of2 error -> return failwith (sprintf "socket error: %A" error)
- }
 
 /// Write the string s to the stream asynchronously as ASCII encoded text
 let asyncWrite (connection : Connection) (s : string) : SocketOp<unit> = 
@@ -93,8 +85,6 @@ let transferStreamBounded (toStream : Connection) (from : Stream) len =
 let lift_async a = liftAsync a
 [<System.Obsolete("Use liftTask")>]
 let lift_task a = liftTask a
-[<System.Obsolete("Use toAsync")>]
-let to_async f = toAsync f
 [<System.Obsolete("Use asyncWrite")>]
 let async_write connection s = asyncWrite connection s
 [<System.Obsolete("Use asyncWriteNewLine")>]
