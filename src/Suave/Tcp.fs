@@ -131,36 +131,38 @@ let startTcpIpServerAsync (bufferSize  : int, maxConcurrentOps : int)
     Log.internf logger "Suave.Tcp.tcpIpServer.job" (fun fmt -> fmt "%O connected, total: %d clients" ipaddr !Globals.numberOfClients)
 
     try
-      let readArgs = b.Pop()
-      let writeArgs = c.Pop()
-      let connection =
-        { ipaddr       = ipaddr
-          transport    = { socket = socket; readArgs = readArgs; writeArgs = writeArgs}
-          bufferManager = bufferManager
-          lineBuffer  = bufferManager.PopBuffer "Suave.Tcp.tcpIpServer.job" // buf allocate
-          segments     = []
-        }
-      use! oo = Async.OnCancel (fun () -> intern "disconnected client (async cancel)"
-                                          shutdownSocket socket)
+      try
+        let readArgs = b.Pop()
+        let writeArgs = c.Pop()
+        let connection =
+          { ipaddr       = ipaddr
+            transport    = { socket = socket; readArgs = readArgs; writeArgs = writeArgs}
+            bufferManager = bufferManager
+            lineBuffer  = bufferManager.PopBuffer "Suave.Tcp.tcpIpServer.job" // buf allocate
+            segments     = []
+          }
+        use! oo = Async.OnCancel (fun () -> intern "disconnected client (async cancel)"
+                                            shutdownSocket socket)
 
-      let! _ = serveClient connection
-      shutdownSocket socket
-      acceptArgs.AcceptSocket <- null
-      a.Push acceptArgs
-      b.Push readArgs
-      c.Push writeArgs
-      bufferManager.FreeBuffer(connection.lineBuffer, "Suave.Tcp.tcpIpServer.job") // buf free OK
+        let! _ = serveClient connection
+        shutdownSocket socket
+        acceptArgs.AcceptSocket <- null
+        a.Push acceptArgs
+        b.Push readArgs
+        c.Push writeArgs
+        bufferManager.FreeBuffer(connection.lineBuffer, "Suave.Tcp.tcpIpServer.job") // buf free OK
+      with 
+      | :? System.IO.EndOfStreamException ->
+        intern "disconnected client (end of stream)"
+      | ex ->
+        logger.Log LogLevel.Warn <| fun _ ->
+          LogLine.mk "Suave.Tcp.tcpIpServer.job"
+                     LogLevel.Warn (TraceHeader.empty)
+                     (Some ex)
+                     "tcp request processing failed"
+    finally
       Interlocked.Decrement(Globals.numberOfClients) |> ignore
       Log.internf logger "Suave.Tcp.tcpIpServer.job" (fun fmt -> fmt "%O disconnected, total: %d clients" ipaddr !Globals.numberOfClients)
-    with 
-    | :? System.IO.EndOfStreamException ->
-      intern "disconnected client (end of stream)"
-    | ex ->
-      logger.Log LogLevel.Warn <| fun _ ->
-        LogLine.mk "Suave.Tcp.tcpIpServer.job"
-                   LogLevel.Warn (TraceHeader.empty)
-                   (Some ex)
-                   "tcp request processing failed"
   }
 
   // start a new async worker for each accepted TCP client
