@@ -27,34 +27,44 @@ module SocketOp =
   open Suave.Utils
   open System.Threading.Tasks
 
+  /// create a new successful value
   let mreturn (x : 'T) : SocketOp<'T> =
     async.Return (Choice1Of2 x)
 
+  /// create a new unsuccessful value
   let abort (x : Error) : SocketOp<_> =
     async.Return (Choice2Of2 x)
 
+  /// says that something is wrong with the input on a protocol level and that
+  /// it's therefore a bad request (user input error) -- the error already present
+  /// is overwritten with the errorMsg parameter.
   let orInputError errorMsg : _ -> SocketOp<_> = function
     | Choice1Of2 x -> async.Return (Choice1Of2 x)
     | Choice2Of2 _ -> async.Return (Choice2Of2 (InputDataError errorMsg))
 
+  /// same as the above, but let's you do something with the existing error message
+  /// through the callback function passed
   let orInputErrorf fErrorMsg : _ -> SocketOp<_> = function
     | Choice1Of2 x -> async.Return (Choice1Of2 x)
     | Choice2Of2 (y : string) -> async.Return (Choice2Of2 (InputDataError (fErrorMsg y)))
 
-  let bind (fMapper : _ -> SocketOp<_>) (value : SocketOp<_>) : SocketOp<_> = async {
+  /// Bind the result successful result of the SocketOp to fCont
+  let bind (fCont : _ -> SocketOp<_>) (value : SocketOp<_>) : SocketOp<_> = async {
     let! x = value
     match x with
-    | Choice1Of2 x -> return! fMapper x
+    | Choice1Of2 x -> return! fCont x
     | Choice2Of2 (err : Error) -> return Choice2Of2 err
     }
 
-  let bindError (fMapper : _ -> SocketOp<_>) (value : SocketOp<_>) : SocketOp<_> = async {
+  /// Bind the error result of the SocketOp to fCont
+  let bindError (fCont : _ -> SocketOp<_>) (value : SocketOp<_>) : SocketOp<_> = async {
     let! x = value
     match x with
     | Choice1Of2 x -> return Choice1Of2 x
-    | Choice2Of2 (err : Error) -> return! fMapper err
+    | Choice2Of2 (err : Error) -> return! fCont err
     }
 
+  /// Map f over the contained successful value in SocketOp
   let map f (value : SocketOp<_>) : SocketOp<_> = async {
     let! x = value
     match x with
@@ -62,6 +72,7 @@ module SocketOp =
     | Choice2Of2 (err : Error) -> return Choice2Of2 err 
     }
 
+  /// Map f over the error value in SocketOp
   let mapError f (value : SocketOp<_>) : SocketOp<_> = async {
     let! x = value
     match x with
@@ -69,13 +80,13 @@ module SocketOp =
     | Choice2Of2 (err : Error) -> return Choice2Of2 (f err)
     }
 
-  /// lift a Async<'a> type to the Socket monad
+  /// lift a Async<'a> type to the SocketOp
   let ofAsync (a : Async<'a>) : SocketOp<'a> = async {
     let! s = a
     return Choice1Of2 s
     }
 
-  /// lift a Task type to the Socket monad
+  /// lift a Task type to the SocketOp
   let ofTask (a : Task) : SocketOp<unit> = async {
     let! s = a
     return Choice1Of2 s
@@ -83,15 +94,17 @@ module SocketOp =
 
 module SocketOpOperators =
 
+  /// See SocketOp.orInputError
   let (@|!) c errorMsg =
     SocketOp.orInputError errorMsg c
 
+  /// See SocketOp.orInputErrorf
   let (@|!!) c fErrorMsg =
     SocketOp.orInputErrorf fErrorMsg c
 
+  /// See SocketOp.bindError
   let (@|>) c fError =
     SocketOp.bindError fError c
-
 
 [<AutoOpen>]
 module Utils =
@@ -113,7 +126,7 @@ module Utils =
       (args.UserToken :?> AsyncUserToken).Continuation <- k
 
       if not (op args) then
-        k args
+        k args  
   
   /// Prepares the arguments by setting the buffer.
   let setBuffer (buf : ByteSegment) (args: SocketAsyncEventArgs) =

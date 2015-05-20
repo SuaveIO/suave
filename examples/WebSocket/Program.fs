@@ -14,10 +14,11 @@ open System
 open System.Net
 
 open Suave.Sockets
+open Suave.Sockets.Control
 open Suave.WebSocket
 
 let echo (webSocket : WebSocket) =
-  fun cx -> socket{
+  fun cx -> socket {
     let loop = ref true
     while !loop do
       let! msg = webSocket.read()

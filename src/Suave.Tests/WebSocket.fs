@@ -13,6 +13,7 @@ open Suave
 open Suave.Types
 open Suave.Http
 open Suave.Sockets
+open Suave.Sockets.Control
 open Suave.WebSocket
 open Suave.Utils
 open Suave.Tests.TestUtilities
