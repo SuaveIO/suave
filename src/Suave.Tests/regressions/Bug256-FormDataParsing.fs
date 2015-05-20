@@ -43,25 +43,24 @@ let tests =
   let postTo res = createRequest Post (uriFor res) |> withKeepAlive false
 
   testCase "can send/receive" <| fun _ ->
-    async {
-      let ctx = runWithConfig app
-      try
-        use fs = File.OpenRead (pathOf "regressions/pix.gif")
-        let file = "pix.gif", ContentType.Create("image", "gif"), StreamData fs
+    let ctx = runWithConfig app
+    try
+      use fs = File.OpenRead (pathOf "regressions/pix.gif")
+      let file = "pix.gif", ContentType.Create("image", "gif"), StreamData fs
 
-        use ms = new MemoryStream()
-        printfn "--- get response"
-        use! resp =
-          postTo "gifs/echo"
-          |> withBody (BodyForm [ FormFile ("img", file) ])
-          |> getResponse
+      printfn "--- get response"
+      let data =
+        postTo "gifs/echo"
+        |> withBody (BodyForm [ FormFile ("img", file) ])
+        |> Request.responseAsBytes
+        |> Async.RunSynchronously
 
-        do! resp.Body.CopyToAsync ms
+      fs.Seek(0L, SeekOrigin.Begin) |> ignore
 
-        fs.Seek(0L, SeekOrigin.Begin) |> ignore
-        ms.Seek(0L, SeekOrigin.Begin) |> ignore
-        Assert.StreamsEqual("the input should eq the echoed data", ms, fs)
-      finally
-        disposeContext ctx
-        ()
-    } |> Async.RunSynchronously
+      use ms = new MemoryStream()
+      ms.Write(data, 0, data.Length)
+      ms.Seek(0L, SeekOrigin.Begin) |> ignore
+      Assert.StreamsEqual("the input should eq the echoed data", ms, fs)
+    finally
+      disposeContext ctx
+      ()

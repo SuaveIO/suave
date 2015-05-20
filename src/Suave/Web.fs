@@ -147,6 +147,15 @@ module internal ParsingAndControl =
   let readUntil (marker : byte []) (select : ArraySegment<_> -> int -> Async<unit>) (connection : Connection) =
     readUntilPattern connection (scanMarker marker select)
 
+  let parseTraceHeaders (headers : NameValueList) =
+    let tryParseUint64 x = 
+      match UInt64.TryParse x with 
+      | true, value -> Choice1Of2 value
+      | false, _    -> Choice2Of2 (sprintf "Couldn't parse '%s' to int64" x)
+    let parent = "x-b3-spanid"  |> getFirst headers |> Choice.bind tryParseUint64 |> Option.ofChoice
+    let trace  = "x-b3-traceid" |> getFirst headers |> Choice.bind tryParseUint64 |> Option.ofChoice
+    TraceHeader.mk trace parent
+
   /// Read a line from the stream, calling ASCII.toString on the bytes before the EOL marker
   let readLine (connection : Connection) = socket {
     let offset = ref 0
@@ -233,10 +242,8 @@ module internal ParsingAndControl =
     }
 
   let parseMultipartMixed fieldName boundary (context : HttpContext) : SocketOp<HttpContext> =
-
-    let verbose str =
-      let logger = context.runtime.logger
-      Log.verbose logger "Suave.Web.parseMultipartMixed" context.request.trace str
+    let verbose = Log.verbose context.runtime.logger "Suave.Web.parseMultipartMixed" context.request.trace
+    let verbosef = Log.verbosef context.runtime.logger "Suave.Web.parseMultipartMixed" context.request.trace
 
     let rec loop (ctx : HttpContext) = socket {
       let! firstLine, connection = readLine ctx.connection
@@ -250,7 +257,10 @@ module internal ParsingAndControl =
         match partHeaders %% "content-type" with
         | Choice1Of2 contentType ->
           let headerParams = headerParams contentDisposition
+          verbosef (fun f -> f "parsing content type %s -> readFilePart" contentType)
           let! res = readFilePart boundary ctx headerParams fieldName contentType
+          verbosef (fun f -> f "parsing content type %s -> readFilePart" contentType)
+
           match res with
           | connection, Some upload -> 
             return! loop { ctx with request = { ctx.request with files = upload :: ctx.request.files }
@@ -322,27 +332,24 @@ module internal ParsingAndControl =
                 do! mem.AsyncWrite(x.Array, x.Offset, y)
               }) connection
           let byts = mem.ToArray()
-          return! loop { ctx with request = { ctx.request with multiPartFields = (fieldName, ASCII.toStringAtOffset byts 0 byts.Length)::(ctx.request.multiPartFields) }; connection = connection}
+          let fields = (fieldName, ASCII.toStringAtOffset byts 0 byts.Length) :: ctx.request.multiPartFields
+          return! loop { ctx with request = { ctx.request with multiPartFields = fields }
+                                  connection = connection }
       }
 
     loop context
-
-  let parseTraceHeaders (headers : NameValueList) =
-    let tryParseUint64 x = 
-      match UInt64.TryParse x with 
-      | true, value -> Choice1Of2 value
-      | false, _    -> Choice2Of2 (sprintf "Couldn't parse '%s' to int64" x)
-    let parent = "x-b3-spanid"  |> getFirst headers |> Choice.bind tryParseUint64 |> Option.ofChoice
-    let trace  = "x-b3-traceid" |> getFirst headers |> Choice.bind tryParseUint64 |> Option.ofChoice
-    TraceHeader.mk trace parent
 
   /// Reads raw POST data
   let getRawPostData connection contentLength =
     socket {
       let offset = ref 0
       let rawForm = Array.zeroCreate contentLength
-      let! connection = readPostData connection contentLength (fun a count -> async { Array.blit a.Array a.Offset rawForm !offset count; offset := !offset + count })
-      return rawForm , connection
+      let! connection =
+        readPostData connection contentLength (fun a count -> async {
+          Array.blit a.Array a.Offset rawForm !offset count;
+          offset := !offset + count
+        })
+      return rawForm, connection
     }
 
   let parsePostData (ctx : HttpContext) = socket {

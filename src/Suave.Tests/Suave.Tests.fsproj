@@ -56,7 +56,7 @@
     <Content Include="regressions\Bug106-ReadingInputData.txt" />
     <Content Include="regressions\Bug105-StopsResponding.verbose.txt" />
     <Content Include="regressions\Bug105-StopsResponding.fsx" />
-    <Compile Include="regressions\256-FormDataParsing.fs" />
+    <Compile Include="regressions\Bug256-FormDataParsing.fs" />
     <Content Include="regressions\pix.gif">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
