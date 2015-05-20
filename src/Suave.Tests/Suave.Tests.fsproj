@@ -50,12 +50,16 @@
   <Import Project="$(FSharpTargetsPath)" />
   <ItemGroup>
     <Content Include="large_xml.xml" />
-    <Content Include="Bug106-ReadingInputData.txt" />
-    <Content Include="Bug105-StopsResponding.verbose.txt" />
-    <None Include="Bug105-StopsResponding.fsx" />
-    <None Include="PerfLab.fsx" />
+    <Content Include="PerfLab.fsx" />
     <Compile Include="AssemblyVersionInfo.fs" Condition="Exists('AssemblyVersionInfo.fs')" />
     <Compile Include="TestUtilities.fs" />
+    <Content Include="regressions\Bug106-ReadingInputData.txt" />
+    <Content Include="regressions\Bug105-StopsResponding.verbose.txt" />
+    <Content Include="regressions\Bug105-StopsResponding.fsx" />
+    <Compile Include="regressions\256-FormDataParsing.fs" />
+    <Content Include="regressions\pix.gif">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <Compile Include="Smoke.fs" />
     <Compile Include="Utils.fs" />
     <Compile Include="Web.fs" />
@@ -80,16 +84,6 @@
     <None Include="suave.p12">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <!--
-    <None Include="..\..\packages\openssl.redist\build\native\bin\v120\Win32\Release\dynamic\ssleay32.dll">
-      <Link>ssleay32.dll</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="..\..\packages\openssl.redist\build\native\bin\v120\Win32\Release\dynamic\libeay32.dll">
-      <Link>libeay32.dll</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-	-->
     <None Include="test-text-file.txt">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
@@ -131,6 +125,9 @@
     </ProjectReference>
   </ItemGroup>
   <Import Project="..\..\tools\paket.targets" />
+  <ItemGroup>
+    <Folder Include="regressions\" />
+  </ItemGroup>
   <Choose>
     <When Condition="($(TargetFrameworkIdentifier) == '.NETFramework' And ($(TargetFrameworkVersion) == 'v4.5' Or $(TargetFrameworkVersion) == 'v4.5.1' Or $(TargetFrameworkVersion) == 'v4.5.2' Or $(TargetFrameworkVersion) == 'v4.5.3' Or $(TargetFrameworkVersion) == 'v4.6')) Or ($(TargetFrameworkIdentifier) == 'MonoAndroid') Or ($(TargetFrameworkIdentifier) == 'MonoTouch')">
       <ItemGroup>
@@ -245,6 +242,17 @@
       <ItemGroup>
         <Reference Include="Fuchu.PerfUtil">
           <HintPath>..\..\packages\Fuchu-suave.PerfUtil\lib\net40\Fuchu.PerfUtil.dll</HintPath>
+          <Private>True</Private>
+          <Paket>True</Paket>
+        </Reference>
+      </ItemGroup>
+    </When>
+  </Choose>
+  <Choose>
+    <When Condition="($(TargetFrameworkIdentifier) == '.NETFramework' And ($(TargetFrameworkVersion) == 'v4.0' Or $(TargetFrameworkVersion) == 'v4.5' Or $(TargetFrameworkVersion) == 'v4.5.1' Or $(TargetFrameworkVersion) == 'v4.5.2' Or $(TargetFrameworkVersion) == 'v4.5.3' Or $(TargetFrameworkVersion) == 'v4.6')) Or ($(TargetFrameworkIdentifier) == 'MonoAndroid') Or ($(TargetFrameworkIdentifier) == 'MonoTouch')">
+      <ItemGroup>
+        <Reference Include="HttpFs">
+          <HintPath>..\..\packages\Http.fs-prerelease\lib\net40\HttpFs.dll</HintPath>
           <Private>True</Private>
           <Paket>True</Paket>
         </Reference>

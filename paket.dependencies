@@ -1,6 +1,7 @@
 source https://nuget.org/api/v2
 
 nuget FSharp.Charting
+nuget Http.fs-prerelease
 nuget RazorEngine
 nuget NuGet.CommandLine
 nuget FsPickler
