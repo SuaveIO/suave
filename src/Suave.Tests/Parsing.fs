@@ -12,6 +12,8 @@ open Suave
 open Suave.Types
 open Suave.Types
 open Suave.Http
+open Suave.Http.Applicatives
+open Suave.Http.RequestErrors
 open Suave.Http.Successful
 open Suave.Utils
 open Suave.Web
@@ -20,7 +22,7 @@ open Suave.Tests.TestUtilities
 open Suave.Testing
 
 [<Tests>]
-let parsing_multipart =
+let parsingMultipart =
   let runWithConfig = runWith defaultConfig
 
   let post_data1 = readBytes "request.txt"
@@ -30,21 +32,21 @@ let parsing_multipart =
   let testUrlEncodedForm fieldName =
     request (fun r ->
       match r.formData fieldName  with
-      | Some str -> OK str
-      | None -> OK "field-does-not-exists")
+      | Choice1Of2 str -> OK str
+      | Choice2Of2 _ -> OK "field-does-not-exists")
 
-  let test_multipart_form =
+  let testMultipartForm =
     request (fun r ->
       match getFirst r.multiPartFields "From" with
-      | Some str -> OK str
-      | None -> OK "field-does-not-exists")
+      | Choice1Of2 str -> OK str
+      | Choice2Of2 _ -> OK "field-does-not-exists")
 
-  let byte_array_content = new ByteArrayContent(post_data1)
-  byte_array_content.Headers.TryAddWithoutValidation("Content-Type","multipart/form-data; boundary=99233d57-854a-4b17-905b-ae37970e8a39") |> ignore
+  let byteArrayContent = new ByteArrayContent(post_data1)
+  byteArrayContent.Headers.TryAddWithoutValidation("Content-Type","multipart/form-data; boundary=99233d57-854a-4b17-905b-ae37970e8a39") |> ignore
 
   testList "http parser tests" [
       testCase "parsing a large multipart form" <| fun _ ->
-        Assert.Equal("", "Bob <bob@wishfulcoding.mailgun.org>", runWithConfig test_multipart_form |> req HttpMethod.POST "/" (Some <| byte_array_content))
+        Assert.Equal("", "Bob <bob@wishfulcoding.mailgun.org>", runWithConfig testMultipartForm |> req HttpMethod.POST "/" (Some byteArrayContent))
 
       testCase "parsing a large urlencoded form data" <| fun _ ->
         Assert.Equal("", "hallo wereld", 
@@ -66,3 +68,63 @@ let parsing_multipart =
         Assert.Equal("", "field-does-not-exists", 
           runWithConfig (testUrlEncodedForm "body-html") |> reqGZip HttpMethod.POST "/" (Some <| new StringContent(post_data3, Encoding.UTF8, "application/x-www-form-urlencoded")))
   ]
+
+open System.Net
+open System.Net.Sockets
+open Suave.Logging
+open Suave.Sockets
+
+[<Tests>]
+let parsingMultipart2 =
+  let app =
+    choose
+      [ POST
+        >>= choose [
+            path "/filecount" >>= warbler (fun ctx ->
+              OK (string ctx.request.files.Length))
+
+            path "/filenames"
+              >>= Writers.setMimeType "application/json"
+              >>= warbler (fun ctx ->
+                  printfn "inside suave"
+                  ctx.request.files
+                  |> List.map (fun f -> "\"" + f.fileName + "\"")
+                  |> String.concat ","
+                  |> fun files -> "[" + files + "]"
+                  |> OK)
+            
+            NOT_FOUND "Nope."
+        ]
+      ]
+
+  let runWithConfig = runWith { defaultConfig with logger = Loggers.ConsoleWindowLogger(LogLevel.Verbose) }
+
+  let sendRecv (data : byte []) =
+    use sender = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp)
+    sender.Connect (new IPEndPoint(IPAddress.Loopback, int HttpBinding.DefaultBindingPort))
+    let written = sender.Send data
+    Assert.Equal("same written as given", data.Length, written)
+
+    let respBuf = Array.zeroCreate<byte> 0x100
+    let resp = sender.Receive respBuf
+    ASCII.toStringAtOffset respBuf 0 resp
+
+  testList "sending funky multiparts" [
+    testCase "sending two files under same form name" <| fun _ ->
+      let ctx = runWithConfig app
+      try
+        let data = readBytes "request-multipartmixed-twofiles.txt"
+        let subject = sendRecv data
+        Assert.Equal("Expecting 200 OK", "HTTP/1.1 200 OK", subject)
+      finally
+        disposeContext ctx
+
+    testCase "no host header" <| fun _ ->
+      let ctx = runWithConfig app
+      try
+        let data = readBytes "request-no-host-header.txt"
+        let subject = sendRecv data
+        Assert.Equal("Expecting 400 Bad Request", "HTTP/1.1 400 Bad Request", subject)
+      finally
+        disposeContext ctx
+    ]

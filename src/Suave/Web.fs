@@ -15,11 +15,13 @@ module internal ParsingAndControl =
   open System.Collections.Generic
 
   open Suave.Http
-  open Suave.Sockets
   open Suave.Types
   open Suave.Globals
   open Suave.Compression
+  open Suave.Sockets
   open Suave.Sockets.Connection
+  open Suave.Sockets.Control
+  open Suave.Sockets.SocketOpOperators
   open Suave.Tcp
   
   open Suave.Utils
@@ -27,6 +29,7 @@ module internal ParsingAndControl =
   open Suave.Utils.Parsing
   open Suave.Logging
 
+  let BadRequestPrefix = "__suave_BAD_REQUEST"
 
   /// Free up a list of buffers
   let internal free context connection =
@@ -76,11 +79,12 @@ module internal ParsingAndControl =
 
   /// Iterates over a BufferSegment list looking for a marker, data before the marker 
   /// is sent to the function select and the corresponding buffers are released
+  /// Returns the number of bytes read.
   let scanMarker marker select connection = socket {
 
     match kmpZ marker connection.segments with
     | Some x -> 
-      let! res, connection = liftAsync <| split x connection select marker.Length
+      let! res, connection = SocketOp.ofAsync <| split x connection select marker.Length
       return Found res, connection
     | None   ->
       let rec loop (xs : BufferSegment list) (acc,n) =
@@ -91,40 +95,38 @@ module internal ParsingAndControl =
           | x :: tail -> loop tail (acc @ [x],n + x.length)
           | []  -> acc,[]
       let rev = List.rev connection.segments
-      let ret,free = loop rev ([],0)
+      let ret, free = loop rev ([],0)
       for b in free do
         assert (b.length >= 0)
-        do! liftAsync <| select (ArraySegment(b.buffer.Array, b.offset, b.length)) b.length
+        do! SocketOp.ofAsync <| select (ArraySegment(b.buffer.Array, b.offset, b.length)) b.length
         do connection.bufferManager.FreeBuffer( b.buffer,"Suave.Web.scanMarker" )
-      return NeedMore,{ connection with segments = ret }
+      return NeedMore, { connection with segments = ret }
     }
 
-
   let readData (connection : Connection) buff = socket {
-    let! b = receive connection buff 
+    let! b = receive connection buff
     if b > 0 then
       return { buffer = buff; offset = buff.Offset; length = b }
     else
-      return! abort (Error.SocketError SocketError.Shutdown)
+      return! SocketOp.abort (Error.SocketError SocketError.Shutdown)
     }
 
   let readMoreData connection = async {
-    let buff = connection.bufferManager.PopBuffer("Suave.Web.read_till_pattern.loop")
+    let buff = connection.bufferManager.PopBuffer("Suave.Web.readMoreData.loop")
     let! result = readData connection buff
     match result with
     | Choice1Of2 data ->
       return { connection with segments = connection.segments @ [data] } |> Choice1Of2
     | Choice2Of2 error ->
       for b in connection.segments do
-        do connection.bufferManager.FreeBuffer( b.buffer, "Suave.Web.read_till_pattern.loop")
-      do connection.bufferManager.FreeBuffer( buff, "Suave.Web.read_till_pattern.loop")
+        do connection.bufferManager.FreeBuffer( b.buffer, "Suave.Web.readMoreData.loop")
+      do connection.bufferManager.FreeBuffer( buff, "Suave.Web.readMoreData.loop")
       return Choice2Of2 error
     }
 
   /// Read the passed stream into buff until the EOL (CRLF) has been reached
-  /// and returns an array containing excess data read past the marker
+  /// and returns the number of bytes read and the connection
   let readUntilPattern (connection : Connection) scanData =
-
     let rec loop (connection : Connection)  = socket {
       let! res, connection = scanData connection
       match res with
@@ -136,10 +138,12 @@ module internal ParsingAndControl =
     }
     loop connection
 
+  /// returns the number of bytes read and the connection
   let readUntilEOL (connection : Connection) select =
     readUntilPattern connection (scanMarker EOL select)
 
-  /// Read the stream until the marker appears.
+  /// Read the stream until the marker appears and return the number of bytes
+  /// read.
   let readUntil (marker : byte []) (select : ArraySegment<_> -> int -> Async<unit>) (connection : Connection) =
     readUntilPattern connection (scanMarker marker select)
 
@@ -147,7 +151,11 @@ module internal ParsingAndControl =
   let readLine (connection : Connection) = socket {
     let offset = ref 0
     let buf = connection.lineBuffer
-    let! count, connection = readUntilEOL connection (fun a count -> async { Array.blit a.Array a.Offset buf.Array (buf.Offset + !offset) count; offset := !offset + count })
+    let! count, connection =
+      readUntilEOL connection (fun a count -> async {
+        Array.blit a.Array a.Offset buf.Array (buf.Offset + !offset) count
+        offset := !offset + count
+      })
     let result = ASCII.toStringAtOffset buf.Array buf.Offset count
     return result, connection
   }
@@ -158,9 +166,10 @@ module internal ParsingAndControl =
       let offset = ref 0
       let buf = connection.lineBuffer
       let! count, connection =
-        readUntilEOL
-          connection
-          (fun a count -> async { Array.blit a.Array a.Offset buf.Array (buf.Offset + !offset) count; offset := !offset + count })
+        readUntilEOL connection (fun a count -> async {
+          Array.blit a.Array a.Offset buf.Array (buf.Offset + !offset) count
+          offset := !offset + count
+        })
       if count <> 0 then
         let line = ASCII.toStringAtOffset buf.Array buf.Offset count
         let indexOfColon = line.IndexOf(':')
@@ -181,11 +190,11 @@ module internal ParsingAndControl =
         match connection.segments with
         | segment :: tail ->
           if segment.length > n then
-            do! liftAsync <| select (arraySegmentFromBufferSegment { segment with offset = n }) n
+            do! SocketOp.ofAsync <| select (arraySegmentFromBufferSegment { segment with offset = n }) n
             return { connection with segments = { buffer = segment.buffer; offset = segment.offset + n; length = segment.length - n } :: tail }
           else
-            do! liftAsync <| select (arraySegmentFromBufferSegment segment) segment.length
-            do connection.bufferManager.FreeBuffer(segment.buffer,"Suave.Web.readPostData:loop")
+            do! SocketOp.ofAsync <| select (arraySegmentFromBufferSegment segment) segment.length
+            do connection.bufferManager.FreeBuffer(segment.buffer, "Suave.Web.readPostData.loop")
             return! loop (n - segment.length) { connection with segments = tail }
         | [] ->
           if n = 0 then
@@ -196,59 +205,143 @@ module internal ParsingAndControl =
       }
     loop bytes connection
 
+  let readFilePart boundary ctx (headerParams : Dictionary<string,string>) fieldName contentType = socket {
+    let tempFilePath = Path.GetTempFileName()
+    use tempFile = new FileStream(tempFilePath, FileMode.Truncate)
+    let! a, connection =
+      readUntil (ASCII.bytes (eol + boundary)) (fun x y -> async {
+          do! tempFile.AsyncWrite(x.Array, x.Offset, y)
+          }) ctx.connection
+    let fileLength = tempFile.Length
+    tempFile.Close()
+
+    if fileLength > 0L then
+      let! filename =
+          (headerParams.TryLookup "filename" |> Choice.map (String.trimc '"'))
+          @|! "Key 'filename' was not present in 'content-disposition'"
+
+      let upload =
+          { fieldName    = fieldName
+            fileName     = filename
+            mimeType     = contentType
+            tempFilePath = tempFilePath }
+
+      return connection, Some upload
+    else
+      File.Delete tempFilePath
+      return connection, None
+      
+    }
+
+  let parseMultipartMixed fieldName boundary (context : HttpContext) : SocketOp<HttpContext> =
+
+    let verbose str =
+      let logger = context.runtime.logger
+      Log.verbose logger "Suave.Web.parseMultipartMixed" context.request.trace str
+
+    let rec loop (ctx : HttpContext) = socket {
+
+      let! firstLine, connection = readLine ctx.connection
+
+      if not (firstLine.Equals("--")) then
+
+        let! partHeaders, connection = readHeaders connection
+
+        let! (contentDisposition : string) =
+          (partHeaders %% "content-disposition")
+          @|! "Missing 'content-disposition'"
+
+        let headerParams = headerParams contentDisposition
+        let contentType = partHeaders %% "content-type"
+
+        match contentType with
+        | Choice1Of2 contentType ->
+          let! res = readFilePart  boundary ctx headerParams fieldName contentType
+          match res with
+          | connection, Some upload -> 
+            return! loop { ctx with request = { ctx.request with files = upload :: ctx.request.files }; connection = connection }
+          | connection, None ->
+            return! loop { ctx with connection = connection }
+        | Choice2Of2 _ ->
+          use mem = new MemoryStream()
+          let! a, connection =
+            readUntil (ASCII.bytes(eol + boundary)) (fun x y -> async {
+                do! mem.AsyncWrite(x.Array, x.Offset, y)
+              }) connection
+          let byts = mem.ToArray()
+          return! loop { ctx with request = { ctx.request with multiPartFields = (fieldName, ASCII.toStringAtOffset byts 0 byts.Length)::(ctx.request.multiPartFields) }; connection = connection}
+      else
+        return { ctx with connection = connection }
+      }
+
+    loop context
+
   /// Parses multipart data from the stream, feeding it into the HttpRequest's property Files.
   let parseMultipart boundary (context : HttpContext) : SocketOp<HttpContext> =
 
-    let rec loop boundary (ctx : HttpContext) = socket {
+    let verbose str =
+      let logger = context.runtime.logger
+      Log.verbose logger "Suave.Web.parseMultipart" context.request.trace str
+
+    let rec loop (ctx : HttpContext) = socket {
 
       let! firstLine, connection = readLine ctx.connection
-      if not(firstLine.Equals("--")) then
-        let! partHeaders, connection = readHeaders connection
-        let contentDisposition = partHeaders %% "content-disposition"
-        let fieldname = 
-          (headerParams contentDisposition).TryLookup "name"
-          |> Option.get
-          |> (fun x -> x.Trim('"'))
-        let contentType = partHeaders %% "content-type"
-        match contentType with
-        | Some(x) when x.StartsWith("multipart/mixed") ->
-          let subboundary = "--" + x.Substring(x.IndexOf('=') + 1).TrimStart()
-          return! loop subboundary { ctx with connection = connection }
-        | Some(x) ->
-          let tempFileName = Path.GetTempFileName()
-          use tempFile = new FileStream(tempFileName, FileMode.Truncate)
-          let! a, connection = readUntil (ASCII.bytes(eol + boundary)) (fun x y -> async { do! tempFile.AsyncWrite(x.Array, x.Offset, y) } ) connection
-          let fileLength = tempFile.Length
-          tempFile.Close()
-          if fileLength > 0L then
-            let filename =
-              (headerParams contentDisposition).["filename"].Trim('"')
-            let upload = 
-                { fieldName     = fieldname
-                  fileName      = filename
-                  mimeType      = (contentType |> Option.get) 
-                  tempFilePath = tempFileName }
-            return! loop boundary { ctx with request = { ctx.request with files = upload :: ctx.request.files};  connection = connection }
-          else
-            File.Delete tempFileName
-            return! loop boundary { ctx with connection = connection }
-        | None ->
-          use mem = new MemoryStream()
-          let! a, connection = readUntil (ASCII.bytes(eol + boundary)) (fun x y -> async { do! mem.AsyncWrite(x.Array, x.Offset, y) } ) connection
-          let byts = mem.ToArray()
-          return! loop boundary { ctx with request = { ctx.request with multiPartFields = (fieldname,ASCII.toStringAtOffset byts 0 byts.Length)::(ctx.request.multiPartFields) }; connection = connection}
-      else 
+
+      if firstLine.Equals("--") || firstLine.Equals(boundary + "--") then
         return { ctx with connection = connection }
+      else
+        let! partHeaders, connection = readHeaders connection
+
+        let! (contentDisposition : string) =
+          (partHeaders %% "content-disposition")
+          @|! "Missing 'content-disposition'"
+
+        let headerParams = headerParams contentDisposition
+
+        let! _ =
+          (headerParams.TryLookup "form-data" |> Choice.map (String.trimc '"'))
+          @|! "Key 'form-data' was not present in 'content-disposition'"
+        
+        let! fieldName =
+          (headerParams.TryLookup "name" |> Choice.map (String.trimc '"'))
+          @|! "Key 'name' was not present in 'content-disposition'"
+
+        let contentType = partHeaders %% "content-type"
+
+        match contentType with
+        | Choice1Of2 x when String.startsWith "multipart/mixed" x ->
+          let subboundary = "--" + x.Substring(x.IndexOf('=') + 1).TrimStart()
+          let! ctx = parseMultipartMixed fieldName subboundary { ctx with connection = connection }
+
+          return! loop ctx
+
+        | Choice1Of2 contentType ->
+          let! res = readFilePart  boundary ctx headerParams fieldName contentType
+          match res with
+          | connection, Some upload -> 
+            return! loop { ctx with request = { ctx.request with files = upload :: ctx.request.files }; connection = connection }
+          | connection, None ->
+            return! loop { ctx with connection = connection }
+
+        | Choice2Of2 _ ->
+          use mem = new MemoryStream()
+          let! a, connection =
+            readUntil (ASCII.bytes(eol + boundary)) (fun x y -> async {
+                do! mem.AsyncWrite(x.Array, x.Offset, y)
+              }) connection
+          let byts = mem.ToArray()
+          return! loop { ctx with request = { ctx.request with multiPartFields = (fieldName, ASCII.toStringAtOffset byts 0 byts.Length)::(ctx.request.multiPartFields) }; connection = connection}
       }
-    loop boundary context
+
+    loop context
 
   let parseTraceHeaders (headers : NameValueList) =
     let tryParseUint64 x = 
-        match UInt64.TryParse x with 
-        | true, value -> Some value
-        | false, _    -> None
-    let parent = "x-b3-spanid"  |> getFirst headers |> Option.bind tryParseUint64
-    let trace  = "x-b3-traceid" |> getFirst headers |> Option.bind tryParseUint64
+      match UInt64.TryParse x with 
+      | true, value -> Choice1Of2 value
+      | false, _    -> Choice2Of2 (sprintf "Couldn't parse '%s' to int64" x)
+    let parent = "x-b3-spanid"  |> getFirst headers |> Choice.bind tryParseUint64 |> Option.ofChoice
+    let trace  = "x-b3-traceid" |> getFirst headers |> Choice.bind tryParseUint64 |> Option.ofChoice
     TraceHeader.mk trace parent
 
   /// Reads raw POST data
@@ -260,26 +353,28 @@ module internal ParsingAndControl =
       return rawForm , connection
     }
 
-  let parsePostData (ctx : HttpContext) = socket{
+  let parsePostData (ctx : HttpContext) = socket {
     let request = ctx.request
     let contentEncoding = request.header "content-type"
 
     match request.header "content-length" with 
-    | Some contentLengthString ->
+    | Choice1Of2 contentLengthString ->
       let contentLength = Convert.ToInt32(contentLengthString)
 
       match contentEncoding with
-      | Some ce when ce.StartsWith("application/x-www-form-urlencoded") ->
+      | Choice1Of2 ce when String.startsWith "application/x-www-form-urlencoded" ce ->
         let! rawForm, connection = getRawPostData ctx.connection contentLength
         return Some { ctx with request = { request with rawForm = rawForm}; connection = connection }
-      | Some ce when ce.StartsWith("multipart/form-data") ->
+
+      | Choice1Of2 ce when String.startsWith "multipart/form-data" ce ->
         let boundary = "--" + ce.Substring(ce.IndexOf('=')+1).TrimStart()
         let! ctx = parseMultipart boundary ctx
         return Some ctx
-      | Some _ | None ->
+
+      | Choice1Of2 _ | Choice2Of2 _ ->
         let! rawForm, connection = getRawPostData ctx.connection contentLength
         return Some { ctx with request = { request with rawForm = rawForm}; connection = connection }
-    | None ->  return Some ctx
+    | Choice2Of2 _ ->  return Some ctx
     }
 
   /// Process the request, reading as it goes from the incoming 'stream', yielding a HttpRequest
@@ -294,14 +389,14 @@ module internal ParsingAndControl =
 
     let! headers, connection'' = readHeaders connection'
 
-    // TODO: if client Host header not present, respond with 400 Bad Request as
+    // Respond with 400 Bad Request as
     // per http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html
-    let host =
-      headers %% "host" |> Option.get
-      |> function
-      | s when System.Text.RegularExpressions.Regex.IsMatch(s, ":\d+$") ->
-        s.Substring(0, s.LastIndexOf(':'))
-      | s -> s
+    let! host =
+      (headers %% "host" |> Choice.map (function
+        | s when System.Text.RegularExpressions.Regex.IsMatch(s, ":\d+$") ->
+          s.Substring(0, s.LastIndexOf(':'))
+        | s -> s))
+      @|! "Missing 'Host' header"
 
     let request =
       { httpVersion      = httpVersion
@@ -394,7 +489,7 @@ module internal ParsingAndControl =
   /// can't it will return None and the run method will return.
   let internal run ctx (webPart : WebPart) = 
     socket {
-      let! result = liftAsync <| executeTask ctx (webPart ctx) ctx.runtime.errorHandler
+      let! result = SocketOp.ofAsync <| executeTask ctx (webPart ctx) ctx.runtime.errorHandler
       match result with 
       | Some newCtx ->
         if newCtx.response.writePreamble then
@@ -413,7 +508,7 @@ module internal ParsingAndControl =
     | WebPart webPart ->
       return! run ctx webPart
     | SocketPart writer ->
-      let! intermediate = liftAsync <| writer ctx
+      let! intermediate = SocketOp.ofAsync <| writer ctx
       match intermediate with
       | Some task ->
         return! task ctx
@@ -423,42 +518,57 @@ module internal ParsingAndControl =
   let cleanResponse (ctx : HttpContext) =
     { ctx with response = HttpResult.empty }
 
-  let httpLoop (ctxOuter:HttpContext) (consumer : HttpConsumer) =
+  let httpLoop (ctxOuter : HttpContext) (consumer : HttpConsumer) =
 
     let runtime = ctxOuter.runtime
-    let connection = ctxOuter.connection
-    let rec loop (ctx : HttpContext) = socket {
+
+    let rec loop (ctx : HttpContext) = async {
 
       let verbose  = Log.verbose runtime.logger "Suave.Web.httpLoop.loop" TraceHeader.empty
       let verbosef = Log.verbosef runtime.logger "Suave.Web.httpLoop.loop" TraceHeader.empty
 
       verbose "-> processor"
-      let! result = processRequest ctx
+      let! result' = processRequest ctx
       verbose "<- processor"
-
-      match result with
-      | None -> verbose "'result = None', exiting"
-      | Some ctx ->
-        let! result = operate consumer ctx
+      match result' with
+      | Choice1Of2 result ->
         match result with
+        | None -> verbose "'result = None', exiting"
         | Some ctx ->
-          match ctx.request.header "connection" with
-          | Some (x : string) when x.ToLower().Equals("keep-alive") ->
-            verbose "'Connection: keep-alive' recurse"
-            return! loop (cleanResponse ctx)
-          | Some _ ->
-            free "Suave.Web.httpLoop.loop (case Some _)" connection
-            verbose "'Connection: close', exiting"
-            return ()
-          | None ->
-            if ctx.request.httpVersion.Equals("HTTP/1.1") then
-              verbose "'Connection: keep-alive' recurse (!)"
-              return! loop (cleanResponse ctx)
-            else
-              free "Suave.Web.httpLoop.loop (case None, else branch)" connection
-              verbose "'Connection: close', exiting"
-              return ()
-        | None -> return ()
+          let! result'' = operate consumer ctx
+          match result'' with
+          | Choice1Of2 result -> 
+            match result with
+            | None -> ()
+            | Some ctx ->
+              match ctx.request.header "connection" with
+              | Choice1Of2 conn when String.eqOrdCi conn "keep-alive" ->
+                verbose "'Connection: keep-alive' recurse"
+                return! loop (cleanResponse ctx)
+              | Choice1Of2 _ ->
+                free "Suave.Web.httpLoop.loop (case Choice1Of2 _)" ctx.connection
+              | Choice2Of2 _ ->
+                if ctx.request.httpVersion.Equals("HTTP/1.1") then
+                  verbose "'Connection: keep-alive' recurse (!)"
+                  return! loop (cleanResponse ctx)
+                else
+                  free "Suave.Web.httpLoop.loop (case Choice2Of2, else branch)" ctx.connection
+                  return ()
+          | Choice2Of2 err ->
+            verbose (sprintf "Socket error while running webpart, exiting: %A" err)
+      | Choice2Of2 err ->
+        match err with
+        | InputDataError msg ->
+          verbose (sprintf "Error parsing http request: %s" msg)
+          let! result''' = run ctx (RequestErrors.BAD_REQUEST msg)
+          match result''' with
+          | Choice1Of2 _ ->
+            verbose "Exiting http loop"
+          | Choice2Of2 err ->
+            verbose (sprintf "Socket error while sending BAD_REQUEST, exiting: %A" err)
+
+        | err ->
+          verbose (sprintf "Socket error while sending BAD_REQUEST, exiting: %A" err)
     }
     loop ctxOuter
 
@@ -470,21 +580,24 @@ module internal ParsingAndControl =
     (runtime    : HttpRuntime)
     (consumer   : HttpConsumer)
     (connection : Connection) =
-
-    socket {
-      let! connection = loadConnection runtime.logger runtime.matchedBinding.scheme connection
-      do! httpLoop { HttpContext.empty with runtime = runtime; connection = connection } consumer
+    let verbose  = Log.verbose runtime.logger "Suave.Web.httpLoop.loop" TraceHeader.empty
+    async {
+      let! result = loadConnection runtime.logger runtime.matchedBinding.scheme connection
+      match result with
+      | Choice1Of2 connection' ->
+        do! httpLoop { HttpContext.empty with runtime = runtime; connection = connection' } consumer
+      | Choice2Of2 err ->
+        verbose (sprintf "Socket error while loading the connection, exiting.")
       return ()
     }
 
 
   /// Starts a new web worker, given the configuration and a web part to serve.
   let startWebWorkerAsync (bufferSize, maxOps) (webpart : WebPart) (runtime : HttpRuntime) =
-    startTcpIpServerAsync
-        (bufferSize, maxOps) 
-        runtime.logger 
-        (requestLoop runtime (WebPart webpart)) 
-        runtime.matchedBinding.socketBinding
+    startTcpIpServerAsync (bufferSize, maxOps)
+                          runtime.logger
+                          (requestLoop runtime (WebPart webpart))
+                          runtime.matchedBinding.socketBinding
 
   let resolveDirectory homeDirectory =
     match homeDirectory with
@@ -546,9 +659,9 @@ let startWebServer (config : SuaveConfig) (webpart : WebPart) =
 /// to succeed.
 let defaultConfig = 
   { bindings              = [ HttpBinding.defaults ]
-    serverKey             = Utils.Crypto.generateKey HttpRuntime.ServerKeyLength
+    serverKey             = Crypto.generateKey HttpRuntime.ServerKeyLength
     errorHandler          = defaultErrorHandler
-    listenTimeout         = TimeSpan.FromSeconds(2.)
+    listenTimeout         = TimeSpan.FromSeconds 2.
     cancellationToken     = Async.DefaultCancellationToken
     bufferSize            = 8192 // 8 KiB
     maxOps                = 100

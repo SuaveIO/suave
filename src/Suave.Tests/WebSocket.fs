@@ -24,7 +24,7 @@ let websocket_tests =
   let runWithConfig = runWith defaultConfig
 
   let websocketApp (webSocket : WebSocket) =
-    fun cx -> socket{
+    fun cx -> socket {
       let loop = ref true
       while !loop do
         let! msg = webSocket.read()
@@ -40,7 +40,7 @@ let websocket_tests =
         | _ -> ()
       }
 
-  let webPart =  Applicatives.path "/websocket" >>= handShake websocketApp
+  let webPart = Applicatives.path "/websocket" >>= handShake websocketApp
 
   testList "websocket tests" [
     testCase "echo test" <| fun _ ->

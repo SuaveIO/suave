@@ -11,13 +11,13 @@
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
-    <DebugType>full</DebugType>
     <OutputPath>bin\Debug</OutputPath>
     <DefineConstants>DEBUG</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <PlatformTarget>x86</PlatformTarget>
     <ConsolePause>false</ConsolePause>
     <Prefer32Bit>false</Prefer32Bit>
+    <Optimize>true</Optimize>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -29,6 +29,8 @@
     <ConsolePause>false</ConsolePause>
     <Tailcalls>true</Tailcalls>
     <Prefer32Bit>false</Prefer32Bit>
+    <DefineConstants>
+    </DefineConstants>
   </PropertyGroup>
   <PropertyGroup>
     <MinimumVisualStudioVersion Condition="'$(MinimumVisualStudioVersion)' == ''">11</MinimumVisualStudioVersion>
@@ -99,6 +101,12 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="request-2.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <None Include="request-multipartmixed-twofiles.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <Content Include="request-no-host-header.txt">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <None Include="App.config" />
@@ -257,7 +265,6 @@
   <ItemGroup>
     <Reference Include="websocket-sharp">
       <HintPath>..\..\packages\WebSocketSharp\lib\websocket-sharp.dll</HintPath>
-      <Private>True</Private>
       <Paket>True</Paket>
     </Reference>
   </ItemGroup>

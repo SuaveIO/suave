@@ -5,6 +5,7 @@ module Compression =
   open Suave.Types
   open Suave.Utils
   open Suave.Sockets
+  open Suave.Sockets.Control
 
   open System
   open System.IO
@@ -37,26 +38,23 @@ module Compression =
     | _         -> None
 
   let getEncoder (request : HttpRequest) =
-    let encondings = request.header "accept-encoding"
-    match encondings with
-    | Some (value : string) ->
-      value.Split ','
-      |> Array.map (fun s -> s.Trim())
-      |> Array.tryPick (fun s -> loadEncoder s)
+    match request.header "accept-encoding" with
+    | Choice1Of2 value ->
+      String.splita ',' value
+      |> Array.map String.trim
+      |> Array.tryPick loadEncoder
     | _ -> None
 
   let parseEncoder (request : HttpRequest) =
-    let encondings = request.header "accept-encoding"
-    match encondings with
-    | Some (value : string) ->
-      value.Split ','
-      |> Array.map (fun s -> s.Trim())
+    match request.header "accept-encoding" with
+    | Choice1Of2 value ->
+      String.splita ',' value
+      |> Array.map String.trim
       |> Array.tryPick
-        (fun s ->
-          match s with
-          | "gzip"    -> Some GZIP
-          | "deflate" -> Some Deflate
-          | _         -> None)
+        (function
+         | "gzip"    -> Some GZIP
+         | "deflate" -> Some Deflate
+         | _         -> None)
     | _ -> None
 
   let transform (content : byte []) (ctx : HttpContext) connection : SocketOp<byte []> =
@@ -79,11 +77,11 @@ module Compression =
     match encoding with
     | GZIP ->
       use gzip = new GZipStream(newFileStream, CompressionMode.Compress)
-      do! liftTask (fs.CopyToAsync gzip)
+      do! SocketOp.ofTask (fs.CopyToAsync gzip)
       gzip.Close()
     | Deflate ->
       use deflate = new DeflateStream(newFileStream, CompressionMode.Compress)
-      do! liftTask (fs.CopyToAsync deflate)
+      do! SocketOp.ofTask (fs.CopyToAsync deflate)
       deflate.Close()
     | _ ->
       return failwith "invalid case."
@@ -93,30 +91,31 @@ module Compression =
   let compressFile n (stream : Stream) compressionFolder = socket {
     let tempFileName = Path.GetRandomFileName()
     if not (Directory.Exists compressionFolder) then Directory.CreateDirectory compressionFolder |> ignore
-    let new_path = Path.Combine(compressionFolder,tempFileName)
-    do! compress n new_path stream
+    let newPath = Path.Combine(compressionFolder,tempFileName)
+    do! compress n newPath stream
     stream.Dispose()
-    return new_path
+    return newPath
   }
 
-  let transformStream (key : string) (getData : string -> Stream) (getLast : string -> DateTime) compression compressionFolder ({ request = q } as ctx) connection =
+  let transformStream (key : string) (getData : string -> Stream) (getLast : string -> DateTime)
+                      compression compressionFolder ctx connection =
     socket {
       let stream = getData key
       if compression && stream.Length > int64(MIN_BYTES_TO_COMPRESS) && stream.Length < int64(MAX_BYTES_TO_COMPRESS) then
-        let enconding = parseEncoder q
+        let enconding = parseEncoder ctx.request
         match enconding with
         | Some (n) ->
           do! asyncWriteLn connection (String.Concat [| "Content-Encoding: "; n.ToString() |])
           if Globals.compressedFilesMap.ContainsKey key then
             let lastModified = getLast key
-            let cmpr_info = new FileInfo(Globals.compressedFilesMap.[key])
-            if lastModified > cmpr_info.CreationTime then
-              let! newPath =  compressFile n stream compressionFolder
+            let cmprInfo = new FileInfo(Globals.compressedFilesMap.[key])
+            if lastModified > cmprInfo.CreationTime then
+              let! newPath = compressFile n stream compressionFolder
               Globals.compressedFilesMap.[key] <- newPath
           else
             let! newPath =  compressFile n stream compressionFolder
             Globals.compressedFilesMap.TryAdd(key,newPath) |> ignore
-          return new FileStream(Globals.compressedFilesMap.[key] , FileMode.Open, FileAccess.Read, FileShare.Read) :> Stream
+          return new FileStream(Globals.compressedFilesMap.[key], FileMode.Open, FileAccess.Read, FileShare.Read) :> Stream
         | None ->
           return stream
       else

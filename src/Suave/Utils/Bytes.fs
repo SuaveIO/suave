@@ -5,8 +5,6 @@ open System.IO
 open System.Text
 open Suave.Utils.Async
 
-
-
 module (* internal *) Bytes =
  
   /// Ordinally compare two strings in constant time, bounded by the length of the
@@ -72,17 +70,17 @@ module (* internal *) Bytes =
   /// Asynchronously write from the 'from' stream to the 'to' stream, with an upper bound on
   /// amount to transfer by len
   let transferBounded (toStream : Stream) (from : Stream) len =
-    let buf_size = 0x2000
-    let buf = Array.zeroCreate<byte> 0x2000
-    let rec do_block left = async {
-      let! read = from.AsyncRead(buf, 0, Math.Min(buf_size, left))
+    let bufSize = 0x2000
+    let buf = Array.zeroCreate<byte> bufSize
+    let rec doBlock left = async {
+      let! read = from.AsyncRead(buf, 0, Math.Min(bufSize, left))
       if read <= 0 || left - read = 0 then
         do! toStream.FlushAsync()
         return ()
       else
         do! toStream.AsyncWrite(buf, 0, read)
-        return! do_block (left - read) }
-    do_block len
+        return! doBlock (left - read) }
+    doBlock len
 
   /// Asynchronously write from the 'from' stream to the 'to' stream.
   let transfer (toStream : Stream) (from : Stream) =

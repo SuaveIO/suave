@@ -1,8 +1,9 @@
-﻿namespace Suave
+namespace Suave
 
 module WebSocket =
 
   open Suave.Sockets
+  open Suave.Sockets.Control
   open Suave.Types
   open Suave.Http
   open Suave.Utils
@@ -48,7 +49,7 @@ module WebSocket =
     | CLOSE_NO_STATUS
     | CLOSE_ABNORMAL
     | CLOSE_TOO_LARGE
-    member x.code = 
+    member x.code =
       match x with
       | CLOSE_NORMAL -> 1000
       | CLOSE_GOING_AWAY -> 1001
@@ -67,7 +68,7 @@ module WebSocket =
       hasMask : bool
       length  : int }
 
-  let internal exctractHeader (arr: byte array) =
+  let internal exctractHeader (arr: byte []) =
     let bytes x = arr.[x]
     let firstByte = bytes 0
     let secondByte = bytes 1
@@ -106,7 +107,7 @@ module WebSocket =
 
     [| yield firstByte; yield secondByte; yield! data |]
 
-  let readBytes (transport : ITransport) (n : int) = 
+  let readBytes (transport : ITransport) (n : int) =
     let arr = Array.zeroCreate n
     let rec loop i = socket {
       if i = n then
@@ -138,7 +139,7 @@ module WebSocket =
           return uint64(header.length)
       }
 
-    let sendFrame opcode bs fin = socket{
+    let sendFrame opcode bs fin = socket {
       let frame = frame opcode bs fin
       let! _ = connection.transport.write <| ArraySegment (frame,0,frame.Length)
       return ()
@@ -155,11 +156,11 @@ module WebSocket =
 
       if extendedLenght > uint64 Int32.MaxValue then
         let reason = sprintf "Frame size of %d bytes exceeds maximun accepted frame size (2 GB)" extendedLenght
-        let data = 
+        let data =
           [| yield! BitConverter.GetBytes (CloseCode.CLOSE_TOO_LARGE.code)
-           ; yield! UTF8.bytes reason |]
+             yield! UTF8.bytes reason |]
         do! sendFrame Close data true
-        return! abort (OtherError reason)
+        return! SocketOp.abort (InputDataError reason)
       else
         let! frame = readBytes connection.transport (int extendedLenght)
         // Messages from the client MUST be masked
@@ -171,7 +172,7 @@ module WebSocket =
     member this.send opcode bs fin = sendFrame  opcode bs fin
 
   let internal handShakeAux webSocketKey continuation (ctx : HttpContext) =
-    socket{
+    socket {
       let webSocketHash = sha1 <| webSocketKey + magicGUID
       let handShakeToken = Convert.ToBase64String webSocketHash
       let! something = ParsingAndControl.run ctx <| handShakeResponse handShakeToken
@@ -180,19 +181,19 @@ module WebSocket =
     }
 
   /// The handShake combinator captures a WebSocket and pass it to the provided `continuation`
-  let handShake (continuation : WebSocket -> HttpContext -> SocketOp<unit>) (ctx : HttpContext) = async{
+  let handShake (continuation : WebSocket -> HttpContext -> SocketOp<unit>) (ctx : HttpContext) = async {
     let r = ctx.request
     if r.``method`` <> HttpMethod.GET then
       return! RequestErrors.METHOD_NOT_ALLOWED "Method not allowed" ctx
-    elif r.header "upgrade"  <> Some "websocket" then 
+    elif r.header "upgrade"  <> Choice1Of2 "websocket" then 
       return! RequestErrors.BAD_REQUEST "Bad Request" ctx
     else
       match r.header "connection" with
       // rfc 6455 - Section 4.1.6 : The request MUST contain a |Connection| header field whose value
       // MUST include the "Upgrade" token.
-      | Some str when str.Contains "Upgrade" -> 
+      | Choice1Of2 str when String.contains "Upgrade" str -> 
         match r.header "sec-websocket-key" with
-        | Some webSocketKey ->
+        | Choice1Of2 webSocketKey ->
           let! a = handShakeAux webSocketKey continuation ctx
           match a with
           | Choice1Of2 _ ->
@@ -204,5 +205,4 @@ module WebSocket =
           return! RequestErrors.BAD_REQUEST "Missing 'sec-websocket-key' header" ctx
       | _ ->
         return! RequestErrors.BAD_REQUEST "Bad Request" ctx
-      
     }

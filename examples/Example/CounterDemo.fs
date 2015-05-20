@@ -3,22 +3,23 @@
 module private Helpers =
   let (<!>) a b =
     match a with
-    | None -> b
-    | Some x -> Some x
+    | Choice1Of2 x -> Choice1Of2 x
+    | Choice2Of2 _ -> b
 
   let (<.>) a b =
     match a with
-    | None -> b
-    | Some x -> x
+    | Choice1Of2 x -> x
+    | Choice2Of2 _ -> b
 
   /// Maybe convert to int32 from string
   let muint32 str =
     match System.UInt32.TryParse str with
-    | true, i -> Some i
-    | _       -> None
+    | true, i -> Choice1Of2 i
+    | _       -> Choice2Of2 "couldn't convert to int32"
 
 open Suave
 open Suave.Sockets
+open Suave.Sockets.Control
 open Suave.Types
 open Suave.Http
 open Suave.Http.EventSource
@@ -32,13 +33,13 @@ let counterDemo (req : HttpRequest) (out : Connection) =
     socket {
       let msg = { id = i; data = string i; ``type`` = None }
       do! msg |> send out
-      return! async {
-        do! Async.Sleep 100
-        return Choice1Of2 () } }
+      return! SocketOp.ofAsync (Async.Sleep 100)
+    }
+
   socket {
     let last_evt_id =
-      (req.header "last-event-id" |> Option.bind muint32) <!>
-      ((req.queryParam "lastEventId") |> Option.bind muint32) <.>
+      (req.header "last-event-id" |> Choice.bind muint32) <!>
+      ((req.queryParam "lastEventId") |> Choice.bind muint32) <.>
       100u
 
     let actions =

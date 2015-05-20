@@ -31,7 +31,7 @@ module Parse =
   let int64 = parseUsing Int64.TryParse
   let uint64 = parseUsing UInt64.TryParse
   let uri = parseUsing (fun s -> Uri.TryCreate(s, UriKind.RelativeOrAbsolute))
-  let date_time = parseUsing (fun s -> DateTime.TryParse(s, CultureInfo.InvariantCulture.DateTimeFormat, DateTimeStyles.RoundtripKind))
+  let dateTime = parseUsing (fun s -> DateTime.TryParse(s, CultureInfo.InvariantCulture.DateTimeFormat, DateTimeStyles.RoundtripKind))
   let decimal = parseUsing (fun s -> Decimal.TryParse(s, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture))
 
 let binding = ChoiceBuilder()
@@ -43,29 +43,29 @@ module Binding =
   open Suave.Types
   open Suave.Utils
 
-  let bind f_bind
-           (f_cont : 'a -> (HttpContext -> 'c))
-           (f_err  : 'b -> (HttpContext -> 'c))
+  let bind fBind
+           (fCont : 'a -> (HttpContext -> 'c))
+           (fErr  : 'b -> (HttpContext -> 'c))
            : (HttpContext -> 'c) =
     context (fun c ->
-      match f_bind c with
-      | Choice1Of2 m   -> f_cont m
-      | Choice2Of2 err -> f_err err)
+      match fBind c with
+      | Choice1Of2 m   -> fCont m
+      | Choice2Of2 err -> fErr err)
 
-  let bindReq f f_cont f_err =
-    bind (HttpContext.request >> f) f_cont f_err
+  let bindReq f fCont fErr =
+    bind (HttpContext.request >> f) fCont fErr
 
   let header key f (req : HttpRequest) =
     (getFirst req.headers key)
-    |> Choice.from_option (sprintf "Missing header '%s'" key)
+    |> Choice.mapError (fun _ -> sprintf "Missing header '%s'" key)
     |> Choice.bind f
 
   let form formKey f (req : HttpRequest) =
     req.formData formKey
-    |> Choice.from_option (sprintf "Missing form field '%s'" formKey)
+    |> Choice.mapError (fun _ -> sprintf "Missing form field '%s'" formKey)
     |> Choice.bind f
 
   let query queryKey f (req : HttpRequest) =
     req.queryParam queryKey
-    |> Choice.from_option (sprintf "Missing query string key '%s'" queryKey)
+    |> Choice.mapError (fun _ -> sprintf "Missing query string key '%s'" queryKey)
     |> Choice.bind f

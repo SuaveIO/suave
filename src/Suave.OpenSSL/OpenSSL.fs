@@ -12,6 +12,7 @@ open OpenSSL.SSL
 
 open Suave.OpenSSL.Native
 open Suave.Sockets
+open Suave.Sockets.Control
 
 let SSL_CTX_set_mode( ctx : IntPtr,  op : int) = SSL_CTX_ctrl(ctx, SSL_CTRL_MODE, op, IntPtr.Zero)
 let SSL_CTX_set_options( ctx : IntPtr, op : int) = SSL_CTX_ctrl(ctx, SSL_CTRL_OPTIONS, op, IntPtr.Zero)

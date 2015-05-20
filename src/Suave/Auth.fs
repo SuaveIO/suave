@@ -47,13 +47,13 @@ let generateData (request : HttpRequest) =
   String.concat "\n"
     [ sessionId
       request.ipaddr.ToString()
-      request.header "user-agent" |> Option.orDefault ""
+      request.header "user-agent" |> Choice.orDefault ""
     ]
 
 let authenticate relativeExpiry secure
                  missingCookie
                  (decryptionFailure : Crypto.SecretboxDecryptionError -> Choice<byte [], WebPart>)
-                 (f_success : WebPart)
+                 (fSuccess : WebPart)
                  : WebPart =
   context (fun ctx ->
     Log.log ctx.runtime.logger "Suave.Auth.authenticate" LogLevel.Debug "authenticating"
@@ -66,13 +66,13 @@ let authenticate relativeExpiry secure
         secure         = secure }
       missingCookie
       decryptionFailure
-      f_success)
+      fSuccess)
 
-let authenticateWithLogin relativeExpiry loginPage f_success : WebPart =
+let authenticateWithLogin relativeExpiry loginPage fSuccess : WebPart =
   authenticate relativeExpiry false
                (fun () -> Choice2Of2(Redirection.FOUND loginPage))
                (sprintf "%A" >> RequestErrors.BAD_REQUEST >> Choice2Of2)
-               f_success
+               fSuccess
 
 /// Set server-signed cookies to make the response contain a cookie
 /// with a valid session id. It's worth having in mind that when you use this web

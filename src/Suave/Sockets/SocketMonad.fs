@@ -1,16 +1,17 @@
-﻿namespace Suave.Sockets
+﻿namespace Suave.Sockets.Control
 
 open System
 open System.Collections.Generic
+open Suave.Sockets
 
 /// Workflow builder to read/write to async sockets with fail/success semantics
 type SocketMonad() =
-  member this.Return(x:'a) : SocketOp<'a> = async{ return Choice1Of2 x }
+  member this.Return(x:'a) : SocketOp<'a> = async { return Choice1Of2 x }
   member this.Zero() : SocketOp<unit> = this.Return()
   member this.ReturnFrom(x : SocketOp<'a>) : SocketOp<'a> = x
   member this.Delay(f: unit ->  SocketOp<'a>) = async { return! f () }
 
-  member this.Bind(x : SocketOp<'a>,f : 'a -> SocketOp<'b>) : SocketOp<'b> = async{
+  member this.Bind(x : SocketOp<'a>,f : 'a -> SocketOp<'b>) : SocketOp<'b> = async {
     let! result = x
     match result with
     | Choice1Of2 a -> return! f a
@@ -29,7 +30,7 @@ type SocketMonad() =
         return result
     else
       return! this.Zero()
-      }
+    }
 
   member this.TryWith(body, handler) = async {
     try

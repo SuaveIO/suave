@@ -18,7 +18,7 @@ type LogLine =
     /// an optional exception
     ``exception`` : exn option
     /// timestamp when this log line was created
-    ts_utc_ticks  : int64 }
+    tsUTCTicks    : int64 }
     
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module LogLine =
@@ -28,7 +28,7 @@ module LogLine =
       path          = path
       ``exception`` = ex
       trace         = trace
-      ts_utc_ticks  = Globals.utcNow().Ticks }
+      tsUTCTicks  = Globals.utcNow().Ticks }
 
   let trace_ =
     (fun x -> x.trace),

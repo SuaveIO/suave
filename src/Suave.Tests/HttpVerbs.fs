@@ -47,11 +47,13 @@ let gets =
 let posts =
   let runWithConfig = runWith defaultConfig
 
+  let get = function Choice1Of2 x -> x | _ -> failwith "couldn't get it"
+
   let webId =
     request (fun x -> OK (x.rawForm |> Encoding.UTF8.GetString))
 
   let getFormValue name =
-    request (fun x -> let q = x.formData name in OK (Option.get q))
+    request (fun x -> let q = x.formData name in OK (get q))
 
   let assertion = "eyJhbGciOiJSUzI1NiJ9.eyJwdWJsaWMta2V5Ijp7ImFsZ29yaXRobSI6IkR"+
                   "TIiwieSI6Ijc1MDMyNGRmYzQwNGI0OGQ3ZDg0MDdlOTI0NWMxNGVkZmVlZTY"+
