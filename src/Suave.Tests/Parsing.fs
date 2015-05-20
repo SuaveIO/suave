@@ -124,7 +124,7 @@ let parsingMultipart2 =
       try
         let data = readBytes "request-no-host-header.txt"
         let subject = sendRecv data
-        Assert.Equal("Expecting 400 Bad Request", "HTTP/1.1 400 Bad Request", subject)
+        Assert.StringContains("Expecting 400 Bad Request", "HTTP/1.1 400 Bad Request", subject)
       finally
         disposeContext ctx
     ]
