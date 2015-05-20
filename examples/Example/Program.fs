@@ -90,6 +90,13 @@ let app =
     GET >>= dirHome //show directory listing
     HEAD >>= path "/head" >>= sleep 100 "Nice sleep .."
     POST >>= path "/upload" >>= OK "Upload successful."
+    POST >>= path "/i18nforms" >>= request (fun r ->
+      sprintf """
+      ödlan: %A
+      小: %A
+      """ (r.formData "ödlan") (r.formData "小")
+      |> OK >>= Writers.setMimeType "text/plain"
+    )
     PUT >>= path "/upload2"
       >>= request (fun x ->
          let files =
