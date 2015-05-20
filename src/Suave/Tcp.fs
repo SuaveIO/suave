@@ -156,7 +156,11 @@ let startTcpIpServerAsync (bufferSize  : int, maxConcurrentOps : int)
     | :? System.IO.EndOfStreamException ->
       intern "disconnected client (end of stream)"
     | ex ->
-      "tcp request processing failed" |> Log.interne logger "Suave.Tcp.tcpIpServer.job" ex
+      logger.Log LogLevel.Warn <| fun _ ->
+        LogLine.mk "Suave.Tcp.tcpIpServer.job"
+                   LogLevel.Warn (TraceHeader.empty)
+                   (Some ex)
+                   "tcp request processing failed"
   }
 
   // start a new async worker for each accepted TCP client
