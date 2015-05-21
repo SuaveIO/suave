@@ -24,8 +24,8 @@ let app =
               >>= Writers.setMimeType "image/gif"
               >>= warbler (fun ctx ->
                   let file = ctx.request.files.Head
-                  printfn "||| in suave, handing over to sendFile, file %s len %d"
-                          file.tempFilePath (FileInfo(file.tempFilePath).Length)
+                  //printfn "||| in suave, handing over to sendFile, file %s len %d"
+                  //        file.tempFilePath (FileInfo(file.tempFilePath).Length)
                   Files.sendFile file.tempFilePath false)
           NOT_FOUND "Nope."
       ]
@@ -37,7 +37,7 @@ let pathOf relativePath =
 
 [<Tests>]
 let tests =
-  let config = { defaultConfig with logger = Loggers.ConsoleWindowLogger(LogLevel.Verbose) }
+  let config = defaultConfig //{ defaultConfig with logger = Loggers.ConsoleWindowLogger(LogLevel.Verbose) }
   let runWithConfig = runWith config
   let uriFor (res : string) = Uri (sprintf "http://localhost:8083/%s" (res.TrimStart('/')))
   let postTo res = createRequest Post (uriFor res) |> withKeepAlive false
@@ -48,7 +48,7 @@ let tests =
       use fs = File.OpenRead (pathOf "regressions/pix.gif")
       let file = "pix.gif", ContentType.Create("image", "gif"), StreamData fs
 
-      printfn "--- get response"
+      //printfn "--- get response"
       let data =
         postTo "gifs/echo"
         |> withBody (BodyForm [ FormFile ("img", file) ])

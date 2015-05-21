@@ -86,18 +86,18 @@ let parsingMultipart2 =
             path "/filenames"
               >>= Writers.setMimeType "application/json"
               >>= warbler (fun ctx ->
-                  printfn "inside suave"
+                  //printfn "inside suave"
                   ctx.request.files
                   |> List.map (fun f -> "\"" + f.fileName + "\"")
                   |> String.concat ","
                   |> fun files -> "[" + files + "]"
                   |> OK)
-            
+
             NOT_FOUND "Nope."
         ]
       ]
 
-  let runWithConfig = runWith { defaultConfig with logger = Loggers.ConsoleWindowLogger(LogLevel.Verbose) }
+  let runWithConfig = runWith defaultConfig //{ defaultConfig with logger = Loggers.ConsoleWindowLogger(LogLevel.Verbose) }
 
   let sendRecv (data : byte []) =
     use sender = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp)
