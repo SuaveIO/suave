@@ -47,18 +47,15 @@ type Assert with
     let s1buf, s2buf = Array.zeroCreate<byte> bufLen, Array.zeroCreate<byte> bufLen
     let mutable read = 0
     let mutable pos = 0
-    let mutable pos2 = 0
     let mutable eq = true
     let mutable first = true
     while read > 0 && eq || first do
       first <- false
-      read <- s1.Read(s1buf, pos, bufLen)
-      let s2read = s2.Read(s2buf, pos, bufLen)
+      read <- s1.Read(s1buf, 0, bufLen)
+      let s2read = s2.Read(s2buf, 0, bufLen)
       eq <- eq && read = s2read
-      for i in 0..read do
-        if eq then pos2 <- i // omg what a hack
+      for i in 0..(read - 1) do
         eq <- eq && s1buf.[i] = s2buf.[i]
-      if eq then
-        pos <- pos + read
-        pos2 <- 0
-    if not eq then Tests.failtestf "The streams to not equal at index %d" (pos + pos2)
+        if eq then
+          pos <- pos + 1
+    if not eq then Tests.failtestf "The streams are not equal at index %d" pos
