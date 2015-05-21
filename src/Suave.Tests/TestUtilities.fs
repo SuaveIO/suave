@@ -43,19 +43,11 @@ let defaultConfig =
 
 type Assert with
   static member StreamsEqual(msg, s1 : Stream, s2 : Stream) =
-    let bufLen = 0x10
-    let s1buf, s2buf = Array.zeroCreate<byte> bufLen, Array.zeroCreate<byte> bufLen
-    let mutable read = 0
-    let mutable pos = 0
-    let mutable eq = true
-    let mutable first = true
-    while read > 0 && eq || first do
-      first <- false
-      read <- s1.Read(s1buf, 0, bufLen)
-      let s2read = s2.Read(s2buf, 0, bufLen)
-      eq <- eq && read = s2read
-      for i in 0..(read - 1) do
-        eq <- eq && s1buf.[i] = s2buf.[i]
-        if eq then
-          pos <- pos + 1
-    if not eq then Tests.failtestf "The streams are not equal at index %d" pos
+    let buf = Array.zeroCreate<byte> 2
+    let rec compare pos =
+      match s1.Read(buf, 0, 1), s2.Read(buf, 1, 1) with
+      | x, y when x <> y -> Tests.failtestf "Not equal at pos %d" pos
+      | 0, _ -> ()
+      | _ when buf.[0] <> buf.[1] -> Tests.failtestf "Not equal at pos %d" pos
+      | _ -> compare (pos + 1)
+    compare 0
