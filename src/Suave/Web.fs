@@ -289,7 +289,7 @@ module internal ParsingAndControl =
     let rec loop (ctx : HttpContext) = socket {
       let! firstLine, connection = readLine ctx.connection
 
-      if firstLine.Equals("--") || firstLine.Equals(boundary + "--") then
+      if firstLine.Equals("--") || firstLine.Equals(boundary + "--") || firstLine.Equals("--" + boundary) then
         return { ctx with connection = connection }
       else
         let! partHeaders, connection = readHeaders connection
@@ -315,7 +315,7 @@ module internal ParsingAndControl =
 
         | Choice1Of2 contentType ->
           verbosef (fun f -> f "parsing content type %s -> readFilePart" contentType)
-          let! res = readFilePart boundary ctx headerParams fieldName contentType
+          let! res = readFilePart boundary { ctx with connection = connection } headerParams fieldName contentType
           verbosef (fun f -> f "parsing content type %s <- readFilePart" contentType)
 
           match res with
