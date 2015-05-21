@@ -115,7 +115,7 @@ let parsingMultipart2 =
       try
         let data = readBytes "request-multipartmixed-twofiles.txt"
         let subject = sendRecv data
-        Assert.Equal("Expecting 200 OK", "HTTP/1.1 200 OK", subject)
+        Assert.StringContains("Expecting 200 OK", "HTTP/1.1 200 OK", subject)
       finally
         disposeContext ctx
 
@@ -125,6 +125,15 @@ let parsingMultipart2 =
         let data = readBytes "request-no-host-header.txt"
         let subject = sendRecv data
         Assert.StringContains("Expecting 400 Bad Request", "HTTP/1.1 400 Bad Request", subject)
+      finally
+        disposeContext ctx
+
+    testCase "bug 256" <| fun _ ->
+      let ctx = runWithConfig app
+      try
+        let data = readBytes "request-hangs.txt"
+        let subject = sendRecv data
+        Assert.StringContains("Expecting 404 Not Found", "HTTP/1.1 404 Not Found", subject)
       finally
         disposeContext ctx
     ]

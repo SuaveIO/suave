@@ -15,6 +15,8 @@ NUGET
       FSharp.Core (>= 3.1.2.1)
       Fuchu-suave (>= 0.6.1)
       PerfUtil (>= 0.1.8)
+    Http.fs-prerelease (2.2.0)
+      FSharp.Core (>= 3.1.2.1)
     Microsoft.AspNet.Razor (2.0.30506.0) - framework: >= net40 < net45
     NuGet.CommandLine (2.8.3)
     openssl.redist (1.0.1.25)

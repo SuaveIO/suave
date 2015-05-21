@@ -1,0 +1,14 @@
+POST /gifs/echo HTTP/1.1
+Content-Type: multipart/form-data; boundary=l_Kl/_shhUshcJYXAZH-gZCPlJ/sFp
+Host: ademar.name
+Content-Length: 249
+Expect: 100-continue
+Connection: Close
+
+--l_Kl/_shhUshcJYXAZH-gZCPlJ/sFp
+Content-Disposition: form-data; name="img"; filename="pix.gif"
+Content-Type: image/gif
+Content-Transfer-Encoding: binary
+
+GIF89a...................!.......,...........D..;
+--l_Kl/_shhUshcJYXAZH-gZCPlJ/sFp--

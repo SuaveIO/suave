@@ -112,15 +112,15 @@ module internal ParsingAndControl =
     }
 
   let readMoreData connection = async {
-    let buff = connection.bufferManager.PopBuffer("Suave.Web.readMoreData.loop")
+    let buff = connection.bufferManager.PopBuffer("Suave.Web.readMoreData")
     let! result = readData connection buff
     match result with
     | Choice1Of2 data ->
       return { connection with segments = connection.segments @ [data] } |> Choice1Of2
     | Choice2Of2 error ->
       for b in connection.segments do
-        do connection.bufferManager.FreeBuffer( b.buffer, "Suave.Web.readMoreData.loop")
-      do connection.bufferManager.FreeBuffer( buff, "Suave.Web.readMoreData.loop")
+        do connection.bufferManager.FreeBuffer(b.buffer, "Suave.Web.readMoreData")
+      do connection.bufferManager.FreeBuffer(buff, "Suave.Web.readMoreData")
       return Choice2Of2 error
     }
 
@@ -146,6 +146,15 @@ module internal ParsingAndControl =
   /// read.
   let readUntil (marker : byte []) (select : ArraySegment<_> -> int -> Async<unit>) (connection : Connection) =
     readUntilPattern connection (scanMarker marker select)
+
+  let parseTraceHeaders (headers : NameValueList) =
+    let tryParseUint64 x = 
+      match UInt64.TryParse x with 
+      | true, value -> Choice1Of2 value
+      | false, _    -> Choice2Of2 (sprintf "Couldn't parse '%s' to int64" x)
+    let parent = "x-b3-spanid"  |> getFirst headers |> Choice.bind tryParseUint64 |> Option.ofChoice
+    let trace  = "x-b3-traceid" |> getFirst headers |> Choice.bind tryParseUint64 |> Option.ofChoice
+    TraceHeader.mk trace parent
 
   /// Read a line from the stream, calling ASCII.toString on the bytes before the EOL marker
   let readLine (connection : Connection) = socket {
@@ -217,51 +226,48 @@ module internal ParsingAndControl =
 
     if fileLength > 0L then
       let! filename =
-          (headerParams.TryLookup "filename" |> Choice.map (String.trimc '"'))
-          @|! "Key 'filename' was not present in 'content-disposition'"
+        (headerParams.TryLookup "filename" |> Choice.map (String.trimc '"'))
+        @|! "Key 'filename' was not present in 'content-disposition'"
 
       let upload =
-          { fieldName    = fieldName
-            fileName     = filename
-            mimeType     = contentType
-            tempFilePath = tempFilePath }
+        { fieldName    = fieldName
+          fileName     = filename
+          mimeType     = contentType
+          tempFilePath = tempFilePath }
 
       return connection, Some upload
     else
       File.Delete tempFilePath
       return connection, None
-      
     }
 
   let parseMultipartMixed fieldName boundary (context : HttpContext) : SocketOp<HttpContext> =
-
-    let verbose str =
-      let logger = context.runtime.logger
-      Log.verbose logger "Suave.Web.parseMultipartMixed" context.request.trace str
+    let verbose = Log.verbose context.runtime.logger "Suave.Web.parseMultipartMixed" context.request.trace
+    let verbosef = Log.verbosef context.runtime.logger "Suave.Web.parseMultipartMixed" context.request.trace
 
     let rec loop (ctx : HttpContext) = socket {
-
       let! firstLine, connection = readLine ctx.connection
 
       if not (firstLine.Equals("--")) then
-
         let! partHeaders, connection = readHeaders connection
-
         let! (contentDisposition : string) =
           (partHeaders %% "content-disposition")
           @|! "Missing 'content-disposition'"
 
-        let headerParams = headerParams contentDisposition
-        let contentType = partHeaders %% "content-type"
-
-        match contentType with
+        match partHeaders %% "content-type" with
         | Choice1Of2 contentType ->
-          let! res = readFilePart  boundary ctx headerParams fieldName contentType
+          let headerParams = headerParams contentDisposition
+          verbosef (fun f -> f "parsing content type %s -> readFilePart" contentType)
+          let! res = readFilePart boundary ctx headerParams fieldName contentType
+          verbosef (fun f -> f "parsing content type %s -> readFilePart" contentType)
+
           match res with
           | connection, Some upload -> 
-            return! loop { ctx with request = { ctx.request with files = upload :: ctx.request.files }; connection = connection }
+            return! loop { ctx with request = { ctx.request with files = upload :: ctx.request.files }
+                                    connection = connection }
           | connection, None ->
             return! loop { ctx with connection = connection }
+
         | Choice2Of2 _ ->
           use mem = new MemoryStream()
           let! a, connection =
@@ -278,20 +284,15 @@ module internal ParsingAndControl =
 
   /// Parses multipart data from the stream, feeding it into the HttpRequest's property Files.
   let parseMultipart boundary (context : HttpContext) : SocketOp<HttpContext> =
-
-    let verbose str =
-      let logger = context.runtime.logger
-      Log.verbose logger "Suave.Web.parseMultipart" context.request.trace str
+    let verbosef = Log.verbosef context.runtime.logger "Suave.Web.parseMultipart" context.request.trace
 
     let rec loop (ctx : HttpContext) = socket {
-
       let! firstLine, connection = readLine ctx.connection
 
-      if firstLine.Equals("--") || firstLine.Equals(boundary + "--") then
+      if firstLine.Equals("--") || firstLine.Equals(boundary + "--") || firstLine.Equals("--" + boundary) then
         return { ctx with connection = connection }
       else
         let! partHeaders, connection = readHeaders connection
-
         let! (contentDisposition : string) =
           (partHeaders %% "content-disposition")
           @|! "Missing 'content-disposition'"
@@ -306,20 +307,21 @@ module internal ParsingAndControl =
           (headerParams.TryLookup "name" |> Choice.map (String.trimc '"'))
           @|! "Key 'name' was not present in 'content-disposition'"
 
-        let contentType = partHeaders %% "content-type"
-
-        match contentType with
+        match partHeaders %% "content-type" with
         | Choice1Of2 x when String.startsWith "multipart/mixed" x ->
           let subboundary = "--" + x.Substring(x.IndexOf('=') + 1).TrimStart()
           let! ctx = parseMultipartMixed fieldName subboundary { ctx with connection = connection }
-
           return! loop ctx
 
         | Choice1Of2 contentType ->
-          let! res = readFilePart  boundary ctx headerParams fieldName contentType
+          verbosef (fun f -> f "parsing content type %s -> readFilePart" contentType)
+          let! res = readFilePart boundary { ctx with connection = connection } headerParams fieldName contentType
+          verbosef (fun f -> f "parsing content type %s <- readFilePart" contentType)
+
           match res with
           | connection, Some upload -> 
-            return! loop { ctx with request = { ctx.request with files = upload :: ctx.request.files }; connection = connection }
+            return! loop { ctx with request = { ctx.request with files = upload :: ctx.request.files }
+                                    connection = connection }
           | connection, None ->
             return! loop { ctx with connection = connection }
 
@@ -330,63 +332,67 @@ module internal ParsingAndControl =
                 do! mem.AsyncWrite(x.Array, x.Offset, y)
               }) connection
           let byts = mem.ToArray()
-          return! loop { ctx with request = { ctx.request with multiPartFields = (fieldName, ASCII.toStringAtOffset byts 0 byts.Length)::(ctx.request.multiPartFields) }; connection = connection}
+          let fields = (fieldName, ASCII.toStringAtOffset byts 0 byts.Length) :: ctx.request.multiPartFields
+          return! loop { ctx with request = { ctx.request with multiPartFields = fields }
+                                  connection = connection }
       }
 
     loop context
-
-  let parseTraceHeaders (headers : NameValueList) =
-    let tryParseUint64 x = 
-      match UInt64.TryParse x with 
-      | true, value -> Choice1Of2 value
-      | false, _    -> Choice2Of2 (sprintf "Couldn't parse '%s' to int64" x)
-    let parent = "x-b3-spanid"  |> getFirst headers |> Choice.bind tryParseUint64 |> Option.ofChoice
-    let trace  = "x-b3-traceid" |> getFirst headers |> Choice.bind tryParseUint64 |> Option.ofChoice
-    TraceHeader.mk trace parent
 
   /// Reads raw POST data
   let getRawPostData connection contentLength =
     socket {
       let offset = ref 0
       let rawForm = Array.zeroCreate contentLength
-      let! connection = readPostData connection contentLength (fun a count -> async { Array.blit a.Array a.Offset rawForm !offset count; offset := !offset + count })
-      return rawForm , connection
+      let! connection =
+        readPostData connection contentLength (fun a count -> async {
+          Array.blit a.Array a.Offset rawForm !offset count;
+          offset := !offset + count
+        })
+      return rawForm, connection
     }
 
   let parsePostData (ctx : HttpContext) = socket {
+    let verbosef = Log.verbosef ctx.runtime.logger "Suave.Web.parsePostData" ctx.request.trace
+    let verbose = Log.verbose ctx.runtime.logger "Suave.Web.parsePostData" ctx.request.trace
     let request = ctx.request
-    let contentEncoding = request.header "content-type"
 
     match request.header "content-length" with 
     | Choice1Of2 contentLengthString ->
-      let contentLength = Convert.ToInt32(contentLengthString)
+      let contentLength = Convert.ToInt32 contentLengthString
+      verbosef (fun f -> f "expecting content length %d" contentLength)
 
-      match contentEncoding with
+      match request.header "content-type" with
       | Choice1Of2 ce when String.startsWith "application/x-www-form-urlencoded" ce ->
         let! rawForm, connection = getRawPostData ctx.connection contentLength
-        return Some { ctx with request = { request with rawForm = rawForm}; connection = connection }
+        return Some { ctx with request = { request with rawForm = rawForm}
+                               connection = connection }
 
       | Choice1Of2 ce when String.startsWith "multipart/form-data" ce ->
-        let boundary = "--" + ce.Substring(ce.IndexOf('=')+1).TrimStart()
+        let boundary = "--" + (ce |> String.substring (ce.IndexOf('=') + 1) |> String.trimStart)
+
+        verbose "parsing multipart"
         let! ctx = parseMultipart boundary ctx
         return Some ctx
 
       | Choice1Of2 _ | Choice2Of2 _ ->
         let! rawForm, connection = getRawPostData ctx.connection contentLength
         return Some { ctx with request = { request with rawForm = rawForm}; connection = connection }
-    | Choice2Of2 _ ->  return Some ctx
+    | Choice2Of2 _ -> return Some ctx
     }
 
   /// Process the request, reading as it goes from the incoming 'stream', yielding a HttpRequest
   /// when done
   let processRequest (ctx : HttpContext) = socket {
+    let verbose = Log.verbose ctx.runtime.logger "Suave.Web.processRequest" ctx.request.trace
 
-    let runtime = ctx.runtime
+    verbose "reading first line of request"
     let! firstLine, connection' = readLine ctx.connection
 
     let rawMethod, path, rawQuery, httpVersion = parseUrl firstLine
     let meth = HttpMethod.parse rawMethod
 
+    verbose "reading headers"
     let! headers, connection'' = readHeaders connection'
 
     // Respond with 400 Bad Request as
@@ -400,7 +406,7 @@ module internal ParsingAndControl =
 
     let request =
       { httpVersion      = httpVersion
-        url              = runtime.matchedBinding.uri path rawQuery
+        url              = ctx.runtime.matchedBinding.uri path rawQuery
         host             = ClientOnly host
         ``method``       = meth  
         headers          = headers
@@ -409,12 +415,14 @@ module internal ParsingAndControl =
         files            = []
         multiPartFields  = []
         trace            = parseTraceHeaders headers
-        isSecure         = runtime.matchedBinding.scheme.secure
+        isSecure         = ctx.runtime.matchedBinding.scheme.secure
         ipaddr           = connection''.ipaddr }
 
-    if runtime.parsePostData then
+    if ctx.runtime.parsePostData then
+      verbose "parsing post data"
       return! parsePostData { ctx with request = request; connection = connection'' }
     else
+      verbose "avoiding to parse post data"
       return Some { ctx with request = request; connection = connection'' }
   }
 

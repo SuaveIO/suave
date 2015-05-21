@@ -36,3 +36,6 @@ let startsWith (substring : string) (s : string) =
 
 let contains (substring : string) (s : string) =
   s.Contains substring
+
+let substring index (s : string) =
+  s.Substring index
