@@ -127,4 +127,13 @@ let parsingMultipart2 =
         Assert.StringContains("Expecting 400 Bad Request", "HTTP/1.1 400 Bad Request", subject)
       finally
         disposeContext ctx
+
+    testCase "bug 256" <| fun _ ->
+      let ctx = runWithConfig app
+      try
+        let data = readBytes "request-hangs.txt"
+        let subject = sendRecv data
+        Assert.StringContains("Expecting 404 Not Found", "HTTP/1.1 404 Not Found", subject)
+      finally
+        disposeContext ctx
     ]
