@@ -115,7 +115,7 @@ let parsingMultipart2 =
       try
         let data = readBytes "request-multipartmixed-twofiles.txt"
         let subject = sendRecv data
-        Assert.Equal("Expecting 200 OK", "HTTP/1.1 200 OK", subject)
+        Assert.StringContains("Expecting 200 OK", "HTTP/1.1 200 OK", subject)
       finally
         disposeContext ctx
 
