@@ -357,13 +357,22 @@ type HttpRequest =
     getFirstOpt x.form k
 
 
-  /// Syntatic Sugar to retrieve form values from HttpRequest like in Asp.Net Web Pages  
-  member this.Item 
-    with get(x) = 
-      match this.formData x with
-      | Choice1Of2 str -> Some str
-      | Choice2Of2 _ -> None
+  /// Syntactic Sugar to retrieve query string, form or multi-field values from HttpRequest 
+  member this.Item     
+    with get(x) =    
 
+      let inline (>>=) f1 f2 x =
+        match f1 x with
+        | Some x' -> Some x'
+        | None -> f2 x
+
+      let params' = 
+        (tryGetChoice1 this.queryParam) 
+          >>= (tryGetChoice1 this.formData) 
+          >>= (tryGetChoice1 <| getFirst this.multiPartFields)
+      
+      params' x  
+      
   [<Obsolete("Renamed to httpVersion")>]
   member x.http_version = x.httpVersion
   [<Obsolete("Renamed to isSecure")>]

@@ -26,6 +26,11 @@ let getFirstOpt (target : NameOptionValueList) (key : string) =
   | Some b -> Choice1Of2 b
   | None -> Choice2Of2 (sprintf "Couldn't find key '%s' in NameOptionValueList" key)
 
+let tryGetChoice1 f x =
+  match f x with 
+  | Choice1Of2 str -> Some str
+  | Choice2Of2 _ -> None
+
 let (%%) target key = getFirst target key
 let (^^) target key = getFirstOpt target key
 
