@@ -7,6 +7,8 @@ open Fuchu
 
 open Suave.Sockets
 open Suave.Types
+open System.Net.Http
+open Suave.Testing
 
 [<Tests>]
 let socket_binding =
@@ -49,3 +51,21 @@ let http_binding =
       Assert.Equal("uri", "http://127.0.0.1/",
                    binding.uri "/" "" |> sprintf "%O")
     ]
+
+
+[<Tests>]
+let http_request_indexed_property =
+
+  let createReq (data : FormUrlEncodedContent) = 
+    {HttpRequest.empty with rawForm = data.ReadAsByteArrayAsync().Result}
+
+  testList "Http Request Index Property for retrieving form data" [
+    testCase "get form value for the given key" <| fun _ ->
+      use data = new FormUrlEncodedContent(dict [ "name", "bob"])
+      let req = createReq data
+      Assert.Equal("form data ", Some "bob", req.["name"])
+    testCase "get form value for a key which is absent" <| fun _ ->
+      use data = new FormUrlEncodedContent(dict [ "name", "bob"])
+      let req = createReq data
+      Assert.Equal("form data ", None, req.["age"])
+  ]

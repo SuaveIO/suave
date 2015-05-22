@@ -347,14 +347,22 @@ type HttpRequest =
   member x.header k =
     getFirst x.headers k
 
-  /// Gets the form as a ((string*string option list) from the HttpRequest. Use formData to get 
-  /// the data for a particular key.
+  /// Gets the form as a ((string*string option list) from the HttpRequest. 
+  /// Use formData to get the data for a particular key or use the indexed property in the HttpRequest
   member x.form  =
     Parsing.parseData (ASCII.toString x.rawForm)
 
   /// Finds the key k from the form in the HttpRequest
   member x.formData (k : string) =
     getFirstOpt x.form k
+
+
+  /// Syntatic Sugar to retrieve form values from HttpRequest like in Asp.Net Web Pages  
+  member this.Item 
+    with get(x) = 
+      match this.formData x with
+      | Choice1Of2 str -> Some str
+      | Choice2Of2 _ -> None
 
   [<Obsolete("Renamed to httpVersion")>]
   member x.http_version = x.httpVersion
