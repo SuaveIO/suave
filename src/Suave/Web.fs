@@ -625,8 +625,10 @@ open Suave.Logging
 /// The default error handler returns a 500 Internal Error in response to
 /// thrown exceptions.
 let defaultErrorHandler (ex : Exception) msg (ctx : HttpContext) =
-  let request = ctx.request
-  msg |> Log.infoe ctx.runtime.logger "Suave.Web.defaultErrorHandler" ctx.request.trace ex
+  ctx.runtime.logger.Log LogLevel.Error (fun _ ->
+    LogLine.mk "Suave.Web.defaultErrorHandler" LogLevel.Error
+               ctx.request.trace (Some ex)
+               msg)
   if IPAddress.IsLoopback ctx.request.ipaddr then
     Response.response HTTP_500 (UTF8.bytes (sprintf "<h1>%s</h1><br/>%A" ex.Message ex)) ctx
   else 
