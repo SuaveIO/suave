@@ -131,10 +131,10 @@ module Http =
   /// Functions have signature f :: TODO
   module Intermediate =
     /// TODO
-    val CONTINUE : x:HttpContext -> HttpContext option
+    val CONTINUE : WebPart
 
     /// TODO
-    val SWITCHING_PROTO : x:HttpContext -> HttpContext option
+    val SWITCHING_PROTO : WebPart
 
   /// <summary><para>
   /// 2xx successful responses

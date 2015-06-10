@@ -381,65 +381,6 @@ module internal ParsingAndControl =
     | Choice2Of2 _ -> return Some ctx
     }
 
-  /// Process the request, reading as it goes from the incoming 'stream', yielding a HttpRequest
-  /// when done
-  let processRequest (ctx : HttpContext) = socket {
-    let verbose = Log.verbose ctx.runtime.logger "Suave.Web.processRequest" ctx.request.trace
-
-    verbose "reading first line of request"
-    let! firstLine, connection' = readLine ctx.connection
-
-    let rawMethod, path, rawQuery, httpVersion = parseUrl firstLine
-    let meth = HttpMethod.parse rawMethod
-
-    verbose "reading headers"
-    let! headers, connection'' = readHeaders connection'
-
-    // Respond with 400 Bad Request as
-    // per http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html
-    let! host =
-      (headers %% "host" |> Choice.map (function
-        | s when System.Text.RegularExpressions.Regex.IsMatch(s, ":\d+$") ->
-          s.Substring(0, s.LastIndexOf(':'))
-        | s -> s))
-      @|! "Missing 'Host' header"
-
-    let request =
-      { httpVersion      = httpVersion
-        url              = ctx.runtime.matchedBinding.uri path rawQuery
-        host             = ClientOnly host
-        ``method``       = meth  
-        headers          = headers
-        rawForm          = [| |]
-        rawQuery         = rawQuery
-        files            = []
-        multiPartFields  = []
-        trace            = parseTraceHeaders headers
-        isSecure         = ctx.runtime.matchedBinding.scheme.secure
-        ipaddr           = connection''.ipaddr }
-
-    if ctx.runtime.parsePostData then
-      verbose "parsing post data"
-      return! parsePostData { ctx with request = request; connection = connection'' }
-    else
-      verbose "avoiding to parse post data"
-      return Some { ctx with request = request; connection = connection'' }
-  }
-
-
-  /// Load a readable plain-text stream, based on the protocol in use. If plain HTTP
-  /// is being used, the stream is returned as it, otherwise a new SslStream is created
-  /// to decipher the stream, without client certificates.
-  let inline loadConnection (logger : Logger) proto (connection : Connection) = socket{
-    match proto with
-    | HTTP       ->
-      return connection
-    | HTTPS sslProvider -> 
-      return! sslProvider.Wrap connection
-    }
-
-  open System.Net.Sockets
-
   let internal writeContentType connection (headers : (string*string) list) = socket {
     if not(List.exists(fun (x : string,_) -> x.ToLower().Equals("content-type")) headers )then
       do! asyncWriteLn connection "Content-Type: text/html"
@@ -478,13 +419,6 @@ module internal ParsingAndControl =
       }
     | NullContent -> socket.Return()
 
-  /// response_f writes the HTTP headers regardles of the setting of context.writePreamble
-  /// it is currently only used in Proxy.fs
-  let response_f (context: HttpContext) = socket {
-    do! writePreamble context
-    do! writeContent context context.response.content
-    }
-
   let executeTask ctx r errorHandler = async {
     try
       let! q  = r
@@ -506,6 +440,75 @@ module internal ParsingAndControl =
         return Some newCtx
       | None -> return None
   }
+
+  /// Process the request, reading as it goes from the incoming 'stream', yielding a HttpRequest
+  /// when done
+  let processRequest (ctx : HttpContext) = socket {
+    let verbose = Log.verbose ctx.runtime.logger "Suave.Web.processRequest" ctx.request.trace
+
+    verbose "reading first line of request"
+    let! firstLine, connection' = readLine ctx.connection
+
+    let rawMethod, path, rawQuery, httpVersion = parseUrl firstLine
+    let meth = HttpMethod.parse rawMethod
+
+    verbose "reading headers"
+    let! headers, connection'' = readHeaders connection'
+
+    // Respond with 400 Bad Request as
+    // per http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html
+    let! host =
+      (headers %% "host" |> Choice.map (function
+        | s when System.Text.RegularExpressions.Regex.IsMatch(s, ":\d+$") ->
+          s.Substring(0, s.LastIndexOf(':'))
+        | s -> s))
+      @|! "Missing 'Host' header"
+
+    let request =
+      { httpVersion      = httpVersion
+        url              = ctx.runtime.matchedBinding.uri path rawQuery
+        host             = ClientOnly host
+        ``method``       = meth  
+        headers          = headers
+        rawForm          = [| |]
+        rawQuery         = rawQuery
+        files            = []
+        multiPartFields  = []
+        trace            = parseTraceHeaders headers
+        isSecure         = ctx.runtime.matchedBinding.scheme.secure
+        ipaddr           = connection''.ipaddr }
+
+    if request.headers %% "expect" = Choice1Of2 "100-continue" then
+      let! _ = run ctx <| Intermediate.CONTINUE
+      verbose "sent 100-continue response"
+
+    if ctx.runtime.parsePostData then
+      verbose "parsing post data"
+      return! parsePostData { ctx with request = request; connection = connection'' }
+    else
+      verbose "avoiding to parse post data"
+      return Some { ctx with request = request; connection = connection'' }
+  }
+
+  /// Load a readable plain-text stream, based on the protocol in use. If plain HTTP
+  /// is being used, the stream is returned as it, otherwise a new SslStream is created
+  /// to decipher the stream, without client certificates.
+  let inline loadConnection (logger : Logger) proto (connection : Connection) = socket{
+    match proto with
+    | HTTP       ->
+      return connection
+    | HTTPS sslProvider -> 
+      return! sslProvider.Wrap connection
+    }
+
+  open System.Net.Sockets
+
+  /// response_f writes the HTTP headers regardles of the setting of context.writePreamble
+  /// it is currently only used in Proxy.fs
+  let response_f (context: HttpContext) = socket {
+    do! writePreamble context
+    do! writeContent context context.response.content
+    }
 
   type HttpConsumer =
     | WebPart of WebPart

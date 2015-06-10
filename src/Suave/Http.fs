@@ -158,12 +158,13 @@ module Http =
   module Intermediate =
 
     open System
+    open Response
 
-    let CONTINUE (ctx : HttpContext) : HttpContext option =
-      raise <| NotImplementedException("TODO")
+    let CONTINUE : WebPart =
+      response HTTP_100 [||]
 
-    let SWITCHING_PROTO (ctx : HttpContext) : HttpContext option =
-      raise <| NotImplementedException("TODO")
+    let SWITCHING_PROTO : WebPart =
+      response HTTP_101 [||]
 
   // 2xx
   module Successful =
