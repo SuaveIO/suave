@@ -309,7 +309,7 @@ module internal ParsingAndControl =
 
         match partHeaders %% "content-type" with
         | Choice1Of2 x when String.startsWith "multipart/mixed" x ->
-          let subboundary = "--" + x.Substring(x.IndexOf('=') + 1).TrimStart()
+          let subboundary = "--" + (x.Substring(x.IndexOf('=') + 1) |> String.trimStart |> String.trimc '"')
           let! ctx = parseMultipartMixed fieldName subboundary { ctx with connection = connection }
           return! loop ctx
 
@@ -369,7 +369,7 @@ module internal ParsingAndControl =
                                connection = connection }
 
       | Choice1Of2 ce when String.startsWith "multipart/form-data" ce ->
-        let boundary = "--" + (ce |> String.substring (ce.IndexOf('=') + 1) |> String.trimStart)
+        let boundary = "--" + (ce |> String.substring (ce.IndexOf('=') + 1) |> String.trimStart |> String.trimc '"')
 
         verbose "parsing multipart"
         let! ctx = parseMultipart boundary ctx
