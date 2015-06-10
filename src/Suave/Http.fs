@@ -137,6 +137,7 @@ module Http =
       | ".jpeg"
       | ".jpg" -> mkMimeType "image/jpeg" false
       | ".js"  -> mkMimeType "application/javascript" true
+      | ".map"  -> mkMimeType "application/json" true
       | ".exe" -> mkMimeType "application/exe" false
       | ".txt" -> mkMimeType "text/plain" true
       | ".ttf" -> mkMimeType "application/x-font-ttf" false
