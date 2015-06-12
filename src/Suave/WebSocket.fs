@@ -199,7 +199,7 @@ module WebSocket =
           | Choice1Of2 _ ->
             do ()
           | Choice2Of2 err ->
-            Log.log ctx.runtime.logger "Suave.Websocket.handShake" LogLevel.Error (sprintf "websocket disconnected: %A" err)
+            Log.log ctx.runtime.logger "Suave.Websocket.handShake" LogLevel.Info (sprintf "websocket disconnected: %A" err)
           return! Control.CLOSE ctx
         | _ ->
           return! RequestErrors.BAD_REQUEST "Missing 'sec-websocket-key' header" ctx
