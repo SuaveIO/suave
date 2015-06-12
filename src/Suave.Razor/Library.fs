@@ -51,7 +51,7 @@ module Razor =
   /// type Bar = { foo : string }
   ///
   /// let app : WebPart =
-  ///   url "/home" >>= razor "/home.chtml" { foo = "Bar" }
+  ///   url "/home" >>= razor "home.chtml" { foo = "Bar" }
   ///
   let razor<'a> path (model : 'a) =
     fun r ->
