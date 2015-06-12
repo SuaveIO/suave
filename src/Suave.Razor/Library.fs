@@ -41,6 +41,7 @@ module Razor =
   open RazorEngine.Templating
 
   let serviceConfiguration = TemplateServiceConfiguration()
+  // generate compiled templates in memory instead of on disk as temporary files
   serviceConfiguration.DisableTempFileLocking <- true
   serviceConfiguration.CachingProvider <- new DefaultCachingProvider(fun t -> ())
 
