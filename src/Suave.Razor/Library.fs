@@ -37,6 +37,15 @@ module Razor =
     loadTemplate |> asyncMemoize (fun templatePath (lastWrite, _) -> 
       File.GetLastWriteTime(templatePath) <= lastWrite )
 
+  open RazorEngine.Configuration
+  open RazorEngine.Templating
+
+  let serviceConfiguration = TemplateServiceConfiguration()
+  serviceConfiguration.DisableTempFileLocking <- true
+  serviceConfiguration.CachingProvider <- new DefaultCachingProvider(fun t -> ())
+
+  let razorService = RazorEngineService.Create(serviceConfiguration)
+
   /// razor WebPart
   ///
   /// type Bar = { foo : string }
@@ -51,7 +60,7 @@ module Razor =
           let template_path = resolvePath r.runtime.homeDirectory path
           let! writeTime, razorTemplate = loadTemplateCached template_path
           let cacheKey = writeTime.Ticks.ToString() + "_" + template_path
-          let content = Razor.Parse(razorTemplate, model, cacheKey)
+          let content = razorService.RunCompile(razorTemplate, cacheKey, typeof<'a>, model)
           return! Response.response HTTP_200 (UTF8.bytes content) r
         with 
           ex ->
