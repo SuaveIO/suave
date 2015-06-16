@@ -98,14 +98,25 @@ module WebSocket =
 
     let firstByte = if fin then firstByte ||| 128uy else firstByte
 
+    let maxHeaderLength = 10
     let strLen = data.Length
+    use ms = new IO.MemoryStream(maxHeaderLength + strLen)
 
-    let secondByte =
-      if strLen < 126 then byte strLen
-      elif strLen < 65536 then 126uy
-      else 127uy
+    ms.WriteByte(firstByte)
 
-    [| yield firstByte; yield secondByte; yield! data |]
+    match strLen with
+    | l when l >= 65536 -> 
+      let lengthBytes = BitConverter.GetBytes(uint64 data.Length) |> Array.rev
+      ms.WriteByte(127uy)
+      ms.Write(lengthBytes, 0, lengthBytes.Length)
+    | l when l >= 126 -> 
+      let lengthBytes = BitConverter.GetBytes(uint16 data.Length) |> Array.rev
+      ms.WriteByte(126uy)
+      ms.Write(lengthBytes, 0, lengthBytes.Length)
+    | _ -> ms.WriteByte(byte strLen)
+
+    ms.Write(data,0,data.Length)
+    ms.ToArray()
 
   let readBytes (transport : ITransport) (n : int) =
     let arr = Array.zeroCreate n
