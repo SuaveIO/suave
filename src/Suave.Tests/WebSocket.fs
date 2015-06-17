@@ -19,6 +19,11 @@ open Suave.Utils
 open Suave.Tests.TestUtilities
 open Suave.Testing
 
+type PayloadSize = 
+  | Bit7 = 125
+  | Bit16 = 129
+  | Bit32 = 66000
+
 [<Tests>]
 let websocket_tests =
 
@@ -32,7 +37,18 @@ let websocket_tests =
         match msg with
         | (Text, data, true) ->
           let str = UTF8.toString data
-          do! webSocket.send Text data true
+          match str with
+          | "BinaryRequest7bit" ->  
+            let message = Array.create (int PayloadSize.Bit7) 0uy
+            do! webSocket.send Binary message true
+          | "BinaryRequest16bit" ->  
+            let message = Array.create (int PayloadSize.Bit16) 0uy
+            do! webSocket.send Binary message true
+          | "BinaryRequest32bit" ->  
+            let message = Array.create (int PayloadSize.Bit32) 0uy
+            do! webSocket.send Binary message true
+          | _ -> 
+            do! webSocket.send Text data true
         | (Ping, _, _) ->
           do! webSocket.send Pong [||] true
         | (Close, _, _) ->
@@ -43,21 +59,93 @@ let websocket_tests =
 
   let webPart = Applicatives.path "/websocket" >>= handShake websocketApp
 
+  let testByteArray (sentSize:int) (bArray: byte []) = 
+    if sentSize = bArray.Length then
+      Array.forall (fun (ele:byte) -> 
+        match  0uy.CompareTo(ele) with
+        | 0 -> true
+        | _ -> false
+      ) bArray
+    else 
+      false
+
   testList "websocket tests" [
-    testCase "echo test" <| fun _ ->
+    testCase "text echo test" <| fun _ ->
       let ctx = runWithConfig webPart
 
       withContext (fun _ ->
 
         let message = "Hello Websocket World!"
+        let echo : string ref = ref ""
 
         use clientWebSocket = new WebSocketSharp.WebSocket("ws://127.0.0.1:8083/websocket")
 
-        clientWebSocket.OnMessage.Add(fun e -> Assert.Equal("should be equal", e.Data , message))
+        clientWebSocket.OnMessage.Add(fun e -> 
+          echo := e.Data
+        )
         clientWebSocket.Connect()
         clientWebSocket.Send(message)
 
         // HACK: wait a little bit for the call-back
         Thread.Sleep(3000)
-        clientWebSocket.Close()) ctx
+        clientWebSocket.Close()
+        Assert.Equal("should be equal", echo.Value , message)
+        ) ctx
+    testCase "socket binary payload 7bit" <| fun _ ->
+      let ctx = runWithConfig webPart
+
+      withContext (fun _ ->
+
+        let message = "BinaryRequest7bit"
+        let echo : byte array ref = ref [||]
+
+        use clientWebSocket = new WebSocketSharp.WebSocket("ws://127.0.0.1:8083/websocket")
+
+        clientWebSocket.OnMessage.Add(fun e -> echo:= e.RawData)
+        clientWebSocket.Connect()
+        clientWebSocket.Send(message)
+
+        // HACK: wait a little bit for the call-back
+        Thread.Sleep(3000)
+        clientWebSocket.Close()
+        Assert.Equal("should be equal", testByteArray (int PayloadSize.Bit7) echo.Value , true)
+        ) ctx
+    testCase "socket binary payload 16bit" <| fun _ ->
+      let ctx = runWithConfig webPart
+
+      withContext (fun _ ->
+
+        let message = "BinaryRequest16bit"
+        let echo : byte array ref = ref [||]
+
+        use clientWebSocket = new WebSocketSharp.WebSocket("ws://127.0.0.1:8083/websocket")
+
+        clientWebSocket.OnMessage.Add(fun e -> echo:= e.RawData)
+        clientWebSocket.Connect()
+        clientWebSocket.Send(message)
+
+        // HACK: wait a little bit for the call-back
+        Thread.Sleep(3000)
+        clientWebSocket.Close()
+        Assert.Equal("should be equal", testByteArray (int PayloadSize.Bit16) echo.Value , true)
+        ) ctx
+    testCase "socket binary payload 32bit" <| fun _ ->
+      let ctx = runWithConfig webPart
+
+      withContext (fun _ ->
+
+        let message = "BinaryRequest32bit"
+        let echo : byte array ref = ref [||]
+
+        use clientWebSocket = new WebSocketSharp.WebSocket("ws://127.0.0.1:8083/websocket")
+
+        clientWebSocket.OnMessage.Add(fun e -> echo:= e.RawData)
+        clientWebSocket.Connect()
+        clientWebSocket.Send(message)
+
+        // HACK: wait a little bit for the call-back
+        Thread.Sleep(3000)
+        clientWebSocket.Close()
+        Assert.Equal("should be equal", testByteArray (int PayloadSize.Bit32) echo.Value , true)
+        ) ctx
   ]
