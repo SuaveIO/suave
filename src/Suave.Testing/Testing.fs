@@ -148,7 +148,7 @@ let send (client : HttpClient) (timeout : TimeSpan) (ctx : SuaveTestCtx) (reques
 
   let completed = send.Wait (int timeout.TotalMilliseconds, ctx.cts.Token)
   if not completed && Debugger.IsAttached then Debugger.Break()
-  else Assert.Equal("should finish request in 5000ms", true, completed)
+  else Assert.Equal(sprintf "should finish request in %fms" timeout.TotalMilliseconds, true, completed)
 
   send.Result
 
@@ -180,7 +180,7 @@ let reqResp
   (f_request : HttpRequestMessage -> HttpRequestMessage)
   f_result =
 
-  let defaultTimeout = TimeSpan.FromSeconds 5.
+  let defaultTimeout = TimeSpan.FromSeconds 10.
 
   withContext <| fun ctx ->
     use handler = mkHandler decompMethod cookies
