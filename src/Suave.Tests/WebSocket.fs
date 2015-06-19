@@ -74,20 +74,20 @@ let websocket_tests =
       let ctx = runWithConfig webPart
 
       withContext (fun _ ->
-
+        let mre = new ManualResetEvent(false)
         let message = "Hello Websocket World!"
         let echo : string ref = ref ""
 
         use clientWebSocket = new WebSocketSharp.WebSocket("ws://127.0.0.1:8083/websocket")
 
-        clientWebSocket.OnMessage.Add(fun e -> 
+        clientWebSocket.OnMessage.Add(fun e ->
           echo := e.Data
+          mre.Set() |> ignore
         )
         clientWebSocket.Connect()
         clientWebSocket.Send(message)
 
-        // HACK: wait a little bit for the call-back
-        Thread.Sleep(3000)
+        mre.WaitOne() |> ignore
         clientWebSocket.Close()
         Assert.Equal("should be equal", echo.Value , message)
         ) ctx
@@ -95,18 +95,20 @@ let websocket_tests =
       let ctx = runWithConfig webPart
 
       withContext (fun _ ->
-
+        let mre = new ManualResetEvent(false)
         let message = "BinaryRequest7bit"
         let echo : byte array ref = ref [||]
 
         use clientWebSocket = new WebSocketSharp.WebSocket("ws://127.0.0.1:8083/websocket")
 
-        clientWebSocket.OnMessage.Add(fun e -> echo:= e.RawData)
+        clientWebSocket.OnMessage.Add(fun e ->
+          echo:= e.RawData
+          mre.Set() |> ignore
+        )
         clientWebSocket.Connect()
         clientWebSocket.Send(message)
 
-        // HACK: wait a little bit for the call-back
-        Thread.Sleep(3000)
+        mre.WaitOne() |> ignore
         clientWebSocket.Close()
         Assert.Equal("should be equal", testByteArray (int PayloadSize.Bit7) echo.Value , true)
         ) ctx
@@ -114,18 +116,20 @@ let websocket_tests =
       let ctx = runWithConfig webPart
 
       withContext (fun _ ->
-
+        let mre = new ManualResetEvent(false)
         let message = "BinaryRequest16bit"
         let echo : byte array ref = ref [||]
 
         use clientWebSocket = new WebSocketSharp.WebSocket("ws://127.0.0.1:8083/websocket")
 
-        clientWebSocket.OnMessage.Add(fun e -> echo:= e.RawData)
+        clientWebSocket.OnMessage.Add(fun e ->
+          echo:= e.RawData
+          mre.Set() |> ignore
+        )
         clientWebSocket.Connect()
         clientWebSocket.Send(message)
 
-        // HACK: wait a little bit for the call-back
-        Thread.Sleep(3000)
+        mre.WaitOne() |> ignore
         clientWebSocket.Close()
         Assert.Equal("should be equal", testByteArray (int PayloadSize.Bit16) echo.Value , true)
         ) ctx
@@ -133,18 +137,19 @@ let websocket_tests =
       let ctx = runWithConfig webPart
 
       withContext (fun _ ->
-
+        let mre = new ManualResetEvent(false)
         let message = "BinaryRequest32bit"
         let echo : byte array ref = ref [||]
 
         use clientWebSocket = new WebSocketSharp.WebSocket("ws://127.0.0.1:8083/websocket")
 
-        clientWebSocket.OnMessage.Add(fun e -> echo:= e.RawData)
+        clientWebSocket.OnMessage.Add(fun e ->
+          echo:= e.RawData
+          mre.Set() |> ignore)
         clientWebSocket.Connect()
         clientWebSocket.Send(message)
 
-        // HACK: wait a little bit for the call-back
-        Thread.Sleep(3000)
+        mre.WaitOne() |> ignore
         clientWebSocket.Close()
         Assert.Equal("should be equal", testByteArray (int PayloadSize.Bit32) echo.Value , true)
         ) ctx
