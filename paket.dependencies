@@ -9,3 +9,4 @@ nuget Fuchu-suave.FsCheck
 nuget Fuchu-suave.PerfUtil ~> 0.6
 nuget WebSocketSharp
 nuget openssl.redist
+nuget DotLiquid
