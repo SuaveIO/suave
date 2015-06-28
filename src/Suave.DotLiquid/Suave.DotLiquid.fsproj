@@ -5,10 +5,10 @@
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProjectGuid>{4e3fe86d-fdb7-4daa-8d58-13f06f75d240}</ProjectGuid>
     <OutputType>Library</OutputType>
-    <RootNamespace>Suave.Razor</RootNamespace>
-    <AssemblyName>Suave.Razor</AssemblyName>
+    <RootNamespace>Suave.DotLiqud</RootNamespace>
+    <AssemblyName>Suave.DotLiquid</AssemblyName>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
-    <Name>Suave.Razor</Name>
+    <Name>Suave.DotLiquid</Name>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -17,7 +17,7 @@
     <OutputPath>bin\Debug\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <WarningLevel>3</WarningLevel>
-    <DocumentationFile>bin\Debug\Suave.Razor.xml</DocumentationFile>
+    <DocumentationFile>bin\Debug\Suave.DotLiquid.xml</DocumentationFile>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
@@ -26,7 +26,7 @@
     <OutputPath>bin\Release\</OutputPath>
     <DefineConstants>TRACE</DefineConstants>
     <WarningLevel>3</WarningLevel>
-    <DocumentationFile>bin\Release\Suave.Razor.xml</DocumentationFile>
+    <DocumentationFile>bin\Release\Suave.DotLiquid.xml</DocumentationFile>
     <DebugSymbols>true</DebugSymbols>
   </PropertyGroup>
   <Choose>
