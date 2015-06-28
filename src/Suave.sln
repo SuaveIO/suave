@@ -44,6 +44,8 @@ Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Suave.Xsp", "Suave.Xsp\Suav
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Suave.DotLiquid", "Suave.DotLiquid\Suave.DotLiquid.fsproj", "{4E3FE86D-FDB7-4DAA-8D58-13F06F75D240}"
 EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "TopshelfService", "..\examples\TopshelfService\TopshelfService.fsproj", "{C602B352-8246-4D18-A0D1-A0BE6FCB9B94}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -106,6 +108,10 @@ Global
 		{4E3FE86D-FDB7-4DAA-8D58-13F06F75D240}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4E3FE86D-FDB7-4DAA-8D58-13F06F75D240}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{4E3FE86D-FDB7-4DAA-8D58-13F06F75D240}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C602B352-8246-4D18-A0D1-A0BE6FCB9B94}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C602B352-8246-4D18-A0D1-A0BE6FCB9B94}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C602B352-8246-4D18-A0D1-A0BE6FCB9B94}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C602B352-8246-4D18-A0D1-A0BE6FCB9B94}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -117,5 +123,6 @@ Global
 		{616F83DA-1EFA-436B-8E7F-8624C7606547} = {E05A9F83-E283-4258-AB0E-AF626002B6EF}
 		{7AB086FA-C3F6-42E4-B03B-27AD81974735} = {E05A9F83-E283-4258-AB0E-AF626002B6EF}
 		{34062010-BC9D-4DEB-804D-CC8D1D109876} = {E05A9F83-E283-4258-AB0E-AF626002B6EF}
+		{C602B352-8246-4D18-A0D1-A0BE6FCB9B94} = {E05A9F83-E283-4258-AB0E-AF626002B6EF}
 	EndGlobalSection
 EndGlobal
