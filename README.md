@@ -123,15 +123,15 @@ the type.
 
 ``` fsharp
 module MyType =
-  let from_string (scheme : string) =
+  let ofString (scheme : string) =
     // ...
 ```
 
 Method formatting with no spaces after/before normal parenthesis
 
 ``` fsharp
-let my_method_name first_arg (second : WithType) = async { // and monad builder
-  return! f first_arg second
+let myMethodName firstArg (second : WithType) = async { // and monad builder
+  return! f firstArg second
   } // at base of 'let' + 2 spaces
 ```
 

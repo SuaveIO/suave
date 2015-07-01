@@ -1066,26 +1066,14 @@ module Http =
     /// Match on the path
     val path : s:string -> WebPart
 
-    [<System.Obsolete("Use path")>]
-    val url : s:string -> WebPart
-
     /// Match on the method
     val ``method`` : ``method``:HttpMethod -> WebPart
 
     /// Match on the protocol
     val isSecure : WebPart
 
-    [<System.Obsolete("Use isSecure")>]
-    val is_secure : WebPart
-
     /// Applies the regex to the path and matches on the result
     val pathRegex : s:string -> WebPart
-    
-    [<System.Obsolete("Use pathRegex")>]
-    val urlRegex : s:string -> WebPart
-
-    [<System.Obsolete("Use pathRegex")>]
-    val url_regex : s:string -> WebPart
 
     /// Match on the hostname (which is a required header for a Http client to send)
     /// -> allows you to have multiple sites with a single application.
@@ -1096,9 +1084,6 @@ module Http =
     /// Formats the HttpRequest as in the default manner
     /// </para></summary>
     val logFormat : ctx:HttpContext -> string
-
-    [<System.Obsolete("Use logFormat")>]
-    val log_format : ctx:HttpContext -> string
 
     /// <summary><para>
     /// Log the HttpRequest to the given logger.
@@ -1127,12 +1112,6 @@ module Http =
     /// 'c', char
     /// </para></summary>
     val pathScan : pf:PrintfFormat<'a,'b,'c,'d,'t> -> h:('t -> WebPart) -> WebPart
-
-    [<System.Obsolete("Use pathScan")>]
-    val urlScan : pf:PrintfFormat<'a,'b,'c,'d,'t> -> h:('t -> WebPart) -> WebPart
-
-    [<System.Obsolete("Use pathScan")>]
-    val url_scan : pf:PrintfFormat<'a,'b,'c,'d,'t> -> h:('t -> WebPart) -> WebPart
 
     /// <summary> Fails the WebPart after x seconds</summary>
     val timeoutWebPart : x:System.TimeSpan -> WebPart -> WebPart
@@ -1421,21 +1400,6 @@ module Http =
     /// </para></summary>
     val dirHome : WebPart
 
-    [<System.Obsolete("Use dirHome")>]
-    val dir' : WebPart
-    [<System.Obsolete("Use browseHome")>]
-    val browse' : WebPart
-    [<System.Obsolete("Use browseFileHome")>]
-    val browse_file' : fileName:string -> WebPart
-    [<System.Obsolete("Use browseFile")>]
-    val browse_file : rootPath:string -> fileName:string -> WebPart
-    [<System.Obsolete("Use resolvePath")>]
-    val local_file : fileName:string -> rootPath:string -> string
-    [<System.Obsolete("Use resolvePath")>]
-    val resolve_path : rootPath:string -> fileName:string -> string
-    [<System.Obsolete("Use sendFile")>]
-    val send_file : fileName:string -> compression:bool -> WebPart
-
   module Embedded =
 
     open System.Reflection
@@ -1489,28 +1453,16 @@ module Http =
     /// </remarks>
     val browseDefaultAsssembly : WebPart
 
-    [<System.Obsolete("Use browseDefaultAsssembly")>]
-    val internal browse' : WebPart
-    [<System.Obsolete("Use resourceFromDefaultAssembly")>]
-    val resource' : name:string -> WebPart
-    [<System.Obsolete("Use sendResource")>]
-    val send_resource : source:Assembly -> resource_name:string -> compression:bool -> WebPart
-    [<System.Obsolete("Use sendResourceFromDefaultAssembly")>]
-    val send_resource' : resource_name:string -> compression:bool -> WebPart
-
   /// A module that implements the Server-Sent Event specification, which can be
   /// read at www.w3.org/TR/eventsource.
   module EventSource =
-
-    [<System.Obsolete("Use asyncWrite")>]
-    val async_write : out:Connection -> data:string -> SocketOp<unit>
 
     /// Helper function that writes a string of data. Most often you are better
     /// off using the `send` function and give it a message, as this will ensure
     /// the proper framing is used. However, if you have a desire to write raw
     /// data, this function overrides the Socket.async_write function so that
     /// you will be writing UTF8 data only, as per the specification.
-    val async_write : out:Connection -> data:string -> SocketOp<unit>
+    val asyncWrite : out:Connection -> data:string -> SocketOp<unit>
 
     /// Same as `async_write`; convenience function.
     val (<<.) : out:Connection -> data:string -> SocketOp<unit>
@@ -1523,9 +1475,6 @@ module Http =
     /// Writes a comment to the stream
     val comment : out:Connection -> cmt:string -> SocketOp<unit>
 
-    [<System.Obsolete("Use esId")>]
-    val event_type : out:Connection -> event_type:string -> SocketOp<unit>
-
     /// "If the field name is 'event' - Set the event type buffer to field value."
     /// Writes the event type to the stream
     val eventType : out:Connection -> eventType:string -> SocketOp<unit>
@@ -1535,9 +1484,6 @@ module Http =
     /// U+000A LINE FEED (LF) character to the data buffer."
     /// Write a piece of data as part of the event
     val data : out:Connection -> data:string -> SocketOp<unit>
-
-    [<System.Obsolete("Use esId")>]
-    val es_id : out:Connection -> last_event_id:string -> SocketOp<unit>
 
     /// "If the field name is 'id' - Set the last event ID buffer to the field value."
     /// Sets the last event id in the stream.
@@ -1553,14 +1499,8 @@ module Http =
         data     : string
         ``type`` : string option }
 
-    [<System.Obsolete("Use mkMessage")>]
-    val mk_message : id:string -> data:string -> Message
-
     /// Create a new message to send over SSE
     val mkMessage : id:string -> data:string -> Message
-
-    [<System.Obsolete("Use mkMessageType")>]
-    val mk_message' : id:string -> data:string -> typ:string -> Message
 
     /// Create a new message with a given type to send over SSE
     val mkMessageType : id:string -> data:string -> typ:string -> Message
@@ -1571,9 +1511,6 @@ module Http =
     /// This function composes the passed function f with the hand-shake required
     /// to start a new event-stream protocol session with the browser.
     val handShake : fCont:(Connection -> SocketOp<unit>) -> WebPart
-
-    [<System.Obsolete("Use handShake")>]
-    val hand_shake : f_cont:(Connection -> SocketOp<unit>) -> WebPart
 
   module Authentication =
 
@@ -1600,9 +1537,6 @@ module Http =
     /// <remarks>
     /// </remarks>
     val authenticateBasic : f:(string * string -> bool) -> WebPart
-
-    [<System.Obsolete("Use authenticateBasic")>]
-    val authenticate_basic : f:(string * string -> bool) -> WebPart
 
   module Control =
 

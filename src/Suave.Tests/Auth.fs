@@ -27,9 +27,9 @@ type Assert with
     if o <> null then Tests.failtest msg
     else ()
 
-  static member Contains (msg : string, f_expected : 'a -> bool, xs : seq<'a>) =
+  static member Contains (msg : string, fExpected : 'a -> bool, xs : seq<'a>) =
     if Seq.isEmpty xs then Tests.failtest "empty seq"
-    match Seq.tryFind f_expected xs with
+    match Seq.tryFind fExpected xs with
     | None -> Tests.failtest msg
     | Some v ->
       // printfn "found %A" v
@@ -39,44 +39,44 @@ let reqResp
   (methd : HttpMethod)
   (resource : string)
   (cookies : CookieContainer option)
-  (f_request : HttpRequestMessage -> HttpRequestMessage)
-  f_result
+  (fRequest : HttpRequestMessage -> HttpRequestMessage)
+  fResult
   ctx =
 
   let log = Suave.Log.info ctx.suaveConfig.logger "Suave.Tests" TraceHeader.empty
   log (sprintf "%A %s" methd resource)
 
-  let default_timeout = TimeSpan.FromSeconds 5.
+  let defaultTimeout = TimeSpan.FromSeconds 5.
 
   use handler = mkHandler DecompressionMethods.None cookies
   use client = mkClient handler
-  use request = mkRequest methd resource "" None (endpointUri ctx.suaveConfig) |> f_request
+  use request = mkRequest methd resource "" None (endpointUri ctx.suaveConfig) |> fRequest
 
   for h in request.Headers do
     log (sprintf "%s: %s" h.Key (String.Join(", ", h.Value)))
 
   // use -> let!!!
-  let result = request |> send client default_timeout ctx
-  f_result result
+  let result = request |> send client defaultTimeout ctx
+  fResult result
 
 let setConnectionKeepAlive (r : HttpRequestMessage) =
   r.Headers.ConnectionClose <- Nullable(false)
   r
 
 /// Test a request by looking at the cookies alone.
-let req_cookies cookies ctx methd resource f_req =
+let reqCookies cookies ctx methd resource fReq =
   reqResp methd resource (Some cookies)
            setConnectionKeepAlive
-           f_req
+           fReq
            ctx
 
 let cookies suaveConfig (container : CookieContainer) =
   container.GetCookies(endpointUri suaveConfig)
 
-let interaction ctx f_ctx = withContext f_ctx ctx
+let interaction ctx fCtx = withContext fCtx ctx
 
 let interact methd resource container ctx =
-  let response = req_cookies container ctx methd resource id
+  let response = reqCookies container ctx methd resource id
   match response.Headers.TryGetValues("Set-Cookie") with
   | false, _ -> ()
   | true, values -> values |> Seq.iter (fun cookie -> container.SetCookies(endpointUri ctx.suaveConfig, cookie))

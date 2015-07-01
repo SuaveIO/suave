@@ -74,7 +74,7 @@ type SQLBuilder(conn : DbConnection) =
 
     let stripFormatting s =
       let i = ref -1
-      let eval (rx_match : Match) =
+      let eval (rxMatch : Match) =
         incr i
         sprintf "@p%d" !i // TODO: isn't this tying the implementation to SQL Server?
       Regex.Replace(s, "%.", eval)
@@ -136,5 +136,5 @@ let executeNonQuery (cmd : DbCommand) =
   cmd.ExecuteNonQuery() |> ignore
 
 /// Executes a command with arguments
-let execute_command cmd arg =
+let executeCommand cmd arg =
   cmd arg |> executeNonQuery

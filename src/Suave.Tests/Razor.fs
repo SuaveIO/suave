@@ -19,13 +19,10 @@ open Suave.Testing
 type Foo = { bar : string }
 
 [<Tests>]
-let razor_test =
+let razorTest =
   let runWithConfig = runWith defaultConfig
 
   testList "razor test" [
     testCase "simple test" <| fun _ ->
       Assert.Equal("process razor file", "Hello Foo", 
         runWithConfig (razor<Foo> "razor.cshtml" { bar = "Foo" }) |> req HttpMethod.GET "/" None) ]
-
-
-

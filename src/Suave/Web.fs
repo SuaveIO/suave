@@ -655,8 +655,9 @@ let startWebServerAsync (config : SuaveConfig) (webpart : WebPart) =
 
   // spawn tcp listeners/web workers
   let servers = 
-    config.bindings |> List.map (SuaveConfig.toRuntime config homeFolder compressionFolder true
-              >> ParsingAndControl.startWebWorkerAsync (config.bufferSize, config.maxOps) webpart)
+    config.bindings
+    |> List.map (SuaveConfig.toRuntime config homeFolder compressionFolder true
+                 >> ParsingAndControl.startWebWorkerAsync (config.bufferSize, config.maxOps) webpart)
               
   let listening = servers |> Seq.map fst |> Async.Parallel
   let server    = servers |> Seq.map snd |> Async.Parallel |> Async.Ignore
@@ -682,12 +683,3 @@ let defaultConfig =
     homeFolder            = None
     compressedFilesFolder = None
     logger                = Loggers.saneDefaultsFor LogLevel.Info }
-
-[<Obsolete("Renamed to defaultErrorHandler")>]
-let default_error_handler ex msg ctx = defaultErrorHandler ex msg ctx
-[<Obsolete("Renamed to startWebServerAsync")>]
-let web_server_async config webpart  = startWebServerAsync config webpart
-[<Obsolete("Renamed to startWebServer")>]
-let web_server config webpart = startWebServer config webpart
-[<Obsolete("Renamed to defaultConfig")>]
-let default_config = defaultConfig

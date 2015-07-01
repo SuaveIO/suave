@@ -148,13 +148,6 @@ module Http =
 
     let setMimeType t = setHeader "Content-Type" t
 
-    let set_header key value ctx = setHeader key value ctx
-    let set_user_data key value ctx = setUserData key value ctx
-    let unset_user_data key ctx = unsetUserData key ctx
-    let mk_mime_type name compression = mkMimeType name compression
-    let default_mime_types_map = defaultMimeTypesMap
-    let set_mime_type t = setMimeType t
-
   // 1xx
   module Intermediate =
 
@@ -448,11 +441,6 @@ module Http =
             return! Response.response HttpCode.HTTP_408 (UTF8.bytes "Request Timeout") ctx
             }
 
-    let is_secure x = isSecure x
-    let url_regex regex x = urlRegex regex x
-    let log_format ctx = logFormat ctx
-    let url_scan pf h = urlScan pf h
-
   module ServeResource =
     open System
 
@@ -604,21 +592,6 @@ module Http =
     let dirHome ctx =
       dir ctx.runtime.homeDirectory ctx
 
-    [<Obsolete("Use resolvePath")>]
-    let local_file fileName rootPath = resolvePath rootPath fileName
-    [<Obsolete("Use sendFile")>]
-    let send_file fileName compression ctx = sendFile fileName compression ctx
-    [<Obsolete("Use resolvePath")>]
-    let resolve_path rootPat fileName = resolvePath rootPat fileName
-    [<Obsolete("Use browseFile")>]
-    let browse_file rootPath fileName = browseFile rootPath fileName
-    [<Obsolete("Use browseFileHome")>]
-    let browse_file' fileName = browseFileHome fileName
-    [<Obsolete("Use browseHome")>]
-    let browse' = browseHome
-    [<Obsolete("Use dirHome")>]
-    let dir' ctx = dirHome ctx
-
   module Embedded =
     
     open System
@@ -685,19 +658,6 @@ module Http =
     let browseDefaultAsssembly =
       browse defaultSourceAssembly
 
-    [<Obsolete("Use browseDefaultAsssembly")>]
-    let browse' = browseDefaultAsssembly 
-    [<Obsolete("Use resourceFromDefaultAssembly")>]
-    let resource' name = resourceFromDefaultAssembly name
-    [<Obsolete("Use sendResourceFromDefaultAssembly")>]
-    let send_resource' resourceName compression = sendResourceFromDefaultAssembly resourceName compression
-    [<Obsolete("Use sendResource")>]
-    let send_resource assembly resourceName compression ctx = sendResource assembly resourceName compression ctx
-    [<Obsolete("Use lastModified")>]
-    let last_modified assembly = lastModified assembly
-    [<Obsolete("Use defaultSourceAssembly")>]
-    let default_source_assembly = defaultSourceAssembly
-
   // See www.w3.org/TR/eventsource/#event-stream-interpretation
   module EventSource =
     open System
@@ -716,8 +676,6 @@ module Http =
     let asyncWrite (out : Connection) (data : string) =
       asyncWriteBytes out (UTF8.bytes data)
 
-    let async_write (out : Connection) (data : string) = asyncWrite out data
-      
     let (<<.) (out : Connection) (data : string) =
       asyncWriteBytes out (UTF8.bytes data)
 
@@ -730,15 +688,11 @@ module Http =
     let eventType (out : Connection) (evType : string) =
       out <<. "event: " + evType + ES_EOL
 
-    let event_type out evType = eventType out evType
-
     let data (out : Connection) (text : string) =
       out <<. "data: " + text + ES_EOL
 
     let esId (out : Connection) (lastEventId : string) =
       out <<. "id: " + lastEventId + ES_EOL
-
-    let es_id out lastEventId = esId out lastEventId
 
     let retry (out : Connection) (retry : uint32) =
       out <<. "retry: " + (string retry) + ES_EOL
@@ -751,13 +705,9 @@ module Http =
     let mkMessage id data =
       { id = id; data = data; ``type`` = None }
 
-    let mk_message id data = mkMessage id data
-
     let mkMessageType id data typ =
       { id = id; data = data; ``type`` = Some typ }
 
-    let mk_message' id data typ = mkMessageType id data typ
-      
     let send (out : Connection) (msg : Message) =
       socket {
         do! msg.id |> esId out
@@ -792,8 +742,6 @@ module Http =
             }
       }
       |> succeed
-
-    let hand_shake f ctx = handShake f ctx
       
   module Authentication =
 
@@ -821,14 +769,18 @@ module Http =
       | Choice2Of2 _ ->
         challenge ctx
 
-    [<System.Obsolete("Use authenticateBasic")>]
-    let authenticate_basic f ctx = authenticateBasic f ctx
-
   module Control =
 
-    let CLOSE (ctx: HttpContext) = 
-      async{
-        return
-          { ctx with
-              response = { ctx.response with content = NullContent; writePreamble = false }
-              request  = { ctx.request  with headers = [ "connection", "close"] }} |> Some }
+    let CLOSE (ctx : HttpContext) =
+      { ctx with
+          response =
+            { ctx.response with
+                content = NullContent
+                writePreamble = false
+            }
+          request =
+            { ctx.request with
+                headers = [ "connection", "close" ]
+            }
+      }
+      |> succeed

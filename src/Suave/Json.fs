@@ -30,14 +30,7 @@ let fromJson<'T> (bytes : byte []) =
 
 let mapJson f =
   Types.request(fun r ->
-      f (fromJson r.rawForm) 
-      |> toJson
-      |> Successful.ok 
-      >>= Writers.setMimeType "application/json") 
-
-[<System.Obsolete("Use toJson")>]
-let to_json o = toJson o
-[<System.Obsolete("Use fromJson")>]
-let from_json  bytes  = fromJson bytes
-[<System.Obsolete("Use mapJson")>]
-let map_json f = mapJson f
+    f (fromJson r.rawForm) 
+    |> toJson
+    |> Successful.ok 
+    >>= Writers.setMimeType "application/json")

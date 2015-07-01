@@ -23,15 +23,15 @@ let version =
     |> fun a -> a.Version
   | _ -> "0.0.0.1"
 
-type SuavePerfHarness(name, suave_config) =
+type SuavePerfHarness(name, suaveConfig) =
   interface ITestable with
     member x.Name = name
     member x.Init() = ()
     member x.Fini() = ()
-  member x.Serve part = suave_config part
+  member x.Serve part = suaveConfig part
 
 [<Tests>]
-let perf_tests =
+let perfTests =
   let inline iterate times (testF : unit -> unit) =
     for i = 1 to times do testF ()
 

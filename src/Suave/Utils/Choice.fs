@@ -23,9 +23,6 @@ module Choice =
     | Some x -> Choice1Of2 x
     | None   -> Choice2Of2 onMissing
 
-  [<Obsolete "use Choice.ofOption instead - for consistency w/ F# naming stds">]
-  let fromOption onMissing = ofOption onMissing
-
   let orDefault onMissing = function
     | Choice1Of2 x -> x
     | Choice2Of2 _ -> onMissing

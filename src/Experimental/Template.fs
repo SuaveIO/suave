@@ -135,9 +135,9 @@ let rec parser (reader : XmlReader) (Xml(l) as k) =
 /// binding the 'user' elements to values from the 'data' bindings. If the processing
 /// is successful, return the data as UTF-8 string in the response body; otherwise
 /// write the exception as a string to a 500 Internal Error response.
-let processTemplate (data : Map<string,Binder>) ({ request = http_request; runtime = runtime } as ctx : HttpContext) =
+let processTemplate (data : Map<string,Binder>) ({ request = httpRequest; runtime = runtime } as ctx : HttpContext) =
   try
-    let xmlReader = new XmlTextReader(Files.resolvePath runtime.homeDirectory http_request.url.AbsolutePath)
+    let xmlReader = new XmlTextReader(Files.resolvePath runtime.homeDirectory httpRequest.url.AbsolutePath)
     xmlReader.Namespaces <- false
 
     let transform = parser xmlReader (Xml [])

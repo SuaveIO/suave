@@ -5,7 +5,7 @@ open Fuchu
 open Suave.Sscanf
 
 [<Tests>]
-let scan_tests =
+let scanTests =
   testList "when scanning " [
     testCase "with escaped % before escaped placeholder in string" <| fun _ ->
       let result = sscanf "(%%%s,%M)" "(%hello, 4.53)"
@@ -44,7 +44,7 @@ open Suave.Tests.TestUtilities
 open Suave.Testing
 
 [<Tests>]
-let more_scan_tests =
+let moreScanTests =
   let runWithConfig = runWith defaultConfig
   testList "when scanning via web server" [
     testCase "parse a long integer" <| fun _ ->
