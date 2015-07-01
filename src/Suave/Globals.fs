@@ -39,6 +39,3 @@ module Internals =
   let SuaveVersion = Assembly.GetExecutingAssembly().GetName().Version.ToString()
 
   let serverHeader = String.Concat [| "Server: Suave/"; SuaveVersion; " (http://suave.io)" |]
-
-  [<Obsolete("Renamed to serverHeader'")>]
-  let server_header = serverHeader

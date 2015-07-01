@@ -13,7 +13,7 @@ open Suave.Http.Successful
 
 open Suave.Testing
 
-let set_connection_keep_alive (r : HttpRequestMessage) =
+let setConnectionKeepAlive (r : HttpRequestMessage) =
   r.Headers.ConnectionClose <- Nullable(false)
   r
 
@@ -25,7 +25,7 @@ let tests =
       let res =
         reqResp HttpMethod.GET "/"  "" None
                  None DecompressionMethods.None
-                 set_connection_keep_alive
+                 setConnectionKeepAlive
                  contentString
                  context
       Assert.Equal("should ACK", "ACK", res)

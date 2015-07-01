@@ -79,13 +79,6 @@ module CookieStateStore =
   let statefulForSession : WebPart =
     stateful Session false
 
-  [<Obsolete("Renamed to decodeMap")>]
-  let decode_map bytes = decodeMap bytes
-  [<Obsolete("Renamed to encodeMap")>]
-  let encode_map bytes = encodeMap bytes
-  [<Obsolete("Renamed to statefulForSession")>]
-  let stateful' = statefulForSession
-
   module HttpContext =
 
     let private mkStateStore (userState : Map<string, obj>) (ss : obj) =
@@ -137,9 +130,6 @@ module MemoryCacheStateStore =
       |> Map.tryFind StateStoreType
       |> Option.map (fun ss -> ss :?> StateStore)
       |> Option.get
-      
-    [<Obsolete("Renamed to stateId")>]
-    let state_id ctx = stateId ctx
 
   let private wrap (sessionMap : MemoryCache) relativeExpiry sessionId =
     let exp = function

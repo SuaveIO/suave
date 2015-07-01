@@ -131,5 +131,5 @@ and xmlToString (Xml xml) =
   String.Concat (List.map nodeToString xml)
 
 ///
-/// let html = sample_page |> xml_to_string
+/// let html = samplePage |> xmlToString
 ///

@@ -11,14 +11,14 @@ open System.Net.Http
 open Suave.Testing
 
 [<Tests>]
-let socket_binding =
+let socketBinding =
   testList "SocketBinding" [
     testCase "on IPv6" <| fun _ ->
       Assert.Equal("", "[::]:3050", (SocketBinding.mk IPAddress.IPv6Any 3050us).ToString())
     ]
 
 [<Tests>]
-let http_binding =
+let httpBinding =
   testList "HttpBinding" [
     testCase "assumption about IPV4 loopback" <| fun _ ->
       Assert.Equal("", "127.0.0.1", IPAddress.Loopback.ToString())
@@ -54,7 +54,7 @@ let http_binding =
 
 
 [<Tests>]
-let http_request_indexed_property_form_data =
+let httpReqIndexedPropertyFormData =
 
   let createReq (data : FormUrlEncodedContent) = 
     {HttpRequest.empty with rawForm = data.ReadAsByteArrayAsync().Result}
@@ -71,7 +71,7 @@ let http_request_indexed_property_form_data =
   ]
   
 [<Tests>]
-let http_request_indexed_property_query_string_data =
+let httpReqIndexedPropertyQueryStringData =
 
   let createReq rawQuery = 
     {HttpRequest.empty with rawQuery = rawQuery}
@@ -90,7 +90,7 @@ let http_request_indexed_property_query_string_data =
   ]
 
 [<Tests>]
-let http_request_indexed_property_multi_part_fields_data =
+let httpReqIndexedPropertyMultiPartFieldsData =
 
   let createReq multiPartFields = 
     {HttpRequest.empty with multiPartFields = multiPartFields}

@@ -193,14 +193,3 @@ let startTcpIpServerAsync (bufferSize  : int, maxConcurrentOps : int)
       "tcp server failed" |> Log.interne logger "Suave.Tcp.tcpIpServer" ex
       return ()
   }
-
-[<Obsolete("Renamed to closeSocket")>]
-let close_socket s = closeSocket s
-[<Obsolete("Renamed to shutdownSocket")>]
-let shutdown_socket s = shutdownSocket s
-[<Obsolete("Renamed to stopTcp")>]
-let stop_tcp logger reason socket = stopTcp logger reason socket
-[<Obsolete("Renamed to createPools")>]
-let create_pools  logger maxOps bufferSize = createPools logger maxOps bufferSize
-[<Obsolete("Renamed to startTcpIpServerAsync")>]
-let tcp_ip_server  (bufferSize, maxConcurrentOps) logger serveClient binding = startTcpIpServerAsync (bufferSize, maxConcurrentOps) logger serveClient binding

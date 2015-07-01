@@ -24,10 +24,10 @@ module Razor =
             return res
       }
 
-  let private loadTemplate template_path =
+  let private loadTemplate templatePath =
     async {
-      let writeTime = File.GetLastWriteTime(template_path)
-      use file = new FileStream(template_path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite)
+      let writeTime = File.GetLastWriteTime(templatePath)
+      use file = new FileStream(templatePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite)
       use reader = new StreamReader(file)
       let! razorTemplate = reader.ReadToEndAsync()
       return writeTime, razorTemplate
@@ -57,9 +57,9 @@ module Razor =
   let razor<'a> path (model : 'a) =
     fun r ->
       async {
-          let template_path = resolvePath r.runtime.homeDirectory path
-          let! writeTime, razorTemplate = loadTemplateCached template_path
-          let cacheKey = writeTime.Ticks.ToString() + "_" + template_path
+          let templatePath = resolvePath r.runtime.homeDirectory path
+          let! writeTime, razorTemplate = loadTemplateCached templatePath
+          let cacheKey = writeTime.Ticks.ToString() + "_" + templatePath
           let content = razorService.RunCompile(razorTemplate, cacheKey, typeof<'a>, model)
           return! Response.response HTTP_200 (UTF8.bytes content) r
         }

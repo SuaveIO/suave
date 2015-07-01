@@ -37,7 +37,7 @@ let counterDemo (req : HttpRequest) (out : Connection) =
     }
 
   socket {
-    let last_evt_id =
+    let lastEvtId =
       (req.header "last-event-id" |> Choice.bind muint32) <!>
       ((req.queryParam "lastEventId") |> Choice.bind muint32) <.>
       100u
@@ -45,7 +45,7 @@ let counterDemo (req : HttpRequest) (out : Connection) =
     let actions =
       Seq.unfold
         (fun i -> if i = 0u then None else Some(write (string i), i-1u))
-        (last_evt_id - 1u)
+        (lastEvtId - 1u)
 
     for a in actions do
       do! a }

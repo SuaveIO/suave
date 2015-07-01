@@ -127,9 +127,3 @@ let createReverseProxyServerAsync (config : SuaveConfig) resolver =
 let startReverseProxyServer config resolver =
   Async.RunSynchronously(createReverseProxyServerAsync config resolver |> snd,
     cancellationToken = config.cancellationToken)
-
-[<System.Obsolete("Use createReverseProxyServerAsync")>]
-let proxy_server_async config resolver = createReverseProxyServerAsync config resolver
-
-[<System.Obsolete("Use startReverseProxyServer")>]
-let proxy_server config resolver = startReverseProxyServer config resolver

@@ -230,36 +230,3 @@ module Cookie =
         | Choice2Of2 wpKont    ->
           log "existing, broken cookie, unsetting it, forwarding to given failure web part"
           wpKont >>= unsetPair csctx.cookieName)
-
-  [<Obsolete("Renamed to parseCookies'")>]
-  let parse_cookies s = parseCookies s
-  [<Obsolete("Renamed to parseResultCookie'")>]
-  let parse_result_cookie (s : string) : HttpCookie = parseResultCookie s 
-  [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
-  module HttpRequest =
-    [<Obsolete("Use the .cookies property instead'")>]
-    let cookies (x:HttpRequest) = x.cookies
-
-  [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
-  module HttpResult =
-    [<Obsolete("Use the .cookies property instead'")>]
-    let cookies (x:HttpResult) = x.cookies
-
-  [<Obsolete("Renamed to setCookie'")>]
-  let set_cookie cookie ctx = setCookie cookie ctx
-  [<Obsolete("Renamed to unsetCookie'")>]
-  let unset_cookie cookieName = unsetCookie cookieName
-  [<Obsolete("Renamed to setPair'")>]
-  let set_pair httpCookie clientCookie = setPair httpCookie clientCookie
-  [<Obsolete("Renamed to unsetPair'")>]
-  let unset_pair httpCookieName = unsetPair httpCookieName 
-  [<Obsolete("Renamed to generateCookies'")>]
-  let generate_cookies serverKey cookieName relativeExpiry secure plainData = generateCookies serverKey cookieName relativeExpiry secure plainData
-  [<Obsolete("Renamed to readCookies'")>]
-  let read_cookies key cookieName cookies = readCookies key cookieName cookies
-  [<Obsolete("Renamed to refreshCookies'")>]
-  let refresh_cookies relativeExpiry httpCookie = refreshCookies relativeExpiry httpCookie 
-  [<Obsolete("Renamed to updateCookies'")>]
-  let update_cookies relativeExpiry httpCookie = updateCookies relativeExpiry httpCookie 
-  [<Obsolete("Renamed to cookieState'")>]
-  let cookie_state csctx noCookie decryptionFailure f_success = cookieState csctx noCookie decryptionFailure f_success 

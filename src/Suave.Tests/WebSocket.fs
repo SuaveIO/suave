@@ -25,7 +25,7 @@ type PayloadSize =
   | Bit32 = 66000
 
 [<Tests>]
-let websocket_tests =
+let websocketTests =
 
   let runWithConfig = runWith defaultConfig
 
