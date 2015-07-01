@@ -655,8 +655,9 @@ let startWebServerAsync (config : SuaveConfig) (webpart : WebPart) =
 
   // spawn tcp listeners/web workers
   let servers = 
-    config.bindings |> List.map (SuaveConfig.toRuntime config homeFolder compressionFolder true
-              >> ParsingAndControl.startWebWorkerAsync (config.bufferSize, config.maxOps) webpart)
+    config.bindings
+    |> List.map (SuaveConfig.toRuntime config homeFolder compressionFolder true
+                 >> ParsingAndControl.startWebWorkerAsync (config.bufferSize, config.maxOps) webpart)
               
   let listening = servers |> Seq.map fst |> Async.Parallel
   let server    = servers |> Seq.map snd |> Async.Parallel |> Async.Ignore

@@ -551,23 +551,23 @@ module HttpRuntime =
   let empty =
     { serverKey         = Crypto.generateKey ServerKeyLength
       errorHandler      = fun _ _ -> fun _ -> async.Return None
-      mimeTypesMap     = fun _ -> None
+      mimeTypesMap      = fun _ -> None
       homeDirectory     = "."
       compressionFolder = "."
-      logger             = Loggers.saneDefaultsFor LogLevel.Debug
+      logger            = Loggers.saneDefaultsFor LogLevel.Debug
       matchedBinding    = HttpBinding.defaults
-      parsePostData    = false }
+      parsePostData     = false }
 
   /// make a new HttpRuntime from the given parameters
   let mk serverKey errorHandler mimeTypes homeDirectory compressionFolder logger parsePostData binding =
     { serverKey         = serverKey
       errorHandler      = errorHandler
-      mimeTypesMap     = mimeTypes
+      mimeTypesMap      = mimeTypes
       homeDirectory     = homeDirectory
       compressionFolder = compressionFolder
-      logger             = logger
+      logger            = logger
       matchedBinding    = binding
-      parsePostData    = parsePostData }
+      parsePostData     = parsePostData }
 
 
 /// A module that provides functions to create a new HttpContext.
@@ -578,14 +578,14 @@ module HttpContext =
   /// in unit tests.
   let empty =
     { request    = HttpRequest.empty
-      userState = Map.empty
+      userState  = Map.empty
       runtime    = HttpRuntime.empty
       connection = Connection.empty
       response   = HttpResult.empty }
 
   let mk request runtime connection writePreamble =
     { request    = request
-      userState = Map.empty
+      userState  = Map.empty
       runtime    = runtime
       connection = connection
       response   = { status = HTTP_404
