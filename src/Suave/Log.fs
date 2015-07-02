@@ -8,7 +8,6 @@ module Log =
   
   open Suave.Logging
   open Suave.Utils
-  open Suave.Utils.RandomExtensions
 
   let verbose (logger : Logger) path trace message =
     logger.Log LogLevel.Verbose (fun _ -> LogLine.mk path LogLevel.Verbose trace None message)
