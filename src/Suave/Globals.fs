@@ -1,15 +1,5 @@
 ﻿module Suave.Globals
 
-/// the global random pool for quick random values, e.g. for generating
-/// random large numbers to identify requests
-let random = System.Random()
-
-// Note: these are global, because they can be (System.Random is) time-dependent
-// and therefore, "However, because the clock has finite resolution, using the
-// parameterless constructor to create different Random objects in close succession
-// creates random number generators that produce identical sequences of random numbers."
-// - MSDN.
-
 /// Get the current DateTimeOffset in UTC format.
 ///
 /// If you are unit-testing

@@ -2,7 +2,6 @@
 
 open Suave
 open Suave.Utils
-open Suave.Utils.RandomExtensions
 
 /// A record that keeps track of what request this is.
 /// In an uint64 there are 18 446 744 073 709 551 616 number
@@ -40,7 +39,7 @@ type TraceHeader =
   /// speak.
 
   static member mk traceId spanParentId =
-    let newId = Globals.random.NextUInt64()
+    let newId = ThreadSafeRandom.nextUInt64()
     { traceId     = defaultArg traceId newId
       reqId       = newId
       reqParentId = spanParentId }
