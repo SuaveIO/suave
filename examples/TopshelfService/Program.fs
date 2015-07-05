@@ -12,23 +12,28 @@ open System.Threading
 let main argv = 
     printfn "%A" argv
 
-    let cancellationTokenSource = new CancellationTokenSource()
-    let token = cancellationTokenSource.Token
-    let config = { defaultConfig with cancellationToken = token}
 
     let home = choose [path "/" >>= GET >>= OK "Hello world"]
     let mind = choose [path "/mind" >>= GET >>= OK "Where is my mind?"]
     let app = choose [ home; mind ]
 
+    let cancellationTokenSource = ref None
     let start hc = 
+        let cts = new CancellationTokenSource()
+        let token = cts.Token
+        let config = { defaultConfig with cancellationToken = token}
         startWebServerAsync config app
         |> snd
         |> Async.StartAsTask 
         |> ignore
+
+        cancellationTokenSource := Some cts
         true
 
     let stop hc = 
-        cancellationTokenSource.Cancel()
+        match !cancellationTokenSource with
+        | Some cts -> cts.Cancel()
+        | None -> ()
         true
 
     Service.Default 
