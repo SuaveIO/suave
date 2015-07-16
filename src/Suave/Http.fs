@@ -543,7 +543,6 @@ module Http =
         else raise <| Exception("File canonalization issue.")
       else raise <| Exception("File canonalization issue.")
 
-
     let browseFile rootPath fileName =
       fun ({request = r; runtime = q} as h) ->
         file (resolvePath rootPath fileName) h
@@ -553,16 +552,16 @@ module Http =
         browseFile q.homeDirectory fileName h
     
     let browse rootPath : WebPart =
-      warbler (fun { request = r; runtime = { logger = l } } ->
-        Log.verbose l
+      warbler (fun ctx ->
+        Log.verbose ctx.runtime.logger
           "Suave.Http.Files.browse"
           TraceHeader.empty
           (sprintf "Files.browse trying file (local file url:'%s' root:'%s')"
-            r.url.AbsolutePath rootPath)
-        file (resolvePath rootPath r.url.AbsolutePath))
+            ctx.request.url.AbsolutePath rootPath)
+        file (resolvePath rootPath ctx.request.url.AbsolutePath))
 
     let browseHome : WebPart =
-      warbler (fun { runtime = q } -> browse q.homeDirectory)
+      warbler (fun ctx -> browse ctx.runtime.homeDirectory)
 
     let dir rootPath (ctx : HttpContext) =
       let req = ctx.request
@@ -578,7 +577,7 @@ module Http =
         else
           String.Format("{0,14}", (new FileInfo(x.FullName)).Length)
 
-      let formatdate (t:DateTime) =
+      let formatdate (t : DateTime) =
         t.ToString("MM-dd-yy") + "  " + t.ToString("hh:mmtt")
 
       let buildLine (x : FileSystemInfo) =
