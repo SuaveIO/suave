@@ -38,7 +38,7 @@ module Http =
         | None   ->
           let! result = b x
           match result with
-          | None -> return Nones
+          | None -> return None
           | r -> return r
         | r -> return r
       }
