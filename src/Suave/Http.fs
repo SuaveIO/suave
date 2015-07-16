@@ -464,6 +464,7 @@ module Http =
 
       let sendIt name compression =
         setHeader "Last-Modified" ((getLast key : DateTime).ToString("R"))
+        >>= setHeader "Vary" "Accept-Encoding"
         >>= setMimeType name
         >>= send key compression
 
