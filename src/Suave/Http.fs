@@ -38,7 +38,7 @@ module Http =
         | None   ->
           let! result = b x
           match result with
-          | None -> return None
+          | None -> return Nones
           | r -> return r
         | r -> return r
       }
@@ -129,19 +129,21 @@ module Http =
       | ".css" -> mkMimeType "text/css" true
       | ".gif" -> mkMimeType "image/gif" false
       | ".png" -> mkMimeType "image/png" false
-      | ".svg" -> mkMimeType "image/svg+xml" false
+      | ".svg" -> mkMimeType "image/svg+xml" true
       | ".ico" -> mkMimeType "image/x-icon" false
+      | ".xml" -> mkMimeType "application/xml" true
+      | ".js"  -> mkMimeType "application/javascript" true
+      | ".json" -> mkMimeType "application/json" true
+      | ".map"  -> mkMimeType "application/json" true
       | ".htm"
       | ".html" -> mkMimeType "text/html" true
       | ".jpe"
       | ".jpeg"
       | ".jpg" -> mkMimeType "image/jpeg" false
-      | ".js"  -> mkMimeType "application/javascript" true
-      | ".map"  -> mkMimeType "application/json" true
       | ".exe" -> mkMimeType "application/exe" false
       | ".txt" -> mkMimeType "text/plain" true
-      | ".ttf" -> mkMimeType "application/x-font-ttf" false
-      | ".otf" -> mkMimeType "application/font-sfnt" false
+      | ".ttf" -> mkMimeType "application/x-font-ttf" true
+      | ".otf" -> mkMimeType "application/font-sfnt" true
       | ".woff" -> mkMimeType "application/font-woff" false
       | ".eot" -> mkMimeType "application/vnd.ms-fontobject" false
       | _      -> None
