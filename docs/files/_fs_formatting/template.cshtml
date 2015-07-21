@@ -1,70 +1,122 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
+
   <head>
-    <meta charset="utf-8">
+    <meta charset='utf-8' />
+    <meta http-equiv="X-UA-Compatible" content="chrome=1" />
+    <meta name="description" content="Suave : Suave is a simple web development F# library providing a lightweight web server and a set of combinators to manipulate route flow and task composition." />
+    <link href='http://fonts.googleapis.com/css?family=Roboto+Slab' rel='stylesheet' type='text/css'>
+    <script src="https://netdna.bootstrapcdn.com/twitter-bootstrap/2.2.1/js/bootstrap.min.js"></script>
+    <link href="https://netdna.bootstrapcdn.com/twitter-bootstrap/2.2.1/css/bootstrap-combined.min.css" rel="stylesheet">
+    <link type="text/css" rel="stylesheet" href="../content/style.css" />
+    <link rel="stylesheet" type="text/css" media="screen" href="../stylesheets/stylesheet.css">
     <title>@Title</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="@Description">
     <meta name="author" content="@Properties["project-author"]">
-
     <script src="https://code.jquery.com/jquery-1.8.0.js"></script>
     <script src="https://code.jquery.com/ui/1.8.23/jquery-ui.js"></script>
-    <script src="https://netdna.bootstrapcdn.com/twitter-bootstrap/2.2.1/js/bootstrap.min.js"></script>
     <script type="text/javascript" src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
-    <link href="https://netdna.bootstrapcdn.com/twitter-bootstrap/2.2.1/css/bootstrap-combined.min.css" rel="stylesheet">
-
-    <link type="text/css" rel="stylesheet" href="@Root/content/style.css" />
-    <script type="text/javascript" src="@Root/content/tips.js"></script>
+    <script type="text/javascript" src="../content/tips.js"></script>
     <!-- HTML5 shim, for IE6-8 support of HTML5 elements -->
     <!--[if lt IE 9]>
       <script src="http://html5shim.googlecode.com/svn/trunk/html5.js"></script>
     <![endif]-->
   </head>
+
   <body>
-    <div class="container">
-      <div class="masthead">
-        <ul class="nav nav-pills pull-right">
-          <li><a href="http://fsharp.org">fsharp.org</a></li>
-          <li><a href="@Properties["project-github"]">github page</a></li>
-        </ul>
-        <h3 class="muted"><a href="@Root/index.html">@Properties["project-name"]</a></h3>
-      </div>
-      <hr />
-      <div class="row">
-        <div class="span9" id="main">
-          @RenderBody()
+
+    <!-- HEADER -->
+    <div id="header_wrap" class="row">
+<div class="container">
+        <div class="inner">
+
+          <div id="logo" >
+            <img src="../images/logo.gif" border="0" alt="Suave.IO">
+          </div>
+
+
+          <h2 id="project_tagline">Suave is a simple web development F# library providing a lightweight web server and a set of combinators to manipulate route flow and task composition.</h2>
+
+            <section id="downloads">
+              <a class="zip_download_link" href="https://github.com/SuaveIO/suave/zipball/master">Download this project as a .zip file</a>
+              <a class="tar_download_link" href="https://github.com/SuaveIO/suave/tarball/master">Download this project as a tar.gz file</a>
+            </section>
+
+          <a id="forkme_banner" href="https://github.com/SuaveIO/suave">View on GitHub</a>
+
         </div>
-        <div class="span3">
-          <a href="@Root/index.html">
-            <img src="https://raw.githubusercontent.com/SuaveIO/resources/master/images/head_white.png" style="width:140px;height:140px;margin:10px 0px 0px 35px;border-style:none;" />
-          </a>
+        </div>
+    </div>
+    <div style="clear:both;"></div>
+    <!-- MAIN CONTENT -->
+    <div id="main_content_wrap" class="row">
+    <div class="container">
+    <div class="row">
+      <div id="main_content" class="span9">
+        @RenderBody()
+      </div>
+      <div class="span3">
 
           <ul class="nav nav-list" id="menu">
 
-            <li class="nav-header">@Properties["project-name"]</li>
-
             <li class="divider"></li>
-            <li><a href="@Root/index.html">Home page</a></li>
+            <li><a href="http://suave.io/index.html">Home page</a></li>
             <li class="divider"></li>
 
-            <li><a href="@Properties["project-nuget"]">Get Suave via NuGet</a></li>
-            <li><a href="@Properties["project-github"]">Source Code on GitHub</a></li>
-            <li><a href="@Properties["project-github"]/blob/master/COPYING">License (Apache 2.0)</a></li>
+            <li><a href="http://www.nuget.org/packages/Suave">Get Suave via NuGet</a></li>
+            <li><a href="https://github.com/SuaveIO/suave">Source Code on GitHub</a></li>
+            <li><a href="https://github.com/SuaveIO/suave/blob/master/COPYING">License (Apache 2.0)</a></li>
             <li><a href="https://github.com/SuaveIO/suave/releases/latest">Release Notes</a></li>
-            <li><a href="@Root//contributing.html">Contributing to @Properties["project-name"]</a></li>
-            <li><a href="@Root/users.html">Who is using Suave?</a></li>                        
-            <li><a href="http://stackoverflow.com/questions/tagged/suaveio">Ask a question</a></li>
-            <li class="nav-header">Tutorials</li>
-            <li><a href="@Root/index.html">Getting started</a></li>
-
+            <li><a href="https://twitter.com/search?q=suave.io&src=typd&vertical=default&f=tweets">Who is using Suave?</a></li>
+            <li><a href="http://stackoverflow.com/questions/tagged/suave">Ask a question</a></li>
+            <li class="nav-header">Documentation</li>
+            <li><a href="http://suave.io/index.html">Getting started</a></li>
+            <li><a href="http://suave.io/routing.html">Routing HTTP requests</a></li>
+            <li><a href="http://suave.io/async.html">Async computation expressions and »=</a></li>
+            <li><a href="http://suave.io/composing.html">Composing bigger programs: combinators</a></li>
+            <li><a href="http://suave.io/applicatives.html">More Applicatives and HTTP combinators</a></li>
+            <li><a href="http://suave.io/fish.html">Programming with fish (custom operator reference)</a></li>
+            <li><a href="http://suave.io/typed.html">Typed routes</a></li>
+            <li><a href="http://suave.io/bindings.html">Multiple bindings and SSL support</a></li>
+            <li><a href="http://suave.io/api.html">API</a></li>
+            <li><a href="http://suave.io/files.html">Serving static files, HTTP Compression and MIME types</a></li>
+            <li><a href="http://suave.io/heroku.html">Deploying Suave to Heroku</a></li>
+            <li><a href="http://suave.io/logs.html">Getting Hold of Suave’s Logs</a></li>
+            <li><a href="http://suave.io/paket.html">Suave + Paket = ♥</a></li>
             <li class="nav-header">Reference</li>
 
-            <li><a href="@Root/reference/index.html">API Reference</a></li>
+            <li><a href="http://suave.io/reference/index.html">API Reference</a></li>
           </ul>
         </div>
+        </div>
+        </div>
+      <br/>
+    </div>
+
+    <!-- FOOTER  -->
+    <div id="footer_wrap" class="outer">
+    <div class="container">
+      <footer class="inner">
+        <p class="copyright">Suave maintained by
+          <a href="https://github.com/ademar">ademar</a> and
+          <a href="https://github.com/haf">haf</a>.
+        </p>
+      </footer>
       </div>
     </div>
-    <a href="@Properties["project-github"]"><img style="position: absolute; top: 0; right: 0; border: 0;" src="https://s3.amazonaws.com/github/ribbons/forkme_right_gray_6d6d6d.png" alt="Fork me on GitHub"></a>
-  </body>
-  </html>
+</div>
+              <script type="text/javascript">
+            var gaJsHost = (("https:" == document.location.protocol) ? "https://ssl." : "http://www.");
+            document.write(unescape("%3Cscript src='" + gaJsHost + "google-analytics.com/ga.js' type='text/javascript'%3E%3C/script%3E"));
+          </script>
+          <script type="text/javascript">
+            try {
+              var pageTracker = _gat._getTracker("UA-45083137-1");
+            pageTracker._trackPageview();
+            } catch(err) {}
+          </script>
 
+
+  </body>
+</html>
