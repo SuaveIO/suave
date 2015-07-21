@@ -30,7 +30,7 @@ let info =
 
 #I "packages/FSharp.Compiler.Service/lib/net40"
 #I "packages/FAKE/tools"
-#load "../../packages/FSharp.Formatting/FSharp.Formatting.fsx"
+#load "packages/FSharp.Formatting/FSharp.Formatting.fsx"
 #r "FakeLib.dll"
 #r "FSharp.Markdown.dll"
 #r "FSharp.Literate.dll"
@@ -61,14 +61,14 @@ let layoutRoots =
 let copyFiles () =
   CopyRecursive files output true |> Log "Copying file: "
   ensureDirectory (output @@ "content")
-  CopyRecursive (formatting @@ "styles") (output @@ "content") true 
+  CopyRecursive (formatting @@ "styles") (output @@ "content") true
     |> Log "Copying styles and scripts: "
 
-System.Environment.CurrentDirectory <- __SOURCE_DIRECTORY__ 
+System.Environment.CurrentDirectory <- __SOURCE_DIRECTORY__
 // Build API reference from XML comments
 let buildReference () =
   CleanDir (output @@ "reference")
-  ensureDirectory output 
+  ensureDirectory output
   let binaries =
     referenceBinaries
     |> List.map (fun lib-> __SOURCE_DIRECTORY__ @@ ".." @@ ".." @@ "src" @@ Path.GetFileNameWithoutExtension lib @@ "bin" @@ "Release" @@ lib)
@@ -76,14 +76,15 @@ let buildReference () =
   let dirs =
     referenceBinaries
     |> List.map (fun lib-> __SOURCE_DIRECTORY__ @@ ".." @@ ".." @@ "src" @@ Path.GetFileNameWithoutExtension lib @@ "bin" @@ "Release")
-    
+
   MetadataFormat.Generate
-    ( binaries , output @@ "reference", layoutRoots, 
+    ( binaries , output @@ "reference", layoutRoots,
       parameters = ("root", root)::info,
       sourceRepo = githubLink @@ "tree/master",
       sourceFolder = __SOURCE_DIRECTORY__ @@ ".." @@ "..",
       libDirs = dirs,
-      publicOnly = true )
+      publicOnly = true,
+      markDownComments = false)
 
 // Build documentation from `fsx` and `md` files in `docs/content`
 (*
@@ -102,4 +103,3 @@ CreateDir output
 copyFiles()
 //buildDocumentation()
 buildReference()
-
