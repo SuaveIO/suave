@@ -202,13 +202,13 @@ To gain access to the underlying `HttpRequest` and read query and http form data
 
 {% highlight fsharp %}
 let greetings q =
-  defaultArg (q ^^ "name") "World" |> sprintf "Hello %s"
+  defaultArg (Option.ofChoice(q ^^ "name")) "World" |> sprintf "Hello %s"
 
 let sample : WebPart = 
     path "/hello" >>= choose [
-      GET  >>= request(fun r -> OK <| greetings (query r))
-      POST >>= request(fun r -> OK <| greetings (form r))
-      NOT_FOUND "Found no handlers" ]
+      GET  >>= request(fun r -> OK <| greetings r.query)
+      POST >>= request(fun r -> OK <| greetings r.form)
+      RequestErrors.NOT_FOUND "Found no handlers" ]
 {% endhighlight %}
 
 You can similarly use `context` to gain access to the full `HttpContext` and connection.
