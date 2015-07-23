@@ -36,4 +36,4 @@ let (^^) target key = getFirstOpt target key
 
 type Property<'T,'P> = ('T -> 'P) * ('P -> 'T -> 'T) 
 
-let internal Property<'T,'P> getter setter : Property<'T,'P> = (getter,setter)
+let internal Property<'T,'P> getter setter : Property<'T,'P> = (getter, setter)
