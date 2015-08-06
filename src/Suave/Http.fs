@@ -786,3 +786,81 @@ module Http =
             }
       }
       |> succeed
+
+  module CORS =
+    
+    open System
+    open Successful
+
+    [<Literal>]
+    let origin = "Origin"
+    [<Literal>]
+    let accessControlRequestMethod = "Access-Control-Request-Method"
+    [<Literal>]
+    let accessControlRequestHeaders = "Access-Control-Request-Headers"
+    [<Literal>]
+    let accessControlAllowOrigin = "Access-Control-Allow-Origin"
+    [<Literal>]
+    let accessControlAllowMethods = "Access-Control-Allow-Methods"
+    [<Literal>]
+    let accessControlAllowHeaders = "Access-Control-Allow-Headers"
+    [<Literal>]
+    let accessControlAllowCredentials = "Access-Control-Allow-Credentials"
+    [<Literal>]
+    let accessControlExposeHeaders = "Access-Control-Expose-Headers"
+    [<Literal>]
+    let accessControlMaxAge = "Access-Control-Max-Age"
+
+    let cors (allowedUris : string list) : WebPart =
+        fun (ctx : HttpContext) ->
+            let req = ctx.request
+            match req.header origin with
+            | Choice1Of2 originValue -> // CORS request
+                let allowedOrigin = List.exists (fun a -> a = originValue) allowedUris
+                match req.``method`` with
+                | HttpMethod.OPTIONS ->
+                    match req.header accessControlRequestMethod with
+                    | Choice1Of2 requestMethodHeaderValue -> // Preflight request
+                        
+                        // Is request method valid? Get from configuration? If no, don't set any headers and continue
+
+                        // Does the request have an Access-Control-Request-Headers header? If so, validate. If not, proceed.
+                        let setAccessControlRequestHeaders =
+                            match req.getAllHeaders accessControlRequestHeaders with
+                                | Choice1Of2 list -> 
+                                    Writers.setHeader accessControlAllowHeaders (list |> String.concat ", ")
+                                | Choice2Of2 _ -> succeed
+
+                        if allowedOrigin then
+                            ctx |>
+                                (
+                                    Writers.setHeader accessControlAllowMethods requestMethodHeaderValue
+                                    >>= setAccessControlRequestHeaders
+                                    
+                                    // Set max age. Optional. Get from configuration?
+                                    // >>= Writers.setHeader accessControlMaxAge "3600"
+                                    
+                                    // Are cookies allowed? Get from configuration?
+                                    >>= Writers.setHeader accessControlAllowCredentials "true"
+                                    >>= Writers.setHeader accessControlAllowOrigin originValue
+                                    >>= OK ""
+                                )
+                        else
+                            ctx |> succeed                        
+                    | Choice2Of2 _ -> ctx |> succeed
+                | _ ->
+                    if allowedOrigin then
+                        ctx |> 
+                            (
+                                // Should response headers be exposed to the client? Get from configuration?   
+                                Writers.setHeader accessControlExposeHeaders "true"
+                                // Are cookies allowed? Get from configuration?
+                                >>= Writers.setHeader accessControlAllowCredentials "true"
+                                // The origin value is in the allowed list. Could this also be obtained from configuration?
+                                >>= Writers.setHeader accessControlAllowOrigin originValue
+                                // Get allowed methods from configuration?
+                                >>= Writers.setHeader accessControlAllowMethods "*"
+                            )
+                    else
+                        ctx |> succeed // No headers will be sent. Browser will deny.
+            | Choice2Of2 _ -> ctx |> succeed // Not a CORS request

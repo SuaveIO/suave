@@ -339,6 +339,10 @@ type HttpRequest =
   member x.header k =
     getFirst x.headers k
 
+  /// Gets all headers for the given key in the HttpRequest
+  member x.getAllHeaders k =
+    getAll x.headers k
+
   /// Gets the form as a ((string*string option list) from the HttpRequest. 
   /// Use formData to get the data for a particular key or use the indexed property in the HttpRequest
   member x.form  =
