@@ -411,7 +411,7 @@ module internal ParsingAndControl =
       // http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.13
       do! asyncWriteLn connection (String.Concat [| "Content-Length: "; content.Length.ToString() |])
       do! asyncWriteLn connection ""
-      if content.Length > 0 then
+      if context.request.``method`` <> HttpMethod.HEAD && content.Length > 0 then
         do! send connection (new ArraySegment<_>(content, 0, content.Length))
       }
     | SocketTask f -> socket{ 
