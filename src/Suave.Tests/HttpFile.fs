@@ -5,10 +5,12 @@ open Fuchu
 open System
 open System.IO
 open System.Text
+open System.Net.Sockets
 
 open Suave.Types
 open Suave.Http
 open Suave.Http.Successful
+open Suave.Utils
 
 open Suave.Tests.TestUtilities
 open Suave.Testing
@@ -45,3 +47,33 @@ let compression =
         , testFileSize
         , (runWithConfig (Files.browseFileHome "test-text-file.txt") |> reqGZipBytes HttpMethod.GET "/" None).Length |> int64)
     ]
+
+[<Tests>]
+let ``http HEAD method`` =
+  let runWithConfig = runWith defaultConfig
+
+  testList "HEAD on `file`" [
+
+    testCase  "HEAD does not return content" <| fun _ ->
+      
+      let ctx = runWithConfig (Files.browseFileHome "test-text-file.txt") 
+
+      withContext (fun _ ->
+        let client = new TcpClient("127.0.0.1",8083)
+        let message = sprintf "HEAD %s HTTP/1.1\r\nHost: %s\r\nConnection: Close\r\n\r\n" "/foo" "127.0.0.1"
+        let outputData = ASCII.bytes message
+        let stream = client.GetStream()
+        stream.Write(outputData, 0, outputData.Length)
+
+        use streamReader = new StreamReader(stream)
+    
+        // read header lines
+        let rec loop _ =
+          let line = streamReader.ReadLine()
+          if line.Equals("") then ()
+          else loop ()
+        loop ()
+
+        Assert.Equal("Stream should be at the end.", true, streamReader.EndOfStream)) ctx
+      
+  ]
