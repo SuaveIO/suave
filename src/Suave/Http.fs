@@ -725,6 +725,8 @@ module Http =
 
     let private handShakeAux f (out : Connection) =
       socket {
+        do! asyncWriteLn out "" // newline after headers
+
         // Buggy Internet Explorer; 2kB of comment padding for IE
         do! String.replicate 2000 " " |> comment out
         do! 2000u |> retry out
