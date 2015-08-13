@@ -515,7 +515,7 @@ module Http =
         do! asyncWriteLn conn (sprintf "Content-Length: %d" (fs : Stream).Length)
         do! asyncWriteLn conn ""
 
-        if fs.Length > 0L then
+        if  ctx.request.``method`` <> HttpMethod.HEAD && fs.Length > 0L then
           do! transferStream conn fs
       }
       { ctx with
@@ -630,7 +630,7 @@ module Http =
         do! asyncWriteLn conn (sprintf "Content-Length: %d" (fs: Stream).Length)
         do! asyncWriteLn conn ""
 
-        if fs.Length > 0L then
+        if ctx.request.``method`` <> HttpMethod.HEAD && fs.Length > 0L then
           do! transferStream conn fs
       }
       { ctx with
