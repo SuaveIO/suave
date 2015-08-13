@@ -455,9 +455,9 @@ type HttpContent =
 /// send the response. Have a look at the docs for HttpContent for further
 /// details on what is possible.
 type HttpResult =
-  { status        : HttpCode
-    headers       : (string * string) list
-    content       : HttpContent
+  { status  : HttpCode
+    headers : (string * string) list
+    content : HttpContent
     writePreamble : bool }
 
   /// The empty HttpResult, with a 404 and a HttpContent.NullContent content

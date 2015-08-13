@@ -722,6 +722,7 @@ module Http =
 
     let private handShakeAux f (out : Connection) =
       socket {
+        // resp.SendChunked       <- false
         // Buggy Internet Explorer; 2kB of comment padding for IE
         do! String.replicate 2000 " " |> comment out
         do! 2000u |> retry out
@@ -739,7 +740,7 @@ module Http =
                   :: ("Access-Control-Allow-Origin", "*")
                   :: []
                 content = SocketTask (handShakeAux f)
-                writePreamble = false
+                //chunked = false
             }
       }
       |> succeed
