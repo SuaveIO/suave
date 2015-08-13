@@ -742,6 +742,9 @@ module Http =
                      ("Content-Type",                "text/event-stream; charset=utf-8")
                   :: ("Cache-Control",               "no-cache")
                   :: ("Access-Control-Allow-Origin", "*")
+                  // http://wiki.nginx.org/X-accel#X-Accel-Buffering – hard to find
+                  // also see http://wiki.nginx.org/HttpProxyModule#proxy_buffering
+                  :: ("X-Accel-Buffering",           "no")
                   :: []
                 content = SocketTask (handShakeAux f)
                 writePreamble = true
