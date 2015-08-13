@@ -124,9 +124,9 @@ let app =
     RequestErrors.NOT_FOUND "Found no handlers"
     ] >>= log logger logFormat
 
-open Suave.OpenSSL
+(*open Suave.OpenSSL
 open OpenSSL.Core
-open System.Security.Cryptography.X509Certificates
+open System.Security.Cryptography.X509Certificates*)
 
 [<EntryPoint>]
 let main argv =
