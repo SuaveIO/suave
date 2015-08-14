@@ -700,8 +700,11 @@ module Http =
       out <<. "retry: " + (string retry) + ES_EOL
 
     type Message =
-      { id       : string
+      { /// The event ID to set the EventSource object's last event ID value.
+        id       : string
+        /// The data field for the message. When the EventSource receives multiple consecutive lines that begin with data:, it will concatenate them, inserting a newline character between each one. Trailing newlines are removed.
         data     : string
+        /// The event's type. If this is specified, an event will be dispatched on the browser to the listener for the specified event name; the web site source code should use addEventListener() to listen for named events. The onmessage handler is called if no event name is specified for a message.
         ``type`` : string option }
 
     let mkMessage id data =
@@ -722,7 +725,8 @@ module Http =
 
     let private handShakeAux f (out : Connection) =
       socket {
-        // resp.SendChunked       <- false
+        do! asyncWriteLn out "" // newline after headers
+
         // Buggy Internet Explorer; 2kB of comment padding for IE
         do! String.replicate 2000 " " |> comment out
         do! 2000u |> retry out
@@ -738,9 +742,12 @@ module Http =
                      ("Content-Type",                "text/event-stream; charset=utf-8")
                   :: ("Cache-Control",               "no-cache")
                   :: ("Access-Control-Allow-Origin", "*")
+                  // http://wiki.nginx.org/X-accel#X-Accel-Buffering – hard to find
+                  // also see http://wiki.nginx.org/HttpProxyModule#proxy_buffering
+                  :: ("X-Accel-Buffering",           "no")
                   :: []
                 content = SocketTask (handShakeAux f)
-                //chunked = false
+                writePreamble = true
             }
       }
       |> succeed
