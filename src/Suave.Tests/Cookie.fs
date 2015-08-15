@@ -60,15 +60,15 @@ let parseResultCookie =
 [<Tests>]
 let parseRequestCookies =
     testList "parse request cookies" [
-        testCase "parse valid cookies" <| fun _ ->
-            let sample = "session=2b14f6a69199243f570031bf94865bb6;abc=123"
-            let result = Cookie.parseCookies sample
-            let expected = [HttpCookie.mkKV "session" "2b14f6a69199243f570031bf94865bb6"
-                            HttpCookie.mkKV "abc" "123"]
-            Assert.Equal("cookies should eq", expected, result)
+      testCase "parse valid cookies" <| fun _ ->
+        let sample = "session=2b14f6a69199243f570031bf94865bb6;abc=123"
+        let result = Cookie.parseCookies sample
+        let expected = [HttpCookie.mkKV "session" "2b14f6a69199243f570031bf94865bb6"
+                        HttpCookie.mkKV "abc" "123"]
+        Assert.Equal("cookies should eq", expected, result)
 
-        testCase "ignore malformed cookies" <| fun _ ->
-            let sample = "session=;value;"
-            let result = Cookie.parseCookies sample
-            Assert.Equal("cookies should be ignored", [], result)
+      testCase "ignore malformed cookies" <| fun _ ->
+        let sample = "session=;value;"
+        let result = Cookie.parseCookies sample
+        Assert.Equal("cookies should be ignored", [], result)
     ]

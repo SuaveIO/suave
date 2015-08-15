@@ -26,9 +26,9 @@ module Cookie =
     |> List.map (fun (cookie : string) ->
         let parts = cookie.Split([|'='|], StringSplitOptions.RemoveEmptyEntries)
         if parts.Length > 1 then
-            Some (HttpCookie.mkKV (String.trim parts.[0]) (String.trim parts.[1]))
+          Some (HttpCookie.mkKV (String.trim parts.[0]) (String.trim parts.[1]))
         else
-            None)
+          None)
     |> List.choose id
 
   let parseResultCookie (s : string) : HttpCookie =
