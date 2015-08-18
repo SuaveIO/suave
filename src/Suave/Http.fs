@@ -508,7 +508,7 @@ module Http =
 
     let sendFile fileName (compression : bool) (ctx : HttpContext) =
       let writeFile file conn = socket {
-        let getFs = fun path -> new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read) :> Stream
+        let getFs = fun path -> new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite) :> Stream
         let getLm = fun path -> FileInfo(path).LastWriteTime
         use! fs = Compression.transformStream file getFs getLm compression ctx.runtime.compressionFolder ctx conn
 
