@@ -401,10 +401,12 @@ module Http =
         ctx.response.status.code
         "0"
 
-    let log (logger : Logger) (formatter : HttpContext -> string) (ctx : HttpContext) =
+    let log (logger : Logger) (contextFormatter : HttpContext -> string) (ctx : HttpContext) =
       logger.Log LogLevel.Debug <| fun _ ->
         { trace         = ctx.request.trace
-          message       = formatter ctx
+          template      = String.Empty
+          formatter     = Some (fun _ _ -> contextFormatter(ctx))
+          data          = Map.empty
           level         = LogLevel.Debug
           path          = "Suave.Http.web-requests"
           ``exception`` = None

@@ -175,9 +175,15 @@ let startTcpIpServerAsync (bufferSize  : int, maxConcurrentOps : int)
       acceptingConnections.Complete startData |> ignore
 
       logger.Log LogLevel.Info <| fun _ ->
+        let cancelReqMsg = if token.IsCancellationRequested then ", cancellation requested" else ""
         { path          = "Suave.Tcp.tcpIpServer"
           trace         = TraceHeader.empty
-          message       = sprintf "listener started in %O%s" startData (if token.IsCancellationRequested then ", cancellation requested" else "")
+          template      = "listener started in {@startData}{cancelReqMsg:l}"
+          data          = Map.ofList [  "startData",     box startData
+                                        "cancelReqMsg",  box cancelReqMsg ]
+          formatter     = Some (fun t getValue ->
+                                    // TODO: bring in template->string formatter
+                                    sprintf "listener started in %O%O" (getValue "startData") (getValue "cancelReqMsg"))
           level         = LogLevel.Info
           ``exception`` = None
           tsUTCTicks    = Globals.utcNow().Ticks }
