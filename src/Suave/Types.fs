@@ -345,6 +345,7 @@ type HttpRequest =
     Parsing.parseData (ASCII.toString x.rawForm)
 
   /// Finds the key k from the form in the HttpRequest
+  /// Match Choice1Of2 to get the value and Choice2Of2 to get an error message
   member x.formData (k : string) =
     getFirstOpt x.form k
 
