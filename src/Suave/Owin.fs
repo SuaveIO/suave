@@ -280,6 +280,7 @@ module OwinAppFunc =
       member x.GetEnumerator() = (x.Delta :> IEnumerable).GetEnumerator()
 
   type internal OwinDictionary(initialState) =
+    let cts = new CancellationTokenSource()
     let state : HttpContext ref = ref initialState
 
     let req l =
@@ -310,7 +311,11 @@ module OwinAppFunc =
       (fun v x -> v.Delta |> Map.toList |> List.map (fun (k, vs) -> k, String.concat ", " vs))
 
     let bytesToStream : Property<byte[], IO.Stream> =
-      failwith "TODO"
+      (fun x -> upcast new IO.MemoryStream(x)),
+      (fun v x ->
+        use ms = new IO.MemoryStream()
+        v.CopyTo ms // TO CONSIDER: save the stream instead and read from it when writing data
+        ms.ToArray())
 
     let claimsPrincipal : Property<Map<string, obj>, ClaimsPrincipal> =
       (fun x ->
@@ -325,6 +330,16 @@ module OwinAppFunc =
     let i2sc : Property<HttpCode, int> =
       (fun x -> x.code),
       (fun v x -> HttpCode.TryParse v |> Option.get) // NOTE: assumes user only sets valid codes
+
+    let steamyBytes : Property<HttpContent, IO.Stream> =
+      (fun x ->
+        let ms = new IO.MemoryStream()
+        let bs = Lens.getPartialOrElse HttpContent.BytesPLens [||] x
+        ms.Write(bs, 0, bs.Length) // hmm? flag that we have a stream?
+        upcast ms),
+      (fun v x ->
+        let impl conn = AsyncSocket.transferStream conn v
+        SocketTask impl)
 
     let owinMap =
       [ (* 3.2.1 Request Data *)
@@ -341,14 +356,14 @@ module OwinAppFunc =
 
         (* 3.2.2 Response Data *)
         OwinConstants.responseStatusCode, HttpContext.response_ >--> HttpResult.status_ >--> i2sc <--> untyped
-        OwinConstants.responseReasonPhrase, HttpContext.response_ <--> untyped // TODO
-        OwinConstants.responseProtocol, HttpContext.response_ <--> untyped // TODO
-        OwinConstants.responseHeaders, HttpContext.response_ <--> untyped // TODO
-        OwinConstants.responseBody, HttpContext.response_ <--> untyped // TODO
+        OwinConstants.responseReasonPhrase, HttpContext.response_ <--> untyped // TODO: add support for modifying phrasing to Core?
+        OwinConstants.responseProtocol, HttpContext.request_ >--> HttpRequest.httpVersion_ >--> hv2p <--> untyped
+        OwinConstants.responseHeaders, HttpContext.response_ >--> HttpResult.headers_ >--> mutableHeaders <--> untyped
+        OwinConstants.responseBody, HttpContext.response_ >--> HttpResult.content_ >--> steamyBytes <--> untyped
 
         (* 3.2.3 Other Data *)
-        OwinConstants.callCancelled, HttpContext.response_ <--> untyped // TODO
-        OwinConstants.owinVersion, HttpContext.response_ <--> untyped // TODO
+        OwinConstants.callCancelled, ((fun x -> cts.Token), (fun v x -> x)) <--> untyped // TODO: support cancellation token in HttpRequest signalling aborted request
+        OwinConstants.owinVersion, ((fun x -> "1.3"), (fun v x -> x)) <--> untyped
 
         // per-request storage
         "userData", HttpContext.userState_ <--> untyped
@@ -452,6 +467,7 @@ module OwinAppFunc =
       }
       |> succeed
 
+  [<CompiledName "OfOwinFunc">]
   let ofOwinFunc (owin : OwinAppFunc) =
     ofOwin (fun e -> Async.AwaitTask ((owin.Invoke e).ContinueWith<_>(fun _ -> ())))
 

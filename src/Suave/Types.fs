@@ -7,8 +7,9 @@ open System.Collections.Generic
 open System.Net.Sockets
 open System.Net
 open System.Text
-
 open Suave.Utils
+open Suave.Utils.Aether
+open Suave.Utils.Aether.Operators
 open Suave.Utils.Collections
 open Suave.Sockets
 open Suave.Utils
@@ -449,6 +450,28 @@ type HttpContent =
   | NullContent
   | Bytes of byte []
   | SocketTask of (Connection -> SocketOp<unit>)
+
+  static member NullContentPIso =
+    (function | NullContent -> Some ()
+              | _ -> None), fun _ -> NullContent
+
+  static member BytesPIso =
+    (function | Bytes bs -> Some bs
+              | _ -> None), Bytes
+
+  static member SocketTaskPIso =
+    (function | SocketTask cb -> Some cb
+              | _ -> None),
+    (fun cb -> SocketTask cb)
+
+  static member NullContentPLens : PLens<HttpContent, unit> =
+    Aether.idLens <-?> HttpContent.NullContentPIso
+
+  static member BytesPLens  : PLens<HttpContent, byte[]> =
+    Aether.idLens <-?> HttpContent.BytesPIso
+
+  static member SocketTaskPLens : PLens<HttpContent, Connection -> SocketOp<unit>> =
+    Aether.idLens <-?> HttpContent.SocketTaskPIso
 
 /// The HttpResult is the structure that you work with to tell Suave how to
 /// send the response. Have a look at the docs for HttpContent for further
