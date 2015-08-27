@@ -67,7 +67,6 @@ type HttpCode =
   | HTTP_422 | HTTP_428 | HTTP_429 | HTTP_414 | HTTP_415 | HTTP_416 | HTTP_417
   | HTTP_500 | HTTP_501 | HTTP_502 | HTTP_503 | HTTP_504 | HTTP_505
 
-
   member x.code = 
     match x with 
     | HTTP_100 -> 100 | HTTP_101 -> 101 | HTTP_200 -> 200 | HTTP_201 -> 201
@@ -516,7 +515,7 @@ and HttpContext =
     response   : HttpResult }
 
   static member request_ = Property (fun x -> x.request) (fun v x -> { x with request = v })
-  static member user_state_ = Property (fun x -> x.userState) (fun v x -> { x with userState = v })
+  static member userState_ = Property (fun x -> x.userState) (fun v x -> { x with userState = v })
   static member runtime_ = Property (fun x -> x.runtime) (fun v x -> { x with runtime = v })
   static member response_ = Property (fun x -> x.response) (fun v x -> { x with response = v })
 

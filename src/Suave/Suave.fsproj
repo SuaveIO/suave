@@ -111,6 +111,7 @@
     <Reference Include="System.Web" />
     <Reference Include="System.Web.Extensions" />
     <Reference Include="System.Xml" />
+    <Reference Include="System.Security" />
   </ItemGroup>
   <Import Project="..\..\tools\paket.targets" />
   <Choose>
