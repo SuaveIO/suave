@@ -176,7 +176,7 @@ module OwinAppFunc =
 
   type private Clock = uint64
 
-  type Muuutation(initialHeaders : Map<string, string[]>) =
+  type internal Muuutation(initialHeaders : Map<string, string[]>) =
     let changed : Map<string, Clock * string []> ref = ref Map.empty
     let removed : Map<string, Clock> ref = ref Map.empty
     let mutable clock = 1UL
@@ -279,7 +279,7 @@ module OwinAppFunc =
     interface IEnumerable with
       member x.GetEnumerator() = (x.Delta :> IEnumerable).GetEnumerator()
 
-  type internal DWr(initialState) =
+  type internal OwinDictionary(initialState) =
     let state : HttpContext ref = ref initialState
 
     let req l =
@@ -349,10 +349,19 @@ module OwinAppFunc =
         (* 3.2.3 Other Data *)
         OwinConstants.callCancelled, HttpContext.response_ <--> untyped // TODO
         OwinConstants.owinVersion, HttpContext.response_ <--> untyped // TODO
+
+        // per-request storage
+        "userData", HttpContext.userState_ <--> untyped
       ]
 
     let owinKeys = owinMap |> List.map fst |> Set.ofSeq
     let owinRW   = owinMap |> Map.ofList
+
+    let owinLensLens key : Lens<Map<string, Property<HttpContext, obj>>, Property<HttpContext, obj>> =
+      (Map.tryFind key >> function
+                          | None -> invalidOp (sprintf "Couldn't use key '%s' to modify OwinEnvironment" key)
+                          | Some lens -> lens),
+      (fun v x -> invalidOp "cannot set owin properties")
 
     member x.Interface =
       x :> IDictionary<string, obj>
@@ -365,46 +374,62 @@ module OwinAppFunc =
         Action<_, _>(fun a -> fun x -> ())
 
     interface IDictionary<string, obj> with
-
-      member x.Item
-        with get key =
-          match !removed |> Map.tryFind key with
-          | Some rmCl ->
-            match !changed |> Map.tryFind key with
-            | Some (chCl, value) ->
-              if chCl > rmCl then value else raise (KeyNotFoundException())
-
-            | None ->
-              raise (KeyNotFoundException())
-
-          | None ->
-            !changed
-            |> Map.tryFind key
-            |> Option.fold (fun s t -> snd t) (initialHeaders |> Map.find key)
-
-        and set key value =
-          changed := !changed |> Map.put key (clock, value)
-          clock <- clock + 1UL
-
-      member x.Add (owinSpecialKey, v) =
-        // when you 'add' a key, you have to change the state for that key, in
-        // Aether notation:
-        // set the state to the 
-        state := Lens.set (owinRW |> Map.find owinSpecialKey) v !state
-
       member x.Remove k =
+        invalidOp "Remove not supported"
         // does it get removed before added?
         // in that case you need to keep track of the last value in the container
         // of the value you're removing, so that it may be updated with the lens
         // on Add
-        ()
+
+      member x.Item
+        with get key =
+          Lens.get (Lens.get (owinLensLens key) owinRW) !state
+        and set key value =
+          state := Lens.set (Lens.get (owinLensLens key) owinRW) value !state
+
+      member x.Keys =
+        (owinRW :> IDictionary<_, _>).Keys
+
+      member x.Values =
+        invalidOp "omg the amount of lensing needed"
+        //(owinRW :> IDictionary<_, _> |> Seq.map (fun (kv) -> Lens.get kv.Value !state)).Values
 
       member x.ContainsKey k =
-        // we have ALL THE KEYS!!!
         owinKeys.Contains k
 
+      member x.Add (key, v) =
+        (x :> IDictionary<_, _>).[key] <- v
+
+      member x.TryGetValue (key, [<Out>] res : byref<obj>) =
+        if owinKeys |> Set.contains key then
+          res <- (x :> IDictionary<_, _>).[key]
+          true
+        else
+          false
+
+    interface ICollection<KeyValuePair<string, obj>> with
+      member x.Add kvp = (x :> IDictionary<_, _>).Add(kvp.Key, kvp.Value)
+      member x.Count = owinKeys.Count
+      member x.IsReadOnly = false
+      member x.Clear() = invalidOp "Clear is not supported"
+      member x.Contains kvp = owinKeys.Contains kvp.Key
+      member x.CopyTo (array, arrayIndex) = invalidOp "CopyTo is not supported"
+      member x.Remove kvp = (x :> IDictionary<_, _>).Remove kvp.Key
+
+    interface IEnumerable<KeyValuePair<string, obj>> with
+      member x.GetEnumerator() =
+        (x :> IDictionary<_, _>).Keys
+        |> Seq.map (fun key -> KeyValuePair(key, (x :> IDictionary<_, _>).[key]))
+        |> fun seq -> seq.GetEnumerator()
+
+    interface IEnumerable with
+      member x.GetEnumerator() =
+        (x :> IDictionary<_, _>).Keys
+        |> Seq.map (fun key -> KeyValuePair(key, (x :> IDictionary<_, _>).[key]))
+        |> fun seq -> (seq :> IEnumerable).GetEnumerator()
+
   let private wrap (ctx : HttpContext) =
-    DWr ctx
+    OwinDictionary ctx
 
   [<CompiledName "OfOwin">]
   let ofOwin (owin : OwinApp) : WebPart =
@@ -498,8 +523,8 @@ module OwinServerFactory =
     let _ = started |> Async.RunSynchronously
 
     { new IDisposable with
-      member x.Dispose () =
-        // note: this won't let the web requests finish gently
-        serverCts.Cancel()
-        serverCts.Dispose()
+        member x.Dispose () =
+          // note: this won't let the web requests finish gently
+          serverCts.Cancel()
+          serverCts.Dispose()
       }
