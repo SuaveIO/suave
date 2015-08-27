@@ -6,11 +6,12 @@
 open System
 open System.Net
 open System.Threading
+open System.Collections
 open System.Collections.Generic
 open System.Threading.Tasks
 open System.Security.Claims
 open System.Security.Principal
-
+open System.Runtime.InteropServices
 open Suave
 open Suave.Http
 open Suave.Types
@@ -180,7 +181,7 @@ module OwinAppFunc =
     let removed : Map<string, Clock> ref = ref Map.empty
     let mutable clock = 1UL
 
-    member x.Delta =
+    member x.Delta = // TODO: memoize function keyed on logical clock
       let keys =
         let changed = !changed |> Map.toSeq |> Seq.map fst |> Set.ofSeq
         let removed = !removed |> Map.toSeq |> Seq.map fst |> Set.ofSeq
@@ -226,8 +227,57 @@ module OwinAppFunc =
           clock <- clock + 1UL
 
       member x.Remove key =
-        removed := !removed |> Map.put key clock
+        let res =
+          match !removed |> Map.tryFind key with
+          | Some rmCl ->
+            match !changed |> Map.tryFind key with
+            | Some (chCl, value) ->
+              if chCl > rmCl then
+                removed := !removed |> Map.put key clock
+                true // changed after removed, so remove it again
+              else
+                false // removed after changed, nothing to do
+
+            | None ->
+              false // already removed, never changed
+
+          | None ->
+            match !changed |> Map.tryFind key with
+            | Some (chCl, value) ->
+              removed := !removed |> Map.put key clock
+              true // remove after changed
+
+            | None ->
+              match initialHeaders |> Map.tryFind key with
+              | Some _ ->
+                removed := !removed |> Map.put key clock
+                true // remove from initial
+              | None ->
+                false // never present
+
         clock <- clock + 1UL
+        res
+
+      member x.Keys = (x.Delta :> IDictionary<_, _>).Keys
+      member x.Values = (x.Delta :> IDictionary<_, _>).Values
+      member x.ContainsKey key = (x.Delta :> IDictionary<_, _>).ContainsKey key
+      member x.Add (key, value) = invalidOp "Add is not supported"
+      member x.TryGetValue (key, [<Out>] res : byref<string[]>) = (x.Delta :> IDictionary<_, _>).TryGetValue(key, ref res)
+
+    interface ICollection<KeyValuePair<string, string[]>> with
+      member x.Add kvp = invalidOp "Add is not supported"
+      member x.Count = (x.Delta :> IDictionary<_, _>).Count
+      member x.IsReadOnly = false
+      member x.Clear() = invalidOp "Clear is not supported"
+      member x.Contains kvp = (x.Delta :> ICollection<_>).Contains kvp
+      member x.CopyTo (array, arrayIndex) = (x.Delta :> ICollection<_>).CopyTo(array, arrayIndex)
+      member x.Remove kvp = (x :> IDictionary<_, _>).Remove kvp.Key
+
+    interface IEnumerable<KeyValuePair<string, string[]>> with
+      member x.GetEnumerator() = (x.Delta :> ICollection<_>).GetEnumerator()
+
+    interface IEnumerable with
+      member x.GetEnumerator() = (x.Delta :> IEnumerable).GetEnumerator()
 
   type internal DWr(initialState) =
     let state : HttpContext ref = ref initialState
@@ -316,11 +366,31 @@ module OwinAppFunc =
 
     interface IDictionary<string, obj> with
 
-      member x.Add (k, v) =
+      member x.Item
+        with get key =
+          match !removed |> Map.tryFind key with
+          | Some rmCl ->
+            match !changed |> Map.tryFind key with
+            | Some (chCl, value) ->
+              if chCl > rmCl then value else raise (KeyNotFoundException())
+
+            | None ->
+              raise (KeyNotFoundException())
+
+          | None ->
+            !changed
+            |> Map.tryFind key
+            |> Option.fold (fun s t -> snd t) (initialHeaders |> Map.find key)
+
+        and set key value =
+          changed := !changed |> Map.put key (clock, value)
+          clock <- clock + 1UL
+
+      member x.Add (owinSpecialKey, v) =
         // when you 'add' a key, you have to change the state for that key, in
         // Aether notation:
         // set the state to the 
-        state := Lens.set (owinRW |> Map.find k) v !state
+        state := Lens.set (owinRW |> Map.find owinSpecialKey) v !state
 
       member x.Remove k =
         // does it get removed before added?
@@ -336,7 +406,7 @@ module OwinAppFunc =
   let private wrap (ctx : HttpContext) =
     DWr ctx
 
-  [<CompiledName "ToSuave">]
+  [<CompiledName "OfOwin">]
   let ofOwin (owin : OwinApp) : WebPart =
     fun (ctx : HttpContext) ->
       let impl conn : SocketOp<unit> = socket {
@@ -369,17 +439,17 @@ module OwinServerFactory =
     | false, _ -> f ()
     | true, value -> value :?> 'a
 
-  let private ``read_env!`` (e : OwinEnvironment) key =
+  let private readEnv (e : OwinEnvironment) key =
     let res = read e key (fun () -> new Dictionary<string, obj>() :> OwinEnvironment)
     e.[key] <- res
     res
 
-  let private ``read_dic!`` (e : OwinEnvironment) key =
+  let private readDic (e : OwinEnvironment) key =
     let res = read e key (fun () -> new Dictionary<string, 'a>())
     e.[key] <- res
     res
 
-  let private ``read_list!`` (e : OwinEnvironment) key =
+  let private readList (e : OwinEnvironment) key =
     let res = read e key (fun () -> new List<'a>() :> IList<'a>)
     e.[key] <- res
     res
@@ -389,7 +459,7 @@ module OwinServerFactory =
     | false, _ -> failwithf "missing value for key '%s'" key
     | true, value -> value :?> 'a
 
-  let private get_default (e : OwinEnvironment) key map defaults =
+  let private getDefault (e : OwinEnvironment) key map defaults =
     match e.TryGetValue key with
     | false, _ -> defaults
     | true, value -> map (value :?> 'a)
@@ -398,7 +468,7 @@ module OwinServerFactory =
   let initialize (props : Dic<string, obj>) =
     if props = null then nullArg "props"
     props.[OwinConstants.owinVersion] <- "1.0.1"
-    let cap = ``read_env!`` props OwinConstants.CommonKeys.capabilities
+    let cap = readEnv props OwinConstants.CommonKeys.capabilities
     cap.[OwinConstants.CommonKeys.serverName] <- Globals.Internals.server_name
 
   [<CompiledName ("Create")>]
@@ -407,12 +477,11 @@ module OwinServerFactory =
     if props = null then nullArg "props"
 
     let bindings =
-      (``read_list!`` props OwinConstants.CommonKeys.addresses
-       : IList<OwinEnvironment>)
+      (readList props OwinConstants.CommonKeys.addresses : IList<OwinEnvironment>)
       |> Seq.map (fun dic ->
         let port   = get dic "port" : string
         let ip     = read dic "ip" (fun () -> "127.0.0.1") : string
-        let scheme = get_default dic "certificate" (fun _ -> HTTP) HTTP
+        let scheme = getDefault dic "certificate" (fun _ -> HTTP) HTTP
         { scheme = scheme; socketBinding = { ip = IPAddress.Parse ip; port = uint16 port } })
       |> List.ofSeq
 
