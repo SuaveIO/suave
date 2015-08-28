@@ -1,4 +1,4 @@
-﻿module Suave.Globals
+module Suave.Globals
 
 /// Get the current DateTimeOffset in UTC format.
 ///
@@ -28,7 +28,4 @@ module Internals =
 
   let SuaveVersion = Assembly.GetExecutingAssembly().GetName().Version.ToString()
 
-  [<Literal>]
-  let server_name = "Suave"
-
-  let serverHeader = String.Concat [| "Server: "; server_name; "/"; SuaveVersion; " (http://suave.io)" |]
+  let serverHeader = String.Concat [| "Server: Suave/"; SuaveVersion; " (http://suave.io)" |]
