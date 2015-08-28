@@ -510,7 +510,7 @@ module OwinServerFactory =
     if props = null then nullArg "props"
     props.[OwinConstants.owinVersion] <- "1.0.1"
     let cap = readEnv props OwinConstants.CommonKeys.capabilities
-    cap.[OwinConstants.CommonKeys.serverName] <- Globals.Internals.server_name
+    cap.[OwinConstants.CommonKeys.serverName] <- "Suave"
 
   [<CompiledName ("Create")>]
   let create (app : OwinAppFunc, props : Dic<string, obj>) =
