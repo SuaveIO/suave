@@ -385,11 +385,11 @@ module Http =
     /// 200 is the HTTP status code returned to the client. 2xx is a successful response, 3xx a redirection, 4xx a client error, and 5xx a server error.
     /// 2326 is the size of the object returned to the client, measured in bytes.
     let logFormat (ctx : HttpContext) =
-      
+
       let dash = function | "" | null -> "-" | x -> x
       let ci = Globalization.CultureInfo("en-US")
       let processId = System.Diagnostics.Process.GetCurrentProcess().Id.ToString()
-      sprintf "%O %s %s [%s] \"%s %s %s\" %d %s"
+      sprintf "%O %s %s [%s] \"%s %s %s\" %d %d"
         ctx.request.ipaddr
         processId //TODO: obtain connection owner via Ident protocol
                          // Authentication.UserNameKey
@@ -399,7 +399,9 @@ module Http =
         ctx.request.url.AbsolutePath
         ctx.request.httpVersion
         ctx.response.status.code
-        "0"
+        (match ctx.response.content with
+         | Bytes bs -> bs.LongLength
+         | _ -> 0L)
 
     let log (logger : Logger) (formatter : HttpContext -> string) (ctx : HttpContext) =
       logger.Log LogLevel.Debug <| fun _ ->
