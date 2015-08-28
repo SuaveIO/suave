@@ -1,4 +1,4 @@
-﻿module Suave.Owin
+module Suave.Owin
 
 // Following the specification:
 // https://github.com/owin/owin/blob/master/spec/owin-1.1.0.md
@@ -28,7 +28,7 @@ type OwinAppFunc =
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module OwinConstants =
-  (* 3.2.1 Request Data *)
+  // 3.2.1 Request Data
   [<CompiledName ("RequestScheme")>]
   let [<Literal>] requestScheme = "owin.RequestScheme"
   [<CompiledName ("RequestMethod")>]
@@ -50,7 +50,7 @@ module OwinConstants =
   [<CompiledName ("RequestUser")>]
   let [<Literal>] requestUser = "owin.RequestUser"
 
-  (* 3.2.2 Response Data *)
+  // 3.2.2 Response Data
   [<CompiledName ("ResponseStatusCode")>]
   let [<Literal>] responseStatusCode = "owin.ResponseStatusCode"
   [<CompiledName ("ResponseReasonPhrase")>]
@@ -62,13 +62,13 @@ module OwinConstants =
   [<CompiledName ("ResponseBody")>]
   let [<Literal>] responseBody = "owin.ResponseBody"
 
-  (* 3.2.3 Other Data *)
+  // 3.2.3 Other Data
   [<CompiledName ("CallCancelled")>]
   let [<Literal>] callCancelled = "owin.CallCancelled"
   [<CompiledName ("OwinVersion")>]
   let [<Literal>] owinVersion = "owin.Version"
 
-  (* http://owin.org/spec/CommonKeys.html *)
+  /// http://owin.org/spec/CommonKeys.html
   [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
   module CommonKeys =
     [<CompiledName ("ClientCertificate")>]
@@ -94,7 +94,7 @@ module OwinConstants =
     [<CompiledName ("OnSendingHeaders")>]
     let [<Literal>] onSendingHeaders = "server.OnSendingHeaders"
 
-  (* http://owin.org/extensions/owin-SendFile-Extension-v0.3.0.htm *)
+  /// http://owin.org/extensions/owin-SendFile-Extension-v0.3.0.htm
   [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
   module SendFiles =
     // 3.1. Startup
@@ -109,7 +109,7 @@ module OwinConstants =
     [<CompiledName ("SendAsync")>]
     let [<Literal>] sendAsync = "sendfile.SendAsync"
 
-  (* http://owin.org/extensions/owin-OpaqueStream-Extension-v0.3.0.htm *)
+  /// http://owin.org/extensions/owin-OpaqueStream-Extension-v0.3.0.htm
   [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
   module Opaque =
     // 3.1. Startup
@@ -126,7 +126,7 @@ module OwinConstants =
     [<CompiledName ("CallCanceled")>]
     let [<Literal>] callCancelled = "opaque.CallCancelled"
 
-  (* http://owin.org/extensions/owin-WebSocket-Extension-v0.4.0.htm *)
+  /// http://owin.org/extensions/owin-WebSocket-Extension-v0.4.0.htm
   [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
   module WebSocket =
     // 3.1. Startup
@@ -342,7 +342,7 @@ module OwinAppFunc =
         SocketTask impl)
 
     let owinMap =
-      [ (* 3.2.1 Request Data *)
+      [ // 3.2.1 Request Data
         OwinConstants.requestScheme, req HttpRequest.httpVersion_
         OwinConstants.requestMethod, req HttpRequest.method_
         OwinConstants.requestPathBase, run HttpRuntime.homeDirectory_
@@ -354,14 +354,14 @@ module OwinAppFunc =
         OwinConstants.requestId, HttpContext.request_ >--> HttpRequest.trace_ >--> Logging.TraceHeader.traceId_ >--> stringlyTyped uint64 <--> untyped
         OwinConstants.requestUser, HttpContext.userState_ >--> claimsPrincipal <--> untyped
 
-        (* 3.2.2 Response Data *)
+        // 3.2.2 Response Data
         OwinConstants.responseStatusCode, HttpContext.response_ >--> HttpResult.status_ >--> i2sc <--> untyped
         OwinConstants.responseReasonPhrase, HttpContext.response_ <--> untyped // TODO: add support for modifying phrasing to Core?
         OwinConstants.responseProtocol, HttpContext.request_ >--> HttpRequest.httpVersion_ >--> hv2p <--> untyped
         OwinConstants.responseHeaders, HttpContext.response_ >--> HttpResult.headers_ >--> mutableHeaders <--> untyped
         OwinConstants.responseBody, HttpContext.response_ >--> HttpResult.content_ >--> steamyBytes <--> untyped
 
-        (* 3.2.3 Other Data *)
+        // 3.2.3 Other Data
         OwinConstants.callCancelled, ((fun x -> cts.Token), (fun v x -> x)) <--> untyped // TODO: support cancellation token in HttpRequest signalling aborted request
         OwinConstants.owinVersion, ((fun x -> "1.3"), (fun v x -> x)) <--> untyped
 
