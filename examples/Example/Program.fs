@@ -62,18 +62,23 @@ module OwinSample =
   open Suave.Owin
 
   let app =
-    let owinApp = OwinAppFunc(fun (env : OwinEnvironment) ->
+    let owinApp (env : OwinEnvironment) =
       let hello = "Hello, OWIN!"B
+
+      let statusCode : int = unbox env.[OwinConstants.responseStatusCode]
+      // NOTE: this is the default, per HTTP, and should not be necessary.
+      env.[OwinConstants.responseStatusCode] <- box 200
 
       let responseHeaders : IDictionary<string, string[]> = unbox env.[OwinConstants.responseHeaders]
       responseHeaders.["Content-Type"] <- [| "text/plain" |]
-      responseHeaders.["Content-Length"] <- [| string hello.Length |]
+      // NOTE: this should be allowed and either ignored or overridden by the server.
+      //responseHeaders.["Content-Length"] <- [| string hello.Length |]
 
       let responseStream : IO.Stream = unbox env.[OwinConstants.responseBody]
-      responseStream.WriteAsync(hello, 0, hello.Length)
-    )
+      responseStream.Write(hello, 0, hello.Length)
+      async.Return ()
 
-    OwinAppFunc.ofOwinFunc owinApp
+    OwinAppFunc.ofOwin owinApp
 
 let app =
   choose [
