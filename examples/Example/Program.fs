@@ -65,14 +65,12 @@ module OwinSample =
     let owinApp (env : OwinEnvironment) =
       let hello = "Hello, OWIN!"B
 
-      let statusCode : int = unbox env.[OwinConstants.responseStatusCode]
       // NOTE: this is the default, per HTTP, and should not be necessary.
       env.[OwinConstants.responseStatusCode] <- box 200
 
       let responseHeaders : IDictionary<string, string[]> = unbox env.[OwinConstants.responseHeaders]
       responseHeaders.["Content-Type"] <- [| "text/plain" |]
-      // NOTE: this should be allowed and either ignored or overridden by the server.
-      //responseHeaders.["Content-Length"] <- [| string hello.Length |]
+      responseHeaders.["Content-Length"] <- [| string hello.Length |]
 
       let responseStream : IO.Stream = unbox env.[OwinConstants.responseBody]
       responseStream.Write(hello, 0, hello.Length)
