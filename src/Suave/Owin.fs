@@ -214,6 +214,10 @@ module OwinAppFunc =
           
       keys |> Seq.fold decide initialHeaders
 
+    member x.DeltaList =
+      x.Delta |> Seq.map (fun kvp -> kvp.Key, String.concat ", " kvp.Value)
+              |> Seq.toList
+
     new(dic : (string * string) list) =
       DeltaDictionary(dic |> List.map (fun (key, value) -> key, [| value |]) |> Map.ofList)
 
@@ -291,11 +295,7 @@ module OwinAppFunc =
     interface IEnumerable with
       member x.GetEnumerator() = (x.Delta :> IEnumerable).GetEnumerator()
 
-  type internal OwinDictionary(initialState) =
-    let cts = new CancellationTokenSource()
-    let state : HttpContext ref = ref initialState
-    let responseHeaders = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
-    let responseStream = new IO.MemoryStream()
+  module internal SirLensALot =
 
     let req l =
       HttpContext.request_ >--> l <--> untyped
@@ -305,6 +305,10 @@ module OwinAppFunc =
 
     let res l =
       HttpContext.response_ >--> l <--> untyped
+
+    let uriScheme : Property<_, string> =
+      (fun (uri : Uri) -> uri.Scheme),
+      (fun v uri -> UriBuilder(uri, Scheme = v).Uri)
 
     let uriAbsolutePath : Property<_, _> =
       (fun (uri : Uri) -> uri.AbsolutePath),
@@ -319,23 +323,6 @@ module OwinAppFunc =
                          | "HTTP/1.1" -> "1.1"
                          | x -> x)
 
-    let mutableHeaders : Property<(string * string) list, IDictionary<string, string[]>> =
-      // NOTE: As with content, this expects the OWIN app to set the headers, which should never happen.
-      // NOTE: Therefore, the headers will never propogate to the HttpContext.
-      // TODO: Headers dictionary that propogates changes immediately into the HttpContext.
-      (fun x -> upcast DeltaDictionary(x)),
-      (fun v x ->
-        v
-        |> Seq.map (fun kvp -> kvp.Key, String.concat ", " kvp.Value)
-        |> Seq.toList
-      )
-      (*(fun x ->
-        for key, value in x do
-          if not (responseHeaders.ContainsKey key) then
-            responseHeaders.Add(key, [|value|])
-          else ()
-        upcast responseHeaders),*)
-      //(fun v x -> x)
 
     let bytesToStream : Property<byte[], IO.Stream> =
       (fun x -> upcast new IO.MemoryStream(x)),
@@ -358,45 +345,87 @@ module OwinAppFunc =
       (fun x -> x.code),
       (fun v x -> HttpCode.TryParse v |> Option.get) // NOTE: assumes user only sets valid codes
 
-    let steamyBytes : Property<HttpContent, IO.Stream> =
-      (fun x ->
-        // TODO: provide a Stream that wraps the following:
-        //let impl conn = AsyncSocket.transferStream conn v
-        //SocketTask impl
-        // TODO: may also provide a Stream that continuously writes to the HttpContext.
-        let bs = Lens.getPartialOrElse HttpContent.BytesPLens [||] x
-        responseStream.Write(bs, 0, bs.Length)
-        upcast responseStream),
-      (fun _ x -> x) // NOTE: OWIN should never have its response stream replaced.
-
-    let owinMap =
+    let owinMap ct requestHeadersLens responseHeadersLens responseStreamLens =
       [ // 3.2.1 Request Data
-        OwinConstants.requestScheme, req HttpRequest.httpVersion_
-        OwinConstants.requestMethod, req HttpRequest.method_
-        OwinConstants.requestPathBase, run HttpRuntime.homeDirectory_
-        OwinConstants.requestPath, HttpContext.request_ >--> HttpRequest.url_ >--> uriAbsolutePath <--> untyped
-        OwinConstants.requestQueryString, req HttpRequest.rawQuery_
-        OwinConstants.requestProtocol, HttpContext.request_ >--> HttpRequest.httpVersion_ >--> hv2p <--> untyped
-        OwinConstants.requestHeaders, HttpContext.request_ >--> HttpRequest.headers_ >--> mutableHeaders <--> untyped
-        OwinConstants.requestBody, HttpContext.request_ >--> HttpRequest.rawForm_ >--> bytesToStream <--> untyped
-        OwinConstants.requestId, HttpContext.request_ >--> HttpRequest.trace_ >--> Logging.TraceHeader.traceId_ >--> stringlyTyped uint64 <--> untyped
-        OwinConstants.requestUser, HttpContext.userState_ >--> claimsPrincipal <--> untyped
+        // writeable / value???
+        OwinConstants.requestScheme,        HttpContext.request_ >--> HttpRequest.url_ >--> uriScheme <--> untyped
+        // writeable / value
+        OwinConstants.requestMethod,        req HttpRequest.method_
+        // writeable / value
+        OwinConstants.requestPathBase,      run HttpRuntime.homeDirectory_
+        // writeable / value
+        OwinConstants.requestPath,          HttpContext.request_ >--> HttpRequest.url_ >--> uriAbsolutePath <--> untyped
+        // writeable / value
+        OwinConstants.requestQueryString,   req HttpRequest.rawQuery_
+        // writeable / value???
+        OwinConstants.requestProtocol,      HttpContext.request_ >--> HttpRequest.httpVersion_ >--> hv2p <--> untyped
+        // !! mutation expected (!)
+        OwinConstants.requestHeaders,       HttpContext.request_ >--> HttpRequest.headers_ >--> requestHeadersLens <--> untyped
+        // writeable / value
+        OwinConstants.requestBody,          HttpContext.request_ >--> HttpRequest.rawForm_ >--> bytesToStream <--> untyped
+        OwinConstants.requestId,            HttpContext.request_ >--> HttpRequest.trace_ >--> Logging.TraceHeader.traceId_ >--> stringlyTyped uint64 <--> untyped
+        // writeable / value
+        OwinConstants.requestUser,          HttpContext.userState_ >--> claimsPrincipal <--> untyped
 
         // 3.2.2 Response Data
-        OwinConstants.responseStatusCode, HttpContext.response_ >--> HttpResult.status_ >--> i2sc <--> untyped
+        // writeable / value
+        OwinConstants.responseStatusCode,   HttpContext.response_ >--> HttpResult.status_ >--> i2sc <--> untyped
+        // writeable / value
         OwinConstants.responseReasonPhrase, HttpContext.response_ <--> untyped // TODO: add support for modifying phrasing to Core?
-        OwinConstants.responseProtocol, HttpContext.request_ >--> HttpRequest.httpVersion_ >--> hv2p <--> untyped
-        OwinConstants.responseHeaders, HttpContext.response_ >--> HttpResult.headers_ >--> mutableHeaders <--> untyped
-        OwinConstants.responseBody, HttpContext.response_ >--> HttpResult.content_ >--> steamyBytes <--> untyped
+        // writeable / value???
+        OwinConstants.responseProtocol,     HttpContext.request_ >--> HttpRequest.httpVersion_ >--> hv2p <--> untyped
+        // !! mutation expected
+        OwinConstants.responseHeaders,      HttpContext.response_ >--> HttpResult.headers_ >--> responseHeadersLens <--> untyped
+        // !! mutation expected
+        OwinConstants.responseBody,         HttpContext.response_ >--> HttpResult.content_ >--> responseStreamLens <--> untyped
 
         // 3.2.3 Other Data
-        OwinConstants.callCancelled, ((fun x -> cts.Token), (fun v x -> x)) <--> untyped // TODO: support cancellation token in HttpRequest signalling aborted request
+        OwinConstants.callCancelled, ((fun x -> ct), (fun v x -> x)) <--> untyped // TODO: support cancellation token in HttpRequest signalling aborted request
         OwinConstants.owinVersion, ((fun x -> "1.3"), (fun v x -> x)) <--> untyped
 
         // per-request storage
         "userData", HttpContext.userState_ <--> untyped
       ]
 
+  type internal OwinDictionary(initialState) =
+    // TODO: support streaming optionally
+      //let impl conn = AsyncSocket.transferStream conn v
+      //SocketTask impl
+    // TODO: cancelled request
+    // TODO: provide typed API in OwinRequest
+
+    let cts = new CancellationTokenSource()
+    let state : HttpContext ref = ref initialState //externally owned
+
+    // NOTE: I cannot make OwinDictionary immutable, because the Task OWIN returns doesn't have
+    // a proper return value (only unit)
+    //
+    // the first time any of these are requested, set the ref, return the reference
+    let requestHeaders : DeltaDictionary option ref = ref None
+    let requestHeadersLens : Property<(string * string) list, IDictionary<string, string[]>> =
+      (fun x ->
+        upcast (match !requestHeaders with
+                | None   -> let v = DeltaDictionary x in requestHeaders := Some v ; v
+                | Some v -> v)),
+      (fun v x -> invalidOp "setting RequestHeaders IDictionary<string, string[]> is not supported")
+
+    let responseHeaders : DeltaDictionary option ref = ref None
+    let responseHeadersLens : Property<(string * string) list, IDictionary<string, string[]>> =
+      (fun x ->
+        upcast (match !responseHeaders with
+                | None   -> let v = DeltaDictionary x in responseHeaders := Some v ; v
+                | Some v -> v)),
+      (fun v x -> invalidOp "setting ResponseHeaders IDictionary<string, string[]> is not supported")
+
+    let responseStream = new IO.MemoryStream()
+    let responseStreamLens : Property<HttpContent, IO.Stream> =
+      (fun x ->
+        let bs = Lens.getPartialOrElse HttpContent.BytesPLens [||] x
+        responseStream.Write(bs, 0, bs.Length)
+        upcast responseStream),
+      (fun _ x -> invalidOp "setting responseStream to a value is not supported in OWIN")
+
+    let owinMap = SirLensALot.owinMap cts.Token requestHeadersLens responseHeadersLens responseStreamLens
     let owinKeys = owinMap |> List.map fst |> Set.ofSeq
     let owinRW   = owinMap |> Map.ofList
 
@@ -409,14 +438,27 @@ module OwinAppFunc =
     member x.Interface =
       x :> IDictionary<string, obj>
 
-    member x.ResponseHeaders =
-      responseHeaders
+    /// Calling this returns a valid HttpResult that we can use for Suave
+    member x.Finalise() =
+      let reqHeaders_, respHeaders_, bytes_ =
+        HttpContext.request_ >--> HttpRequest.headers_,
+        HttpContext.response_ >--> HttpResult.headers_,
+        HttpContext.response_ >--> HttpResult.content_ >-?> HttpContent.BytesPLens
 
-    member x.ResponseStream =
-      responseStream
+      let setResponseHeaders (rhs : DeltaDictionary) =
+        Lens.set respHeaders_ rhs.DeltaList
 
-    member x.State =
-      state
+      let setRequestHeaders (rhs : DeltaDictionary) =
+        Lens.set reqHeaders_ rhs.DeltaList
+
+      let setResponseData (ms : IO.MemoryStream) =
+        ms.Seek(0L, IO.SeekOrigin.Begin) |> ignore
+        Lens.setPartial bytes_ (ms.ToArray())
+
+      !state
+      |> Option.foldBack setRequestHeaders !requestHeaders
+      |> Option.foldBack setResponseHeaders !responseHeaders
+      |> setResponseData responseStream
 
     interface OwinRequest with
       member x.OnSendingHeadersAction =
@@ -425,10 +467,6 @@ module OwinAppFunc =
     interface IDictionary<string, obj> with
       member x.Remove k =
         invalidOp "Remove not supported"
-        // does it get removed before added?
-        // in that case you need to keep track of the last value in the container
-        // of the value you're removing, so that it may be updated with the lens
-        // on Add
 
       member x.Item
         with get key =
@@ -477,27 +515,20 @@ module OwinAppFunc =
         |> Seq.map (fun key -> KeyValuePair(key, (x :> IDictionary<_, _>).[key]))
         |> fun seq -> (seq :> IEnumerable).GetEnumerator()
 
-  let private wrap (ctx : HttpContext) =
-    OwinDictionary ctx
+    interface IDisposable with
+      member x.Dispose() =
+        (responseStream :> IDisposable).Dispose()
+        (cts :> IDisposable).Dispose()
 
   [<CompiledName "OfOwin">]
   let ofOwin (owin : OwinApp) : WebPart =
     fun (ctx : HttpContext) ->
       let impl conn : SocketOp<unit> = socket {
-        let wrapper = wrap ctx
+        // disposable because it buffers what the OwinApp writes to the stream
+        use wrapper = new OwinDictionary(ctx)
         do! SocketOp.ofAsync (owin wrapper.Interface)
-        let ctx =
-            // TODO: update HttpContext headers and content from the OwinDictionary.
-            let state = !wrapper.State
-            { state with
-                response =
-                  { state.response with
-                      // NOTE: if using a custom stream that sends data to the socket, this is not needed.
-                      content = Bytes(wrapper.ResponseStream.ToArray())
-                      headers = [ for KeyValue(k,vs) in wrapper.ResponseHeaders -> k, String.concat ", " vs ]
-                  }
-            }
-        // if wrapper has OnHeadersSend, call that now => a new HttpContext (possibly), assign to ctx
+        let ctx = wrapper.Finalise()
+        //TO CONSIDER: do (wrapper :> OwinRequest).OnSendingHeadersAction
         do! Web.ParsingAndControl.writePreamble ctx
         do! Web.ParsingAndControl.writeContent ctx ctx.response.content
       }

@@ -85,8 +85,20 @@ let endToEnd =
 
       env.[OwinConstants.responseStatusCode] <- box 201
 
+      // set content type, new reference, invalid charset
       let responseHeaders : IDictionary<string, string[]> = unbox env.[OwinConstants.responseHeaders]
-      responseHeaders.["Content-Type"] <- [| "text/plain; charset=utf-8" |]
+      responseHeaders.["Content-Type"] <- [| "application/json; charset=utf-1" |]
+
+      // overwrite invalid 1, new reference, invalid charset
+      let responseHeaders' : IDictionary<string, string[]> = unbox env.[OwinConstants.responseHeaders]
+      responseHeaders'.["Content-Type"] <- [| "text/plain; charset=utf-2" |]
+
+      // overwrite invalid 2, old reference, invalid charset
+      responseHeaders.["Content-Type"] <- [| "application/json; charset=utf-3" |]
+
+      // overwrite final, new reference
+      let responseHeaders'' : IDictionary<string, string[]> = unbox env.[OwinConstants.responseHeaders]
+      responseHeaders''.["Content-Type"] <- [| "text/plain; charset=utf-8" |]
 
       let responseStream : IO.Stream = unbox env.[OwinConstants.responseBody]
       responseStream.Write(hello, 0, hello.Length)
@@ -107,12 +119,20 @@ let endToEnd =
         eq "Http Status Code" HttpStatusCode.Created result.StatusCode
         eq "Content Length" ("Hello, OWIN!"B.LongLength) (result.Content.Headers.ContentLength.Value)
         eq "Contents" "Hello, OWIN!" (result.Content.ReadAsStringAsync().Result)
-        eq "Headers set before the OWIN app func, are sent"
-           (true, ["Before OWIN"] :> _ seq)
-           (result.Headers.TryGetValues("X-Custom-Before"))
-        eq "Headers after before the OWIN app func, are sent"
-           (true, ["After OWIN"] :> _ seq)
-           (result.Headers.TryGetValues("X-Custom-After"))
+
+        match result.Headers.TryGetValues("X-Custom-Before") with
+        | true, actual ->
+          eqs "Headers set before the OWIN app func, are sent"
+              ["Before OWIN"]
+              actual
+        | false, _ -> Tests.failtest "X-Custom-Before is missing"
+
+        match result.Headers.TryGetValues("X-Custom-After") with
+        | true, actual ->
+          eqs "Headers after before the OWIN app func, are sent"
+              ["After OWIN"]
+              actual
+        | false, _ -> Tests.failtest "X-Custom-After is missing"
 
       runWithConfig composedApp |> reqResp Types.GET "/" "" None None DecompressionMethods.GZip id asserts
     ]
