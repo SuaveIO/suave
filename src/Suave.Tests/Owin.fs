@@ -20,13 +20,59 @@ open Suave.Tests.TestUtilities
 open Suave.Testing
 
 let eq msg a b =
-  Assert.Equal(msg, b, a)
+  Assert.Equal(msg, a, b)
+
+let eqs msg bs aas =
+  Assert.Equal(msg, bs |> List.ofSeq, aas |> List.ofSeq)
+
+let throws msg matcher fn =
+  try fn () with e when matcher e -> ()
 
 [<Tests>]
 let unit =
+  let create (m : (string * string) list) =
+    OwinAppFunc.DeltaDictionary(m)
+
   testList "infrastructure" [
-    testCase "DeltaDictionary" <| fun () ->
-      ()
+    testList "DeltaDictionary" [
+      testCase "construct & Delta" <| fun () ->
+        let subject = create ["a", "a-1"]
+        eq "has a" [|"a-1"|] subject.Delta.["a"]
+
+      testCase "interaction set/remove" <| fun _ ->
+        let subject = create ["a", "a-1"]
+        eqs "has a" ["a-1"] subject.Delta.["a"]
+
+        eqs "has only a"
+           ([ "a" ] :> _ seq)
+           ((subject.Delta :> IDictionary<_, _>).Keys :> _ seq)
+
+        (subject :> IDictionary<_, _>).["b"] <- [| "b-1"; "b-2" |]
+        eqs "has b" ["b-1"; "b-2"] subject.Delta.["b"]
+
+        eq "can remove b once" true ((subject :> IDictionary<_, _>).Remove("b"))
+        throws "key not found exception on b"
+               (function :? KeyNotFoundException -> true | _ -> false)
+               (fun _ -> subject.Delta.["b"] |> ignore)
+        eq "cannot remove b twice" false ((subject :> IDictionary<_, _>).Remove("b"))
+
+        (subject :> IDictionary<_, _>).["b"] <- [| "b-3" |]
+        eqs "has b once more" ["b-3"] subject.Delta.["b"]
+
+        (subject :> IDictionary<_, _>).["b"] <- [| "b-4" |]
+        eqs "can change b after remove" ["b-4"] ((subject.Delta :> IDictionary<_, _>).["b"])
+        eq "can remove b after change b after remove" true ((subject :> IDictionary<_, _>).Remove("b"))
+        
+        (subject :> IDictionary<_, _>).["c"] <- [| "c-1" |]
+        eqs "has a, c"
+            ["a"; "c"]
+            ((subject.Delta :> IDictionary<_, _>).Keys :> _ seq)
+
+        eq "can remove a once" true ((subject :> IDictionary<_, _>).Remove("a"))
+        eq "cannot remove a twice" false ((subject :> IDictionary<_, _>).Remove("a"))
+
+        eq "cannot remove what's never been there" false ((subject :> IDictionary<_, _>).Remove("x"))
+      ]
     ]
 
 [<Tests>]
