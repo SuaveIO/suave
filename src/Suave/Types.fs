@@ -449,7 +449,7 @@ module HttpBinding =
 type HttpContent =
   | NullContent
   | Bytes of byte []
-  | SocketTask of (Connection -> SocketOp<unit>)
+  | SocketTask of (Connection * HttpResult -> SocketOp<unit>)
 
   static member NullContentPIso =
     (function | NullContent -> Some ()
@@ -470,16 +470,16 @@ type HttpContent =
   static member BytesPLens  : PLens<HttpContent, byte[]> =
     Aether.idLens <-?> HttpContent.BytesPIso
 
-  static member SocketTaskPLens : PLens<HttpContent, Connection -> SocketOp<unit>> =
+  static member SocketTaskPLens : PLens<HttpContent, Connection * HttpResult -> SocketOp<unit>> =
     Aether.idLens <-?> HttpContent.SocketTaskPIso
 
 /// The HttpResult is the structure that you work with to tell Suave how to
 /// send the response. Have a look at the docs for HttpContent for further
 /// details on what is possible.
-type HttpResult =
-  { status  : HttpCode
-    headers : (string * string) list
-    content : HttpContent
+and HttpResult =
+  { status        : HttpCode
+    headers       : (string * string) list
+    content       : HttpContent
     writePreamble : bool }
 
   /// The empty HttpResult, with a 404 and a HttpContent.NullContent content

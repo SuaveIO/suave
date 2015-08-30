@@ -414,8 +414,8 @@ module internal ParsingAndControl =
       if content.Length > 0 then
         do! send connection (new ArraySegment<_>(content, 0, content.Length))
       }
-    | SocketTask f -> socket{ 
-      return! f context.connection
+    | SocketTask f -> socket {
+        return! f (context.connection, context.response)
       }
     | NullContent -> socket.Return()
 

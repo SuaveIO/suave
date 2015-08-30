@@ -79,7 +79,7 @@ let unit =
 let endToEnd =
   let runWithConfig = runWith defaultConfig
 
-  let owinApp : WebPart =
+  let owinHelloWorld : WebPart =
     let owinApp (env : OwinEnvironment) =
       let hello = "Hello, OWIN!"B
 
@@ -107,10 +107,10 @@ let endToEnd =
     OwinAppFunc.ofOwin owinApp
 
   let composedApp =
-    path "/"
+    path "/yey-owin"
       >>= setHeader "X-Custom-Before" "Before OWIN"
-      >>= owinApp
-      >>= Writers.setHeader "X-Custom-After" "After OWIN"
+      >>= owinHelloWorld
+      >>= setHeader "X-Custom-After" "After OWIN"
 
   testList "e2e" [
     testCase "Hello, OWIN!" <| fun _ ->
@@ -134,6 +134,6 @@ let endToEnd =
               actual
         | false, _ -> Tests.failtest "X-Custom-After is missing"
 
-      runWithConfig composedApp |> reqResp Types.GET "/" "" None None DecompressionMethods.GZip id asserts
+      runWithConfig composedApp |> reqResp Types.GET "/yey-owin" "" None None DecompressionMethods.GZip id asserts
     ]
     

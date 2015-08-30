@@ -507,7 +507,7 @@ module Http =
     open ServeResource
 
     let sendFile fileName (compression : bool) (ctx : HttpContext) =
-      let writeFile file conn = socket {
+      let writeFile file (conn, _) = socket {
         let getFs = fun path -> new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read) :> Stream
         let getLm = fun path -> FileInfo(path).LastWriteTime
         use! fs = Compression.transformStream file getFs getLm compression ctx.runtime.compressionFolder ctx conn
@@ -622,7 +622,7 @@ module Http =
                       resourceName
                       (compression : bool)
                       (ctx : HttpContext) =
-      let writeResource name conn = socket {
+      let writeResource name (conn, _) = socket {
         let getFs = fun name -> assembly.GetManifestResourceStream(name)
         let getLm = fun _ -> lastModified assembly
         use! fs = Compression.transformStream name getFs getLm compression ctx.runtime.compressionFolder ctx conn
@@ -720,7 +720,7 @@ module Http =
         return! dispatch out
       }
 
-    let private handShakeAux f (out : Connection) =
+    let private handShakeAux f (out : Connection, _) =
       socket {
         // resp.SendChunked       <- false
         // Buggy Internet Explorer; 2kB of comment padding for IE
@@ -740,7 +740,6 @@ module Http =
                   :: ("Access-Control-Allow-Origin", "*")
                   :: []
                 content = SocketTask (handShakeAux f)
-                //chunked = false
             }
       }
       |> succeed

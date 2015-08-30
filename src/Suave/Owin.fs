@@ -523,9 +523,9 @@ module OwinAppFunc =
   [<CompiledName "OfOwin">]
   let ofOwin (owin : OwinApp) : WebPart =
     fun (ctx : HttpContext) ->
-      let impl conn : SocketOp<unit> = socket {
+      let impl (conn, response) : SocketOp<unit> = socket {
         // disposable because it buffers what the OwinApp writes to the stream
-        use wrapper = new OwinDictionary(ctx)
+        use wrapper = new OwinDictionary({ ctx with response = response })
         do! SocketOp.ofAsync (owin wrapper.Interface)
         let ctx = wrapper.Finalise()
         //TO CONSIDER: do (wrapper :> OwinRequest).OnSendingHeadersAction
