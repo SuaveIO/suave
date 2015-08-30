@@ -17,15 +17,6 @@ open Suave.Http
 open Suave.Types
 open Suave.Sockets
 
-type OwinEnvironment =
-  IDictionary<string, obj>
-
-type OwinApp =
-  OwinEnvironment -> Async<unit>
-
-type OwinAppFunc =
-  Func<OwinEnvironment, Task>
-
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module OwinConstants =
   // 3.2.1 Request Data
@@ -33,6 +24,7 @@ module OwinConstants =
   let [<Literal>] requestScheme = "owin.RequestScheme"
   [<CompiledName ("RequestMethod")>]
   let [<Literal>] requestMethod = "owin.RequestMethod"
+  /// Servers may have the ability to map application delegates to some base path. For example, a server might have an application delegate configured to respond to requests beginning with "/my-app", in which case it should set the value of "owin.RequestPathBase" in the environment dictionary to "/my-app". If this server receives a request for "/my-app/foo", the “owin.RequestPath” value of the environment dictionary provided to the application configured to respond at "/my-app" should be "/foo".
   [<CompiledName ("RequestPathBase")>]
   let [<Literal>] requestPathBase = "owin.RequestPathBase"
   [<CompiledName ("RequestPath")>]
@@ -164,6 +156,15 @@ module OwinConstants =
     [<CompiledName ("ClientCloseDescription")>]
     let [<Literal>] clientCloseDescription = "websocket.ClientCloseDescription"
 
+type OwinEnvironment =
+  IDictionary<string, obj>
+
+type OwinApp =
+  OwinEnvironment -> Async<unit>
+
+type OwinAppFunc =
+  Func<OwinEnvironment, Task>
+
 [<RequireQualifiedAccess>]
 [<CompilationRepresentation (CompilationRepresentationFlags.ModuleSuffix)>]
 module OwinAppFunc =
@@ -176,12 +177,6 @@ module OwinAppFunc =
 
   type OwinRequest =
     abstract OnSendingHeadersAction : Action<Action<obj>, obj>
-
-  let untyped<'t> : Iso<'t, obj> =
-    box, unbox
-
-  let inline stringlyTyped (convertBack : string -> 'a) : Property<'a, string> =
-    string, fun v x -> convertBack v
 
   type private Clock = uint64
 
@@ -297,6 +292,16 @@ module OwinAppFunc =
 
   module internal SirLensALot =
 
+    let untyped<'t> : Iso<'t, obj> =
+      (fun x ->
+        box x),
+      (fun x ->
+        //failwithf "converting %s to %s" (x.GetType().Name) (typeof<'t>.Name)
+        unbox x)
+
+    let inline stringlyTyped (convertBack : string -> 'a) : Property<'a, string> =
+      string, fun v x -> convertBack v
+
     let req l =
       HttpContext.request_ >--> l <--> untyped
 
@@ -305,6 +310,10 @@ module OwinAppFunc =
 
     let res l =
       HttpContext.response_ >--> l <--> untyped
+
+    let methodString : Property<HttpMethod, string> =
+      (fun x -> x.ToString()),
+      (fun v x -> HttpMethod.parse v)
 
     let uriScheme : Property<_, string> =
       (fun (uri : Uri) -> uri.Scheme),
@@ -345,14 +354,23 @@ module OwinAppFunc =
       (fun x -> x.code),
       (fun v x -> HttpCode.TryParse v |> Option.get) // NOTE: assumes user only sets valid codes
 
+    let constant x =
+      ((fun _ -> x),
+       (fun v x -> x)
+      ) <--> untyped
+
+    let mapFindLens key : Property<Map<_, _>, _>=
+      (fun x -> x |> Map.find key),
+      (fun v x -> x |> Map.put key v)
+
     let owinMap ct requestHeadersLens responseHeadersLens responseStreamLens =
       [ // 3.2.1 Request Data
         // writeable / value???
         OwinConstants.requestScheme,        HttpContext.request_ >--> HttpRequest.url_ >--> uriScheme <--> untyped
         // writeable / value
-        OwinConstants.requestMethod,        req HttpRequest.method_
+        OwinConstants.requestMethod,        HttpContext.request_ >--> HttpRequest.method_ >--> methodString <--> untyped
         // writeable / value
-        OwinConstants.requestPathBase,      run HttpRuntime.homeDirectory_
+        OwinConstants.requestPathBase,      constant String.Empty
         // writeable / value
         OwinConstants.requestPath,          HttpContext.request_ >--> HttpRequest.url_ >--> uriAbsolutePath <--> untyped
         // writeable / value
@@ -384,8 +402,27 @@ module OwinAppFunc =
         OwinConstants.owinVersion, ((fun x -> "1.3"), (fun v x -> x)) <--> untyped
 
         // per-request storage
-        "userData", HttpContext.userState_ <--> untyped
+        "suave.UserData", HttpContext.userState_ <--> untyped
+
+        // TODO: common keys
+        OwinConstants.CommonKeys.addresses, HttpContext.userState_ <--> untyped // TODO:
+        OwinConstants.CommonKeys.capabilities, HttpContext.userState_ <--> untyped // TODO:
+        OwinConstants.CommonKeys.clientCertificate, HttpContext.userState_ <--> untyped // TODO:
+        OwinConstants.CommonKeys.isLocal, HttpContext.userState_ <--> untyped // TODO:
+        OwinConstants.CommonKeys.localIpAddress, HttpContext.userState_ <--> untyped // TODO:
+        OwinConstants.CommonKeys.localPort, HttpContext.userState_ <--> untyped // TODO:
+        OwinConstants.CommonKeys.onSendingHeaders, HttpContext.userState_ <--> untyped // TODO:
+        OwinConstants.CommonKeys.remoteIpAddress, HttpContext.userState_ <--> untyped // TODO:
+        OwinConstants.CommonKeys.remotePort, HttpContext.userState_ <--> untyped // TODO:
+        OwinConstants.CommonKeys.serverName, constant "Suave"
       ]
+
+  type UnclosableMemoryStream() =
+    inherit IO.MemoryStream()
+    // I can't be bothered to do a full delegation... R# needed for that.
+    override x.Close () = ()
+    member x.Dispose() = ()
+    member x.RealDispose() = base.Dispose()
 
   type internal OwinDictionary(initialState) =
     // TODO: support streaming optionally
@@ -393,7 +430,6 @@ module OwinAppFunc =
       //SocketTask impl
     // TODO: cancelled request
     // TODO: provide typed API in OwinRequest
-
     let cts = new CancellationTokenSource()
     let state : HttpContext ref = ref initialState //externally owned
 
@@ -417,7 +453,7 @@ module OwinAppFunc =
                 | Some v -> v)),
       (fun v x -> invalidOp "setting ResponseHeaders IDictionary<string, string[]> is not supported")
 
-    let responseStream = new IO.MemoryStream()
+    let responseStream = new UnclosableMemoryStream()
     let responseStreamLens : Property<HttpContent, IO.Stream> =
       (fun x ->
         let bs = Lens.getPartialOrElse HttpContent.BytesPLens [||] x
@@ -430,10 +466,10 @@ module OwinAppFunc =
     let owinRW   = owinMap |> Map.ofList
 
     let owinLensLens key : Lens<Map<string, Property<HttpContext, obj>>, Property<HttpContext, obj>> =
-      (Map.tryFind key >> function
-                          | None -> invalidOp (sprintf "Couldn't use key '%s' to modify OwinEnvironment" key)
-                          | Some lens -> lens),
-      (fun v x -> invalidOp "cannot set owin properties")
+      let userDataItem_ = HttpContext.userState_ >--> SirLensALot.mapFindLens key <--> SirLensALot.untyped
+      (fun x -> Map.tryFind key x |> function | None -> userDataItem_
+                                              | Some lens -> lens),
+      (fun v x -> invalidOp "TODO")
 
     member x.Interface =
       x :> IDictionary<string, obj>
@@ -472,7 +508,8 @@ module OwinAppFunc =
         with get key =
           Lens.get (Lens.get (owinLensLens key) owinRW) !state
         and set key value =
-          state := Lens.set (Lens.get (owinLensLens key) owinRW) value !state
+          let settable = Lens.get (owinLensLens key) owinRW
+          state := Lens.set settable value !state
 
       member x.Keys =
         (owinRW :> IDictionary<_, _>).Keys
@@ -517,7 +554,7 @@ module OwinAppFunc =
 
     interface IDisposable with
       member x.Dispose() =
-        (responseStream :> IDisposable).Dispose()
+        responseStream.RealDispose()
         (cts :> IDisposable).Dispose()
 
   [<CompiledName "OfOwin">]

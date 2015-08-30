@@ -33,6 +33,10 @@ let unit =
   let create (m : (string * string) list) =
     OwinAppFunc.DeltaDictionary(m)
 
+  let createOwin () =
+    let request = { HttpRequest.empty with ``method`` = HttpMethod.PUT }
+    new OwinAppFunc.OwinDictionary({ HttpContext.empty with request = request })
+
   testList "infrastructure" [
     testList "DeltaDictionary" [
       testCase "construct & Delta" <| fun () ->
@@ -72,6 +76,18 @@ let unit =
         eq "cannot remove a twice" false ((subject :> IDictionary<_, _>).Remove("a"))
 
         eq "cannot remove what's never been there" false ((subject :> IDictionary<_, _>).Remove("x"))
+      ]
+
+    testList "OwinDictionary" [
+      testCase "read/write HttpMethod" <| fun _ ->
+        let subj : IDictionary<_, _> = upcast createOwin ()
+        eq "method" "PUT" (subj.[OwinConstants.requestMethod] |> unbox)
+        subj.[OwinConstants.requestMethod] <- "get"
+
+      testCase "read/write custom" <| fun _ ->
+        let subj : IDictionary<_, _> = upcast createOwin ()
+        subj.["testing.MyKey"] <- "oh yeah"
+        eq "read back" "oh yeah" (subj.["testing.MyKey"] |> unbox)
       ]
     ]
 
