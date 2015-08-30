@@ -61,7 +61,7 @@ module OwinSample =
   open System.Collections.Generic
   open Suave.Owin
 
-  let app =
+  let app : WebPart =
     let owinApp (env : OwinEnvironment) =
       let hello = "Hello, OWIN!"B
 
@@ -130,7 +130,11 @@ let app =
       >>= path "/custom_header"
       >>= setHeader "X-Doge-Location" "http://www.elregalista.com/wp-content/uploads/2014/02/46263312.jpg"
       >>= OK "Doooooge"
-    GET >>= path "/owin" >>= OwinSample.app
+    GET
+      >>= path "/owin"
+      >>= Writers.setHeader "X-Custom-Before" "Before OWIN"
+      >>= OwinSample.app
+      >>= Writers.setHeader "X-Custom-After" "After OWIN"
     RequestErrors.NOT_FOUND "Found no handlers"
     ] >>= log logger logFormat
 
