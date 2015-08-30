@@ -3,7 +3,7 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{4e3fe86d-fdb7-4daa-8d58-13f06f75d240}</ProjectGuid>
+    <ProjectGuid>{4E3FE86D-FDB7-4DAA-8D58-13F06F75D240}</ProjectGuid>
     <OutputType>Library</OutputType>
     <RootNamespace>Suave.DotLiqud</RootNamespace>
     <AssemblyName>Suave.DotLiquid</AssemblyName>

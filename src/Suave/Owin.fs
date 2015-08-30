@@ -59,6 +59,15 @@ module OwinConstants =
   let [<Literal>] responseProtocol = "owin.ResponseProtocol"
   [<CompiledName ("ResponseHeaders")>]
   let [<Literal>] responseHeaders = "owin.ResponseHeaders"
+
+  /// The server provides a response body Stream with the “owin.ResponseBody” key
+  /// in the initial environment dictionary.  The headers, status code, reason
+  /// phrase, etc., can be modified up until the first write to the response body
+  /// stream.  Upon first write, the server validates and sends the headers.
+  /// Applications MAY choose to buffer response data to delay the header
+  /// finalization.
+  ///
+  /// Currently, Suave buffers the response data.
   [<CompiledName ("ResponseBody")>]
   let [<Literal>] responseBody = "owin.ResponseBody"
 
@@ -176,7 +185,7 @@ module OwinAppFunc =
 
   type private Clock = uint64
 
-  type internal Muuutation(initialHeaders : Map<string, string[]>) =
+  type internal DeltaDictionary(initialHeaders : Map<string, string[]>) =
     let changed : Map<string, Clock * string []> ref = ref Map.empty
     let removed : Map<string, Clock> ref = ref Map.empty
     let mutable clock = 1UL
@@ -204,6 +213,9 @@ module OwinAppFunc =
           headers |> Map.put key (!changed |> Map.find key |> snd)
           
       keys |> Seq.fold decide initialHeaders
+
+    new(dic : (string * string) list) =
+      DeltaDictionary(dic |> List.map (fun (key, value) -> key, [| value |]) |> Map.ofList)
 
     interface IDictionary<string, string[]> with
       member x.Item
@@ -307,20 +319,23 @@ module OwinAppFunc =
                          | "HTTP/1.1" -> "1.1"
                          | x -> x)
 
-    // as we say in Swedish; slafsigt!
     let mutableHeaders : Property<(string * string) list, IDictionary<string, string[]>> =
       // NOTE: As with content, this expects the OWIN app to set the headers, which should never happen.
       // NOTE: Therefore, the headers will never propogate to the HttpContext.
       // TODO: Headers dictionary that propogates changes immediately into the HttpContext.
-      //(fun x -> Muuutation(x |> List.map (fun (key, value) -> key, [| value |]) |> Map.ofList)),
-      //(fun v x -> v.Delta |> Map.toList |> List.map (fun (k, vs) -> k, String.concat ", " vs))
-      (fun x ->
+      (fun x -> upcast DeltaDictionary(x)),
+      (fun v x ->
+        v
+        |> Seq.map (fun kvp -> kvp.Key, String.concat ", " kvp.Value)
+        |> Seq.toList
+      )
+      (*(fun x ->
         for key, value in x do
           if not (responseHeaders.ContainsKey key) then
             responseHeaders.Add(key, [|value|])
           else ()
-        upcast responseHeaders),
-      (fun v x -> x)
+        upcast responseHeaders),*)
+      //(fun v x -> x)
 
     let bytesToStream : Property<byte[], IO.Stream> =
       (fun x -> upcast new IO.MemoryStream(x)),
