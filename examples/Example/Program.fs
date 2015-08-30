@@ -57,6 +57,27 @@ let mimeTypes =
   Writers.defaultMimeTypesMap
     >=> (function | ".avi" -> Writers.mkMimeType "video/avi" false | _ -> None)
 
+module OwinSample =
+  open System.Collections.Generic
+  open Suave.Owin
+
+  let app =
+    let owinApp (env : OwinEnvironment) =
+      let hello = "Hello, OWIN!"B
+
+      // NOTE: this is the default, per HTTP, and should not be necessary.
+      env.[OwinConstants.responseStatusCode] <- box 200
+
+      let responseHeaders : IDictionary<string, string[]> = unbox env.[OwinConstants.responseHeaders]
+      responseHeaders.["Content-Type"] <- [| "text/plain" |]
+      responseHeaders.["Content-Length"] <- [| string hello.Length |]
+
+      let responseStream : IO.Stream = unbox env.[OwinConstants.responseBody]
+      responseStream.Write(hello, 0, hello.Length)
+      async.Return ()
+
+    OwinAppFunc.ofOwin owinApp
+
 let app =
   choose [
     GET >>= path "/hello" >>= never
@@ -109,6 +130,7 @@ let app =
       >>= path "/custom_header"
       >>= setHeader "X-Doge-Location" "http://www.elregalista.com/wp-content/uploads/2014/02/46263312.jpg"
       >>= OK "Doooooge"
+    GET >>= path "/owin" >>= OwinSample.app
     RequestErrors.NOT_FOUND "Found no handlers"
     ] >>= log logger logFormat
 

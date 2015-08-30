@@ -282,6 +282,8 @@ module OwinAppFunc =
   type internal OwinDictionary(initialState) =
     let cts = new CancellationTokenSource()
     let state : HttpContext ref = ref initialState
+    let responseHeaders = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
+    let responseStream = new IO.MemoryStream()
 
     let req l =
       HttpContext.request_ >--> l <--> untyped
@@ -306,9 +308,19 @@ module OwinAppFunc =
                          | x -> x)
 
     // as we say in Swedish; slafsigt!
-    let mutableHeaders : Property<(string * string) list, Muuutation> =
-      (fun x -> Muuutation(x |> List.map (fun (key, value) -> key, [| value |]) |> Map.ofList)),
-      (fun v x -> v.Delta |> Map.toList |> List.map (fun (k, vs) -> k, String.concat ", " vs))
+    let mutableHeaders : Property<(string * string) list, IDictionary<string, string[]>> =
+      // NOTE: As with content, this expects the OWIN app to set the headers, which should never happen.
+      // NOTE: Therefore, the headers will never propogate to the HttpContext.
+      // TODO: Headers dictionary that propogates changes immediately into the HttpContext.
+      //(fun x -> Muuutation(x |> List.map (fun (key, value) -> key, [| value |]) |> Map.ofList)),
+      //(fun v x -> v.Delta |> Map.toList |> List.map (fun (k, vs) -> k, String.concat ", " vs))
+      (fun x ->
+        for key, value in x do
+          if not (responseHeaders.ContainsKey key) then
+            responseHeaders.Add(key, [|value|])
+          else ()
+        upcast responseHeaders),
+      (fun v x -> x)
 
     let bytesToStream : Property<byte[], IO.Stream> =
       (fun x -> upcast new IO.MemoryStream(x)),
@@ -333,13 +345,14 @@ module OwinAppFunc =
 
     let steamyBytes : Property<HttpContent, IO.Stream> =
       (fun x ->
-        let ms = new IO.MemoryStream()
+        // TODO: provide a Stream that wraps the following:
+        //let impl conn = AsyncSocket.transferStream conn v
+        //SocketTask impl
+        // TODO: may also provide a Stream that continuously writes to the HttpContext.
         let bs = Lens.getPartialOrElse HttpContent.BytesPLens [||] x
-        ms.Write(bs, 0, bs.Length) // hmm? flag that we have a stream?
-        upcast ms),
-      (fun v x ->
-        let impl conn = AsyncSocket.transferStream conn v
-        SocketTask impl)
+        responseStream.Write(bs, 0, bs.Length)
+        upcast responseStream),
+      (fun _ x -> x) // NOTE: OWIN should never have its response stream replaced.
 
     let owinMap =
       [ // 3.2.1 Request Data
@@ -380,6 +393,12 @@ module OwinAppFunc =
 
     member x.Interface =
       x :> IDictionary<string, obj>
+
+    member x.ResponseHeaders =
+      responseHeaders
+
+    member x.ResponseStream =
+      responseStream
 
     member x.State =
       state
@@ -452,7 +471,17 @@ module OwinAppFunc =
       let impl conn : SocketOp<unit> = socket {
         let wrapper = wrap ctx
         do! SocketOp.ofAsync (owin wrapper.Interface)
-        let ctx = !wrapper.State
+        let ctx =
+            // TODO: update HttpContext headers and content from the OwinDictionary.
+            let state = !wrapper.State
+            { state with
+                response =
+                  { state.response with
+                      // NOTE: if using a custom stream that sends data to the socket, this is not needed.
+                      content = Bytes(wrapper.ResponseStream.ToArray())
+                      headers = [ for KeyValue(k,vs) in wrapper.ResponseHeaders -> k, String.concat ", " vs ]
+                  }
+            }
         // if wrapper has OnHeadersSend, call that now => a new HttpContext (possibly), assign to ctx
         do! Web.ParsingAndControl.writePreamble ctx
         do! Web.ParsingAndControl.writeContent ctx ctx.response.content
