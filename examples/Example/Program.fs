@@ -105,6 +105,11 @@ let app =
           | None ->
             store.set "counter" 1
             >>= OK "First time")
+    GET
+      >>= path "/owin"
+      >>= Writers.setHeader "X-Custom-Before" "Before OWIN"
+      >>= OwinSample.app
+      >>= Writers.setHeader "X-Custom-After" "After OWIN"
     basicAuth // from here on it will require authentication
     GET >>= path "/events" >>= request (fun r -> EventSource.handShake (CounterDemo.counterDemo r))
     GET >>= browseHome //serves file if exists
@@ -130,11 +135,6 @@ let app =
       >>= path "/custom_header"
       >>= setHeader "X-Doge-Location" "http://www.elregalista.com/wp-content/uploads/2014/02/46263312.jpg"
       >>= OK "Doooooge"
-    GET
-      >>= path "/owin"
-      >>= Writers.setHeader "X-Custom-Before" "Before OWIN"
-      >>= OwinSample.app
-      >>= Writers.setHeader "X-Custom-After" "After OWIN"
     RequestErrors.NOT_FOUND "Found no handlers"
     ] >>= log logger logFormat
 

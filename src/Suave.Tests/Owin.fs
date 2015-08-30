@@ -79,37 +79,34 @@ let unit =
 let endToEnd =
   let runWithConfig = runWith defaultConfig
 
-  let owinHelloWorld : WebPart =
-    let owinApp (env : OwinEnvironment) =
-      let hello = "Hello, OWIN!"B
+  let owinHelloWorld (env : OwinEnvironment) =
+    let hello = "Hello, OWIN!"B
 
-      env.[OwinConstants.responseStatusCode] <- box 201
+    env.[OwinConstants.responseStatusCode] <- box 201
 
-      // set content type, new reference, invalid charset
-      let responseHeaders : IDictionary<string, string[]> = unbox env.[OwinConstants.responseHeaders]
-      responseHeaders.["Content-Type"] <- [| "application/json; charset=utf-1" |]
+    // set content type, new reference, invalid charset
+    let responseHeaders : IDictionary<string, string[]> = unbox env.[OwinConstants.responseHeaders]
+    responseHeaders.["Content-Type"] <- [| "application/json; charset=utf-1" |]
 
-      // overwrite invalid 1, new reference, invalid charset
-      let responseHeaders' : IDictionary<string, string[]> = unbox env.[OwinConstants.responseHeaders]
-      responseHeaders'.["Content-Type"] <- [| "text/plain; charset=utf-2" |]
+    // overwrite invalid 1, new reference, invalid charset
+    let responseHeaders' : IDictionary<string, string[]> = unbox env.[OwinConstants.responseHeaders]
+    responseHeaders'.["Content-Type"] <- [| "text/plain; charset=utf-2" |]
 
-      // overwrite invalid 2, old reference, invalid charset
-      responseHeaders.["Content-Type"] <- [| "application/json; charset=utf-3" |]
+    // overwrite invalid 2, old reference, invalid charset
+    responseHeaders.["Content-Type"] <- [| "application/json; charset=utf-3" |]
 
-      // overwrite final, new reference
-      let responseHeaders'' : IDictionary<string, string[]> = unbox env.[OwinConstants.responseHeaders]
-      responseHeaders''.["Content-Type"] <- [| "text/plain; charset=utf-8" |]
+    // overwrite final, new reference
+    let responseHeaders'' : IDictionary<string, string[]> = unbox env.[OwinConstants.responseHeaders]
+    responseHeaders''.["Content-Type"] <- [| "text/plain; charset=utf-8" |]
 
-      let responseStream : IO.Stream = unbox env.[OwinConstants.responseBody]
-      responseStream.Write(hello, 0, hello.Length)
-      async.Return ()
-
-    OwinAppFunc.ofOwin owinApp
+    let responseStream : IO.Stream = unbox env.[OwinConstants.responseBody]
+    responseStream.Write(hello, 0, hello.Length)
+    async.Return ()
 
   let composedApp =
-    path "/yey-owin"
+    path "/owin"
       >>= setHeader "X-Custom-Before" "Before OWIN"
-      >>= owinHelloWorld
+      >>= OwinAppFunc.ofOwin owinHelloWorld
       >>= setHeader "X-Custom-After" "After OWIN"
 
   testList "e2e" [
@@ -134,6 +131,6 @@ let endToEnd =
               actual
         | false, _ -> Tests.failtest "X-Custom-After is missing"
 
-      runWithConfig composedApp |> reqResp Types.GET "/yey-owin" "" None None DecompressionMethods.GZip id asserts
+      runWithConfig composedApp |> reqResp Types.GET "/owin" "" None None DecompressionMethods.GZip id asserts
     ]
     
