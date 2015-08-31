@@ -76,6 +76,12 @@ let unit =
         eq "cannot remove a twice" false ((subject :> IDictionary<_, _>).Remove("a"))
 
         eq "cannot remove what's never been there" false ((subject :> IDictionary<_, _>).Remove("x"))
+
+        (subject :> IDictionary<_, _>).["a"] <- [| "a-1" |]
+        eqs "has a once more" ["a-1"] subject.Delta.["a"]
+        eqs "can retrieve header using StringComparer.OrdinalIgnoreCase"
+            ["a-1"]
+            subject.Delta.["A"]
       ]
 
     testList "OwinDictionary" [
@@ -88,6 +94,11 @@ let unit =
         let subj : IDictionary<_, _> = upcast createOwin ()
         subj.["testing.MyKey"] <- "oh yeah"
         eq "read back" "oh yeah" (subj.["testing.MyKey"] |> unbox)
+
+      testCase "uses StringComparer.OrdinalIgnoreCase" <| fun _ ->
+        let subj : IDictionary<_, _> = upcast createOwin ()
+        subj.["testing.MyKey"] <- "oh yeah"
+        eq "read back" "oh yeah" (subj.["Testing.MyKey"] |> unbox)
       ]
     ]
 
