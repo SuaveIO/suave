@@ -167,7 +167,7 @@ let endToEnd =
         async.Return ()
 
       let composedApp =
-        path "/owin" >>= OwinAppFunc.ofOwin noContent
+        path "/owin" >>= OwinApp.ofApp noContent
 
       let asserts (result : HttpResponseMessage) =
         eq "Http Status Code" HttpStatusCode.NoContent result.StatusCode
@@ -181,7 +181,7 @@ let endToEnd =
         async.Return ()
 
       let composedApp =
-        path "/owin" >>= OwinAppFunc.ofOwin noContent
+        path "/owin" >>= OwinApp.ofApp noContent
 
       let asserts (result : HttpResponseMessage) =
         eq "Http Status Code" HttpStatusCode.NoContent result.StatusCode
@@ -197,12 +197,152 @@ let endToEnd =
         async.Return ()
 
       let composedApp =
-        path "/owin" >>= OwinAppFunc.ofOwin noContent
+        path "/owin" >>= OwinApp.ofApp noContent
 
       let asserts (result : HttpResponseMessage) =
         eq "Http Status Code" HttpStatusCode.NoContent result.StatusCode
         eq "Reason Phrase set by server" "No Content" result.ReasonPhrase
         eq "Content-Type" "text/plain; charset=utf-8" (result.Content.Headers.ContentType.ToString())
+
+      runWithConfig composedApp |> reqResp Types.GET "/owin" "" None None DecompressionMethods.GZip id asserts
+    
+    testCase "OWIN middleware run before OWIN app" <| fun _ ->
+      let noContent (env : OwinEnvironment) =
+        env.[OwinConstants.responseStatusCode] <- box 204
+        async.Return ()
+      
+      let basicAuthMidFunc = OwinMidFunc(fun next -> OwinAppFunc(fun env ->
+          let requestHeaders : IDictionary<string, string[]> = unbox env.[OwinConstants.requestHeaders]
+          let credentials = requestHeaders.["Authorization"].[0].Split([|' '|]).[1].Split([|':'|])
+          match credentials with
+          | [|"foo";"bar"|] -> next.Invoke(env)
+          | _ ->
+            env.[OwinConstants.responseStatusCode] <- box 401
+            Threading.Tasks.Task.FromResult() :> Threading.Tasks.Task
+        ))
+
+      let composedApp =
+        path "/owin"
+          >>= OwinApp.ofMidFunc basicAuthMidFunc
+          >>= OwinApp.ofApp noContent
+
+      let asserts (result : HttpResponseMessage) =
+        eq "Http Status Code" HttpStatusCode.NoContent result.StatusCode
+        eq "Reason Phrase set by server" "No Content" result.ReasonPhrase
+
+      let sendAuthHeader (req : HttpRequestMessage) =
+        req.Headers.Authorization <- Net.Http.Headers.AuthenticationHeaderValue("Basic", Convert.ToBase64String("foo:bar"B))
+        req
+
+      runWithConfig composedApp |> reqResp Types.GET "/owin" "" None None DecompressionMethods.GZip sendAuthHeader asserts
+
+    testCase "OWIN middleware run after OWIN app" <| fun _ ->
+      let noContent (env : OwinEnvironment) =
+        env.[OwinConstants.responseStatusCode] <- box 204
+        async.Return ()
+      
+      let setCustomHeaderAfter = OwinMidFunc(fun next -> OwinAppFunc(fun env ->
+          next.Invoke(env).ContinueWith(fun _ ->
+            let responseHeaders : IDictionary<string, string[]> = unbox env.[OwinConstants.requestHeaders]
+            responseHeaders.["X-Custom-After"] <- [|"After OWIN"|]
+          )
+        ))
+
+      let composedApp =
+        path "/owin"
+          >>= OwinApp.ofApp noContent
+          >>= OwinApp.ofMidFunc setCustomHeaderAfter
+
+      let asserts (result : HttpResponseMessage) =
+        eq "Http Status Code" HttpStatusCode.NoContent result.StatusCode
+        eq "Reason Phrase set by server" "No Content" result.ReasonPhrase
+
+        match result.Headers.TryGetValues("X-Custom-Before") with
+        | true, actual ->
+          eqs "Headers set after the OWIN app func, are sent"
+              ["After OWIN"]
+              actual
+        | false, _ -> Tests.failtest "X-Custom-After is missing"
+
+      runWithConfig composedApp |> reqResp Types.GET "/owin" "" None None DecompressionMethods.GZip id asserts
+
+    testCase "OWIN middleware run around OWIN app, set before" <| fun _ ->
+      let noContent (env : OwinEnvironment) =
+        env.[OwinConstants.responseStatusCode] <- box 204
+        async.Return ()
+      
+      let setCustomHeaders = OwinMidFunc(fun next -> OwinAppFunc(fun env ->
+          let responseHeaders : IDictionary<string, string[]> = unbox env.[OwinConstants.requestHeaders]
+          responseHeaders.["X-Custom-Before"] <- [|"Before OWIN"|]
+          next.Invoke(env).ContinueWith(fun _ ->
+            let responseHeaders : IDictionary<string, string[]> = unbox env.[OwinConstants.requestHeaders]
+            responseHeaders.["X-Custom-After"] <- [|"After OWIN"|]
+          )
+        ))
+
+      let composedApp =
+        path "/owin"
+          // NOTE: really need some sort of splitter, as found in Freya.
+          >>= OwinApp.ofMidFunc setCustomHeaders
+          >>= OwinApp.ofApp noContent
+      
+      let asserts (result : HttpResponseMessage) =
+        eq "Http Status Code" HttpStatusCode.NoContent result.StatusCode
+        eq "Reason Phrase set by server" "No Content" result.ReasonPhrase
+
+        match result.Headers.TryGetValues("X-Custom-Before") with
+        | true, actual ->
+          eqs "Headers set before the OWIN app func, are sent"
+              ["Before OWIN"]
+              actual
+        | false, _ -> Tests.failtest "X-Custom-Before is missing"
+
+        match result.Headers.TryGetValues("X-Custom-Before") with
+        | true, actual ->
+          eqs "Headers set after the OWIN app func, are sent"
+              ["After OWIN"]
+              actual
+        | false, _ -> Tests.failtest "X-Custom-After is missing"
+
+      runWithConfig composedApp |> reqResp Types.GET "/owin" "" None None DecompressionMethods.GZip id asserts
+
+    testCase "OWIN middleware run around OWIN app, set after" <| fun _ ->
+      let noContent (env : OwinEnvironment) =
+        env.[OwinConstants.responseStatusCode] <- box 204
+        async.Return ()
+      
+      let setCustomHeaders = OwinMidFunc(fun next -> OwinAppFunc(fun env ->
+          let responseHeaders : IDictionary<string, string[]> = unbox env.[OwinConstants.requestHeaders]
+          responseHeaders.["X-Custom-Before"] <- [|"Before OWIN"|]
+          next.Invoke(env).ContinueWith(fun _ ->
+            let responseHeaders : IDictionary<string, string[]> = unbox env.[OwinConstants.requestHeaders]
+            responseHeaders.["X-Custom-After"] <- [|"After OWIN"|]
+          )
+        ))
+
+      let composedApp =
+        path "/owin"
+          >>= OwinApp.ofApp noContent
+          // NOTE: really need some sort of splitter, as found in Freya.
+          >>= OwinApp.ofMidFunc setCustomHeaders
+      
+      let asserts (result : HttpResponseMessage) =
+        eq "Http Status Code" HttpStatusCode.NoContent result.StatusCode
+        eq "Reason Phrase set by server" "No Content" result.ReasonPhrase
+
+        match result.Headers.TryGetValues("X-Custom-Before") with
+        | true, actual ->
+          eqs "Headers set before the OWIN app func, are sent"
+              ["Before OWIN"]
+              actual
+        | false, _ -> Tests.failtest "X-Custom-Before is missing"
+
+        match result.Headers.TryGetValues("X-Custom-Before") with
+        | true, actual ->
+          eqs "Headers set after the OWIN app func, are sent"
+              ["After OWIN"]
+              actual
+        | false, _ -> Tests.failtest "X-Custom-After is missing"
 
       runWithConfig composedApp |> reqResp Types.GET "/owin" "" None None DecompressionMethods.GZip id asserts
     ]
