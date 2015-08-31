@@ -165,9 +165,12 @@ type OwinApp =
 type OwinAppFunc =
   Func<OwinEnvironment, Task>
 
+type OwinMidFunc =
+  Func<Func<OwinEnvironment, Task>, Func<OwinEnvironment, Task>>
+
 [<RequireQualifiedAccess>]
 [<CompilationRepresentation (CompilationRepresentationFlags.ModuleSuffix)>]
-module OwinAppFunc =
+module OwinApp =
 
   open Suave.Utils.Aether
   open Suave.Utils.Aether.Operators
@@ -557,8 +560,8 @@ module OwinAppFunc =
         responseStream.RealDispose()
         (cts :> IDisposable).Dispose()
 
-  [<CompiledName "OfOwin">]
-  let ofOwin (owin : OwinApp) : WebPart =
+  [<CompiledName "OfApp">]
+  let ofApp (owin : OwinApp) : WebPart =
     fun (ctx : HttpContext) ->
       let impl (conn, response) : SocketOp<unit> = socket {
         // disposable because it buffers what the OwinApp writes to the stream
@@ -573,15 +576,19 @@ module OwinAppFunc =
       { ctx with
           response =
             { ctx.response with
-                content = SocketTask impl
+                content       = SocketTask impl
                 writePreamble = false
             }
       }
       |> succeed
 
-  [<CompiledName "OfOwinFunc">]
-  let ofOwinFunc (owin : OwinAppFunc) =
-    ofOwin (fun e -> Async.AwaitTask ((owin.Invoke e).ContinueWith<_>(fun _ -> ())))
+  [<CompiledName "OfAppFunc">]
+  let ofAppFunc (owin : OwinAppFunc) =
+    ofApp (fun e -> Async.AwaitTask ((owin.Invoke e).ContinueWith<_>(fun _ -> ())))
+
+  [<CompiledName "OfMidFunc">]
+  let ofMidFunc (owin : OwinMidFunc) =
+    ofAppFunc (owin.Invoke(fun _ -> new Task(fun _ -> ())))
 
 module OwinServerFactory =
 
@@ -646,7 +653,7 @@ module OwinServerFactory =
           cancellationToken = serverCts.Token }
 
     let started, listening =
-      Web.startWebServerAsync conf (OwinAppFunc.ofOwinFunc app)
+      Web.startWebServerAsync conf (OwinApp.ofAppFunc app)
 
     let _ = started |> Async.RunSynchronously
 

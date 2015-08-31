@@ -31,11 +31,11 @@ let throws msg matcher fn =
 [<Tests>]
 let unit =
   let create (m : (string * string) list) =
-    OwinAppFunc.DeltaDictionary(m)
+    OwinApp.DeltaDictionary(m)
 
   let createOwin () =
     let request = { HttpRequest.empty with ``method`` = HttpMethod.PUT }
-    new OwinAppFunc.OwinDictionary({ HttpContext.empty with request = request })
+    new OwinApp.OwinDictionary({ HttpContext.empty with request = request })
 
   testList "infrastructure" [
     testList "DeltaDictionary" [
@@ -133,7 +133,7 @@ let endToEnd =
   let composedApp =
     path "/owin"
       >>= setHeader "X-Custom-Before" "Before OWIN"
-      >>= OwinAppFunc.ofOwin owinHelloWorld
+      >>= OwinApp.ofApp owinHelloWorld
       >>= setHeader "X-Custom-After" "After OWIN"
 
   testList "e2e" [

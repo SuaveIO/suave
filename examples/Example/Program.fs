@@ -76,7 +76,7 @@ module OwinSample =
       responseStream.Write(hello, 0, hello.Length)
       async.Return ()
 
-    OwinAppFunc.ofOwin owinApp
+    OwinApp.ofApp owinApp
 
 let app =
   choose [

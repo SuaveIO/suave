@@ -1,11 +1,8 @@
 ﻿namespace Suave.NancyFx
 
-open Suave
 open Suave.Types
-open Suave.Http
 open Suave.Web
 open Suave.Owin
-open System.Threading.Tasks
 open Nancy
 open Nancy.Owin
 
@@ -22,13 +19,10 @@ type App() as x =
       response :> obj
 
 module Program =
-  let utterMagicWordsOfCode (opts : NancyOptions) : WebPart =
-    let appFunc = NancyMiddleware.UseNancy(opts).Invoke(fun _ -> new Task(fun _ -> ()))
-    OwinAppFunc.ofOwinFunc appFunc
 
   [<EntryPoint>]
   let main argv =
     let opts = new NancyOptions()
-    let app = utterMagicWordsOfCode opts
+    let app = OwinApp.ofMidFunc (NancyMiddleware.UseNancy(opts))
     startWebServer defaultConfig app
     0
