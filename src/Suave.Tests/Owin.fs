@@ -106,38 +106,38 @@ let unit =
 let endToEnd =
   let runWithConfig = runWith defaultConfig
 
-  let owinHelloWorld (env : OwinEnvironment) =
-    let hello = "Hello, OWIN!"B
-
-    env.[OwinConstants.responseStatusCode] <- box 201
-
-    // set content type, new reference, invalid charset
-    let responseHeaders : IDictionary<string, string[]> = unbox env.[OwinConstants.responseHeaders]
-    responseHeaders.["Content-Type"] <- [| "application/json; charset=utf-1" |]
-
-    // overwrite invalid 1, new reference, invalid charset
-    let responseHeaders' : IDictionary<string, string[]> = unbox env.[OwinConstants.responseHeaders]
-    responseHeaders'.["Content-Type"] <- [| "text/plain; charset=utf-2" |]
-
-    // overwrite invalid 2, old reference, invalid charset
-    responseHeaders.["Content-Type"] <- [| "application/json; charset=utf-3" |]
-
-    // overwrite final, new reference
-    let responseHeaders'' : IDictionary<string, string[]> = unbox env.[OwinConstants.responseHeaders]
-    responseHeaders''.["Content-Type"] <- [| "text/plain; charset=utf-8" |]
-
-    let responseStream : IO.Stream = unbox env.[OwinConstants.responseBody]
-    responseStream.Write(hello, 0, hello.Length)
-    async.Return ()
-
-  let composedApp =
-    path "/owin"
-      >>= setHeader "X-Custom-Before" "Before OWIN"
-      >>= OwinAppFunc.ofOwin owinHelloWorld
-      >>= setHeader "X-Custom-After" "After OWIN"
-
   testList "e2e" [
     testCase "Hello, OWIN!" <| fun _ ->
+      let owinHelloWorld (env : OwinEnvironment) =
+        let hello = "Hello, OWIN!"B
+
+        env.[OwinConstants.responseStatusCode] <- box 201
+
+        // set content type, new reference, invalid charset
+        let responseHeaders : IDictionary<string, string[]> = unbox env.[OwinConstants.responseHeaders]
+        responseHeaders.["Content-Type"] <- [| "application/json; charset=utf-1" |]
+
+        // overwrite invalid 1, new reference, invalid charset
+        let responseHeaders' : IDictionary<string, string[]> = unbox env.[OwinConstants.responseHeaders]
+        responseHeaders'.["Content-Type"] <- [| "text/plain; charset=utf-2" |]
+
+        // overwrite invalid 2, old reference, invalid charset
+        responseHeaders.["Content-Type"] <- [| "application/json; charset=utf-3" |]
+
+        // overwrite final, new reference
+        let responseHeaders'' : IDictionary<string, string[]> = unbox env.[OwinConstants.responseHeaders]
+        responseHeaders''.["Content-Type"] <- [| "text/plain; charset=utf-8" |]
+
+        let responseStream : IO.Stream = unbox env.[OwinConstants.responseBody]
+        responseStream.Write(hello, 0, hello.Length)
+        async.Return ()
+
+      let composedApp =
+        path "/owin"
+          >>= setHeader "X-Custom-Before" "Before OWIN"
+          >>= OwinAppFunc.ofOwin owinHelloWorld
+          >>= setHeader "X-Custom-After" "After OWIN"
+
       let asserts (result : HttpResponseMessage) =
         eq "Content-Type" "text/plain; charset=utf-8" (result.Content.Headers.ContentType.ToString())
         eq "Http Status Code" HttpStatusCode.Created result.StatusCode
@@ -159,5 +159,19 @@ let endToEnd =
         | false, _ -> Tests.failtest "X-Custom-After is missing"
 
       runWithConfig composedApp |> reqResp Types.GET "/owin" "" None None DecompressionMethods.GZip id asserts
+
+    testCase "Custom status code" <| fun _ ->
+      let noContent (env : OwinEnvironment) =
+        env.[OwinConstants.responseStatusCode] <- box 204
+        env.[OwinConstants.responseReasonPhrase] <- box "Nothing to see here"
+        async.Return ()
+
+      let composedApp =
+        path "/owin" >>= OwinAppFunc.ofOwin noContent
+
+      let asserts (result : HttpResponseMessage) =
+        eq "Http Status Code" HttpStatusCode.NoContent result.StatusCode
+        eq "Reason Phrase" "Nothing to see here" result.ReasonPhrase
+
+      runWithConfig composedApp |> reqResp Types.GET "/owin" "" None None DecompressionMethods.GZip id asserts
     ]
-    
