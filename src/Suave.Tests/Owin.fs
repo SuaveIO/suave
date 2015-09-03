@@ -160,6 +160,19 @@ let endToEnd =
 
       runWithConfig composedApp |> reqResp Types.GET "/owin" "" None None DecompressionMethods.GZip id asserts
 
+    testCase "Empty OWIN app should return 200 OK" <| fun _ ->
+      let owinDefaults (env : OwinEnvironment) =
+        async.Return ()
+
+      let composedApp =
+        path "/owin" >>= OwinApp.ofApp owinDefaults
+
+      let asserts (result : HttpResponseMessage) =
+        eq "Http Status Code" HttpStatusCode.OK result.StatusCode
+        eq "Reason Phrase" "OK" result.ReasonPhrase
+
+      runWithConfig composedApp |> reqResp Types.GET "/owin" "" None None DecompressionMethods.GZip id asserts
+
     testCase "Custom status code" <| fun _ ->
       let noContent (env : OwinEnvironment) =
         env.[OwinConstants.responseStatusCode] <- box 204
