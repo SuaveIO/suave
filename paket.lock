@@ -6,7 +6,7 @@ NUGET
     FsCheck (2.0.5)
       FSharp.Core (>= 3.1.2.5)
     FSharp.Charting (0.90.10)
-    FSharp.Core (4.0.0.1)
+    FSharp.Core (3.1.2.5)
     FsPickler (1.2.5)
     Fuchu (0.6.0.0)
     Fuchu.FsCheck (0.6.0.0)
