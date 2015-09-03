@@ -565,7 +565,9 @@ module OwinApp =
     fun (ctx : HttpContext) ->
       let impl (conn, response) : SocketOp<unit> = socket {
         // disposable because it buffers what the OwinApp writes to the stream
-        use wrapper = new OwinDictionary({ ctx with response = response })
+        // also, OWIN expects the default HTTP status code to be 200 OK
+        // could also set the status code after calling SocketOp.ofAsync if the value is not set
+        use wrapper = new OwinDictionary({ ctx with response = { response with status = HTTP_200 } })
         do! SocketOp.ofAsync (owin wrapper.Interface)
         let ctx = wrapper.Finalise()
         //TO CONSIDER: do (wrapper :> OwinRequest).OnSendingHeadersAction
