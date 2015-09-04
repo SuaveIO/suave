@@ -1,4 +1,4 @@
-framework = NET45
+framework: NET45
 source https://nuget.org/api/v2
 
 nuget FSharp.Charting
