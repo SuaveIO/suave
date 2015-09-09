@@ -608,9 +608,9 @@ let context f (a : HttpContext) = f a a
 
 open System.Threading
 
-/// The core configuration of suave. See also Suave.Web.default_config which
+/// The core configuration of suave. See also Suave.Web.defaultConfig which
 /// you can use to bootstrap the configuration:
-/// <code>{ default_config with bindings = [ ... ] }</code>
+/// <code>{ defaultConfig with bindings = [ ... ] }</code>
 type SuaveConfig =
   { /// The bindings for the web server to launch with
     bindings                : HttpBinding list
@@ -672,3 +672,33 @@ module SuaveConfig =
                    compressionFolder
                    config.logger
                    parsePostData
+
+[<RequireQualifiedAccess>]
+type InclusiveOption<'T> =
+  | None
+  | Some of 'T
+  | All
+
+/// The configuration values for CORS
+type CORSConfig =
+  {
+    /// The list of allowed Uri(s) for requests.
+    allowedUris             : string list
+
+    /// The list of allowed HttpMethods for the request.
+    allowedMethods          : InclusiveOption<HttpMethod list>
+    
+    /// Allow cookies? This is sent in the AccessControlAllowCredentials header.
+    allowCookies            : bool
+
+    /// Should response headers be exposed to the client? This is sent in AccessControlExposeHeaders header. 
+    exposeHeaders           : bool
+    
+    /// Max age in seconds the user agent is allowed to cache the result of the request.
+    maxAge                  : int option }
+  
+  static member allowedUris_           = Property<CORSConfig,_> (fun x -> x.allowedUris)           (fun v x -> { x with allowedUris = v })
+  static member allowedMethods_        = Property<CORSConfig,_> (fun x -> x.allowedMethods)        (fun v x -> { x with allowedMethods = v })
+  static member allowCookies_          = Property<CORSConfig,_> (fun x -> x.allowCookies)          (fun v x -> { x with allowCookies = v })
+  static member exposeHeaders_         = Property<CORSConfig,_> (fun x -> x.exposeHeaders)         (fun v x -> { x with exposeHeaders = v })
+  static member maxAge_                = Property<CORSConfig,_> (fun x -> x.maxAge)                (fun v x -> { x with maxAge = v })

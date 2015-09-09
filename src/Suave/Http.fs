@@ -793,74 +793,89 @@ module Http =
     open Successful
 
     [<Literal>]
-    let origin = "Origin"
+    let Origin = "Origin"
     [<Literal>]
-    let accessControlRequestMethod = "Access-Control-Request-Method"
+    let AccessControlRequestMethod = "Access-Control-Request-Method"
     [<Literal>]
-    let accessControlRequestHeaders = "Access-Control-Request-Headers"
+    let AccessControlRequestHeaders = "Access-Control-Request-Headers"
     [<Literal>]
-    let accessControlAllowOrigin = "Access-Control-Allow-Origin"
+    let AccessControlAllowOrigin = "Access-Control-Allow-Origin"
     [<Literal>]
-    let accessControlAllowMethods = "Access-Control-Allow-Methods"
+    let AccessControlAllowMethods = "Access-Control-Allow-Methods"
     [<Literal>]
-    let accessControlAllowHeaders = "Access-Control-Allow-Headers"
+    let AccessControlAllowHeaders = "Access-Control-Allow-Headers"
     [<Literal>]
-    let accessControlAllowCredentials = "Access-Control-Allow-Credentials"
+    let AccessControlAllowCredentials = "Access-Control-Allow-Credentials"
     [<Literal>]
-    let accessControlExposeHeaders = "Access-Control-Expose-Headers"
+    let AccessControlExposeHeaders = "Access-Control-Expose-Headers"
     [<Literal>]
-    let accessControlMaxAge = "Access-Control-Max-Age"
+    let AccessControlMaxAge = "Access-Control-Max-Age"
 
-    let cors (allowedUris : string list) : WebPart =
+    let setMaxAgeHeader config =
+      match config.maxAge with
+      | None -> succeed
+      | Some age -> Writers.setHeader AccessControlMaxAge (age.ToString())
+
+    let setAllowCredentialsHeader config = 
+      Writers.setHeader AccessControlAllowCredentials (config.allowCookies.ToString())
+
+    let setAllowMethodsHeader (config : CORSConfig) value =
+      match config.allowedMethods with
+      | InclusiveOption.None -> succeed
+      | InclusiveOption.All -> Writers.setHeader AccessControlAllowMethods "*"
+      | InclusiveOption.Some methods -> 
+        let exists = List.exists (fun m -> m.ToString() = value) methods
+        if exists then
+          let header = sprintf "%s,%s" (methods.Head.ToString()) (methods.Tail |> Seq.map (fun i -> i.ToString()) |> String.concat( ", "))
+          Writers.setHeader AccessControlAllowMethods header
+        else
+          succeed
+
+    let setAllowOriginHeader value = 
+      Writers.setHeader AccessControlAllowOrigin value
+
+    let setExposeHeadersHeader config =
+      Writers.setHeader AccessControlExposeHeaders (config.exposeHeaders.ToString())
+
+    let cors (config : CORSConfig) : WebPart =
         fun (ctx : HttpContext) ->
             let req = ctx.request
-            match req.header origin with
+            match req.header (Origin.ToLowerInvariant()) with
             | Choice1Of2 originValue -> // CORS request
-                let allowedOrigin = List.exists (fun a -> a = originValue) allowedUris
+                let allowedOrigin = List.exists (fun a -> a = originValue) config.allowedUris
                 match req.``method`` with
                 | HttpMethod.OPTIONS ->
-                    match req.header accessControlRequestMethod with
+                    match req.header AccessControlRequestMethod with
                     | Choice1Of2 requestMethodHeaderValue -> // Preflight request
-                        
-                        // Is request method valid? Get from configuration? If no, don't set any headers and continue
-
                         // Does the request have an Access-Control-Request-Headers header? If so, validate. If not, proceed.
                         let setAccessControlRequestHeaders =
-                            match req.getAllHeaders accessControlRequestHeaders with
+                            match req.getAllHeaders AccessControlRequestHeaders with
                                 | Choice1Of2 list -> 
-                                    Writers.setHeader accessControlAllowHeaders (list |> String.concat ", ")
+                                    Writers.setHeader AccessControlAllowHeaders (list |> String.concat ", ")
                                 | Choice2Of2 _ -> succeed
 
                         if allowedOrigin then
                             ctx |>
                                 (
-                                    Writers.setHeader accessControlAllowMethods requestMethodHeaderValue
+                                    setAllowMethodsHeader config requestMethodHeaderValue
                                     >>= setAccessControlRequestHeaders
-                                    
-                                    // Set max age. Optional. Get from configuration?
-                                    // >>= Writers.setHeader accessControlMaxAge "3600"
-                                    
-                                    // Are cookies allowed? Get from configuration?
-                                    >>= Writers.setHeader accessControlAllowCredentials "true"
-                                    >>= Writers.setHeader accessControlAllowOrigin originValue
+                                    >>= setMaxAgeHeader config
+                                    >>= setAllowCredentialsHeader config
+                                    >>= setAllowOriginHeader originValue
                                     >>= OK ""
                                 )
                         else
-                            ctx |> succeed                        
-                    | Choice2Of2 _ -> ctx |> succeed
+                            succeed ctx                        
+                    | Choice2Of2 _ -> succeed ctx
                 | _ ->
                     if allowedOrigin then
                         ctx |> 
                             (
-                                // Should response headers be exposed to the client? Get from configuration?   
-                                Writers.setHeader accessControlExposeHeaders "true"
-                                // Are cookies allowed? Get from configuration?
-                                >>= Writers.setHeader accessControlAllowCredentials "true"
-                                // The origin value is in the allowed list. Could this also be obtained from configuration?
-                                >>= Writers.setHeader accessControlAllowOrigin originValue
-                                // Get allowed methods from configuration?
-                                >>= Writers.setHeader accessControlAllowMethods "*"
+                                setExposeHeadersHeader config
+                                >>= setAllowCredentialsHeader config
+                                >>= setAllowOriginHeader originValue
+                                >>= setAllowMethodsHeader config "*"
                             )
                     else
-                        ctx |> succeed // No headers will be sent. Browser will deny.
-            | Choice2Of2 _ -> ctx |> succeed // Not a CORS request
+                        succeed ctx // No headers will be sent. Browser will deny.
+            | Choice2Of2 _ -> succeed ctx // Not a CORS request

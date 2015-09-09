@@ -1558,4 +1558,4 @@ module Http =
     /// </para></summary>
     /// <remarks>
     /// </remarks>
-    val cors : allowedUris:(string list) -> WebPart
+    val cors : CORSConfig:(CORSConfig) -> WebPart

@@ -683,3 +683,10 @@ let defaultConfig =
     homeFolder            = None
     compressedFilesFolder = None
     logger                = Loggers.saneDefaultsFor LogLevel.Info }
+
+let defaultCORSConfig =
+  { allowedUris           = []
+    allowedMethods        = InclusiveOption.All
+    allowCookies          = true
+    exposeHeaders         = true
+    maxAge                = None }
