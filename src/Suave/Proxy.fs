@@ -51,9 +51,9 @@ let forward (ip : IPAddress) (port : uint16) (ctx : HttpContext) =
   q.AllowAutoRedirect         <- false
   q.AllowReadStreamBuffering  <- false
   q.AllowWriteStreamBuffering <- false
-  q.Method  <- string p.``method``
-  q.Headers <- buildWebHeadersCollection p.headers
-  q.Proxy   <- null
+  q.Method                    <- string p.``method``
+  q.Headers                   <- buildWebHeadersCollection p.headers
+  q.Proxy                     <- null
 
   //copy restricted headers
   let header s = getFirst p.headers s
@@ -69,7 +69,7 @@ let forward (ip : IPAddress) (port : uint16) (ctx : HttpContext) =
   header "transfer-encoding" |> Choice.iter (fun v -> q.TransferEncoding <- v)
   header "user-agent"        |> Choice.iter (fun v -> q.UserAgent <- v)
 
-  q.Headers.Add("X-Forwarded-For", p.ipaddr.ToString())
+  q.Headers.Add("X-Real-IP", ctx.clientIpTrustProxy.ToString())
 
   fun ctx -> socket {
     if p.``method`` = HttpMethod.POST || p.``method`` = HttpMethod.PUT then

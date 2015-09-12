@@ -78,10 +78,10 @@
     <Compile Include="Sockets\SocketOp.fs" />
     <Compile Include="Sockets\ITransport.fs" />
     <Compile Include="Sockets\TcpTransport.fs" />
+    <Compile Include="Sockets\SocketBinding.fs" />
     <Compile Include="Sockets\Connection.fs" />
     <Compile Include="Sockets\SocketMonad.fs" />
     <Compile Include="Sockets\AsyncSocket.fs" />
-    <Compile Include="Sockets\SocketBinding.fs" />
     <Compile Include="Tcp.fs" />
     <Compile Include="Sscanf.fs" />
     <Compile Include="Types.fs" />

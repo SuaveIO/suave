@@ -467,16 +467,14 @@ module internal ParsingAndControl =
     let request =
       { httpVersion      = httpVersion
         url              = ctx.runtime.matchedBinding.uri path rawQuery
-        host             = ClientOnly host
+        host             = host
         ``method``       = meth  
         headers          = headers
-        rawForm          = [| |]
+        rawForm          = [||]
         rawQuery         = rawQuery
         files            = []
         multiPartFields  = []
-        trace            = parseTraceHeaders headers
-        isSecure         = ctx.runtime.matchedBinding.scheme.secure
-        ipaddr           = connection''.ipaddr }
+        trace            = parseTraceHeaders headers }
 
     if request.headers %% "expect" = Choice1Of2 "100-continue" then
       let! _ = run ctx <| Intermediate.CONTINUE
@@ -632,7 +630,7 @@ let defaultErrorHandler (ex : Exception) msg (ctx : HttpContext) =
     LogLine.mk "Suave.Web.defaultErrorHandler" LogLevel.Error
                ctx.request.trace (Some ex)
                msg)
-  if IPAddress.IsLoopback ctx.request.ipaddr then
+  if ctx.isLocal then
     Response.response HTTP_500 (UTF8.bytes (sprintf "<h1>%s</h1><br/>%A" ex.Message ex)) ctx
   else 
     Response.response HTTP_500 (UTF8.bytes HTTP_500.message) ctx

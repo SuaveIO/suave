@@ -82,9 +82,13 @@ module OwinConstants =
     [<CompiledName ("ClientCertificate")>]
     let [<Literal>] clientCertificate = "ssl.ClientCertificate"
 
+    /// A tracing output that may be provided by the host.
+    /// Type: TextWriter
     [<CompiledName ("TraceOutput")>]
     let [<Literal>] traceOutput = "host.TraceOutput"
 
+    /// A list of per-address server configuration. The following keys are defined with string values: scheme, host, port, path.
+    /// Type: IList<IDictionary<string, object>>
     [<CompiledName ("Addresses")>]
     let [<Literal>] addresses = "host.Addresses"
 
@@ -93,6 +97,8 @@ module OwinConstants =
     [<CompiledName ("RemoteIpAddress")>]
     let [<Literal>] remoteIpAddress = "server.RemoteIpAddress"
 
+    /// The port of the remote client. E.g. 1234
+    /// Type: String
     [<CompiledName ("RemotePort")>]
     let [<Literal>] remotePort = "server.RemotePort"
 
@@ -101,12 +107,18 @@ module OwinConstants =
     [<CompiledName ("LocalIpAddress")>]
     let [<Literal>] localIpAddress = "server.LocalIpAddress"
 
+    /// The port the request was received on. E.g. 80
+    /// Type: String
     [<CompiledName ("LocalPort")>]
     let [<Literal>] localPort = "server.LocalPort"
 
+    /// Was the request sent from the same machine? E.g. true or false.
+    /// Type: Boolean
     [<CompiledName ("IsLocal")>]
     let [<Literal>] isLocal = "server.IsLocal"
 
+    /// It is important for applications to be able to determine if a specific feature is supported by the current server or middleware.  The following pattern is recommended for announcing and detecting feature/extension support.
+    /// Each extension SHOULD add to the capabilities IDictionary a "featurename.Version" key with the associated string value of the latest version of that extension supported (e.g. "1.2").
     [<CompiledName ("Capabilities")>]
     let [<Literal>] capabilities = "server.Capabilities"
 
@@ -420,23 +432,29 @@ module OwinApp =
         OwinConstants.responseBody,         HttpContext.response_ >--> HttpResult.content_ >--> responseStreamLens <--> untyped
 
         // 3.2.3 Other Data
-        OwinConstants.callCancelled, ((fun x -> ct), (fun v x -> x)) <--> untyped // TODO: support cancellation token in HttpRequest signalling aborted request
-        OwinConstants.owinVersion, ((fun x -> "1.3"), (fun v x -> x)) <--> untyped
+        OwinConstants.callCancelled,        ((fun x -> ct), (fun v x -> x)) <--> untyped // TODO: support cancellation token in HttpRequest signalling aborted request
+        OwinConstants.owinVersion,          constant "1.3"
+
+        OwinConstants.CommonKeys.addresses,         HttpContext.userState_ <--> untyped // TODO:
+        OwinConstants.CommonKeys.serverName,        constant "Suave"
+        OwinConstants.CommonKeys.capabilities,      constant (
+          Map [
+            "owin.Version", "1.0.1"
+            "suave.Version", Globals.Internals.SuaveVersion
+          ]
+          |> Map.map (fun key value -> box value)
+          :> IDictionary<string, obj>
+        )
+        OwinConstants.CommonKeys.clientCertificate, constant Unchecked.defaultof<Security.Cryptography.X509Certificates.X509Certificate>
+        OwinConstants.CommonKeys.isLocal,           HttpContext.isLocal_ <--> untyped
+        OwinConstants.CommonKeys.localIpAddress,    HttpContext.runtime_ >--> HttpRuntime.matchedBinding_ >--> HttpBinding.socketBinding_ >--> SocketBinding.ip_ <--> stringlyTyped (sprintf "%O") IPAddress.Parse <--> untyped
+        OwinConstants.CommonKeys.localPort,         HttpContext.runtime_  >--> HttpRuntime.matchedBinding_ >--> HttpBinding.socketBinding_ >--> SocketBinding.port_ <--> stringlyTyped string uint16 <--> untyped
+        OwinConstants.CommonKeys.onSendingHeaders,  HttpContext.userState_ <--> untyped // TODO:
+        OwinConstants.CommonKeys.remoteIpAddress,   HttpContext.clientIp_ <--> stringlyTyped (sprintf "%O") IPAddress.Parse <--> untyped
+        OwinConstants.CommonKeys.remotePort,        HttpContext.clientPort_ <--> stringlyTyped string uint16 <--> untyped // TODO:
 
         // per-request storage
         "suave.UserData", HttpContext.userState_ <--> untyped
-
-        // TODO: common keys
-        OwinConstants.CommonKeys.addresses, HttpContext.userState_ <--> untyped // TODO:
-        OwinConstants.CommonKeys.capabilities, HttpContext.userState_ <--> untyped // TODO:
-        OwinConstants.CommonKeys.clientCertificate, HttpContext.userState_ <--> untyped // TODO:
-        OwinConstants.CommonKeys.isLocal, HttpContext.userState_ <--> untyped // TODO:
-        OwinConstants.CommonKeys.localIpAddress, HttpContext.runtime_ >--> HttpRuntime.matchedBinding_ >--> HttpBinding.socketBinding_ >--> SocketBinding.ip_ <--> stringlyTyped (sprintf "%O") IPAddress.Parse <--> untyped
-        OwinConstants.CommonKeys.localPort, HttpContext.runtime_  >--> HttpRuntime.matchedBinding_ >--> HttpBinding.socketBinding_ >--> SocketBinding.port_ <--> stringlyTyped string uint16 <--> untyped
-        OwinConstants.CommonKeys.onSendingHeaders, HttpContext.userState_ <--> untyped // TODO:
-        OwinConstants.CommonKeys.remoteIpAddress, HttpContext.userState_ <--> untyped // TODO:
-        OwinConstants.CommonKeys.remotePort, HttpContext.userState_ <--> untyped // TODO:
-        OwinConstants.CommonKeys.serverName, constant "Suave"
       ]
 
   type UnclosableMemoryStream() =

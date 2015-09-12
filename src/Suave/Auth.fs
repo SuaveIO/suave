@@ -40,14 +40,13 @@ let parseData (textBlob : string) =
     sessionId
   | _ -> failwith "internal error; should not have successfully decrypted data"
 
-
 /// Returns a list of the hmac data to use, from the request.
-let generateData (request : HttpRequest) =
+let generateData (ctx : HttpContext) =
   let sessionId = Utils.generateReadableKey SessionIdLength
   String.concat "\n"
     [ sessionId
-      request.ipaddr.ToString()
-      request.header "user-agent" |> Choice.orDefault ""
+      ctx.clientIpTrustProxy.ToString()
+      ctx.request.header "user-agent" |> Choice.orDefault ""
     ]
 
 let authenticate relativeExpiry secure
@@ -86,8 +85,8 @@ let authenticateWithLogin relativeExpiry loginPage fSuccess : WebPart =
 ///
 /// Always succeeds.
 let authenticated relativeExpiry secure : WebPart =
-  context (fun { request = req } ->
-    let data = generateData req |> UTF8.bytes
+  context (fun ctx ->
+    let data = generateData ctx |> UTF8.bytes
     authenticate relativeExpiry secure
                  (fun _ -> Choice1Of2 data)
                  (fun _ -> Choice1Of2 data)
