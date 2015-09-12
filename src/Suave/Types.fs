@@ -31,6 +31,7 @@ type HttpMethod =
   | TRACE
   | OPTIONS
   | OTHER of string // This represents a method string that isn't one of the standard methods.
+
   override x.ToString() =
     match x with
     | GET     -> "GET"
@@ -301,18 +302,18 @@ type Host =
 
 /// A holder for the data extracted from the request.
 type HttpRequest =
-  { httpVersion      : string
-    url              : Uri
-    host             : Host
-    ``method``       : HttpMethod
-    headers          : (string * string) list
-    rawForm          : byte []
-    rawQuery         : string
-    files            : HttpUpload list
-    multiPartFields  : (string * string) list
-    trace            : TraceHeader
-    isSecure         : bool
-    ipaddr           : IPAddress }
+  { httpVersion     : string
+    url             : Uri
+    host            : Host
+    ``method``      : HttpMethod
+    headers         : (string * string) list
+    rawForm         : byte []
+    rawQuery        : string
+    files           : HttpUpload list
+    multiPartFields : (string * string) list
+    trace           : TraceHeader
+    isSecure        : bool
+    ipaddr          : IPAddress }
 
   static member httpVersion_     = Property<HttpRequest,_> (fun x -> x.httpVersion) (fun v (x : HttpRequest) -> { x with httpVersion = v })
   static member url_             = Property<HttpRequest,_> (fun x -> x.url) (fun v x -> { x with url = v })
@@ -348,7 +349,6 @@ type HttpRequest =
   member x.formData (k : string) =
     getFirstOpt x.form k
 
-
   /// Syntactic Sugar to retrieve query string, form or multi-field values from HttpRequest 
   member this.Item     
     with get(x) =    
@@ -371,18 +371,18 @@ module HttpRequest =
   open Suave.Utils
 
   let empty =
-    { httpVersion      = "1.1"
-      url              = Uri("http://localhost/")
-      host             = ClientOnly "localhost"
-      ``method``       = HttpMethod.OTHER("")
-      headers          = []
-      rawForm          = Array.empty
-      rawQuery         = ""
-      files            = []
-      multiPartFields  = []
-      trace            = TraceHeader.empty
-      isSecure         = false
-      ipaddr           = IPAddress.Loopback }
+    { httpVersion     = "1.1"
+      url             = Uri("http://localhost/")
+      host            = ClientOnly "localhost"
+      ``method``      = HttpMethod.OTHER("")
+      headers         = []
+      rawForm         = Array.empty
+      rawQuery        = ""
+      files           = []
+      multiPartFields = []
+      trace           = TraceHeader.empty
+      isSecure        = false
+      ipaddr          = IPAddress.Loopback }
 
 type ITlsProvider =
   abstract member Wrap : Connection -> SocketOp<Connection>
@@ -429,25 +429,37 @@ module HttpBinding =
 
   let DefaultBindingPort = 8083us
 
-  let defaults =  
-    { scheme  = HTTP
+  let defaults =
+    { scheme        = HTTP
       socketBinding = SocketBinding.mk IPAddress.Loopback DefaultBindingPort }
 
-  /// Create a HttpBinding for the given protocol, an IP address to bind to and a port
-  /// to listen on.
+  /// Create a HttpBinding for the given protocol, an IP address to bind to and
+  /// a port to listen on.
   let mk scheme (ip:IPAddress) (port:Port) = 
-    { scheme  = scheme
+    { scheme        = scheme
       socketBinding = SocketBinding.mk ip port }
 
-  /// Create a HttpBinding for the given protocol, an IP address to bind to and a port
-  /// to listen on.
+  /// Create a HttpBinding for the given protocol, an IP address to bind to and
+  /// a port to listen on.
   let mk' scheme ip (port : int) = 
-    { scheme  = scheme 
+    { scheme        = scheme
       socketBinding = SocketBinding.mk (IPAddress.Parse ip) (uint16 port) } 
 
 type HttpContent =
+  /// This is the default HttpContent. If you place this is a HttpResult the web
+  /// server won't be that happy. It's assumed by Suave that you place a proper
+  /// Bytes or SocketTask content as the value – all built-in Http applicates
+  /// do this properly.
   | NullContent
+  /// This tells Suave to respond with an array of bytes. Since most responses
+  /// are small enough to fit into memory, this is the most used HttpContent
+  /// used as results. If you want a streaming result, use SocketTask instead;
+  /// useful when you're serving large files through Suave.
   | Bytes of byte []
+  /// This task, especially with the `writePreamble`-flag lets your WebPart
+  /// control the flow of bytes by using a SocketOp. Contrasting with Bytes,
+  /// setting the HttpContent as this discriminated union type lets you stream
+  /// data back to the client through Suave.
   | SocketTask of (Connection * HttpResult -> SocketOp<unit>)
 
   static member NullContentPIso =
@@ -483,9 +495,9 @@ and HttpResult =
 
   /// The empty HttpResult, with a 404 and a HttpContent.NullContent content
   static member empty =
-    { status  = HTTP_404
-      headers = []
-      content = HttpContent.NullContent
+    { status        = HTTP_404
+      headers       = []
+      content       = HttpContent.NullContent
       writePreamble = true }
 
   static member status_ = Property<HttpResult,_> (fun x -> x.status) (fun v x -> { x with status = v })
@@ -677,7 +689,6 @@ type SuaveConfig =
   static member homeFolder_            = Property<SuaveConfig,_> (fun x -> x.homeFolder)            (fun v x -> { x with homeFolder = v })
   static member compressedFilesFolder_ = Property<SuaveConfig,_> (fun x -> x.compressedFilesFolder) (fun v x -> { x with compressedFilesFolder = v })
   static member logger_                = Property<SuaveConfig,_> (fun x -> x.logger)                (fun v x -> { x with logger = v })
-
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module SuaveConfig =

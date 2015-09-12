@@ -8,22 +8,22 @@ open Suave.Utils.Bytes
 /// A connection (TCP implied) is a thing that can read and write from a socket
 /// and that can be closed.
 type Connection =
-  { ipaddr         : IPAddress
-    transport      : ITransport
-    bufferManager  : BufferManager
-    lineBuffer     : ArraySegment<byte>
-    segments       : BufferSegment list }
+  { ipaddr        : IPAddress
+    transport     : ITransport
+    bufferManager : BufferManager
+    lineBuffer    : ArraySegment<byte>
+    segments      : BufferSegment list }
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Connection =
 
   let empty : Connection =
-    { ipaddr     = IPAddress.Loopback
-      transport       =  { socket = null; readArgs = null; writeArgs   = null }
+    { ipaddr        = IPAddress.Loopback
+      transport     =  { socket = null; readArgs = null; writeArgs   = null }
       bufferManager = null
-      lineBuffer  =  ArraySegment<byte>()
-      segments     = []  }
-      
+      lineBuffer    =  ArraySegment<byte>()
+      segments      = [] }
+
   let inline receive (cn : Connection) (buf : ByteSegment) =
     cn.transport.read buf
   

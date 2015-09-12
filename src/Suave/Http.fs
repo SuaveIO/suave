@@ -169,7 +169,6 @@ module Http =
     open Response
     open Suave.Types
     
-
     let ok s : WebPart = 
       fun ctx -> { ctx with response = { ctx.response with status = HTTP_200; content = Bytes s }} |> succeed
 
@@ -218,7 +217,6 @@ module Http =
     </body>
   </html>"
         url HTTP_302.message))
-     
 
     let not_modified : WebPart =
       fun ctx -> { ctx with response = {status = HTTP_304; headers = []; content = Bytes [||]; writePreamble = true }} |> succeed

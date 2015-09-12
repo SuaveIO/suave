@@ -46,10 +46,13 @@ module OwinConstants =
   // 3.2.2 Response Data
   [<CompiledName ("ResponseStatusCode")>]
   let [<Literal>] responseStatusCode = "owin.ResponseStatusCode"
+
   [<CompiledName ("ResponseReasonPhrase")>]
   let [<Literal>] responseReasonPhrase = "owin.ResponseReasonPhrase"
+
   [<CompiledName ("ResponseProtocol")>]
   let [<Literal>] responseProtocol = "owin.ResponseProtocol"
+
   [<CompiledName ("ResponseHeaders")>]
   let [<Literal>] responseHeaders = "owin.ResponseHeaders"
 
@@ -163,14 +166,19 @@ module OwinConstants =
     // 5. Consumption
     [<CompiledName ("SendAsync")>]
     let [<Literal>] sendAsync = "websocket.SendAsync"
+
     [<CompiledName ("ReceiveAsync")>]
-    let [<Literal>] receiveAsync = "websocket.ReceiveAsync"
+    let [<Literal>] receiveAsync = "websocket.ReceiveAsync
+    "
     [<CompiledName ("CloseAsync")>]
     let [<Literal>] closeAsync = "websocket.CloseAsync"
+
     [<CompiledName ("CallCancelled")>]
     let [<Literal>] callCancelled = "websocket.CallCancelled"
+
     [<CompiledName ("ClientCloseStatus")>]
     let [<Literal>] clientCloseStatus = "websocket.ClientCloseStatus"
+
     [<CompiledName ("ClientCloseDescription")>]
     let [<Literal>] clientCloseDescription = "websocket.ClientCloseDescription"
 
@@ -320,15 +328,6 @@ module OwinApp =
         //failwithf "converting %s to %s" (x.GetType().Name) (typeof<'t>.Name)
         unbox x)
 
-    let req l =
-      HttpContext.request_ >--> l <--> untyped
-
-    let run l =
-      HttpContext.runtime_ >--> l <--> untyped
-
-    let res l =
-      HttpContext.response_ >--> l <--> untyped
-
     let methodString : Property<HttpMethod, string> =
       (fun x -> x.ToString()),
       (fun v x -> HttpMethod.parse v)
@@ -396,7 +395,7 @@ module OwinApp =
         // writeable / value
         OwinConstants.requestPath,          HttpContext.request_ >--> HttpRequest.url_ >--> uriAbsolutePath <--> untyped
         // writeable / value
-        OwinConstants.requestQueryString,   req HttpRequest.rawQuery_
+        OwinConstants.requestQueryString,   HttpContext.request_ >--> HttpRequest.rawQuery_ <--> untyped
         // writeable / value???
         OwinConstants.requestProtocol,      HttpContext.request_ >--> HttpRequest.httpVersion_ >--> hv2p <--> untyped
         // !! mutation expected (!)
@@ -410,8 +409,9 @@ module OwinApp =
         // 3.2.2 Response Data
         // writeable / value
         OwinConstants.responseStatusCode,   HttpContext.response_ >--> HttpResult.status_ >--> i2sc <--> untyped
+        // TO CONSIDER: add support for modifying phrasing to Core?
         // writeable / value
-        OwinConstants.responseReasonPhrase, HttpContext.response_ <--> untyped // TODO: add support for modifying phrasing to Core?
+        OwinConstants.responseReasonPhrase, constant "Changing the reason phrase is not supported in Suave"
         // writeable / value???
         OwinConstants.responseProtocol,     HttpContext.request_ >--> HttpRequest.httpVersion_ >--> hv2p <--> untyped
         // !! mutation expected
