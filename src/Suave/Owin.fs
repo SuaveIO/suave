@@ -236,7 +236,7 @@ module OwinApp =
         fun eventType eventId state ex formatter ->
           let exo = match ex with | null -> None | eee -> Some eee
           suaveLogger.Log LogLevel.Info (fun () ->
-            LogLine.mk "Suave.Examples.WebSharper" LogLevel.Info TraceHeader.empty exo (formatter.Invoke (state, ex))
+            LogLine.mk "Suave.Owin" LogLevel.Info TraceHeader.empty exo (formatter.Invoke (state, ex))
           )
           true
       )
