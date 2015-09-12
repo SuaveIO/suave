@@ -221,6 +221,8 @@ module OwinApp =
   open Suave.Utils
   open Suave.Sockets.Control
   open Suave.Web.ParsingAndControl
+  open System.Text
+  open System.Globalization
   open System.Diagnostics
 
   /// http://www.tugberkugurlu.com/archive/logging-in-the-owin-world-with-microsoft-owin--introduction
@@ -241,6 +243,15 @@ module OwinApp =
           true
       )
     new Func<_, _>(createLogger)
+
+  let textWriter (suaveLogger : Logger) : IO.TextWriter =
+    { new IO.TextWriter(CultureInfo.InvariantCulture) with
+        member x.Encoding = Encoding.UTF8
+        override x.WriteLine (str : string) =
+          suaveLogger.Log LogLevel.Info (fun () ->
+            LogLine.mk "Suave.Owin" LogLevel.Info TraceHeader.empty None str
+          )
+    }
 
   type OwinRequest =
     abstract OnSendingHeadersAction : Action<Action<obj>, obj>
@@ -457,7 +468,7 @@ module OwinApp =
         OwinConstants.responseBody,         HttpContext.response_ >--> HttpResult.content_ >--> responseStreamLens <--> untyped
 
         // 3.2.3 Other Data
-        OwinConstants.callCancelled,        ((fun x -> ct), (fun v x -> x)) <--> untyped // TODO: support cancellation token in HttpRequest signalling aborted request
+        OwinConstants.callCancelled,        constant ct // TODO: support cancellation token in HttpRequest signalling aborted request
         OwinConstants.owinVersion,          constant "1.3"
 
         OwinConstants.CommonKeys.addresses,         HttpContext.userState_ <--> untyped // TODO:
@@ -477,7 +488,8 @@ module OwinApp =
         OwinConstants.CommonKeys.onSendingHeaders,  HttpContext.userState_ <--> untyped // TODO:
         OwinConstants.CommonKeys.remoteIpAddress,   HttpContext.clientIp_ <--> stringlyTyped (sprintf "%O") IPAddress.Parse <--> untyped
         OwinConstants.CommonKeys.remotePort,        HttpContext.clientPort_ <--> stringlyTyped string uint16 <--> untyped // TODO:
-
+        OwinConstants.CommonKeys.traceOutput,       HttpContext.runtime_ >--> HttpRuntime.logger_ >--> ((fun x -> textWriter x), (fun v x -> x)) <--> untyped
+        
         // per-request storage
         "suave.UserData", HttpContext.userState_ <--> untyped
 
@@ -584,8 +596,7 @@ module OwinApp =
         (owinRW :> IDictionary<_, _>).Keys
 
       member x.Values =
-        invalidOp "omg the amount of lensing needed"
-        //(owinRW :> IDictionary<_, _> |> Seq.map (fun (kv) -> Lens.get kv.Value !state)).Values
+        (owinRW |> Map.map (fun key valueLens -> Lens.get valueLens !state) :> IDictionary<_, _>).Values
 
       member x.ContainsKey k =
         owinKeys.Contains k
