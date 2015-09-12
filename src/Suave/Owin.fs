@@ -70,6 +70,7 @@ module OwinConstants =
   // 3.2.3 Other Data
   [<CompiledName ("CallCancelled")>]
   let [<Literal>] callCancelled = "owin.CallCancelled"
+
   [<CompiledName ("OwinVersion")>]
   let [<Literal>] owinVersion = "owin.Version"
 
@@ -157,6 +158,7 @@ module OwinConstants =
     // 5. Consumption
     [<CompiledName ("Stream")>]
     let [<Literal>] stream = "opaque.Stream"
+
     [<CompiledName ("CallCanceled")>]
     let [<Literal>] callCancelled = "opaque.CallCancelled"
 
@@ -194,6 +196,10 @@ module OwinConstants =
     [<CompiledName ("ClientCloseDescription")>]
     let [<Literal>] clientCloseDescription = "websocket.ClientCloseDescription"
 
+  module MSFT =
+    [<CompiledName "TraceFactoryDelegate">]
+    let [<Literal>] traceFactoryDelegate = "server.LoggerFactory"
+
 type OwinEnvironment =
   IDictionary<string, obj>
 
@@ -215,6 +221,26 @@ module OwinApp =
   open Suave.Utils
   open Suave.Sockets.Control
   open Suave.Web.ParsingAndControl
+  open System.Diagnostics
+
+  /// http://www.tugberkugurlu.com/archive/logging-in-the-owin-world-with-microsoft-owin--introduction
+  type TraceFactoryDelegate =
+    Func<string, Func<Diagnostics.TraceEventType, int, obj, Exception,
+                      Func<obj, Exception, string>,
+                      bool>>
+
+  /// http://www.tugberkugurlu.com/archive/logging-in-the-owin-world-with-microsoft-owin--introduction
+  let traceFactory (suaveLogger : Logger) : TraceFactoryDelegate =
+    let createLogger name =
+      new Func<TraceEventType, int, obj, exn, Func<obj, exn, string>, bool>(
+        fun eventType eventId state ex formatter ->
+          let exo = match ex with | null -> None | eee -> Some eee
+          suaveLogger.Log LogLevel.Info (fun () ->
+            LogLine.mk "Suave.Examples.WebSharper" LogLevel.Info TraceHeader.empty exo (formatter.Invoke (state, ex))
+          )
+          true
+      )
+    new Func<_, _>(createLogger)
 
   type OwinRequest =
     abstract OnSendingHeadersAction : Action<Action<obj>, obj>
@@ -361,7 +387,6 @@ module OwinApp =
                          | "HTTP/1.1" -> "1.1"
                          | x -> x)
 
-
     let bytesToStream : Property<byte[], IO.Stream> =
       (fun x -> upcast new IO.MemoryStream(x)),
       (fun v x ->
@@ -455,6 +480,10 @@ module OwinApp =
 
         // per-request storage
         "suave.UserData", HttpContext.userState_ <--> untyped
+
+        // MSFT non standard
+        // readable
+        OwinConstants.MSFT.traceFactoryDelegate,    HttpContext.runtime_ >--> HttpRuntime.logger_ >--> ((fun x -> traceFactory x), (fun v x -> x)) <--> untyped
       ]
 
   type UnclosableMemoryStream() =
