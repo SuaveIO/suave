@@ -13,6 +13,7 @@ open System.Security.Claims
 open System.Security.Principal
 open System.Runtime.InteropServices
 open Suave
+open Suave.Logging
 open Suave.Http
 open Suave.Types
 open Suave.Sockets
@@ -70,28 +71,45 @@ module OwinConstants =
   let [<Literal>] owinVersion = "owin.Version"
 
   /// http://owin.org/spec/CommonKeys.html
+  /// http://owin.org/spec/spec/CommonKeys.html
   [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
   module CommonKeys =
+    /// The client certificate provided during HTTPS SSL negotiation.
+    /// Type: X509Certificate
     [<CompiledName ("ClientCertificate")>]
     let [<Literal>] clientCertificate = "ssl.ClientCertificate"
+
     [<CompiledName ("TraceOutput")>]
     let [<Literal>] traceOutput = "host.TraceOutput"
+
     [<CompiledName ("Addresses")>]
     let [<Literal>] addresses = "host.Addresses"
+
+    /// The IP Address of the remote client. E.g. 192.168.1.1 or ::1
+    /// Type: String
     [<CompiledName ("RemoteIpAddress")>]
     let [<Literal>] remoteIpAddress = "server.RemoteIpAddress"
+
     [<CompiledName ("RemotePort")>]
     let [<Literal>] remotePort = "server.RemotePort"
+
+    /// The local IP Address the request was received on. E.g. 127.0.0.1 or ::1
+    /// Type: string
     [<CompiledName ("LocalIpAddress")>]
     let [<Literal>] localIpAddress = "server.LocalIpAddress"
+
     [<CompiledName ("LocalPort")>]
     let [<Literal>] localPort = "server.LocalPort"
+
     [<CompiledName ("IsLocal")>]
     let [<Literal>] isLocal = "server.IsLocal"
+
     [<CompiledName ("Capabilities")>]
     let [<Literal>] capabilities = "server.Capabilities"
+
     [<CompiledName ("ServerName")>]
     let [<Literal>] serverName = "server.Name"
+
     [<CompiledName ("OnSendingHeaders")>]
     let [<Literal>] onSendingHeaders = "server.OnSendingHeaders"
 
@@ -302,9 +320,6 @@ module OwinApp =
         //failwithf "converting %s to %s" (x.GetType().Name) (typeof<'t>.Name)
         unbox x)
 
-    let inline stringlyTyped (convertBack : string -> 'a) : Property<'a, string> =
-      string, fun v x -> convertBack v
-
     let req l =
       HttpContext.request_ >--> l <--> untyped
 
@@ -362,9 +377,13 @@ module OwinApp =
        (fun v x -> x)
       ) <--> untyped
 
-    let mapFindLens key : Property<Map<_, _>, _>=
+    let mapFindLens key : Property<Map<_, _>, _> =
       (fun x -> x |> Map.find key),
       (fun v x -> x |> Map.put key v)
+
+    let stringlyTyped (toString : 'a -> string) (ofString : string -> 'a) : Iso<'a, string> =
+      (fun x -> toString x),
+      (fun v -> ofString v)
 
     let owinMap ct requestHeadersLens responseHeadersLens responseStreamLens =
       [ // 3.2.1 Request Data
@@ -384,7 +403,7 @@ module OwinApp =
         OwinConstants.requestHeaders,       HttpContext.request_ >--> HttpRequest.headers_ >--> requestHeadersLens <--> untyped
         // writeable / value
         OwinConstants.requestBody,          HttpContext.request_ >--> HttpRequest.rawForm_ >--> bytesToStream <--> untyped
-        OwinConstants.requestId,            HttpContext.request_ >--> HttpRequest.trace_ >--> Logging.TraceHeader.traceId_ >--> stringlyTyped uint64 <--> untyped
+        OwinConstants.requestId,            HttpContext.request_ >--> HttpRequest.trace_ >--> TraceHeader.traceId_ <--> stringlyTyped string uint64 <--> untyped
         // writeable / value
         OwinConstants.requestUser,          HttpContext.userState_ >--> claimsPrincipal <--> untyped
 
@@ -412,8 +431,8 @@ module OwinApp =
         OwinConstants.CommonKeys.capabilities, HttpContext.userState_ <--> untyped // TODO:
         OwinConstants.CommonKeys.clientCertificate, HttpContext.userState_ <--> untyped // TODO:
         OwinConstants.CommonKeys.isLocal, HttpContext.userState_ <--> untyped // TODO:
-        OwinConstants.CommonKeys.localIpAddress, HttpContext.userState_ <--> untyped // TODO:
-        OwinConstants.CommonKeys.localPort, HttpContext.userState_ <--> untyped // TODO:
+        OwinConstants.CommonKeys.localIpAddress, HttpContext.runtime_ >--> HttpRuntime.matchedBinding_ >--> HttpBinding.socketBinding_ >--> SocketBinding.ip_ <--> stringlyTyped (sprintf "%O") IPAddress.Parse <--> untyped
+        OwinConstants.CommonKeys.localPort, HttpContext.runtime_  >--> HttpRuntime.matchedBinding_ >--> HttpBinding.socketBinding_ >--> SocketBinding.port_ <--> stringlyTyped string uint16 <--> untyped
         OwinConstants.CommonKeys.onSendingHeaders, HttpContext.userState_ <--> untyped // TODO:
         OwinConstants.CommonKeys.remoteIpAddress, HttpContext.userState_ <--> untyped // TODO:
         OwinConstants.CommonKeys.remotePort, HttpContext.userState_ <--> untyped // TODO:
@@ -563,13 +582,26 @@ module OwinApp =
   [<CompiledName "OfApp">]
   let ofApp (owin : OwinApp) : WebPart =
     fun (ctx : HttpContext) ->
+      let verbose f =
+        ctx.runtime.logger.Log LogLevel.Verbose (
+          f >> LogLine.mk "Suave.Owin" LogLevel.Verbose ctx.request.trace None
+        )
+
       let impl (conn, response) : SocketOp<unit> = socket {
         // disposable because it buffers what the OwinApp writes to the stream
         use wrapper = new OwinDictionary({ ctx with response = response })
+
+        verbose (fun _ -> "yielding to OWIN middleware")
         do! SocketOp.ofAsync (owin wrapper.Interface)
+
+        verbose (fun _ -> "suave back in control")
         let ctx = wrapper.Finalise()
+
+        verbose (fun _ -> "writing preamble")
         //TO CONSIDER: do (wrapper :> OwinRequest).OnSendingHeadersAction
         do! Web.ParsingAndControl.writePreamble ctx
+
+        verbose (fun _ -> "writing body")
         do! Web.ParsingAndControl.writeContent ctx ctx.response.content
       }
 

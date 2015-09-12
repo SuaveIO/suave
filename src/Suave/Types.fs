@@ -404,10 +404,9 @@ type Protocol =
         | HTTP -> "http"
         | HTTPS _ -> "https"
 
-
 /// A HTTP binding is a protocol is the product of HTTP or HTTP, a DNS or IP binding and a port number
 type HttpBinding = 
-  { scheme: Protocol
+  { scheme        : Protocol
     socketBinding : SocketBinding } 
 
   member x.uri path query =
@@ -501,14 +500,14 @@ type ServerKey = byte []
 /// server starts. You can also use the `HttpRuntime` module to create a new
 /// value yourself, or use the `empty` one.
 type HttpRuntime =
-  { serverKey          : ServerKey
-    errorHandler       : ErrorHandler
-    mimeTypesMap       : MimeTypesMap
-    homeDirectory      : string
-    compressionFolder  : string
-    logger             : Logger
-    matchedBinding     : HttpBinding
-    parsePostData      : bool }
+  { serverKey         : ServerKey
+    errorHandler      : ErrorHandler
+    mimeTypesMap      : MimeTypesMap
+    homeDirectory     : string
+    compressionFolder : string
+    logger            : Logger
+    matchedBinding    : HttpBinding
+    parsePostData     : bool }
 
   static member serverKey_ = Property (fun x -> x.serverKey) (fun v x -> { x with serverKey = v })
   static member errorHandler_ = Property (fun x -> x.errorHandler) (fun v x -> { x with errorHandler = v })
