@@ -221,6 +221,7 @@ type OwinAppFunc =
 type OwinMidFunc =
   Func<Func<OwinEnvironment, Task>, Func<OwinEnvironment, Task>>
 
+// TO CONSIDER: provide typed API in OwinRequest
 type OwinRequest =
   /// Registers for an event that fires just before the response headers are sent.
   /// (Action<Action<obj>, obj>)
@@ -535,7 +536,7 @@ module OwinApp =
       //let impl conn = AsyncSocket.transferStream conn v
       //SocketTask impl
     // TODO: cancelled request
-    // TODO: provide typed API in OwinRequest
+
     let cts = new CancellationTokenSource()
     let state : HttpContext ref = ref initialState //externally owned
 
@@ -611,7 +612,7 @@ module OwinApp =
         ms.Seek(0L, IO.SeekOrigin.Begin) |> ignore
         Lens.setPartial bytes_ (ms.ToArray())
 
-      !sendingHeaders |> List.iter (fun (cb, st) -> cb st)
+      List.foldBack (fun (cb, st) s -> cb st) !sendingHeaders ()
 
       !state
       |> Option.foldBack setRequestHeaders !requestHeaders
@@ -711,11 +712,11 @@ module OwinApp =
 
   [<CompiledName "OfAppFunc">]
   let ofAppFunc (owin : OwinAppFunc) =
-    ofApp (fun e -> Async.AwaitTask ((owin.Invoke e).ContinueWith<_>(fun _ -> ())))
+    ofApp (fun e -> Async.AwaitTask ((owin.Invoke e).ContinueWith<_>(fun x -> ())))
 
   [<CompiledName "OfMidFunc">]
   let ofMidFunc (owin : OwinMidFunc) =
-    ofAppFunc (owin.Invoke(fun _ -> new Task(fun _ -> ())))
+    ofAppFunc (owin.Invoke(fun _ -> new Task(fun x -> ())))
 
 module OwinServerFactory =
 
