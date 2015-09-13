@@ -23,23 +23,32 @@ module OwinConstants =
   // 3.2.1 Request Data
   [<CompiledName ("RequestScheme")>]
   let [<Literal>] requestScheme = "owin.RequestScheme"
+
   [<CompiledName ("RequestMethod")>]
   let [<Literal>] requestMethod = "owin.RequestMethod"
+
   /// Servers may have the ability to map application delegates to some base path. For example, a server might have an application delegate configured to respond to requests beginning with "/my-app", in which case it should set the value of "owin.RequestPathBase" in the environment dictionary to "/my-app". If this server receives a request for "/my-app/foo", the “owin.RequestPath” value of the environment dictionary provided to the application configured to respond at "/my-app" should be "/foo".
   [<CompiledName ("RequestPathBase")>]
   let [<Literal>] requestPathBase = "owin.RequestPathBase"
+
   [<CompiledName ("RequestPath")>]
   let [<Literal>] requestPath = "owin.RequestPath"
+
   [<CompiledName ("RequestQueryString")>]
   let [<Literal>] requestQueryString = "owin.RequestQueryString"
+
   [<CompiledName ("RequestProtocol")>]
   let [<Literal>] requestProtocol = "owin.RequestProtocol"
+
   [<CompiledName ("RequestHeaders")>]
   let [<Literal>] requestHeaders = "owin.RequestHeaders"
+
   [<CompiledName ("RequestBody")>]
   let [<Literal>] requestBody = "owin.RequestBody"
+
   [<CompiledName ("RequestId")>]
   let [<Literal>] requestId = "owin.RequestId"
+
   [<CompiledName ("RequestUser")>]
   let [<Literal>] requestUser = "owin.RequestUser"
 
@@ -212,6 +221,11 @@ type OwinAppFunc =
 type OwinMidFunc =
   Func<Func<OwinEnvironment, Task>, Func<OwinEnvironment, Task>>
 
+type OwinRequest =
+  /// Registers for an event that fires just before the response headers are sent.
+  /// (Action<Action<obj>, obj>)
+  abstract OnSendingHeaders<'State> : ('State -> unit) -> 'State -> unit
+
 [<RequireQualifiedAccess>]
 [<CompilationRepresentation (CompilationRepresentationFlags.ModuleSuffix)>]
 module OwinApp =
@@ -253,9 +267,6 @@ module OwinApp =
           )
     }
 
-  type OwinRequest =
-    abstract OnSendingHeadersAction : Action<Action<obj>, obj>
-
   type private Clock = uint64
 
   type internal DeltaDictionary(initialHeaders : Map<string, string[]>) =
@@ -263,7 +274,7 @@ module OwinApp =
     let removed : Map<string, Clock> ref = ref Map.empty
     let mutable clock = 1UL
 
-    member x.Delta = // TODO: memoize function keyed on logical clock
+    member x.Delta = // TO CONSIDER: memoize function keyed on logical clock
       let keys =
         let changed = !changed |> Map.toSeq |> Seq.map fst |> Set.ofSeq
         let removed = !removed |> Map.toSeq |> Seq.map fst |> Set.ofSeq
@@ -377,6 +388,19 @@ module OwinApp =
         //failwithf "converting %s to %s" (x.GetType().Name) (typeof<'t>.Name)
         unbox x)
 
+    let boundAddresses : Property<HttpContext, IList<IDictionary<string, obj>>> =
+      (fun x ->
+        let binding =
+          Map [ "scheme", x.runtime.matchedBinding.scheme.ToString()
+                "host", x.request.host
+                "port", x.runtime.matchedBinding.socketBinding.port.ToString(CultureInfo.InvariantCulture)
+                "path", x.runtime.matchedBinding.socketBinding.port.ToString(CultureInfo.InvariantCulture) ]
+          |> Map.map (fun key value -> box value)
+          :> IDictionary<string, obj>
+        List<_> [ binding ] :> IList<_>
+      ),
+      fun v x -> invalidOp "cannot change the bound addresses after start."
+
     let methodString : Property<HttpMethod, string> =
       (fun x -> x.ToString()),
       (fun v x -> HttpMethod.parse v)
@@ -432,7 +456,7 @@ module OwinApp =
       (fun x -> toString x),
       (fun v -> ofString v)
 
-    let owinMap ct requestHeadersLens responseHeadersLens responseStreamLens =
+    let owinMap ct requestHeadersLens responseHeadersLens responseStreamLens onSendingHeadersLens =
       [ // 3.2.1 Request Data
         // writeable / value???
         OwinConstants.requestScheme,        HttpContext.request_ >--> HttpRequest.url_ >--> uriScheme <--> untyped
@@ -471,7 +495,8 @@ module OwinApp =
         OwinConstants.callCancelled,        constant ct // TODO: support cancellation token in HttpRequest signalling aborted request
         OwinConstants.owinVersion,          constant "1.3"
 
-        OwinConstants.CommonKeys.addresses,         HttpContext.userState_ <--> untyped // TODO:
+        // Common Keys
+        OwinConstants.CommonKeys.addresses,         boundAddresses <--> untyped
         OwinConstants.CommonKeys.serverName,        constant "Suave"
         OwinConstants.CommonKeys.capabilities,      constant (
           Map [
@@ -482,16 +507,16 @@ module OwinApp =
           :> IDictionary<string, obj>
         )
         OwinConstants.CommonKeys.clientCertificate, constant Unchecked.defaultof<Security.Cryptography.X509Certificates.X509Certificate>
+        OwinConstants.CommonKeys.onSendingHeaders,  onSendingHeadersLens <--> untyped
         OwinConstants.CommonKeys.isLocal,           HttpContext.isLocal_ <--> untyped
         OwinConstants.CommonKeys.localIpAddress,    HttpContext.runtime_ >--> HttpRuntime.matchedBinding_ >--> HttpBinding.socketBinding_ >--> SocketBinding.ip_ <--> stringlyTyped (sprintf "%O") IPAddress.Parse <--> untyped
         OwinConstants.CommonKeys.localPort,         HttpContext.runtime_  >--> HttpRuntime.matchedBinding_ >--> HttpBinding.socketBinding_ >--> SocketBinding.port_ <--> stringlyTyped string uint16 <--> untyped
-        OwinConstants.CommonKeys.onSendingHeaders,  HttpContext.userState_ <--> untyped // TODO:
         OwinConstants.CommonKeys.remoteIpAddress,   HttpContext.clientIp_ <--> stringlyTyped (sprintf "%O") IPAddress.Parse <--> untyped
-        OwinConstants.CommonKeys.remotePort,        HttpContext.clientPort_ <--> stringlyTyped string uint16 <--> untyped // TODO:
+        OwinConstants.CommonKeys.remotePort,        HttpContext.clientPort_ <--> stringlyTyped string uint16 <--> untyped
         OwinConstants.CommonKeys.traceOutput,       HttpContext.runtime_ >--> HttpRuntime.logger_ >--> ((fun x -> textWriter x), (fun v x -> x)) <--> untyped
         
         // per-request storage
-        "suave.UserData", HttpContext.userState_ <--> untyped
+        "suave.UserData",                           HttpContext.userState_ <--> untyped
 
         // MSFT non standard
         // readable
@@ -542,7 +567,17 @@ module OwinApp =
         upcast responseStream),
       (fun _ x -> invalidOp "setting responseStream to a value is not supported in OWIN")
 
-    let owinMap = SirLensALot.owinMap cts.Token requestHeadersLens responseHeadersLens responseStreamLens
+    let sendingHeaders : ((obj -> unit) * obj) list ref = ref []
+    let onSendingHeadersLens : Property<HttpContext, Action<Action<obj>, obj>> =
+      (fun x ->
+        Action<_, _>(fun (cb : Action<obj>) (st : obj) ->
+          sendingHeaders := (cb.Invoke, st) :: !sendingHeaders
+          ())),
+      (fun v x -> invalidOp "cannot set onSendingHeadersAction")
+
+    let owinMap = SirLensALot.owinMap cts.Token requestHeadersLens
+                                      responseHeadersLens responseStreamLens
+                                      onSendingHeadersLens
     let owinKeys = owinMap |> List.map fst |> Set.ofSeq
     let owinRW   = owinMap |> Map.ofList
 
@@ -552,8 +587,12 @@ module OwinApp =
                                               | Some lens -> lens),
       (fun v x -> invalidOp "TODO")
 
+    interface OwinRequest with
+      member x.OnSendingHeaders cb st =
+        sendingHeaders := ((fun o -> cb (unbox o)), box st) :: !sendingHeaders
+
     member x.Interface =
-      x :> IDictionary<string, obj>
+      x :> OwinEnvironment
 
     /// Calling this returns a valid HttpResult that we can use for Suave
     member x.Finalise() =
@@ -572,15 +611,14 @@ module OwinApp =
         ms.Seek(0L, IO.SeekOrigin.Begin) |> ignore
         Lens.setPartial bytes_ (ms.ToArray())
 
+      !sendingHeaders |> List.iter (fun (cb, st) -> cb st)
+
       !state
       |> Option.foldBack setRequestHeaders !requestHeaders
       |> Option.foldBack setResponseHeaders !responseHeaders
       |> setResponseData responseStream
 
-    interface OwinRequest with
-      member x.OnSendingHeadersAction =
-        Action<_, _>(fun a -> fun x -> ())
-
+      
     interface IDictionary<string, obj> with
       member x.Remove k =
         invalidOp "Remove not supported"
@@ -656,7 +694,6 @@ module OwinApp =
         let ctx = wrapper.Finalise()
 
         verbose (fun _ -> "writing preamble")
-        //TO CONSIDER: do (wrapper :> OwinRequest).OnSendingHeadersAction
         do! Web.ParsingAndControl.writePreamble ctx
 
         verbose (fun _ -> "writing body")
