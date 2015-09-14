@@ -28,7 +28,7 @@ module LogLine =
       path          = path
       ``exception`` = ex
       trace         = trace
-      tsUTCTicks  = Globals.utcNow().Ticks }
+      tsUTCTicks    = Globals.utcNow().Ticks }
 
   let trace_ =
     (fun x -> x.trace),
@@ -45,3 +45,11 @@ module LogLine =
   let message_ =
     (fun x -> x.message),
     fun v (x : LogLine) -> { x with message = v }
+
+  let tsUTCTicks_ =
+    (fun x -> x.tsUTCTicks),
+    fun v (x : LogLine) -> { x with tsUTCTicks = v }
+
+  let exception_ =
+    (fun x -> x.``exception``),
+    fun v x -> { x with ``exception`` = v }

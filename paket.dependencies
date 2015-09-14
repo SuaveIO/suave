@@ -1,3 +1,4 @@
+framework: net45
 source https://nuget.org/api/v2
 
 nuget FSharp.Charting
@@ -10,6 +11,7 @@ nuget FsPickler
 nuget Fuchu-suave.FsCheck
 nuget Fuchu-suave.PerfUtil ~> 0.6
 nuget Topshelf.FSharp
+nuget WebSharper.Owin
 nuget WebSocketSharp
 nuget openssl.redist
 nuget DotLiquid

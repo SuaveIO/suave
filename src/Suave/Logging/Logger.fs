@@ -53,7 +53,9 @@ module Loggers =
         (write << formatter) line
 
     interface Logger with
-      member x.Log level f = if level >= minLevel then log (toColor level) (f ())
+      member x.Log level f =
+        if level >= minLevel then
+          log (toColor level) (f ())
       
   type OutputWindowLogger(minLevel, ?formatter) =
     let formatter = defaultArg formatter defaultFormatter

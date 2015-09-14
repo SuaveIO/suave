@@ -31,6 +31,7 @@ type HttpMethod =
   | TRACE
   | OPTIONS
   | OTHER of string // This represents a method string that isn't one of the standard methods.
+
   override x.ToString() =
     match x with
     | GET     -> "GET"
@@ -194,13 +195,16 @@ module Codes =
 
 /// HTTP cookie
 type HttpCookie =
-  { name      : string
-    value     : string
-    expires   : DateTimeOffset option
-    path      : string option
-    domain    : string option
-    secure    : bool
-    httpOnly  : bool }
+  { name     : string
+    value    : string
+    expires  : DateTimeOffset option
+    path     : string option
+    /// This cookies is only valid for the given domain
+    domain   : string option
+    /// This cookie is not forwarded over plaintext transports
+    secure   : bool
+    /// This cookie is not readable from JavaScript
+    httpOnly : bool }
 
   static member name_     = (fun x -> x.name),    fun v x -> { x with name = v }
   static member value_    = (fun x -> x.value), fun v x -> { x with value = v }
@@ -285,37 +289,56 @@ type HttpUpload =
   static member mimeType_ = Property<HttpUpload,_> (fun x -> x.mimeType) (fun v x -> { x with mimeType = v })
   static member tempFilePath_ = Property<HttpUpload,_> (fun x -> x.tempFilePath) (fun v x -> { x with tempFilePath = v })
 
-type Host =
-  /// The Http.Applicatives.host function has ensured this value
-  | ServerClient of string
-  /// The client's Host header is this value
-  | ClientOnly of string
-  /// The
-  | Forwarded of forwardedFor:string * Host
+type ITlsProvider =
+  abstract member Wrap : Connection -> SocketOp<Connection>
 
-  member x.value =
+/// Gets the supported protocols, HTTP and HTTPS with a certificate
+type Protocol = 
+  /// The HTTP protocol is the core protocol
+  | HTTP
+  /// The HTTP protocol tunneled in a TLS tunnel
+  | HTTPS of ITlsProvider
+    
+  member x.secure = 
     match x with
-    | ServerClient v -> v
-    | ClientOnly v -> v
-    | Forwarded (forwardedFor, _) -> forwardedFor
+    | HTTP    -> false
+    | HTTPS _ -> true
+  
+  override x.ToString() = 
+    match x with
+    | HTTP    -> "http"
+    | HTTPS _ -> "https"
+
+/// Type alias for string. This is the host as seen from the server; not
+/// necessarily as seen from the client.
+type Host = string
 
 /// A holder for the data extracted from the request.
 type HttpRequest =
-  { httpVersion      : string
-    url              : Uri
-    host             : Host
-    ``method``       : HttpMethod
-    headers          : (string * string) list
-    rawForm          : byte []
-    rawQuery         : string
-    files            : HttpUpload list
-    multiPartFields  : (string * string) list
-    trace            : TraceHeader
-    isSecure         : bool
-    ipaddr           : IPAddress }
+  { httpVersion     : string
+    url             : Uri
+    /// The Host that the web server responds to; not necessarily the host called
+    /// by the client, as the request may have traversed proxies. As Suave
+    /// binds to an IP rather than IP+Hostname, this can be anything the client
+    /// has passed as the Host header. If you're behind a proxy, it may be the
+    /// DNS name of the node that the reverse proxy forwards to, or if you're
+    /// exposing Suave publically, it should match the public DNS name of the
+    /// node.
+    ///
+    /// To ensure the correct host-name is being called, you can use `Http.host`
+    /// in your web app.
+    host            : Host
+    ``method``      : HttpMethod
+    headers         : (string * string) list
+    rawForm         : byte []
+    rawQuery        : string
+    files           : HttpUpload list
+    multiPartFields : (string * string) list
+    trace           : TraceHeader }
 
   static member httpVersion_     = Property<HttpRequest,_> (fun x -> x.httpVersion) (fun v (x : HttpRequest) -> { x with httpVersion = v })
   static member url_             = Property<HttpRequest,_> (fun x -> x.url) (fun v x -> { x with url = v })
+  static member host_            = Property<HttpRequest,_> (fun x -> x.host) (fun v x -> { x with host = v })
   static member method_          = Property<HttpRequest,_> (fun x -> x.``method``) (fun v x -> { x with ``method`` = v })
   static member headers_         = Property<HttpRequest,_> (fun x -> x.headers) (fun v x -> { x with headers = v })
   static member rawForm_         = Property<HttpRequest,_> (fun x -> x.rawForm) (fun v x -> { x with rawForm = v })
@@ -323,8 +346,6 @@ type HttpRequest =
   static member files_           = Property<HttpRequest,_> (fun x -> x.files) (fun v x -> { x with files = v })
   static member multipartFields_ = Property<HttpRequest,_> (fun x -> x.multiPartFields) (fun v x -> { x with multiPartFields = v })
   static member trace_           = Property<HttpRequest,_> (fun x -> x.trace) (fun v x -> { x with trace = v })
-  static member isSecure_        = Property<HttpRequest,_> (fun x -> x.isSecure) (fun v x -> { x with isSecure = v })
-  static member ipaddr_          = Property<HttpRequest,_> (fun x -> x.ipaddr) (fun v x -> { x with ipaddr = v })
 
   /// Gets the query string from the HttpRequest. Use
   /// queryParam to try to fetch data for individual items.
@@ -348,7 +369,6 @@ type HttpRequest =
   member x.formData (k : string) =
     getFirstOpt x.form k
 
-
   /// Syntactic Sugar to retrieve query string, form or multi-field values from HttpRequest 
   member this.Item     
     with get(x) =    
@@ -365,50 +385,46 @@ type HttpRequest =
       
       params' x
 
+  /// Get the client's view of what host is being called. If you trust your
+  /// proxy the value will be fetched from X-Forwarded-Host, then the Host
+  /// headers. If you don't explicitly overwrite these headers in the proxy
+  /// you may be open to clients spoofing the headers. Hence the explicit
+  /// interfaces which force you as a developer to think abou the problem.
+  member x.clientHost trustProxy sources : string =
+    if trustProxy then
+      sources
+      |> List.fold (fun state source ->
+        state |> Choice.bindError (fun _ -> x.header source))
+        (Choice2Of2 "")
+      |> Choice.orDefault x.host
+    else
+      x.host
+
+  member x.clientHostTrustProxy =
+    x.clientHost true [ "x-forwarded-host" ]
+
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module HttpRequest =
 
   open Suave.Utils
 
   let empty =
-    { httpVersion      = "1.1"
-      url              = Uri("http://localhost/")
-      host             = ClientOnly "localhost"
-      ``method``       = HttpMethod.OTHER("")
-      headers          = []
-      rawForm          = Array.empty
-      rawQuery         = ""
-      files            = []
-      multiPartFields  = []
-      trace            = TraceHeader.empty
-      isSecure         = false
-      ipaddr           = IPAddress.Loopback }
+    { httpVersion     = "HTTP/1.1"
+      url             = Uri("http://localhost/")
+      host            = "localhost"
+      ``method``      = HttpMethod.OTHER("")
+      headers         = []
+      rawForm         = Array.empty
+      rawQuery        = ""
+      files           = []
+      multiPartFields = []
+      trace           = TraceHeader.empty }
 
-type ITlsProvider =
-  abstract member Wrap : Connection -> SocketOp<Connection>
-
-/// Gets the supported protocols, HTTP and HTTPS with a certificate
-type Protocol = 
-    /// The HTTP protocol is the core protocol
-    | HTTP
-    /// The HTTP protocol tunneled in a TLS tunnel
-    | HTTPS of ITlsProvider
-    
-    member x.secure = 
-        match x with
-        | HTTP -> false
-        | _ -> true
-    
-    override x.ToString() = 
-        match x with
-        | HTTP -> "http"
-        | HTTPS _ -> "https"
-
-
-/// A HTTP binding is a protocol is the product of HTTP or HTTP, a DNS or IP binding and a port number
-type HttpBinding = 
-  { scheme: Protocol
-    socketBinding : SocketBinding } 
+/// A HTTP binding is a protocol is the product of HTTP or HTTP, a DNS or IP
+/// binding and a port number.
+type HttpBinding =
+  { scheme        : Protocol
+    socketBinding : SocketBinding }
 
   member x.uri path query =
     String.Concat [
@@ -430,25 +446,37 @@ module HttpBinding =
 
   let DefaultBindingPort = 8083us
 
-  let defaults =  
-    { scheme  = HTTP
+  let defaults =
+    { scheme        = HTTP
       socketBinding = SocketBinding.mk IPAddress.Loopback DefaultBindingPort }
 
-  /// Create a HttpBinding for the given protocol, an IP address to bind to and a port
-  /// to listen on.
+  /// Create a HttpBinding for the given protocol, an IP address to bind to and
+  /// a port to listen on.
   let mk scheme (ip:IPAddress) (port:Port) = 
-    { scheme  = scheme
+    { scheme        = scheme
       socketBinding = SocketBinding.mk ip port }
 
-  /// Create a HttpBinding for the given protocol, an IP address to bind to and a port
-  /// to listen on.
+  /// Create a HttpBinding for the given protocol, an IP address to bind to and
+  /// a port to listen on.
   let mk' scheme ip (port : int) = 
-    { scheme  = scheme 
+    { scheme        = scheme
       socketBinding = SocketBinding.mk (IPAddress.Parse ip) (uint16 port) } 
 
 type HttpContent =
+  /// This is the default HttpContent. If you place this is a HttpResult the web
+  /// server won't be that happy. It's assumed by Suave that you place a proper
+  /// Bytes or SocketTask content as the value – all built-in Http applicates
+  /// do this properly.
   | NullContent
+  /// This tells Suave to respond with an array of bytes. Since most responses
+  /// are small enough to fit into memory, this is the most used HttpContent
+  /// used as results. If you want a streaming result, use SocketTask instead;
+  /// useful when you're serving large files through Suave.
   | Bytes of byte []
+  /// This task, especially with the `writePreamble`-flag lets your WebPart
+  /// control the flow of bytes by using a SocketOp. Contrasting with Bytes,
+  /// setting the HttpContent as this discriminated union type lets you stream
+  /// data back to the client through Suave.
   | SocketTask of (Connection * HttpResult -> SocketOp<unit>)
 
   static member NullContentPIso =
@@ -484,9 +512,9 @@ and HttpResult =
 
   /// The empty HttpResult, with a 404 and a HttpContent.NullContent content
   static member empty =
-    { status  = HTTP_404
-      headers = []
-      content = HttpContent.NullContent
+    { status        = HTTP_404
+      headers       = []
+      content       = HttpContent.NullContent
       writePreamble = true }
 
   static member status_ = Property<HttpResult,_> (fun x -> x.status) (fun v x -> { x with status = v })
@@ -497,18 +525,24 @@ and HttpResult =
 /// A server-key is a 256 bit key with high entropy
 type ServerKey = byte []
 
+type IPAddress with
+  static member TryParseC str =
+    match IPAddress.TryParse str with
+    | false, _ -> Choice2Of2 ()
+    | _, ip    -> Choice1Of2 ip
+
 /// The HttpRuntime is created from the SuaveConfig structure when the web
 /// server starts. You can also use the `HttpRuntime` module to create a new
 /// value yourself, or use the `empty` one.
 type HttpRuntime =
-  { serverKey          : ServerKey
-    errorHandler       : ErrorHandler
-    mimeTypesMap       : MimeTypesMap
-    homeDirectory      : string
-    compressionFolder  : string
-    logger             : Logger
-    matchedBinding     : HttpBinding
-    parsePostData      : bool }
+  { serverKey         : ServerKey
+    errorHandler      : ErrorHandler
+    mimeTypesMap      : MimeTypesMap
+    homeDirectory     : string
+    compressionFolder : string
+    logger            : Logger
+    matchedBinding    : HttpBinding
+    parsePostData     : bool }
 
   static member serverKey_ = Property (fun x -> x.serverKey) (fun v x -> { x with serverKey = v })
   static member errorHandler_ = Property (fun x -> x.errorHandler) (fun v x -> { x with errorHandler = v })
@@ -537,10 +571,74 @@ and HttpContext =
     /// The response for the request being processed
     response   : HttpResult }
 
-  static member request_ = Property (fun x -> x.request) (fun v x -> { x with request = v })
-  static member userState_ = Property (fun x -> x.userState) (fun v x -> { x with userState = v })
-  static member runtime_ = Property (fun x -> x.runtime) (fun v x -> { x with runtime = v })
-  static member response_ = Property (fun x -> x.response) (fun v x -> { x with response = v })
+  /// Get the IP of the client from the HttpContext.
+  member x.clientIp trustProxy sources =
+    if trustProxy then
+      sources
+      |> List.fold (fun state source ->
+        state |> Choice.bindError (fun _ ->
+          x.request.header source |> Choice.bindUnit IPAddress.TryParseC))
+        (Choice2Of2 ())
+      |> Choice.orDefault x.connection.ipAddr
+    else
+      x.connection.ipAddr
+
+  /// Warning; if you don't write these headers in your rev.proxy, the client will
+  /// be able to spoof them. Related headers:
+  /// - client-ip
+  /// - x-forwarded-for: the "X-Forwarded-For" client request header field with
+  ///   the $remote_addr variable appended to it, separated by a comma. If the
+  ///   "X-Forwarded-For" field is not present in the client request header, the
+  ///   $proxy_add_x_forwarded_for variable is equal to the $remote_addr variable.
+  ///   from http://nginx.org/en/docs/http/ngx_http_proxy_module.html
+  ///
+  /// Related blog entry, with suggestion on nginx module to use to recursively
+  /// tell all upstream proxies to overwrite X-Real-IP:
+  /// http://distinctplace.com/infrastructure/2014/04/23/story-behind-x-forwarded-for-and-x-real-ip-headers/
+  member x.clientIpTrustProxy =
+    x.clientIp true [ "x-real-ip" ]
+
+  member x.isLocal =
+    IPAddress.IsLoopback (x.clientIp false [])
+
+  member x.clientPort trustProxy sources : Port =
+    if trustProxy then
+      sources
+      |> List.fold (fun state source ->
+        state |> Choice.bindError (fun _ ->
+          x.request.header source
+          |> Choice.bind (
+            Choice.parser UInt16.TryParse "failed to parse X-Forwarded-Port")))
+        (Choice2Of2 "")
+      |> Choice.orDefault x.connection.port
+    else
+      x.connection.port
+
+  member x.clientPortTrustProxy =
+    x.clientPort true [ "x-forwarded-port" ]
+
+  member x.clientProto trustProxy sources : string =
+    if trustProxy then
+      sources
+      |> List.fold (fun state source ->
+        state |> Choice.bindError (fun _ ->
+          x.request.header source))
+        (Choice2Of2 "")
+      |> Choice.orDefault (x.runtime.matchedBinding.scheme.ToString())
+    else
+      x.runtime.matchedBinding.scheme.ToString()
+
+  member x.clientProtoTrustProxy =
+    x.clientProto true [ "x-forwarded-proto" ]
+
+  static member request_     = Property (fun x -> x.request) (fun v x -> { x with request = v })
+  static member userState_   = Property (fun x -> x.userState) (fun v x -> { x with userState = v })
+  static member runtime_     = Property (fun x -> x.runtime) (fun v x -> { x with runtime = v })
+  static member response_    = Property (fun x -> x.response) (fun v x -> { x with response = v })
+  static member clientIp_    = Property (fun (x : HttpContext) -> x.clientIpTrustProxy) (fun v x -> x)
+  static member isLocal_     = Property (fun (x : HttpContext) -> x.isLocal) (fun v x -> x)
+  static member clientPort_  = Property (fun (x : HttpContext) -> x.clientPortTrustProxy) (fun v x -> x)
+  static member clientProto_ = Property (fun (x : HttpContext) -> x.clientProtoTrustProxy) (fun v x -> x)
 
 /// A WebPart is an asynchronous function that transforms the HttpContext.  An asynchronous return
 /// value of None indicates 'did not handle'. 
@@ -678,7 +776,6 @@ type SuaveConfig =
   static member homeFolder_            = Property<SuaveConfig,_> (fun x -> x.homeFolder)            (fun v x -> { x with homeFolder = v })
   static member compressedFilesFolder_ = Property<SuaveConfig,_> (fun x -> x.compressedFilesFolder) (fun v x -> { x with compressedFilesFolder = v })
   static member logger_                = Property<SuaveConfig,_> (fun x -> x.logger)                (fun v x -> { x with logger = v })
-
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module SuaveConfig =
