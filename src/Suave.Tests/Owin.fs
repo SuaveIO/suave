@@ -76,6 +76,12 @@ let unit =
         eq "cannot remove a twice" false ((subject :> IDictionary<_, _>).Remove("a"))
 
         eq "cannot remove what's never been there" false ((subject :> IDictionary<_, _>).Remove("x"))
+
+        (subject :> IDictionary<_, _>).["a"] <- [| "a-1" |]
+        eqs "has a once more" ["a-1"] subject.Delta.["a"]
+        eqs "can retrieve header using StringComparer.OrdinalIgnoreCase"
+            ["a-1"]
+            subject.Delta.["A"]
       ]
 
     testList "OwinDictionary" [
@@ -88,6 +94,11 @@ let unit =
         let subj : IDictionary<_, _> = upcast createOwin ()
         subj.["testing.MyKey"] <- "oh yeah"
         eq "read back" "oh yeah" (subj.["testing.MyKey"] |> unbox)
+
+      testCase "uses StringComparer.OrdinalIgnoreCase" <| fun _ ->
+        let subj : IDictionary<_, _> = upcast createOwin ()
+        subj.["testing.MyKey"] <- "oh yeah"
+        eq "read back" "oh yeah" (subj.["Testing.MyKey"] |> unbox)
       ]
     ]
 
@@ -148,5 +159,177 @@ let endToEnd =
         | false, _ -> Tests.failtest "X-Custom-After is missing"
 
       runWithConfig composedApp |> reqResp Types.GET "/owin" "" None None DecompressionMethods.GZip id asserts
+
+    testCase "Empty OWIN app should return 200 OK" <| fun _ ->
+      let owinDefaults (env : OwinEnvironment) =
+        async.Return ()
+
+      let composedApp =
+        OwinApp.ofApp owinDefaults
+
+      let asserts (result : HttpResponseMessage) =
+        eq "Http Status Code" HttpStatusCode.OK result.StatusCode
+        eq "Reason Phrase" "OK" result.ReasonPhrase
+
+      runWithConfig composedApp |> reqResp Types.GET "/" "" None None DecompressionMethods.GZip id asserts
+
+    testCase "Empty OwinAppFunc should return 200 OK" <| fun _ ->
+      let owinDefaults = OwinAppFunc(fun env ->
+        Threading.Tasks.Task.FromResult() :> Threading.Tasks.Task)
+
+      let composedApp =
+        OwinApp.ofAppFunc owinDefaults
+
+      let asserts (result : HttpResponseMessage) =
+        eq "Http Status Code" HttpStatusCode.OK result.StatusCode
+        eq "Reason Phrase" "OK" result.ReasonPhrase
+
+      runWithConfig composedApp |> reqResp Types.GET "/" "" None None DecompressionMethods.GZip id asserts
+
+    testCase "Completed Async signals completion with status code" <| fun _ ->
+      let noContent (env : OwinEnvironment) =
+        env.[OwinConstants.responseStatusCode] <- box 204
+        async.Return ()
+
+      let composedApp =
+        OwinApp.ofApp noContent
+
+      let asserts (result : HttpResponseMessage) =
+        eq "Http Status Code" HttpStatusCode.NoContent result.StatusCode
+        eq "Reason Phrase set by server" "No Content" result.ReasonPhrase
+
+      runWithConfig composedApp |> reqResp Types.GET "/" "" None None DecompressionMethods.GZip id asserts
+
+    testCase "Completed Async signals completion with status code and headers" <| fun _ ->
+      let noContent (env : OwinEnvironment) =
+        env.[OwinConstants.responseStatusCode] <- box 204
+        let responseHeaders : IDictionary<string, string[]> = unbox env.[OwinConstants.responseHeaders]
+        responseHeaders.["Content-Type"] <- [| "text/plain; charset=utf-8" |]
+        async.Return ()
+
+      let composedApp =
+        OwinApp.ofApp noContent
+
+      let asserts (result : HttpResponseMessage) =
+        eq "Http Status Code" HttpStatusCode.NoContent result.StatusCode
+        eq "Reason Phrase set by server" "No Content" result.ReasonPhrase
+        eq "Content-Type" "text/plain; charset=utf-8" (result.Content.Headers.ContentType.ToString())
+
+      runWithConfig composedApp |> reqResp Types.GET "/" "" None None DecompressionMethods.GZip id asserts
+
+    testCase "Custom reason phrase" <| fun _ ->
+      let noContent (env : OwinEnvironment) =
+        env.[OwinConstants.responseStatusCode] <- box 204
+        env.[OwinConstants.responseReasonPhrase] <- box "Nothing to see here"
+        async.Return ()
+
+      let composedApp =
+        OwinApp.ofApp noContent
+
+      let asserts (result : HttpResponseMessage) =
+        eq "Http Status Code" HttpStatusCode.NoContent result.StatusCode
+        eq "Reason Phrase" "Nothing to see here" result.ReasonPhrase
+
+      runWithConfig composedApp |> reqResp Types.GET "/" "" None None DecompressionMethods.GZip id asserts
+
+    testCase "OWIN middleware runs as a Suave app" <| fun _ ->
+      // This test case exists to show that a middleware will mount into Suave as an application.
+      let noContent = OwinMidFunc(fun next -> OwinAppFunc(fun env ->
+        env.[OwinConstants.responseStatusCode] <- box 204
+        Threading.Tasks.Task.FromResult() :> Threading.Tasks.Task
+        ))
+
+      let composedApp =
+        OwinApp.ofMidFunc noContent
+
+      let asserts (result : HttpResponseMessage) =
+        eq "Http Status Code" HttpStatusCode.NoContent result.StatusCode
+        eq "Reason Phrase set by server" "No Content" result.ReasonPhrase
+
+      runWithConfig composedApp |> reqResp Types.GET "/" "" None None DecompressionMethods.GZip id asserts
+
+    testCase "Composed OWIN security middleware and app" <| fun _ ->
+      let noContent = OwinAppFunc(fun env ->
+        env.[OwinConstants.responseStatusCode] <- box 204
+        Threading.Tasks.Task.FromResult() :> Threading.Tasks.Task
+        )
+      
+      let basicAuthMidFunc = OwinMidFunc(fun next -> OwinAppFunc(fun env ->
+        let requestHeaders : IDictionary<string, string[]> = unbox env.[OwinConstants.requestHeaders]
+        // NOTE: currently fails b/c headers are not using StringComparer.OrdinalIgnoreCase.
+        let authHeader = requestHeaders.["Authorization"].[0].Split([|' '|])
+        let credentials =
+          authHeader.[1]
+          |> Convert.FromBase64String
+          |> Encoding.UTF8.GetString
+        match credentials.Split([|':'|]) with
+        | [|"foo";"bar"|] ->
+          let task = next.Invoke(env)
+          task
+        | _ ->
+          env.[OwinConstants.responseStatusCode] <- box 401
+          Threading.Tasks.Task.FromResult() :> Threading.Tasks.Task
+        ))
+
+      let composedApp =
+        OwinApp.ofAppFunc (basicAuthMidFunc.Invoke(noContent))
+
+      let asserts (result : HttpResponseMessage) =
+        eq "Http Status Code" HttpStatusCode.NoContent result.StatusCode
+        eq "Reason Phrase set by server" "No Content" result.ReasonPhrase
+
+      let sendAuthHeader (req : HttpRequestMessage) =
+        req.Headers.Authorization <- Net.Http.Headers.AuthenticationHeaderValue("Basic", Convert.ToBase64String("foo:bar"B))
+        req
+
+      runWithConfig composedApp |> reqResp Types.GET "/" "" None None DecompressionMethods.GZip sendAuthHeader asserts
+
+    testCase "Setting a path in Suave should mount an OWIN app at that path and set requestPathBase" <| fun _ ->
+      let ok (env : OwinEnvironment) =
+        let requestPathBase : string = unbox env.[OwinConstants.requestPathBase]
+        printfn "owin.RequestPathBase is %s" requestPathBase
+        //eq "owin.RequestPathBase" requestPathBase "/owin"
+        let requestPath : string = unbox env.[OwinConstants.requestPath]
+        printfn "owin.RequestPath is %s" requestPath
+        if requestPath <> "/app" then
+          env.[OwinConstants.responseStatusCode] <- box 404
+        else () // 200 OK
+        async.Return ()
+
+      let composedApp =
+        pathRegex "/owin(/.+)*" >>= OwinApp.ofApp ok
+
+      let asserts (result : HttpResponseMessage) =
+        eq "Http Status Code" HttpStatusCode.OK result.StatusCode
+        eq "Reason Phrase set by server" "OK" result.ReasonPhrase
+
+      runWithConfig composedApp |> reqResp Types.GET "/owin/app" "" None None DecompressionMethods.GZip id asserts
+
+    testCase "Manually mount an OWIN app at that path and set requestPathBase" <| fun _ ->
+      let ok (env : OwinEnvironment) =
+        let requestPathBase : string = unbox env.[OwinConstants.requestPathBase]
+        printfn "owin.RequestPathBase is %s" requestPathBase
+        //eq "owin.RequestPathBase" requestPathBase "/owin"
+        let requestPath : string = unbox env.[OwinConstants.requestPath]
+        printfn "owin.RequestPath is %s" requestPath
+        if requestPath <> "/app" then
+          env.[OwinConstants.responseStatusCode] <- box 404
+        else () // 200 OK
+        async.Return ()
+
+      let composedApp =
+        pathScan "/owin/%s" (fun path -> OwinApp.ofApp (fun env -> async {
+          env.[OwinConstants.requestPathBase] <- box "/owin"
+          env.[OwinConstants.requestPath] <- box ("/" + path)
+          do! ok env
+          env.[OwinConstants.requestPathBase] <- box ""
+          env.[OwinConstants.requestPath] <- box ("/owin/" + path)
+          })
+        )
+
+      let asserts (result : HttpResponseMessage) =
+        eq "Http Status Code" HttpStatusCode.OK result.StatusCode
+        eq "Reason Phrase set by server" "OK" result.ReasonPhrase
+
+      runWithConfig composedApp |> reqResp Types.GET "/owin/app" "" None None DecompressionMethods.GZip id asserts
     ]
-    

@@ -464,6 +464,7 @@ module OwinApp =
         // writeable / value
         OwinConstants.requestMethod,        HttpContext.request_ >--> HttpRequest.method_ >--> methodString <--> untyped
         // writeable / value
+        // TODO: any path segment set via Suave should be used as the requestPathBase
         OwinConstants.requestPathBase,      constant String.Empty
         // writeable / value
         OwinConstants.requestPath,          HttpContext.request_ >--> HttpRequest.url_ >--> uriAbsolutePath <--> untyped
@@ -686,7 +687,9 @@ module OwinApp =
 
       let impl (conn, response) : SocketOp<unit> = socket {
         // disposable because it buffers what the OwinApp writes to the stream
-        use wrapper = new OwinDictionary({ ctx with response = response })
+        // also, OWIN expects the default HTTP status code to be 200 OK
+        // could also set the status code after calling SocketOp.ofAsync if the value is not set
+        use wrapper = new OwinDictionary({ ctx with response = { response with status = HTTP_200 } })
 
         verbose (fun _ -> "yielding to OWIN middleware")
         do! SocketOp.ofAsync (owin wrapper.Interface)
