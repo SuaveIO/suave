@@ -464,6 +464,7 @@ module OwinApp =
         // writeable / value
         OwinConstants.requestMethod,        HttpContext.request_ >--> HttpRequest.method_ >--> methodString <--> untyped
         // writeable / value
+        // TODO: any path segment set via Suave should be used as the requestPathBase
         OwinConstants.requestPathBase,      constant String.Empty
         // writeable / value
         OwinConstants.requestPath,          HttpContext.request_ >--> HttpRequest.url_ >--> uriAbsolutePath <--> untyped
