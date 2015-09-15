@@ -270,9 +270,49 @@ module OwinApp =
 
   type private Clock = uint64
 
-  type internal DeltaDictionary(initialHeaders : Map<string, string[]>) =
-    let changed : Map<string, Clock * string []> ref = ref Map.empty
-    let removed : Map<string, Clock> ref = ref Map.empty
+  [<CustomEquality; CustomComparison>]
+  type internal OwinKey =
+    | OwinKey of string
+
+    override x.GetHashCode() =
+      let (OwinKey key) = x
+      key.GetHashCode()
+
+    member inline x.Equals(other : string) =
+      let (OwinKey key) = x
+      key.Equals(other, StringComparison.OrdinalIgnoreCase)
+
+    member inline x.Equals(OwinKey other) =
+      x.Equals(other)
+
+    override x.Equals(obj) =
+      match obj with
+      | null -> false
+      | :? OwinKey as other -> x.Equals(other)
+      | :? string as other -> x.Equals(other)
+      | _ -> invalidArg "obj" "The parameter obj must be of type string or OwinKey"
+
+    member inline x.CompareTo(other : string) =
+      let (OwinKey key) = x
+      StringComparer.OrdinalIgnoreCase.Compare(key, other)
+
+    member inline x.CompareTo(OwinKey other) =
+      x.CompareTo(other)
+
+    member x.CompareTo(obj : obj) =
+      let (OwinKey key) = x
+      match obj with
+      | null -> 1
+      | :? OwinKey as other -> x.CompareTo(other)
+      | :? string as other -> x.CompareTo(other)
+      | _ -> invalidArg "obj" "The parameter obj must be of type string or OwinKey"
+
+    interface IComparable with
+      member x.CompareTo(obj) = x.CompareTo(obj)
+
+  type internal DeltaDictionary private (initialHeaders : Map<OwinKey, string[]>) =
+    let changed : Map<OwinKey, Clock * string []> ref = ref Map.empty
+    let removed : Map<OwinKey, Clock> ref = ref Map.empty
     let mutable clock = 1UL
 
     member x.Delta = // TO CONSIDER: memoize function keyed on logical clock
@@ -297,21 +337,25 @@ module OwinApp =
         | None ->
           headers |> Map.put key (!changed |> Map.find key |> snd)
           
-      keys |> Seq.fold decide initialHeaders
+      keys
+      |> Seq.fold decide initialHeaders
+      |> Map.toList
+      |> List.map (fun (OwinKey key, value) -> key, value)
+      |> Map.ofList
 
     member x.DeltaList =
-      x.Delta |> Seq.map (fun kvp -> kvp.Key, String.concat ", " kvp.Value)
+      x.Delta |> Seq.map (fun (KeyValue(key, value)) -> key, String.concat ", " value)
               |> Seq.toList
 
     new(dic : (string * string) list) =
-      DeltaDictionary(dic |> List.map (fun (key, value) -> key, [| value |]) |> Map.ofList)
+      DeltaDictionary(dic |> List.map (fun (key, value) -> OwinKey key, [| value |]) |> Map.ofList)
 
     interface IDictionary<string, string[]> with
       member x.Item
         with get key =
-          match !removed |> Map.tryFind key with
+          match !removed |> Map.tryFind (OwinKey key) with
           | Some rmCl ->
-            match !changed |> Map.tryFind key with
+            match !changed |> Map.tryFind (OwinKey key) with
             | Some (chCl, value) ->
               if chCl > rmCl then value else raise (KeyNotFoundException())
 
@@ -320,21 +364,21 @@ module OwinApp =
 
           | None ->
             !changed
-            |> Map.tryFind key
-            |> Option.fold (fun s t -> snd t) (initialHeaders |> Map.find key)
+            |> Map.tryFind (OwinKey key)
+            |> Option.fold (fun s t -> snd t) (initialHeaders |> Map.find (OwinKey key))
 
         and set key value =
-          changed := !changed |> Map.put key (clock, value)
+          changed := !changed |> Map.put (OwinKey key) (clock, value)
           clock <- clock + 1UL
 
       member x.Remove key =
         let res =
-          match !removed |> Map.tryFind key with
+          match !removed |> Map.tryFind (OwinKey key) with
           | Some rmCl ->
-            match !changed |> Map.tryFind key with
+            match !changed |> Map.tryFind (OwinKey key) with
             | Some (chCl, value) ->
               if chCl > rmCl then
-                removed := !removed |> Map.put key clock
+                removed := !removed |> Map.put (OwinKey key) clock
                 true // changed after removed, so remove it again
               else
                 false // removed after changed, nothing to do
@@ -343,15 +387,15 @@ module OwinApp =
               false // already removed, never changed
 
           | None ->
-            match !changed |> Map.tryFind key with
+            match !changed |> Map.tryFind (OwinKey key) with
             | Some (chCl, value) ->
-              removed := !removed |> Map.put key clock
+              removed := !removed |> Map.put (OwinKey key) clock
               true // remove after changed
 
             | None ->
-              match initialHeaders |> Map.tryFind key with
+              match initialHeaders |> Map.tryFind (OwinKey key) with
               | Some _ ->
-                removed := !removed |> Map.put key clock
+                removed := !removed |> Map.put (OwinKey key) clock
                 true // remove from initial
               | None ->
                 false // never present
