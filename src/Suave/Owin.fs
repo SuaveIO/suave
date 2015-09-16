@@ -270,89 +270,75 @@ module OwinApp =
 
   type private Clock = uint64
 
-  [<CustomEquality; CustomComparison>]
-  type internal OwinKey =
-    | OwinKey of string
+  let private keyOf (KeyValue(k,_)) = k
 
-    override x.GetHashCode() =
-      let (OwinKey key) = x
-      key.GetHashCode()
+  let private containsKey key =
+    List.exists (fun (KeyValue(k,_)) -> String.Equals(key, k, StringComparison.OrdinalIgnoreCase))
 
-    member inline x.Equals(other : string) =
-      let (OwinKey key) = x
-      key.Equals(other, StringComparison.OrdinalIgnoreCase)
+  let private contains (KeyValue(key, value)) =
+    List.exists (fun (KeyValue(k,v)) -> String.Equals(key, k, StringComparison.OrdinalIgnoreCase) && value = v)
 
-    member inline x.Equals(OwinKey other) =
-      x.Equals(other)
+  let private find key =
+    List.pick (fun (KeyValue(k,v)) -> if String.Equals(key, k, StringComparison.OrdinalIgnoreCase) then Some v else None)
 
-    override x.Equals(obj) =
-      match obj with
-      | null -> false
-      | :? OwinKey as other -> x.Equals(other)
-      | :? string as other -> x.Equals(other)
-      | _ -> invalidArg "obj" "The parameter obj must be of type string or OwinKey"
+  let private tryFind key =
+    List.tryPick (fun (KeyValue(k,v)) -> if String.Equals(key, k, StringComparison.OrdinalIgnoreCase) then Some v else None)
 
-    member inline x.CompareTo(other : string) =
-      let (OwinKey key) = x
-      StringComparer.OrdinalIgnoreCase.Compare(key, other)
+  let private put key value list =
+    if containsKey key list then
+      [ for KeyValue(k, v) in list do
+          if String.Equals(key, k, StringComparison.OrdinalIgnoreCase) then
+            yield KeyValuePair(k, value)
+          else
+            yield KeyValuePair(k, v)
+      ]
+    else KeyValuePair(key, value)::list
 
-    member inline x.CompareTo(OwinKey other) =
-      x.CompareTo(other)
+  let private remove key =
+    List.filter (fun (KeyValue(k,_)) -> not (String.Equals(key, k, StringComparison.OrdinalIgnoreCase)))
 
-    member x.CompareTo(obj : obj) =
-      let (OwinKey key) = x
-      match obj with
-      | null -> 1
-      | :? OwinKey as other -> x.CompareTo(other)
-      | :? string as other -> x.CompareTo(other)
-      | _ -> invalidArg "obj" "The parameter obj must be of type string or OwinKey"
-
-    interface IComparable with
-      member x.CompareTo(obj) = x.CompareTo(obj)
-
-  // NOTE: a custom Map type might be more performant.
-  type internal DeltaDictionary private (initialHeaders : Map<OwinKey, string[]>) =
-    let changed : Map<OwinKey, Clock * string []> ref = ref Map.empty
-    let removed : Map<OwinKey, Clock> ref = ref Map.empty
+  type internal DeltaDictionary (initialHeaders : KeyValuePair<string, string[]> list) =
+    let changed : KeyValuePair<string, Clock * string[]> list ref = ref []
+    let removed : KeyValuePair<string, Clock> list ref = ref []
     let mutable clock = 1UL
 
     member x.Delta = // TO CONSIDER: memoize function keyed on logical clock
       let keys =
-        let changed = !changed |> Map.toSeq |> Seq.map fst |> Set.ofSeq
-        let removed = !removed |> Map.toSeq |> Seq.map fst |> Set.ofSeq
+        let changed = !changed |> List.map keyOf |> Set.ofList
+        let removed = !removed |> List.map keyOf |> Set.ofList
         Set.union changed removed
 
       let decide headers key =
-        match !removed |> Map.tryFind key with
+        match !removed |> tryFind key with
         | Some rmCl ->
-          match !changed |> Map.tryFind key with
+          match !changed |> tryFind key with
           | Some (chCl, value) ->
             if chCl > rmCl then
-              headers |> Map.put key value
+              headers |> put key value
             else
-              headers |> Map.remove key
+              headers |> remove key
 
           | None ->
-            headers |> Map.remove key
+            headers |> remove key
             
         | None ->
-          headers |> Map.put key (!changed |> Map.find key |> snd)
+          headers |> put key (!changed |> find key |> snd)
           
       keys |> Seq.fold decide initialHeaders
 
     member x.DeltaList =
-      x.Delta |> Seq.map (fun (KeyValue(OwinKey key, value)) -> key, String.concat ", " value)
+      x.Delta |> Seq.map (fun (KeyValue(key, value)) -> key, String.concat ", " value)
               |> Seq.toList
 
     new(dic : (string * string) list) =
-      DeltaDictionary(dic |> List.map (fun (key, value) -> OwinKey key, [| value |]) |> Map.ofList)
+      DeltaDictionary(dic |> List.map (fun (key, value) -> KeyValuePair(key, [| value |])))
 
     interface IDictionary<string, string[]> with
       member x.Item
         with get key =
-          match !removed |> Map.tryFind (OwinKey key) with
+          match !removed |> tryFind key with
           | Some rmCl ->
-            match !changed |> Map.tryFind (OwinKey key) with
+            match !changed |> tryFind key with
             | Some (chCl, value) ->
               if chCl > rmCl then value else raise (KeyNotFoundException())
 
@@ -360,22 +346,21 @@ module OwinApp =
               raise (KeyNotFoundException())
 
           | None ->
-            !changed
-            |> Map.tryFind (OwinKey key)
-            |> Option.fold (fun s t -> snd t) (initialHeaders |> Map.find (OwinKey key))
+            let value = !changed |> tryFind key
+            value |> Option.fold (fun s t -> snd t) (initialHeaders |> find key)
 
         and set key value =
-          changed := !changed |> Map.put (OwinKey key) (clock, value)
+          changed := !changed |> put key (clock, value)
           clock <- clock + 1UL
 
       member x.Remove key =
         let res =
-          match !removed |> Map.tryFind (OwinKey key) with
+          match !removed |> tryFind key with
           | Some rmCl ->
-            match !changed |> Map.tryFind (OwinKey key) with
+            match !changed |> tryFind key with
             | Some (chCl, value) ->
               if chCl > rmCl then
-                removed := !removed |> Map.put (OwinKey key) clock
+                removed := !removed |> put key clock
                 true // changed after removed, so remove it again
               else
                 false // removed after changed, nothing to do
@@ -384,15 +369,15 @@ module OwinApp =
               false // already removed, never changed
 
           | None ->
-            match !changed |> Map.tryFind (OwinKey key) with
+            match !changed |> tryFind key with
             | Some (chCl, value) ->
-              removed := !removed |> Map.put (OwinKey key) clock
+              removed := !removed |> put key clock
               true // remove after changed
 
             | None ->
-              match initialHeaders |> Map.tryFind (OwinKey key) with
+              match initialHeaders |> tryFind key with
               | Some _ ->
-                removed := !removed |> Map.put (OwinKey key) clock
+                removed := !removed |> put key clock
                 true // remove from initial
               | None ->
                 false // never present
@@ -400,30 +385,34 @@ module OwinApp =
         clock <- clock + 1UL
         res
 
-      member x.Keys = [| for KeyValue(OwinKey k,_) in x.Delta -> k |] :> ICollection<_>
-      member x.Values = (x.Delta :> IDictionary<_, _>).Values
-      member x.ContainsKey key = (x.Delta :> IDictionary<_, _>).ContainsKey(OwinKey key)
+      member x.Keys = Set.ofArray [| for KeyValue(k,_) in x.Delta -> k |] :> ICollection<_>
+      member x.Values = [| for KeyValue(_,v) in x.Delta -> v |] :> ICollection<_>
+      member x.ContainsKey key = containsKey key x.Delta
       member x.Add (key, value) = invalidOp "Add is not supported"
-      member x.TryGetValue (key, [<Out>] res : byref<string[]>) = (x.Delta :> IDictionary<_, _>).TryGetValue(OwinKey key, ref res)
+      member x.TryGetValue (key, [<Out>] res : byref<string[]>) =
+        match tryFind key x.Delta with
+        | Some x ->
+          res <- x
+          true
+        | None -> 
+          false
 
     interface ICollection<KeyValuePair<string, string[]>> with
       member x.Add kvp = invalidOp "Add is not supported"
-      member x.Count = (x.Delta :> IDictionary<_, _>).Count
+      member x.Count = List.length x.Delta
       member x.IsReadOnly = false
       member x.Clear() = invalidOp "Clear is not supported"
-      member x.Contains (KeyValue(k, v)) = (x.Delta :> ICollection<_>).Contains(KeyValuePair(OwinKey k, v))
-      member x.CopyTo (array, arrayIndex) = (x.Delta :> ICollection<_>).CopyTo([| for KeyValue(k, v) in array -> KeyValuePair(OwinKey k, v) |], arrayIndex)
+      member x.Contains kvp = contains kvp x.Delta
+      member x.CopyTo (array, arrayIndex) = (List.toArray x.Delta).CopyTo(array, arrayIndex)
       member x.Remove kvp = (x :> IDictionary<_, _>).Remove kvp.Key
 
     interface IEnumerable<KeyValuePair<string, string[]>> with
       member x.GetEnumerator() =
-        let s = seq { for KeyValue(OwinKey k, v) in x.Delta -> KeyValuePair(k, v) }
-        s.GetEnumerator()
+        (x.Delta :> IEnumerable<_>).GetEnumerator()
 
     interface IEnumerable with
       member x.GetEnumerator() =
-        let s = seq { for KeyValue(OwinKey k, v) in x.Delta -> KeyValuePair(k, v) }
-        (s :> IEnumerable).GetEnumerator()
+        (x.Delta :> IEnumerable).GetEnumerator()
 
   module internal SirLensALot =
 
@@ -625,13 +614,12 @@ module OwinApp =
     let owinMap = SirLensALot.owinMap cts.Token requestHeadersLens
                                       responseHeadersLens responseStreamLens
                                       onSendingHeadersLens
-    let owinKeys = owinMap |> List.map fst |> Set.ofSeq
-    let owinRW   = owinMap |> Map.ofList
+    let owinRW   = owinMap |> List.map (fun (k,v) -> KeyValuePair(k, v))
 
-    let owinLensLens key : Lens<Map<string, Property<HttpContext, obj>>, Property<HttpContext, obj>> =
+    let owinLensLens key : Lens<KeyValuePair<string, Property<HttpContext, obj>> list, Property<HttpContext, obj>> =
       let userDataItem_ = HttpContext.userState_ >--> SirLensALot.mapFindLens key <--> SirLensALot.untyped
-      (fun x -> Map.tryFind key x |> function | None -> userDataItem_
-                                              | Some lens -> lens),
+      (fun x -> tryFind key x |> function | None -> userDataItem_
+                                          | Some lens -> lens),
       (fun v x -> invalidOp "TODO")
 
     interface OwinRequest with
@@ -678,19 +666,19 @@ module OwinApp =
           state := Lens.set settable value !state
 
       member x.Keys =
-        (owinRW :> IDictionary<_, _>).Keys
+        owinRW |> List.map keyOf |> Set.ofList :> ICollection<_>
 
       member x.Values =
-        (owinRW |> Map.map (fun key valueLens -> Lens.get valueLens !state) :> IDictionary<_, _>).Values
+        [| for KeyValue(key, valueLens) in owinRW -> Lens.get valueLens !state |] :> ICollection<_>
 
       member x.ContainsKey k =
-        owinKeys.Contains k
+        containsKey k owinRW
 
       member x.Add (key, v) =
         (x :> IDictionary<_, _>).[key] <- v
 
       member x.TryGetValue (key, [<Out>] res : byref<obj>) =
-        if owinKeys |> Set.contains key then
+        if containsKey key owinRW then
           res <- (x :> IDictionary<_, _>).[key]
           true
         else
@@ -698,10 +686,11 @@ module OwinApp =
 
     interface ICollection<KeyValuePair<string, obj>> with
       member x.Add kvp = (x :> IDictionary<_, _>).Add(kvp.Key, kvp.Value)
-      member x.Count = owinKeys.Count
+      member x.Count = List.length owinRW
       member x.IsReadOnly = false
       member x.Clear() = invalidOp "Clear is not supported"
-      member x.Contains kvp = owinKeys.Contains kvp.Key
+      member x.Contains kvp =
+        ([| for KeyValue(k,v) in owinRW -> Lens.get (Lens.get (owinLensLens k) owinRW) !state |] :> ICollection<_>).Contains kvp
       member x.CopyTo (array, arrayIndex) = invalidOp "CopyTo is not supported"
       member x.Remove kvp = (x :> IDictionary<_, _>).Remove kvp.Key
 
