@@ -310,6 +310,7 @@ module OwinApp =
     interface IComparable with
       member x.CompareTo(obj) = x.CompareTo(obj)
 
+  // NOTE: a custom Map type might be more performant.
   type internal DeltaDictionary private (initialHeaders : Map<OwinKey, string[]>) =
     let changed : Map<OwinKey, Clock * string []> ref = ref Map.empty
     let removed : Map<OwinKey, Clock> ref = ref Map.empty
@@ -337,14 +338,10 @@ module OwinApp =
         | None ->
           headers |> Map.put key (!changed |> Map.find key |> snd)
           
-      keys
-      |> Seq.fold decide initialHeaders
-      |> Map.toList
-      |> List.map (fun (OwinKey key, value) -> key, value)
-      |> Map.ofList
+      keys |> Seq.fold decide initialHeaders
 
     member x.DeltaList =
-      x.Delta |> Seq.map (fun (KeyValue(key, value)) -> key, String.concat ", " value)
+      x.Delta |> Seq.map (fun (KeyValue(OwinKey key, value)) -> key, String.concat ", " value)
               |> Seq.toList
 
     new(dic : (string * string) list) =
@@ -403,26 +400,30 @@ module OwinApp =
         clock <- clock + 1UL
         res
 
-      member x.Keys = (x.Delta :> IDictionary<_, _>).Keys
+      member x.Keys = [| for KeyValue(OwinKey k,_) in x.Delta -> k |] :> ICollection<_>
       member x.Values = (x.Delta :> IDictionary<_, _>).Values
-      member x.ContainsKey key = (x.Delta :> IDictionary<_, _>).ContainsKey key
+      member x.ContainsKey key = (x.Delta :> IDictionary<_, _>).ContainsKey(OwinKey key)
       member x.Add (key, value) = invalidOp "Add is not supported"
-      member x.TryGetValue (key, [<Out>] res : byref<string[]>) = (x.Delta :> IDictionary<_, _>).TryGetValue(key, ref res)
+      member x.TryGetValue (key, [<Out>] res : byref<string[]>) = (x.Delta :> IDictionary<_, _>).TryGetValue(OwinKey key, ref res)
 
     interface ICollection<KeyValuePair<string, string[]>> with
       member x.Add kvp = invalidOp "Add is not supported"
       member x.Count = (x.Delta :> IDictionary<_, _>).Count
       member x.IsReadOnly = false
       member x.Clear() = invalidOp "Clear is not supported"
-      member x.Contains kvp = (x.Delta :> ICollection<_>).Contains kvp
-      member x.CopyTo (array, arrayIndex) = (x.Delta :> ICollection<_>).CopyTo(array, arrayIndex)
+      member x.Contains (KeyValue(k, v)) = (x.Delta :> ICollection<_>).Contains(KeyValuePair(OwinKey k, v))
+      member x.CopyTo (array, arrayIndex) = (x.Delta :> ICollection<_>).CopyTo([| for KeyValue(k, v) in array -> KeyValuePair(OwinKey k, v) |], arrayIndex)
       member x.Remove kvp = (x :> IDictionary<_, _>).Remove kvp.Key
 
     interface IEnumerable<KeyValuePair<string, string[]>> with
-      member x.GetEnumerator() = (x.Delta :> ICollection<_>).GetEnumerator()
+      member x.GetEnumerator() =
+        let s = seq { for KeyValue(OwinKey k, v) in x.Delta -> KeyValuePair(k, v) }
+        s.GetEnumerator()
 
     interface IEnumerable with
-      member x.GetEnumerator() = (x.Delta :> IEnumerable).GetEnumerator()
+      member x.GetEnumerator() =
+        let s = seq { for KeyValue(OwinKey k, v) in x.Delta -> KeyValuePair(k, v) }
+        (s :> IEnumerable).GetEnumerator()
 
   module internal SirLensALot =
 

@@ -31,72 +31,73 @@ let throws msg matcher fn =
 [<Tests>]
 let unit =
   let create (m : (string * string) list) =
-    OwinApp.DeltaDictionary(m)
+    OwinApp.DeltaDictionary(m) :> IDictionary<string, string[]>
 
   let createOwin () =
     let request = { HttpRequest.empty with ``method`` = HttpMethod.PUT }
     new OwinApp.OwinDictionary({ HttpContext.empty with request = request })
+    :> IDictionary<string, obj>
 
   testList "infrastructure" [
     testList "DeltaDictionary" [
       testCase "construct & Delta" <| fun () ->
         let subject = create ["a", "a-1"]
-        eq "has a" [|"a-1"|] subject.Delta.["a"]
+        eq "has a" [|"a-1"|] subject.["a"]
 
       testCase "interaction set/remove" <| fun _ ->
         let subject = create ["a", "a-1"]
-        eqs "has a" ["a-1"] subject.Delta.["a"]
+        eqs "has a" ["a-1"] subject.["a"]
 
         eqs "has only a"
            ([ "a" ] :> _ seq)
-           ((subject.Delta :> IDictionary<_, _>).Keys :> _ seq)
+           (subject.Keys :> _ seq)
 
-        (subject :> IDictionary<_, _>).["b"] <- [| "b-1"; "b-2" |]
-        eqs "has b" ["b-1"; "b-2"] subject.Delta.["b"]
+        subject.["b"] <- [| "b-1"; "b-2" |]
+        eqs "has b" ["b-1"; "b-2"] subject.["b"]
 
-        eq "can remove b once" true ((subject :> IDictionary<_, _>).Remove("b"))
+        eq "can remove b once" true (subject.Remove("b"))
         throws "key not found exception on b"
                (function :? KeyNotFoundException -> true | _ -> false)
-               (fun _ -> subject.Delta.["b"] |> ignore)
-        eq "cannot remove b twice" false ((subject :> IDictionary<_, _>).Remove("b"))
+               (fun _ -> subject.["b"] |> ignore)
+        eq "cannot remove b twice" false (subject.Remove("b"))
 
-        (subject :> IDictionary<_, _>).["b"] <- [| "b-3" |]
-        eqs "has b once more" ["b-3"] subject.Delta.["b"]
+        subject.["b"] <- [| "b-3" |]
+        eqs "has b once more" ["b-3"] subject.["b"]
 
-        (subject :> IDictionary<_, _>).["b"] <- [| "b-4" |]
-        eqs "can change b after remove" ["b-4"] ((subject.Delta :> IDictionary<_, _>).["b"])
-        eq "can remove b after change b after remove" true ((subject :> IDictionary<_, _>).Remove("b"))
+        subject.["b"] <- [| "b-4" |]
+        eqs "can change b after remove" ["b-4"] (subject.["b"])
+        eq "can remove b after change b after remove" true (subject.Remove("b"))
         
-        (subject :> IDictionary<_, _>).["c"] <- [| "c-1" |]
+        subject.["c"] <- [| "c-1" |]
         eqs "has a, c"
             ["a"; "c"]
-            ((subject.Delta :> IDictionary<_, _>).Keys :> _ seq)
+            (subject.Keys :> _ seq)
 
-        eq "can remove a once" true ((subject :> IDictionary<_, _>).Remove("a"))
-        eq "cannot remove a twice" false ((subject :> IDictionary<_, _>).Remove("a"))
+        eq "can remove a once" true (subject.Remove("a"))
+        eq "cannot remove a twice" false (subject.Remove("a"))
 
-        eq "cannot remove what's never been there" false ((subject :> IDictionary<_, _>).Remove("x"))
+        eq "cannot remove what's never been there" false (subject.Remove("x"))
 
-        (subject :> IDictionary<_, _>).["a"] <- [| "a-1" |]
-        eqs "has a once more" ["a-1"] subject.Delta.["a"]
+        subject.["a"] <- [| "a-1" |]
+        eqs "has a once more" ["a-1"] subject.["a"]
         eqs "can retrieve header using StringComparer.OrdinalIgnoreCase"
             ["a-1"]
-            subject.Delta.["A"]
+            subject.["A"]
       ]
 
     testList "OwinDictionary" [
       testCase "read/write HttpMethod" <| fun _ ->
-        let subj : IDictionary<_, _> = upcast createOwin ()
+        let subj = createOwin ()
         eq "method" "PUT" (subj.[OwinConstants.requestMethod] |> unbox)
         subj.[OwinConstants.requestMethod] <- "get"
 
       testCase "read/write custom" <| fun _ ->
-        let subj : IDictionary<_, _> = upcast createOwin ()
+        let subj = createOwin ()
         subj.["testing.MyKey"] <- "oh yeah"
         eq "read back" "oh yeah" (subj.["testing.MyKey"] |> unbox)
 
       testCase "uses StringComparer.OrdinalIgnoreCase" <| fun _ ->
-        let subj : IDictionary<_, _> = upcast createOwin ()
+        let subj = createOwin ()
         subj.["testing.MyKey"] <- "oh yeah"
         eq "read back" "oh yeah" (subj.["Testing.MyKey"] |> unbox)
       ]
@@ -287,10 +288,8 @@ let endToEnd =
     testCase "Setting a path in Suave should mount an OWIN app at that path and set requestPathBase" <| fun _ ->
       let ok (env : OwinEnvironment) =
         let requestPathBase : string = unbox env.[OwinConstants.requestPathBase]
-        printfn "owin.RequestPathBase is %s" requestPathBase
         //eq "owin.RequestPathBase" requestPathBase "/owin"
         let requestPath : string = unbox env.[OwinConstants.requestPath]
-        printfn "owin.RequestPath is %s" requestPath
         if requestPath <> "/app" then
           env.[OwinConstants.responseStatusCode] <- box 404
         else () // 200 OK
@@ -308,10 +307,8 @@ let endToEnd =
     testCase "Manually mount an OWIN app at that path and set requestPathBase" <| fun _ ->
       let ok (env : OwinEnvironment) =
         let requestPathBase : string = unbox env.[OwinConstants.requestPathBase]
-        printfn "owin.RequestPathBase is %s" requestPathBase
         //eq "owin.RequestPathBase" requestPathBase "/owin"
         let requestPath : string = unbox env.[OwinConstants.requestPath]
-        printfn "owin.RequestPath is %s" requestPath
         if requestPath <> "/app" then
           env.[OwinConstants.responseStatusCode] <- box 404
         else () // 200 OK
