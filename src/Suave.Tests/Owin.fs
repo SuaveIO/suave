@@ -44,6 +44,10 @@ let unit =
         let subject = create ["a", "a-1"]
         eq "has a" [|"a-1"|] subject.["a"]
 
+      testCase "case insensitive lookup" <| fun () ->
+        let subject = create ["a", "a-1"]
+        eq "has a" [|"a-1"|] subject.["A"]
+
       testCase "interaction set/remove" <| fun _ ->
         let subject = create ["a", "a-1"]
         eqs "has a" ["a-1"] subject.["a"]
@@ -80,9 +84,6 @@ let unit =
 
         subject.["a"] <- [| "a-1" |]
         eqs "has a once more" ["a-1"] subject.["a"]
-        eqs "can retrieve header using StringComparer.OrdinalIgnoreCase"
-            ["a-1"]
-            subject.["A"]
       ]
 
     testList "OwinDictionary" [
@@ -96,7 +97,12 @@ let unit =
         subj.["testing.MyKey"] <- "oh yeah"
         eq "read back" "oh yeah" (subj.["testing.MyKey"] |> unbox)
 
-      testCase "uses StringComparer.OrdinalIgnoreCase" <| fun _ ->
+      testCase "case insensitive lookup for OWIN key" <| fun _ ->
+        let subj = createOwin ()
+        subj.["owin.RequestPath"] <- "/owin"
+        eq "read back" "/owin" (subj.["owin.requestPath"] |> unbox)
+
+      testCase "case insensitive lookup for custom key" <| fun _ ->
         let subj = createOwin ()
         subj.["testing.MyKey"] <- "oh yeah"
         eq "read back" "oh yeah" (subj.["Testing.MyKey"] |> unbox)
