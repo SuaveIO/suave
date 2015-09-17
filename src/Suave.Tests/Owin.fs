@@ -48,6 +48,11 @@ let unit =
         let subject = create ["a", "a-1"]
         eq "has a" [|"a-1"|] subject.["A"]
 
+      testCase "interaction set" <| fun _ ->
+        let subject = create []
+        subject.["b"] <- [| "b-1"; "b-2" |]
+        eqs "has b" ["b-1"; "b-2"] subject.["b"]
+
       testCase "interaction set/remove" <| fun _ ->
         let subject = create ["a", "a-1"]
         eqs "has a" ["a-1"] subject.["a"]
