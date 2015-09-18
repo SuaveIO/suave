@@ -270,9 +270,50 @@ module OwinApp =
 
   type private Clock = uint64
 
-  type internal DeltaDictionary(initialHeaders : Map<string, string[]>) =
-    let changed : Map<string, Clock * string []> ref = ref Map.empty
-    let removed : Map<string, Clock> ref = ref Map.empty
+  [<CustomEquality; CustomComparison>]
+  type internal OwinKey =
+    | OwinKey of string
+
+    override x.GetHashCode() =
+      let (OwinKey key) = x
+      key.GetHashCode()
+
+    member inline x.Equals(other : string) =
+      let (OwinKey key) = x
+      key.Equals(other, StringComparison.OrdinalIgnoreCase)
+
+    member inline x.Equals(OwinKey other) =
+      x.Equals(other)
+
+    override x.Equals(obj) =
+      match obj with
+      | null -> false
+      | :? OwinKey as other -> x.Equals(other)
+      | :? string as other -> x.Equals(other)
+      | _ -> invalidArg "obj" "The parameter obj must be of type string or OwinKey"
+
+    member inline x.CompareTo(other : string) =
+      let (OwinKey key) = x
+      StringComparer.OrdinalIgnoreCase.Compare(key, other)
+
+    member inline x.CompareTo(OwinKey other) =
+      x.CompareTo(other)
+
+    member x.CompareTo(obj : obj) =
+      let (OwinKey key) = x
+      match obj with
+      | null -> 1
+      | :? OwinKey as other -> x.CompareTo(other)
+      | :? string as other -> x.CompareTo(other)
+      | _ -> invalidArg "obj" "The parameter obj must be of type string or OwinKey"
+
+    interface IComparable with
+      member x.CompareTo(obj) = x.CompareTo(obj)
+
+  // NOTE: a custom Map type might be more performant.
+  type internal DeltaDictionary private (initialHeaders : Map<OwinKey, string[]>) =
+    let changed : Map<OwinKey, Clock * string []> ref = ref Map.empty
+    let removed : Map<OwinKey, Clock> ref = ref Map.empty
     let mutable clock = 1UL
 
     member x.Delta = // TO CONSIDER: memoize function keyed on logical clock
@@ -300,18 +341,18 @@ module OwinApp =
       keys |> Seq.fold decide initialHeaders
 
     member x.DeltaList =
-      x.Delta |> Seq.map (fun kvp -> kvp.Key, String.concat ", " kvp.Value)
+      x.Delta |> Seq.map (fun (KeyValue(OwinKey key, value)) -> key, String.concat ", " value)
               |> Seq.toList
 
     new(dic : (string * string) list) =
-      DeltaDictionary(dic |> List.map (fun (key, value) -> key, [| value |]) |> Map.ofList)
+      DeltaDictionary(dic |> List.map (fun (key, value) -> OwinKey key, [| value |]) |> Map.ofList)
 
     interface IDictionary<string, string[]> with
       member x.Item
         with get key =
-          match !removed |> Map.tryFind key with
+          match !removed |> Map.tryFind (OwinKey key) with
           | Some rmCl ->
-            match !changed |> Map.tryFind key with
+            match !changed |> Map.tryFind (OwinKey key) with
             | Some (chCl, value) ->
               if chCl > rmCl then value else raise (KeyNotFoundException())
 
@@ -320,21 +361,21 @@ module OwinApp =
 
           | None ->
             !changed
-            |> Map.tryFind key
-            |> Option.fold (fun s t -> snd t) (initialHeaders |> Map.find key)
+            |> Map.tryFind (OwinKey key)
+            |> Option.fold (fun s t -> snd t) (defaultArg (initialHeaders |> Map.tryFind (OwinKey key)) [||])
 
         and set key value =
-          changed := !changed |> Map.put key (clock, value)
+          changed := !changed |> Map.put (OwinKey key) (clock, value)
           clock <- clock + 1UL
 
       member x.Remove key =
         let res =
-          match !removed |> Map.tryFind key with
+          match !removed |> Map.tryFind (OwinKey key) with
           | Some rmCl ->
-            match !changed |> Map.tryFind key with
+            match !changed |> Map.tryFind (OwinKey key) with
             | Some (chCl, value) ->
               if chCl > rmCl then
-                removed := !removed |> Map.put key clock
+                removed := !removed |> Map.put (OwinKey key) clock
                 true // changed after removed, so remove it again
               else
                 false // removed after changed, nothing to do
@@ -343,15 +384,15 @@ module OwinApp =
               false // already removed, never changed
 
           | None ->
-            match !changed |> Map.tryFind key with
+            match !changed |> Map.tryFind (OwinKey key) with
             | Some (chCl, value) ->
-              removed := !removed |> Map.put key clock
+              removed := !removed |> Map.put (OwinKey key) clock
               true // remove after changed
 
             | None ->
-              match initialHeaders |> Map.tryFind key with
+              match initialHeaders |> Map.tryFind (OwinKey key) with
               | Some _ ->
-                removed := !removed |> Map.put key clock
+                removed := !removed |> Map.put (OwinKey key) clock
                 true // remove from initial
               | None ->
                 false // never present
@@ -359,26 +400,30 @@ module OwinApp =
         clock <- clock + 1UL
         res
 
-      member x.Keys = (x.Delta :> IDictionary<_, _>).Keys
+      member x.Keys = [| for KeyValue(OwinKey k,_) in x.Delta -> k |] :> ICollection<_>
       member x.Values = (x.Delta :> IDictionary<_, _>).Values
-      member x.ContainsKey key = (x.Delta :> IDictionary<_, _>).ContainsKey key
+      member x.ContainsKey key = (x.Delta :> IDictionary<_, _>).ContainsKey(OwinKey key)
       member x.Add (key, value) = invalidOp "Add is not supported"
-      member x.TryGetValue (key, [<Out>] res : byref<string[]>) = (x.Delta :> IDictionary<_, _>).TryGetValue(key, ref res)
+      member x.TryGetValue (key, [<Out>] res : byref<string[]>) = (x.Delta :> IDictionary<_, _>).TryGetValue(OwinKey key, ref res)
 
     interface ICollection<KeyValuePair<string, string[]>> with
       member x.Add kvp = invalidOp "Add is not supported"
       member x.Count = (x.Delta :> IDictionary<_, _>).Count
       member x.IsReadOnly = false
       member x.Clear() = invalidOp "Clear is not supported"
-      member x.Contains kvp = (x.Delta :> ICollection<_>).Contains kvp
-      member x.CopyTo (array, arrayIndex) = (x.Delta :> ICollection<_>).CopyTo(array, arrayIndex)
+      member x.Contains (KeyValue(k, v)) = (x.Delta :> ICollection<_>).Contains(KeyValuePair(OwinKey k, v))
+      member x.CopyTo (array, arrayIndex) = (x.Delta :> ICollection<_>).CopyTo([| for KeyValue(k, v) in array -> KeyValuePair(OwinKey k, v) |], arrayIndex)
       member x.Remove kvp = (x :> IDictionary<_, _>).Remove kvp.Key
 
     interface IEnumerable<KeyValuePair<string, string[]>> with
-      member x.GetEnumerator() = (x.Delta :> ICollection<_>).GetEnumerator()
+      member x.GetEnumerator() =
+        let s = seq { for KeyValue(OwinKey k, v) in x.Delta -> KeyValuePair(k, v) }
+        s.GetEnumerator()
 
     interface IEnumerable with
-      member x.GetEnumerator() = (x.Delta :> IEnumerable).GetEnumerator()
+      member x.GetEnumerator() =
+        let s = seq { for KeyValue(OwinKey k, v) in x.Delta -> KeyValuePair(k, v) }
+        (s :> IEnumerable).GetEnumerator()
 
   module internal SirLensALot =
 
@@ -449,8 +494,8 @@ module OwinApp =
        (fun v x -> x)
       ) <--> untyped
 
-    let mapFindLens key : Property<Map<_, _>, _> =
-      (fun x -> x |> Map.find key),
+    let mapFindLens key : Property<Map<string, _>, _> =
+      (fun x -> x |> Map.pick (fun k v -> if k.Equals(key, StringComparison.OrdinalIgnoreCase) then Some v else None)),
       (fun v x -> x |> Map.put key v)
 
     let stringlyTyped (toString : 'a -> string) (ofString : string -> 'a) : Iso<'a, string> =
@@ -460,69 +505,69 @@ module OwinApp =
     let owinMap ct requestHeadersLens responseHeadersLens responseStreamLens onSendingHeadersLens =
       [ // 3.2.1 Request Data
         // writeable / value???
-        OwinConstants.requestScheme,        HttpContext.request_ >--> HttpRequest.url_ >--> uriScheme <--> untyped
+        OwinKey OwinConstants.requestScheme,        HttpContext.request_ >--> HttpRequest.url_ >--> uriScheme <--> untyped
         // writeable / value
-        OwinConstants.requestMethod,        HttpContext.request_ >--> HttpRequest.method_ >--> methodString <--> untyped
+        OwinKey OwinConstants.requestMethod,        HttpContext.request_ >--> HttpRequest.method_ >--> methodString <--> untyped
         // writeable / value
         // TODO: any path segment set via Suave should be used as the requestPathBase
-        OwinConstants.requestPathBase,      constant String.Empty
+        OwinKey OwinConstants.requestPathBase,      constant String.Empty
         // writeable / value
-        OwinConstants.requestPath,          HttpContext.request_ >--> HttpRequest.url_ >--> uriAbsolutePath <--> untyped
+        OwinKey OwinConstants.requestPath,          HttpContext.request_ >--> HttpRequest.url_ >--> uriAbsolutePath <--> untyped
         // writeable / value
-        OwinConstants.requestQueryString,   HttpContext.request_ >--> HttpRequest.rawQuery_ <--> untyped
+        OwinKey OwinConstants.requestQueryString,   HttpContext.request_ >--> HttpRequest.rawQuery_ <--> untyped
         // writeable / value???
-        OwinConstants.requestProtocol,      HttpContext.request_ >--> HttpRequest.httpVersion_ >--> hv2p <--> untyped
+        OwinKey OwinConstants.requestProtocol,      HttpContext.request_ >--> HttpRequest.httpVersion_ >--> hv2p <--> untyped
         // !! mutation expected (!)
-        OwinConstants.requestHeaders,       HttpContext.request_ >--> HttpRequest.headers_ >--> requestHeadersLens <--> untyped
+        OwinKey OwinConstants.requestHeaders,       HttpContext.request_ >--> HttpRequest.headers_ >--> requestHeadersLens <--> untyped
         // writeable / value
-        OwinConstants.requestBody,          HttpContext.request_ >--> HttpRequest.rawForm_ >--> bytesToStream <--> untyped
-        OwinConstants.requestId,            HttpContext.request_ >--> HttpRequest.trace_ >--> TraceHeader.traceId_ <--> stringlyTyped string uint64 <--> untyped
+        OwinKey OwinConstants.requestBody,          HttpContext.request_ >--> HttpRequest.rawForm_ >--> bytesToStream <--> untyped
+        OwinKey OwinConstants.requestId,            HttpContext.request_ >--> HttpRequest.trace_ >--> TraceHeader.traceId_ <--> stringlyTyped string uint64 <--> untyped
         // writeable / value
-        OwinConstants.requestUser,          HttpContext.userState_ >--> claimsPrincipal <--> untyped
+        OwinKey OwinConstants.requestUser,          HttpContext.userState_ >--> claimsPrincipal <--> untyped
 
         // 3.2.2 Response Data
         // writeable / value
-        OwinConstants.responseStatusCode,   HttpContext.response_ >--> HttpResult.status_ >--> i2sc <--> untyped
+        OwinKey OwinConstants.responseStatusCode,   HttpContext.response_ >--> HttpResult.status_ >--> i2sc <--> untyped
         // TO CONSIDER: add support for modifying phrasing to Core?
         // writeable / value
-        OwinConstants.responseReasonPhrase, constant "Changing the reason phrase is not supported in Suave"
+        OwinKey OwinConstants.responseReasonPhrase, constant "Changing the reason phrase is not supported in Suave"
         // writeable / value???
-        OwinConstants.responseProtocol,     HttpContext.request_ >--> HttpRequest.httpVersion_ >--> hv2p <--> untyped
+        OwinKey OwinConstants.responseProtocol,     HttpContext.request_ >--> HttpRequest.httpVersion_ >--> hv2p <--> untyped
         // !! mutation expected
-        OwinConstants.responseHeaders,      HttpContext.response_ >--> HttpResult.headers_ >--> responseHeadersLens <--> untyped
+        OwinKey OwinConstants.responseHeaders,      HttpContext.response_ >--> HttpResult.headers_ >--> responseHeadersLens <--> untyped
         // !! mutation expected
-        OwinConstants.responseBody,         HttpContext.response_ >--> HttpResult.content_ >--> responseStreamLens <--> untyped
+        OwinKey OwinConstants.responseBody,         HttpContext.response_ >--> HttpResult.content_ >--> responseStreamLens <--> untyped
 
         // 3.2.3 Other Data
-        OwinConstants.callCancelled,        constant ct // TODO: support cancellation token in HttpRequest signalling aborted request
-        OwinConstants.owinVersion,          constant "1.3"
+        OwinKey OwinConstants.callCancelled,        constant ct // TODO: support cancellation token in HttpRequest signalling aborted request
+        OwinKey OwinConstants.owinVersion,          constant "1.3"
 
         // Common Keys
-        OwinConstants.CommonKeys.addresses,         boundAddresses <--> untyped
-        OwinConstants.CommonKeys.serverName,        constant "Suave"
-        OwinConstants.CommonKeys.capabilities,      constant (
+        OwinKey OwinConstants.CommonKeys.addresses,         boundAddresses <--> untyped
+        OwinKey OwinConstants.CommonKeys.serverName,        constant "Suave"
+        OwinKey OwinConstants.CommonKeys.capabilities,      constant (
           Map [
-            "owin.Version", "1.0.1"
-            "suave.Version", Globals.Internals.SuaveVersion
+            OwinKey "owin.Version", "1.0.1"
+            OwinKey "suave.Version", Globals.Internals.SuaveVersion
           ]
           |> Map.map (fun key value -> box value)
-          :> IDictionary<string, obj>
+          :> IDictionary<OwinKey, obj>
         )
-        OwinConstants.CommonKeys.clientCertificate, constant Unchecked.defaultof<Security.Cryptography.X509Certificates.X509Certificate>
-        OwinConstants.CommonKeys.onSendingHeaders,  onSendingHeadersLens <--> untyped
-        OwinConstants.CommonKeys.isLocal,           HttpContext.isLocal_ <--> untyped
-        OwinConstants.CommonKeys.localIpAddress,    HttpContext.runtime_ >--> HttpRuntime.matchedBinding_ >--> HttpBinding.socketBinding_ >--> SocketBinding.ip_ <--> stringlyTyped (sprintf "%O") IPAddress.Parse <--> untyped
-        OwinConstants.CommonKeys.localPort,         HttpContext.runtime_  >--> HttpRuntime.matchedBinding_ >--> HttpBinding.socketBinding_ >--> SocketBinding.port_ <--> stringlyTyped string uint16 <--> untyped
-        OwinConstants.CommonKeys.remoteIpAddress,   HttpContext.clientIp_ <--> stringlyTyped (sprintf "%O") IPAddress.Parse <--> untyped
-        OwinConstants.CommonKeys.remotePort,        HttpContext.clientPort_ <--> stringlyTyped string uint16 <--> untyped
-        OwinConstants.CommonKeys.traceOutput,       HttpContext.runtime_ >--> HttpRuntime.logger_ >--> ((fun x -> textWriter x), (fun v x -> x)) <--> untyped
+        OwinKey OwinConstants.CommonKeys.clientCertificate, constant Unchecked.defaultof<Security.Cryptography.X509Certificates.X509Certificate>
+        OwinKey OwinConstants.CommonKeys.onSendingHeaders,  onSendingHeadersLens <--> untyped
+        OwinKey OwinConstants.CommonKeys.isLocal,           HttpContext.isLocal_ <--> untyped
+        OwinKey OwinConstants.CommonKeys.localIpAddress,    HttpContext.runtime_ >--> HttpRuntime.matchedBinding_ >--> HttpBinding.socketBinding_ >--> SocketBinding.ip_ <--> stringlyTyped (sprintf "%O") IPAddress.Parse <--> untyped
+        OwinKey OwinConstants.CommonKeys.localPort,         HttpContext.runtime_  >--> HttpRuntime.matchedBinding_ >--> HttpBinding.socketBinding_ >--> SocketBinding.port_ <--> stringlyTyped string uint16 <--> untyped
+        OwinKey OwinConstants.CommonKeys.remoteIpAddress,   HttpContext.clientIp_ <--> stringlyTyped (sprintf "%O") IPAddress.Parse <--> untyped
+        OwinKey OwinConstants.CommonKeys.remotePort,        HttpContext.clientPort_ <--> stringlyTyped string uint16 <--> untyped
+        OwinKey OwinConstants.CommonKeys.traceOutput,       HttpContext.runtime_ >--> HttpRuntime.logger_ >--> ((fun x -> textWriter x), (fun v x -> x)) <--> untyped
         
         // per-request storage
-        "suave.UserData",                           HttpContext.userState_ <--> untyped
+        OwinKey "suave.UserData",                           HttpContext.userState_ <--> untyped
 
         // MSFT non standard
         // readable
-        OwinConstants.MSFT.traceFactoryDelegate,    HttpContext.runtime_ >--> HttpRuntime.logger_ >--> ((fun x -> traceFactory x), (fun v x -> x)) <--> untyped
+        OwinKey OwinConstants.MSFT.traceFactoryDelegate,    HttpContext.runtime_ >--> HttpRuntime.logger_ >--> ((fun x -> traceFactory x), (fun v x -> x)) <--> untyped
       ]
 
   type UnclosableMemoryStream() =
@@ -583,10 +628,13 @@ module OwinApp =
     let owinKeys = owinMap |> List.map fst |> Set.ofSeq
     let owinRW   = owinMap |> Map.ofList
 
-    let owinLensLens key : Lens<Map<string, Property<HttpContext, obj>>, Property<HttpContext, obj>> =
+    let owinLensLens key : Lens<Map<OwinKey, Property<HttpContext, obj>>, Property<HttpContext, obj>> =
       let userDataItem_ = HttpContext.userState_ >--> SirLensALot.mapFindLens key <--> SirLensALot.untyped
-      (fun x -> Map.tryFind key x |> function | None -> userDataItem_
-                                              | Some lens -> lens),
+      (fun x ->
+        x
+        |> Map.tryPick (fun k v -> if k.Equals(key) then Some v else None)
+        |> function | None -> userDataItem_
+                    | Some lens -> lens),
       (fun v x -> invalidOp "TODO")
 
     interface OwinRequest with
@@ -633,19 +681,19 @@ module OwinApp =
           state := Lens.set settable value !state
 
       member x.Keys =
-        (owinRW :> IDictionary<_, _>).Keys
+        owinKeys |> Set.map (fun (OwinKey key) -> key) :> ICollection<_>
 
       member x.Values =
         (owinRW |> Map.map (fun key valueLens -> Lens.get valueLens !state) :> IDictionary<_, _>).Values
 
       member x.ContainsKey k =
-        owinKeys.Contains k
+        owinKeys.Contains(OwinKey k)
 
       member x.Add (key, v) =
         (x :> IDictionary<_, _>).[key] <- v
 
       member x.TryGetValue (key, [<Out>] res : byref<obj>) =
-        if owinKeys |> Set.contains key then
+        if owinKeys |> Set.contains (OwinKey key) then
           res <- (x :> IDictionary<_, _>).[key]
           true
         else
@@ -656,7 +704,7 @@ module OwinApp =
       member x.Count = owinKeys.Count
       member x.IsReadOnly = false
       member x.Clear() = invalidOp "Clear is not supported"
-      member x.Contains kvp = owinKeys.Contains kvp.Key
+      member x.Contains kvp = owinKeys.Contains(OwinKey kvp.Key)
       member x.CopyTo (array, arrayIndex) = invalidOp "CopyTo is not supported"
       member x.Remove kvp = (x :> IDictionary<_, _>).Remove kvp.Key
 
