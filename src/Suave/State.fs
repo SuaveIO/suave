@@ -21,18 +21,13 @@ module CookieStateStore =
   [<Literal>]
   let StateCookie = "st"
 
-  let private encodeMap (map : Map<string, obj>) =
-    let pickler = FsPickler.CreateBinary ()
-    use ms = new MemoryStream()
-    pickler.Serialize(ms, map)
-    ms.ToArray()
 
-  let private decodeMap bytes : Map<string, obj> =
-    let pickler = FsPickler.CreateBinary ()
-    use ms = new MemoryStream()
-    ms.Write (bytes, 0, bytes.Length)
-    ms.Seek (0L, SeekOrigin.Begin) |> ignore
-    pickler.Deserialize ms
+  let private binarySerializer = FsPickler.CreateBinarySerializer ()
+  let private encodeMap (map : Map<string, obj>) : byte [] =
+    binarySerializer.Pickle map
+
+  let private decodeMap (bytes : byte []) : Map<string, obj> =
+    binarySerializer.UnPickle<Map<string, obj>> bytes
 
   let write relativeExpiry (key : string) (value : 'T) =
     context (fun ctx ->
