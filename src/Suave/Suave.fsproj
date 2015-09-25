@@ -65,6 +65,7 @@
     <Compile Include="Utils\Encoding.fs" />
     <Compile Include="Utils\Crypto.fs" />
     <Compile Include="Utils\Parsing.fs" />
+    <Compile Include="Utils\Serialisation.fs" />
     <Compile Include="Globals.fs" />
     <Compile Include="Logging\LogLevel.fs" />
     <Compile Include="Logging\TraceHeader.fs" />
