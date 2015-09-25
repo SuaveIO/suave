@@ -21,11 +21,15 @@ module Cookie =
     | DecryptionError of Crypto.SecretboxDecryptionError
 
   let parseCookies (s : string) : HttpCookie list =
-    s.Split(';')
+    s.Split([|';'|], StringSplitOptions.RemoveEmptyEntries)
     |> Array.toList
     |> List.map (fun (cookie : string) ->
-        let parts = cookie.Split('=')
-        HttpCookie.mkKV (String.trim parts.[0]) (String.trim parts.[1]))
+        let parts = cookie.Split([|'='|], StringSplitOptions.RemoveEmptyEntries)
+        if parts.Length > 1 then
+          Some (HttpCookie.mkKV (String.trim parts.[0]) (String.trim parts.[1]))
+        else
+          None)
+    |> List.choose id
 
   let parseResultCookie (s : string) : HttpCookie =
     let parseExpires (str : string) =

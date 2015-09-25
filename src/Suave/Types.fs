@@ -1,4 +1,3 @@
-
 module Suave.Types
 
 open System
@@ -366,6 +365,7 @@ type HttpRequest =
     Parsing.parseData (ASCII.toString x.rawForm)
 
   /// Finds the key k from the form in the HttpRequest
+  /// Match Choice1Of2 to get the value and Choice2Of2 to get an error message
   member x.formData (k : string) =
     getFirstOpt x.form k
 
@@ -542,7 +542,8 @@ type HttpRuntime =
     compressionFolder : string
     logger            : Logger
     matchedBinding    : HttpBinding
-    parsePostData     : bool }
+    parsePostData     : bool
+    cookieSerialiser  : Utils.CookieSerialiser }
 
   static member serverKey_ = Property (fun x -> x.serverKey) (fun v x -> { x with serverKey = v })
   static member errorHandler_ = Property (fun x -> x.errorHandler) (fun v x -> { x with errorHandler = v })
@@ -676,10 +677,11 @@ module HttpRuntime =
       compressionFolder = "."
       logger            = Loggers.saneDefaultsFor LogLevel.Debug
       matchedBinding    = HttpBinding.defaults
-      parsePostData     = false }
+      parsePostData     = false
+      cookieSerialiser  = new BinaryFormatterSerialiser() }
 
   /// make a new HttpRuntime from the given parameters
-  let mk serverKey errorHandler mimeTypes homeDirectory compressionFolder logger parsePostData binding =
+  let mk serverKey errorHandler mimeTypes homeDirectory compressionFolder logger parsePostData cookieSerialiser binding =
     { serverKey         = serverKey
       errorHandler      = errorHandler
       mimeTypesMap      = mimeTypes
@@ -687,8 +689,8 @@ module HttpRuntime =
       compressionFolder = compressionFolder
       logger            = logger
       matchedBinding    = binding
-      parsePostData     = parsePostData }
-
+      parsePostData     = parsePostData
+      cookieSerialiser  = cookieSerialiser }
 
 /// A module that provides functions to create a new HttpContext.
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
@@ -763,7 +765,9 @@ type SuaveConfig =
     compressedFilesFolder : string option
 
     /// A logger to log with
-    logger                  : Logger }
+    logger                  : Logger
+
+    cookieSerialiser        : Utils.CookieSerialiser }
 
   static member bindings_              = Property<SuaveConfig,_> (fun x -> x.bindings)              (fun v x -> { x with bindings = v })
   static member serverKey_             = Property<SuaveConfig,_> (fun x -> x.serverKey)             (fun v x -> { x with serverKey = v })
@@ -787,3 +791,4 @@ module SuaveConfig =
                    compressionFolder
                    config.logger
                    parsePostData
+                   config.cookieSerialiser

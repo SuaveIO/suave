@@ -4,9 +4,12 @@ open System
 open System.Net
 
 open Suave
+open Suave.Sockets
+open Suave.Sockets.Control
 open Suave.Logging
 open Suave.Web
 open Suave.Http
+open Suave.Http.EventSource
 open Suave.Http.Applicatives
 open Suave.Http.Writers
 open Suave.Http.Files
@@ -111,7 +114,16 @@ let app =
       >>= OwinSample.app
       >>= Writers.setHeader "X-Custom-After" "After OWIN"
     basicAuth // from here on it will require authentication
+    // surf to: http://localhost:8082/es.html to view the ES
+    GET >>= path "/events2" >>= request (fun _ -> EventSource.handShake (fun out ->
+      socket {
+        let msg = { id = "1"; data = "First Message"; ``type`` = None }
+        do! msg |> send out
+        let msg = { id = "2"; data = "Second Message"; ``type`` = None }
+        do! msg |> send out
+      }))
     GET >>= path "/events" >>= request (fun r -> EventSource.handShake (CounterDemo.counterDemo r))
+
     GET >>= browseHome //serves file if exists
     GET >>= dirHome //show directory listing
     HEAD >>= path "/head" >>= sleep 100 "Nice sleep .."
@@ -138,10 +150,22 @@ let app =
     RequestErrors.NOT_FOUND "Found no handlers"
     ] >>= log logger logFormat
 
+(*open Suave.OpenSSL
+open OpenSSL.Core
+open System.Security.Cryptography.X509Certificates*)
+
 [<EntryPoint>]
 let main argv =
+  (*let cert =
+    let bio = BIO.MemoryBuffer()
+    let cert = System.IO.File.ReadAllBytes "example.pem"
+    bio.Write cert
+    OpenSSL.X509.X509Certificate.FromDER bio*)
+
   startWebServer
-    { bindings              = [ HttpBinding.mk' HTTP "127.0.0.1" 8082 ]
+    { bindings              = [ HttpBinding.mk' HTTP "127.0.0.1" 8082
+                                //HttpBinding.mk' (HTTPS (Provider.open_ssl cert)) "127.0.0.1" 8443
+                              ]
       serverKey             = Utils.Crypto.generateKey HttpRuntime.ServerKeyLength
       errorHandler          = defaultErrorHandler
       listenTimeout         = TimeSpan.FromMilliseconds 2000.
@@ -151,6 +175,7 @@ let main argv =
       mimeTypesMap          = mimeTypes
       homeFolder            = None
       compressedFilesFolder = None
-      logger                = logger }
+      logger                = logger
+      cookieSerialiser      = new Utils.BinaryFormatterSerialiser() }
     app
   0

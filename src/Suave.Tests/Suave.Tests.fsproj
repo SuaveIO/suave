@@ -174,7 +174,7 @@
     <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
       <ItemGroup>
         <Reference Include="Fuchu">
-          <HintPath>..\..\packages\Fuchu-suave\lib\net40\Fuchu.dll</HintPath>
+          <HintPath>..\..\packages\Fuchu\lib\Fuchu.dll</HintPath>
           <Private>True</Private>
           <Paket>True</Paket>
         </Reference>
@@ -185,7 +185,7 @@
     <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
       <ItemGroup>
         <Reference Include="Fuchu.FsCheck">
-          <HintPath>..\..\packages\Fuchu-suave.FsCheck\lib\net40\Fuchu.FsCheck.dll</HintPath>
+          <HintPath>..\..\packages\Fuchu.FsCheck\lib\Fuchu.FsCheck.dll</HintPath>
           <Private>True</Private>
           <Paket>True</Paket>
         </Reference>
@@ -196,7 +196,7 @@
     <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
       <ItemGroup>
         <Reference Include="Fuchu.PerfUtil">
-          <HintPath>..\..\packages\Fuchu-suave.PerfUtil\lib\net40\Fuchu.PerfUtil.dll</HintPath>
+          <HintPath>..\..\packages\Fuchu.PerfUtil\lib\Fuchu.PerfUtil.dll</HintPath>
           <Private>True</Private>
           <Paket>True</Paket>
         </Reference>
