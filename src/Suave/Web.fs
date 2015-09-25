@@ -682,4 +682,5 @@ let defaultConfig =
     mimeTypesMap          = Http.Writers.defaultMimeTypesMap
     homeFolder            = None
     compressedFilesFolder = None
-    logger                = Loggers.saneDefaultsFor LogLevel.Info }
+    logger                = Loggers.saneDefaultsFor LogLevel.Info
+    cookieSerialiser      = new Utils.BinaryFormatterSerialiser() }

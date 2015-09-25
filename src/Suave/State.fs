@@ -1,5 +1,6 @@
 module Suave.State
 
+open Suave.Utils
 open Suave.Types
 open Suave.Http
 open Suave.Log
@@ -11,7 +12,6 @@ module CookieStateStore =
   open System
   open System.IO
   open System.Collections.Generic
-  open Nessos.FsPickler
 
   /// The user state key for the state store. Always "Suave.State.CookieStateStore". 
   [<Literal>]
@@ -20,14 +20,6 @@ module CookieStateStore =
   /// The cookie name for the state store. Always "st".
   [<Literal>]
   let StateCookie = "st"
-
-
-  let private binarySerializer = FsPickler.CreateBinarySerializer ()
-  let private encodeMap (map : Map<string, obj>) : byte [] =
-    binarySerializer.Pickle map
-
-  let private decodeMap (bytes : byte []) : Map<string, obj> =
-    binarySerializer.UnPickle<Map<string, obj>> bytes
 
   let write relativeExpiry (key : string) (value : 'T) =
     context (fun ctx ->
@@ -41,12 +33,16 @@ module CookieStateStore =
         (function
          | None      ->
            log ctx.runtime.logger "Suave.State.CookieStateStore.write" LogLevel.Debug "in fPlainText, no existing"
-           Map.empty |> Map.add key (box value) |> encodeMap
+           Map.empty
+           |> Map.add key (box value)
+           |> ctx.runtime.cookieSerialiser.Serialise
          | Some data ->
-           let m = decodeMap data
+           let m = ctx.runtime.cookieSerialiser.Deserialise data
            log ctx.runtime.logger "Suave.State.CookieStateStore.write" LogLevel.Debug
              (sprintf "in fPlainText, has existing %A" m)
-           m |> Map.add key (box value) |> encodeMap))
+           m
+           |> Map.add key (box value)
+           |> ctx.runtime.cookieSerialiser.Serialise))
 
   let stateful relativeExpiry secure : WebPart =
     context (fun ctx ->
@@ -64,7 +60,7 @@ module CookieStateStore =
           userStateKey   = StateStoreType
           relativeExpiry = relativeExpiry
           secure         = secure }
-        (fun () -> Choice1Of2(Map.empty<string, obj> |> encodeMap))
+        (fun () -> Choice1Of2(Map.empty<string, obj> |> ctx.runtime.cookieSerialiser.Serialise))
         cipherTextCorrupt
         setExpiry)
 
@@ -76,10 +72,10 @@ module CookieStateStore =
 
   module HttpContext =
 
-    let private mkStateStore (userState : Map<string, obj>) (ss : obj) =
+    let private mkStateStore (serialiser : CookieSerialiser) (userState : Map<string, obj>) (ss : obj) =
       { new StateStore with
           member x.get key =
-            decodeMap (ss :?> byte []) |> Map.tryFind key
+            serialiser.Deserialise (ss :?> byte []) |> Map.tryFind key
             |> Option.map (fun x -> Convert.ChangeType(x, typeof<'T>) :?> 'T)
           member x.set key value =
             let expiry = userState |> Map.find (StateStoreType + "-expiry") :?> CookieLife
@@ -90,7 +86,7 @@ module CookieStateStore =
     let state (ctx : HttpContext) =
       ctx.userState
       |> Map.tryFind StateStoreType
-      |> Option.map (mkStateStore ctx.userState)
+      |> Option.map (mkStateStore ctx.runtime.cookieSerialiser ctx.userState)
 
 /// This module contains the implementation for the memory-cache backed session
 /// state store, when the memory cache is global for the server.

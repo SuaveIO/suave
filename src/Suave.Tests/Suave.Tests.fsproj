@@ -125,8 +125,7 @@
     <Reference Include="System.Runtime.Serialization" />
     <ProjectReference Include="..\Suave.Razor\Suave.Razor.fsproj">
       <Name>Suave.Razor</Name>
-      <Project>{c1dc691b-1019-4a15-aa17-0c5cb0e0909c}</Project>
-      <Private>True</Private>
+      <Project>{C1DC691B-1019-4A15-AA17-0C5CB0E0909C}</Project>
     </ProjectReference>
     <ProjectReference Include="..\Suave.Testing\Suave.Testing.fsproj">
       <Project>{4BB79AAC-0D6D-4E0E-BB6E-8F61B3C6D99C}</Project>

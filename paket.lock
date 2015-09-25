@@ -7,7 +7,6 @@ NUGET
       FSharp.Core (>= 3.1.2.5)
     FSharp.Charting (0.90.12)
     FSharp.Core (3.1.2.5)
-    FsPickler (1.4.0)
     Fuchu (0.6.0) - framework: net45
     Fuchu.FsCheck (0.6.0)
       FsCheck (>= 1.0.4)
