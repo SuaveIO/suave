@@ -32,10 +32,10 @@ module Http =
 
   let inline (<|>) (a : WebPart) (b : WebPart) : WebPart =
     fun x ->
-      async{
+      async {
         let! e = a x
         match e with
-        | None   ->
+        | None ->
           let! result = b x
           match result with
           | None -> return None
@@ -43,7 +43,7 @@ module Http =
         | r -> return r
       }
 
-  let rec choose (options : WebPart list): WebPart =
+  let rec choose (options : WebPart list) : WebPart =
     fun arg -> async {
     match options with
     | []        -> return None
