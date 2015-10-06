@@ -1536,7 +1536,7 @@ module Http =
     /// </para></summary>
     /// <remarks>
     /// </remarks>
-    val authenticateBasic : f:(string * string -> bool) -> WebPart
+    val authenticateBasic : f:(string * string -> bool) -> protectedPart:WebPart -> WebPart
 
   module Control =
 
