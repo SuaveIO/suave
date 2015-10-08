@@ -20,20 +20,20 @@
     <ConsolePause>false</ConsolePause>
     <Tailcalls>false</Tailcalls>
     <WarningLevel>3</WarningLevel>
-    <DocumentationFile>bin\Debug\Suave.xml</DocumentationFile>
+    <DocumentationFile>bin\Debug\Suave.XML</DocumentationFile>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
-    <DebugType>pdbonly</DebugType>
     <Optimize>true</Optimize>
     <Tailcalls>true</Tailcalls>
     <OutputPath>bin\Release\</OutputPath>
     <ErrorReport>prompt</ErrorReport>
     <ConsolePause>false</ConsolePause>
     <WarningLevel>3</WarningLevel>
-    <DocumentationFile>bin\Release\Suave.xml</DocumentationFile>
+    <DocumentationFile>bin\Release\Suave.XML</DocumentationFile>
     <DefineConstants>
     </DefineConstants>
+    <DebugType>pdbonly</DebugType>
   </PropertyGroup>
   <PropertyGroup>
     <MinimumVisualStudioVersion Condition="'$(MinimumVisualStudioVersion)' == ''">11</MinimumVisualStudioVersion>
@@ -104,7 +104,6 @@
     <Compile Include="Sockets\SocketMonad.fs" />
     <Compile Include="Sockets\AsyncSocket.fs" />
     <Compile Include="Sockets\SocketBinding.fs" />
-    <Compile Include="Native\LibUv.fs" />
     <Compile Include="Tcp.fs" />
     <Compile Include="Sscanf.fs" />
     <Compile Include="Types.fs" />
