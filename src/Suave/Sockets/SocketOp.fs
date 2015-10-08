@@ -15,6 +15,7 @@ type Error =
   /// For a HTTP socket user this means a response of '400 Bad Request', or for
   /// example WebSockets would abort the connection.
   | InputDataError of string
+  | ConnectionError of string
 
 type ByteSegment = System.ArraySegment<byte>
 
