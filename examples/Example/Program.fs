@@ -149,6 +149,7 @@ let main argv =
       mimeTypesMap          = mimeTypes
       homeFolder            = None
       compressedFilesFolder = None
-      logger                = logger }
+      logger                = logger
+      tcpServerFactory      = new DefaultTcpServerFactory() }
     app
   0
