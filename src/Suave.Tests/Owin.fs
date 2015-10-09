@@ -99,6 +99,38 @@ let owinUnit cfg =
         eq "method" "PUT" (subj.[OwinConstants.requestMethod] |> unbox)
         subj.[OwinConstants.requestMethod] <- "get"
 
+      testCase "read request scheme" <| fun _ ->
+        let subj = createOwin ()
+        eq "request scheme" "http" (subj.[OwinConstants.requestScheme] |> unbox)
+
+      testCase "request uri matches original" <| fun _ ->
+        let requestUri = "http://localhost/path?q=a&b=c"
+        let subj =
+          let request =
+            { HttpRequest.empty with
+                url = Uri(requestUri)
+                headers = [("host","localhost")]
+                rawQuery = "q=a&b=c"
+              }
+          new OwinApp.OwinDictionary("", { HttpContext.empty with request = request })
+          :> IDictionary<string, obj>
+        let headers : IDictionary<string, string[]> =
+          unbox subj.[OwinConstants.requestHeaders]
+        let host : string =
+          if headers.ContainsKey("Host") then
+            headers.["Host"].[0]
+          else "localhost"
+        let queryString : string = 
+          unbox subj.[OwinConstants.requestQueryString]
+        let resultUri =
+          unbox subj.[OwinConstants.requestScheme] + "://" +
+          host +
+          unbox subj.[OwinConstants.requestPathBase] +
+          unbox subj.[OwinConstants.requestPath] +
+          if String.IsNullOrEmpty queryString then "" else "?" + queryString
+        eq "request uri" requestUri resultUri
+        eq "request path base" "" (unbox subj.[OwinConstants.requestPathBase])
+
       testCase "read/write custom" <| fun _ ->
         let subj = createOwin ()
         subj.["testing.MyKey"] <- "oh yeah"
@@ -113,6 +145,14 @@ let owinUnit cfg =
         let subj = createOwin ()
         subj.["testing.MyKey"] <- "oh yeah"
         eq "read back" "oh yeah" (subj.["Testing.MyKey"] |> unbox)
+
+      testCase "interaction/set and retrieve with case insensitivity" <| fun _ ->
+        let subj = createOwin ()
+        subj.["testing.MyKey"] <- "oh yeah"
+        eq "read back" "oh yeah" (subj.["Testing.MyKey"] |> unbox)
+
+        subj.["Testing.MyKey"] <- "oh no"
+        eq "read again" "oh no" (subj.["testing.MyKey"] |> unbox)
     ]
 
     testList "OWIN response headers" [
@@ -147,7 +187,6 @@ let owinUnit cfg =
         runWithConfig composedApp
         |> reqResp HttpMethod.GET "/owin" "" None None DecompressionMethods.GZip
                    id asserts
-
     ]
   ]
 
