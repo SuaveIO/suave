@@ -3,6 +3,7 @@
 open Fuchu
 
 open System
+open System.Linq
 
 open Suave
 open Suave.Http
@@ -13,10 +14,10 @@ open Suave.Types
 open Suave.Tests.TestUtilities
 open Suave.Testing
 
+let runWithConfig = runWith defaultConfig
+
 [<Tests>]
 let cookies =
-  let runWithConfig = runWith defaultConfig
-
   let basic_cookie =
     { name      = "mycookie"
     ; value     = "42"
@@ -48,3 +49,32 @@ let cookies =
           (runWithConfig (Cookie.setCookie { basic_cookie with httpOnly = true } >>= OK "test")))
             .GetCookies(Uri("http://127.0.0.1")).[0].HttpOnly)
     ]
+
+[<Tests>]
+let headers =
+  testList "Headers basic tests" [
+    testCase "setHeader adds header if it was not there" <| fun _ ->
+        Assert.Equal("expecting header value"
+        , "value"
+        , (reqHeaders HttpMethod.GET "/" None
+          (runWithConfig (Writers.setHeader "X-Custom-Header" "value" >>= OK "test"))).GetValues("X-Custom-Header").Single())
+
+    testCase "setHeader rewrites all instances of header with new single value" <| fun _ ->
+        Assert.Equal("expecting header value"
+            , "third"
+            , (reqHeaders HttpMethod.GET "/" None
+              (runWithConfig (
+                Writers.setHeader "X-Custom-Header" "first"
+                >>= Writers.setHeader "X-Custom-Header" "second"
+                >>= Writers.setHeader "X-Custom-Header" "third"
+                >>= OK "test"))).GetValues("X-Custom-Header").Single())
+
+    testCase "putHeader adds header and preserve order" <| fun _ ->
+        Assert.Equal("expecting header value"
+            , [| "first"; "second" |]
+            , (reqHeaders HttpMethod.GET "/" None
+              (runWithConfig (
+                Writers.putHeader "X-Custom-Header" "first"
+                >>= Writers.putHeader "X-Custom-Header" "second"
+                >>= OK "test"))).GetValues("X-Custom-Header").ToArray())
+  ]

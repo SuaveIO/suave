@@ -91,8 +91,11 @@ module Http =
   /// Functions have signature f :: params... -> HttpContext -> HttpContext.
   module Writers =
 
-    /// Sets a header with the key and value specified
+    /// Adds or replace a headers with the key and value specified
     val setHeader : key:string -> value:string -> WebPart
+
+    /// Adds a header with the key and value specified
+    val putHeader : key:string -> value:string -> WebPart
 
     /// Sets a user data key-value pair with the key and value specified. Downstream
     /// web parts can read this.

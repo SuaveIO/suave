@@ -109,7 +109,11 @@ module Http =
     open System
 
     let setHeader key value (ctx : HttpContext) =
-      { ctx with response = { ctx.response with headers = (key, value) :: ctx.response.headers } }
+      { ctx with response = { ctx.response with headers = (key, value) :: (ctx.response.headers |> List.filter (fun (k,_) -> k <> key))  } }
+      |> succeed
+
+    let putHeader key value (ctx : HttpContext) =
+      { ctx with response = { ctx.response with headers = List.append ctx.response.headers [key, value] } }
       |> succeed
 
     let setUserData key value (ctx : HttpContext) =
