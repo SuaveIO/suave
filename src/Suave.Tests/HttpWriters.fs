@@ -3,13 +3,16 @@
 open Fuchu
 
 open System
+open System.IO
 open System.Linq
+open System.Net.Sockets
 
 open Suave
 open Suave.Http
 open Suave.Http.Successful
 open Suave.Http.Writers
 open Suave.Types
+open Suave.Utils
 
 open Suave.Tests.TestUtilities
 open Suave.Testing
@@ -52,29 +55,61 @@ let cookies =
 
 [<Tests>]
 let headers =
+  let requestHeaders () =
+    use client = new TcpClient("127.0.0.1",8083)
+    let outputData = ASCII.bytes "GET / HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: Close\r\n\r\n"
+    use stream = client.GetStream()
+    stream.Write(outputData, 0, outputData.Length)
+
+    use streamReader = new StreamReader(stream)
+    
+    let splitHeader (line: string) =
+        let ind = line.IndexOf(':')
+        let name = line.Substring(0, ind)
+        let value = line.Substring(ind + 1)
+        name.Trim(), value.Trim()
+
+    // skip 200 OK
+    streamReader.ReadLine() |> ignore
+
+    // read header lines
+    let rec loop hdrs =
+      let line = streamReader.ReadLine()
+      if line.Equals("") then (List.rev hdrs)
+      else
+        let name, value = splitHeader line
+        loop ((name, value) :: hdrs)
+    loop []
+
   testList "Headers basic tests" [
     testCase "setHeader adds header if it was not there" <| fun _ ->
+      let ctx = runWithConfig (Writers.setHeader "X-Custom-Header" "value" >>= OK "test")
+      withContext (fun _ ->
+        let hdrs = requestHeaders ()
         Assert.Equal("expecting header value"
-        , "value"
-        , (reqHeaders HttpMethod.GET "/" None
-          (runWithConfig (Writers.setHeader "X-Custom-Header" "value" >>= OK "test"))).GetValues("X-Custom-Header").Single())
+          , ["X-Custom-Header", "value"]
+          , hdrs |> List.filter (fun (n,_) -> n = "X-Custom-Header"))) ctx
 
     testCase "setHeader rewrites all instances of header with new single value" <| fun _ ->
+      let ctx = runWithConfig (
+                  Writers.setHeader "X-Custom-Header" "first"
+                  >>= Writers.setHeader "X-Custom-Header" "second"
+                  >>= Writers.setHeader "X-Custom-Header" "third"
+                  >>= OK "test")
+      withContext (fun _ ->
+        let hdrs = requestHeaders ()
         Assert.Equal("expecting header value"
-            , "third"
-            , (reqHeaders HttpMethod.GET "/" None
-              (runWithConfig (
-                Writers.setHeader "X-Custom-Header" "first"
-                >>= Writers.setHeader "X-Custom-Header" "second"
-                >>= Writers.setHeader "X-Custom-Header" "third"
-                >>= OK "test"))).GetValues("X-Custom-Header").Single())
+          , ["X-Custom-Header", "third"]
+          , hdrs |> List.filter (fun (n,_) -> n = "X-Custom-Header"))) ctx
 
     testCase "putHeader adds header and preserve order" <| fun _ ->
-        Assert.Equal("expecting header value"
-            , [| "first"; "second" |]
-            , (reqHeaders HttpMethod.GET "/" None
-              (runWithConfig (
-                Writers.putHeader "X-Custom-Header" "first"
-                >>= Writers.putHeader "X-Custom-Header" "second"
-                >>= OK "test"))).GetValues("X-Custom-Header").ToArray())
+      let ctx = runWithConfig (
+                  Writers.putHeader "X-Custom-Header" "first"
+                  >>= Writers.putHeader "X-Custom-Header" "second"
+                  >>= OK "test")
+      withContext (fun _ ->
+        let hdrs = requestHeaders ()
+        Assert.Equal("expecting headers value"
+          , ["X-Custom-Header", "first"; "X-Custom-Header", "second"]
+          , hdrs |> List.filter (fun (n,_) -> n = "X-Custom-Header"))) ctx
   ]
