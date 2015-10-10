@@ -308,8 +308,12 @@ let endToEnd =
         else () // 200 OK
         async.Return ()
 
+      let postCondition (ctx : HttpContext) =
+        eq "request url contains /owin again" "/owin/app" ctx.request.url.AbsolutePath
+        async.Return (Some ctx)
+
       let composedApp =
-        pathRegex "/owin(/.+)*" >>= OwinApp.ofApp "/owin" ok
+        pathRegex "/owin(/.+)*" >>= OwinApp.ofApp "/owin" ok >>= postCondition
 
       let asserts (result : HttpResponseMessage) =
         eq "Http Status Code" HttpStatusCode.OK result.StatusCode
