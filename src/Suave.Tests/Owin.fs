@@ -35,7 +35,7 @@ let unit =
 
   let createOwin () =
     let request = { HttpRequest.empty with ``method`` = HttpMethod.PUT }
-    new OwinApp.OwinDictionary({ HttpContext.empty with request = request })
+    new OwinApp.OwinDictionary("/", { HttpContext.empty with request = request })
     :> IDictionary<string, obj>
 
   testList "infrastructure" [
@@ -301,7 +301,7 @@ let endToEnd =
 
       let ok (env : OwinEnvironment) =
         let requestPathBase : string = unbox env.[OwinConstants.requestPathBase]
-        //eq "owin.RequestPathBase" requestPathBase "/owin"
+        eq OwinConstants.requestPathBase requestPathBase "/owin"
         let requestPath : string = unbox env.[OwinConstants.requestPath]
         if requestPath <> "/app" then
           env.[OwinConstants.responseStatusCode] <- box 404

@@ -502,15 +502,17 @@ module OwinApp =
       (fun x -> toString x),
       (fun v -> ofString v)
 
-    let owinMap ct requestHeadersLens responseHeadersLens responseStreamLens onSendingHeadersLens =
+    let owinMap ct requestPathBase
+                requestHeadersLens responseHeadersLens
+                responseStreamLens onSendingHeadersLens =
+
       [ // 3.2.1 Request Data
         // writeable / value???
         OwinKey OwinConstants.requestScheme,        HttpContext.request_ >--> HttpRequest.url_ >--> uriScheme <--> untyped
         // writeable / value
         OwinKey OwinConstants.requestMethod,        HttpContext.request_ >--> HttpRequest.method_ >--> methodString <--> untyped
         // writeable / value
-        // TODO: any path segment set via Suave should be used as the requestPathBase
-        OwinKey OwinConstants.requestPathBase,      constant String.Empty
+        OwinKey OwinConstants.requestPathBase,      constant requestPathBase
         // writeable / value
         OwinKey OwinConstants.requestPath,          HttpContext.request_ >--> HttpRequest.url_ >--> uriAbsolutePath <--> untyped
         // writeable / value
@@ -577,7 +579,7 @@ module OwinApp =
     member x.Dispose() = ()
     member x.RealDispose() = base.Dispose()
 
-  type internal OwinDictionary(initialState) =
+  type internal OwinDictionary(requestPathBase, initialState) =
     // TODO: support streaming optionally
       //let impl conn = AsyncSocket.transferStream conn v
       //SocketTask impl
@@ -622,9 +624,9 @@ module OwinApp =
           ())),
       (fun v x -> invalidOp "cannot set onSendingHeadersAction")
 
-    let owinMap = SirLensALot.owinMap cts.Token requestHeadersLens
-                                      responseHeadersLens responseStreamLens
-                                      onSendingHeadersLens
+    let owinMap = SirLensALot.owinMap cts.Token requestPathBase
+                                      requestHeadersLens responseHeadersLens
+                                      responseStreamLens onSendingHeadersLens
     let owinKeys = owinMap |> List.map fst |> Set.ofSeq
     let owinRW   = owinMap |> Map.ofList
 
@@ -635,7 +637,7 @@ module OwinApp =
         |> Map.tryPick (fun k v -> if k.Equals(key) then Some v else None)
         |> function | None -> userDataItem_
                     | Some lens -> lens),
-      (fun v x -> invalidOp "TODO")
+      (fun v x -> invalidOp "setting owin constants not supported")
 
     interface OwinRequest with
       member x.OnSendingHeaders cb st =
@@ -726,7 +728,9 @@ module OwinApp =
         (cts :> IDisposable).Dispose()
 
   [<CompiledName "OfApp">]
-  let ofApp requestPathBase (owin : OwinApp) : WebPart =
+  let ofApp (requestPathBase : string) (owin : OwinApp) : WebPart =
+
+    Applicatives.pathStarts requestPathBase >>=
     fun (ctx : HttpContext) ->
       let verbose f =
         ctx.runtime.logger.Log LogLevel.Verbose (
@@ -734,10 +738,23 @@ module OwinApp =
         )
 
       let impl (conn, response) : SocketOp<unit> = socket {
+        let owinRequestUri = UriBuilder ctx.request.url
+
+        owinRequestUri.Path <-
+          if ctx.request.url.AbsolutePath.StartsWith requestPathBase then
+            ctx.request.url.AbsolutePath.Substring requestPathBase.Length
+          else
+            ctx.request.url.AbsolutePath
+
         // disposable because it buffers what the OwinApp writes to the stream
         // also, OWIN expects the default HTTP status code to be 200 OK
         // could also set the status code after calling SocketOp.ofAsync if the value is not set
-        use wrapper = new OwinDictionary({ ctx with response = { response with status = HTTP_200 } })
+        use wrapper =
+          new OwinDictionary(
+            requestPathBase,
+            { ctx with
+                request = { ctx.request with url = owinRequestUri.Uri }
+                response = { response with status = HTTP_200 } })
 
         verbose (fun _ -> "yielding to OWIN middleware")
         do! SocketOp.ofAsync (owin wrapper.Interface)

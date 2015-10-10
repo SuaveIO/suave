@@ -1069,6 +1069,9 @@ module Http =
     /// Match on the path
     val path : s:string -> WebPart
 
+    /// Match on the initial path
+    val pathStarts : s:string -> WebPart
+
     /// Match on the method
     val ``method`` : ``method``:HttpMethod -> WebPart
 

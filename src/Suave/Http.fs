@@ -325,7 +325,6 @@ module Http =
     let INVALID_HTTP_VERSION = invalid_http_version (UTF8.bytes HTTP_505.message)
 
   module Applicatives =
-  
 
     open Suave.Utils
     open Suave.Logging
@@ -340,6 +339,9 @@ module Http =
 
     let path s (x : HttpContext) =
       async.Return (Option.iff (s = x.request.url.AbsolutePath) x)
+
+    let pathStarts s (x : HttpContext) =
+      async.Return (Option.iff (x.request.url.AbsolutePath.StartsWith s) x)
 
     let url x = path x
 
