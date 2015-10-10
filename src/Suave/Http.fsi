@@ -1069,6 +1069,9 @@ module Http =
     /// Match on the path
     val path : s:string -> WebPart
 
+    /// Match on the initial path
+    val pathStarts : s:string -> WebPart
+
     /// Match on the method
     val ``method`` : ``method``:HttpMethod -> WebPart
 
@@ -1081,10 +1084,40 @@ module Http =
     /// Match on the hostname (which is a required header for a Http client to send)
     /// -> allows you to have multiple sites with a single application.
     /// TODO: support SNI #177
+    ///
+    /// Perform a case-insensitive string comparison with context.request.clientHostTrustProxy
+    /// which is the client-host; i.e. what the request says is the host, or
+    /// what the proxy server says is the forwarded Host value. To match on what
+    /// the web server *knows for sure* is the host, in the case when you've
+    /// not overridden x-forwarded-host in your proxy, you should use
+    /// x.request.host or Http.Applicatives.serverHost instead. The normal use-
+    /// case, however, is to match on what's publically routable, which is the
+    /// client host.
     val host : hostname:string -> WebPart
 
+    /// This is the server's knowledge of what's the host is. In the case you
+    /// have a clustered web server deployment, you might be more interested in
+    /// what the client expects the host to be, since most validation logic you
+    /// have in your app is concerned with this.
+    val serverHost : hostname:string -> WebPart
+
+    /// Alias for `host`.
+    val clientHost : hostname:string -> WebPart
+
     /// <summary><para>
-    /// Formats the HttpRequest as in the default manner
+    /// The default log format for <see cref="log" />.  NCSA Common log format
+    ///
+    /// 127.0.0.1 user-identifier frank [10/Oct/2000:13:55:36 -0700] "GET /apache_pb.gif HTTP/1.0" 200 2326
+    ///
+    /// A "-" in a field indicates missing data.
+    ///
+    /// 127.0.0.1 is the IP address of the client (remote host) which made the request to the server.
+    /// user-identifier is the RFC 1413 identity of the client.
+    /// frank is the userid of the person requesting the document.
+    /// [10/Oct/2000:13:55:36 -0700] is the date, time, and time zone when the server finished processing the request, by default in strftime format %d/%b/%Y:%H:%M:%S %z.
+    /// "GET /apache_pb.gif HTTP/1.0" is the request line from the client. The method GET, /apache_pb.gif the resource requested, and HTTP/1.0 the HTTP protocol.
+    /// 200 is the HTTP status code returned to the client. 2xx is a successful response, 3xx a redirection, 4xx a client error, and 5xx a server error.
+    /// 2326 is the size of the object returned to the client, measured in bytes.
     /// </para></summary>
     val logFormat : ctx:HttpContext -> string
 

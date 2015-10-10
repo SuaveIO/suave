@@ -1,4 +1,4 @@
-﻿namespace Suave
+namespace Suave
 
 module Http =
 
@@ -173,7 +173,6 @@ module Http =
     open Response
     open Suave.Types
     
-
     let ok s : WebPart = 
       fun ctx -> { ctx with response = { ctx.response with status = HTTP_200; content = Bytes s }} |> succeed
 
@@ -222,7 +221,6 @@ module Http =
     </body>
   </html>"
         url HTTP_302.message))
-     
 
     let not_modified : WebPart =
       fun ctx -> { ctx with response = {status = HTTP_304; headers = []; content = Bytes [||]; writePreamble = true }} |> succeed
@@ -327,7 +325,6 @@ module Http =
     let INVALID_HTTP_VERSION = invalid_http_version (UTF8.bytes HTTP_505.message)
 
   module Applicatives =
-  
 
     open Suave.Utils
     open Suave.Logging
@@ -343,25 +340,29 @@ module Http =
     let path s (x : HttpContext) =
       async.Return (Option.iff (s = x.request.url.AbsolutePath) x)
 
+    let pathStarts s (x : HttpContext) =
+      async.Return (Option.iff (x.request.url.AbsolutePath.StartsWith s) x)
+
     let url x = path x
 
     let ``method`` (m : HttpMethod) (x : HttpContext) =
       async.Return (Option.iff (m = x.request.``method``) x)
 
     let isSecure (x : HttpContext) =
-      async.Return (Option.iff x.request.isSecure x)
+      async.Return (Option.iff x.runtime.matchedBinding.scheme.secure x)
 
     let pathRegex regex (x : HttpContext) =
       async.Return (Option.iff (Regex.IsMatch(x.request.url.AbsolutePath, regex)) x)
 
     let urlRegex x = pathRegex x
 
-    let host hostname (x : HttpContext) = async {
-      if x.request.host.value = hostname then
-        return Some { x with request = { x.request with host = ServerClient hostname } }
-      else
-        return None
-      }
+    let host hostname (x : HttpContext) =
+      async.Return (Option.iff (String.eqOrdCi x.request.clientHostTrustProxy hostname) x)
+
+    let serverHost hostname (x : HttpContext) =
+      async.Return (Option.iff (String.eqOrdCi x.request.host hostname) x)
+
+    let clientHost hostname x = host hostname x
 
     // see http://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html
 
@@ -375,26 +376,13 @@ module Http =
     let TRACE   (x : HttpContext) = ``method`` HttpMethod.TRACE x
     let OPTIONS (x : HttpContext) = ``method`` HttpMethod.OPTIONS x
 
-    /// The default log format for <see cref="log" />.  NCSA Common log format
-    /// 
-    /// 127.0.0.1 user-identifier frank [10/Oct/2000:13:55:36 -0700] "GET /apache_pb.gif HTTP/1.0" 200 2326
-    /// 
-    /// A "-" in a field indicates missing data.
-    /// 
-    /// 127.0.0.1 is the IP address of the client (remote host) which made the request to the server.
-    /// user-identifier is the RFC 1413 identity of the client.
-    /// frank is the userid of the person requesting the document.
-    /// [10/Oct/2000:13:55:36 -0700] is the date, time, and time zone when the server finished processing the request, by default in strftime format %d/%b/%Y:%H:%M:%S %z.
-    /// "GET /apache_pb.gif HTTP/1.0" is the request line from the client. The method GET, /apache_pb.gif the resource requested, and HTTP/1.0 the HTTP protocol.
-    /// 200 is the HTTP status code returned to the client. 2xx is a successful response, 3xx a redirection, 4xx a client error, and 5xx a server error.
-    /// 2326 is the size of the object returned to the client, measured in bytes.
     let logFormat (ctx : HttpContext) =
 
       let dash = function | "" | null -> "-" | x -> x
       let ci = Globalization.CultureInfo("en-US")
       let processId = System.Diagnostics.Process.GetCurrentProcess().Id.ToString()
       sprintf "%O %s %s [%s] \"%s %s %s\" %d %d"
-        ctx.request.ipaddr
+        ctx.clientIpTrustProxy
         processId //TODO: obtain connection owner via Ident protocol
                          // Authentication.UserNameKey
         (match Map.tryFind "userName" ctx.userState with Some x -> x :?> string | None -> "-")
@@ -513,7 +501,7 @@ module Http =
     open ServeResource
 
     let sendFile fileName (compression : bool) (ctx : HttpContext) =
-      let writeFile file conn = socket {
+      let writeFile file (conn, _) = socket {
         let getFs = fun path -> new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite) :> Stream
         let getLm = fun path -> FileInfo(path).LastWriteTime
         use! fs = Compression.transformStream file getFs getLm compression ctx.runtime.compressionFolder ctx conn
@@ -628,7 +616,7 @@ module Http =
                       resourceName
                       (compression : bool)
                       (ctx : HttpContext) =
-      let writeResource name conn = socket {
+      let writeResource name (conn, _) = socket {
         let getFs = fun name -> assembly.GetManifestResourceStream(name)
         let getLm = fun _ -> lastModified assembly
         use! fs = Compression.transformStream name getFs getLm compression ctx.runtime.compressionFolder ctx conn
@@ -729,7 +717,7 @@ module Http =
         return! dispatch out
       }
 
-    let private handShakeAux f (out : Connection) =
+    let private handShakeAux f (out : Connection, _) =
       socket {
         do! asyncWriteLn out "" // newline after headers
 
@@ -753,11 +741,10 @@ module Http =
                   :: ("X-Accel-Buffering",           "no")
                   :: []
                 content = SocketTask (handShakeAux f)
-                writePreamble = true
             }
       }
       |> succeed
-      
+
   module Authentication =
 
     open RequestErrors

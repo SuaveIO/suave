@@ -53,6 +53,7 @@
   <Import Project="$(FSharpTargetsPath)" Condition="Exists('$(FSharpTargetsPath)')" />
   <ItemGroup>
     <Compile Include="Utils\Async.fs" />
+    <Compile Include="Utils\Aether.fs" />
     <Compile Include="Utils\Collections.fs" />
     <Compile Include="Utils\UTF8.fs" />
     <Compile Include="Utils\ASCII.fs" />
@@ -78,10 +79,10 @@
     <Compile Include="Sockets\SocketOp.fs" />
     <Compile Include="Sockets\ITransport.fs" />
     <Compile Include="Sockets\TcpTransport.fs" />
+    <Compile Include="Sockets\SocketBinding.fs" />
     <Compile Include="Sockets\Connection.fs" />
     <Compile Include="Sockets\SocketMonad.fs" />
     <Compile Include="Sockets\AsyncSocket.fs" />
-    <Compile Include="Sockets\SocketBinding.fs" />
     <Compile Include="Tcp.fs" />
     <Compile Include="Sscanf.fs" />
     <Compile Include="Types.fs" />
@@ -94,6 +95,7 @@
     <Compile Include="State.fs" />
     <Compile Include="Auth.fs" />
     <Compile Include="Web.fs" />
+    <Compile Include="Owin.fs" />
     <Compile Include="WebSocket.fs" />
     <Compile Include="Json.fs" />
     <Compile Include="Proxy.fs" />
@@ -110,6 +112,7 @@
     <Reference Include="System.Web" />
     <Reference Include="System.Web.Extensions" />
     <Reference Include="System.Xml" />
+    <Reference Include="System.Security" />
   </ItemGroup>
   <Import Project="..\..\tools\paket.targets" />
   <Choose>
@@ -117,17 +120,6 @@
       <ItemGroup>
         <Reference Include="FSharp.Core">
           <HintPath>..\..\packages\FSharp.Core\lib\net40\FSharp.Core.dll</HintPath>
-          <Private>True</Private>
-          <Paket>True</Paket>
-        </Reference>
-      </ItemGroup>
-    </When>
-  </Choose>
-  <Choose>
-    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
-      <ItemGroup>
-        <Reference Include="FsPickler">
-          <HintPath>..\..\packages\FsPickler\lib\net45\FsPickler.dll</HintPath>
           <Private>True</Private>
           <Paket>True</Paket>
         </Reference>

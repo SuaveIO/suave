@@ -125,21 +125,22 @@ let startTcpIpServerAsync (bufferSize  : int, maxConcurrentOps : int)
   let job (acceptArgs : SocketAsyncEventArgs) = async {
     let intern = Log.intern logger "Suave.Tcp.tcpIpServer.job"
     let socket = acceptArgs.AcceptSocket
-    let ipaddr = (socket.RemoteEndPoint :?> IPEndPoint).Address
+    let rme    = (socket.RemoteEndPoint :?> IPEndPoint)
+    let ipAddr, port = rme.Address, uint16 rme.Port
     Interlocked.Increment Globals.numberOfClients |> ignore
 
-    Log.internf logger "Suave.Tcp.tcpIpServer.job" (fun fmt -> fmt "%O connected, total: %d clients" ipaddr !Globals.numberOfClients)
+    Log.internf logger "Suave.Tcp.tcpIpServer.job" (fun fmt -> fmt "%O connected, total: %d clients" ipAddr !Globals.numberOfClients)
 
     try
       try
         let readArgs = b.Pop()
         let writeArgs = c.Pop()
         let connection =
-          { ipaddr       = ipaddr
-            transport    = { socket = socket; readArgs = readArgs; writeArgs = writeArgs}
+          { socketBinding = binding
+            transport     = { socket = socket; readArgs = readArgs; writeArgs = writeArgs}
             bufferManager = bufferManager
-            lineBuffer  = bufferManager.PopBuffer "Suave.Tcp.tcpIpServer.job" // buf allocate
-            segments     = []
+            lineBuffer    = bufferManager.PopBuffer "Suave.Tcp.tcpIpServer.job"
+            segments      = []
           }
         use! oo = Async.OnCancel (fun () -> intern "disconnected client (async cancel)"
                                             shutdownSocket socket)
@@ -162,7 +163,7 @@ let startTcpIpServerAsync (bufferSize  : int, maxConcurrentOps : int)
                      "tcp request processing failed"
     finally
       Interlocked.Decrement(Globals.numberOfClients) |> ignore
-      Log.internf logger "Suave.Tcp.tcpIpServer.job" (fun fmt -> fmt "%O disconnected, total: %d clients" ipaddr !Globals.numberOfClients)
+      Log.internf logger "Suave.Tcp.tcpIpServer.job" (fun fmt -> fmt "%O disconnected, total: %d clients" ipAddr !Globals.numberOfClients)
   }
 
   // start a new async worker for each accepted TCP client

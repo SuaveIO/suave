@@ -60,6 +60,27 @@ let mimeTypes =
   Writers.defaultMimeTypesMap
     >=> (function | ".avi" -> Writers.mkMimeType "video/avi" false | _ -> None)
 
+module OwinSample =
+  open System.Collections.Generic
+  open Suave.Owin
+
+  let app : WebPart =
+    let owinApp (env : OwinEnvironment) =
+      let hello = "Hello, OWIN!"B
+
+      // NOTE: this is the default, per HTTP, and should not be necessary.
+      env.[OwinConstants.responseStatusCode] <- box 200
+
+      let responseHeaders : IDictionary<string, string[]> = unbox env.[OwinConstants.responseHeaders]
+      responseHeaders.["Content-Type"] <- [| "text/plain" |]
+      responseHeaders.["Content-Length"] <- [| string hello.Length |]
+
+      let responseStream : IO.Stream = unbox env.[OwinConstants.responseBody]
+      responseStream.Write(hello, 0, hello.Length)
+      async.Return ()
+
+    OwinApp.ofApp "/" owinApp
+
 let app =
   choose [
     GET >>= path "/hello" >>= never
@@ -87,6 +108,11 @@ let app =
           | None ->
             store.set "counter" 1
             >>= OK "First time")
+    GET
+      >>= path "/owin"
+      >>= Writers.setHeader "X-Custom-Before" "Before OWIN"
+      >>= OwinSample.app
+      >>= Writers.setHeader "X-Custom-After" "After OWIN"
     basicAuth <| choose [ // from here on it will require authentication
         // surf to: http://localhost:8082/es.html to view the ES
         GET >>= path "/events2" >>= request (fun _ -> EventSource.handShake (fun out ->
@@ -97,7 +123,6 @@ let app =
             do! msg |> send out
           }))
         GET >>= path "/events" >>= request (fun r -> EventSource.handShake (CounterDemo.counterDemo r))
-
         GET >>= browseHome //serves file if exists
         GET >>= dirHome //show directory listing
         HEAD >>= path "/head" >>= sleep 100 "Nice sleep .."
@@ -121,7 +146,8 @@ let app =
           >>= path "/custom_header"
           >>= setHeader "X-Doge-Location" "http://www.elregalista.com/wp-content/uploads/2014/02/46263312.jpg"
           >>= OK "Doooooge"
-        RequestErrors.NOT_FOUND "Found no handlers" ]
+        RequestErrors.NOT_FOUND "Found no handlers"
+      ]
     ] >>= log logger logFormat
 
 (*open Suave.OpenSSL
