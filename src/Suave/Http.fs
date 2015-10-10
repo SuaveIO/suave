@@ -112,7 +112,7 @@ module Http =
       { ctx with response = { ctx.response with headers = (key, value) :: (ctx.response.headers |> List.filter (fun (k,_) -> k <> key))  } }
       |> succeed
 
-    let putHeader key value (ctx : HttpContext) =
+    let addHeader key value (ctx : HttpContext) =
       { ctx with response = { ctx.response with headers = List.append ctx.response.headers [key, value] } }
       |> succeed
 

@@ -102,10 +102,10 @@ let headers =
           , ["X-Custom-Header", "third"]
           , hdrs |> List.filter (fun (n,_) -> n = "X-Custom-Header"))) ctx
 
-    testCase "putHeader adds header and preserve order" <| fun _ ->
+    testCase "addHeader adds header and preserve order" <| fun _ ->
       let ctx = runWithConfig (
-                  Writers.putHeader "X-Custom-Header" "first"
-                  >>= Writers.putHeader "X-Custom-Header" "second"
+                  Writers.addHeader "X-Custom-Header" "first"
+                  >>= Writers.addHeader "X-Custom-Header" "second"
                   >>= OK "test")
       withContext (fun _ ->
         let hdrs = requestHeaders ()
