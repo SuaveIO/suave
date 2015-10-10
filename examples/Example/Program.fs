@@ -79,7 +79,7 @@ module OwinSample =
       responseStream.Write(hello, 0, hello.Length)
       async.Return ()
 
-    OwinApp.ofApp owinApp
+    OwinApp.ofApp "/" owinApp
 
 let app =
   choose [
@@ -113,41 +113,41 @@ let app =
       >>= Writers.setHeader "X-Custom-Before" "Before OWIN"
       >>= OwinSample.app
       >>= Writers.setHeader "X-Custom-After" "After OWIN"
-    basicAuth // from here on it will require authentication
-    // surf to: http://localhost:8082/es.html to view the ES
-    GET >>= path "/events2" >>= request (fun _ -> EventSource.handShake (fun out ->
-      socket {
-        let msg = { id = "1"; data = "First Message"; ``type`` = None }
-        do! msg |> send out
-        let msg = { id = "2"; data = "Second Message"; ``type`` = None }
-        do! msg |> send out
-      }))
-    GET >>= path "/events" >>= request (fun r -> EventSource.handShake (CounterDemo.counterDemo r))
-
-    GET >>= browseHome //serves file if exists
-    GET >>= dirHome //show directory listing
-    HEAD >>= path "/head" >>= sleep 100 "Nice sleep .."
-    POST >>= path "/upload" >>= OK "Upload successful."
-    POST >>= path "/i18nforms" >>= request (fun r ->
-      sprintf """
-      ödlan: %A
-      小: %A
-      """ (r.formData "ödlan") (r.formData "小")
-      |> OK >>= Writers.setMimeType "text/plain"
-    )
-    PUT >>= path "/upload2"
-      >>= request (fun x ->
-         let files =
-           x.files 
-           |> Seq.map (fun y -> sprintf "(%s, %s, %s)" y.fileName y.mimeType y.tempFilePath)
-           |> String.concat "<br/>"
-         OK (sprintf "Upload successful.<br>POST data: %A<br>Uploaded files (%d): %s" x.multiPartFields (List.length x.files) files))
-    POST >>= request (fun x -> OK (sprintf "POST data: %s" (System.Text.Encoding.ASCII.GetString x.rawForm)))
-    GET
-      >>= path "/custom_header"
-      >>= setHeader "X-Doge-Location" "http://www.elregalista.com/wp-content/uploads/2014/02/46263312.jpg"
-      >>= OK "Doooooge"
-    RequestErrors.NOT_FOUND "Found no handlers"
+    basicAuth <| choose [ // from here on it will require authentication
+        // surf to: http://localhost:8082/es.html to view the ES
+        GET >>= path "/events2" >>= request (fun _ -> EventSource.handShake (fun out ->
+          socket {
+            let msg = { id = "1"; data = "First Message"; ``type`` = None }
+            do! msg |> send out
+            let msg = { id = "2"; data = "Second Message"; ``type`` = None }
+            do! msg |> send out
+          }))
+        GET >>= path "/events" >>= request (fun r -> EventSource.handShake (CounterDemo.counterDemo r))
+        GET >>= browseHome //serves file if exists
+        GET >>= dirHome //show directory listing
+        HEAD >>= path "/head" >>= sleep 100 "Nice sleep .."
+        POST >>= path "/upload" >>= OK "Upload successful."
+        POST >>= path "/i18nforms" >>= request (fun r ->
+          sprintf """
+          ödlan: %A
+          小: %A
+          """ (r.formData "ödlan") (r.formData "小")
+          |> OK >>= Writers.setMimeType "text/plain"
+        )
+        PUT >>= path "/upload2"
+          >>= request (fun x ->
+             let files =
+               x.files 
+               |> Seq.map (fun y -> sprintf "(%s, %s, %s)" y.fileName y.mimeType y.tempFilePath)
+               |> String.concat "<br/>"
+             OK (sprintf "Upload successful.<br>POST data: %A<br>Uploaded files (%d): %s" x.multiPartFields (List.length x.files) files))
+        POST >>= request (fun x -> OK (sprintf "POST data: %s" (System.Text.Encoding.ASCII.GetString x.rawForm)))
+        GET
+          >>= path "/custom_header"
+          >>= setHeader "X-Doge-Location" "http://www.elregalista.com/wp-content/uploads/2014/02/46263312.jpg"
+          >>= OK "Doooooge"
+        RequestErrors.NOT_FOUND "Found no handlers"
+      ]
     ] >>= log logger logFormat
 
 (*open Suave.OpenSSL

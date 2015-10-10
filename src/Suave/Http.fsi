@@ -91,8 +91,11 @@ module Http =
   /// Functions have signature f :: params... -> HttpContext -> HttpContext.
   module Writers =
 
-    /// Sets a header with the key and value specified
+    /// Ensures that the key header has the given value
     val setHeader : key:string -> value:string -> WebPart
+
+    /// Adds the header key with the given value to the list of returned headers, even if that header already exists
+    val addHeader : key:string -> value:string -> WebPart
 
     /// Sets a user data key-value pair with the key and value specified. Downstream
     /// web parts can read this.
@@ -1566,7 +1569,7 @@ module Http =
     /// </para></summary>
     /// <remarks>
     /// </remarks>
-    val authenticateBasic : f:(string * string -> bool) -> WebPart
+    val authenticateBasic : f:(string * string -> bool) -> protectedPart:WebPart -> WebPart
 
   module Control =
 

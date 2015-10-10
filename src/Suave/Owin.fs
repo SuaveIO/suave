@@ -726,7 +726,7 @@ module OwinApp =
         (cts :> IDisposable).Dispose()
 
   [<CompiledName "OfApp">]
-  let ofApp (owin : OwinApp) : WebPart =
+  let ofApp requestPathBase (owin : OwinApp) : WebPart =
     fun (ctx : HttpContext) ->
       let verbose f =
         ctx.runtime.logger.Log LogLevel.Verbose (
@@ -762,12 +762,14 @@ module OwinApp =
       |> succeed
 
   [<CompiledName "OfAppFunc">]
-  let ofAppFunc (owin : OwinAppFunc) =
-    ofApp (fun e -> Async.AwaitTask ((owin.Invoke e).ContinueWith<_>(fun x -> ())))
+  let ofAppFunc requestPathBase (owin : OwinAppFunc) =
+    ofApp requestPathBase
+          (fun e -> Async.AwaitTask ((owin.Invoke e).ContinueWith<_>(fun x -> ())))
 
   [<CompiledName "OfMidFunc">]
-  let ofMidFunc (owin : OwinMidFunc) =
-    ofAppFunc (owin.Invoke(fun _ -> new Task(fun x -> ())))
+  let ofMidFunc requestPathBase (owin : OwinMidFunc) =
+    ofAppFunc requestPathBase
+              (owin.Invoke(fun _ -> new Task(fun x -> ())))
 
 module OwinServerFactory =
 
@@ -832,7 +834,7 @@ module OwinServerFactory =
           cancellationToken = serverCts.Token }
 
     let started, listening =
-      Web.startWebServerAsync conf (OwinApp.ofAppFunc app)
+      Web.startWebServerAsync conf (OwinApp.ofAppFunc "/" app)
 
     let _ = started |> Async.RunSynchronously
 

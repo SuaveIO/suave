@@ -39,7 +39,7 @@ module SelfHostedServer =
     let app =
       let root = ".."
       SiteletMiddleware<_>.AsMidFunc(Options.Create(root), SampleSite.MySampleWebsite)
-      |> Suave.Owin.OwinApp.ofMidFunc
+      |> Suave.Owin.OwinApp.ofMidFunc "/"
 
     let config =
       { defaultConfig with
