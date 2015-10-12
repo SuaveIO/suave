@@ -61,6 +61,9 @@ type uv_close_cb  = delegate of IntPtr -> unit
 [<UnmanagedFunctionPointer(CallingConvention.Cdecl)>]
 type uv_handle_cb  = delegate of IntPtr -> unit
 
+[<UnmanagedFunctionPointer(CallingConvention.Cdecl)>]
+type uv_walk_cb  = delegate of IntPtr * IntPtr -> unit
+
 [<DllImport("libuv.dll", CallingConvention = CallingConvention.Cdecl)>]
 extern int uv_tcp_init(IntPtr loop, IntPtr handle)
 
@@ -186,3 +189,6 @@ extern int uv_async_init(IntPtr loop, IntPtr handle, uv_handle_cb callback)
 
 [<DllImport("libuv.dll", CallingConvention = CallingConvention.Cdecl)>]
 extern int uv_async_send(IntPtr handle);
+
+[<DllImport("libuv.dll", CallingConvention = CallingConvention.Cdecl)>]
+extern void uv_walk(IntPtr loop, uv_walk_cb cb, IntPtr arg);
