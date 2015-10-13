@@ -74,12 +74,10 @@ type ReadOp() =
         this.ok (Choice1Of2 nread)
 
   member this.alloc_buffer ((_ : IntPtr), (suggested_size: int), ([<Out>] buff : byref<uv_buf_t>)) =
-    Console.WriteLine "alloc_buffer"
     buff.``base`` <- Marshal.UnsafeAddrOfPinnedArrayElement(this.buf.Array,this.buf.Offset)
     buff.len <- IntPtr(this.buf.Count)
 
   member this.uv_read_start cn buf ok =
-    Console.WriteLine "uv_read_start"
     this.buf <- buf
     this.ok <- ok
     uv_read_start(cn, this.uv_alloc_cb, this.uv_read_cb) |> checkStatus
