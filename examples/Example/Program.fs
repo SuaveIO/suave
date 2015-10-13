@@ -98,8 +98,13 @@ let app =
     path "/session"
       >>= statefulForSession // Session.State.CookieStateStore
       >>= context (fun x ->
-        match x |> HttpContext.state with
-        | None -> Redirection.FOUND "/session" // restarted server without keeping the key; set key manually?
+        match HttpContext.state x with
+        | None ->
+          // restarted server without keeping the key; set key manually?
+          let msg = "Server Key, Cookie Serialiser reset, or Cookie Data Corrupt, "
+                    + "if you refresh the browser page, you'll have gotten a new cookie."
+          OK msg
+
         | Some store ->
           match store.get "counter" with
           | Some y ->
