@@ -112,6 +112,8 @@ let job logger (serveClient : TcpWorker<unit>) ipaddr (transport : ITransport) (
           segments     = []
         }
   try
+    use! oo = Async.OnCancel (fun () -> intern "disconnected client (async cancel)"
+                                        Async.RunSynchronously shutdownTransport)
     do! serveClient connection
   with 
     | :? System.IO.EndOfStreamException ->
