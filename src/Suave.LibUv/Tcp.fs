@@ -15,6 +15,10 @@ let createHandle size : Handle =
 let destroyHandle (handle : Handle) =
   Marshal.FreeCoTaskMem handle
 
+let checkStatus(s : int) =
+    if s < 0 then
+      failwith (new string (uv_strerror(s)))
+
 open System.Threading
 open System.Threading.Tasks
 open System.Collections.Concurrent
@@ -41,7 +45,7 @@ type SingleThreadSynchronizationContext(loop,runOnThisThreadHandler) =
 
   member this.Init() =
     this.uv_handle_cb <- uv_handle_cb(this.RunOnCurrentThread)
-    uv_async_init(loop,runOnThisThreadHandler,this.uv_handle_cb) |> ignore
+    uv_async_init(loop,runOnThisThreadHandler,this.uv_handle_cb) |> checkStatus
 
 open Suave.Sockets
 open Suave.Utils.Async
@@ -52,29 +56,37 @@ type ReadOp() =
   [<DefaultValue>] val mutable ok : Choice<int,Error> -> unit
   [<DefaultValue>] val mutable uv_alloc_cb : uv_alloc_cb
   [<DefaultValue>] val mutable uv_read_cb : uv_read_cb
+  [<DefaultValue>] val mutable pin : GCHandle
+  [<DefaultValue>] val mutable pin1 : GCHandle
 
   member this.end_read ((client : IntPtr), (nread : int), (buff : byref<uv_buf_t>)) =
-    let h = uv_read_stop(client)
 
     if (nread < 0) then
       if (nread <> UV_EOF) then
-        let err = new string(uv_err_name(nread))
-        this.ok (Choice2Of2 <| ConnectionError err)
+        this.ok (Choice2Of2 <| ConnectionError (new string(uv_err_name(nread))))
       else
         this.ok (Choice2Of2 <| ConnectionError("eof"))
     else
-      this.ok (Choice1Of2 nread)
+      let s = uv_read_stop(client)
+      if (s < 0) then
+        this.ok (Choice2Of2 <| ConnectionError (new string(uv_err_name(s))))
+      else
+        this.ok (Choice1Of2 nread)
 
   member this.alloc_buffer ((_ : IntPtr), (suggested_size: int), ([<Out>] buff : byref<uv_buf_t>)) =
+    Console.WriteLine "alloc_buffer"
     buff.``base`` <- Marshal.UnsafeAddrOfPinnedArrayElement(this.buf.Array,this.buf.Offset)
-    buff.len <- this.buf.Count
+    buff.len <- IntPtr(this.buf.Count)
 
   member this.uv_read_start cn buf ok =
+    Console.WriteLine "uv_read_start"
     this.buf <- buf
     this.ok <- ok
-    uv_read_start(cn, this.uv_alloc_cb, this.uv_read_cb) |> ignore
+    uv_read_start(cn, this.uv_alloc_cb, this.uv_read_cb) |> checkStatus
 
   member this.Initialize() =
+    this.pin <- GCHandle.Alloc(this, GCHandleType.Pinned)
+    this.pin1 <- GCHandle.Alloc(this.buf, GCHandleType.Pinned)
     this.uv_alloc_cb <- uv_alloc_cb(fun a b c -> this.alloc_buffer(a, b, &c))
     this.uv_read_cb <- uv_read_cb(fun a b c -> this.end_read (a, b, &c))
 
@@ -99,10 +111,9 @@ type WriteOp() =
   member this.uv_write cn (buf : ArraySegment<byte>) ok =
     this.ok <- ok
     this.wrbuffArray.[0].``base`` <- Marshal.UnsafeAddrOfPinnedArrayElement(buf.Array,buf.Offset)
-    this.wrbuffArray.[0].len <- buf.Count
+    this.wrbuffArray.[0].len <- IntPtr(buf.Count)
     let request = Marshal.AllocCoTaskMem(uv_req_size(uv_request_type.UV_WRITE))
-    uv_write(request, cn, this.wrbuffArray, 1, this.uv_write_cb )
-    |> ignore
+    uv_write(request, cn, this.wrbuffArray, 1, this.uv_write_cb ) |> checkStatus
 
 type OperationPair = ReadOp*WriteOp
 
@@ -125,7 +136,7 @@ type LibUvTransport(pool : ConcurrentPool<OperationPair>,loop : IntPtr,client : 
 
   member this.uv_close cont =
     this.cont <- cont
-    uv_close(client, this.uv_close_cb) |> ignore
+    uv_close(client, this.uv_close_cb)
 
   member this.initialize() =
     this.pin <- GCHandle.Alloc(this, GCHandleType.Normal)
@@ -197,7 +208,7 @@ type LibUvSocket(pool : ConcurrentPool<OperationPair>,logger, serveClient, ip, l
 
       let client = createHandle <| uv_handle_size(uv_handle_type.UV_TCP)
 
-      let _ = uv_tcp_init(loop, client)
+      uv_tcp_init(loop, client) |> checkStatus
 
       if (uv_accept(server, client) = 0) then
         let transport = new LibUvTransport(pool,loop,client,this.synchronizationContext,logger)
@@ -227,7 +238,7 @@ type LibUvSocket(pool : ConcurrentPool<OperationPair>,logger, serveClient, ip, l
           ``exception`` = None
           tsUTCTicks    = Globals.utcNow().Ticks }
 
-    let _ = uv_run(loop, UV_RUN_DEFAULT)
+    uv_run(loop, UV_RUN_DEFAULT) |> checkStatus
     let x = uv_loop_close(loop)
     Log.info logger "LibUvServer.destroyServerCallback" TraceHeader.empty ("uv_loop_close returned: " + x.ToString())
     assert(x = 0)
@@ -260,9 +271,9 @@ type LibUvServer(maxConcurrentOps,bufferManager,logger : Logger, binding, startD
     Thread.BeginThreadAffinity()
     this.initLoop()
     try
-      let _ = uv_tcp_init(loop, server)
-      let _ = uv_ip4_addr(ip, port, &addr)
-      let _ = uv_tcp_bind(server, &addr, 0)
+      uv_tcp_init(loop, server) |> checkStatus
+      uv_ip4_addr(ip, port, &addr) |> checkStatus
+      uv_tcp_bind(server, &addr, 0) |> checkStatus
       let s = new LibUvSocket(opsPool,logger, serveClient, binding.ip, loop, bufferManager, startData, acceptingConnections,synchronizationContextCallback)
       s.Initialize()
       s.run(server)
@@ -277,7 +288,7 @@ type LibUvServer(maxConcurrentOps,bufferManager,logger : Logger, binding, startD
     Marshal.FreeCoTaskMem handle
 
   member this.closeHandler (handle : IntPtr) (arg : IntPtr) =
-    uv_close(handle,uv_close_cb(this.closeHandlerCallback)) |> ignore
+    uv_close(handle,uv_close_cb(this.closeHandlerCallback))
 
   member this.uv_stop_loop (_ : IntPtr) =
     Log.info logger "LibUvServer.uv_stop_loop" TraceHeader.empty "-->"
@@ -286,18 +297,19 @@ type LibUvServer(maxConcurrentOps,bufferManager,logger : Logger, binding, startD
 
   member this.init() = 
     this.thread <- new Thread(this.run)
+    this.thread.Name <- "LibUvLoop"
     this.uv_async_stop_loop_cb <- uv_handle_cb(this.uv_stop_loop)
 
   member this.initLoop () =
-    let _ = uv_loop_init(loop)
-    uv_async_init(loop, stopLoopCallback, this.uv_async_stop_loop_cb) |> ignore
+    uv_loop_init(loop) |> checkStatus
+    uv_async_init(loop, stopLoopCallback, this.uv_async_stop_loop_cb) |> checkStatus
 
   member this.start() = 
     this.thread.Start()
 
   member this.stopLoop() =
     Log.info logger "LibUvServer.stopLoop" TraceHeader.empty "-->"
-    uv_async_send (stopLoopCallback) |> ignore
+    uv_async_send (stopLoopCallback) |> checkStatus
     closeEvent.WaitOne() |> ignore
 
     Log.info logger "LibUvServer.stopLoop" TraceHeader.empty "<--"

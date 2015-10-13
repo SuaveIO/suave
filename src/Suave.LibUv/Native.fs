@@ -40,7 +40,7 @@ type sockaddr_in6 =
 type uv_buf_t =
   struct
     val mutable ``base`` : IntPtr // pointer to bytes
-    val mutable len  : int
+    val mutable len      : IntPtr
   end
 
 [<UnmanagedFunctionPointer(CallingConvention.Cdecl)>]
