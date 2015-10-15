@@ -11,6 +11,4 @@ let main args =
   let defaultConfig = { defaultConfig with logger = Loggers.saneDefaultsFor LogLevel.Warn}
   defaultMainThisAssemblyWithParam defaultConfig args |> ignore
 
-  // NOTE: To test LibUv uncomment the following statement
-  //defaultMainThisAssemblyWithParam { defaultConfig with tcpServerFactory = Suave.LibUv.Tcp.LibUvServerFactory() } args
-  0
+  defaultMainThisAssemblyWithParam { defaultConfig with tcpServerFactory = Suave.LibUv.Tcp.LibUvServerFactory() } args
