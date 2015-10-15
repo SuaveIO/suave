@@ -1,0 +1,10 @@
+version: 1.0.{build}
+build_script:
+- cmd: >-
+    gem sources -r https://rubygems.org/
+
+    gem install bundler --no-ri --no-rdoc --source http://rubygems.org/
+
+    bundle install
+
+    bundle exec rake
