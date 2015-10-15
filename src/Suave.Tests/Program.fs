@@ -13,3 +13,4 @@ let main args =
 
   // NOTE: To test LibUv uncomment the following statement
   //defaultMainThisAssemblyWithParam { defaultConfig with tcpServerFactory = Suave.LibUv.Tcp.LibUvServerFactory() } args
+  0
