@@ -16,7 +16,7 @@ open Suave.Tests.TestUtilities
 open Suave.Testing
 
 [<Tests>]
-let ``canonicalization attacks`` =
+let ``canonicalization attacks`` (_: SuaveConfig) =
   testList "canonicalization attacks" [
     testCase "should throw" <| fun _ ->
       Assert.Raise("'../../passwd' is not a valid path",
@@ -25,8 +25,8 @@ let ``canonicalization attacks`` =
   ]
 
 [<Tests>]
-let compression =
-  let runWithConfig = runWith defaultConfig
+let compression cfg =
+  let runWithConfig = runWith cfg
 
   let testFileSize = (new FileInfo(Path.Combine(currentPath,"test-text-file.txt"))).Length
 
@@ -49,8 +49,8 @@ let compression =
     ]
 
 [<Tests>]
-let ``http HEAD method`` =
-  let runWithConfig = runWith defaultConfig
+let ``http HEAD method`` cfg =
+  let runWithConfig = runWith cfg
 
   testList "HEAD on `file`" [
 

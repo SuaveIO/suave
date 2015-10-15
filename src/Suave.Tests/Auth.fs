@@ -20,8 +20,6 @@ open Suave.Http.RequestErrors
 
 open Suave.Testing
 
-let runWithConfig = runWith { defaultConfig with logger = Loggers.saneDefaultsFor LogLevel.Warn }
-
 type Assert with
   static member Null (msg : string, o : obj) =
     if o <> null then Tests.failtest msg
@@ -89,7 +87,8 @@ let sessionState f =
     | Some store -> f store )
 
 [<Tests>]
-let tests =
+let tests cfg =
+  let runWithConfig = runWith { cfg with logger = Loggers.saneDefaultsFor LogLevel.Warn }
   testList "auth tests" [
     testCase "baseline, no auth cookie" <| fun _ ->
       let ctx = runWithConfig (OK "ACK")

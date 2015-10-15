@@ -1,7 +1,12 @@
 module Suave.Tests.Program
 
-open Fuchu
+open Suave.Types
+open Suave.Web
+open Suave.Logging
+
+open FuchuExtensions
 
 [<EntryPoint>]
 let main args =
-  defaultMainThisAssembly args
+  let defaultConfig = { defaultConfig with logger = Loggers.saneDefaultsFor LogLevel.Warn}
+  defaultMainThisAssemblyWithParam defaultConfig args |> ignore

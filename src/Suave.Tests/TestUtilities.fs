@@ -37,10 +37,6 @@ let readBytes relativePath =
 let openRead relativePath =
   File.OpenRead (Path.Combine(currentPath, relativePath))
 
-let defaultConfig =
-  { defaultConfig with
-      logger = Loggers.saneDefaultsFor LogLevel.Warn }
-
 type Assert with
   static member StreamsEqual(msg, s1 : Stream, s2 : Stream) =
     let buf = Array.zeroCreate<byte> 2

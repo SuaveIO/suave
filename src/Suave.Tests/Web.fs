@@ -2,13 +2,14 @@
 
 open Fuchu
 
+open Suave.Types
 open Suave.Web.ParsingAndControl
 open Suave.Logging
 
 let private (=>) a b = a, b
 
 [<Tests>]
-let parsing_tests =
+let parsing_tests (_: SuaveConfig) =
   testList "when parsing headers for tracing" [
     // https://github.com/twitter/zipkin/blob/master/doc/collector-api.md#http
     // Parsing these headers are as good as anything, we don't have to use ZipKin

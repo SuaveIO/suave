@@ -31,13 +31,13 @@ type SuavePerfHarness(name, suaveConfig) =
   member x.Serve part = suaveConfig part
 
 [<Tests>]
-let perfTests =
+let perfTests cfg =
   let inline iterate times (testF : unit -> unit) =
     for i = 1 to times do testF ()
 
   let get = function Choice1Of2 x -> x | _ -> failwith "couldn't get it"
     
-  let serverFactory = SuavePerfHarness("default config", runWith defaultConfig)
+  let serverFactory = SuavePerfHarness("default config", runWith cfg)
 
   let getFormValue name =
     request (fun x -> OK (x.formData name |> get))

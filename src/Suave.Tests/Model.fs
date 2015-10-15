@@ -20,8 +20,8 @@ open Suave.Tests.TestUtilities
 open Suave.Testing
 
 [<Tests>]
-let tests =
-  let runWithConfig = runWith defaultConfig
+let tests cfg =
+  let runWithConfig = runWith cfg
 
   let postData3 = readText "request-2.txt"
   

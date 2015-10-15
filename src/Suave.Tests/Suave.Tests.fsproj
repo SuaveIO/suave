@@ -81,6 +81,7 @@
     <Compile Include="Types.fs" />
     <Compile Include="WebSocket.fs" />
     <Compile Include="Razor.fs" />
+    <Compile Include="FuchuExtensions.fs" />
     <Compile Include="Program.fs" />
     <None Include="paket.references" />
     <None Include="suave.p12">
@@ -125,8 +126,7 @@
     <Reference Include="System.Runtime.Serialization" />
     <ProjectReference Include="..\Suave.Razor\Suave.Razor.fsproj">
       <Name>Suave.Razor</Name>
-      <Project>{c1dc691b-1019-4a15-aa17-0c5cb0e0909c}</Project>
-      <Private>True</Private>
+      <Project>{C1DC691B-1019-4A15-AA17-0C5CB0E0909C}</Project>
     </ProjectReference>
     <ProjectReference Include="..\Suave.Testing\Suave.Testing.fsproj">
       <Project>{4BB79AAC-0D6D-4E0E-BB6E-8F61B3C6D99C}</Project>
@@ -135,6 +135,10 @@
     <ProjectReference Include="..\Suave\Suave.fsproj">
       <Project>{3DC9193E-BD0C-4486-9C58-56B630C36623}</Project>
       <Name>Suave</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\Suave.LibUv\Suave.LibUv.fsproj">
+      <Project>{7C787110-A146-4021-8163-40137E325DB4}</Project>
+      <Name>Suave.LibUv</Name>
     </ProjectReference>
   </ItemGroup>
   <Choose>

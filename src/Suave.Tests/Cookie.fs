@@ -11,7 +11,7 @@ open FsCheck
 open Tests.TestUtilities
 
 [<Tests>]
-let parseResultCookie =
+let parseResultCookie (_:SuaveConfig) =
   testList "parse result cookie" [
     testCase "parse path" <| fun _ ->
       let sample = @"st=oFqpYxbMObHvpEW!QLzedHwSZ1gZnotBs$; Path=/; HttpOnly"
@@ -58,7 +58,7 @@ let parseResultCookie =
     ]
 
 [<Tests>]
-let parseRequestCookies =
+let parseRequestCookies (_ : SuaveConfig) =
     testList "parse request cookies" [
       testCase "parse valid cookies" <| fun _ ->
         let sample = "session=2b14f6a69199243f570031bf94865bb6;abc=123"
