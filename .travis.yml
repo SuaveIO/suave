@@ -9,10 +9,8 @@ env:
 before_install:
  - wget "http://download.mono-project.com/archive/${MONO_VERSION}/macos-10-x86/MonoFramework-MDK-${MONO_VERSION}.macos10.xamarin.x86.pkg"
  - sudo installer -pkg "MonoFramework-MDK-${MONO_VERSION}.macos10.xamarin.x86.pkg" -target /
- - wget https://github.com/libuv/libuv/archive/v1.7.5.tar.gz
- - tar -xzvf v1.7.5.tar.gz
- - cd libuv-1.7.5 && sh autogen.sh && ./configure --prefix=/usr && make && sudo make install
- - export LD_LIBRARY_PATH="/usr/lib"
+ - brew update
+ - brew install libuv
 
 script:
  - bundle install
