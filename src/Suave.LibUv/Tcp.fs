@@ -56,8 +56,6 @@ type ReadOp() =
   [<DefaultValue>] val mutable ok : Choice<int,Error> -> unit
   [<DefaultValue>] val mutable uv_alloc_cb : uv_alloc_cb
   [<DefaultValue>] val mutable uv_read_cb : uv_read_cb
-  [<DefaultValue>] val mutable pin : GCHandle
-  [<DefaultValue>] val mutable pin1 : GCHandle
 
   member this.end_read ((client : IntPtr), (nread : int), (buff : byref<uv_buf_t>)) =
 
@@ -83,8 +81,6 @@ type ReadOp() =
     uv_read_start(cn, this.uv_alloc_cb, this.uv_read_cb) |> checkStatus
 
   member this.Initialize() =
-    this.pin <- GCHandle.Alloc(this, GCHandleType.Pinned)
-    this.pin1 <- GCHandle.Alloc(this.buf, GCHandleType.Pinned)
     this.uv_alloc_cb <- uv_alloc_cb(fun a b c -> this.alloc_buffer(a, b, &c))
     this.uv_read_cb <- uv_read_cb(fun a b c -> this.end_read (a, b, &c))
 
@@ -120,7 +116,6 @@ open Suave.Logging
 type LibUvTransport(pool : ConcurrentPool<OperationPair>,loop : IntPtr,client : Handle, synchronizationContext : SingleThreadSynchronizationContext,logger : Logger) =
 
   [<DefaultValue>] val mutable uv_close_cb : uv_close_cb
-  [<DefaultValue>] val mutable pin : GCHandle
   [<DefaultValue>] val mutable cont : unit -> unit
 
   let (readOp,writeOp) = pool.Pop()
@@ -129,7 +124,6 @@ type LibUvTransport(pool : ConcurrentPool<OperationPair>,loop : IntPtr,client : 
   member this.uv_close_callback _ =
     destroyHandle client
     pool.Push (readOp,writeOp)
-    this.pin.Free()
     this.cont ()
 
   member this.uv_close cont =
@@ -137,7 +131,6 @@ type LibUvTransport(pool : ConcurrentPool<OperationPair>,loop : IntPtr,client : 
     uv_close(client, this.uv_close_cb)
 
   member this.initialize() =
-    this.pin <- GCHandle.Alloc(this, GCHandleType.Normal)
     this.uv_close_cb <- uv_close_cb(this.uv_close_callback)
 
   member this.shutdown() =
