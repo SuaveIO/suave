@@ -1,4 +1,9 @@
 version: 1.0.{build}
+
+install:
+ - ps: (new-object net.webclient).DownloadFile('https://github.com/libuv/libuv/archive/v1.7.5.zip', 'v1.7.5.zip')
+ - cmd: 7z x v1.7.5.zip & cd libuv-1.7.5 & vcbuild.bat
+ 
 build_script:
 - cmd: >-
     gem sources -r https://rubygems.org/
