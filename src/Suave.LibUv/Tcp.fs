@@ -252,6 +252,10 @@ type LibUvServer(maxConcurrentOps,bufferManager,logger : Logger, binding, startD
 
   [<DefaultValue>] val mutable thread : Thread
   [<DefaultValue>] val mutable uv_async_stop_loop_cb : uv_handle_cb
+  [<DefaultValue>] val mutable uv_close_cb_destroy : uv_close_cb
+  [<DefaultValue>] val mutable uv_close_cb_thread  : uv_close_cb
+  [<DefaultValue>] val mutable uv_close_cb_loop    : uv_close_cb
+  [<DefaultValue>] val mutable uv_walk_cb          : uv_walk_cb
 
   let mutable addr = sockaddr_in( a = 0L, b= 0L, c = 0L, d = 0L)
 
@@ -299,7 +303,11 @@ type LibUvServer(maxConcurrentOps,bufferManager,logger : Logger, binding, startD
   member this.init() = 
     this.thread <- new Thread(this.run)
     this.thread.Name <- "LibUvLoop"
+    this.uv_close_cb_destroy <- uv_close_cb(this.destroyServerCallback)
+    this.uv_close_cb_thread  <- uv_close_cb(this.destroyRunOnThisThreadCallback)
+    this.uv_close_cb_loop    <- uv_close_cb(this.destroyLoopCallback)
     this.uv_async_stop_loop_cb <- uv_handle_cb(this.uv_stop_loop)
+    this.uv_walk_cb <- uv_walk_cb(this.closeHandler)
 
   member this.initLoop () =
     uv_loop_init(loop) |> checkStatus
@@ -317,7 +325,7 @@ type LibUvServer(maxConcurrentOps,bufferManager,logger : Logger, binding, startD
 
   member private this.destroyServerCallback _ =
     Log.info logger "LibUvServer.destroyServerCallback" TraceHeader.empty "-->"
-    uv_walk(loop,uv_walk_cb(this.closeHandler), IntPtr.Zero)
+    uv_walk(loop,this.uv_walk_cb, IntPtr.Zero)
     destroyHandle server
     Log.info logger "LibUvServer.destroy" TraceHeader.empty "<--"
     closeEvent.Set() |> ignore
@@ -325,18 +333,18 @@ type LibUvServer(maxConcurrentOps,bufferManager,logger : Logger, binding, startD
   member private this.destroyRunOnThisThreadCallback _ =
     Log.info logger "LibUvServer.destroyRunOnThisThreadCallback" TraceHeader.empty "-->"
     destroyHandle synchronizationContextCallback
-    uv_close(server, uv_close_cb(this.destroyServerCallback))
+    uv_close(server, this.uv_close_cb_destroy)
     Log.info logger "LibUvServer.destroyRunOnThisThreadCallback" TraceHeader.empty "<--"
 
   member private this.destroyLoopCallback _ =
     Log.info logger "LibUvServer.destroyLoopCallback" TraceHeader.empty "-->"
     destroyHandle stopLoopCallback
-    uv_close(synchronizationContextCallback, uv_close_cb(this.destroyRunOnThisThreadCallback))
+    uv_close(synchronizationContextCallback, this.uv_close_cb_thread)
     Log.info logger "LibUvServer.destroyLoopCallback" TraceHeader.empty "<--"
 
   member this.destroy _ =
     Log.info logger "LibUvServer.destroy" TraceHeader.empty "-->"
-    uv_close(stopLoopCallback, uv_close_cb(this.destroyLoopCallback))
+    uv_close(stopLoopCallback, this.uv_close_cb_loop)
 
 let runServerLibUv logger maxConcurrentOps bufferSize (binding: SocketBinding) startData (acceptingConnections: AsyncResultCell<StartedData>) serveClient =
   let bufferManager = new BufferManager(bufferSize * (maxConcurrentOps + 1), bufferSize, logger)
