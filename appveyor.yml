@@ -13,3 +13,5 @@ build_script:
     bundle install
 
     bundle exec rake
+	
+test: off	
