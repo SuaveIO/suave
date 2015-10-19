@@ -50,6 +50,8 @@ type SingleThreadSynchronizationContext(loop,runOnThisThreadHandler) =
 open Suave.Sockets
 open Suave.Utils.Async
 
+let isWinNT = Environment.OSVersion.Platform = PlatformID.Win32NT
+
 type ReadOp() =
 
   [<DefaultValue>] val mutable buf : ArraySegment<byte>
@@ -72,8 +74,12 @@ type ReadOp() =
         this.ok (Choice1Of2 nread)
 
   member this.alloc_buffer ((_ : IntPtr), (suggested_size: int), ([<Out>] buff : byref<uv_buf_t>)) =
-    buff.``base`` <- Marshal.UnsafeAddrOfPinnedArrayElement(this.buf.Array,this.buf.Offset)
-    buff.len <- IntPtr(this.buf.Count)
+    if isWinNT then
+      buff.``base`` <- IntPtr(this.buf.Count)
+      buff.len <- Marshal.UnsafeAddrOfPinnedArrayElement(this.buf.Array,this.buf.Offset)
+    else
+      buff.``base`` <- Marshal.UnsafeAddrOfPinnedArrayElement(this.buf.Array,this.buf.Offset)
+      buff.len <- IntPtr(this.buf.Count)
 
   member this.uv_read_start cn buf ok =
     this.buf <- buf
@@ -104,8 +110,12 @@ type WriteOp() =
 
   member this.uv_write cn (buf : ArraySegment<byte>) ok =
     this.ok <- ok
-    this.wrbuffArray.[0].``base`` <- Marshal.UnsafeAddrOfPinnedArrayElement(buf.Array,buf.Offset)
-    this.wrbuffArray.[0].len <- IntPtr(buf.Count)
+    if isWinNT then
+      this.wrbuffArray.[0].``base`` <- IntPtr(buf.Count)
+      this.wrbuffArray.[0].len <- Marshal.UnsafeAddrOfPinnedArrayElement(buf.Array,buf.Offset)
+    else
+      this.wrbuffArray.[0].``base`` <- Marshal.UnsafeAddrOfPinnedArrayElement(buf.Array,buf.Offset)
+      this.wrbuffArray.[0].len <- IntPtr(buf.Count)
     let request = Marshal.AllocCoTaskMem(uv_req_size(uv_request_type.UV_WRITE))
     uv_write(request, cn, this.wrbuffArray, 1, this.uv_write_cb ) |> checkStatus
 
