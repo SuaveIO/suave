@@ -653,11 +653,17 @@ let startWebServerAsync (config : SuaveConfig) (webpart : WebPart) =
     Path.Combine(ParsingAndControl.resolveDirectory config.compressedFilesFolder, "_temporary_compressed_files")
 
   // spawn tcp listeners/web workers
+  let toRuntime = SuaveConfig.toRuntime config homeFolder compressionFolder true
+
+  let startWebWorkerAsync runtime =
+    ParsingAndControl.startWebWorkerAsync 
+      (config.bufferSize, config.maxOps) 
+      webpart
+      runtime 
+      (config.tcpServerFactory.create(config.logger, config.maxOps, config.bufferSize,runtime.matchedBinding))
 
   let servers = 
-    config.bindings
-    |> List.map (SuaveConfig.toRuntime config homeFolder compressionFolder true
-                 >> (fun runtime -> ParsingAndControl.startWebWorkerAsync (config.bufferSize, config.maxOps) webpart runtime (config.tcpServerFactory.create(config.logger, config.maxOps, config.bufferSize,runtime.matchedBinding))))
+     List.map (toRuntime >> startWebWorkerAsync) config.bindings
               
   let listening = servers |> Seq.map fst |> Async.Parallel
   let server    = servers |> Seq.map snd |> Async.Parallel |> Async.Ignore
