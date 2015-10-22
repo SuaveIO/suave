@@ -1,4 +1,4 @@
-﻿namespace Suave.Sockets
+namespace Suave.Sockets
 
 open System
 open System.Collections.Generic

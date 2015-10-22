@@ -98,7 +98,7 @@
     <Compile Include="Log.fs" />
     <Compile Include="Sockets\SocketBinding.fs" />
     <Compile Include="Sockets\BufferManager.fs" />
-    <Compile Include="Sockets\SocketEventArgsPool.fs" />
+    <Compile Include="Sockets\ConcurrentPool.fs" />
     <Compile Include="Sockets\AsyncUserToken.fs" />
     <Compile Include="Sockets\SocketOp.fs" />
     <Compile Include="Sockets\ITransport.fs" />
