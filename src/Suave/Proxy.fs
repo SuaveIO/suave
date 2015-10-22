@@ -114,10 +114,13 @@ let createReverseProxyServerAsync (config : SuaveConfig) resolver =
   let homeFolder, compressionFolder =
     ParsingAndControl.resolveDirectory config.homeFolder,
     Path.Combine(ParsingAndControl.resolveDirectory config.compressedFilesFolder, "_temporary_compressed_files")
+
   let all =
     [ for binding in config.bindings do 
-        let reqLoop = ParsingAndControl.requestLoop (SuaveConfig.toRuntime config homeFolder compressionFolder false binding )  (SocketPart (proxy resolver))
-        let server = startTcpIpServerAsync reqLoop binding.socketBinding (config.tcpServerFactory.create(config.logger,config.maxOps,config.bufferSize,binding))
+        let runtime = SuaveConfig.toRuntime config homeFolder compressionFolder false binding
+        let reqLoop = ParsingAndControl.requestLoop runtime (SocketPart (proxy resolver))
+        let tcpServer = config.tcpServerFactory.create(config.logger, config.maxOps, config.bufferSize, binding)
+        let server = startTcpIpServerAsync reqLoop binding.socketBinding tcpServer
         yield server ]
       
   let listening = all |> List.map fst |> Async.Parallel |> Async.Ignore
