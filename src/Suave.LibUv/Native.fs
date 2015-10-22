@@ -128,7 +128,6 @@ extern void uv_close(IntPtr handle, uv_close_cb cb)
 
 [<DllImport("libuv.dll", EntryPoint = "uv_write", CallingConvention = CallingConvention.Cdecl)>]
 extern int uv_write(IntPtr req, IntPtr handle, uv_buf_t[] bufs, int bufcnt, uv_write_cb write_callback)
-//extern int uv_write(IntPtr req, IntPtr handle, uv_buf_t* bufs, int bufcnt, uv_write_cb write_callback)
 
 [<DllImport("libuv.dll", CallingConvention = CallingConvention.Cdecl)>]
 extern int uv_idle_init(IntPtr loop, IntPtr idle)
