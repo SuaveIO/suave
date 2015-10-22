@@ -170,7 +170,7 @@ let endToEnd cfg =
               actual
         | false, _ -> Tests.failtest "X-Custom-After is missing"
 
-      runWithConfig composedApp |> reqResp Types.GET "/owin" "" None None DecompressionMethods.GZip id asserts
+      runWithConfig composedApp |> reqResp HttpMethod.GET "/owin" "" None None DecompressionMethods.GZip id asserts
 
     testCase "Empty OWIN app should return 200 OK" <| fun _ ->
       let owinDefaults (env : OwinEnvironment) =
@@ -183,7 +183,7 @@ let endToEnd cfg =
         eq "Http Status Code" HttpStatusCode.OK result.StatusCode
         eq "Reason Phrase" "OK" result.ReasonPhrase
 
-      runWithConfig composedApp |> reqResp Types.GET "/" "" None None DecompressionMethods.GZip id asserts
+      runWithConfig composedApp |> reqResp HttpMethod.GET "/" "" None None DecompressionMethods.GZip id asserts
 
     testCase "Empty OwinAppFunc should return 200 OK" <| fun _ ->
       let owinDefaults = OwinAppFunc(fun env ->
@@ -196,7 +196,7 @@ let endToEnd cfg =
         eq "Http Status Code" HttpStatusCode.OK result.StatusCode
         eq "Reason Phrase" "OK" result.ReasonPhrase
 
-      runWithConfig composedApp |> reqResp Types.GET "/" "" None None DecompressionMethods.GZip id asserts
+      runWithConfig composedApp |> reqResp HttpMethod.GET "/" "" None None DecompressionMethods.GZip id asserts
 
     testCase "Completed Async signals completion with status code" <| fun _ ->
       let noContent (env : OwinEnvironment) =
@@ -210,7 +210,7 @@ let endToEnd cfg =
         eq "Http Status Code" HttpStatusCode.NoContent result.StatusCode
         eq "Reason Phrase set by server" "No Content" result.ReasonPhrase
 
-      runWithConfig composedApp |> reqResp Types.GET "/" "" None None DecompressionMethods.GZip id asserts
+      runWithConfig composedApp |> reqResp HttpMethod.GET "/" "" None None DecompressionMethods.GZip id asserts
 
     testCase "Completed Async signals completion with status code and headers" <| fun _ ->
       let noContent (env : OwinEnvironment) =
@@ -227,7 +227,7 @@ let endToEnd cfg =
         eq "Reason Phrase set by server" "No Content" result.ReasonPhrase
         eq "Content-Type" "text/plain; charset=utf-8" (result.Content.Headers.ContentType.ToString())
 
-      runWithConfig composedApp |> reqResp Types.GET "/" "" None None DecompressionMethods.GZip id asserts
+      runWithConfig composedApp |> reqResp HttpMethod.GET "/" "" None None DecompressionMethods.GZip id asserts
 
     testCase "Custom reason phrase" <| fun _ ->
       let noContent (env : OwinEnvironment) =
@@ -243,7 +243,7 @@ let endToEnd cfg =
         // TO CONSIDER: allow to change reason phrase
         // eq "Reason Phrase" "Nothing to see here" result.ReasonPhrase
 
-      runWithConfig composedApp |> reqResp Types.GET "/" "" None None DecompressionMethods.GZip id asserts
+      runWithConfig composedApp |> reqResp HttpMethod.GET "/" "" None None DecompressionMethods.GZip id asserts
 
     testCase "OWIN middleware runs as a Suave app" <| fun _ ->
       // This test case exists to show that a middleware will mount into Suave as an application.
@@ -259,7 +259,7 @@ let endToEnd cfg =
         eq "Http Status Code" HttpStatusCode.NoContent result.StatusCode
         eq "Reason Phrase set by server" "No Content" result.ReasonPhrase
 
-      runWithConfig composedApp |> reqResp Types.GET "/" "" None None DecompressionMethods.GZip id asserts
+      runWithConfig composedApp |> reqResp HttpMethod.GET "/" "" None None DecompressionMethods.GZip id asserts
 
     testCase "Composed OWIN security middleware and app" <| fun _ ->
       let noContent = OwinAppFunc(fun env ->
@@ -295,7 +295,7 @@ let endToEnd cfg =
         req.Headers.Authorization <- Net.Http.Headers.AuthenticationHeaderValue("Basic", Convert.ToBase64String("foo:bar"B))
         req
 
-      runWithConfig composedApp |> reqResp Types.GET "/" "" None None DecompressionMethods.GZip sendAuthHeader asserts
+      runWithConfig composedApp |> reqResp HttpMethod.GET "/" "" None None DecompressionMethods.GZip sendAuthHeader asserts
 
     testCase "Setting a path in Suave should mount an OWIN app at that path and set requestPathBase" <| fun _ ->
 
@@ -319,7 +319,7 @@ let endToEnd cfg =
         eq "Http Status Code" HttpStatusCode.OK result.StatusCode
         eq "Reason Phrase set by server" "OK" result.ReasonPhrase
 
-      runWithConfig composedApp |> reqResp Types.GET "/owin/app" "" None None DecompressionMethods.GZip id asserts
+      runWithConfig composedApp |> reqResp HttpMethod.GET "/owin/app" "" None None DecompressionMethods.GZip id asserts
 
     testCase "Manually mount an OWIN app at that path and set requestPathBase" <| fun _ ->
       let ok (env : OwinEnvironment) =
@@ -345,5 +345,5 @@ let endToEnd cfg =
         eq "Http Status Code" HttpStatusCode.OK result.StatusCode
         eq "Reason Phrase set by server" "OK" result.ReasonPhrase
 
-      runWithConfig composedApp |> reqResp Types.GET "/owin/app" "" None None DecompressionMethods.GZip id asserts
+      runWithConfig composedApp |> reqResp HttpMethod.GET "/owin/app" "" None None DecompressionMethods.GZip id asserts
     ]
