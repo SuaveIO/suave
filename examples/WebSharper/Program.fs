@@ -1,4 +1,5 @@
 ﻿namespace Suave.Examples.WebSharper
+#nowarn "44"
 
 module SampleSite =
   open WebSharper
