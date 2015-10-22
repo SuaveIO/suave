@@ -48,8 +48,30 @@ asmver_files :asmver => :versioning do |a|
   end
 end
 
+task :libs do
+  system "pkg-config --cflags libuv" do |ok, res|
+    if !ok
+      raise %{
+You seem to be missing `libuv`, which needs to be installed.
+
+On OS X:
+  brew install libuv --universal
+  and then `export LD_LIBRARY_PATH=/usr/local/lib:/usr/lib:/lib`
+
+On Windows:
+  @powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-FileDownload 'https://github.com/libuv/libuv/archive/v1.7.5.zip'"
+  7z x v1.7.5.zip & cd libuv-1.7.5 & vcbuild.bat x86 shared debug
+  mkdir src\\Suave.Tests\\bin\\Release\\ & cp libuv-1.7.5\\Debug\\libuv.dll src\\Suave.Tests\\bin\\Release\\libuv.dll
+
+On Linux:
+  ...
+}
+    end
+  end
+end
+
 desc 'Perform full build'
-task :compile => [:versioning, :restore, :asmver, :compile_quick]
+task :compile => [:libs, :versioning, :restore, :asmver, :compile_quick]
 
 desc 'clean the project'
 build :clean do |b|
