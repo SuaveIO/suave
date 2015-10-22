@@ -16,8 +16,8 @@ let destroyHandle (handle : Handle) =
   Marshal.FreeCoTaskMem handle
 
 let checkStatus(s : int) =
-    if s < 0 then
-      failwith (new string (uv_strerror(s)))
+  if s < 0 then
+    failwith (new string (uv_strerror(s)))
 
 open System.Threading
 open System.Threading.Tasks
@@ -221,7 +221,7 @@ type LibUvSocket(pool : ConcurrentPool<OperationPair>,logger, serveClient, ip, l
 
   member this.initialize() =
     this.uv_connection_cb <- uv_connection_cb(this.onNewConnection)
-    this.synchronizationContext <- new SingleThreadSynchronizationContext(loop,synchronizationContextCallback)
+    this.synchronizationContext <- new SingleThreadSynchronizationContext(loop, synchronizationContextCallback)
     this.synchronizationContext.init()
 
   member this.run(server) =
@@ -248,7 +248,11 @@ type LibUvSocket(pool : ConcurrentPool<OperationPair>,logger, serveClient, ip, l
   member this.exit() =
     this.uv_connection_cb <- null
 
-type LibUvServer(maxConcurrentOps, bufferManager, logger : Logger, binding, startData, serveClient, acceptingConnections: AsyncResultCell<StartedData>, event : ManualResetEvent) =
+type LibUvServer(maxConcurrentOps, bufferManager, logger : Logger,
+                 binding,
+                 startData, serveClient,
+                 acceptingConnections: AsyncResultCell<StartedData>,
+                 event : ManualResetEvent) =
 
   [<DefaultValue>] val mutable thread : Thread
   [<DefaultValue>] val mutable uv_async_stop_loop_cb : uv_handle_cb
@@ -279,7 +283,9 @@ type LibUvServer(maxConcurrentOps, bufferManager, logger : Logger, binding, star
       uv_tcp_init(loop, server) |> checkStatus
       uv_ip4_addr(ip, port, &addr) |> checkStatus
       uv_tcp_bind(server, &addr, 0) |> checkStatus
-      let s = new LibUvSocket(opsPool, logger, serveClient, binding.ip, loop, bufferManager, startData, acceptingConnections, synchronizationContextCallback)
+      let s = new LibUvSocket(opsPool, logger, serveClient, binding, loop,
+                              bufferManager, startData, acceptingConnections,
+                              synchronizationContextCallback)
       s.initialize()
       s.run(server)
       s.exit()
@@ -350,7 +356,7 @@ let runServerLibUv logger maxConcurrentOps bufferSize (binding: SocketBinding) s
   let libUvServer = new LibUvServer(maxConcurrentOps, bufferManager, logger, binding, startData, serveClient, acceptingConnections, exitEvent)
 
   libUvServer.init()
-  async{
+  async {
     use! disposable = Async.OnCancel(fun () -> libUvServer.stopLoop())
     do libUvServer.start()
     let! _ = Async.AwaitWaitHandle (exitEvent)

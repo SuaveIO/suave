@@ -8,7 +8,7 @@ open Suave.Utils.Collections
 type Port = uint16
 
 type SocketBinding = 
-  { ip: IPAddress
+  { ip   : IPAddress
     port : Port }
 
   member x.endpoint = new IPEndPoint(x.ip, int x.port)

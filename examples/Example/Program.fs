@@ -60,6 +60,27 @@ let mimeTypes =
   Writers.defaultMimeTypesMap
     >=> (function | ".avi" -> Writers.mkMimeType "video/avi" false | _ -> None)
 
+module OwinSample =
+  open System.Collections.Generic
+  open Suave.Owin
+
+  let app : WebPart =
+    let owinApp (env : OwinEnvironment) =
+      let hello = "Hello, OWIN!"B
+
+      // NOTE: this is the default, per HTTP, and should not be necessary.
+      env.[OwinConstants.responseStatusCode] <- box 200
+
+      let responseHeaders : IDictionary<string, string[]> = unbox env.[OwinConstants.responseHeaders]
+      responseHeaders.["Content-Type"] <- [| "text/plain" |]
+      responseHeaders.["Content-Length"] <- [| string hello.Length |]
+
+      let responseStream : IO.Stream = unbox env.[OwinConstants.responseBody]
+      responseStream.Write(hello, 0, hello.Length)
+      async.Return ()
+
+    OwinApp.ofApp "/" owinApp
+
 let app =
   choose [
     GET >>= path "/hello" >>= never
@@ -77,8 +98,13 @@ let app =
     path "/session"
       >>= statefulForSession // Session.State.CookieStateStore
       >>= context (fun x ->
-        match x |> HttpContext.state with
-        | None -> Redirection.FOUND "/session" // restarted server without keeping the key; set key manually?
+        match HttpContext.state x with
+        | None ->
+          // restarted server without keeping the key; set key manually?
+          let msg = "Server Key, Cookie Serialiser reset, or Cookie Data Corrupt, "
+                    + "if you refresh the browser page, you'll have gotten a new cookie."
+          OK msg
+
         | Some store ->
           match store.get "counter" with
           | Some y ->
@@ -87,41 +113,46 @@ let app =
           | None ->
             store.set "counter" 1
             >>= OK "First time")
-    basicAuth // from here on it will require authentication
-    // surf to: http://localhost:8082/es.html to view the ES
-    GET >>= path "/events2" >>= request (fun _ -> EventSource.handShake (fun out ->
-      socket {
-        let msg = { id = "1"; data = "First Message"; ``type`` = None }
-        do! msg |> send out
-        let msg = { id = "2"; data = "Second Message"; ``type`` = None }
-        do! msg |> send out
-      }))
-    GET >>= path "/events" >>= request (fun r -> EventSource.handShake (CounterDemo.counterDemo r))
-
-    GET >>= browseHome //serves file if exists
-    GET >>= dirHome //show directory listing
-    HEAD >>= path "/head" >>= sleep 100 "Nice sleep .."
-    POST >>= path "/upload" >>= OK "Upload successful."
-    POST >>= path "/i18nforms" >>= request (fun r ->
-      sprintf """
-      ödlan: %A
-      小: %A
-      """ (r.formData "ödlan") (r.formData "小")
-      |> OK >>= Writers.setMimeType "text/plain"
-    )
-    PUT >>= path "/upload2"
-      >>= request (fun x ->
-         let files =
-           x.files 
-           |> Seq.map (fun y -> sprintf "(%s, %s, %s)" y.fileName y.mimeType y.tempFilePath)
-           |> String.concat "<br/>"
-         OK (sprintf "Upload successful.<br>POST data: %A<br>Uploaded files (%d): %s" x.multiPartFields (List.length x.files) files))
-    POST >>= request (fun x -> OK (sprintf "POST data: %s" (System.Text.Encoding.ASCII.GetString x.rawForm)))
     GET
-      >>= path "/custom_header"
-      >>= setHeader "X-Doge-Location" "http://www.elregalista.com/wp-content/uploads/2014/02/46263312.jpg"
-      >>= OK "Doooooge"
-    RequestErrors.NOT_FOUND "Found no handlers"
+      >>= path "/owin"
+      >>= Writers.setHeader "X-Custom-Before" "Before OWIN"
+      >>= OwinSample.app
+      >>= Writers.setHeader "X-Custom-After" "After OWIN"
+    basicAuth <| choose [ // from here on it will require authentication
+        // surf to: http://localhost:8082/es.html to view the ES
+        GET >>= path "/events2" >>= request (fun _ -> EventSource.handShake (fun out ->
+          socket {
+            let msg = { id = "1"; data = "First Message"; ``type`` = None }
+            do! msg |> send out
+            let msg = { id = "2"; data = "Second Message"; ``type`` = None }
+            do! msg |> send out
+          }))
+        GET >>= path "/events" >>= request (fun r -> EventSource.handShake (CounterDemo.counterDemo r))
+        GET >>= browseHome //serves file if exists
+        GET >>= dirHome //show directory listing
+        HEAD >>= path "/head" >>= sleep 100 "Nice sleep .."
+        POST >>= path "/upload" >>= OK "Upload successful."
+        POST >>= path "/i18nforms" >>= request (fun r ->
+          sprintf """
+          ödlan: %A
+          小: %A
+          """ (r.formData "ödlan") (r.formData "小")
+          |> OK >>= Writers.setMimeType "text/plain"
+        )
+        PUT >>= path "/upload2"
+          >>= request (fun x ->
+             let files =
+               x.files 
+               |> Seq.map (fun y -> sprintf "(%s, %s, %s)" y.fileName y.mimeType y.tempFilePath)
+               |> String.concat "<br/>"
+             OK (sprintf "Upload successful.<br>POST data: %A<br>Uploaded files (%d): %s" x.multiPartFields (List.length x.files) files))
+        POST >>= request (fun x -> OK (sprintf "POST data: %s" (System.Text.Encoding.ASCII.GetString x.rawForm)))
+        GET
+          >>= path "/custom_header"
+          >>= setHeader "X-Doge-Location" "http://www.elregalista.com/wp-content/uploads/2014/02/46263312.jpg"
+          >>= OK "Doooooge"
+        RequestErrors.NOT_FOUND "Found no handlers"
+      ]
     ] >>= log logger logFormat
 
 (*open Suave.OpenSSL
@@ -150,6 +181,7 @@ let main argv =
       homeFolder            = None
       compressedFilesFolder = None
       logger                = logger
-      tcpServerFactory      = new DefaultTcpServerFactory() }
+      tcpServerFactory      = new DefaultTcpServerFactory()
+      cookieSerialiser      = new Utils.BinaryFormatterSerialiser() }
     app
   0

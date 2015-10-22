@@ -1,4 +1,4 @@
-﻿module Suave.Tests.HttpFile
+module Suave.Tests.HttpFile
 
 open Fuchu
 
@@ -53,9 +53,8 @@ let ``http HEAD method`` cfg =
   let runWithConfig = runWith cfg
 
   testList "HEAD on `file`" [
-
     testCase  "HEAD does not return content" <| fun _ ->
-      
+
       let ctx = runWithConfig (Files.browseFileHome "test-text-file.txt") 
 
       withContext (fun _ ->
@@ -66,7 +65,7 @@ let ``http HEAD method`` cfg =
         stream.Write(outputData, 0, outputData.Length)
 
         use streamReader = new StreamReader(stream)
-    
+
         // read header lines
         let rec loop _ =
           let line = streamReader.ReadLine()
@@ -75,5 +74,4 @@ let ``http HEAD method`` cfg =
         loop ()
 
         Assert.Equal("Stream should be at the end.", true, streamReader.EndOfStream)) ctx
-      
   ]

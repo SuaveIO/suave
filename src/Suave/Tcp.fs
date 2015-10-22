@@ -1,4 +1,4 @@
-﻿module Suave.Tcp
+module Suave.Tcp
 
 open System
 open System.Collections.Generic
@@ -100,17 +100,22 @@ let private aFewTimes f =
 // echo 5 > /proc/sys/net/ipv4/tcp_fin_timeout
 // echo 1 > /proc/sys/net/ipv4/tcp_tw_recycle
 // custom kernel with shorter TCP_TIMEWAIT_LEN in include/net/tcp.h
-let job logger (serveClient : TcpWorker<unit>) ipaddr (transport : ITransport) (bufferManager : BufferManager) (shutdownTransport: Async<unit>) = async {
+let job logger
+        (serveClient : TcpWorker<unit>)
+        binding
+        (transport : ITransport)
+        (bufferManager : BufferManager)
+        (shutdownTransport: Async<unit>) = async {
   let intern = Log.intern logger "Suave.Tcp.job"
   Interlocked.Increment Globals.numberOfClients |> ignore
-  intern (ipaddr.ToString() + " connected, total: " + (!Globals.numberOfClients).ToString() + " clients")
+  intern (binding.ip.ToString() + " connected, total: " + (!Globals.numberOfClients).ToString() + " clients")
   let connection =
-        { ipaddr       = ipaddr
-          transport    = transport
-          bufferManager = bufferManager
-          lineBuffer  = bufferManager.PopBuffer "Suave.Tcp.job" // buf allocate
-          segments     = []
-        }
+    { socketBinding = binding
+      transport     = transport
+      bufferManager = bufferManager
+      lineBuffer    = bufferManager.PopBuffer "Suave.Tcp.job" // buf allocate
+      segments      = []
+    }
   try
     use! oo = Async.OnCancel (fun () -> intern "disconnected client (async cancel)"
                                         Async.RunSynchronously shutdownTransport)
@@ -128,14 +133,14 @@ let job logger (serveClient : TcpWorker<unit>) ipaddr (transport : ITransport) (
   intern "Shutting down transport."
   do! shutdownTransport
   Interlocked.Decrement(Globals.numberOfClients) |> ignore
-  intern (ipaddr.ToString() + " disconnected, total: " + (!Globals.numberOfClients).ToString() + " clients")
+  intern (binding.ip.ToString() + " disconnected, total: " + (!Globals.numberOfClients).ToString() + " clients")
   }
 
 type TcpServer = StartedData -> AsyncResultCell<StartedData> -> TcpWorker<unit> -> Async<unit>
 
-let runServer logger maxConcurrentOps bufferSize (binding: SocketBinding) startData (acceptingConnections: AsyncResultCell<StartedData>) serveClient = async {
+let runServer logger maxConcurrentOps bufferSize (binding: SocketBinding) startData
+              (acceptingConnections: AsyncResultCell<StartedData>) serveClient = async {
   try
-      
     let a, b, c, bufferManager = createPools logger maxConcurrentOps bufferSize
 
     let listenSocket = new Socket(binding.endpoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp)
@@ -149,12 +154,12 @@ let runServer logger maxConcurrentOps bufferSize (binding: SocketBinding) startD
     acceptingConnections.Complete startData |> ignore
 
     logger.Log LogLevel.Info <| fun _ ->
-        { path          = "Suave.Tcp.tcpIpServer"
-          trace         = TraceHeader.empty
-          message       = sprintf "listener started in %O%s" startData (if token.IsCancellationRequested then ", cancellation requested" else "")
-          level         = LogLevel.Info
-          ``exception`` = None
-          tsUTCTicks    = Globals.utcNow().Ticks }
+      { path          = "Suave.Tcp.tcpIpServer"
+        trace         = TraceHeader.empty
+        message       = sprintf "listener started in %O%s" startData (if token.IsCancellationRequested then ", cancellation requested" else "")
+        level         = LogLevel.Info
+        ``exception`` = None
+        tsUTCTicks    = Globals.utcNow().Ticks }
 
     while not (token.IsCancellationRequested) do
       try
@@ -164,7 +169,9 @@ let runServer logger maxConcurrentOps bufferSize (binding: SocketBinding) startD
         | Choice1Of2 s ->
           // start a new async worker for each accepted TCP client
           let socket = acceptArgs.AcceptSocket
-          let ipaddr = (socket.RemoteEndPoint :?> IPEndPoint).Address
+          let remoteBinding =
+            let rep = socket.RemoteEndPoint :?> IPEndPoint
+            { ip = rep.Address; port = uint16 rep.Port }
           let readArgs = b.Pop()
           let writeArgs = c.Pop()
           let transport = { socket = socket; readArgs = readArgs; writeArgs = writeArgs }
@@ -174,7 +181,7 @@ let runServer logger maxConcurrentOps bufferSize (binding: SocketBinding) startD
             a.Push acceptArgs
             b.Push readArgs
             c.Push writeArgs
-          Async.Start (job logger serveClient ipaddr transport bufferManager (async { do shutdownTransport()}), token)
+          Async.Start (job logger serveClient remoteBinding transport bufferManager (async { do shutdownTransport()}), token)
         | Choice2Of2 e -> failwith "failed to accept."
       with ex -> "failed to accept a client" |> Log.interne logger "Suave.Tcp.tcpIpServer" ex
     return ()

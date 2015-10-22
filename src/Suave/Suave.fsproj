@@ -20,7 +20,7 @@
     <ConsolePause>false</ConsolePause>
     <Tailcalls>false</Tailcalls>
     <WarningLevel>3</WarningLevel>
-    <DocumentationFile>bin\Debug\Suave.XML</DocumentationFile>
+    <DocumentationFile>bin\Debug\Suave.xml</DocumentationFile>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -30,7 +30,7 @@
     <ErrorReport>prompt</ErrorReport>
     <ConsolePause>false</ConsolePause>
     <WarningLevel>3</WarningLevel>
-    <DocumentationFile>bin\Release\Suave.XML</DocumentationFile>
+    <DocumentationFile>bin\Release\Suave.xml</DocumentationFile>
     <DefineConstants>
     </DefineConstants>
     <DebugType>pdbonly</DebugType>
@@ -75,6 +75,7 @@
     </When>
   </Choose>
   <ItemGroup>
+    <Compile Include="Utils\Aether.fs" />
     <Compile Include="Utils\Async.fs" />
     <Compile Include="Utils\Collections.fs" />
     <Compile Include="Utils\UTF8.fs" />
@@ -88,12 +89,14 @@
     <Compile Include="Utils\Encoding.fs" />
     <Compile Include="Utils\Crypto.fs" />
     <Compile Include="Utils\Parsing.fs" />
+    <Compile Include="Utils\Serialisation.fs" />
     <Compile Include="Globals.fs" />
     <Compile Include="Logging\LogLevel.fs" />
     <Compile Include="Logging\TraceHeader.fs" />
     <Compile Include="Logging\LogLine.fs" />
     <Compile Include="Logging\Logger.fs" />
     <Compile Include="Log.fs" />
+    <Compile Include="Sockets\SocketBinding.fs" />
     <Compile Include="Sockets\BufferManager.fs" />
     <Compile Include="Sockets\SocketEventArgsPool.fs" />
     <Compile Include="Sockets\AsyncUserToken.fs" />
@@ -103,7 +106,6 @@
     <Compile Include="Sockets\Connection.fs" />
     <Compile Include="Sockets\SocketMonad.fs" />
     <Compile Include="Sockets\AsyncSocket.fs" />
-    <Compile Include="Sockets\SocketBinding.fs" />
     <Compile Include="Tcp.fs" />
     <Compile Include="Sscanf.fs" />
     <Compile Include="Types.fs" />
@@ -116,6 +118,7 @@
     <Compile Include="State.fs" />
     <Compile Include="Auth.fs" />
     <Compile Include="Web.fs" />
+    <Compile Include="Owin.fs" />
     <Compile Include="WebSocket.fs" />
     <Compile Include="Json.fs" />
     <Compile Include="Proxy.fs" />
