@@ -3,11 +3,11 @@ NUGET
   remote: https://nuget.org/api/v2
   specs:
     DotLiquid (1.8.0)
-    FsCheck (2.0.7) - framework: net45
+    FsCheck (2.0.7)
       FSharp.Core (>= 3.1.2.5)
     FSharp.Charting (0.90.12)
     FSharp.Core (3.1.2.5)
-    Fuchu (0.6.0) - framework: net45
+    Fuchu (0.6.0)
     Fuchu.FsCheck (0.6.0)
       FsCheck (>= 1.0.4)
       FSharp.Core (>= 3.1.2.1)
@@ -18,7 +18,7 @@ NUGET
       PerfUtil (>= 0.1.8)
     Http.fs-prerelease (2.3.0)
       FSharp.Core (>= 3.1.2.1)
-    Microsoft.AspNet.Razor (3.2.3) - framework: >= net45
+    Microsoft.AspNet.Razor (3.2.3)
     Microsoft.Owin (3.0.1)
       Owin (>= 1.0)
     Nancy (1.2.0)
@@ -31,7 +31,7 @@ NUGET
     PerfUtil (0.1.8)
     RazorEngine (3.7.0)
       Microsoft.AspNet.Razor (>= 3.0.0) - framework: >= net45
-    Topshelf (3.2.0) - framework: net45
+    Topshelf (3.2.0)
     Topshelf.FSharp (2.1.0)
       Topshelf (>= 3.2.0)
     WebSharper (3.4.14.193)
