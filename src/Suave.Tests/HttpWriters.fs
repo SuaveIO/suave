@@ -21,37 +21,37 @@ open Suave.Testing
 let cookies cfg =
   let runWithConfig = runWith cfg
 
-  let basic_cookie =
+  let basicCookie =
     { name      = "mycookie"
-    ; value     = "42"
-    ; expires   = None
-    ; domain    = None
-    ; path      = Some "/"
-    ; httpOnly = false
-    ; secure    = false }
+      value     = "42"
+      expires   = None
+      domain    = None
+      path      = Some "/"
+      httpOnly = false
+      secure    = false }
 
   testList "Cookies basic tests" [
-      testCase "cookie data makes round trip" <| fun _ ->
-        Assert.Equal("expecting cookie value"
-        , "42"
-        , (reqCookies HttpMethod.GET "/" None
-          (runWithConfig (Cookie.setCookie basic_cookie >>= OK "test")))
-            .GetCookies(Uri("http://127.0.0.1")).[0].Value)
+    testCase "cookie data makes round trip" <| fun _ ->
+      Assert.Equal("expecting cookie value"
+      , "42"
+      , (reqCookies HttpMethod.GET "/" None
+        (runWithConfig (Cookie.setCookie basicCookie >>= OK "test")))
+          .GetCookies(Uri("http://127.0.0.1")).[0].Value)
 
-      testCase "cookie name makes round trip" <| fun _ ->
-        Assert.Equal("expecting cookie name"
-        , "mycookie"
-        , (reqCookies HttpMethod.GET "/" None
-            (runWithConfig (Cookie.setCookie basic_cookie >>= OK "test")))
-            .GetCookies(Uri("http://127.0.0.1")).[0].Name)
+    testCase "cookie name makes round trip" <| fun _ ->
+      Assert.Equal("expecting cookie name"
+      , "mycookie"
+      , (reqCookies HttpMethod.GET "/" None
+          (runWithConfig (Cookie.setCookie basicCookie >>= OK "test")))
+          .GetCookies(Uri("http://127.0.0.1")).[0].Name)
 
-      testCase "http_only cookie is http_only" <| fun _ ->
-        Assert.Equal("expecting http_only"
-        , true
-        , (reqCookies HttpMethod.GET "/" None
-          (runWithConfig (Cookie.setCookie { basic_cookie with httpOnly = true } >>= OK "test")))
-            .GetCookies(Uri("http://127.0.0.1")).[0].HttpOnly)
-    ]
+    testCase "http_only cookie is http_only" <| fun _ ->
+      Assert.Equal("expecting http_only"
+      , true
+      , (reqCookies HttpMethod.GET "/" None
+        (runWithConfig (Cookie.setCookie { basicCookie with httpOnly = true } >>= OK "test")))
+          .GetCookies(Uri("http://127.0.0.1")).[0].HttpOnly)
+  ]
 
 [<Tests>]
 let headers cfg =
@@ -66,10 +66,10 @@ let headers cfg =
     use streamReader = new StreamReader(stream)
     
     let splitHeader (line: string) =
-        let ind = line.IndexOf(':')
-        let name = line.Substring(0, ind)
-        let value = line.Substring(ind + 1)
-        name.Trim(), value.Trim()
+      let ind = line.IndexOf(':')
+      let name = line.Substring(0, ind)
+      let value = line.Substring(ind + 1)
+      name.Trim(), value.Trim()
 
     // skip 200 OK
     streamReader.ReadLine() |> ignore
