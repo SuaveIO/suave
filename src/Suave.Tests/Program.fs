@@ -8,7 +8,13 @@ open FuchuExtensions
 
 [<EntryPoint>]
 let main args =
-  let defaultConfig = { defaultConfig with logger = Loggers.saneDefaultsFor LogLevel.Warn}
-  defaultMainThisAssemblyWithParam defaultConfig args |> ignore
+  let defaultConfig =
+    { defaultConfig with logger = Loggers.saneDefaultsFor LogLevel.Warn}
 
-  defaultMainThisAssemblyWithParam { defaultConfig with tcpServerFactory = Suave.LibUv.Tcp.LibUvServerFactory() } args
+  let firstRun = defaultMainThisAssemblyWithParam defaultConfig args
+
+  if firstRun <> 0 then
+    firstRun
+  else
+    let libUvConfig = { defaultConfig with tcpServerFactory = Suave.LibUv.Tcp.LibUvServerFactory() }
+    defaultMainThisAssemblyWithParam libUvConfig args
