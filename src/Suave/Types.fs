@@ -768,13 +768,17 @@ type SuaveConfig =
     /// Folder for temporary compressed files
     compressedFilesFolder : string option
 
-    /// A logger to log with
+    /// Suave's logger. You can override the default instance if you wish to
+    /// ship your logs, e.g. using https://www.nuget.org/packages/Logary.Adapters.Suave/
     logger                 : Logger
 
-    /// Pluggable TCP async sockets implementation
+    /// Pluggable TCP async sockets implementation. You can choose betwee libuv
+    /// and CLR's Async Socket Event Args. Currently defaults to the managed-only
+    /// implementation.
     tcpServerFactory       : TcpServerFactory
 
-    /// The default cookie serialiser
+    /// The cookie serialiser to use for converting the data you save in cookies
+    /// from your application into a byte array.
     cookieSerialiser        : Utils.CookieSerialiser }
 
   static member bindings_              = Property<SuaveConfig,_> (fun x -> x.bindings)              (fun v x -> { x with bindings = v })
