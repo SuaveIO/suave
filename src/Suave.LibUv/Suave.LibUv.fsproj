@@ -8,6 +8,7 @@
     <RootNamespace>Suave.LibUv</RootNamespace>
     <AssemblyName>Suave.LibUv</AssemblyName>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
+    <IconUrl>https://raw.githubusercontent.com/SuaveIO/resources/master/images/libuv-logo.png</IconUrl>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
