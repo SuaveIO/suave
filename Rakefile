@@ -121,6 +121,7 @@ nugets_pack :create_nuget_quick => [:versioning, 'build/pkg'] do |p|
     m.copyright     = 'Ademar Gonzalez, Henrik Feldt'
     m.license_url   = "https://github.com/SuaveIO/Suave/blob/master/COPYING"
     m.project_url   = "http://suave.io"
+    m.icon_url      = 'https://raw.githubusercontent.com/SuaveIO/resources/master/images/head_trans.png'
     # m.add_dependency 'Fuchu-suave', '0.5.0'
   end
 end
