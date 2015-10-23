@@ -83,6 +83,7 @@
     <Compile Include="Types.fs" />
     <Compile Include="WebSocket.fs" />
     <Compile Include="Razor.fs" />
+    <Compile Include="FuchuExtensions.fs" />
     <Compile Include="Program.fs" />
     <None Include="paket.references" />
     <None Include="suave.p12">
@@ -136,6 +137,10 @@
     <ProjectReference Include="..\Suave\Suave.fsproj">
       <Project>{3DC9193E-BD0C-4486-9C58-56B630C36623}</Project>
       <Name>Suave</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\Suave.LibUv\Suave.LibUv.fsproj">
+      <Project>{7C787110-A146-4021-8163-40137E325DB4}</Project>
+      <Name>Suave.LibUv</Name>
     </ProjectReference>
   </ItemGroup>
   <Choose>

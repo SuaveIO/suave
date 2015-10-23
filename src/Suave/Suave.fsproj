@@ -24,7 +24,6 @@
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
-    <DebugType>pdbonly</DebugType>
     <Optimize>true</Optimize>
     <Tailcalls>true</Tailcalls>
     <OutputPath>bin\Release\</OutputPath>
@@ -34,6 +33,7 @@
     <DocumentationFile>bin\Release\Suave.xml</DocumentationFile>
     <DefineConstants>
     </DefineConstants>
+    <DebugType>pdbonly</DebugType>
   </PropertyGroup>
   <PropertyGroup>
     <MinimumVisualStudioVersion Condition="'$(MinimumVisualStudioVersion)' == ''">11</MinimumVisualStudioVersion>
@@ -51,9 +51,10 @@
     </Otherwise>
   </Choose>
   <Import Project="$(FSharpTargetsPath)" Condition="Exists('$(FSharpTargetsPath)')" />
+  <Import Project="..\..\tools\paket.targets" />
   <ItemGroup>
-    <Compile Include="Utils\Async.fs" />
     <Compile Include="Utils\Aether.fs" />
+    <Compile Include="Utils\Async.fs" />
     <Compile Include="Utils\Collections.fs" />
     <Compile Include="Utils\UTF8.fs" />
     <Compile Include="Utils\ASCII.fs" />
@@ -73,13 +74,13 @@
     <Compile Include="Logging\LogLine.fs" />
     <Compile Include="Logging\Logger.fs" />
     <Compile Include="Log.fs" />
+    <Compile Include="Sockets\SocketBinding.fs" />
     <Compile Include="Sockets\BufferManager.fs" />
-    <Compile Include="Sockets\SocketEventArgsPool.fs" />
+    <Compile Include="Sockets\ConcurrentPool.fs" />
     <Compile Include="Sockets\AsyncUserToken.fs" />
     <Compile Include="Sockets\SocketOp.fs" />
     <Compile Include="Sockets\ITransport.fs" />
     <Compile Include="Sockets\TcpTransport.fs" />
-    <Compile Include="Sockets\SocketBinding.fs" />
     <Compile Include="Sockets\Connection.fs" />
     <Compile Include="Sockets\SocketMonad.fs" />
     <Compile Include="Sockets\AsyncSocket.fs" />
@@ -101,6 +102,7 @@
     <Compile Include="Proxy.fs" />
     <Compile Include="AssemblyVersionInfo.fs" Condition="Exists('AssemblyVersionInfo.fs')" />
     <None Include="paket.references" />
+    <Content Include="App.config" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="mscorlib" />
@@ -112,9 +114,7 @@
     <Reference Include="System.Web" />
     <Reference Include="System.Web.Extensions" />
     <Reference Include="System.Xml" />
-    <Reference Include="System.Security" />
   </ItemGroup>
-  <Import Project="..\..\tools\paket.targets" />
   <Choose>
     <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
       <ItemGroup>

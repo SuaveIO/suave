@@ -17,8 +17,8 @@ open Suave.Testing
 open Fuchu
 
 [<Tests>]
-let gets =
-  let runWithConfig = runWith defaultConfig
+let gets cfg =
+  let runWithConfig = runWith cfg
   testList "getting basic responses" [
       testCase "200 OK returns 'a'" <| fun _ ->
         Assert.Equal("expecting non-empty response", "a", runWithConfig (OK "a") |> req HttpMethod.GET "/" None)
@@ -44,8 +44,8 @@ let gets =
     ]
 
 [<Tests>]
-let posts =
-  let runWithConfig = runWith defaultConfig
+let posts cfg =
+  let runWithConfig = runWith cfg
 
   let get = function Choice1Of2 x -> x | _ -> failwith "couldn't get it"
 

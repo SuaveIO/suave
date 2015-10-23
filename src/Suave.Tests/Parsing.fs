@@ -22,8 +22,8 @@ open Suave.Tests.TestUtilities
 open Suave.Testing
 
 [<Tests>]
-let parsingMultipart =
-  let runWithConfig = runWith defaultConfig
+let parsingMultipart cfg =
+  let runWithConfig = runWith cfg
 
   let postData1 = readBytes "request.txt"
   let postData2 = readText "request-1.txt"
@@ -75,7 +75,7 @@ open Suave.Logging
 open Suave.Sockets
 
 [<Tests>]
-let parsingMultipart2 =
+let parsingMultipart2 cfg =
   let app =
     choose
       [ POST
@@ -97,7 +97,7 @@ let parsingMultipart2 =
         ]
       ]
 
-  let runWithConfig = runWith defaultConfig //{ defaultConfig with logger = Loggers.ConsoleWindowLogger(LogLevel.Verbose) }
+  let runWithConfig = runWith cfg //{ cfg with logger = Loggers.ConsoleWindowLogger(LogLevel.Verbose) }
 
   let sendRecv (data : byte []) =
     use sender = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp)

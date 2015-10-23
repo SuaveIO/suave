@@ -12,8 +12,8 @@ open Suave.Tests.TestUtilities
 open Suave.Testing
 
 [<Tests>]
-let embedded_resources =
-  let runWithConfig = runWith defaultConfig
+let embedded_resources cfg =
+  let runWithConfig = runWith cfg
 
   testList "test Embedded.browse" [
       testCase "200 OK returns embedded file" <| fun _ ->

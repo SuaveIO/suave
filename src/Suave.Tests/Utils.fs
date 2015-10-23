@@ -10,12 +10,13 @@ open Suave.Utils.Parsing
 
 open Fuchu
 
+open Suave.Types
 open TestUtilities
 
 #nowarn "25"
 
 [<Tests>]
-let utilities =
+let utilities (_: SuaveConfig) =
   testList "trying some utility functions" [
     testCase "loopback ipv4" <| fun _ ->
       Assert.Equal("127.0.0.1 is a local address", true, isLocalAddress "127.0.0.1")

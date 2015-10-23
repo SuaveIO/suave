@@ -17,8 +17,8 @@ open Suave.Testing
 open Fuchu
 
 [<Tests>]
-let tests =
-  let runWithConfig = runWith defaultConfig
+let tests cfg =
+  let runWithConfig = runWith cfg
 
   let user = "foo"
   let pasw = "bar"

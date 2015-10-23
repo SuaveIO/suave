@@ -1,9 +1,11 @@
 ﻿namespace Suave.Examples.WebSharper
+#nowarn "44"
 
 module SampleSite =
   open WebSharper
+  open WebSharper.Web
   open WebSharper.Sitelets
-  open WebSharper.Html.Server
+  open WebSharper.UI.Next.Html
 
   type EndPoint =
     | Index
@@ -12,12 +14,17 @@ module SampleSite =
     let time = System.DateTime.Now.ToString()
     Content.Page(
       Title = "Index",
-      Body = [H1 [Text ("Current time: " + time)]]
+      Body = [h1 [text ("Current time: " + time)]]
     )
 
   [<Website>]
   let MySampleWebsite : Sitelet<EndPoint> =
     Sitelet.Content "/index" EndPoint.Index IndexContent
+
+// NOTE: WebSharper has a custom Suave module that's more WebSharper-ideomatic;
+// at https://github.com/intellifactory/websharper.suave/tree/master/WebSharper.Suave.Tests
+// but the below is a display that we can run WebSharper only based on the OWIN
+// spec.
 
 module SelfHostedServer =
 

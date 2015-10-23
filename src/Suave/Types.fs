@@ -11,6 +11,7 @@ open Suave.Utils.Aether
 open Suave.Utils.Aether.Operators
 open Suave.Utils.Collections
 open Suave.Sockets
+open Suave.Tcp
 open Suave.Utils
 open Suave.Log
 open Suave.Logging
@@ -726,6 +727,9 @@ let context f (a : HttpContext) = f a a
 
 open System.Threading
 
+type TcpServerFactory =
+  abstract member create  : Logger * int * int * HttpBinding -> TcpServer
+
 /// The core configuration of suave. See also Suave.Web.default_config which
 /// you can use to bootstrap the configuration:
 /// <code>{ default_config with bindings = [ ... ] }</code>
@@ -764,9 +768,17 @@ type SuaveConfig =
     /// Folder for temporary compressed files
     compressedFilesFolder : string option
 
-    /// A logger to log with
-    logger                  : Logger
+    /// Suave's logger. You can override the default instance if you wish to
+    /// ship your logs, e.g. using https://www.nuget.org/packages/Logary.Adapters.Suave/
+    logger                 : Logger
 
+    /// Pluggable TCP async sockets implementation. You can choose betwee libuv
+    /// and CLR's Async Socket Event Args. Currently defaults to the managed-only
+    /// implementation.
+    tcpServerFactory       : TcpServerFactory
+
+    /// The cookie serialiser to use for converting the data you save in cookies
+    /// from your application into a byte array.
     cookieSerialiser        : Utils.CookieSerialiser }
 
   static member bindings_              = Property<SuaveConfig,_> (fun x -> x.bindings)              (fun v x -> { x with bindings = v })
@@ -780,6 +792,7 @@ type SuaveConfig =
   static member homeFolder_            = Property<SuaveConfig,_> (fun x -> x.homeFolder)            (fun v x -> { x with homeFolder = v })
   static member compressedFilesFolder_ = Property<SuaveConfig,_> (fun x -> x.compressedFilesFolder) (fun v x -> { x with compressedFilesFolder = v })
   static member logger_                = Property<SuaveConfig,_> (fun x -> x.logger)                (fun v x -> { x with logger = v })
+  static member tcpServerFactory_      = Property<SuaveConfig,_> (fun x -> x.tcpServerFactory)      (fun v x -> { x with tcpServerFactory = v })
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module SuaveConfig =
