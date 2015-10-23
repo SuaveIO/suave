@@ -15,6 +15,8 @@ type Error =
   /// For a HTTP socket user this means a response of '400 Bad Request', or for
   /// example WebSockets would abort the connection.
   | InputDataError of string
+  /// Represents an IO/network error; to be used when we do not have a SocketError
+  /// but just an error message; like in libuv calls.
   | ConnectionError of string
 
 type ByteSegment = System.ArraySegment<byte>
