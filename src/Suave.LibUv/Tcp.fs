@@ -36,7 +36,7 @@ type SingleThreadSynchronizationContext(loop, runOnThisThreadHandler) =
     else queue.Enqueue(new KeyValuePair<SendOrPostCallback, obj>(d, state))
 
   member this.Send() =
-    uv_async_send(runOnThisThreadHandler) |> ignore
+    uv_async_send(runOnThisThreadHandler) |> checkStatus
 
   member this.runOnCurrentThread( _ :IntPtr)  =
       let mutable workItem = KeyValuePair(null,null)
