@@ -11,11 +11,10 @@ install:
  - cmd: mkdir src\Suave.Tests\bin\Release\ & cp libuv-1.7.5\Debug\libuv.dll src\Suave.Tests\bin\Release\libuv.dll
  
 build_script:
- - cmd: >-
-     gem sources -r https://rubygems.org/
-     gem install bundler --no-ri --no-rdoc --source http://rubygems.org/
-     bundle install
-     bundle exec rake
+ - cmd: gem sources -r https://rubygems.org/
+ - cmd: gem install bundler --no-ri --no-rdoc --source http://rubygems.org/
+ - cmd: bundle install
+ - cmd: bundle exec rake
 
 test:  off
 
