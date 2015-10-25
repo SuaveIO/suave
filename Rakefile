@@ -18,6 +18,7 @@ suave_description = 'Suave is a simple web development F# library providing a li
 
 Configuration = ENV['CONFIGURATION'] || 'Release'
 Platform = ENV['MSBUILD_PLATFORM'] || 'Any CPU'
+Prefer32Bits = ENV['PREFER_32_BITS'] || 'false'
 
 desc "Restore paket.exe"
 task :restore_paket do
@@ -87,6 +88,7 @@ build :compile_quick do |b|
   b.file = 'src/Suave.sln'
   b.prop 'Configuration', Configuration
   b.prop 'Platform', Platform
+  b.prop 'Prefer32Bits', Prefer32Bits
 end
 
 namespace :tests do

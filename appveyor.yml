@@ -4,8 +4,10 @@ environment:
   matrix:
    - platform: x86
      arch: "x86"
+     PREFER_32_BITS: true
    - platform: x64
      arch: "x64"
+     PREFER_32_BITS: false
 
 install:
  - ps: Start-FileDownload 'https://github.com/libuv/libuv/archive/v1.7.5.zip'
