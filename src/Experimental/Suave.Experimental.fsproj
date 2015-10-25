@@ -58,9 +58,6 @@
     <None Include="paket.references" />
   </ItemGroup>
   <ItemGroup>
-    <Reference Include="ManagedOpenSsl">
-      <HintPath>..\..\libs\ManagedOpenSsl.dll</HintPath>
-    </Reference>
     <Reference Include="mscorlib" />
     <Reference Include="System" />
     <Reference Include="System.Core" />
