@@ -1,8 +1,12 @@
 version: 1.0.{build}
 
+matrix:
+ - platform: "x86"
+ - platform: "x64"
+
 install:
  - ps: Start-FileDownload 'https://github.com/libuv/libuv/archive/v1.7.5.zip'
- - cmd: 7z x v1.7.5.zip & cd libuv-1.7.5 & vcbuild.bat x86 shared debug
+ - cmd: 7z x v1.7.5.zip & cd libuv-1.7.5 & vcbuild.bat %platform% shared debug
  - cmd: mkdir src\Suave.Tests\bin\Release\ & cp libuv-1.7.5\Debug\libuv.dll src\Suave.Tests\bin\Release\libuv.dll
 build_script:
 - cmd: >-
