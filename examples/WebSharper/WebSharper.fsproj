@@ -20,7 +20,6 @@
     <ConsolePause>false</ConsolePause>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <DebugSymbols>false</DebugSymbols>
     <Optimize>true</Optimize>
     <OutputPath>bin</OutputPath>
     <ErrorReport>prompt</ErrorReport>
@@ -31,6 +30,25 @@
     <DefineConstants>
     </DefineConstants>
   </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|x86' ">
+    <DebugSymbols>true</DebugSymbols>
+    <Optimize>false</Optimize>
+    <Tailcalls>false</Tailcalls>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <WarningLevel>3</WarningLevel>
+    <PlatformTarget>x86</PlatformTarget>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|x86' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <Tailcalls>true</Tailcalls>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <WarningLevel>3</WarningLevel>
+    <DebugSymbols>true</DebugSymbols>
+    <PlatformTarget>x86</PlatformTarget>
+  </PropertyGroup>
   <ItemGroup>
     <Reference Include="mscorlib" />
     <Reference Include="System" />
@@ -38,7 +56,6 @@
     <Reference Include="System.Numerics" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="AssemblyVersionInfo.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath32)\..\Microsoft SDKs\F#\3.1\Framework\v4.0\Microsoft.FSharp.Targets" />
