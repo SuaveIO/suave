@@ -17,7 +17,7 @@ include ::Albacore::NugetsPack
 suave_description = 'Suave is a simple web development F# library providing a lightweight web server and a set of combinators to manipulate route flow and task composition.'
 
 Configuration = ENV['CONFIGURATION'] || 'Release'
-Platform = ENV['PLATFORM'] || 'AnyCPU'
+Platform = ENV['MSBUILD_PLATFORM'] || 'AnyCPU'
 
 desc "Restore paket.exe"
 task :restore_paket do
