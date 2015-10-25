@@ -12,10 +12,10 @@ install:
  
 build_script:
  - cmd: >-
-   gem sources -r https://rubygems.org/
-   gem install bundler --no-ri --no-rdoc --source http://rubygems.org/
-   bundle install
-   bundle exec rake
+     gem sources -r https://rubygems.org/
+     gem install bundler --no-ri --no-rdoc --source http://rubygems.org/
+     bundle install
+     bundle exec rake
 
 test:  off
 
