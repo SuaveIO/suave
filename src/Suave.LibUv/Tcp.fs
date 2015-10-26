@@ -129,7 +129,6 @@ type LibUvTransport(pool : ConcurrentPool<OperationPair>,loop : IntPtr,client : 
   [<DefaultValue>] val mutable cont : unit -> unit
 
   let (readOp,writeOp) = pool.Pop()
-  let intern = Suave.Log.intern logger "Suave.Tcp.job"
  
   member this.closeCallback _ =
     destroyHandle client
@@ -204,7 +203,7 @@ type LibUvSocket(pool : ConcurrentPool<OperationPair>,logger, serveClient, ip, l
   member this.onNewConnection (server : IntPtr) (status: int) =
 
     if status < 0 then
-          "New connection error: " +  (new string (uv_strerror(status))) |> Log.intern logger "Suave.Tcp.LibUvSocket.on_new_connection"
+          "New connection error: " +  (new string (uv_strerror(status))) |> Log.intern logger "Suave.LibUv.Tcp.LibUvSocket.on_new_connection"
     else
 
       let client = createHandle <| uv_handle_size(uv_handle_type.UV_TCP)
@@ -230,9 +229,9 @@ type LibUvSocket(pool : ConcurrentPool<OperationPair>,logger, serveClient, ip, l
 
     let startData = { startData with socketBoundUtc = Some (Globals.utcNow()) }
     acceptingConnections.Complete startData |> ignore
-
+    
     logger.Log LogLevel.Info <| fun _ ->
-        { path          = "Suave.Tcp.tcpIpServer"
+        { path          = "Suave.LibUv.Tcp.LibUvSocket.run"
           trace         = TraceHeader.empty
           message       = "listener started in " + (startData.ToString())
           level         = LogLevel.Info
@@ -241,9 +240,9 @@ type LibUvSocket(pool : ConcurrentPool<OperationPair>,logger, serveClient, ip, l
 
     uv_run(loop, UV_RUN_DEFAULT) |> checkStatus
     let x = uv_loop_close(loop)
-    Log.info logger "LibUvServer.destroyServerCallback" TraceHeader.empty ("uv_loop_close returned: " + x.ToString())
+    Log.intern logger "Suave.LibUv.Tcp.LibUvSocket.run" ("uv_loop_close returned: " + x.ToString())
     assert(x = 0)
-    Log.info logger "LibUvServer.destroyServerCallback" TraceHeader.empty "<--"
+    Log.intern logger "Suave.LibUv.Tcp.LibUvSocket.run" "<--"
 
   member this.exit() =
     this.uv_connection_cb <- null
@@ -290,10 +289,10 @@ type LibUvServer(maxConcurrentOps, bufferManager, logger : Logger,
       s.run(server)
       s.exit()
     with ex ->
-      Log.infoe logger "LibUvServer.run" TraceHeader.empty ex "could not start LibUvSocket"
+      Log.infoe logger "Suave.LibUv.Tcp.LibUvServer.run" TraceHeader.empty ex "could not start LibUvSocket"
     destroyHandle loop
     event.Set() |> ignore
-    Log.info logger "LibUvServer.run" TraceHeader.empty "exiting server."
+    Log.info logger "Suave.LibUv.Tcp.LibUvServer.run" TraceHeader.empty "exiting server."
 
   member this.closeHandlerCallback (handle : IntPtr) =
     Marshal.FreeCoTaskMem handle
@@ -302,9 +301,9 @@ type LibUvServer(maxConcurrentOps, bufferManager, logger : Logger,
     uv_close(handle,uv_close_cb(this.closeHandlerCallback))
 
   member this.uv_stop_loop (_ : IntPtr) =
-    Log.info logger "LibUvServer.uv_stop_loop" TraceHeader.empty "-->"
+    Log.info logger "Suave.LibUv.Tcp.LibUvServer.uv_stop_loop" TraceHeader.empty "-->"
     uv_close(stopLoopCallback, this.uv_close_cb_loop)
-    Log.info logger "LibUvServer.uv_stop_loop" TraceHeader.empty "<--"
+    Log.info logger "Suave.LibUv.Tcp.LibUvServer.uv_stop_loop" TraceHeader.empty "<--"
 
   member this.init() = 
     this.thread <- new Thread(this.run)
@@ -323,29 +322,29 @@ type LibUvServer(maxConcurrentOps, bufferManager, logger : Logger,
     this.thread.Start()
 
   member this.stopLoop() =
-    Log.info logger "LibUvServer.stopLoop" TraceHeader.empty "-->"
+    Log.info logger "Suave.LibUv.Tcp.LibUvServer.stopLoop" TraceHeader.empty "-->"
     uv_async_send (stopLoopCallback) |> checkStatus
     closeEvent.WaitOne() |> ignore
-    Log.info logger "LibUvServer.stopLoop" TraceHeader.empty "<--"
+    Log.info logger "Suave.LibUv.Tcp.LibUvServer.stopLoop" TraceHeader.empty "<--"
 
   member private this.destroyServerCallback _ =
-    Log.info logger "LibUvServer.destroyServerCallback" TraceHeader.empty "-->"
+    Log.info logger "Suave.LibUv.Tcp.LibUvServer.destroyServerCallback" TraceHeader.empty "-->"
     uv_walk(loop, this.uv_walk_cb, IntPtr.Zero)
     destroyHandle server
-    Log.info logger "LibUvServer.destroy" TraceHeader.empty "<--"
+    Log.info logger "Suave.LibUv.Tcp.LibUvServer.destroy" TraceHeader.empty "<--"
     closeEvent.Set() |> ignore
 
   member private this.destroyRunOnThisThreadCallback _ =
-    Log.info logger "LibUvServer.destroyRunOnThisThreadCallback" TraceHeader.empty "-->"
+    Log.info logger "Suave.LibUv.Tcp.LibUvServer.destroyRunOnThisThreadCallback" TraceHeader.empty "-->"
     destroyHandle synchronizationContextCallback
     uv_close(server, this.uv_close_cb_destroy)
-    Log.info logger "LibUvServer.destroyRunOnThisThreadCallback" TraceHeader.empty "<--"
+    Log.info logger "Suave.LibUv.Tcp.LibUvServer.destroyRunOnThisThreadCallback" TraceHeader.empty "<--"
 
   member private this.destroyLoopCallback _ =
-    Log.info logger "LibUvServer.destroyLoopCallback" TraceHeader.empty "-->"
+    Log.info logger "Suave.LibUv.Tcp.LibUvServer.destroyLoopCallback" TraceHeader.empty "-->"
     destroyHandle stopLoopCallback
     uv_close(synchronizationContextCallback, this.uv_close_cb_thread)
-    Log.info logger "LibUvServer.destroyLoopCallback" TraceHeader.empty "<--"
+    Log.info logger "Suave.LibUv.Tcp.LibUvServer.destroyLoopCallback" TraceHeader.empty "<--"
 
 let runServerLibUv logger maxConcurrentOps bufferSize (binding: SocketBinding) startData (acceptingConnections: AsyncResultCell<StartedData>) serveClient =
   let bufferManager = new BufferManager(bufferSize * (maxConcurrentOps + 1), bufferSize, logger)
