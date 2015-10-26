@@ -20,7 +20,6 @@
     </PlatformTarget>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <DebugSymbols>false</DebugSymbols>
     <Optimize>true</Optimize>
     <OutputPath>bin\Release</OutputPath>
     <ErrorReport>prompt</ErrorReport>
@@ -31,26 +30,25 @@
     <DefineConstants>
     </DefineConstants>
   </PropertyGroup>
-  <ItemGroup>
-    <Reference Include="mscorlib" />
-    <Reference Include="System" />
-    <Reference Include="System.Core" />
-    <Reference Include="System.Numerics" />
-  </ItemGroup>
-  <ItemGroup>
-    <Compile Include="AssemblyVersionInfo.fs" />
-    <Compile Include="Program.fs" />
-  </ItemGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|x86' ">
+    <DebugSymbols>true</DebugSymbols>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug</OutputPath>
+    <DefineConstants>DEBUG</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <Externalconsole>true</Externalconsole>
+    <PlatformTarget>x86</PlatformTarget>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|x86' ">
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release</OutputPath>
+    <ErrorReport>prompt</ErrorReport>
+    <Externalconsole>true</Externalconsole>
+    <GenerateTailCalls>true</GenerateTailCalls>
+    <DefineConstants />
+    <PlatformTarget>x86</PlatformTarget>
+  </PropertyGroup>
   <Import Project="$(MSBuildExtensionsPath32)\..\Microsoft SDKs\F#\3.1\Framework\v4.0\Microsoft.FSharp.Targets" />
-  <ItemGroup>
-    <ProjectReference Include="..\..\src\Suave\Suave.fsproj">
-      <Project>{3DC9193E-BD0C-4486-9C58-56B630C36623}</Project>
-      <Name>Suave</Name>
-    </ProjectReference>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="paket.references" />
-  </ItemGroup>
   <Choose>
     <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
       <ItemGroup>
@@ -95,4 +93,20 @@
       </ItemGroup>
     </When>
   </Choose>
+  <ItemGroup>
+    <Compile Include="AssemblyVersionInfo.fs" />
+    <Compile Include="Program.fs" />
+    <None Include="paket.references" />
+    <Content Include="App.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="mscorlib" />
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Numerics" />
+    <ProjectReference Include="..\..\src\Suave\Suave.fsproj">
+      <Project>{3DC9193E-BD0C-4486-9C58-56B630C36623}</Project>
+      <Name>Suave</Name>
+    </ProjectReference>
+  </ItemGroup>
 </Project>

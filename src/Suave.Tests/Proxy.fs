@@ -4,9 +4,6 @@
 
 open Fuchu
 
-open OpenSSL.X509
-open OpenSSL.Core
-
 open System
 open System.Net
 
