@@ -127,6 +127,7 @@ type LibUvTransport(pool : ConcurrentPool<OperationPair>,loop : IntPtr,client : 
 
   [<DefaultValue>] val mutable uv_close_cb : uv_close_cb
   [<DefaultValue>] val mutable cont : unit -> unit
+  [<DefaultValue>] val mutable pin : GCHandle
 
   let (readOp,writeOp) = pool.Pop()
  
@@ -141,6 +142,11 @@ type LibUvTransport(pool : ConcurrentPool<OperationPair>,loop : IntPtr,client : 
 
   member this.initialize() =
     this.uv_close_cb <- uv_close_cb(this.closeCallback)
+    this.pin <- GCHandle.Alloc(this)
+
+  member this.shutdown () = Async.FromContinuations <| fun (ok, _, _) ->
+        synchronizationContext.Post(SendOrPostCallback(fun o -> this.close ok),null)
+        synchronizationContext.Send()
 
   interface ITransport with
     member this.read (buf : ByteSegment) =
@@ -153,10 +159,11 @@ type LibUvTransport(pool : ConcurrentPool<OperationPair>,loop : IntPtr,client : 
       synchronizationContext.Post(SendOrPostCallback(fun o -> writeOp.writeStart client buf ok),null)
       synchronizationContext.Send()
 
-    member this.shutdown() =
-      Async.FromContinuations <| fun (ok, _, _) ->
-        synchronizationContext.Post(SendOrPostCallback(fun o -> this.close ok),null)
-        synchronizationContext.Send()
+    member this.shutdown() = async{
+      do! this.shutdown()
+      do this.pin.Free()
+      }
+      
 
 let createLibUvOpsPool maxOps =
 
