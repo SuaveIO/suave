@@ -13,6 +13,8 @@ type TlsTransport(cn : Connection, ssl) =
   interface ITransport with
     member this.read (buf : ByteSegment) = sslReceive cn ssl buf
     member this.write(buf : ByteSegment) = sslSend cn  ssl buf
+    member this.shutdown() =
+      cn.transport.shutdown()
 
 type OpenSSLProvider(cert : X509Certificate) = 
 
