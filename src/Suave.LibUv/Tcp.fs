@@ -142,11 +142,6 @@ type LibUvTransport(pool : ConcurrentPool<OperationPair>,loop : IntPtr,client : 
   member this.initialize() =
     this.uv_close_cb <- uv_close_cb(this.closeCallback)
 
-  member this.shutdown() =
-    Async.FromContinuations <| fun (ok, _, _) ->
-      synchronizationContext.Post(SendOrPostCallback(fun o -> this.close ok),null)
-      synchronizationContext.Send()
-
   interface ITransport with
     member this.read (buf : ByteSegment) =
       Async.FromContinuations <| fun (ok, _, _) ->
@@ -157,6 +152,11 @@ type LibUvTransport(pool : ConcurrentPool<OperationPair>,loop : IntPtr,client : 
       Async.FromContinuations <| fun (ok, _, _) ->
       synchronizationContext.Post(SendOrPostCallback(fun o -> writeOp.writeStart client buf ok),null)
       synchronizationContext.Send()
+
+    member this.shutdown() =
+      Async.FromContinuations <| fun (ok, _, _) ->
+        synchronizationContext.Post(SendOrPostCallback(fun o -> this.close ok),null)
+        synchronizationContext.Send()
 
 let createLibUvOpsPool maxOps =
 
@@ -214,7 +214,7 @@ type LibUvSocket(pool : ConcurrentPool<OperationPair>,logger, serveClient, ip, l
         let transport = new LibUvTransport(pool,loop,client,this.synchronizationContext,logger)
         transport.initialize()
         Async.Start <| 
-            job logger serveClient ip transport bufferManager (transport.shutdown())
+            job logger serveClient ip transport bufferManager
       else
         destroyHandle client
 
