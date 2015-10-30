@@ -303,6 +303,7 @@ type LibUvServer(maxConcurrentOps, bufferManager, logger : Logger,
       s.exit()
     with ex ->
       Log.infoe logger "Suave.LibUv.Tcp.LibUvServer.run" TraceHeader.empty ex "could not start LibUvSocket"
+    closeEvent.WaitOne() |> ignore
     destroyHandle loop
     event.Set() |> ignore
     Log.info logger "Suave.LibUv.Tcp.LibUvServer.run" TraceHeader.empty "exiting server."
