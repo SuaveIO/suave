@@ -52,6 +52,10 @@ open Suave.Utils.Async
 
 let isWinNT = Environment.OSVersion.Platform = PlatformID.Win32NT
 
+let fork task =
+  ThreadPool.QueueUserWorkItem(WaitCallback task)
+  |> ignore
+
 type ReadOp() =
 
   [<DefaultValue>] val mutable buf : ArraySegment<byte>
@@ -63,15 +67,15 @@ type ReadOp() =
 
     if (nread < 0) then
       if (nread <> UV_EOF) then
-        this.ok (Choice2Of2 <| ConnectionError (new string(uv_err_name(nread))))
+        fork(fun _ -> this.ok (Choice2Of2 <| ConnectionError (new string(uv_err_name(nread)))))
       else
-        this.ok (Choice2Of2 <| ConnectionError("eof"))
+        fork(fun _ -> this.ok (Choice2Of2 <| ConnectionError("eof")))
     else
       let s = uv_read_stop(client)
       if (s < 0) then
-        this.ok (Choice2Of2 <| ConnectionError (new string(uv_err_name(s))))
+        fork(fun _ -> this.ok (Choice2Of2 <| ConnectionError (new string(uv_err_name(s)))))
       else
-        this.ok (Choice1Of2 nread)
+        fork(fun _ -> this.ok (Choice1Of2 nread))
 
   member this.allocBuffer (_ : IntPtr, suggested_size: int, [<Out>] buff : byref<uv_buf_t>) =
     if isWinNT then
@@ -100,9 +104,9 @@ type WriteOp() =
     Marshal.FreeCoTaskMem request
     if (status < 0) then 
       let err = new string(uv_strerror(status))
-      this.ok (Choice2Of2 <| ConnectionError err)
+      fork(fun _ -> this.ok (Choice2Of2 <| ConnectionError err))
     else
-      this.ok (Choice1Of2())
+      fork(fun _ -> this.ok (Choice1Of2()))
 
   member this.initialize() =
     this.wrbuffArray <- [| new uv_buf_t() |]
