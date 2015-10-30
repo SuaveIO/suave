@@ -206,10 +206,9 @@ open Suave.Types
 open Suave.Tcp
 open Suave
 
-type LibUvSocket(pool : ConcurrentPool<OperationPair>,logger, serveClient, ip, loop , bufferManager, startData, acceptingConnections: AsyncResultCell<StartedData>,synchronizationContextCallback) =
+type LibUvSocket(pool : ConcurrentPool<OperationPair>,logger, serveClient, ip, loop , bufferManager, startData, acceptingConnections: AsyncResultCell<StartedData>,synchronizationContext) =
 
   [<DefaultValue>] val mutable uv_connection_cb : uv_connection_cb
-  [<DefaultValue>] val mutable synchronizationContext : SingleThreadSynchronizationContext
 
   member this.onNewConnection (server : IntPtr) (status: int) =
 
@@ -222,7 +221,7 @@ type LibUvSocket(pool : ConcurrentPool<OperationPair>,logger, serveClient, ip, l
       uv_tcp_init(loop, client) |> checkStatus
 
       if (uv_accept(server, client) = 0) then
-        let transport = new LibUvTransport(pool,loop,client,this.synchronizationContext,logger)
+        let transport = new LibUvTransport(pool,loop,client,synchronizationContext,logger)
         transport.initialize()
         Async.Start <| 
             job logger serveClient ip transport bufferManager
@@ -231,8 +230,6 @@ type LibUvSocket(pool : ConcurrentPool<OperationPair>,logger, serveClient, ip, l
 
   member this.initialize() =
     this.uv_connection_cb <- uv_connection_cb(this.onNewConnection)
-    this.synchronizationContext <- new SingleThreadSynchronizationContext(loop, synchronizationContextCallback)
-    this.synchronizationContext.init()
 
   member this.run(server) =
 
@@ -265,6 +262,7 @@ type LibUvServer(maxConcurrentOps, bufferManager, logger : Logger,
                  event : ManualResetEvent) =
 
   [<DefaultValue>] val mutable thread : Thread
+  [<DefaultValue>] val mutable synchronizationContext : SingleThreadSynchronizationContext
   [<DefaultValue>] val mutable uv_async_stop_loop_cb : uv_handle_cb
   [<DefaultValue>] val mutable uv_close_cb_destroy : uv_close_cb
   [<DefaultValue>] val mutable uv_close_cb_thread  : uv_close_cb
@@ -296,7 +294,7 @@ type LibUvServer(maxConcurrentOps, bufferManager, logger : Logger,
       uv_tcp_bind(server, &addr, 0) |> checkStatus
       let s = new LibUvSocket(opsPool, logger, serveClient, binding, loop,
                               bufferManager, startData, acceptingConnections,
-                              synchronizationContextCallback)
+                              this.synchronizationContext)
       s.initialize()
       s.run(server)
       s.exit()
@@ -330,6 +328,8 @@ type LibUvServer(maxConcurrentOps, bufferManager, logger : Logger,
   member this.initLoop () =
     uv_loop_init(loop) |> checkStatus
     uv_async_init(loop, stopLoopCallback, this.uv_async_stop_loop_cb) |> checkStatus
+    this.synchronizationContext <- new SingleThreadSynchronizationContext(loop, synchronizationContextCallback)
+    this.synchronizationContext.init()
 
   member this.start() = 
     this.thread.Start()
