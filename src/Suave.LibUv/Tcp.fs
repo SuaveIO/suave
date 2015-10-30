@@ -265,6 +265,7 @@ type LibUvServer(maxConcurrentOps, bufferManager, logger : Logger,
   [<DefaultValue>] val mutable uv_close_cb_destroy : uv_close_cb
   [<DefaultValue>] val mutable uv_close_cb_thread  : uv_close_cb
   [<DefaultValue>] val mutable uv_close_cb_loop    : uv_close_cb
+  [<DefaultValue>] val mutable uv_close_cb_handler : uv_close_cb
   [<DefaultValue>] val mutable uv_walk_cb          : uv_walk_cb
 
   let mutable addr = sockaddr_in( a = 0L, b= 0L, c = 0L, d = 0L)
@@ -305,7 +306,7 @@ type LibUvServer(maxConcurrentOps, bufferManager, logger : Logger,
     Marshal.FreeCoTaskMem handle
 
   member this.closeHandler (handle : IntPtr) (arg : IntPtr) =
-    uv_close(handle,uv_close_cb(this.closeHandlerCallback))
+    uv_close(handle,this.uv_close_cb_handler)
 
   member this.uv_stop_loop (_ : IntPtr) =
     Log.info logger "Suave.LibUv.Tcp.LibUvServer.uv_stop_loop" TraceHeader.empty "-->"
@@ -319,6 +320,7 @@ type LibUvServer(maxConcurrentOps, bufferManager, logger : Logger,
     this.uv_close_cb_thread  <- uv_close_cb(this.destroyRunOnThisThreadCallback)
     this.uv_close_cb_loop    <- uv_close_cb(this.destroyLoopCallback)
     this.uv_async_stop_loop_cb <- uv_handle_cb(this.uv_stop_loop)
+    this.uv_close_cb_handler <- uv_close_cb(this.closeHandlerCallback)
     this.uv_walk_cb <- uv_walk_cb(this.closeHandler)
 
   member this.initLoop () =
