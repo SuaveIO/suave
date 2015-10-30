@@ -28,6 +28,7 @@ type SingleThreadSynchronizationContext(loop, runOnThisThreadHandler) =
 
   let queue = new ConcurrentQueue<KeyValuePair<SendOrPostCallback, obj>>()
 
+  [<DefaultValue>] val mutable running : bool
   [<DefaultValue>] val mutable uv_handle_cb : uv_handle_cb
  
   member this.Post( d : SendOrPostCallback, state : obj) =
@@ -36,7 +37,8 @@ type SingleThreadSynchronizationContext(loop, runOnThisThreadHandler) =
     else queue.Enqueue(new KeyValuePair<SendOrPostCallback, obj>(d, state))
 
   member this.Send() =
-    uv_async_send(runOnThisThreadHandler) |> checkStatus
+    if this.running then
+      uv_async_send(runOnThisThreadHandler) |> checkStatus
 
   member this.runOnCurrentThread( _ :IntPtr)  =
       let mutable workItem = KeyValuePair(null,null)
@@ -45,6 +47,7 @@ type SingleThreadSynchronizationContext(loop, runOnThisThreadHandler) =
 
   member this.init() =
     this.uv_handle_cb <- uv_handle_cb(this.runOnCurrentThread)
+    this.running <- true
     uv_async_init(loop,runOnThisThreadHandler,this.uv_handle_cb) |> checkStatus
 
 open Suave.Sockets
@@ -356,6 +359,7 @@ type LibUvServer(maxConcurrentOps, bufferManager, logger : Logger,
   member private this.destroyLoopCallback _ =
     Log.info logger "Suave.LibUv.Tcp.LibUvServer.destroyLoopCallback" TraceHeader.empty "-->"
     destroyHandle stopLoopCallback
+    this.synchronizationContext.running <- false
     uv_close(synchronizationContextCallback, this.uv_close_cb_thread)
     Log.info logger "Suave.LibUv.Tcp.LibUvServer.destroyLoopCallback" TraceHeader.empty "<--"
 
