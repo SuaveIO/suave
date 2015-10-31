@@ -31,7 +31,7 @@ type SingleThreadSynchronizationContext(loop, runOnThisThreadHandler) =
   [<DefaultValue>] val mutable running : bool
   [<DefaultValue>] val mutable uv_handle_cb : uv_handle_cb
  
-  member this.Post( d : SendOrPostCallback, state : obj) =
+  member this.Post(d : SendOrPostCallback, state : obj) =
     if (d = null) then
       raise( ArgumentNullException("d"))
     else queue.Enqueue(new KeyValuePair<SendOrPostCallback, obj>(d, state))
@@ -48,7 +48,7 @@ type SingleThreadSynchronizationContext(loop, runOnThisThreadHandler) =
   member this.init() =
     this.uv_handle_cb <- uv_handle_cb(this.runOnCurrentThread)
     this.running <- true
-    uv_async_init(loop,runOnThisThreadHandler,this.uv_handle_cb) |> checkStatus
+    uv_async_init(loop, runOnThisThreadHandler, this.uv_handle_cb) |> checkStatus
 
 open Suave.Sockets
 open Suave.Utils.Async
@@ -76,7 +76,7 @@ type ReadOp() =
       else
         this.ok (Choice1Of2 nread)
 
-  member this.allocBuffer (_ : IntPtr, suggested_size: int, [<Out>] buff : byref<uv_buf_t>) =
+  member this.allocBuffer (_ : IntPtr, suggested_size : int, [<Out>] buff : byref<uv_buf_t>) =
     if isWinNT then
       buff.``base`` <- IntPtr(this.buf.Count)
       buff.len <- Marshal.UnsafeAddrOfPinnedArrayElement(this.buf.Array,this.buf.Offset)
@@ -126,7 +126,11 @@ type OperationPair = ReadOp*WriteOp
 
 open Suave.Logging
 
-type LibUvTransport(pool : ConcurrentPool<OperationPair>,loop : IntPtr,client : Handle, synchronizationContext : SingleThreadSynchronizationContext,logger : Logger) =
+type LibUvTransport(pool : ConcurrentPool<OperationPair>,
+                    loop : IntPtr,
+                    client : Handle, 
+                    synchronizationContext : SingleThreadSynchronizationContext,
+                    logger : Logger) =
 
   [<DefaultValue>] val mutable uv_close_cb : uv_close_cb
   [<DefaultValue>] val mutable cont : unit -> unit
@@ -147,9 +151,10 @@ type LibUvTransport(pool : ConcurrentPool<OperationPair>,loop : IntPtr,client : 
     this.uv_close_cb <- uv_close_cb(this.closeCallback)
     this.pin <- GCHandle.Alloc(this)
 
-  member this.shutdown () = Async.FromContinuations <| fun (ok, _, _) ->
-        synchronizationContext.Post(SendOrPostCallback(fun o -> this.close ok),null)
-        synchronizationContext.Send()
+  member this.shutdown () =
+    Async.FromContinuations <| fun (ok, _, _) ->
+      synchronizationContext.Post(SendOrPostCallback(fun o -> this.close ok),null)
+      synchronizationContext.Send()
 
   interface ITransport with
     member this.read (buf : ByteSegment) =
@@ -159,8 +164,8 @@ type LibUvTransport(pool : ConcurrentPool<OperationPair>,loop : IntPtr,client : 
 
     member this.write(buf : ByteSegment) =
       Async.FromContinuations <| fun (ok, _, _) ->
-      synchronizationContext.Post(SendOrPostCallback(fun o -> writeOp.writeStart client buf ok),null)
-      synchronizationContext.Send()
+        synchronizationContext.Post(SendOrPostCallback(fun o -> writeOp.writeStart client buf ok),null)
+        synchronizationContext.Send()
 
     member this.shutdown() = async{
       do! this.shutdown()
@@ -205,7 +210,15 @@ open Suave.Types
 open Suave.Tcp
 open Suave
 
-type LibUvSocket(pool : ConcurrentPool<OperationPair>,logger, serveClient, ip, loop , bufferManager, startData, acceptingConnections: AsyncResultCell<StartedData>,synchronizationContext) =
+type LibUvSocket(pool : ConcurrentPool<OperationPair>,
+                  logger, 
+                  serveClient, 
+                  ip, 
+                  loop, 
+                  bufferManager,
+                  startData,
+                  acceptingConnections: AsyncResultCell<StartedData>,
+                  synchronizationContext) =
 
   [<DefaultValue>] val mutable uv_connection_cb : uv_connection_cb
 
@@ -222,8 +235,7 @@ type LibUvSocket(pool : ConcurrentPool<OperationPair>,logger, serveClient, ip, l
       if (uv_accept(server, client) = 0) then
         let transport = new LibUvTransport(pool,loop,client,synchronizationContext,logger)
         transport.initialize()
-        Async.Start <| 
-            job logger serveClient ip transport bufferManager
+        Async.Start (job logger serveClient ip transport bufferManager)
       else
         destroyHandle client
 
@@ -277,7 +289,7 @@ type LibUvServer(maxConcurrentOps, bufferManager, logger : Logger,
   let ip = binding.ip.ToString()
   let port = int binding.port
 
-  let stopLoopCallback = createHandle <| uv_handle_size(uv_handle_type.UV_ASYNC)
+  let stopLoopCallbackHandle = createHandle <| uv_handle_size(uv_handle_type.UV_ASYNC)
   let synchronizationContextCallback = createHandle <| uv_handle_size(uv_handle_type.UV_ASYNC)
 
   let closeEvent = new ManualResetEvent(false)
@@ -310,9 +322,9 @@ type LibUvServer(maxConcurrentOps, bufferManager, logger : Logger,
   member this.closeHandler (handle : IntPtr) (arg : IntPtr) =
     uv_close(handle,this.uv_close_cb_handler)
 
-  member this.uv_stop_loop (_ : IntPtr) =
+  member this.stopLoopCallback (_ : IntPtr) =
     Log.info logger "Suave.LibUv.Tcp.LibUvServer.uv_stop_loop" TraceHeader.empty "-->"
-    uv_close(stopLoopCallback, this.uv_close_cb_loop)
+    uv_close(stopLoopCallbackHandle, this.uv_close_cb_loop)
     Log.info logger "Suave.LibUv.Tcp.LibUvServer.uv_stop_loop" TraceHeader.empty "<--"
 
   member this.init() = 
@@ -321,13 +333,13 @@ type LibUvServer(maxConcurrentOps, bufferManager, logger : Logger,
     this.uv_close_cb_destroy <- uv_close_cb(this.destroyServerCallback)
     this.uv_close_cb_thread  <- uv_close_cb(this.destroyRunOnThisThreadCallback)
     this.uv_close_cb_loop    <- uv_close_cb(this.destroyLoopCallback)
-    this.uv_async_stop_loop_cb <- uv_handle_cb(this.uv_stop_loop)
+    this.uv_async_stop_loop_cb <- uv_handle_cb(this.stopLoopCallback)
     this.uv_close_cb_handler <- uv_close_cb(this.closeHandlerCallback)
     this.uv_walk_cb <- uv_walk_cb(this.closeHandler)
 
   member this.initLoop () =
     uv_loop_init(loop) |> checkStatus
-    uv_async_init(loop, stopLoopCallback, this.uv_async_stop_loop_cb) |> checkStatus
+    uv_async_init(loop, stopLoopCallbackHandle, this.uv_async_stop_loop_cb) |> checkStatus
     this.synchronizationContext <- new SingleThreadSynchronizationContext(loop, synchronizationContextCallback)
     this.synchronizationContext.init()
 
@@ -336,7 +348,7 @@ type LibUvServer(maxConcurrentOps, bufferManager, logger : Logger,
 
   member this.stopLoop() =
     Log.info logger "Suave.LibUv.Tcp.LibUvServer.stopLoop" TraceHeader.empty "-->"
-    uv_async_send (stopLoopCallback) |> checkStatus
+    uv_async_send stopLoopCallbackHandle |> checkStatus
     closeEvent.WaitOne() |> ignore
     Log.info logger "Suave.LibUv.Tcp.LibUvServer.stopLoop" TraceHeader.empty "<--"
 
@@ -355,7 +367,7 @@ type LibUvServer(maxConcurrentOps, bufferManager, logger : Logger,
 
   member private this.destroyLoopCallback _ =
     Log.info logger "Suave.LibUv.Tcp.LibUvServer.destroyLoopCallback" TraceHeader.empty "-->"
-    destroyHandle stopLoopCallback
+    destroyHandle stopLoopCallbackHandle
     this.synchronizationContext.running <- false
     uv_close(synchronizationContextCallback, this.uv_close_cb_thread)
     Log.info logger "Suave.LibUv.Tcp.LibUvServer.destroyLoopCallback" TraceHeader.empty "<--"
@@ -366,7 +378,8 @@ let runServerLibUv logger maxConcurrentOps bufferSize (binding: SocketBinding) s
 
   let exitEvent = new ManualResetEvent(false)
 
-  let libUvServer = new LibUvServer(maxConcurrentOps, bufferManager, logger, binding, startData, serveClient, acceptingConnections, exitEvent)
+  let libUvServer = new LibUvServer(maxConcurrentOps, bufferManager,
+                          logger, binding, startData, serveClient, acceptingConnections, exitEvent)
 
   libUvServer.init()
   async {

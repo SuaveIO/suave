@@ -117,7 +117,7 @@ let job logger
     }
   try
     use! oo = Async.OnCancel (fun () -> intern "disconnected client (async cancel)"
-                                        Async.RunSynchronously <| transport.shutdown())
+                                        Async.RunSynchronously (transport.shutdown()))
     do! serveClient connection
   with 
     | :? System.IO.EndOfStreamException ->
@@ -171,7 +171,7 @@ let runServer logger maxConcurrentOps bufferSize (binding: SocketBinding) startD
           let remoteBinding =
             let rep = socket.RemoteEndPoint :?> IPEndPoint
             { ip = rep.Address; port = uint16 rep.Port }
-          let transport = new TcpTransport(acceptArgs,a,b,c)
+          let transport = new TcpTransport(acceptArgs, a, b, c)
           Async.Start (job logger serveClient remoteBinding transport bufferManager, token)
         | Choice2Of2 e -> failwith "failed to accept."
       with ex -> "failed to accept a client" |> Log.interne logger "Suave.Tcp.tcpIpServer" ex

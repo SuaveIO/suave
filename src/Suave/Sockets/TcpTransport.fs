@@ -3,10 +3,13 @@
 open System
 open System.Net.Sockets
 
-type TcpTransport(acceptArgs: SocketAsyncEventArgs, a : ConcurrentPool<SocketAsyncEventArgs>,b : ConcurrentPool<SocketAsyncEventArgs>,c : ConcurrentPool<SocketAsyncEventArgs>) =
+type TcpTransport(acceptArgs: SocketAsyncEventArgs,
+                  acceptArgsPool: ConcurrentPool<SocketAsyncEventArgs>,
+                  readArgsPool  : ConcurrentPool<SocketAsyncEventArgs>,
+                  writeArgsPool : ConcurrentPool<SocketAsyncEventArgs>) =
   let socket = acceptArgs.AcceptSocket
-  let readArgs = b.Pop()
-  let writeArgs = c.Pop()
+  let readArgs = readArgsPool.Pop()
+  let writeArgs = writeArgsPool.Pop()
   let shutdownSocket _ =
     try
       if socket <> null then
@@ -24,8 +27,8 @@ type TcpTransport(acceptArgs: SocketAsyncEventArgs, a : ConcurrentPool<SocketAsy
     member this.shutdown() = async {
       shutdownSocket ()
       acceptArgs.AcceptSocket <- null
-      a.Push acceptArgs
-      b.Push readArgs
-      c.Push writeArgs
+      acceptArgsPool.Push acceptArgs
+      readArgsPool.Push readArgs
+      writeArgsPool.Push writeArgs
       return ()
       }
