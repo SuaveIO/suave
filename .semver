@@ -2,5 +2,5 @@
 :major: 0
 :minor: 33
 :patch: 0
-:special: libuv
+:special: libuv.1
 :metadata: ''
