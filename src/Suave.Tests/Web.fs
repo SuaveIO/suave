@@ -34,3 +34,29 @@ let parsing_tests (_: SuaveConfig) =
       Assert.Equal("should parse trace id", expected.traceId, (parseTraceHeaders headers).traceId)
       Assert.Equal("should parse span id to parent span id", expected.reqParentId, (parseTraceHeaders headers).reqParentId)
     ]
+
+[<Tests>]
+let keepAliveTests =
+  let genKeepAliveTest httpVersion connectionHeader shouldAddKeepAlive =
+    let connectionHeaderDesc, reqHeaders =
+      match connectionHeader with
+      | Some v -> sprintf "a 'Connection: %s' header" v, [("connection", v)]
+      | None -> "no Connection header", []
+    testCase (sprintf "for an %s request with %s" httpVersion connectionHeaderDesc) <| fun _ ->
+      let reqContext = { HttpContext.empty with request = { HttpContext.empty.request with httpVersion = httpVersion; headers = reqHeaders } }
+      let message, expected =
+        if shouldAddKeepAlive then
+          "should add a keep-alive header to the response", { reqContext with response = { reqContext.response with headers = ("Connection","Keep-Alive") :: reqContext.response.headers } }
+        else
+          "should not modify the response headers", reqContext
+      let actual = addKeepAliveHeader reqContext
+      Assert.Equal(message, expected.response.headers, actual.response.headers)
+
+  testList "when processing keep-alive directives" [
+    genKeepAliveTest "HTTP/1.0" None false
+    genKeepAliveTest "HTTP/1.0" (Some "close") false
+    genKeepAliveTest "HTTP/1.0" (Some "Keep-Alive") true
+    genKeepAliveTest "HTTP/1.1" None false
+    genKeepAliveTest "HTTP/1.1" (Some "close") false
+    genKeepAliveTest "HTTP/1.1" (Some "Keep-Alive") false
+  ]
