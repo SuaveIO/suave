@@ -386,6 +386,12 @@ module internal ParsingAndControl =
       do! asyncWriteLn connection "Content-Type: text/html"
   }
 
+  let internal addKeepAliveHeader (context : HttpContext) =
+    match context.request.httpVersion, context.request.header "connection" with
+    | "HTTP/1.0", Choice1Of2 v when String.eqOrdCi v "keep-alive" ->
+      { context with response = { context.response with headers = ("Connection","Keep-Alive") :: context.response.headers } }
+    | _ -> context
+
   let internal writeHeaders connection (headers : (string*string) seq) = socket {
     for x,y in headers do
       if not (List.exists (fun y -> x.ToLower().Equals(y)) ["server";"date";"content-length"]) then
@@ -544,7 +550,7 @@ module internal ParsingAndControl =
         match result with
         | None -> verbose "'result = None', exiting"
         | Some ctx ->
-          let! result'' = operate consumer ctx
+          let! result'' = addKeepAliveHeader ctx |> operate consumer
           match result'' with
           | Choice1Of2 result -> 
             match result with
