@@ -33,8 +33,7 @@ let asyncWriteNewLine (connection : Connection) =
 
 let asyncWriteLn (connection : Connection) (s : string) : SocketOp<unit> = 
   socket {
-    do! asyncWrite connection s
-    do! asyncWriteNewLine connection
+    do! asyncWrite connection (s + eol)
   }
 
 /// Write the string s to the stream asynchronously from a byte array
