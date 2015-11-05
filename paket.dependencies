@@ -18,6 +18,11 @@ nuget openssl.redist
 nuget DotLiquid
 
 nuget System.Net.Http 4.0.1-beta-23225
+nuget System.Net.Sockets 4.1.0-beta-23225
+nuget System.Net.Primitives 4.1.0-beta-23225
+nuget System.IO.Compression 4.0.1-beta-23409
+nuget System.Security.Cryptography.Algorithms 4.0.0-beta-23409
+nuget System.Security.Cryptography.Primitives 4.0.0-beta-23409
 
 source https://www.myget.org/F/dotnet-coreclr
 source https://www.myget.org/F/dotnet-corefx/
