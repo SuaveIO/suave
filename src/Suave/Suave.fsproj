@@ -146,11 +146,17 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Reference Include="System.Console">
+      <HintPath>..\..\packages\System.Console\ref\dotnet\System.Console.dll</HintPath>
+    </Reference>
     <Reference Include="System.Collections">
       <HintPath>..\..\packages\System.Collections\ref\dotnet\System.Collections.dll</HintPath>
     </Reference>
     <Reference Include="System.Collections.Concurrent">
       <HintPath>..\..\packages\System.Collections.Concurrent\ref\dotnet\System.Collections.Concurrent.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Global   ization">
+      <HintPath>..\..\packages\System.Globalization\ref\dotnet\System.Globalization.dll</HintPath>
     </Reference>
     <Reference Include="System.IO">
       <HintPath>..\..\packages\System.IO\ref\dotnet\System.IO.dll</HintPath>
@@ -160,6 +166,9 @@
     </Reference>
     <Reference Include="System.IO.FileSystem">
       <HintPath>..\..\packages\System.IO.FileSystem\ref\dotnet\System.IO.FileSystem.dll</HintPath>
+    </Reference>
+    <Reference Include="System.IO.FileSystem.Primitives">
+      <HintPath>..\..\packages\System.IO.FileSystem.Primitives\ref\dotnet\System.IO.FileSystem.Primitives.dll</HintPath>
     </Reference>
     <Reference Include="System.Net.Http">
       <HintPath>..\..\packages\System.Net.Http\ref\dotnet\System.Net.Http.dll</HintPath>
@@ -176,11 +185,23 @@
     <Reference Include="System.Runtime">
       <HintPath>..\..\packages\System.Runtime\ref\dotnet\System.Runtime.dll</HintPath>
     </Reference>
+    <Reference Include="System.Runtime.Serialization.Json">
+      <HintPath>..\..\packages\System.Runtime.Serialization.Json\ref\dotnet\System.Runtime.Serialization.Json.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Security.Cryptography.Algorithms">
+      <HintPath>..\..\packages\System.Security.Cryptography.Algorithms\ref\dotnet\System.Security.Cryptography.Algorithms.dll</HintPath>
+    </Reference>
     <Reference Include="System.Security.Cryptography.Primitives">
       <HintPath>..\..\packages\System.Security.Cryptography.Primitives\ref\dotnet\System.Security.Cryptography.Primitives.dll</HintPath>
     </Reference>
+    <Reference Include="System.Security.Cryptography.X509Certificates">
+      <HintPath>..\..\packages\System.Security.Cryptography.X509Certificates\ref\dotnet\System.Security.Cryptography.X509Certificates.dll</HintPath>
+    </Reference>
     <Reference Include="System.Text.Encoding">
       <HintPath>..\..\packages\System.Text.Encoding\ref\dotnet\System.Text.Encoding.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Text.RegularExpressions">
+      <HintPath>..\..\packages\System.Text.RegularExpressions\ref\dotnet\System.Text.RegularExpressions.dll</HintPath>
     </Reference>
     <Reference Include="System.Threading">
       <HintPath>..\..\packages\System.Threading\ref\dotnet\System.Threading.dll</HintPath>
