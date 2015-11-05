@@ -146,14 +146,29 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Reference Include="System.Runtime">
-      <HintPath>..\..\packages\System.Runtime\ref\dotnet\System.Runtime.dll</HintPath>
-    </Reference>
     <Reference Include="System.Collections">
       <HintPath>..\..\packages\System.Collections\ref\dotnet\System.Collections.dll</HintPath>
     </Reference>
     <Reference Include="System.Net.Http">
+      <HintPath>..\..\packages\System.IO\ref\dotnet\System.IO.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Net.Http">
       <HintPath>..\..\packages\System.Net.Http\ref\dotnet\System.Net.Http.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Runtime.Extensions">
+      <HintPath>..\..\packages\System.Runtime.Extensions\ref\dotnet\System.Runtime.Extensions.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Runtime">
+      <HintPath>..\..\packages\System.Runtime\ref\dotnet\System.Runtime.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Text.Encoding">
+      <HintPath>..\..\packages\System.Text.Encoding\ref\dotnet\System.Text.Encoding.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Threading">
+      <HintPath>..\..\packages\System.Threading\ref\dotnet\System.Threading.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Threading.Tasks">
+      <HintPath>..\..\packages\System.Threading.Tasks\ref\dotnet\System.Threading.Tasks.dll</HintPath>
     </Reference>
   </ItemGroup>
 </Project>
