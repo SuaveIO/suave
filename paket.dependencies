@@ -23,6 +23,7 @@ nuget System.Net.Primitives 4.0.11-beta-23409
 nuget System.IO.Compression 4.0.1-beta-23409
 nuget System.Security.Cryptography.Algorithms 4.0.0-beta-23409
 nuget System.Security.Cryptography.Primitives 4.0.0-beta-23409
+nuget System.Threading.Thread 4.0.0-beta-23225
 
 source https://www.myget.org/F/dotnet-coreclr
 source https://www.myget.org/F/dotnet-corefx/
