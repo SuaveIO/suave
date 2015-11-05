@@ -42,3 +42,7 @@ NUGET
     WebSharper.UI.Next (3.5.16.190)
       WebSharper (>= 3.5.12.213)
     WebSocketSharp (1.0.3-rc9)
+
+remote: https://www.myget.org/F/fsharp-daily
+specs:
+  runtime.win7-x64.Microsoft.FSharp.Compiler.netcore (1.0.0-alpha-0001)
