@@ -1,4 +1,4 @@
-framework: NET45
+framework: NET50
 source https://nuget.org/api/v2
 
 nuget FSharp.Charting
@@ -16,6 +16,8 @@ nuget WebSharper.UI.Next
 nuget WebSocketSharp
 nuget openssl.redist
 nuget DotLiquid
+
+nuget System.Net.Http 4.0.1-beta-23225
 
 source https://www.myget.org/F/dotnet-coreclr
 source https://www.myget.org/F/dotnet-corefx/
