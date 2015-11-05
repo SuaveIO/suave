@@ -1,12 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
     <FscToolPath>..\..\packages\runtime.win7-x64.Microsoft.FSharp.Compiler.netcore</FscToolPath>
     <OtherFlags>--targetprofile:netcore --simpleresolution --noframework</OtherFlags>
     <ImplicitlyExpandTargetFramework>false</ImplicitlyExpandTargetFramework>
     <ImplicitlyExpandDesignTimeFacades>false</ImplicitlyExpandDesignTimeFacades>
+    <NoStdLib>true</NoStdLib> 
+    <NoExplicitReferenceToStdLib>true</NoExplicitReferenceToStdLib> 
+    <AddAdditionalExplicitAssemblyReferences>false</AddAdditionalExplicitAssemblyReferences> 
+    <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute> 
   </PropertyGroup>
-  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
@@ -143,13 +147,13 @@
   </ItemGroup>
   <ItemGroup>
     <Reference Include="System.Runtime">
-      <HintPath>..\..\packages\System.Runtime\netcore50\System.Runtime.dll</HintPath>
+      <HintPath>..\..\packages\System.Runtime\ref\dotnet\System.Runtime.dll</HintPath>
     </Reference>
     <Reference Include="System.Collections">
-      <HintPath>..\..\packages\System.Collections\netcore50\System.Collections.dll</HintPath>
+      <HintPath>..\..\packages\System.Collections\ref\dotnet\System.Collections.dll</HintPath>
     </Reference>
     <Reference Include="System.Net.Http">
-      <HintPath>..\..\packages\System.Net.Http\netcore50\System.Net.Http.dll</HintPath>
+      <HintPath>..\..\packages\System.Net.Http\ref\dotnet\System.Net.Http.dll</HintPath>
     </Reference>
   </ItemGroup>
 </Project>
