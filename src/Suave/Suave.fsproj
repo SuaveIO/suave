@@ -149,11 +149,26 @@
     <Reference Include="System.Collections">
       <HintPath>..\..\packages\System.Collections\ref\dotnet\System.Collections.dll</HintPath>
     </Reference>
-    <Reference Include="System.Net.Http">
+    <Reference Include="System.Collections.Concurrent">
+      <HintPath>..\..\packages\System.Collections.Concurrent\ref\dotnet\System.Collections.Concurrent.dll</HintPath>
+    </Reference>
+    <Reference Include="System.IO">
       <HintPath>..\..\packages\System.IO\ref\dotnet\System.IO.dll</HintPath>
+    </Reference>
+    <Reference Include="System.IO.Compression">
+      <HintPath>..\..\packages\System.IO.Compression\ref\dotnet\System.IO.Compression.dll</HintPath>
+    </Reference>
+    <Reference Include="System.IO.FileSystem">
+      <HintPath>..\..\packages\System.IO.FileSystem\ref\dotnet\System.IO.FileSystem.dll</HintPath>
     </Reference>
     <Reference Include="System.Net.Http">
       <HintPath>..\..\packages\System.Net.Http\ref\dotnet\System.Net.Http.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Net.Primitives">
+      <HintPath>..\..\packages\System.Net.Primitives\ref\dotnet\System.Net.Primitives.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Net.Sockets">
+      <HintPath>..\..\packages\System.Net.Sockets\ref\dotnet\System.Net.Sockets.dll</HintPath>
     </Reference>
     <Reference Include="System.Runtime.Extensions">
       <HintPath>..\..\packages\System.Runtime.Extensions\ref\dotnet\System.Runtime.Extensions.dll</HintPath>
@@ -161,11 +176,17 @@
     <Reference Include="System.Runtime">
       <HintPath>..\..\packages\System.Runtime\ref\dotnet\System.Runtime.dll</HintPath>
     </Reference>
+    <Reference Include="System.Security.Cryptography.Primitives">
+      <HintPath>..\..\packages\System.Security.Cryptography.Primitives\ref\dotnet\System.Security.Cryptography.Primitives.dll</HintPath>
+    </Reference>
     <Reference Include="System.Text.Encoding">
       <HintPath>..\..\packages\System.Text.Encoding\ref\dotnet\System.Text.Encoding.dll</HintPath>
     </Reference>
     <Reference Include="System.Threading">
       <HintPath>..\..\packages\System.Threading\ref\dotnet\System.Threading.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Threading.Thread">
+      <HintPath>..\..\packages\System.Threading.Thread\ref\dotnet\System.Threading.Thread.dll</HintPath>
     </Reference>
     <Reference Include="System.Threading.Tasks">
       <HintPath>..\..\packages\System.Threading.Tasks\ref\dotnet\System.Threading.Tasks.dll</HintPath>
