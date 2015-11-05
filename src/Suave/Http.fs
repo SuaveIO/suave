@@ -568,7 +568,7 @@ module Http =
 
       let filesize  (x : FileSystemInfo) =
         if (x.Attributes ||| FileAttributes.Directory = FileAttributes.Directory) then
-          String.Format("{0,-14}",System.Web.HttpUtility.HtmlEncode("<DIR>"))
+          String.Format("{0,-14}",System.Net.WebUtility.HtmlEncode("<DIR>"))
         else
           String.Format("{0,14}", (new FileInfo(x.FullName)).Length)
 
