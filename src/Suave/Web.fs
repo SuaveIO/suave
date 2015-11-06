@@ -222,7 +222,7 @@ module internal ParsingAndControl =
           do! tempFile.AsyncWrite(x.Array, x.Offset, y)
           }) ctx.connection
     let fileLength = tempFile.Length
-    tempFile.Close()
+    tempFile.Dispose()
 
     if fileLength > 0L then
       let! filename =

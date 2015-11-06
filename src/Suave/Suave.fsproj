@@ -152,6 +152,9 @@
     <Reference Include="System.Collections">
       <HintPath>..\..\packages\System.Collections\ref\dotnet\System.Collections.dll</HintPath>
     </Reference>
+    <Reference Include="System.Diagnostics.Debug">
+      <HintPath>..\..\packages\System.Diagnostics.Debug\ref\dotnet\System.Diagnostics.Debug.dll</HintPath>
+    </Reference>
     <Reference Include="System.Diagnostics.Process">
       <HintPath>..\..\packages\System.Diagnostics.Process\ref\dotnet\System.Diagnostics.Process.dll</HintPath>
     </Reference>

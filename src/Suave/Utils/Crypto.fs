@@ -20,8 +20,7 @@ module Crypto =
 
   /// Calculate the HMAC of the passed data given a private key
   let hmacAtOffset (key : byte []) offset count (data : byte[]) =
-    use hmac = HMAC.Create(HMACAlgorithm)
-    hmac.Key <- key
+    use hmac = new HMACSHA256(key)
     hmac.ComputeHash (data, offset, count)
 
   let hmacOfBytes key (data : byte []) =
@@ -81,7 +80,7 @@ module Crypto =
     | AlteredOrCorruptMessage of string
 
   let private secretboxInit key iv =
-    let aes = new AesManaged()
+    let aes = Aes.Create()
     aes.KeySize   <- KeySize
     aes.BlockSize <- BlockSize
     aes.Mode      <- CipherMode.CBC

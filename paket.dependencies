@@ -17,6 +17,7 @@ nuget WebSocketSharp
 nuget openssl.redist
 nuget DotLiquid
 
+nuget System.Diagnostics.Debug 4.0.11-beta-23409
 nuget System.Diagnostics.Process 4.1.0-beta-23409
 nuget System.Diagnostics.TraceSource 4.0.0-beta-23225
 nuget System.Console 4.0.0-beta-23225
@@ -26,7 +27,7 @@ nuget System.Net.Primitives 4.0.11-beta-23409
 nuget System.Net.Requests 4.0.11-beta-23409
 nuget System.Net.WebHeaderCollection 4.0.1-beta-23409
 nuget System.IO.Compression 4.0.1-beta-23409
-nuget System.Runtime.Serialization.Json v4.0.1-beta-23409
+nuget System.Runtime.Serialization.Json 4.0.1-beta-23409
 nuget System.Security.Cryptography.Algorithms 4.0.0-beta-23409
 nuget System.Security.Cryptography.Primitives 4.0.0-beta-23409
 nuget System.Threading.Thread 4.0.0-beta-23225
@@ -38,4 +39,4 @@ source https://www.myget.org/F/dotnet-corefxtestdata/
 source https://www.myget.org/F/dotnet-buildtools/
 source https://www.myget.org/F/fsharp-daily/
 
-nuget runtime.win7-x64.Microsoft.FSharp.Compiler.netcore 1.0.0-alpha-0001
+nuget runtime.win7-x64.Microsoft.FSharp.Compiler.netcore 1.0.0-alpha-0002
