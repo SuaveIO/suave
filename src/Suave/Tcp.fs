@@ -38,7 +38,6 @@ let shutdownSocket (s : Socket) =
       try
         s.Shutdown(SocketShutdown.Both)
       with _ -> ()
-      s.Close ()
       s.Dispose ()
   with _ -> ()
 
@@ -46,7 +45,7 @@ let shutdownSocket (s : Socket) =
 let stopTcp (logger : Logger) reason (socket : Socket) =
   try
     Log.internf logger "Tcp.stopTcp" (fun fmt -> fmt "stopping tcp server, reason: '%s'" reason)
-    socket.Close()
+    socket.Dispose()
     "stopped tcp server" |> Log.intern logger "Tcp.stopTcp"
   with ex ->
     "failure stopping tcp server" |> Log.interne logger "Tcp.stopTcp" ex

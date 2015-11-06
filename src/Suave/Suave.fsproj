@@ -152,10 +152,16 @@
     <Reference Include="System.Collections">
       <HintPath>..\..\packages\System.Collections\ref\dotnet\System.Collections.dll</HintPath>
     </Reference>
+    <Reference Include="System.Diagnostics.Process">
+      <HintPath>..\..\packages\System.Diagnostics.Process\ref\dotnet\System.Diagnostics.Process.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Diagnostics.TraceSource">
+      <HintPath>..\..\packages\System.Diagnostics.TraceSource\ref\dotnet\System.Diagnostics.TraceSource.dll</HintPath>
+    </Reference>
     <Reference Include="System.Collections.Concurrent">
       <HintPath>..\..\packages\System.Collections.Concurrent\ref\dotnet\System.Collections.Concurrent.dll</HintPath>
     </Reference>
-    <Reference Include="System.Global   ization">
+    <Reference Include="System.Globalization">
       <HintPath>..\..\packages\System.Globalization\ref\dotnet\System.Globalization.dll</HintPath>
     </Reference>
     <Reference Include="System.IO">
@@ -173,11 +179,20 @@
     <Reference Include="System.Net.Http">
       <HintPath>..\..\packages\System.Net.Http\ref\dotnet\System.Net.Http.dll</HintPath>
     </Reference>
+    <Reference Include="System.Net.Requests">
+      <HintPath>..\..\packages\System.Net.Requests\ref\dotnet\System.Net.Requests.dll</HintPath>
+    </Reference>
     <Reference Include="System.Net.Primitives">
       <HintPath>..\..\packages\System.Net.Primitives\ref\dotnet\System.Net.Primitives.dll</HintPath>
     </Reference>
     <Reference Include="System.Net.Sockets">
       <HintPath>..\..\packages\System.Net.Sockets\ref\dotnet\System.Net.Sockets.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Net.WebHeaderCollection">
+      <HintPath>..\..\packages\System.Net.WebHeaderCollection\ref\dotnet\System.Net.WebHeaderCollection.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Reflection">
+      <HintPath>..\..\packages\System.Reflection\ref\dotnet\System.Reflection.dll</HintPath>
     </Reference>
     <Reference Include="System.Runtime.Extensions">
       <HintPath>..\..\packages\System.Runtime.Extensions\ref\dotnet\System.Runtime.Extensions.dll</HintPath>
