@@ -222,7 +222,7 @@ module internal ParsingAndControl =
           do! tempFile.AsyncWrite(x.Array, x.Offset, y)
           }) ctx.connection
     let fileLength = tempFile.Length
-    tempFile.Dispose()
+    tempFile.Close()
 
     if fileLength > 0L then
       let! filename =
@@ -699,4 +699,4 @@ let defaultConfig =
     compressedFilesFolder = None
     logger                = Loggers.saneDefaultsFor LogLevel.Info
     tcpServerFactory      = new DefaultTcpServerFactory()
-    cookieSerialiser      = new Utils.BinaryFormatterSerialiser() }
+    cookieSerialiser      = new Utils.JsonFormatterSerialiser() }

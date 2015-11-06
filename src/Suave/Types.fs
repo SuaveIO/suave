@@ -679,7 +679,7 @@ module HttpRuntime =
       logger            = Loggers.saneDefaultsFor LogLevel.Debug
       matchedBinding    = HttpBinding.defaults
       parsePostData     = false
-      cookieSerialiser  = new BinaryFormatterSerialiser() }
+      cookieSerialiser  = new JsonFormatterSerialiser() }
 
   /// make a new HttpRuntime from the given parameters
   let mk serverKey errorHandler mimeTypes homeDirectory compressionFolder logger parsePostData cookieSerialiser binding =
