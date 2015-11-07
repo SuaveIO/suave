@@ -1,4 +1,5 @@
-framework: NET50
+source https://www.myget.org/F/dotnet-core
+source https://www.myget.org/F/fsharp-daily
 source https://nuget.org/api/v2
 
 nuget FSharp.Charting
@@ -17,26 +18,25 @@ nuget WebSocketSharp
 nuget openssl.redist
 nuget DotLiquid
 
-nuget System.Diagnostics.Debug 4.0.11-beta-23409
-nuget System.Diagnostics.Process 4.1.0-beta-23409
-nuget System.Diagnostics.TraceSource 4.0.0-beta-23225
-nuget System.Console 4.0.0-beta-23225
-nuget System.Net.Http 4.0.1-beta-23225
-nuget System.Net.Sockets 4.1.0-beta-23225
-nuget System.Net.Primitives 4.0.11-beta-23409
-nuget System.Net.Requests 4.0.11-beta-23409
-nuget System.Net.WebHeaderCollection 4.0.1-beta-23409
-nuget System.IO.Compression 4.0.1-beta-23409
-nuget System.Runtime.Serialization.Json 4.0.1-beta-23409
-nuget System.Security.Cryptography.Algorithms 4.0.0-beta-23409
-nuget System.Security.Cryptography.Primitives 4.0.0-beta-23409
-nuget System.Threading.Thread 4.0.0-beta-23225
-nuget System.Text.RegularExpressions 4.0.11-beta-23225
-
-source https://www.myget.org/F/dotnet-coreclr
-source https://www.myget.org/F/dotnet-corefx/
-source https://www.myget.org/F/dotnet-corefxtestdata/
-source https://www.myget.org/F/dotnet-buildtools/
-source https://www.myget.org/F/fsharp-daily/
+nuget System.Collections.Concurrent 4.0.11-beta-23506
+nuget System.Console 4.0.0-beta-23506
+nuget System.Diagnostics.Debug 4.0.11-beta-23506
+nuget System.Diagnostics.Process 4.1.0-beta-23506
+nuget System.Diagnostics.TraceSource 4.0.0-beta-23506
+nuget System.Net.Http 4.0.1-beta-23506
+nuget System.Net.Sockets 4.1.0-beta-23506
+nuget System.Net.Primitives 4.0.11-beta-23506
+nuget System.Net.Requests 4.0.11-beta-23506
+nuget System.Net.WebHeaderCollection 4.0.1-beta-23506
+nuget System.IO.Compression 4.1.0-beta-23506
+nuget System.IO.FileSystem 4.0.1-beta-23506
+nuget System.Reflection 4.1.0-beta-23506
+nuget System.Reflection.TypeExtensions 4.1.0-beta-23506
+nuget System.Runtime.Serialization.Json 4.0.1-beta-23506
+nuget System.Security.Cryptography.Algorithms 4.0.0-beta-23506
+nuget System.Security.Cryptography.Primitives 4.0.0-beta-23506
+nuget System.Security.Cryptography.X509Certificates 4.0.0-beta-23506
+nuget System.Threading.Thread 4.0.0-beta-23506
+nuget System.Text.RegularExpressions 4.0.11-beta-23506
 
 nuget runtime.win7-x64.Microsoft.FSharp.Compiler.netcore 1.0.0-alpha-0002

@@ -22,10 +22,13 @@ let internal compressedFilesMap = new ConcurrentDictionary<string,string>()
 do()
 
 module Internals =
+  type private TypeInThisAssembly = class end
 
   open System
   open System.Reflection
 
-  let SuaveVersion = Assembly.GetExecutingAssembly().GetName().Version.ToString()
+  let getExecutingAssembly = typeof<TypeInThisAssembly>.GetTypeInfo().Assembly
+
+  let SuaveVersion = (getExecutingAssembly).GetName().Version.ToString()
 
   let serverHeader = String.Concat [| "Server: Suave/"; SuaveVersion; " (http://suave.io)" |]
