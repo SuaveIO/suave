@@ -16,6 +16,8 @@ open Suave.Utils
 open Suave.Log
 open Suave.Logging
 
+open Microsoft.FSharp.Reflection
+
 /// <summary>
 /// These are the known HTTP methods. See http://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html
 /// </summary>
@@ -184,7 +186,7 @@ type HttpCode =
 and private HttpCodeStatics() =
   static member val mapCases : Lazy<Map<string,HttpCode>> =
     lazy
-      Microsoft.FSharp.Reflection.FSharpType.GetUnionCases(typeof<HttpCode>)
+      FSharpType.GetUnionCases(typeof<HttpCode>)
       |> Array.map (fun case -> case.Name, Microsoft.FSharp.Reflection.FSharpValue.MakeUnion(case, [||]) :?> HttpCode)
       |> Map.ofArray
   

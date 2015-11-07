@@ -601,11 +601,6 @@ module Http =
     open Response
     open ServeResource
     
-    let defaultSourceAssembly =
-      if Assembly.GetEntryAssembly() = null
-      then Assembly.GetCallingAssembly()
-      else Assembly.GetEntryAssembly()
-
     let resources (assembly : Assembly) =
       assembly.GetManifestResourceNames()
 
@@ -634,9 +629,6 @@ module Http =
                 content = SocketTask (writeResource resourceName) }}
       |> succeed
 
-    let sendResourceFromDefaultAssembly resourceName compression =
-      sendResource defaultSourceAssembly resourceName compression
-
     let resource assembly name =
       resource
         name
@@ -645,14 +637,8 @@ module Http =
         (Path.GetExtension)
         (sendResource assembly)
 
-    let resourceFromDefaultAssembly name =
-      resource defaultSourceAssembly name
-
     let browse assembly =
       warbler (fun ctx -> resource assembly (ctx.request.url.AbsolutePath.TrimStart [|'/'|]))
-
-    let browseDefaultAsssembly =
-      browse defaultSourceAssembly
 
   // See www.w3.org/TR/eventsource/#event-stream-interpretation
   module EventSource =
