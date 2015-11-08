@@ -186,7 +186,7 @@
       <HintPath>..\..\packages\System.Net.Primitives\ref\netcore50\System.Net.Primitives.dll</HintPath>
     </Reference>
     <Reference Include="System.Net.Requests">
-      <HintPath>..\..\packages\System.Net.Requests\ref\netcore50\System.Net.Requests.dll</HintPath>
+      <HintPath>..\..\packages\System.Net.Requests\ref\dotnet5.4\System.Net.Requests.dll</HintPath>
     </Reference>
     <Reference Include="System.Net.Sockets">
       <HintPath>..\..\packages\System.Net.Sockets\ref\dotnet5.4\System.Net.Sockets.dll</HintPath>
@@ -205,6 +205,9 @@
     </Reference>
     <Reference Include="System.Runtime.Serialization.Json">
       <HintPath>..\..\packages\System.Runtime.Serialization.Json\ref\netcore50\System.Runtime.Serialization.Json.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Security.Claims">
+      <HintPath>..\..\packages\System.Security.Claims\ref\dotnet5.4\System.Security.Claims.dll</HintPath>
     </Reference>
     <Reference Include="System.Security.Cryptography.Algorithms">
       <HintPath>..\..\packages\System.Security.Cryptography.Algorithms\ref\dotnet5.4\System.Security.Cryptography.Algorithms.dll</HintPath>

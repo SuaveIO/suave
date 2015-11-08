@@ -88,6 +88,7 @@ module CookieStateStore =
       |> Map.tryFind StateStoreType
       |> Option.map (mkStateStore ctx.runtime.cookieSerialiser ctx.userState)
 
+#if SYSTEM_RUNTIME_CACHING
 /// This module contains the implementation for the memory-cache backed session
 /// state store, when the memory cache is global for the server.
 module MemoryCacheStateStore =
@@ -153,3 +154,4 @@ module MemoryCacheStateStore =
       Writers.setUserData StateStoreType (stateStore stateId))
 
   let DefaultExpiry = TimeSpan.FromMinutes 30. |> MaxAge
+#endif

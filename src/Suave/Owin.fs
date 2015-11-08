@@ -266,6 +266,9 @@ module OwinApp =
           suaveLogger.Log LogLevel.Info (fun () ->
             LogLine.mk "Suave.Owin" LogLevel.Info TraceHeader.empty None str
           )
+        override x.Write (c : char) =
+            // Required because it is abstract.  Does nothing interesting
+            ()
     }
 
   type private Clock = uint64
@@ -575,7 +578,6 @@ module OwinApp =
   type UnclosableMemoryStream() =
     inherit IO.MemoryStream()
     // I can't be bothered to do a full delegation... R# needed for that.
-    override x.Close () = ()
     member x.Dispose() = ()
     member x.RealDispose() = base.Dispose()
 

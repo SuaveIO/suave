@@ -10,8 +10,6 @@ module internal ParsingAndControl =
   open System.Net.Sockets
   open System.Threading
   open System.Threading.Tasks
-  open System.Security.Permissions
-  open System.Security.Principal
   open System.Collections.Generic
 
   open Suave.Http
@@ -615,7 +613,7 @@ module internal ParsingAndControl =
 
   let resolveDirectory homeDirectory =
     match homeDirectory with
-    | None   -> Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location)
+    | None   -> Path.GetDirectoryName((Internals.getExecutingAssembly).Location)
     | Some s -> s
 
 ////////////////////////////////////////////////////
