@@ -94,6 +94,13 @@ let parsingMultipart2 cfg =
                   |> fun files -> "[" + files + "]"
                   |> OK)
 
+            path "/msgid"
+              >>= request (fun r ->
+                match r.formData "messageId" with
+                | Choice1Of2 yep -> OK yep
+                | Choice2Of2 nope -> NOT_FOUND nope
+              )
+
             NOT_FOUND "Nope."
         ]
       ]
@@ -132,17 +139,13 @@ let parsingMultipart2 cfg =
       finally
         disposeContext ctx
 
-    testCase "sending base64 file with bad Content-Type header should not hang server" <| fun _ ->
-      Tests.skiptest "currently hangs the test suite"
+    testCase "extracting messageId from form-data post" <| fun _ ->
       let ctx = runWithConfig app
       try
-        let data = readBytes "request-base64-formdata.txt"
+        let data = readBytes "request-binary-n-formdata.txt"
         let subject = sendRecv data
         Assert.StringContains("Expecting 200 OK", "HTTP/1.1 200 OK", subject)
-        Assert.StringContains(
-          "Expecting response to contain file name",
-          "file0",
-          subject)
+        Assert.StringContains("Expecting response to contain messageid", "online sha1 hash of all files", subject)
       finally
         disposeContext ctx
 
