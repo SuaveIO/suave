@@ -96,9 +96,9 @@ let parsingMultipart2 cfg =
 
             path "/msgid"
               >>= request (fun r ->
-                match r.formData "messageId" with
-                | Choice1Of2 yep -> OK yep
-                | Choice2Of2 nope -> NOT_FOUND nope
+                match r.multiPartFields |> List.tryFind (fst >> (=) "messageId") with
+                | Some (_, yep) -> OK yep
+                | None -> NOT_FOUND "Nope... Not found"
               )
 
             NOT_FOUND "Nope."

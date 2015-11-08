@@ -347,12 +347,14 @@ type HttpRequest =
   static member multipartFields_ = Property<HttpRequest,_> (fun x -> x.multiPartFields) (fun v x -> { x with multiPartFields = v })
   static member trace_           = Property<HttpRequest,_> (fun x -> x.trace) (fun v x -> { x with trace = v })
 
-  /// Gets the query string from the HttpRequest. Use
-  /// queryParam to try to fetch data for individual items.
+  /// Gets the query string from the HttpRequest. Use queryParam to try to fetch
+  /// data for individual items.
   member x.query =
     Parsing.parseData x.rawQuery
 
-  /// Finds the key k from the query string in the HttpRequest
+  /// Finds the key k from the query string in the HttpRequest. To access form
+  /// data, use either `formData` to access normal form data, or `fieldData` to
+  /// access the multipart-fields.
   member x.queryParam (k : string) =
     getFirstOpt x.query k
 
@@ -360,30 +362,38 @@ type HttpRequest =
   member x.header k =
     getFirst x.headers k
 
-  /// Gets the form as a ((string*string option list) from the HttpRequest. 
-  /// Use formData to get the data for a particular key or use the indexed property in the HttpRequest
-  member x.form  =
+  /// Gets the form as a ((string * string option) list) from the HttpRequest.
+  /// Use formData to get the data for a particular key or use the indexed
+  /// property in the HttpRequest.
+  member x.form =
     Parsing.parseData (ASCII.toString x.rawForm)
 
-  /// Finds the key k from the form in the HttpRequest
-  /// Match Choice1Of2 to get the value and Choice2Of2 to get an error message
+  /// Finds the key k from the form of the HttpRequest. To access query string
+  /// parameters, use `queryParam` or to access multipart form fields, use
+  /// `fieldData`.
   member x.formData (k : string) =
     getFirstOpt x.form k
 
+  /// Finds the key k from the multipart-form of the HttpRequest. To access
+  /// query string parameters, use `queryParam` or to access regular form data,
+  /// use `formData`.
+  member x.fieldData (k : string) =
+    getFirst x.multiPartFields k
+
   /// Syntactic Sugar to retrieve query string, form or multi-field values from HttpRequest 
-  member this.Item     
-    with get(x) =    
+  member this.Item
+    with get(x) =
 
       let inline (>>=) f1 f2 x =
         match f1 x with
         | Some x' -> Some x'
         | None -> f2 x
 
-      let params' = 
-        (tryGetChoice1 this.queryParam) 
+      let params' =
+        (tryGetChoice1 this.queryParam)
           >>= (tryGetChoice1 this.formData) 
           >>= (tryGetChoice1 <| getFirst this.multiPartFields)
-      
+
       params' x
 
   /// Get the client's view of what host is being called. If you trust your
