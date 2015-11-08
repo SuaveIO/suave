@@ -53,6 +53,10 @@ let restrictedHeaders = [| "Accept";
                            "Proxy-Connection" 
                         |] 
 
+[<Literal>]let headerIdsDate = "Date"
+[<Literal>]let headerIdsExpect = "Expect"
+[<Literal>]let headerIdsUserAgent = "User-Agent"
+
 type private HttpWebRequest with
     member this.GetRequestStream () =
         let mutable value = null
@@ -65,20 +69,31 @@ type private HttpWebRequest with
         value
 
     member this.Date 
-      with get():DateTime = 
-        let date = this.Headers.["Date"]
-        let result, value = DateTime.TryParseExact(date, 
-                                                   dateTimePatterns, DateTimeFormatInfo.InvariantInfo, 
-                                                   DateTimeStyles.AllowWhiteSpaces ||| DateTimeStyles.AssumeUniversal) 
-        if result then value else Unchecked.defaultof<DateTime>
-       and  set (value:DateTime) =
-                // Format according to RFC1123; 'r' uses invariant info (DateTimeFormatInfo.InvariantInfo) 
-                let date = value.ToUniversalTime().ToString("r", CultureInfo.InvariantCulture) 
-                this.Headers.["Date"] <- date
+        with get():DateTime = 
+            let date = this.Headers.[headerIdsDate]
+            let result, value = DateTime.TryParseExact(date, 
+                                                       dateTimePatterns, DateTimeFormatInfo.InvariantInfo, 
+                                                       DateTimeStyles.AllowWhiteSpaces ||| DateTimeStyles.AssumeUniversal) 
+            if result then value else Unchecked.defaultof<DateTime>
+
+        and  set (value:DateTime) =
+            // Format according to RFC1123; 'r' uses invariant info (DateTimeFormatInfo.InvariantInfo) 
+            let date = value.ToUniversalTime().ToString("r", CultureInfo.InvariantCulture) 
+            this.Headers.[headerIdsDate] <- date
+
+    member this.Expect 
+        with get():string = this.Headers.[headerIdsExpect]
+
+        and  set (value:string) =
+            let expect = value
+            if String.IsNullOrWhiteSpace(value) then
+                this.Headers.Remove(headerIdsExpect)
+            else
+                this.Headers.[headerIdsExpect] <- expect
 
     member this.UserAgent 
-      with get() =  this.Headers.["User-Agent"]
-      and  set value =  this.Headers.["User-Agent"] <- value
+      with get() =  this.Headers.[headerIdsUserAgent]
+      and  set value =  this.Headers.[headerIdsUserAgent] <- value
 
 type private System.Net.WebHeaderCollection with
     static member IsRestricted (key:string):bool =   
@@ -115,9 +130,11 @@ let forward (ip : IPAddress) (port : uint16) (ctx : HttpContext) =
   let url = new UriBuilder("http", ip.ToString(), int port, p.url.AbsolutePath, p.rawQuery)
   let q = WebRequest.Create(url.Uri) :?> HttpWebRequest
 
+#if !LIMITED_WEB_CLIENT
   q.AllowAutoRedirect         <- false
-  q.AllowReadStreamBuffering  <- false
   q.AllowWriteStreamBuffering <- false
+#endif
+  q.AllowReadStreamBuffering  <- false
   q.Method                    <- string p.``method``
   q.Headers                   <- buildWebHeadersCollection p.headers
   q.Proxy                     <- null
@@ -127,13 +144,17 @@ let forward (ip : IPAddress) (port : uint16) (ctx : HttpContext) =
   header "accept"            |> Choice.iter (fun v -> q.Accept <- v)
   header "date"              |> Choice.iter (fun v -> q.Date <- DateTime.Parse v)
   header "expect"            |> Choice.iter (fun v -> q.Expect <- v)
+#if !LIMITED_WEB_CLIENT
   header "host"              |> Choice.iter (fun v -> q.Host <- v)
   header "range"             |> Choice.iter (fun v -> q.AddRange(Int64.Parse v))
   header "referer"           |> Choice.iter (fun v -> q.Referer <- v)
+#endif
   header "content-type"      |> Choice.iter (fun v -> q.ContentType <- v)
+#if !LIMITED_WEB_CLIENT
   header "content-length"    |> Choice.iter (fun v -> q.ContentLength <- Int64.Parse(v))
   header "if-modified-since" |> Choice.iter (fun v -> q.IfModifiedSince <- DateTime.Parse v)
   header "transfer-encoding" |> Choice.iter (fun v -> q.TransferEncoding <- v)
+#endif
   header "user-agent"        |> Choice.iter (fun v -> q.UserAgent <- v)
 
   q.Headers.["X-Real-IP"] <- (ctx.clientIpTrustProxy.ToString())
