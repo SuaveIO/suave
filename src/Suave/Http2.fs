@@ -39,20 +39,22 @@ module Http2 =
 
   let (<=<) first second = Http.bind first second
 
-  [<AutoOpen>]
-  module AsyncExtension =
-    let (>>=) (vl:Async<'T>) (fn : 'T -> Async<'Q>) =
-      async {
-        let! e = vl
-        return! fn e}
-
-  [<AutoOpen>]
-  module OptionExtension =
-    let (>>=) (vl:'T Option) (fn : 'T -> 'Q Option) =
-      match vl with
-        | Some(v) -> fn v
-        | None -> None
   
+  type BindIt = BindIt with
+    static member inline  (>>=) (BindIt,vl) = fun fn ->
+      async {
+      let! e = vl
+      return! fn e}
+
+    static member inline (>>=) (BindIt,vl : 'T option) = fun (fn : 'T -> 'U option) ->
+      match vl with
+        | Some(e) -> fn e
+        | None -> None
+
+    static member inline (>>=) (BindIt, vl) = fun (fn) -> vl >>= fn
+
+  let inline (>>=) vl fn = (BindIt >>= vl) fn
+
   module Response = Http.Response
   module Intermediate = Http.Intermediate
   module Successful = Http.Successful
