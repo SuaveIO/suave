@@ -1,6 +1,5 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+<?xml version="1.0" encoding="utf-8"?><Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')"></Import>
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
@@ -59,7 +58,7 @@
     <ConsolePause>false</ConsolePause>
     <WarningLevel>3</WarningLevel>
     <DocumentationFile>bin\Release\Suave.xml</DocumentationFile>
-    <DefineConstants />
+    <DefineConstants></DefineConstants>
     <DebugType>pdbonly</DebugType>
     <PlatformTarget>x86</PlatformTarget>
   </PropertyGroup>
@@ -75,70 +74,70 @@
       </PropertyGroup>
     </Otherwise>
   </Choose>
-  <Import Project="$(FSharpTargetsPath)" Condition="Exists('$(FSharpTargetsPath)')" />
-  <Import Project="..\..\tools\paket.targets" />
+  <Import Project="$(FSharpTargetsPath)" Condition="Exists('$(FSharpTargetsPath)')"></Import>
+  <Import Project="..\..\tools\paket.targets"></Import>
   <ItemGroup>
-    <Compile Include="Utils\Aether.fs" />
-    <Compile Include="Utils\Async.fs" />
-    <Compile Include="Utils\Collections.fs" />
-    <Compile Include="Utils\UTF8.fs" />
-    <Compile Include="Utils\ASCII.fs" />
-    <Compile Include="Utils\String.fs" />
-    <Compile Include="Utils\Option.fs" />
-    <Compile Include="Utils\Map.fs" />
-    <Compile Include="Utils\Choice.fs" />
-    <Compile Include="Utils\Random.fs" />
-    <Compile Include="Utils\Bytes.fs" />
-    <Compile Include="Utils\Encoding.fs" />
-    <Compile Include="Utils\Crypto.fs" />
-    <Compile Include="Utils\Parsing.fs" />
-    <Compile Include="Utils\Serialisation.fs" />
-    <Compile Include="Globals.fs" />
-    <Compile Include="Logging\LogLevel.fs" />
-    <Compile Include="Logging\TraceHeader.fs" />
-    <Compile Include="Logging\LogLine.fs" />
-    <Compile Include="Logging\Logger.fs" />
-    <Compile Include="Log.fs" />
-    <Compile Include="Sockets\SocketBinding.fs" />
-    <Compile Include="Sockets\BufferManager.fs" />
-    <Compile Include="Sockets\ConcurrentPool.fs" />
-    <Compile Include="Sockets\AsyncUserToken.fs" />
-    <Compile Include="Sockets\SocketOp.fs" />
-    <Compile Include="Sockets\ITransport.fs" />
-    <Compile Include="Sockets\TcpTransport.fs" />
-    <Compile Include="Sockets\Connection.fs" />
-    <Compile Include="Sockets\SocketMonad.fs" />
-    <Compile Include="Sockets\AsyncSocket.fs" />
-    <Compile Include="Tcp.fs" />
-    <Compile Include="Sscanf.fs" />
-    <Compile Include="Types.fs" />
-    <Compile Include="Model.fs" />
-    <Compile Include="Compression.fs" />
-    <Compile Include="Http.fsi" />
-    <Compile Include="Http.fs" />
-    <Compile Include="Cookie.fsi" />
-    <Compile Include="Cookie.fs" />
-    <Compile Include="State.fs" />
-    <Compile Include="Auth.fs" />
-    <Compile Include="Web.fs" />
-    <Compile Include="Owin.fs" />
-    <Compile Include="WebSocket.fs" />
-    <Compile Include="Json.fs" />
-    <Compile Include="Proxy.fs" />
-    <Compile Include="AssemblyVersionInfo.fs" Condition="Exists('AssemblyVersionInfo.fs')" />
-    <None Include="paket.references" />
-    <Content Include="App.config" />
+    <Compile Include="Utils\Aether.fs"></Compile>
+    <Compile Include="Utils\Async.fs"></Compile>
+    <Compile Include="Utils\Collections.fs"></Compile>
+    <Compile Include="Utils\UTF8.fs"></Compile>
+    <Compile Include="Utils\ASCII.fs"></Compile>
+    <Compile Include="Utils\String.fs"></Compile>
+    <Compile Include="Utils\Option.fs"></Compile>
+    <Compile Include="Utils\Map.fs"></Compile>
+    <Compile Include="Utils\Choice.fs"></Compile>
+    <Compile Include="Utils\Random.fs"></Compile>
+    <Compile Include="Utils\Bytes.fs"></Compile>
+    <Compile Include="Utils\Encoding.fs"></Compile>
+    <Compile Include="Utils\Crypto.fs"></Compile>
+    <Compile Include="Utils\Parsing.fs"></Compile>
+    <Compile Include="Utils\Serialisation.fs"></Compile>
+    <Compile Include="Globals.fs"></Compile>
+    <Compile Include="Logging\LogLevel.fs"></Compile>
+    <Compile Include="Logging\TraceHeader.fs"></Compile>
+    <Compile Include="Logging\LogLine.fs"></Compile>
+    <Compile Include="Logging\Logger.fs"></Compile>
+    <Compile Include="Log.fs"></Compile>
+    <Compile Include="Sockets\SocketBinding.fs"></Compile>
+    <Compile Include="Sockets\BufferManager.fs"></Compile>
+    <Compile Include="Sockets\ConcurrentPool.fs"></Compile>
+    <Compile Include="Sockets\AsyncUserToken.fs"></Compile>
+    <Compile Include="Sockets\SocketOp.fs"></Compile>
+    <Compile Include="Sockets\ITransport.fs"></Compile>
+    <Compile Include="Sockets\TcpTransport.fs"></Compile>
+    <Compile Include="Sockets\Connection.fs"></Compile>
+    <Compile Include="Sockets\SocketMonad.fs"></Compile>
+    <Compile Include="Sockets\AsyncSocket.fs"></Compile>
+    <Compile Include="Tcp.fs"></Compile>
+    <Compile Include="Sscanf.fs"></Compile>
+    <Compile Include="Types.fs"></Compile>
+    <Compile Include="Model.fs"></Compile>
+    <Compile Include="Compression.fs"></Compile>
+    <Compile Include="Http.fsi"></Compile>
+    <Compile Include="Http.fs"></Compile>
+    <Compile Include="Http2.fs"></Compile><Compile Include="Cookie.fsi"></Compile>
+    <Compile Include="Cookie.fs"></Compile>
+    <Compile Include="State.fs"></Compile>
+    <Compile Include="Auth.fs"></Compile>
+    <Compile Include="Web.fs"></Compile>
+    <Compile Include="Owin.fs"></Compile>
+    <Compile Include="WebSocket.fs"></Compile>
+    <Compile Include="Json.fs"></Compile>
+    <Compile Include="Proxy.fs"></Compile>
+    <Compile Include="AssemblyVersionInfo.fs" Condition="Exists('AssemblyVersionInfo.fs')"></Compile>
+    <None Include="paket.references"></None>
+    <Content Include="App.config"></Content>
   </ItemGroup>
   <ItemGroup>
-    <Reference Include="mscorlib" />
-    <Reference Include="System" />
-    <Reference Include="System.Core" />
-    <Reference Include="System.Numerics" />
-    <Reference Include="System.Runtime.Caching" />
-    <Reference Include="System.Runtime.Serialization" />
-    <Reference Include="System.Web" />
-    <Reference Include="System.Web.Extensions" />
-    <Reference Include="System.Xml" />
+    <Reference Include="mscorlib"></Reference>
+    <Reference Include="System"></Reference>
+    <Reference Include="System.Core"></Reference>
+    <Reference Include="System.Numerics"></Reference>
+    <Reference Include="System.Runtime.Caching"></Reference>
+    <Reference Include="System.Runtime.Serialization"></Reference>
+    <Reference Include="System.Web"></Reference>
+    <Reference Include="System.Web.Extensions"></Reference>
+    <Reference Include="System.Xml"></Reference>
   </ItemGroup>
   <Choose>
     <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
