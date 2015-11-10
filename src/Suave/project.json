@@ -1,0 +1,35 @@
+{
+  "dependencies": {
+    "Microsoft.NETCore.Platforms": "1.0.1-beta-23506",
+    "System.Collections.Concurrent": "4.0.11-beta-23506",
+    "System.Console": "4.0.0-beta-23506",
+    "System.Diagnostics.Debug": "4.0.11-beta-23506",
+    "System.Diagnostics.Process": "4.1.0-beta-23506",
+    "System.Diagnostics.TraceSource": "4.0.0-beta-23506",
+    "System.Net.Http": "4.0.1-beta-23506",
+    "System.Net.Sockets": "4.1.0-beta-23506",
+    "System.Net.Primitives": "4.0.11-beta-23506",
+    "System.Net.Requests": "4.0.11-beta-23506",
+    "System.Net.WebHeaderCollection": "4.0.1-beta-23506",
+    "System.IO.Compression": "4.1.0-beta-23506",
+    "System.IO.FileSystem": "4.0.1-beta-23506",
+    "System.Reflection": "4.1.0-beta-23506",
+    "System.Reflection.TypeExtensions": "4.1.0-beta-23506",
+    "System.Runtime.Serialization.Json": "4.0.1-beta-23506",
+    "System.Security.Claims": "4.0.1-beta-23506",
+    "System.Security.Cryptography.Algorithms": "4.0.0-beta-23506",
+    "System.Security.Cryptography.Primitives": "4.0.0-beta-23506",
+    "System.Security.Cryptography.X509Certificates": "4.0.0-beta-23506",
+    "System.Threading.Thread": "4.0.0-beta-23506",
+    "System.Text.Encoding": "4.0.11-beta-23506",
+    "System.Text.RegularExpressions": "4.0.11-beta-23506"
+  },
+  "runtimes": {
+    "win7": { },
+    "linux": { },
+  },
+  "frameworks": {
+    "dnxcore50": { }
+  }
+}
+"

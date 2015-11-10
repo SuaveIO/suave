@@ -1,16 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
-  <PropertyGroup>
-    <FscToolPath>..\..\packages\runtime.win7-x64.Microsoft.FSharp.Compiler.netcore</FscToolPath>
+  <PropertyGroup Condition=" '$(TargetPlatform)' == 'coreclr' ">
+    <NuGetPackagesDirectory>..\..\packages</NuGetPackagesDirectory>
+    <FscToolPath>$(NuGetPackagesDirectory)\runtime.win7-x64.Microsoft.FSharp.Compiler.netcore</FscToolPath>
     <OtherFlags>--targetprofile:netcore --simpleresolution --noframework</OtherFlags>
     <ImplicitlyExpandTargetFramework>false</ImplicitlyExpandTargetFramework>
     <ImplicitlyExpandDesignTimeFacades>false</ImplicitlyExpandDesignTimeFacades>
-    <NoStdLib>true</NoStdLib> 
-    <NoExplicitReferenceToStdLib>true</NoExplicitReferenceToStdLib> 
-    <AddAdditionalExplicitAssemblyReferences>false</AddAdditionalExplicitAssemblyReferences> 
-    <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute> 
+    <NoStdLib>true</NoStdLib>
+    <NoExplicitReferenceToStdLib>true</NoExplicitReferenceToStdLib>
+    <AddAdditionalExplicitAssemblyReferences>false</AddAdditionalExplicitAssemblyReferences>
+    <OutputPath>bin\coreclr</OutputPath>
+    <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
     <DefineConstants>$(DefineConstants);LIMITED_WEB_CLIENT</DefineConstants>
+    <NuGetIngoreLockFile>true</NuGetIngoreLockFile>
+    <NuGetTargetMoniker>DNXCore,Version=v5.0</NuGetTargetMoniker>
+    <BaseNuGetRuntimeIdentifier>win7</BaseNuGetRuntimeIdentifier>
+ </PropertyGroup>
+  <PropertyGroup Condition=" '$(TargetPlatform)' != 'coreclr' ">
+    <FscToolPath></FscToolPath>
+    <OtherFlags></OtherFlags>
+    <OutputPath>bin</OutputPath>
+    <ResolveNuGetPackages>false</ResolveNuGetPackages>
+    <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
   </PropertyGroup>
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
@@ -19,13 +31,13 @@
     <OutputType>Library</OutputType>
     <RootNamespace>Suave</RootNamespace>
     <AssemblyName>Suave</AssemblyName>
-    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <Name>Suave</Name>
+    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
     <Optimize>false</Optimize>
-    <OutputPath>bin\Debug\</OutputPath>
+    <OutputPath>$(OutputPath)\Debug\</OutputPath>
     <DefineConstants>$(DefineConstants);DEBUG</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <ConsolePause>false</ConsolePause>
@@ -37,7 +49,7 @@
     <DebugSymbols>true</DebugSymbols>
     <Optimize>true</Optimize>
     <Tailcalls>true</Tailcalls>
-    <OutputPath>bin\Release\</OutputPath>
+    <OutputPath>$(OutputPath)\Release\</OutputPath>
     <ErrorReport>prompt</ErrorReport>
     <ConsolePause>false</ConsolePause>
     <WarningLevel>3</WarningLevel>
@@ -51,7 +63,7 @@
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|x86' ">
     <DebugSymbols>true</DebugSymbols>
     <Optimize>false</Optimize>
-    <OutputPath>bin\Debug\</OutputPath>
+    <OutputPath>$(OutputPath)\Debug\</OutputPath>
     <DefineConstants>DEBUG</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <ConsolePause>false</ConsolePause>
@@ -64,7 +76,7 @@
     <DebugSymbols>true</DebugSymbols>
     <Optimize>true</Optimize>
     <Tailcalls>true</Tailcalls>
-    <OutputPath>bin\Release\</OutputPath>
+    <OutputPath>$(OutputPath)\bin\Release\</OutputPath>
     <ErrorReport>prompt</ErrorReport>
     <ConsolePause>false</ConsolePause>
     <WarningLevel>3</WarningLevel>
@@ -86,7 +98,7 @@
     </Otherwise>
   </Choose>
   <Import Project="$(FSharpTargetsPath)" Condition="Exists('$(FSharpTargetsPath)')" />
-  <Import Project="..\..\tools\paket.targets" />
+  <Import Project="..\..\tools\paket.targets" Condition=" '$(TargetPlatform)' != 'coreclr' " />
   <ItemGroup>
     <Compile Include="Utils\Aether.fs" />
     <Compile Include="Utils\Async.fs" />
@@ -136,102 +148,25 @@
     <Compile Include="Json.fs" />
     <Compile Include="Proxy.fs" />
     <Compile Include="AssemblyVersionInfo.fs" Condition="Exists('AssemblyVersionInfo.fs')" />
-    <None Include="paket.references" />
+    <None Include="paket.references" Condition=" '$(TargetPlatform)' != 'coreclr' " />
+    <None Include="project.json" Condition=" '$(TargetPlatform)' == 'coreclr' " />
     <Content Include="App.config" />
   </ItemGroup>
-  <ItemGroup>
-    <Reference Include="FSharp.Core">
-      <HintPath>..\..\packages\runtime.win7-x64.Microsoft.FSharp.Compiler.netcore\FSharp.Core.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
+  <ItemGroup Condition=" '$(TargetPlatform)' == 'coreclr' ">
+    <Reference Include="$(NuGetPackagesDirectory)\runtime.win7-x64.Microsoft.FSharp.Compiler.netcore\fsharp.core.dll" />
   </ItemGroup>
-  <ItemGroup>
-    <Reference Include="System.Collections">
-      <HintPath>..\..\packages\System.Collections\ref\dotnet\System.Collections.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Collections.Concurrent">
-      <HintPath>..\..\packages\System.Collections.Concurrent\ref\netcore50\System.Collections.Concurrent.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Console">
-      <HintPath>..\..\packages\System.Console\ref\dotnet5.4\System.Console.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Globalization">
-      <HintPath>..\..\packages\System.Globalization\ref\dotnet\System.Globalization.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Diagnostics.Debug">
-      <HintPath>..\..\packages\System.Diagnostics.Debug\ref\netcore50\System.Diagnostics.Debug.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Diagnostics.Process">
-      <HintPath>..\..\packages\System.Diagnostics.Process\ref\dotnet5.4\System.Diagnostics.Process.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Diagnostics.TraceSource">
-      <HintPath>..\..\packages\System.Diagnostics.TraceSource\ref\dotnet5.4\System.Diagnostics.TraceSource.dll</HintPath>
-    </Reference>
-    <Reference Include="System.IO">
-      <HintPath>..\..\packages\System.IO\ref\dotnet\System.IO.dll</HintPath>
-    </Reference>
-    <Reference Include="System.IO.Compression">
-      <HintPath>..\..\packages\System.IO.Compression\ref\netcore50\System.IO.Compression.dll</HintPath>
-    </Reference>
-    <Reference Include="System.IO.FileSystem">
-      <HintPath>..\..\packages\System.IO.FileSystem\ref\dotnet5.4\System.IO.FileSystem.dll</HintPath>
-    </Reference>
-    <Reference Include="System.IO.FileSystem.Primitives">
-      <HintPath>..\..\packages\System.IO.FileSystem.Primitives\ref\dotnet\System.IO.FileSystem.Primitives.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Net.Http">
-      <HintPath>..\..\packages\System.Net.Http\ref\netcore50\System.Net.Http.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Net.Primitives">
-      <HintPath>..\..\packages\System.Net.Primitives\ref\netcore50\System.Net.Primitives.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Net.Requests">
-      <HintPath>..\..\packages\System.Net.Requests\ref\dotnet5.4\System.Net.Requests.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Net.Sockets">
-      <HintPath>..\..\packages\System.Net.Sockets\ref\dotnet5.4\System.Net.Sockets.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Net.WebHeaderCollection">
-      <HintPath>..\..\packages\System.Net.WebHeaderCollection\ref\dotnet5.4\System.Net.WebHeaderCollection.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Reflection">
-      <HintPath>..\..\packages\System.Reflection\ref\netcore50\System.Reflection.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Runtime.Extensions">
-      <HintPath>..\..\packages\System.Runtime.Extensions\ref\dotnet\System.Runtime.Extensions.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Runtime">
-      <HintPath>..\..\packages\System.Runtime\ref\dotnet\System.Runtime.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Runtime.Serialization.Json">
-      <HintPath>..\..\packages\System.Runtime.Serialization.Json\ref\netcore50\System.Runtime.Serialization.Json.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Security.Claims">
-      <HintPath>..\..\packages\System.Security.Claims\ref\dotnet5.4\System.Security.Claims.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Security.Cryptography.Algorithms">
-      <HintPath>..\..\packages\System.Security.Cryptography.Algorithms\ref\dotnet5.4\System.Security.Cryptography.Algorithms.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Security.Cryptography.Primitives">
-      <HintPath>..\..\packages\System.Security.Cryptography.Primitives\ref\dotnet5.4\System.Security.Cryptography.Primitives.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Security.Cryptography.X509Certificates">
-      <HintPath>..\..\packages\System.Security.Cryptography.X509Certificates\ref\dotnet5.4\System.Security.Cryptography.X509Certificates.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Text.Encoding">
-      <HintPath>..\..\packages\System.Text.Encoding\ref\dotnet\System.Text.Encoding.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Text.RegularExpressions">
-      <HintPath>..\..\packages\System.Text.RegularExpressions\ref\netcore50\System.Text.RegularExpressions.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Threading">
-      <HintPath>..\..\packages\System.Threading\ref\dotnet\System.Threading.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Threading.Thread">
-      <HintPath>..\..\packages\System.Threading.Thread\ref\dotnet5.4\System.Threading.Thread.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Threading.Tasks">
-      <HintPath>..\..\packages\System.Threading.Tasks\ref\dotnet\System.Threading.Tasks.dll</HintPath>
-    </Reference>
+  <ItemGroup Condition=" '$(TargetPlatform)' != 'coreclr' ">
+    <Reference Include="mscorlib" />
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Numerics" />
+    <Reference Include="System.Runtime.Caching" />
+    <Reference Include="System.Runtime.Serialization" />
+    <Reference Include="System.Web" />
+    <Reference Include="System.Web.Extensions" />
+    <Reference Include="System.Xml" />
   </ItemGroup>
+  <Target Name="BeforeBuild" BeforeTargets="Build" Condition="'$(TargetPlatform)' == 'coreclr'">
+    <Exec Command="..\..\tools\nuget\NuGet.exe restore -Source https://www.myget.org/F/dotnet-core;https://www.myget.org/F/fsharp-daily;https://nuget.org/api/v2 project.json -PackagesDirectory ..\..\packages -Verbosity detailed" />
+  </Target>
 </Project>

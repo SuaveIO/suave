@@ -53,9 +53,12 @@ let restrictedHeaders = [| "Accept";
                            "Proxy-Connection" 
                         |] 
 
-[<Literal>]let headerIdsDate = "Date"
-[<Literal>]let headerIdsExpect = "Expect"
-[<Literal>]let headerIdsUserAgent = "User-Agent"
+[<Literal>]
+let headerIdsDate = "Date"
+[<Literal>]
+let headerIdsExpect = "Expect"
+[<Literal>]
+let headerIdsUserAgent = "User-Agent"
 
 type private HttpWebRequest with
     member this.GetRequestStream () =
