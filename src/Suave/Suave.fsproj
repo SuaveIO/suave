@@ -10,17 +10,17 @@
     <NoStdLib>true</NoStdLib>
     <NoExplicitReferenceToStdLib>true</NoExplicitReferenceToStdLib>
     <AddAdditionalExplicitAssemblyReferences>false</AddAdditionalExplicitAssemblyReferences>
-    <OutputPath>bin\coreclr</OutputPath>
+    <OutputRoot>bin\coreclr</OutputRoot>
     <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
     <DefineConstants>$(DefineConstants);LIMITED_WEB_CLIENT</DefineConstants>
     <NuGetIngoreLockFile>true</NuGetIngoreLockFile>
     <NuGetTargetMoniker>DNXCore,Version=v5.0</NuGetTargetMoniker>
-    <BaseNuGetRuntimeIdentifier>win7</BaseNuGetRuntimeIdentifier>
+    <CopyNugetImplementations>false</CopyNugetImplementations>
  </PropertyGroup>
   <PropertyGroup Condition=" '$(TargetPlatform)' != 'coreclr' ">
     <FscToolPath></FscToolPath>
     <OtherFlags></OtherFlags>
-    <OutputPath>bin</OutputPath>
+    <OutputRoot>bin</OutputRoot>
     <ResolveNuGetPackages>false</ResolveNuGetPackages>
     <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
   </PropertyGroup>
@@ -37,7 +37,7 @@
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
     <Optimize>false</Optimize>
-    <OutputPath>$(OutputPath)\Debug\</OutputPath>
+    <OutputPath>$(OutputRoot)\Debug\</OutputPath>
     <DefineConstants>$(DefineConstants);DEBUG</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <ConsolePause>false</ConsolePause>
@@ -49,7 +49,7 @@
     <DebugSymbols>true</DebugSymbols>
     <Optimize>true</Optimize>
     <Tailcalls>true</Tailcalls>
-    <OutputPath>$(OutputPath)\Release\</OutputPath>
+    <OutputPath>$(OutputRoot)\Release\</OutputPath>
     <ErrorReport>prompt</ErrorReport>
     <ConsolePause>false</ConsolePause>
     <WarningLevel>3</WarningLevel>
@@ -63,7 +63,7 @@
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|x86' ">
     <DebugSymbols>true</DebugSymbols>
     <Optimize>false</Optimize>
-    <OutputPath>$(OutputPath)\Debug\</OutputPath>
+    <OutputPath>$(OutputRoot)\Debug\</OutputPath>
     <DefineConstants>DEBUG</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <ConsolePause>false</ConsolePause>
@@ -76,7 +76,7 @@
     <DebugSymbols>true</DebugSymbols>
     <Optimize>true</Optimize>
     <Tailcalls>true</Tailcalls>
-    <OutputPath>$(OutputPath)\bin\Release\</OutputPath>
+    <OutputPath>$(OutputRoot)\bin\Release\</OutputPath>
     <ErrorReport>prompt</ErrorReport>
     <ConsolePause>false</ConsolePause>
     <WarningLevel>3</WarningLevel>
