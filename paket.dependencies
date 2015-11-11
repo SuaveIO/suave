@@ -5,6 +5,7 @@ source https://nuget.org/api/v2
 
 nuget FSharp.Charting
 nuget FSharp.Core ~> 3.1.2
+nuget FSharp.Data
 nuget Http.fs-prerelease
 nuget Nancy.Owin
 nuget RazorEngine
@@ -19,4 +20,7 @@ nuget WebSocketSharp
 nuget openssl.redist
 nuget DotLiquid
 
+nuget runtime.win7-x86.Microsoft.FSharp.Compiler.netcore
 nuget runtime.win7-x64.Microsoft.FSharp.Compiler.netcore
+nuget runtime.ubuntu.14.04-x64.Microsoft.FSharp.Compiler.netcore
+nuget runtime.osx.10.10-x64.Microsoft.FSharp.Compiler.netcore
