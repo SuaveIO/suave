@@ -29,10 +29,23 @@
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProjectGuid>{3DC9193E-BD0C-4486-9C58-56B630C36623}</ProjectGuid>
     <OutputType>Library</OutputType>
+    <OutputPath>$(OutputRoot)\Debug\</OutputPath>
     <RootNamespace>Suave</RootNamespace>
     <AssemblyName>Suave</AssemblyName>
     <Name>Suave</Name>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
+    <DebugSymbols>true</DebugSymbols>
+    <Optimize>true</Optimize>
+    <Tailcalls>true</Tailcalls>
+    <OutputPath>$(OutputRoot)\Release\</OutputPath>
+    <ErrorReport>prompt</ErrorReport>
+    <ConsolePause>false</ConsolePause>
+    <WarningLevel>3</WarningLevel>
+    <DocumentationFile>$(OutputRoot)\bin\Release\Suave.xml</DocumentationFile>
+    <DefineConstants>$(DefineConstants)</DefineConstants>
+    <DebugType>pdbonly</DebugType>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -53,7 +66,7 @@
     <ErrorReport>prompt</ErrorReport>
     <ConsolePause>false</ConsolePause>
     <WarningLevel>3</WarningLevel>
-    <DocumentationFile>bin\Release\Suave.xml</DocumentationFile>
+    <DocumentationFile>$(OutputRoot)\bin\Release\Suave.xml</DocumentationFile>
     <DefineConstants>$(DefineConstants)</DefineConstants>
     <DebugType>pdbonly</DebugType>
   </PropertyGroup>
@@ -80,7 +93,7 @@
     <ErrorReport>prompt</ErrorReport>
     <ConsolePause>false</ConsolePause>
     <WarningLevel>3</WarningLevel>
-    <DocumentationFile>bin\Release\Suave.xml</DocumentationFile>
+    <DocumentationFile>$(OutputRoot)\bin\Release\Suave.xml</DocumentationFile>
     <DefineConstants />
     <DebugType>pdbonly</DebugType>
     <PlatformTarget>x86</PlatformTarget>

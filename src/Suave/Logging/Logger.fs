@@ -29,7 +29,7 @@ module Loggers =
   /// '2013-10-13T13:03:50.2950037Z: today is the day'
   type ConsoleWindowLogger(minLevel, ?formatter, ?colourise, ?originalColor, ?consoleSemaphore) =
     let sem           = defaultArg consoleSemaphore (obj())
-    let originalColor = defaultArg originalColor Console.ForegroundColor
+    let originalColor = defaultArg originalColor ( try Console.ForegroundColor with | _ -> ConsoleColor.Black )  // If get_Colour ever throws an exception, can do on non-windows
     let formatter     = defaultArg formatter defaultFormatter
     let colourise     = defaultArg colourise true
     let write         = System.Console.WriteLine : string -> unit

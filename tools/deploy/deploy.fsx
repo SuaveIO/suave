@@ -31,19 +31,12 @@ let TargetPlatformName = GetArgumentFromCommandLine "--targetPlatformName:" @"DN
 let CompilerPath = GetArgumentFromCommandLine       "--compilerPath:"       @""
 let Output = GetArgumentFromCommandLine             "--output:"             @"."
 let Verbosity = GetArgumentFromCommandLine          "--v:"                  @"quiet"
-let CopyCompiler = GetArgumentFromCommandLine       "--copyCompiler:"       @"no"
 let ProjectOutput = GetArgumentFromCommandLine      "--projectOutput:"      @""
 
 let FSharpCompilerFiles =
-    seq {
-        yield Path.Combine(CompilerPath, "fsc.exe")
-        yield Path.Combine(CompilerPath, "FSharp.Compiler.dll")
-        yield Path.Combine(CompilerPath, "fsharp.core.sigdata")
-        yield Path.Combine(CompilerPath, "fsharp.core.optdata")
-        yield Path.Combine(CompilerPath, "default.win32manifest")
-    }
+    Directory.GetFiles(CompilerPath, "*.*")
 
-let isVerbose = Verbosity = "verbose"
+let isVerbose = (Verbosity = "verbose")
 
 // Utility functions
 let copyFile source dir =
@@ -132,5 +125,3 @@ makeDirectory(Output)
 copyFile  (Path.Combine(CompilerPath, "fsharp.core.dll")) Output
 copyFiles ProjectOutput Output
 dependencies |> Seq.iter(fun source -> copyFile source Output)
-if CopyCompiler = "yes" then 
-    FSharpCompilerFiles |> Seq.iter(fun source -> copyFile source Output)
