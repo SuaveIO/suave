@@ -115,7 +115,7 @@
     <Compile Include="Compression.fs"></Compile>
     <Compile Include="Http.fsi"></Compile>
     <Compile Include="Http.fs"></Compile>
-    <Compile Include="Http2.fs"></Compile><Compile Include="Cookie.fsi"></Compile>
+    <Compile Include="HttpAltBindings.fs"></Compile><Compile Include="Cookie.fsi"></Compile>
     <Compile Include="Cookie.fs"></Compile>
     <Compile Include="State.fs"></Compile>
     <Compile Include="Auth.fs"></Compile>
