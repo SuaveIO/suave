@@ -54,7 +54,8 @@
     <ConsolePause>false</ConsolePause>
     <Tailcalls>true</Tailcalls>
     <Prefer32Bit>false</Prefer32Bit>
-    <DefineConstants />
+    <DefineConstants>
+    </DefineConstants>
     <PlatformTarget>x86</PlatformTarget>
   </PropertyGroup>
   <Choose>
@@ -125,6 +126,9 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <None Include="request-multipartmixed-twofiles.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="request-binary-n-formdata.txt">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <Content Include="request-no-host-header.txt">

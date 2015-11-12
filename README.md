@@ -76,7 +76,7 @@ All of our tests use this assembly; you can do too.
 
 If you just want to hack away or try the samples, just open suave.sln and run them!
 
-For 'getting started quick', run 'build.sh'.
+For 'getting started quick', run './build.sh' on any OS or 'build.cmd' on Windows.
 
 ---
 
