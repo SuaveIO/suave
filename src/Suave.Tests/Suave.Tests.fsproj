@@ -90,7 +90,6 @@
     <Compile Include="Proxy.fs" />
     <Compile Include="HttpWriters.fs" />
     <Compile Include="HttpFile.fs" />
-    <Compile Include="HttpEmbedded.fs" />
     <Compile Include="HttpVerbs.fs" />
     <Compile Include="HttpApplicatives.fs" />
     <Compile Include="HttpAuthentication.fs" />
