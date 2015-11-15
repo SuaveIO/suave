@@ -16,8 +16,8 @@ module WebSocket =
 
   let magicGUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
-  let internal sha1 (x : string) =
-    let crpto = new SHA1Managed()
+  let internal sha1 (x : string) = 
+    let crpto = new HMACSHA1()
     let bytes = Encoding.ASCII.GetBytes x
     let hash = crpto.ComputeHash bytes
     hash

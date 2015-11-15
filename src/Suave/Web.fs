@@ -10,8 +10,6 @@ module internal ParsingAndControl =
   open System.Net.Sockets
   open System.Threading
   open System.Threading.Tasks
-  open System.Security.Permissions
-  open System.Security.Principal
   open System.Collections.Generic
 
   open Suave.Http
@@ -222,7 +220,7 @@ module internal ParsingAndControl =
           do! tempFile.AsyncWrite(x.Array, x.Offset, y)
           }) ctx.connection
     let fileLength = tempFile.Length
-    tempFile.Close()
+    tempFile.Dispose()
 
     if fileLength > 0L then
       let! filename =
@@ -615,7 +613,7 @@ module internal ParsingAndControl =
 
   let resolveDirectory homeDirectory =
     match homeDirectory with
-    | None   -> Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location)
+    | None   -> Path.GetDirectoryName((Internals.getExecutingAssembly).Location)
     | Some s -> s
 
 ////////////////////////////////////////////////////
@@ -699,4 +697,4 @@ let defaultConfig =
     compressedFilesFolder = None
     logger                = Loggers.saneDefaultsFor LogLevel.Info
     tcpServerFactory      = new DefaultTcpServerFactory()
-    cookieSerialiser      = new Utils.BinaryFormatterSerialiser() }
+    cookieSerialiser      = new Utils.JsonFormatterSerialiser() }
