@@ -94,9 +94,16 @@ let tests cfg =
       let ctx = runWithConfig (OK "ACK")
       let cookies = ctx |> reqCookies' HttpMethod.GET "/"  None
       Assert.Null("should not have auth cookie", cookies.[Auth.SessionAuthCookie])
-      
+
     testCase "can set cookie" <| fun _ ->
       let ctx = runWithConfig (Auth.authenticated Session false >>= OK "ACK")
+      let cookies = ctx |> reqCookies' HttpMethod.GET "/"  None
+      Assert.NotNull("should have auth cookie", cookies.[Auth.SessionAuthCookie])
+
+    testCase "can set MaxAge cookie" <| fun _ ->
+      let timespan = System.TimeSpan.FromDays(13.0)
+      let maxAge = Suave.Cookie.CookieLife.MaxAge timespan
+      let ctx = runWithConfig (Auth.authenticated maxAge false >>= OK "ACK")
       let cookies = ctx |> reqCookies' HttpMethod.GET "/"  None
       Assert.NotNull("should have auth cookie", cookies.[Auth.SessionAuthCookie])
 
