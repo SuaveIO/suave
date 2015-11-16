@@ -8,7 +8,7 @@ let private encode (mkStream : Stream * CompressionMode -> Stream) (bytes: byte[
     use memory =  new MemoryStream()
     use compressStream = mkStream(memory, CompressionMode.Compress)
     do compressStream.Write(bytes, 0, bytes.Length)
-    compressStream.Close()
+    compressStream.Dispose()
     memory.ToArray()
   else
     [||]

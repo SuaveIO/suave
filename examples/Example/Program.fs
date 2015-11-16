@@ -182,6 +182,6 @@ let main argv =
       compressedFilesFolder = None
       logger                = logger
       tcpServerFactory      = new DefaultTcpServerFactory()
-      cookieSerialiser      = new Utils.BinaryFormatterSerialiser() }
+      cookieSerialiser      = new Utils.JsonFormatterSerialiser() }
     app
   0

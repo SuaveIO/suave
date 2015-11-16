@@ -1,21 +1,57 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup Condition=" '$(TargetPlatform)' == 'coreclr' ">
+    <NuGetPackagesDirectory>..\..\packages</NuGetPackagesDirectory>
+    <FscToolPath>$(NuGetPackagesDirectory)\runtime.win7-x64.Microsoft.FSharp.Compiler.netcore</FscToolPath>
+    <OtherFlags>--targetprofile:netcore --simpleresolution --noframework</OtherFlags>
+    <ImplicitlyExpandTargetFramework>false</ImplicitlyExpandTargetFramework>
+    <ImplicitlyExpandDesignTimeFacades>false</ImplicitlyExpandDesignTimeFacades>
+    <NoStdLib>true</NoStdLib>
+    <NoExplicitReferenceToStdLib>true</NoExplicitReferenceToStdLib>
+    <AddAdditionalExplicitAssemblyReferences>false</AddAdditionalExplicitAssemblyReferences>
+    <OutputRoot>bin\coreclr</OutputRoot>
+    <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
+    <DefineConstants>$(DefineConstants);LIMITED_WEB_CLIENT</DefineConstants>
+    <NuGetIngoreLockFile>true</NuGetIngoreLockFile>
+    <NuGetTargetMoniker>DNXCore,Version=v5.0</NuGetTargetMoniker>
+    <CopyNugetImplementations>false</CopyNugetImplementations>
+ </PropertyGroup>
+  <PropertyGroup Condition=" '$(TargetPlatform)' != 'coreclr' ">
+    <FscToolPath></FscToolPath>
+    <OtherFlags></OtherFlags>
+    <OutputRoot>bin</OutputRoot>
+    <ResolveNuGetPackages>false</ResolveNuGetPackages>
+    <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
+  </PropertyGroup>
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProjectGuid>{3DC9193E-BD0C-4486-9C58-56B630C36623}</ProjectGuid>
     <OutputType>Library</OutputType>
+    <OutputPath>$(OutputRoot)\Debug\</OutputPath>
     <RootNamespace>Suave</RootNamespace>
     <AssemblyName>Suave</AssemblyName>
-    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <Name>Suave</Name>
+    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
+    <DebugSymbols>true</DebugSymbols>
+    <Optimize>true</Optimize>
+    <Tailcalls>true</Tailcalls>
+    <OutputPath>$(OutputRoot)\Release\</OutputPath>
+    <ErrorReport>prompt</ErrorReport>
+    <ConsolePause>false</ConsolePause>
+    <WarningLevel>3</WarningLevel>
+    <DocumentationFile>$(OutputRoot)\bin\Release\Suave.xml</DocumentationFile>
+    <DefineConstants>$(DefineConstants)</DefineConstants>
+    <DebugType>pdbonly</DebugType>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
     <Optimize>false</Optimize>
-    <OutputPath>bin\Debug\</OutputPath>
-    <DefineConstants>DEBUG</DefineConstants>
+    <OutputPath>$(OutputRoot)\Debug\</OutputPath>
+    <DefineConstants>$(DefineConstants);DEBUG</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <ConsolePause>false</ConsolePause>
     <Tailcalls>false</Tailcalls>
@@ -26,13 +62,12 @@
     <DebugSymbols>true</DebugSymbols>
     <Optimize>true</Optimize>
     <Tailcalls>true</Tailcalls>
-    <OutputPath>bin\Release\</OutputPath>
+    <OutputPath>$(OutputRoot)\Release\</OutputPath>
     <ErrorReport>prompt</ErrorReport>
     <ConsolePause>false</ConsolePause>
     <WarningLevel>3</WarningLevel>
-    <DocumentationFile>bin\Release\Suave.xml</DocumentationFile>
-    <DefineConstants>
-    </DefineConstants>
+    <DocumentationFile>$(OutputRoot)\bin\Release\Suave.xml</DocumentationFile>
+    <DefineConstants>$(DefineConstants)</DefineConstants>
     <DebugType>pdbonly</DebugType>
   </PropertyGroup>
   <PropertyGroup>
@@ -41,7 +76,7 @@
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|x86' ">
     <DebugSymbols>true</DebugSymbols>
     <Optimize>false</Optimize>
-    <OutputPath>bin\Debug\</OutputPath>
+    <OutputPath>$(OutputRoot)\Debug\</OutputPath>
     <DefineConstants>DEBUG</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <ConsolePause>false</ConsolePause>
@@ -54,11 +89,11 @@
     <DebugSymbols>true</DebugSymbols>
     <Optimize>true</Optimize>
     <Tailcalls>true</Tailcalls>
-    <OutputPath>bin\Release\</OutputPath>
+    <OutputPath>$(OutputRoot)\bin\Release\</OutputPath>
     <ErrorReport>prompt</ErrorReport>
     <ConsolePause>false</ConsolePause>
     <WarningLevel>3</WarningLevel>
-    <DocumentationFile>bin\Release\Suave.xml</DocumentationFile>
+    <DocumentationFile>$(OutputRoot)\bin\Release\Suave.xml</DocumentationFile>
     <DefineConstants />
     <DebugType>pdbonly</DebugType>
     <PlatformTarget>x86</PlatformTarget>
@@ -76,7 +111,7 @@
     </Otherwise>
   </Choose>
   <Import Project="$(FSharpTargetsPath)" Condition="Exists('$(FSharpTargetsPath)')" />
-  <Import Project="..\..\tools\paket.targets" />
+  <Import Project="..\..\tools\paket.targets" Condition=" '$(TargetPlatform)' != 'coreclr' " />
   <ItemGroup>
     <Compile Include="Utils\Aether.fs" />
     <Compile Include="Utils\Async.fs" />
@@ -126,10 +161,14 @@
     <Compile Include="Json.fs" />
     <Compile Include="Proxy.fs" />
     <Compile Include="AssemblyVersionInfo.fs" Condition="Exists('AssemblyVersionInfo.fs')" />
-    <None Include="paket.references" />
+    <None Include="paket.references" Condition=" '$(TargetPlatform)' != 'coreclr' " />
+    <None Include="project.json" Condition=" '$(TargetPlatform)' == 'coreclr' " />
     <Content Include="App.config" />
   </ItemGroup>
-  <ItemGroup>
+  <ItemGroup Condition=" '$(TargetPlatform)' == 'coreclr' ">
+    <Reference Include="$(NuGetPackagesDirectory)\runtime.win7-x64.Microsoft.FSharp.Compiler.netcore\fsharp.core.dll" />
+  </ItemGroup>
+  <ItemGroup Condition=" '$(TargetPlatform)' != 'coreclr' ">
     <Reference Include="mscorlib" />
     <Reference Include="System" />
     <Reference Include="System.Core" />
@@ -141,7 +180,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <Choose>
-    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
+    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5' And '$(TargetPlatform)' != 'coreclr' ">
       <ItemGroup>
         <Reference Include="FSharp.Core">
           <HintPath>..\..\packages\FSharp.Core\lib\net40\FSharp.Core.dll</HintPath>
@@ -150,5 +189,8 @@
         </Reference>
       </ItemGroup>
     </When>
-  </Choose>
+  </Choose>  
+  <Target Name="BeforeBuild" BeforeTargets="Build" Condition="'$(TargetPlatform)' == 'coreclr'">
+    <Exec Command="..\..\tools\nuget\NuGet.exe restore -Source https://www.myget.org/F/dotnet-core;https://www.myget.org/F/fsharp-daily;https://nuget.org/api/v2 project.json -PackagesDirectory ..\..\packages -Verbosity detailed" />
+  </Target>
 </Project>

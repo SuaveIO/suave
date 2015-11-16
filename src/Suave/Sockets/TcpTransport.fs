@@ -16,7 +16,6 @@ type TcpTransport(acceptArgs: SocketAsyncEventArgs,
         try
           socket.Shutdown(SocketShutdown.Both)
         with _ -> ()
-        socket.Close ()
         socket.Dispose ()
     with _ -> ()
   interface ITransport with

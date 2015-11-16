@@ -16,6 +16,8 @@ open Suave.Utils
 open Suave.Log
 open Suave.Logging
 
+open Microsoft.FSharp.Reflection
+
 /// <summary>
 /// These are the known HTTP methods. See http://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html
 /// </summary>
@@ -184,7 +186,7 @@ type HttpCode =
 and private HttpCodeStatics() =
   static member val mapCases : Lazy<Map<string,HttpCode>> =
     lazy
-      Microsoft.FSharp.Reflection.FSharpType.GetUnionCases(typeof<HttpCode>)
+      FSharpType.GetUnionCases(typeof<HttpCode>)
       |> Array.map (fun case -> case.Name, Microsoft.FSharp.Reflection.FSharpValue.MakeUnion(case, [||]) :?> HttpCode)
       |> Map.ofArray
   
@@ -689,7 +691,7 @@ module HttpRuntime =
       logger            = Loggers.saneDefaultsFor LogLevel.Debug
       matchedBinding    = HttpBinding.defaults
       parsePostData     = false
-      cookieSerialiser  = new BinaryFormatterSerialiser() }
+      cookieSerialiser  = new JsonFormatterSerialiser() }
 
   /// make a new HttpRuntime from the given parameters
   let mk serverKey errorHandler mimeTypes homeDirectory compressionFolder logger parsePostData cookieSerialiser binding =

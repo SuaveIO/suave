@@ -392,8 +392,8 @@ module Http =
         ctx.request.httpVersion
         ctx.response.status.code
         (match ctx.response.content with
-         | Bytes bs -> bs.LongLength
-         | _ -> 0L)
+         | Bytes bs -> bs.Length
+         | _ -> 0)
 
     let log (logger : Logger) (formatter : HttpContext -> string) (ctx : HttpContext) =
       logger.Log LogLevel.Debug <| fun _ ->
@@ -568,7 +568,7 @@ module Http =
 
       let filesize  (x : FileSystemInfo) =
         if (x.Attributes ||| FileAttributes.Directory = FileAttributes.Directory) then
-          String.Format("{0,-14}",System.Web.HttpUtility.HtmlEncode("<DIR>"))
+          String.Format("{0,-14}",System.Net.WebUtility.HtmlEncode("<DIR>"))
         else
           String.Format("{0,14}", (new FileInfo(x.FullName)).Length)
 
@@ -601,11 +601,6 @@ module Http =
     open Response
     open ServeResource
     
-    let defaultSourceAssembly =
-      if Assembly.GetEntryAssembly() = null
-      then Assembly.GetCallingAssembly()
-      else Assembly.GetEntryAssembly()
-
     let resources (assembly : Assembly) =
       assembly.GetManifestResourceNames()
 
@@ -634,9 +629,6 @@ module Http =
                 content = SocketTask (writeResource resourceName) }}
       |> succeed
 
-    let sendResourceFromDefaultAssembly resourceName compression =
-      sendResource defaultSourceAssembly resourceName compression
-
     let resource assembly name =
       resource
         name
@@ -645,14 +637,8 @@ module Http =
         (Path.GetExtension)
         (sendResource assembly)
 
-    let resourceFromDefaultAssembly name =
-      resource defaultSourceAssembly name
-
     let browse assembly =
       warbler (fun ctx -> resource assembly (ctx.request.url.AbsolutePath.TrimStart [|'/'|]))
-
-    let browseDefaultAsssembly =
-      browse defaultSourceAssembly
 
   // See www.w3.org/TR/eventsource/#event-stream-interpretation
   module EventSource =

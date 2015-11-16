@@ -78,14 +78,14 @@ module Compression =
     | GZIP ->
       use gzip = new GZipStream(newFileStream, CompressionMode.Compress)
       do! SocketOp.ofTask (fs.CopyToAsync gzip)
-      gzip.Close()
+      gzip.Dispose()
     | Deflate ->
       use deflate = new DeflateStream(newFileStream, CompressionMode.Compress)
       do! SocketOp.ofTask (fs.CopyToAsync deflate)
-      deflate.Close()
+      deflate.Dispose()
     | _ ->
       return failwith "invalid case."
-    newFileStream.Close()
+    newFileStream.Dispose()
   }
 
   let compressFile n (stream : Stream) compressionFolder = socket {

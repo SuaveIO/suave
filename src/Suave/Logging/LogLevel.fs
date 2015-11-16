@@ -64,7 +64,7 @@ type LogLevel =
       | 4 -> Warn
       | 5 -> Error
       | 6 -> Fatal
-      | _ as i -> failwith "rank %i not available" i) i
+      | _ as i -> failwith (sprintf "rank %i not available" i)) i
 
     static member op_LessThan (a, b) = (a :> IComparable<LogLevel>).CompareTo(b) < 0
     static member op_LessThanOrEqual (a, b) = (a :> IComparable<LogLevel>).CompareTo(b) <= 0

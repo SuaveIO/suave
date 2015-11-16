@@ -2,6 +2,7 @@
 module Suave.Proxy
 
 open System
+open System.Globalization
 open System.IO
 open System.Net
 open System.Collections.Generic
@@ -18,6 +19,90 @@ open Suave.Tcp
 open Suave.Http
 open Suave.Http.Response
 open Suave.Web.ParsingAndControl
+
+let dateTimePatterns = [| "ddd, d MMM yyyy H:m:s 'GMT'";      // RFC 1123 (r, except it allows both 1 and 01 for date and time) 
+                          "ddd, d MMM yyyy H:m:s";            // RFC 1123, no zone - assume GMT 
+                          "d MMM yyyy H:m:s 'GMT'";           // RFC 1123, no day-of-week 
+                          "d MMM yyyy H:m:s";                 // RFC 1123, no day-of-week, no zone 
+                          "ddd, d MMM yy H:m:s 'GMT'";        // RFC 1123, short year 
+                          "ddd, d MMM yy H:m:s";              // RFC 1123, short year, no zone 
+                          "d MMM yy H:m:s 'GMT'";             // RFC 1123, no day-of-week, short year 
+                          "d MMM yy H:m:s";                   // RFC 1123, no day-of-week, short year, no zone 
+                          "dddd, d'-'MMM'-'yy H:m:s 'GMT'";   // RFC 850 
+                          "dddd, d'-'MMM'-'yy H:m:s";         // RFC 850 no zone 
+                          "ddd MMM d H:m:s yyyy";             // ANSI C's asctime() format 
+                          "ddd, d MMM yyyy H:m:s zzz";        // RFC 5322 
+                          "ddd, d MMM yyyy H:m:s";            // RFC 5322 no zone 
+                          "d MMM yyyy H:m:s zzz";             // RFC 5322 no day-of-week 
+                          "d MMM yyyy H:m:s"                  // RFC 5322 no day-of-week, no zone 
+                       |]
+
+/// See: https://msdn.microsoft.com/en-us/library/system.net.webheadercollection(v=vs.110).aspx
+let restrictedHeaders = [| "Accept";
+                           "Connection"; 
+                           "Content-Length";  
+                           "Content-Type"; 
+                           "Date"; 
+                           "Expect"; 
+                           "Host"; 
+                           "If-Modified-Since"; 
+                           "Range"; 
+                           "Referrer"; 
+                           "Transfer-Encoding"; 
+                           "User-Agent"; 
+                           "Proxy-Connection" 
+                        |] 
+
+[<Literal>]
+let headerIdsDate = "Date"
+[<Literal>]
+let headerIdsExpect = "Expect"
+[<Literal>]
+let headerIdsUserAgent = "User-Agent"
+
+type private HttpWebRequest with
+    member this.GetRequestStream () =
+        let mutable value = null
+        let iar = this.BeginGetRequestStream(new AsyncCallback(fun r -> let req = r.AsyncState :?> HttpWebRequest
+                                                                        value <- req.EndGetRequestStream(r)
+                                                                        ()), this)
+        if not iar.IsCompleted then do 
+            iar.AsyncWaitHandle.WaitOne()
+            iar.AsyncWaitHandle.Dispose()
+        value
+
+    member this.Date 
+        with get():DateTime = 
+            let date = this.Headers.[headerIdsDate]
+            let result, value = DateTime.TryParseExact(date, 
+                                                       dateTimePatterns, DateTimeFormatInfo.InvariantInfo, 
+                                                       DateTimeStyles.AllowWhiteSpaces ||| DateTimeStyles.AssumeUniversal) 
+            if result then value else Unchecked.defaultof<DateTime>
+
+        and  set (value:DateTime) =
+            // Format according to RFC1123; 'r' uses invariant info (DateTimeFormatInfo.InvariantInfo) 
+            let date = value.ToUniversalTime().ToString("r", CultureInfo.InvariantCulture) 
+            this.Headers.[headerIdsDate] <- date
+
+    member this.Expect 
+        with get():string = this.Headers.[headerIdsExpect]
+
+        and  set (value:string) =
+            let expect = value
+            if String.IsNullOrWhiteSpace(value) then
+                this.Headers.Remove(headerIdsExpect)
+            else
+                this.Headers.[headerIdsExpect] <- expect
+
+    member this.UserAgent 
+      with get() =  this.Headers.[headerIdsUserAgent]
+      and  set value =  this.Headers.[headerIdsUserAgent] <- value
+
+type private System.Net.WebHeaderCollection with
+    static member IsRestricted (key:string):bool =   
+        match restrictedHeaders |> Array.tryFind(fun elem -> String.Compare(key, elem, StringComparison.OrdinalIgnoreCase) = 0) with
+        | Some(_) -> true 
+        | None -> false
 
 /// Copies the headers from 'headers1' to 'headers2'
 let private toHeaderList (headers : WebHeaderCollection) =
@@ -43,14 +128,16 @@ let forward (ip : IPAddress) (port : uint16) (ctx : HttpContext) =
     for e in h do
       let key = fst e
       if not (WebHeaderCollection.IsRestricted key) then
-        r.Add(key, snd e)
+        r.[key] <- (snd e)
     r
   let url = new UriBuilder("http", ip.ToString(), int port, p.url.AbsolutePath, p.rawQuery)
   let q = WebRequest.Create(url.Uri) :?> HttpWebRequest
 
+#if !LIMITED_WEB_CLIENT
   q.AllowAutoRedirect         <- false
-  q.AllowReadStreamBuffering  <- false
   q.AllowWriteStreamBuffering <- false
+#endif
+  q.AllowReadStreamBuffering  <- false
   q.Method                    <- string p.``method``
   q.Headers                   <- buildWebHeadersCollection p.headers
   q.Proxy                     <- null
@@ -60,16 +147,20 @@ let forward (ip : IPAddress) (port : uint16) (ctx : HttpContext) =
   header "accept"            |> Choice.iter (fun v -> q.Accept <- v)
   header "date"              |> Choice.iter (fun v -> q.Date <- DateTime.Parse v)
   header "expect"            |> Choice.iter (fun v -> q.Expect <- v)
+#if !LIMITED_WEB_CLIENT
   header "host"              |> Choice.iter (fun v -> q.Host <- v)
   header "range"             |> Choice.iter (fun v -> q.AddRange(Int64.Parse v))
   header "referer"           |> Choice.iter (fun v -> q.Referer <- v)
+#endif
   header "content-type"      |> Choice.iter (fun v -> q.ContentType <- v)
+#if !LIMITED_WEB_CLIENT
   header "content-length"    |> Choice.iter (fun v -> q.ContentLength <- Int64.Parse(v))
   header "if-modified-since" |> Choice.iter (fun v -> q.IfModifiedSince <- DateTime.Parse v)
   header "transfer-encoding" |> Choice.iter (fun v -> q.TransferEncoding <- v)
+#endif
   header "user-agent"        |> Choice.iter (fun v -> q.UserAgent <- v)
 
-  q.Headers.Add("X-Real-IP", ctx.clientIpTrustProxy.ToString())
+  q.Headers.["X-Real-IP"] <- (ctx.clientIpTrustProxy.ToString())
 
   fun ctx -> socket {
     if p.``method`` = HttpMethod.POST || p.``method`` = HttpMethod.PUT then
