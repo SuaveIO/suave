@@ -25,9 +25,9 @@ type PayloadSize =
   | Bit32 = 66000
 
 [<Tests>]
-let websocketTests =
+let websocketTests cfg =
 
-  let runWithConfig = runWith defaultConfig
+  let runWithConfig = runWith cfg
 
   let websocketApp (webSocket : WebSocket) =
     fun cx -> socket {

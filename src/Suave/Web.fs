@@ -386,6 +386,12 @@ module internal ParsingAndControl =
       do! asyncWriteLn connection "Content-Type: text/html"
   }
 
+  let internal addKeepAliveHeader (context : HttpContext) =
+    match context.request.httpVersion, context.request.header "connection" with
+    | "HTTP/1.0", Choice1Of2 v when String.eqOrdCi v "keep-alive" ->
+      { context with response = { context.response with headers = ("Connection","Keep-Alive") :: context.response.headers } }
+    | _ -> context
+
   let internal writeHeaders connection (headers : (string*string) seq) = socket {
     for x,y in headers do
       if not (List.exists (fun y -> x.ToLower().Equals(y)) ["server";"date";"content-length"]) then
@@ -411,11 +417,11 @@ module internal ParsingAndControl =
       // http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.13
       do! asyncWriteLn connection (String.Concat [| "Content-Length: "; content.Length.ToString() |])
       do! asyncWriteLn connection ""
-      if content.Length > 0 then
+      if context.request.``method`` <> HttpMethod.HEAD && content.Length > 0 then
         do! send connection (new ArraySegment<_>(content, 0, content.Length))
       }
-    | SocketTask f -> socket{ 
-      return! f context.connection
+    | SocketTask f -> socket {
+        return! f (context.connection, context.response)
       }
     | NullContent -> socket.Return()
 
@@ -467,16 +473,14 @@ module internal ParsingAndControl =
     let request =
       { httpVersion      = httpVersion
         url              = ctx.runtime.matchedBinding.uri path rawQuery
-        host             = ClientOnly host
+        host             = host
         ``method``       = meth  
         headers          = headers
-        rawForm          = [| |]
+        rawForm          = [||]
         rawQuery         = rawQuery
         files            = []
         multiPartFields  = []
-        trace            = parseTraceHeaders headers
-        isSecure         = ctx.runtime.matchedBinding.scheme.secure
-        ipaddr           = connection''.ipaddr }
+        trace            = parseTraceHeaders headers }
 
     if request.headers %% "expect" = Choice1Of2 "100-continue" then
       let! _ = run ctx <| Intermediate.CONTINUE
@@ -546,7 +550,7 @@ module internal ParsingAndControl =
         match result with
         | None -> verbose "'result = None', exiting"
         | Some ctx ->
-          let! result'' = operate consumer ctx
+          let! result'' = addKeepAliveHeader ctx |> operate consumer
           match result'' with
           | Choice1Of2 result -> 
             match result with
@@ -579,7 +583,7 @@ module internal ParsingAndControl =
             verbose (sprintf "Socket error while sending BAD_REQUEST, exiting: %A" err)
 
         | err ->
-          verbose (sprintf "Socket error while sending BAD_REQUEST, exiting: %A" err)
+          verbose (sprintf "Socket error while processing request, exiting: %A" err)
     }
     loop ctxOuter
 
@@ -604,11 +608,10 @@ module internal ParsingAndControl =
 
 
   /// Starts a new web worker, given the configuration and a web part to serve.
-  let startWebWorkerAsync (bufferSize, maxOps) (webpart : WebPart) (runtime : HttpRuntime) =
-    startTcpIpServerAsync (bufferSize, maxOps)
-                          runtime.logger
-                          (requestLoop runtime (WebPart webpart))
+  let startWebWorkerAsync (bufferSize, maxOps) (webpart : WebPart) (runtime : HttpRuntime) runServer =
+    startTcpIpServerAsync (requestLoop runtime (WebPart webpart))
                           runtime.matchedBinding.socketBinding
+                          runServer
 
   let resolveDirectory homeDirectory =
     match homeDirectory with
@@ -632,7 +635,7 @@ let defaultErrorHandler (ex : Exception) msg (ctx : HttpContext) =
     LogLine.mk "Suave.Web.defaultErrorHandler" LogLevel.Error
                ctx.request.trace (Some ex)
                msg)
-  if IPAddress.IsLoopback ctx.request.ipaddr then
+  if ctx.isLocal then
     Response.response HTTP_500 (UTF8.bytes (sprintf "<h1>%s</h1><br/>%A" ex.Message ex)) ctx
   else 
     Response.response HTTP_500 (UTF8.bytes HTTP_500.message) ctx
@@ -654,10 +657,17 @@ let startWebServerAsync (config : SuaveConfig) (webpart : WebPart) =
     Path.Combine(ParsingAndControl.resolveDirectory config.compressedFilesFolder, "_temporary_compressed_files")
 
   // spawn tcp listeners/web workers
+  let toRuntime = SuaveConfig.toRuntime config homeFolder compressionFolder true
+
+  let startWebWorkerAsync runtime =
+    ParsingAndControl.startWebWorkerAsync 
+      (config.bufferSize, config.maxOps) 
+      webpart
+      runtime 
+      (config.tcpServerFactory.create(config.logger, config.maxOps, config.bufferSize,runtime.matchedBinding))
+
   let servers = 
-    config.bindings
-    |> List.map (SuaveConfig.toRuntime config homeFolder compressionFolder true
-                 >> ParsingAndControl.startWebWorkerAsync (config.bufferSize, config.maxOps) webpart)
+     List.map (toRuntime >> startWebWorkerAsync) config.bindings
               
   let listening = servers |> Seq.map fst |> Async.Parallel
   let server    = servers |> Seq.map snd |> Async.Parallel |> Async.Ignore
@@ -667,6 +677,11 @@ let startWebServerAsync (config : SuaveConfig) (webpart : WebPart) =
 /// it returning itself.
 let startWebServer (config : SuaveConfig) (webpart : WebPart) =
   Async.RunSynchronously(startWebServerAsync config webpart |> snd, cancellationToken = config.cancellationToken)
+
+type DefaultTcpServerFactory() =
+  interface TcpServerFactory with
+    member this.create (logger,maxOps, bufferSize,binding) =
+      Tcp.runServer logger maxOps bufferSize binding.socketBinding
 
 /// The default configuration binds on IPv4, 127.0.0.1:8083 with a regular 500 Internal Error handler,
 /// with a timeout of one minute for computations to run. Waiting for 2 seconds for the socket bind
@@ -682,11 +697,6 @@ let defaultConfig =
     mimeTypesMap          = Http.Writers.defaultMimeTypesMap
     homeFolder            = None
     compressedFilesFolder = None
-    logger                = Loggers.saneDefaultsFor LogLevel.Info }
-
-let defaultCORSConfig =
-  { allowedUris           = []
-    allowedMethods        = InclusiveOption.All
-    allowCookies          = true
-    exposeHeaders         = true
-    maxAge                = None }
+    logger                = Loggers.saneDefaultsFor LogLevel.Info
+    tcpServerFactory      = new DefaultTcpServerFactory()
+    cookieSerialiser      = new Utils.BinaryFormatterSerialiser() }

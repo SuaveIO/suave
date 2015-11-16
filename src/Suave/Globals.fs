@@ -1,4 +1,4 @@
-﻿module Suave.Globals
+module Suave.Globals
 
 /// Get the current DateTimeOffset in UTC format.
 ///

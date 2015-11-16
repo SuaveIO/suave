@@ -21,11 +21,15 @@ module Cookie =
     | DecryptionError of Crypto.SecretboxDecryptionError
 
   let parseCookies (s : string) : HttpCookie list =
-    s.Split(';')
+    s.Split([|';'|], StringSplitOptions.RemoveEmptyEntries)
     |> Array.toList
     |> List.map (fun (cookie : string) ->
-        let parts = cookie.Split('=')
-        HttpCookie.mkKV (String.trim parts.[0]) (String.trim parts.[1]))
+        let parts = cookie.Split([|'='|], StringSplitOptions.RemoveEmptyEntries)
+        if parts.Length > 1 then
+          Some (HttpCookie.mkKV (String.trim parts.[0]) (String.trim parts.[1]))
+        else
+          None)
+    |> List.choose id
 
   let parseResultCookie (s : string) : HttpCookie =
     let parseExpires (str : string) =
@@ -64,8 +68,7 @@ module Cookie =
     member x.cookies =
       x.headers
       |> List.filter (fst >> (String.eqOrdCi "Set-Cookie"))
-      /// duplicate headers are comma separated
-      |> List.collect (snd >> String.split ',' >> List.map String.trim)
+      |> List.map (snd >> String.trim)
       |> List.map parseResultCookie
       |> List.fold (fun cookies cookie ->
           cookies |> Map.add cookie.name cookie)
@@ -110,7 +113,7 @@ module Cookie =
   let unsetCookie (cookieName : string) =
     let startEpoch = DateTimeOffset(1970, 1, 1, 0, 0, 1, TimeSpan.Zero) |> Some
     let stringValue = HttpCookie.toHeader { HttpCookie.mkKV cookieName "x" with expires = startEpoch }
-    Writers.setHeader "Set-Cookie" stringValue
+    Writers.addHeader "Set-Cookie" stringValue
 
   let setPair (httpCookie : HttpCookie) (clientCookie : HttpCookie) : WebPart =
     context (fun { runtime = { logger = logger } } ->

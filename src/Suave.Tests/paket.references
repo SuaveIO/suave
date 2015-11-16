@@ -1,5 +1,6 @@
+FSharp.Core
 FSharp.Charting
-Fuchu-suave.FsCheck
-Fuchu-suave.PerfUtil
+Fuchu.FsCheck
+Fuchu.PerfUtil
 WebSocketSharp
 Http.fs-prerelease

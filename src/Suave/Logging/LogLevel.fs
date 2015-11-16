@@ -8,13 +8,13 @@ open System
 type LogLevel =
   /// The most verbose log level, more verbose than Debug.
   | Verbose
-  /// Less verbose than Verbose, more verbose than Info
+  /// Less verbose than Verbose, more verbose than Info.
   | Debug
-  /// Less verbose than Debug, more verbose than Warn
+  /// Less verbose than Debug, more verbose than Warn.
   | Info
-  /// Less verbose than Info, more verbose than Error
+  /// Less verbose than Info, more verbose than Error.
   | Warn
-  /// Less verbose than Warn, more verbose than Fatal
+  /// Less verbose than Warn, more verbose than Fatal.
   | Error
   /// The least verbose level. Will only pass through fatal
   /// log lines that cause the application to crash or become

@@ -22,8 +22,8 @@ open Suave.Tests.TestUtilities
 open Suave.Testing
 
 [<Tests>]
-let parsingMultipart =
-  let runWithConfig = runWith defaultConfig
+let parsingMultipart cfg =
+  let runWithConfig = runWith cfg
 
   let postData1 = readBytes "request.txt"
   let postData2 = readText "request-1.txt"
@@ -75,7 +75,7 @@ open Suave.Logging
 open Suave.Sockets
 
 [<Tests>]
-let parsingMultipart2 =
+let parsingMultipart2 cfg =
   let app =
     choose
       [ POST
@@ -88,18 +88,26 @@ let parsingMultipart2 =
               >>= warbler (fun ctx ->
                   //printfn "inside suave"
                   ctx.request.files
-                  |> List.map (fun f -> "\"" + f.fileName + "\"")
+                  |> List.map (fun f ->
+                    "\"" + f.fileName + "\"")
                   |> String.concat ","
                   |> fun files -> "[" + files + "]"
                   |> OK)
+
+            path "/msgid"
+              >>= request (fun r ->
+                match r.multiPartFields |> List.tryFind (fst >> (=) "messageId") with
+                | Some (_, yep) -> OK yep
+                | None -> NOT_FOUND "Nope... Not found"
+              )
 
             NOT_FOUND "Nope."
         ]
       ]
 
-  let runWithConfig = runWith defaultConfig //{ defaultConfig with logger = Loggers.ConsoleWindowLogger(LogLevel.Verbose) }
+  let runWithConfig = runWith cfg //{ cfg with logger = Loggers.ConsoleWindowLogger(LogLevel.Verbose) }
 
-  let sendRecv (data : byte []) =
+  let sendRecvRaw (data : byte []) =
     use sender = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp)
     sender.Connect (new IPEndPoint(IPAddress.Loopback, int HttpBinding.DefaultBindingPort))
     let written = sender.Send data
@@ -109,6 +117,14 @@ let parsingMultipart2 =
     let resp = sender.Receive respBuf
     ASCII.toStringAtOffset respBuf 0 resp
 
+  let sendRecv (data : byte []) =
+    let client = new TcpClient("127.0.0.1", 8083)
+    use stream = client.GetStream()
+    stream.Write(data, 0, data.Length)
+
+    use streamReader = new StreamReader(stream)
+    streamReader.ReadToEnd()
+
   testList "sending funky multiparts" [
     testCase "sending two files under same form name" <| fun _ ->
       let ctx = runWithConfig app
@@ -116,6 +132,20 @@ let parsingMultipart2 =
         let data = readBytes "request-multipartmixed-twofiles.txt"
         let subject = sendRecv data
         Assert.StringContains("Expecting 200 OK", "HTTP/1.1 200 OK", subject)
+        Assert.StringContains(
+          "Expecting response to contain file name",
+          "file1.txt",
+          subject)
+      finally
+        disposeContext ctx
+
+    testCase "extracting messageId from form-data post" <| fun _ ->
+      let ctx = runWithConfig app
+      try
+        let data = readBytes "request-binary-n-formdata.txt"
+        let subject = sendRecv data
+        Assert.StringContains("Expecting 200 OK", "HTTP/1.1 200 OK", subject)
+        Assert.StringContains("Expecting response to contain messageid", "online sha1 hash of all files", subject)
       finally
         disposeContext ctx
 
@@ -123,7 +153,7 @@ let parsingMultipart2 =
       let ctx = runWithConfig app
       try
         let data = readBytes "request-no-host-header.txt"
-        let subject = sendRecv data
+        let subject = sendRecvRaw data
         Assert.StringContains("Expecting 400 Bad Request", "HTTP/1.1 400 Bad Request", subject)
       finally
         disposeContext ctx
@@ -132,7 +162,7 @@ let parsingMultipart2 =
       let ctx = runWithConfig app
       try
         let data = readBytes "request-hangs.txt"
-        let subject = sendRecv data
+        let subject = sendRecvRaw data
         Assert.StringContains("Expecting 404 Not Found", "HTTP/1.1 404 Not Found", subject)
       finally
         disposeContext ctx

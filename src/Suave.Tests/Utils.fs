@@ -10,12 +10,13 @@ open Suave.Utils.Parsing
 
 open Fuchu
 
+open Suave.Types
 open TestUtilities
 
 #nowarn "25"
 
 [<Tests>]
-let utilities =
+let utilities (_: SuaveConfig) =
   testList "trying some utility functions" [
     testCase "loopback ipv4" <| fun _ ->
       Assert.Equal("127.0.0.1 is a local address", true, isLocalAddress "127.0.0.1")
@@ -57,6 +58,13 @@ let utilities =
       let key = Crypto.generateStdKey ()
       let (Choice1Of2 cipher) = Crypto.secretboxOfText key str
       cipher.[cipher.Length - Crypto.HMACLength - 1] <- 0uy
+      cipher.[cipher.Length - Crypto.HMACLength - 2] <- 0uy
+      cipher.[cipher.Length - Crypto.HMACLength - 3] <- 0uy
+      cipher.[cipher.Length - Crypto.HMACLength - 4] <- 0uy
+      cipher.[cipher.Length - Crypto.HMACLength - 5] <- 0uy
+      cipher.[cipher.Length - Crypto.HMACLength - 6] <- 0uy
+      cipher.[cipher.Length - Crypto.HMACLength - 7] <- 0uy
+      cipher.[cipher.Length - Crypto.HMACLength - 8] <- 0uy
       match Crypto.secretboxOpen key cipher with
       | Choice1Of2 _ -> Tests.failtest "should not decrypt successfully"
       | Choice2Of2 (Crypto.AlteredOrCorruptMessage(msg) as aocm) -> ()

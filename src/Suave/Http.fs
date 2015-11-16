@@ -1,4 +1,4 @@
-﻿namespace Suave
+namespace Suave
 
 module Http =
 
@@ -32,10 +32,10 @@ module Http =
 
   let inline (<|>) (a : WebPart) (b : WebPart) : WebPart =
     fun x ->
-      async{
+      async {
         let! e = a x
         match e with
-        | None   ->
+        | None ->
           let! result = b x
           match result with
           | None -> return None
@@ -43,7 +43,7 @@ module Http =
         | r -> return r
       }
 
-  let rec choose (options : WebPart list): WebPart =
+  let rec choose (options : WebPart list) : WebPart =
     fun arg -> async {
     match options with
     | []        -> return None
@@ -109,7 +109,11 @@ module Http =
     open System
 
     let setHeader key value (ctx : HttpContext) =
-      { ctx with response = { ctx.response with headers = (key, value) :: ctx.response.headers } }
+      { ctx with response = { ctx.response with headers = (key, value) :: (ctx.response.headers |> List.filter (fun (k,_) -> k <> key))  } }
+      |> succeed
+
+    let addHeader key value (ctx : HttpContext) =
+      { ctx with response = { ctx.response with headers = List.append ctx.response.headers [key, value] } }
       |> succeed
 
     let setUserData key value (ctx : HttpContext) =
@@ -169,7 +173,6 @@ module Http =
     open Response
     open Suave.Types
     
-
     let ok s : WebPart = 
       fun ctx -> { ctx with response = { ctx.response with status = HTTP_200; content = Bytes s }} |> succeed
 
@@ -218,7 +221,6 @@ module Http =
     </body>
   </html>"
         url HTTP_302.message))
-     
 
     let not_modified : WebPart =
       fun ctx -> { ctx with response = {status = HTTP_304; headers = []; content = Bytes [||]; writePreamble = true }} |> succeed
@@ -323,7 +325,6 @@ module Http =
     let INVALID_HTTP_VERSION = invalid_http_version (UTF8.bytes HTTP_505.message)
 
   module Applicatives =
-  
 
     open Suave.Utils
     open Suave.Logging
@@ -339,25 +340,29 @@ module Http =
     let path s (x : HttpContext) =
       async.Return (Option.iff (s = x.request.url.AbsolutePath) x)
 
+    let pathStarts s (x : HttpContext) =
+      async.Return (Option.iff (x.request.url.AbsolutePath.StartsWith s) x)
+
     let url x = path x
 
     let ``method`` (m : HttpMethod) (x : HttpContext) =
       async.Return (Option.iff (m = x.request.``method``) x)
 
     let isSecure (x : HttpContext) =
-      async.Return (Option.iff x.request.isSecure x)
+      async.Return (Option.iff x.runtime.matchedBinding.scheme.secure x)
 
     let pathRegex regex (x : HttpContext) =
       async.Return (Option.iff (Regex.IsMatch(x.request.url.AbsolutePath, regex)) x)
 
     let urlRegex x = pathRegex x
 
-    let host hostname (x : HttpContext) = async {
-      if x.request.host.value = hostname then
-        return Some { x with request = { x.request with host = ServerClient hostname } }
-      else
-        return None
-      }
+    let host hostname (x : HttpContext) =
+      async.Return (Option.iff (String.eqOrdCi x.request.clientHostTrustProxy hostname) x)
+
+    let serverHost hostname (x : HttpContext) =
+      async.Return (Option.iff (String.eqOrdCi x.request.host hostname) x)
+
+    let clientHost hostname x = host hostname x
 
     // see http://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html
 
@@ -371,26 +376,13 @@ module Http =
     let TRACE   (x : HttpContext) = ``method`` HttpMethod.TRACE x
     let OPTIONS (x : HttpContext) = ``method`` HttpMethod.OPTIONS x
 
-    /// The default log format for <see cref="log" />.  NCSA Common log format
-    /// 
-    /// 127.0.0.1 user-identifier frank [10/Oct/2000:13:55:36 -0700] "GET /apache_pb.gif HTTP/1.0" 200 2326
-    /// 
-    /// A "-" in a field indicates missing data.
-    /// 
-    /// 127.0.0.1 is the IP address of the client (remote host) which made the request to the server.
-    /// user-identifier is the RFC 1413 identity of the client.
-    /// frank is the userid of the person requesting the document.
-    /// [10/Oct/2000:13:55:36 -0700] is the date, time, and time zone when the server finished processing the request, by default in strftime format %d/%b/%Y:%H:%M:%S %z.
-    /// "GET /apache_pb.gif HTTP/1.0" is the request line from the client. The method GET, /apache_pb.gif the resource requested, and HTTP/1.0 the HTTP protocol.
-    /// 200 is the HTTP status code returned to the client. 2xx is a successful response, 3xx a redirection, 4xx a client error, and 5xx a server error.
-    /// 2326 is the size of the object returned to the client, measured in bytes.
     let logFormat (ctx : HttpContext) =
-      
+
       let dash = function | "" | null -> "-" | x -> x
       let ci = Globalization.CultureInfo("en-US")
       let processId = System.Diagnostics.Process.GetCurrentProcess().Id.ToString()
-      sprintf "%O %s %s [%s] \"%s %s %s\" %d %s"
-        ctx.request.ipaddr
+      sprintf "%O %s %s [%s] \"%s %s %s\" %d %d"
+        ctx.clientIpTrustProxy
         processId //TODO: obtain connection owner via Ident protocol
                          // Authentication.UserNameKey
         (match Map.tryFind "userName" ctx.userState with Some x -> x :?> string | None -> "-")
@@ -399,7 +391,9 @@ module Http =
         ctx.request.url.AbsolutePath
         ctx.request.httpVersion
         ctx.response.status.code
-        "0"
+        (match ctx.response.content with
+         | Bytes bs -> bs.LongLength
+         | _ -> 0L)
 
     let log (logger : Logger) (formatter : HttpContext -> string) (ctx : HttpContext) =
       logger.Log LogLevel.Debug <| fun _ ->
@@ -507,15 +501,15 @@ module Http =
     open ServeResource
 
     let sendFile fileName (compression : bool) (ctx : HttpContext) =
-      let writeFile file conn = socket {
-        let getFs = fun path -> new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read) :> Stream
+      let writeFile file (conn, _) = socket {
+        let getFs = fun path -> new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite) :> Stream
         let getLm = fun path -> FileInfo(path).LastWriteTime
         use! fs = Compression.transformStream file getFs getLm compression ctx.runtime.compressionFolder ctx conn
 
         do! asyncWriteLn conn (sprintf "Content-Length: %d" (fs : Stream).Length)
         do! asyncWriteLn conn ""
 
-        if fs.Length > 0L then
+        if  ctx.request.``method`` <> HttpMethod.HEAD && fs.Length > 0L then
           do! transferStream conn fs
       }
       { ctx with
@@ -622,7 +616,7 @@ module Http =
                       resourceName
                       (compression : bool)
                       (ctx : HttpContext) =
-      let writeResource name conn = socket {
+      let writeResource name (conn, _) = socket {
         let getFs = fun name -> assembly.GetManifestResourceStream(name)
         let getLm = fun _ -> lastModified assembly
         use! fs = Compression.transformStream name getFs getLm compression ctx.runtime.compressionFolder ctx conn
@@ -630,7 +624,7 @@ module Http =
         do! asyncWriteLn conn (sprintf "Content-Length: %d" (fs: Stream).Length)
         do! asyncWriteLn conn ""
 
-        if fs.Length > 0L then
+        if ctx.request.``method`` <> HttpMethod.HEAD && fs.Length > 0L then
           do! transferStream conn fs
       }
       { ctx with
@@ -700,8 +694,11 @@ module Http =
       out <<. "retry: " + (string retry) + ES_EOL
 
     type Message =
-      { id       : string
+      { /// The event ID to set the EventSource object's last event ID value.
+        id       : string
+        /// The data field for the message. When the EventSource receives multiple consecutive lines that begin with data:, it will concatenate them, inserting a newline character between each one. Trailing newlines are removed.
         data     : string
+        /// The event's type. If this is specified, an event will be dispatched on the browser to the listener for the specified event name; the web site source code should use addEventListener() to listen for named events. The onmessage handler is called if no event name is specified for a message.
         ``type`` : string option }
 
     let mkMessage id data =
@@ -720,9 +717,10 @@ module Http =
         return! dispatch out
       }
 
-    let private handShakeAux f (out : Connection) =
+    let private handShakeAux f (out : Connection, _) =
       socket {
-        // resp.SendChunked       <- false
+        do! asyncWriteLn out "" // newline after headers
+
         // Buggy Internet Explorer; 2kB of comment padding for IE
         do! String.replicate 2000 " " |> comment out
         do! 2000u |> retry out
@@ -738,13 +736,15 @@ module Http =
                      ("Content-Type",                "text/event-stream; charset=utf-8")
                   :: ("Cache-Control",               "no-cache")
                   :: ("Access-Control-Allow-Origin", "*")
+                  // http://wiki.nginx.org/X-accel#X-Accel-Buffering – hard to find
+                  // also see http://wiki.nginx.org/HttpProxyModule#proxy_buffering
+                  :: ("X-Accel-Buffering",           "no")
                   :: []
                 content = SocketTask (handShakeAux f)
-                //chunked = false
             }
       }
       |> succeed
-      
+
   module Authentication =
 
     open RequestErrors
@@ -759,15 +759,17 @@ module Http =
       let indexOfColon = decoded.IndexOf(':')
       (parts.[0].ToLower(), decoded.Substring(0,indexOfColon), decoded.Substring(indexOfColon+1))
 
-    let authenticateBasic f (ctx : HttpContext) =
+    let inline private addUserName username ctx = { ctx with userState = ctx.userState |> Map.add UserNameKey (box username) }
+
+    let authenticateBasic f (protectedPart : WebPart) (ctx : HttpContext) =
       let p = ctx.request
       match p.header "authorization" with
       | Choice1Of2 header ->
         let (typ, username, password) = parseAuthenticationToken header
         if (typ.Equals("basic")) && f (username, password) then
-          fail
+          protectedPart (addUserName username ctx)
         else
-          challenge { ctx with userState = ctx.userState |> Map.add UserNameKey (box username) }
+          challenge (addUserName username ctx)
       | Choice2Of2 _ ->
         challenge ctx
 
