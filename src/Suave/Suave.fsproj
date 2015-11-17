@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
@@ -116,6 +116,7 @@
     <Compile Include="Compression.fs" />
     <Compile Include="Http.fsi" />
     <Compile Include="Http.fs" />
+    <Compile Include="HttpAltBindings.fs"/>
     <Compile Include="Cookie.fsi" />
     <Compile Include="Cookie.fs" />
     <Compile Include="State.fs" />
