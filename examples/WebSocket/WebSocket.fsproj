@@ -91,7 +91,6 @@
       </PropertyGroup>
     </Otherwise>
   </Choose>
-  <Import Project="$(FSharpTargetsPath)" />
   <Choose>
     <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
       <ItemGroup>
@@ -103,4 +102,5 @@
       </ItemGroup>
     </When>
   </Choose>
+  <Import Project="$(FSharpTargetsPath)" />
 </Project>

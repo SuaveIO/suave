@@ -851,7 +851,7 @@ module Http =
                     | Choice1Of2 requestMethodHeaderValue -> // Preflight request
                         // Does the request have an Access-Control-Request-Headers header? If so, validate. If not, proceed.
                         let setAccessControlRequestHeaders =
-                            match req.getAllHeaders AccessControlRequestHeaders with
+                            match req.allHeaders AccessControlRequestHeaders with
                                 | Choice1Of2 list -> 
                                     Writers.setHeader AccessControlAllowHeaders (list |> String.concat ", ")
                                 | Choice2Of2 _ -> succeed

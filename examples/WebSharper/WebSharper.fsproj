@@ -63,12 +63,6 @@
   <ItemGroup>
     <None Include="paket.references" />
   </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\..\src\Suave\Suave.fsproj">
-      <Project>{3DC9193E-BD0C-4486-9C58-56B630C36623}</Project>
-      <Name>Suave</Name>
-    </ProjectReference>
-  </ItemGroup>
   <Choose>
     <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
       <ItemGroup>
@@ -100,6 +94,13 @@
           <Paket>True</Paket>
         </Reference>
       </ItemGroup>
+    </When>
+  </Choose>
+  <Choose>
+    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
+      <PropertyGroup>
+        <__paket__WebSharper_targets>WebSharper</__paket__WebSharper_targets>
+      </PropertyGroup>
     </When>
   </Choose>
   <Choose>
@@ -165,14 +166,6 @@
   </Choose>
   <Choose>
     <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
-      <PropertyGroup>
-        <__paket__WebSharper_targets>WebSharper</__paket__WebSharper_targets>
-      </PropertyGroup>
-    </When>
-  </Choose>
-  <Import Project="..\..\packages\WebSharper\build\$(__paket__WebSharper_targets).targets" Condition="Exists('..\..\packages\WebSharper\build\$(__paket__WebSharper_targets).targets')" Label="Paket" />
-  <Choose>
-    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
       <ItemGroup>
         <Reference Include="HttpMultipartParser">
           <HintPath>..\..\packages\WebSharper.Owin\lib\net45\HttpMultipartParser.dll</HintPath>
@@ -218,4 +211,11 @@
       </ItemGroup>
     </When>
   </Choose>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Suave\Suave.fsproj">
+      <Project>{3DC9193E-BD0C-4486-9C58-56B630C36623}</Project>
+      <Name>Suave</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="..\..\packages\WebSharper\build\$(__paket__WebSharper_targets).targets" Condition="Exists('..\..\packages\WebSharper\build\$(__paket__WebSharper_targets).targets')" Label="Paket" />
 </Project>

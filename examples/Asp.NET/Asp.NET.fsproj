@@ -90,16 +90,6 @@
     </Otherwise>
   </Choose>
   <Import Project="$(FSharpTargetsPath)" />
-  <ItemGroup>
-    <ProjectReference Include="..\..\src\Suave.Xsp\Suave.Xsp.fsproj">
-      <Project>{6D3955FC-6978-4B6B-A72D-7B73D6F3F71C}</Project>
-      <Name>Suave.Xsp</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\..\src\Suave\Suave.fsproj">
-      <Project>{3DC9193E-BD0C-4486-9C58-56B630C36623}</Project>
-      <Name>Suave</Name>
-    </ProjectReference>
-  </ItemGroup>
   <Choose>
     <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
       <ItemGroup>
@@ -111,4 +101,14 @@
       </ItemGroup>
     </When>
   </Choose>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Suave.Xsp\Suave.Xsp.fsproj">
+      <Project>{6D3955FC-6978-4B6B-A72D-7B73D6F3F71C}</Project>
+      <Name>Suave.Xsp</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\..\src\Suave\Suave.fsproj">
+      <Project>{3DC9193E-BD0C-4486-9C58-56B630C36623}</Project>
+      <Name>Suave</Name>
+    </ProjectReference>
+  </ItemGroup>
 </Project>
