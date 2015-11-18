@@ -2,7 +2,9 @@ framework: NET45
 source https://nuget.org/api/v2
 
 nuget FSharp.Charting
+nuget FSharp.Compiler.Service
 nuget FSharp.Core ~> 3.1.2
+nuget Hopac
 nuget Http.fs-prerelease
 nuget Nancy.Owin
 nuget RazorEngine
