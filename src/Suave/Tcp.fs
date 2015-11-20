@@ -199,3 +199,6 @@ let startTcpIpServerAsync (serveClient : TcpWorker<unit>)
 
   acceptingConnections.AwaitResult()
     , runServer startData acceptingConnections serveClient
+
+type TcpServerFactory =
+  abstract member create  : Logger * int * int * SocketBinding -> TcpServer
