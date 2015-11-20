@@ -10,8 +10,8 @@ open System.Text
 open System.Threading
 
 open Suave
-open Suave.Types
 open Suave.Http
+open Suave.Http.Operators
 open Suave.Sockets
 open Suave.Sockets.Control
 open Suave.WebSocket

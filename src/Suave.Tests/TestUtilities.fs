@@ -11,9 +11,8 @@ open System.Net.Http.Headers
 open System.Reflection
 
 open Suave
-open Suave.Types
 open Suave.Web
-open Suave.Http
+open Suave.Http.Operators
 open Suave.Logging
 
 open FsCheck

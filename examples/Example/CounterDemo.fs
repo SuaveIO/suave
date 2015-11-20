@@ -20,7 +20,6 @@ module private Helpers =
 open Suave
 open Suave.Sockets
 open Suave.Sockets.Control
-open Suave.Types
 open Suave.Http
 open Suave.Http.EventSource
 open Suave.Utils

@@ -2,9 +2,9 @@
 
 open System
 open System.IO
-open Suave.Types
-open Suave.Types.Codes
 open Suave.Http
+open Suave.Http.Types.Codes
+open Suave.Http.Operators
 open Suave.Http.Files
 open Suave.Utils
 

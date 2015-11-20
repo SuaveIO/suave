@@ -2,8 +2,8 @@ open Suave
 open Suave.Http.Successful
 open Suave.Web 
 open Suave.Http
+open Suave.Http.Operators
 open Suave.Http.Applicatives
-open Suave.Http.Successful
 open Topshelf
 open System
 open System.Threading

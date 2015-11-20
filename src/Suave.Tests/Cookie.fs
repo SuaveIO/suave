@@ -1,8 +1,9 @@
 ﻿module Suave.Tests.Cookie
 
 open Suave
-open Suave.Types
-open Suave.Cookie
+open Suave.Web
+open Suave.Http
+open Suave.Http.Cookie
 
 open Fuchu
 

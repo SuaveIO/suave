@@ -4,8 +4,8 @@ open System
 open System.Net
 open System.Net.Http.Headers
 open System.Text
-open Suave.Types
 open Suave.Http
+open Suave.Http.Operators
 open Suave.Http.Applicatives
 open Suave.Http.Authentication
 open Suave.Http.Successful

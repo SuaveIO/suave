@@ -12,7 +12,7 @@ open System.Text
 
 open Suave.Web
 open Suave.Html
-open Suave.Http
+open Suave.Http.Operators
 
 /// Load an object from its name
 let loadObject (str : string) =
@@ -102,7 +102,7 @@ let rec writeXmlToStringWriter (Xml(nodes)) (stream : StringWriter) =
       stream.Write(s)
       writeXmlToStringWriter children stream
 
-open Suave.Types
+open Suave.Http
 
 /// Read an attribute from the xml reader by moving it
 /// one step along and then yielding that value.

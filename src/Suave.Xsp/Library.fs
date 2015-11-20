@@ -7,8 +7,6 @@ open System.Web.Hosting
 open System.Text
 
 open Suave
-open Suave.Types
-open Suave.Types.Codes
 open Suave.Http
 open Suave.Utils
 

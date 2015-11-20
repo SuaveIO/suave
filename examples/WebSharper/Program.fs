@@ -32,9 +32,6 @@ module SelfHostedServer =
   open System.Net
   open System
   open System.Diagnostics
-  open Suave
-  open Suave.Types
-  open Suave.Http.Successful
   open Suave.Web
   open Suave.Logging
   open Suave.Owin

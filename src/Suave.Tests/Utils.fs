@@ -10,7 +10,7 @@ open Suave.Utils.Parsing
 
 open Fuchu
 
-open Suave.Types
+open Suave.Web
 open TestUtilities
 
 #nowarn "25"

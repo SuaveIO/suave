@@ -9,9 +9,10 @@ open System.Net.Sockets
 
 open Suave
 open Suave.Http
+open Suave.Http.Operators
 open Suave.Http.Successful
 open Suave.Http.Writers
-open Suave.Types
+open Suave.Http.Types
 open Suave.Utils
 
 open Suave.Tests.TestUtilities

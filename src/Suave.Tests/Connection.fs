@@ -8,7 +8,7 @@ open Fuchu
 
 open Suave
 open Suave.Web
-open Suave.Types
+open Suave.Http
 open Suave.Http.Successful
 
 open Suave.Testing

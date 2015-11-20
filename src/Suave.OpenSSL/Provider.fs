@@ -5,7 +5,7 @@ open OpenSSL.Core
 
 open Suave.Sockets
 open Suave.Sockets.Control
-open Suave.Types
+open Suave.Http
 
 open Suave.OpenSSL.Functions
 

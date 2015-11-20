@@ -3,8 +3,8 @@
 open Fuchu
 
 open Suave
-open Suave.Types
 open Suave.Http
+open Suave.Http.Operators
 open Suave.Http.Successful
 open Suave.Http.Embedded
 

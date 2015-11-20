@@ -3,8 +3,8 @@ open System.Net
 
 open Suave
 open Suave.Web
+open Suave.Http.Operators
 open Suave.Http
-open Suave.Types
 open Suave.Http.Applicatives
 open Suave.Http.Files
 open Suave.Logging

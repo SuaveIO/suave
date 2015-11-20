@@ -10,7 +10,7 @@ open System.Text.RegularExpressions
 
 open Suave.Html
 open Suave.Utils
-open Suave.Types
+open Suave.Http
 open Suave.Model
 
 type MailAddress with

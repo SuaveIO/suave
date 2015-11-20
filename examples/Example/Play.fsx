@@ -1,7 +1,7 @@
 ﻿#r "bin/Release/suave.dll"
 
 open Suave
-open Suave.Http
+open Suave.Http.Operators
 
 open Successful
 

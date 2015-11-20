@@ -5,10 +5,10 @@ open System.Text
 open System.Net.Http
 
 open Suave
-open Suave.Types
-open Suave.Web
 open Suave.Http
-open Successful
+open Suave.Web
+open Suave.Http.Operators
+open Suave.Http.Successful
 open Suave.Utils
 
 open Suave.Tests.TestUtilities

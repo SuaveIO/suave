@@ -8,10 +8,9 @@ open System.Net.Http.Headers
 open Fuchu
 
 open Suave
-open Suave.Types
-open Suave.Model
-open Suave.Types
 open Suave.Http
+open Suave.Model
+open Suave.Http.Operators
 open Suave.Http.Successful
 open Suave.Http.RequestErrors
 open Suave.Web

@@ -1,4 +1,4 @@
-﻿open Suave.Types
+﻿open Suave.Http
 open Suave.Web
 open Suave.Http.Applicatives
 open Suave.Http.Successful

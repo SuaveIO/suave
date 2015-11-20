@@ -4,8 +4,8 @@ open System.Reflection
 open System.Net.Http
 
 open Suave.Utils
-open Suave.Types
 open Suave.Http
+open Suave.Http.Operators
 open Suave.Http.Successful
 open Suave.Web
 

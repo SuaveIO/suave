@@ -1,6 +1,5 @@
 module Suave.Tests.Program
 
-open Suave.Types
 open Suave.Web
 open Suave.Logging
 open FuchuExtensions

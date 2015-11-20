@@ -9,11 +9,11 @@ open Fuchu
 
 open Suave
 open Suave.Logging
-open Suave.Cookie
+open Suave.Http.Cookie
 open Suave.State.CookieStateStore
-open Suave.Http
+open Suave.Http.Operators
 open Suave.Web
-open Suave.Types
+open Suave.Http
 open Suave.Http.Successful
 open Suave.Http.Applicatives
 open Suave.Http.RequestErrors

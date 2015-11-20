@@ -2,7 +2,7 @@
 
 open Fuchu
 
-open Suave.Types
+open Suave.Web
 open Suave.Sscanf
 
 [<Tests>]
@@ -38,7 +38,7 @@ let scanTests (_ : SuaveConfig) =
       Assert.Equal("should parse each item correctly", (100, 9223372036854775807L, 42u), result)
     ]
 
-open Suave.Types
+open Suave.Http
 open Suave.Http.Applicatives
 open Suave.Http.Successful
 open Suave.Tests.TestUtilities

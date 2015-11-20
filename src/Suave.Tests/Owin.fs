@@ -10,8 +10,8 @@ open System.Net.Http.Headers
 open System.Text
 
 open Suave
-open Suave.Types
 open Suave.Http
+open Suave.Http.Operators
 open Suave.Http.Applicatives
 open Suave.Http.Writers
 open Suave.Owin

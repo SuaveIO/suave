@@ -1,9 +1,6 @@
 ﻿
 open Suave
-open Suave.Types
 open Suave.Web
-open Suave.Http.Applicatives
-open Suave.Http.Successful
 open Suave.Logging
 
 open System.IO

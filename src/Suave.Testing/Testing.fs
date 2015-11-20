@@ -32,7 +32,7 @@ open System.Net.Http.Headers
 open Fuchu
 
 open Suave
-open Suave.Types
+open Suave.Http
 open Suave.Web
 
 [<AutoOpen>]

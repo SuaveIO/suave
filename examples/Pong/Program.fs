@@ -1,5 +1,4 @@
-﻿open Suave.Types
-open Suave.Web
+﻿open Suave.Web
 open Suave.Http
 open Suave.Http.Successful
 open System

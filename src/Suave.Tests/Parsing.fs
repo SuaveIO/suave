@@ -9,9 +9,8 @@ open System.Net.Http.Headers
 open System.Text
 
 open Suave
-open Suave.Types
-open Suave.Types
 open Suave.Http
+open Suave.Http.Operators
 open Suave.Http.Applicatives
 open Suave.Http.RequestErrors
 open Suave.Http.Successful

@@ -9,8 +9,9 @@ open System.Net.Http.Headers
 open System.Text
 
 open Suave
-open Suave.Types
+open Suave.Web
 open Suave.Http
+open Suave.Http.Operators
 open Suave.Razor
 
 open Suave.Tests.TestUtilities
