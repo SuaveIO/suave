@@ -702,7 +702,7 @@ let defaultConfig =
     cookieSerialiser      = new Utils.BinaryFormatterSerialiser() }
 
 let defaultCORSConfig =
-  { allowedUris           = []
+  { allowedUris           = InclusiveOption.All
     allowedMethods        = InclusiveOption.All
     allowCookies          = true
     exposeHeaders         = true

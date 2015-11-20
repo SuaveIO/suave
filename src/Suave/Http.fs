@@ -813,15 +813,22 @@ module Http =
     [<Literal>]
     let AccessControlMaxAge = "Access-Control-Max-Age"
 
-    let setMaxAgeHeader config =
+    let private isAllowedOrigin config value = 
+      match config.allowedUris with
+      | InclusiveOption.All -> true
+      | InclusiveOption.None -> false
+      | InclusiveOption.Some uris ->
+        List.exists (fun a -> a = value) uris
+
+    let private setMaxAgeHeader config =
       match config.maxAge with
       | None -> succeed
       | Some age -> Writers.setHeader AccessControlMaxAge (age.ToString())
 
-    let setAllowCredentialsHeader config = 
+    let private setAllowCredentialsHeader config = 
       Writers.setHeader AccessControlAllowCredentials (config.allowCookies.ToString())
 
-    let setAllowMethodsHeader (config : CORSConfig) value =
+    let private setAllowMethodsHeader config value =
       match config.allowedMethods with
       | InclusiveOption.None -> succeed
       | InclusiveOption.All -> Writers.setHeader AccessControlAllowMethods "*"
@@ -833,10 +840,10 @@ module Http =
         else
           succeed
 
-    let setAllowOriginHeader value = 
+    let private setAllowOriginHeader value = 
       Writers.setHeader AccessControlAllowOrigin value
 
-    let setExposeHeadersHeader config =
+    let private setExposeHeadersHeader config =
       Writers.setHeader AccessControlExposeHeaders (config.exposeHeaders.ToString())
 
     let cors (config : CORSConfig) : WebPart =
@@ -844,7 +851,7 @@ module Http =
             let req = ctx.request
             match req.header (Origin.ToLowerInvariant()) with
             | Choice1Of2 originValue -> // CORS request
-                let allowedOrigin = List.exists (fun a -> a = originValue) config.allowedUris
+                let allowedOrigin = isAllowedOrigin config originValue
                 match req.``method`` with
                 | HttpMethod.OPTIONS ->
                     match req.header AccessControlRequestMethod with

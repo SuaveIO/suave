@@ -831,7 +831,7 @@ type InclusiveOption<'T> =
 type CORSConfig =
   {
     /// The list of allowed Uri(s) for requests.
-    allowedUris             : string list
+    allowedUris             : InclusiveOption<string list>
 
     /// The list of allowed HttpMethods for the request.
     allowedMethods          : InclusiveOption<HttpMethod list>
