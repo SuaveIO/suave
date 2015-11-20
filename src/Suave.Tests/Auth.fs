@@ -102,7 +102,7 @@ let tests cfg =
 
     testCase "can set MaxAge cookie" <| fun _ ->
       let timespan = System.TimeSpan.FromDays(13.0)
-      let maxAge = Suave.Cookie.CookieLife.MaxAge timespan
+      let maxAge = Cookie.CookieLife.MaxAge timespan
       let ctx = runWithConfig (Auth.authenticated maxAge false >>= OK "ACK")
       let cookies = ctx |> reqCookies' HttpMethod.GET "/"  None
       Assert.NotNull("should have auth cookie", cookies.[Auth.SessionAuthCookie])
