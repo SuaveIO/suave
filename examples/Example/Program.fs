@@ -8,13 +8,13 @@ open Suave.Sockets
 open Suave.Sockets.Control
 open Suave.Logging
 open Suave.Web
-open Suave.Http
+open Suave.Http.Monad
 open Suave.Http.EventSource
 open Suave.Http.Applicatives
 open Suave.Http.Writers
 open Suave.Http.Files
 open Suave.Http.Successful
-open Suave.Types
+open Suave.Http
 open Suave.State.CookieStateStore
 open Suave.Utils
 
@@ -23,22 +23,33 @@ let basicAuth =
 
 let logger = Loggers.ConsoleWindowLogger LogLevel.Verbose
 
+///  With this workflow you can write WebParts like this
+let task : WebPart =
+  fun ctx -> asyncOption {
+    let! ctx = GET ctx
+    let! ctx = Writers.setHeader "foo" "bar" ctx
+    return ctx
+  }
+
+///  we can still use the old symbol but now has a new meaning
+let foo : WebPart = fun ctx -> GET ctx >>= OK "hello"
+
 let myApp =
   choose [
-    GET >>= choose
-      [ path "/hello" >>= OK "Hello GET" ; path "/goodbye" >>= OK "Good bye GET" ];
-    POST >>= choose
-      [ path "/hello" >>= OK "Hello POST" ; path "/goodbye" >>= OK "Good bye POST" ];
-    DELETE >>= choose
-      [ path "/hello" >>= OK "Hello DELETE" ; path "/goodbye" >>= OK "Good bye DELETE" ];
-    PUT >>= choose
-      [ path "/hello" >>= OK "Hello PUT" ; path "/goodbye" >>= OK "Good bye PUT" ];
+    GET >=> choose
+      [ path "/hello" >=> OK "Hello GET" ; path "/goodbye" >=> OK "Good bye GET" ];
+    POST >=> choose
+      [ path "/hello" >=> OK "Hello POST" ; path "/goodbye" >=> OK "Good bye POST" ];
+    DELETE >=> choose
+      [ path "/hello" >=> OK "Hello DELETE" ; path "/goodbye" >=> OK "Good bye DELETE" ];
+    PUT >=> choose
+      [ path "/hello" >=> OK "Hello PUT" ; path "/goodbye" >=> OK "Good bye PUT" ];
   ]
 
 // typed routes
 let testApp =
   choose [
-    log logger logFormat >>= never
+    log logger logFormat >=> never
     pathScan "/add/%d/%d"   (fun (a,b) -> OK((a + b).ToString()))
     pathScan "/minus/%d/%d" (fun (a,b) -> OK((a - b).ToString()))
     pathScan "/divide/%d/%d" (fun (a,b) -> OK((a / b).ToString()))
@@ -58,7 +69,7 @@ let sleep milliseconds message: WebPart =
 // Adds a new mime type to the default map
 let mimeTypes =
   Writers.defaultMimeTypesMap
-    >=> (function | ".avi" -> Writers.mkMimeType "video/avi" false | _ -> None)
+    @@ (function | ".avi" -> Writers.mkMimeType "video/avi" false | _ -> None)
 
 module OwinSample =
   open System.Collections.Generic
@@ -83,21 +94,21 @@ module OwinSample =
 
 let app =
   choose [
-    GET >>= path "/hello" >>= never
-    pathRegex "(.*?)\.(dll|mdb|log)$" >>= RequestErrors.FORBIDDEN "Access denied."
-    path "/neverme" >>= never >>= OK (Guid.NewGuid().ToString())
-    path "/guid" >>= OK (Guid.NewGuid().ToString())
-    path "/hello" >>= OK "Hello World"
-    (path "/apple" <|> path "/orange") >>= OK "Hello Fruit"
-    GET >>= path "/query" >>= request( fun x -> cond (x.queryParam "name") (fun y -> OK ("Hello " + y)) never)
-    GET >>= path "/query" >>= OK "Hello beautiful"
-    path "/redirect" >>= Redirection.redirect "/redirected"
-    path "/redirected" >>=  OK "You have been redirected."
-    path "/date" >>= warbler (fun _ -> OK (DateTimeOffset.UtcNow.ToString("o")))
-    path "/timeout" >>= timeoutWebPart (TimeSpan.FromSeconds 1.) (sleep 120000 "Did not timed out")
+    GET >=> path "/hello" >=> never
+    pathRegex "(.*?)\.(dll|mdb|log)$" >=> RequestErrors.FORBIDDEN "Access denied."
+    path "/neverme" >=> never >=> OK (Guid.NewGuid().ToString())
+    path "/guid" >=> OK (Guid.NewGuid().ToString())
+    path "/hello" >=> OK "Hello World"
+    (path "/apple" <|> path "/orange") >=> OK "Hello Fruit"
+    GET >=> path "/query" >=> request( fun x -> cond (x.queryParam "name") (fun y -> OK ("Hello " + y)) never)
+    GET >=> path "/query" >=> OK "Hello beautiful"
+    path "/redirect" >=> Redirection.redirect "/redirected"
+    path "/redirected" >=>  OK "You have been redirected."
+    path "/date" >=> warbler (fun _ -> OK (DateTimeOffset.UtcNow.ToString("o")))
+    path "/timeout" >=> timeoutWebPart (TimeSpan.FromSeconds 1.) (sleep 120000 "Did not timed out")
     path "/session"
-      >>= statefulForSession // Session.State.CookieStateStore
-      >>= context (fun x ->
+      >=> statefulForSession // Session.State.CookieStateStore
+      >=> context (fun x ->
         match HttpContext.state x with
         | None ->
           // restarted server without keeping the key; set key manually?
@@ -109,51 +120,51 @@ let app =
           match store.get "counter" with
           | Some y ->
             store.set "counter" (y + 1)
-            >>= OK (sprintf "Hello %d time(s)" (y + 1) )
+            >=> OK (sprintf "Hello %d time(s)" (y + 1) )
           | None ->
             store.set "counter" 1
-            >>= OK "First time")
+            >=> OK "First time")
     GET
-      >>= path "/owin"
-      >>= Writers.setHeader "X-Custom-Before" "Before OWIN"
-      >>= OwinSample.app
-      >>= Writers.setHeader "X-Custom-After" "After OWIN"
+      >=> path "/owin"
+      >=> Writers.setHeader "X-Custom-Before" "Before OWIN"
+      >=> OwinSample.app
+      >=> Writers.setHeader "X-Custom-After" "After OWIN"
     basicAuth <| choose [ // from here on it will require authentication
         // surf to: http://localhost:8082/es.html to view the ES
-        GET >>= path "/events2" >>= request (fun _ -> EventSource.handShake (fun out ->
+        GET >=> path "/events2" >=> request (fun _ -> EventSource.handShake (fun out ->
           socket {
             let msg = { id = "1"; data = "First Message"; ``type`` = None }
             do! msg |> send out
             let msg = { id = "2"; data = "Second Message"; ``type`` = None }
             do! msg |> send out
           }))
-        GET >>= path "/events" >>= request (fun r -> EventSource.handShake (CounterDemo.counterDemo r))
-        GET >>= browseHome //serves file if exists
-        GET >>= dirHome //show directory listing
-        HEAD >>= path "/head" >>= sleep 100 "Nice sleep .."
-        POST >>= path "/upload" >>= OK "Upload successful."
-        POST >>= path "/i18nforms" >>= request (fun r ->
+        GET >=> path "/events" >=> request (fun r -> EventSource.handShake (CounterDemo.counterDemo r))
+        GET >=> browseHome //serves file if exists
+        GET >=> dirHome //show directory listing
+        HEAD >=> path "/head" >=> sleep 100 "Nice sleep .."
+        POST >=> path "/upload" >=> OK "Upload successful."
+        POST >=> path "/i18nforms" >=> request (fun r ->
           sprintf """
           ödlan: %A
           小: %A
           """ (r.formData "ödlan") (r.formData "小")
-          |> OK >>= Writers.setMimeType "text/plain"
+          |> OK >=> Writers.setMimeType "text/plain"
         )
-        PUT >>= path "/upload2"
-          >>= request (fun x ->
+        PUT >=> path "/upload2"
+          >=> request (fun x ->
              let files =
                x.files 
                |> Seq.map (fun y -> sprintf "(%s, %s, %s)" y.fileName y.mimeType y.tempFilePath)
                |> String.concat "<br/>"
              OK (sprintf "Upload successful.<br>POST data: %A<br>Uploaded files (%d): %s" x.multiPartFields (List.length x.files) files))
-        POST >>= request (fun x -> OK (sprintf "POST data: %s" (System.Text.Encoding.ASCII.GetString x.rawForm)))
+        POST >=> request (fun x -> OK (sprintf "POST data: %s" (System.Text.Encoding.ASCII.GetString x.rawForm)))
         GET
-          >>= path "/custom_header"
-          >>= setHeader "X-Doge-Location" "http://www.elregalista.com/wp-content/uploads/2014/02/46263312.jpg"
-          >>= OK "Doooooge"
+          >=> path "/custom_header"
+          >=> setHeader "X-Doge-Location" "http://www.elregalista.com/wp-content/uploads/2014/02/46263312.jpg"
+          >=> OK "Doooooge"
         RequestErrors.NOT_FOUND "Found no handlers"
       ]
-    ] >>= log logger logFormat
+    ] >=> log logger logFormat
 
 (*open Suave.OpenSSL
 open OpenSSL.Core
