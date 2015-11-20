@@ -68,8 +68,7 @@ module Cookie =
     member x.cookies =
       x.headers
       |> List.filter (fst >> (String.eqOrdCi "Set-Cookie"))
-      /// duplicate headers are comma separated
-      |> List.collect (snd >> String.split ',' >> List.map String.trim)
+      |> List.map (snd >> String.trim)
       |> List.map parseResultCookie
       |> List.fold (fun cookies cookie ->
           cookies |> Map.add cookie.name cookie)
