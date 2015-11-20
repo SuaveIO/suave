@@ -2,7 +2,7 @@
 
 module Compression =
 
-  open Suave.Types
+  open Suave.Http
   open Suave.Utils
   open Suave.Sockets
   open Suave.Sockets.Control

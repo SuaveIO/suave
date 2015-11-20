@@ -4,9 +4,9 @@ open System
 open System.Text
 
 open Suave
-open Suave.Types
-open Suave.Cookie
 open Suave.Http
+open Suave.Http.Cookie
+open Suave.Http.Operators
 open Suave.Logging
 open Suave.Utils
 
@@ -90,7 +90,7 @@ let authenticated relativeExpiry secure : WebPart =
     authenticate relativeExpiry secure
                  (fun _ -> Choice1Of2 data)
                  (fun _ -> Choice1Of2 data)
-                 Suave.Http.succeed)
+                 succeed)
 
 //  let deauthenticate : WebPart =
 //    Cookies.unset_cookies

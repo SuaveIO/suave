@@ -11,11 +11,11 @@ open Suave.Utils.Bytes
 
 open Suave.Sockets
 open Suave.Sockets.Control
-open Suave.Types
+open Suave.Http
 open Suave.Web
 open Suave.Tcp
 
-open Suave.Http
+open Suave.Http.Operators
 open Suave.Http.Response
 open Suave.Web.ParsingAndControl
 
@@ -119,7 +119,7 @@ let createReverseProxyServerAsync (config : SuaveConfig) resolver =
     [ for binding in config.bindings do 
         let runtime = SuaveConfig.toRuntime config homeFolder compressionFolder false binding
         let reqLoop = ParsingAndControl.requestLoop runtime (SocketPart (proxy resolver))
-        let tcpServer = config.tcpServerFactory.create(config.logger, config.maxOps, config.bufferSize, binding)
+        let tcpServer = config.tcpServerFactory.create(config.logger, config.maxOps, config.bufferSize, binding.socketBinding)
         let server = startTcpIpServerAsync reqLoop binding.socketBinding tcpServer
         yield server ]
       

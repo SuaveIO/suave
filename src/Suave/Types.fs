@@ -1,4 +1,5 @@
-module Suave.Types
+[<AutoOpen>]
+module Suave.Http.Types
 
 open System
 open System.IO
@@ -544,7 +545,7 @@ type HttpRuntime =
     logger            : Logger
     matchedBinding    : HttpBinding
     parsePostData     : bool
-    cookieSerialiser  : Utils.CookieSerialiser }
+    cookieSerialiser  : Suave.Utils.CookieSerialiser }
 
   static member serverKey_ = Property (fun x -> x.serverKey) (fun v x -> { x with serverKey = v })
   static member errorHandler_ = Property (fun x -> x.errorHandler) (fun v x -> { x with errorHandler = v })
@@ -724,84 +725,3 @@ module HttpContext =
 let request f (a : HttpContext) = f a.request a
 
 let context f (a : HttpContext) = f a a
-
-open System.Threading
-
-type TcpServerFactory =
-  abstract member create  : Logger * int * int * HttpBinding -> TcpServer
-
-/// The core configuration of suave. See also Suave.Web.default_config which
-/// you can use to bootstrap the configuration:
-/// <code>{ default_config with bindings = [ ... ] }</code>
-type SuaveConfig =
-  { /// The bindings for the web server to launch with
-    bindings                : HttpBinding list
-
-    /// A server-key to use for cryptographic operations. When generated it
-    /// should be completely random; you can share this key between load-balanced
-    /// servers if you want to have them cryptographically verify similarly.
-    serverKey              : byte []
-
-    /// An error handler to use for handling exceptions that are
-    /// are thrown from the web parts
-    errorHandler           : ErrorHandler
-
-    /// Timeout to wait for the socket bind to finish
-    listenTimeout          : TimeSpan
-
-    /// A cancellation token for the web server. Signalling this token
-    /// means that the web server shuts down
-    cancellationToken      : CancellationToken
-
-    /// buffer size for socket operations
-    bufferSize             : int
-
-    /// max number of concurrent socket operations
-    maxOps                 : int
-
-    /// MIME types
-    mimeTypesMap          : MimeTypesMap
-
-    /// Home or root directory
-    homeFolder             : string option
-
-    /// Folder for temporary compressed files
-    compressedFilesFolder : string option
-
-    /// Suave's logger. You can override the default instance if you wish to
-    /// ship your logs, e.g. using https://www.nuget.org/packages/Logary.Adapters.Suave/
-    logger                 : Logger
-
-    /// Pluggable TCP async sockets implementation. You can choose betwee libuv
-    /// and CLR's Async Socket Event Args. Currently defaults to the managed-only
-    /// implementation.
-    tcpServerFactory       : TcpServerFactory
-
-    /// The cookie serialiser to use for converting the data you save in cookies
-    /// from your application into a byte array.
-    cookieSerialiser        : Utils.CookieSerialiser }
-
-  static member bindings_              = Property<SuaveConfig,_> (fun x -> x.bindings)              (fun v x -> { x with bindings = v })
-  static member serverKey_             = Property<SuaveConfig,_> (fun x -> x.serverKey)             (fun v x -> { x with serverKey = v })
-  static member errorHandler_          = Property<SuaveConfig,_> (fun x -> x.errorHandler)          (fun v x -> { x with errorHandler = v })
-  static member listenTimeout_         = Property<SuaveConfig,_> (fun x -> x.listenTimeout)         (fun v x -> { x with listenTimeout = v })
-  static member ct_                    = Property<SuaveConfig,_> (fun x -> x.cancellationToken)     (fun v x -> { x with cancellationToken = v })
-  static member bufferSize_            = Property<SuaveConfig,_> (fun x -> x.bufferSize)            (fun v x -> { x with bufferSize = v })
-  static member maxOps_                = Property<SuaveConfig,_> (fun x -> x.maxOps)                (fun v x -> { x with maxOps = v })
-  static member mimeTypesMap_          = Property<SuaveConfig,_> (fun x -> x.mimeTypesMap)          (fun v x -> { x with mimeTypesMap = v })
-  static member homeFolder_            = Property<SuaveConfig,_> (fun x -> x.homeFolder)            (fun v x -> { x with homeFolder = v })
-  static member compressedFilesFolder_ = Property<SuaveConfig,_> (fun x -> x.compressedFilesFolder) (fun v x -> { x with compressedFilesFolder = v })
-  static member logger_                = Property<SuaveConfig,_> (fun x -> x.logger)                (fun v x -> { x with logger = v })
-  static member tcpServerFactory_      = Property<SuaveConfig,_> (fun x -> x.tcpServerFactory)      (fun v x -> { x with tcpServerFactory = v })
-
-[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
-module SuaveConfig =
-  let toRuntime config contentFolder compressionFolder parsePostData =
-    HttpRuntime.mk config.serverKey
-                   config.errorHandler
-                   config.mimeTypesMap
-                   contentFolder
-                   compressionFolder
-                   config.logger
-                   parsePostData
-                   config.cookieSerialiser

@@ -206,7 +206,7 @@ let bindSocket server bindCallback=
     failwith ("Listen error: " + (new string(uv_strerror(r))))
 
 open Suave.Logging
-open Suave.Types
+open Suave.Http
 open Suave.Tcp
 open Suave
 
@@ -392,4 +392,4 @@ let runServerLibUv logger maxConcurrentOps bufferSize (binding: SocketBinding) s
 type LibUvServerFactory() =
   interface TcpServerFactory with
     member this.create (logger, maxOps, bufferSize, binding) =
-      runServerLibUv logger maxOps bufferSize binding.socketBinding
+      runServerLibUv logger maxOps bufferSize binding

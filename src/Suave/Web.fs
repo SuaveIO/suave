@@ -14,8 +14,8 @@ module internal ParsingAndControl =
   open System.Security.Principal
   open System.Collections.Generic
 
+  open Suave.Http.Operators
   open Suave.Http
-  open Suave.Types
   open Suave.Globals
   open Suave.Compression
   open Suave.Sockets
@@ -623,7 +623,6 @@ module internal ParsingAndControl =
 open System
 open System.IO
 open System.Net
-open Suave.Types
 open Suave.Http
 open Suave.Utils
 open Suave.Logging
@@ -639,6 +638,82 @@ let defaultErrorHandler (ex : Exception) msg (ctx : HttpContext) =
     Response.response HTTP_500 (UTF8.bytes (sprintf "<h1>%s</h1><br/>%A" ex.Message ex)) ctx
   else 
     Response.response HTTP_500 (UTF8.bytes HTTP_500.message) ctx
+
+/// The core configuration of suave. See also Suave.Web.default_config which
+/// you can use to bootstrap the configuration:
+/// <code>{ default_config with bindings = [ ... ] }</code>
+type SuaveConfig =
+  { /// The bindings for the web server to launch with
+    bindings                : HttpBinding list
+
+    /// A server-key to use for cryptographic operations. When generated it
+    /// should be completely random; you can share this key between load-balanced
+    /// servers if you want to have them cryptographically verify similarly.
+    serverKey              : byte []
+
+    /// An error handler to use for handling exceptions that are
+    /// are thrown from the web parts
+    errorHandler           : ErrorHandler
+
+    /// Timeout to wait for the socket bind to finish
+    listenTimeout          : TimeSpan
+
+    /// A cancellation token for the web server. Signalling this token
+    /// means that the web server shuts down
+    cancellationToken      : Threading.CancellationToken
+
+    /// buffer size for socket operations
+    bufferSize             : int
+
+    /// max number of concurrent socket operations
+    maxOps                 : int
+
+    /// MIME types
+    mimeTypesMap          : MimeTypesMap
+
+    /// Home or root directory
+    homeFolder             : string option
+
+    /// Folder for temporary compressed files
+    compressedFilesFolder : string option
+
+    /// Suave's logger. You can override the default instance if you wish to
+    /// ship your logs, e.g. using https://www.nuget.org/packages/Logary.Adapters.Suave/
+    logger                 : Logger
+
+    /// Pluggable TCP async sockets implementation. You can choose betwee libuv
+    /// and CLR's Async Socket Event Args. Currently defaults to the managed-only
+    /// implementation.
+    tcpServerFactory       : Tcp.TcpServerFactory
+
+    /// The cookie serialiser to use for converting the data you save in cookies
+    /// from your application into a byte array.
+    cookieSerialiser        : Suave.Utils.CookieSerialiser }
+
+  static member bindings_              = Property<SuaveConfig,_> (fun x -> x.bindings)              (fun v x -> { x with bindings = v })
+  static member serverKey_             = Property<SuaveConfig,_> (fun x -> x.serverKey)             (fun v x -> { x with serverKey = v })
+  static member errorHandler_          = Property<SuaveConfig,_> (fun x -> x.errorHandler)          (fun v x -> { x with errorHandler = v })
+  static member listenTimeout_         = Property<SuaveConfig,_> (fun x -> x.listenTimeout)         (fun v x -> { x with listenTimeout = v })
+  static member ct_                    = Property<SuaveConfig,_> (fun x -> x.cancellationToken)     (fun v x -> { x with cancellationToken = v })
+  static member bufferSize_            = Property<SuaveConfig,_> (fun x -> x.bufferSize)            (fun v x -> { x with bufferSize = v })
+  static member maxOps_                = Property<SuaveConfig,_> (fun x -> x.maxOps)                (fun v x -> { x with maxOps = v })
+  static member mimeTypesMap_          = Property<SuaveConfig,_> (fun x -> x.mimeTypesMap)          (fun v x -> { x with mimeTypesMap = v })
+  static member homeFolder_            = Property<SuaveConfig,_> (fun x -> x.homeFolder)            (fun v x -> { x with homeFolder = v })
+  static member compressedFilesFolder_ = Property<SuaveConfig,_> (fun x -> x.compressedFilesFolder) (fun v x -> { x with compressedFilesFolder = v })
+  static member logger_                = Property<SuaveConfig,_> (fun x -> x.logger)                (fun v x -> { x with logger = v })
+  static member tcpServerFactory_      = Property<SuaveConfig,_> (fun x -> x.tcpServerFactory)      (fun v x -> { x with tcpServerFactory = v })
+
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module SuaveConfig =
+  let toRuntime config contentFolder compressionFolder parsePostData =
+    HttpRuntime.mk config.serverKey
+                    config.errorHandler
+                    config.mimeTypesMap
+                    contentFolder
+                    compressionFolder
+                    config.logger
+                    parsePostData
+                    config.cookieSerialiser
 
 /// Starts the web server asynchronously.
 ///
@@ -664,7 +739,7 @@ let startWebServerAsync (config : SuaveConfig) (webpart : WebPart) =
       (config.bufferSize, config.maxOps) 
       webpart
       runtime 
-      (config.tcpServerFactory.create(config.logger, config.maxOps, config.bufferSize,runtime.matchedBinding))
+      (config.tcpServerFactory.create(config.logger, config.maxOps, config.bufferSize,runtime.matchedBinding.socketBinding))
 
   let servers = 
      List.map (toRuntime >> startWebWorkerAsync) config.bindings
@@ -679,9 +754,9 @@ let startWebServer (config : SuaveConfig) (webpart : WebPart) =
   Async.RunSynchronously(startWebServerAsync config webpart |> snd, cancellationToken = config.cancellationToken)
 
 type DefaultTcpServerFactory() =
-  interface TcpServerFactory with
+  interface Tcp.TcpServerFactory with
     member this.create (logger,maxOps, bufferSize,binding) =
-      Tcp.runServer logger maxOps bufferSize binding.socketBinding
+      Tcp.runServer logger maxOps bufferSize binding
 
 /// The default configuration binds on IPv4, 127.0.0.1:8083 with a regular 500 Internal Error handler,
 /// with a timeout of one minute for computations to run. Waiting for 2 seconds for the socket bind
@@ -694,7 +769,7 @@ let defaultConfig =
     cancellationToken     = Async.DefaultCancellationToken
     bufferSize            = 8192 // 8 KiB
     maxOps                = 100
-    mimeTypesMap          = Http.Writers.defaultMimeTypesMap
+    mimeTypesMap          = Writers.defaultMimeTypesMap
     homeFolder            = None
     compressedFilesFolder = None
     logger                = Loggers.saneDefaultsFor LogLevel.Info

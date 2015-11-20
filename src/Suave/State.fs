@@ -1,10 +1,10 @@
 module Suave.State
 
 open Suave.Utils
-open Suave.Types
 open Suave.Http
+open Suave.Http.Operators
 open Suave.Log
-open Suave.Cookie
+open Suave.Http.Cookie
 open Suave.Logging
 
 module CookieStateStore =

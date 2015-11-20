@@ -1,11 +1,10 @@
-﻿namespace Suave
+﻿namespace Suave.Http
 
 module Cookie =
   open System
   open System.Text
   open System.Globalization
   open Suave.Utils
-  open Suave.Types
 
   type CookieLife =
     | Session

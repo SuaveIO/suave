@@ -40,7 +40,7 @@ let binding = ChoiceBuilder()
 module Binding =
 
   open Suave
-  open Suave.Types
+  open Suave.Http
   open Suave.Utils
 
   let bind fBind

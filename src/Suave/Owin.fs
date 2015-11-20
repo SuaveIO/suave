@@ -14,8 +14,8 @@ open System.Security.Principal
 open System.Runtime.InteropServices
 open Suave
 open Suave.Logging
+open Suave.Http.Operators
 open Suave.Http
-open Suave.Types
 open Suave.Sockets
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]

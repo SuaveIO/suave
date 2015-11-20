@@ -59,7 +59,8 @@
     <ConsolePause>false</ConsolePause>
     <WarningLevel>3</WarningLevel>
     <DocumentationFile>bin\Release\Suave.xml</DocumentationFile>
-    <DefineConstants />
+    <DefineConstants>
+    </DefineConstants>
     <DebugType>pdbonly</DebugType>
     <PlatformTarget>x86</PlatformTarget>
   </PropertyGroup>
@@ -114,6 +115,11 @@
     <Compile Include="Types.fs" />
     <Compile Include="Model.fs" />
     <Compile Include="Compression.fs" />
+    <Compile Include="Operators.fsi" />
+    <Compile Include="Operators.fs" />
+    <Compile Include="Monad.fs" />
+    <Compile Include="WebPart.fsi" />
+    <Compile Include="WebPart.fs" />
     <Compile Include="Http.fsi" />
     <Compile Include="Http.fs" />
     <Compile Include="Cookie.fsi" />
