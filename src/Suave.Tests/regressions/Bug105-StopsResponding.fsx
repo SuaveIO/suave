@@ -16,11 +16,11 @@ module XD =
 
 module SystemUnderTest =
   open Suave
-  open Suave.Http
-  open Suave.Http.Successful
-  open Suave.Http.RequestErrors
-  open Suave.Http.ServerErrors
-  open Suave.Http.Applicatives
+  open Suave.Http.Operators
+  open Suave.Http.Operators.Successful
+  open Suave.Http.Operators.RequestErrors
+  open Suave.Http.Operators.ServerErrors
+  open Suave.Http.Operators.Applicatives
   open Suave.Types
   open Suave.Web
   open Suave.Log

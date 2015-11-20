@@ -7,10 +7,12 @@ open System
 open System.IO
 open System.Reflection
 
+open Suave
 open Suave.Web
 open Suave.Utils
 open Suave.Logging
 open Suave.Http
+open Suave.Http.Operators
 open Suave.Http.Applicatives
 open Suave.Http.RequestErrors
 open Suave.Testing
