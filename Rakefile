@@ -20,6 +20,7 @@ Configuration = ENV['CONFIGURATION'] || 'Release'
 Platform = ENV['MSBUILD_PLATFORM'] || 'Any CPU'
 
 task :yolo do
+  return if Albacore.windows?
   system %{ruby -pi.bak -e "gsub(/module internal YoLo/, 'module internal Suave.Utils.YoLo')" paket-files/haf/YoLo/YoLo.fs}
 end
 
