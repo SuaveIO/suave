@@ -6,7 +6,7 @@ module Monad =
   /// The base monad
   type AsyncOption<'a> = Async<'a option>
 
-  let bind (a: AsyncOption<'a>) (f: 'a -> AsyncOption<'b>) = async {
+  let bind (f: 'a -> AsyncOption<'b>) (a: AsyncOption<'a>) = async {
     let! p = a
     match p with
     | None ->
@@ -17,19 +17,19 @@ module Monad =
     }
 
   /// Classic bind
-  let (>>=) a b = bind a b
+  let (>>=) a b = bind b a
 
   /// Left-to-right Kleisli composition of monads.
   let (>=>) (first : 'a -> AsyncOption<'b>)  (second : 'b -> AsyncOption<'c>) : 'a -> AsyncOption<'c> =
     fun x ->
-      bind (first x) second
+      bind second (first x)
 
   type AsyncOptionBuilder() =
     member this.Return(x:'a) : AsyncOption<'a> = async { return Some x }
     member this.Zero() : AsyncOption<unit> = this.Return()
     member this.ReturnFrom(x : AsyncOption<'a>) : AsyncOption<'a> = x
     member this.Delay(f: unit ->  AsyncOption<'a>) = async { return! f () }
-    member this.Bind(x : AsyncOption<'a>, f : 'a -> AsyncOption<'b>) : AsyncOption<'b> = bind x f
+    member this.Bind(x : AsyncOption<'a>, f : 'a -> AsyncOption<'b>) : AsyncOption<'b> = bind f x
 
   ///  With this workflow you can write WebParts like this
   ///  let task ctx = asyncOption {
