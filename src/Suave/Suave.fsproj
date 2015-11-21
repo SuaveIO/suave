@@ -94,6 +94,7 @@
     <Compile Include="Utils\Compression.fs" />
     <Compile Include="Utils\Crypto.fs" />
     <Compile Include="Utils\Parsing.fs" />
+    <Compile Include="Utils\CookieSerialiser.fs" />
     <Compile Include="Utils\OpenMemoryStream.fs" />
     <Compile Include="Globals.fs" />
     <Compile Include="Logging\LogLevel.fs" />
@@ -130,7 +131,6 @@
     <Compile Include="AssemblyVersionInfo.fs" Condition="Exists('AssemblyVersionInfo.fs')" />
     <None Include="paket.references" />
     <Content Include="App.config" />
-    <Compile Include="Utils\CookieSerialiser.fs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="mscorlib" />
