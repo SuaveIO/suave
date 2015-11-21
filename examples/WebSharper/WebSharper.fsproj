@@ -29,6 +29,7 @@
     </PlatformTarget>
     <DefineConstants>
     </DefineConstants>
+    <DebugSymbols>true</DebugSymbols>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|x86' ">
     <DebugSymbols>true</DebugSymbols>

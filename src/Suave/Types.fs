@@ -421,9 +421,9 @@ module HttpRequest =
 
   let empty =
     { httpVersion     = "HTTP/1.1"
-      url             = Uri("http://localhost/")
+      url             = Uri "http://localhost/"
       host            = "localhost"
-      ``method``      = HttpMethod.OTHER("")
+      ``method``      = HttpMethod.OTHER ""
       headers         = []
       rawForm         = Array.empty
       rawQuery        = ""
@@ -437,17 +437,19 @@ type HttpBinding =
   { scheme        : Protocol
     socketBinding : SocketBinding }
 
-  member x.uri path query =
+  member x.uri (path : string) query =
+    let path' = if path.StartsWith "/" then path else "/" + path
     String.Concat [
       x.scheme.ToString(); "://"; x.socketBinding.ToString()
-      path
+      path'
       (match query with | "" -> "" | qs -> "?" + qs)
     ]
     |> fun x -> Uri x
 
-  /// Overrides the default ToString() method to provide an implementation that is assignable
-  /// to a BaseUri for a RestClient/HttpClient.
-  override x.ToString() = String.Concat [ x.scheme.ToString(); "://"; x.socketBinding.ToString() ]
+  /// Overrides the default ToString() method to provide an implementation that
+  /// is assignable to a BaseUri for a RestClient/HttpClient.
+  override x.ToString() =
+    String.Concat [ x.scheme.ToString(); "://"; x.socketBinding.ToString() ]
 
   static member scheme_ = Property<HttpBinding,_> (fun x -> x.scheme) (fun v x -> { x with scheme = v })
   static member socketBinding_ = Property<HttpBinding,_> (fun x -> x.socketBinding) (fun v x -> { x with socketBinding=v })
@@ -462,14 +464,14 @@ module HttpBinding =
       socketBinding = SocketBinding.mk IPAddress.Loopback DefaultBindingPort }
 
   /// Create a HttpBinding for the given protocol, an IP address to bind to and
-  /// a port to listen on.
-  let mk scheme (ip:IPAddress) (port:Port) = 
+  /// a port to listen on – this is the strongly typed overload.
+  let mk scheme (ip : IPAddress) (port : Port) = 
     { scheme        = scheme
       socketBinding = SocketBinding.mk ip port }
 
   /// Create a HttpBinding for the given protocol, an IP address to bind to and
-  /// a port to listen on.
-  let mk' scheme ip (port : int) = 
+  /// a port to listen on – this is the "stringly typed" overload.
+  let mkSimple scheme ip (port : int) = 
     { scheme        = scheme
       socketBinding = SocketBinding.mk (IPAddress.Parse ip) (uint16 port) } 
 
@@ -770,13 +772,13 @@ type SuaveConfig =
     maxOps                 : int
 
     /// MIME types
-    mimeTypesMap          : MimeTypesMap
+    mimeTypesMap           : MimeTypesMap
 
     /// Home or root directory
     homeFolder             : string option
 
     /// Folder for temporary compressed files
-    compressedFilesFolder : string option
+    compressedFilesFolder  : string option
 
     /// Suave's logger. You can override the default instance if you wish to
     /// ship your logs, e.g. using https://www.nuget.org/packages/Logary.Adapters.Suave/
@@ -806,6 +808,10 @@ type SuaveConfig =
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module SuaveConfig =
+
+  /// Convert the Suave configuration to a runtime that the web server understands.
+  /// You will normally not have to use this function as a consumer from the
+  /// library, but it may be useful for unit testing with the HttpRuntime record.
   let toRuntime config contentFolder compressionFolder parsePostData =
     HttpRuntime.mk config.serverKey
                    config.errorHandler
@@ -815,3 +821,21 @@ module SuaveConfig =
                    config.logger
                    parsePostData
                    config.cookieSerialiser
+
+  /// Finds an endpoint that is configured from the given configuration. Throws
+  /// an exception if the configuration has no bindings. Useful if you make
+  /// the suave configuration parametised, because it is then enough for your
+  /// software to find a valid endpoint to make HTTP/ES/WebSocket requests to.
+  let firstBinding (cfg : SuaveConfig) =
+    match cfg.bindings with
+    | [] ->
+      failwith "No bindings found for SuaveConfig."
+
+    | b :: _ ->
+      b
+
+  /// Construct a `System.Uri` from the first binding available in Suave, by
+  /// giving a path and a uri.
+  let firstBindingUri (cfg : SuaveConfig) path query =
+    let binding = firstBinding cfg
+    binding.uri path query

@@ -24,7 +24,7 @@ let utilities (_: SuaveConfig) =
     testCase "loopback ipv6" <| fun _ ->
       Assert.Equal("::0 is a local address", true, isLocalAddress "::1")
 
-    testPropertyWithConfig fsCheckConfig "gzip_encode/gzip_decode" <| fun str ->
+    testPropertyWithConfig fsCheckConfig "gzipEncode/gzipDecode" <| fun str ->
       let get_bytes  = Encoding.UTF8.GetBytes  : string -> byte []
       let from_bytes = Encoding.UTF8.GetString : byte [] -> string
       Assert.Equal(

@@ -77,8 +77,6 @@
     <Content Include="PerfLab.fsx" />
     <Compile Include="AssemblyVersionInfo.fs" Condition="Exists('AssemblyVersionInfo.fs')" />
     <Compile Include="TestUtilities.fs" />
-    <Content Include="regressions\Bug106-ReadingInputData.txt" />
-    <Content Include="regressions\Bug105-StopsResponding.verbose.txt" />
     <Content Include="regressions\Bug105-StopsResponding.fsx" />
     <Compile Include="regressions\Bug256-FormDataParsing.fs" />
     <Content Include="regressions\pix.gif">

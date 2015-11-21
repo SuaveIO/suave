@@ -76,6 +76,11 @@ open Suave.Sockets
 
 [<Tests>]
 let parsingMultipart2 cfg =
+  let ip, port =
+    let binding = SuaveConfig.firstBinding cfg
+    binding.socketBinding.ip,
+    int binding.socketBinding.port
+
   let app =
     choose
       [ POST
@@ -109,7 +114,7 @@ let parsingMultipart2 cfg =
 
   let sendRecvRaw (data : byte []) =
     use sender = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp)
-    sender.Connect (new IPEndPoint(IPAddress.Loopback, int HttpBinding.DefaultBindingPort))
+    sender.Connect (new IPEndPoint(ip, port))
     let written = sender.Send data
     Assert.Equal("same written as given", data.Length, written)
 
@@ -118,7 +123,7 @@ let parsingMultipart2 cfg =
     ASCII.toStringAtOffset respBuf 0 resp
 
   let sendRecv (data : byte []) =
-    let client = new TcpClient("127.0.0.1", 8083)
+    let client = new TcpClient(string ip, port)
     use stream = client.GetStream()
     stream.Write(data, 0, data.Length)
 

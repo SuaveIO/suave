@@ -58,7 +58,8 @@
     <ConsolePause>false</ConsolePause>
     <WarningLevel>3</WarningLevel>
     <DocumentationFile>bin\Release\Suave.OpenSSL.xml</DocumentationFile>
-    <DefineConstants />
+    <DefineConstants>
+    </DefineConstants>
     <PlatformTarget>x86</PlatformTarget>
   </PropertyGroup>
   <Choose>

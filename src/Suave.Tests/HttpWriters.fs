@@ -22,13 +22,18 @@ let cookies cfg =
   let runWithConfig = runWith cfg
 
   let basicCookie =
-    { name      = "mycookie"
-      value     = "42"
-      expires   = None
-      domain    = None
-      path      = Some "/"
+    { name     = "mycookie"
+      value    = "42"
+      expires  = None
+      domain   = None
+      path     = Some "/"
       httpOnly = false
-      secure    = false }
+      secure   = false }
+
+  let ip, port =
+    let binding = SuaveConfig.firstBinding cfg
+    string binding.socketBinding.ip,
+    int binding.socketBinding.port
 
   testList "Cookies basic tests" [
     testCase "cookie data makes round trip" <| fun _ ->
@@ -36,21 +41,21 @@ let cookies cfg =
       , "42"
       , (reqCookies HttpMethod.GET "/" None
         (runWithConfig (Cookie.setCookie basicCookie >>= OK "test")))
-          .GetCookies(Uri("http://127.0.0.1")).[0].Value)
+          .GetCookies(Uri(sprintf "http://%s" ip)).[0].Value)
 
     testCase "cookie name makes round trip" <| fun _ ->
       Assert.Equal("expecting cookie name"
       , "mycookie"
       , (reqCookies HttpMethod.GET "/" None
           (runWithConfig (Cookie.setCookie basicCookie >>= OK "test")))
-          .GetCookies(Uri("http://127.0.0.1")).[0].Name)
+          .GetCookies(Uri(sprintf "http://%s" ip)).[0].Name)
 
     testCase "http_only cookie is http_only" <| fun _ ->
       Assert.Equal("expecting http_only"
       , true
       , (reqCookies HttpMethod.GET "/" None
         (runWithConfig (Cookie.setCookie { basicCookie with httpOnly = true } >>= OK "test")))
-          .GetCookies(Uri("http://127.0.0.1")).[0].HttpOnly)
+          .GetCookies(Uri(sprintf "http://%s" ip)).[0].HttpOnly)
   ]
 
 [<Tests>]
@@ -58,13 +63,18 @@ let headers cfg =
   let runWithConfig = runWith cfg
 
   let requestHeaders () =
-    use client = new TcpClient("127.0.0.1",8083)
-    let outputData = ASCII.bytes "GET / HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: Close\r\n\r\n"
+    let ip, port =
+      let binding = SuaveConfig.firstBinding cfg
+      string binding.socketBinding.ip,
+      int binding.socketBinding.port
+
+    use client = new TcpClient(ip, port)
+    let outputData = ASCII.bytes (sprintf "GET / HTTP/1.1\r\nHost: %s\r\nConnection: Close\r\n\r\n" ip)
     use stream = client.GetStream()
     stream.Write(outputData, 0, outputData.Length)
 
     use streamReader = new StreamReader(stream)
-    
+
     let splitHeader (line: string) =
       let ind = line.IndexOf(':')
       let name = line.Substring(0, ind)

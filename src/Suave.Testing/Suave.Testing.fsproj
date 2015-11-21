@@ -33,6 +33,7 @@
     <DocumentationFile>bin\Release\Suave.Testing.xml</DocumentationFile>
     <DefineConstants>
     </DefineConstants>
+    <DebugSymbols>true</DebugSymbols>
   </PropertyGroup>
   <PropertyGroup>
     <MinimumVisualStudioVersion Condition="'$(MinimumVisualStudioVersion)' == ''">11</MinimumVisualStudioVersion>
@@ -56,8 +57,10 @@
     <ConsolePause>false</ConsolePause>
     <Tailcalls>true</Tailcalls>
     <DocumentationFile>bin\Release\Suave.Testing.xml</DocumentationFile>
-    <DefineConstants />
+    <DefineConstants>
+    </DefineConstants>
     <PlatformTarget>x86</PlatformTarget>
+    <DebugSymbols>true</DebugSymbols>
   </PropertyGroup>
   <Choose>
     <When Condition="'$(VisualStudioVersion)' == '11.0'">

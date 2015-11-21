@@ -73,7 +73,6 @@
     <WarningLevel>3</WarningLevel>
     <DocumentationFile>bin\Debug\Load.xml</DocumentationFile>
     <Prefer32Bit>true</Prefer32Bit>
-    <PlatformTarget>x86</PlatformTarget>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|x86' ">
     <DebugType>pdbonly</DebugType>
@@ -85,7 +84,6 @@
     <DocumentationFile>bin\Release\Load.xml</DocumentationFile>
     <Prefer32Bit>true</Prefer32Bit>
     <DebugSymbols>true</DebugSymbols>
-    <PlatformTarget>x86</PlatformTarget>
   </PropertyGroup>
   <Choose>
     <When Condition="'$(VisualStudioVersion)' == '11.0'">
