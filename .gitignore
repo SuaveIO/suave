@@ -23,3 +23,4 @@ paket.exe
 *.nuspec
 
 .DS_Store
+*.bak
