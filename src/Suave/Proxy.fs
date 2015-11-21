@@ -26,15 +26,23 @@ let private toHeaderList (headers : WebHeaderCollection) =
   |> List.ofSeq
 
 /// Send the web response from HttpWebResponse to the HttpRequest 'p'
-let private sendWebResponse (data : HttpWebResponse) ({ request = { trace = t }; response = resp } as ctx : HttpContext) =
+let private sendWebResponse (data : HttpWebResponse) ({ request = { trace = t }; response = resp } as ctx : HttpContext) = async {
   let headers = toHeaderList data.Headers 
-  // TODO: if downstream sends a Content-Length header copy from one stream
-  // to the other asynchronously
   "-> readFully" |> Log.verbose ctx.runtime.logger "Suave.Proxy.sendWebResponse:GetResponseStream" ctx.request.trace
-  let bytes = data.GetResponseStream() |> readFully
+  use ms = new MemoryStream()
+  do! data.GetResponseStream().CopyToAsync ms
+  let bytes = ms.ToArray()
   "<- readFully" |> Log.verbose ctx.runtime.logger "Suave.Proxy.sendWebResponse:GetResponseStream" ctx.request.trace
-  response (HttpCode.TryParse(int data.StatusCode) |> Option.get) bytes { ctx with response = { resp with headers = resp.headers @ headers } }
-  
+
+  let ctxNext =
+    { ctx with response = { resp with headers = resp.headers @ headers } }
+
+  let composed = 
+    response (HttpCode.TryParse(int data.StatusCode) |> Option.get) bytes
+
+  return! composed ctxNext
+  }
+
 /// Forward the HttpRequest 'p' to the 'ip':'port'
 let forward (ip : IPAddress) (port : uint16) (ctx : HttpContext) =
   let p = ctx.request

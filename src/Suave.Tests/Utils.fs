@@ -5,7 +5,7 @@ open System.Text
 
 open Suave
 open Suave.Utils
-open Suave.Utils.Encoding
+open Suave.Utils.Compression
 open Suave.Utils.Parsing
 
 open Fuchu

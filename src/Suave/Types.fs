@@ -405,7 +405,7 @@ type HttpRequest =
     if trustProxy then
       sources
       |> List.fold (fun state source ->
-        state |> Choice.bindError (fun _ -> x.header source))
+        state |> Choice.bindSnd (fun _ -> x.header source))
         (Choice2Of2 "")
       |> Choice.orDefault x.host
     else
@@ -590,7 +590,7 @@ and HttpContext =
     if trustProxy then
       sources
       |> List.fold (fun state source ->
-        state |> Choice.bindError (fun _ ->
+        state |> Choice.bindSnd (fun _ ->
           x.request.header source |> Choice.bindUnit IPAddress.TryParseC))
         (Choice2Of2 ())
       |> Choice.orDefault x.connection.ipAddr
@@ -619,7 +619,7 @@ and HttpContext =
     if trustProxy then
       sources
       |> List.fold (fun state source ->
-        state |> Choice.bindError (fun _ ->
+        state |> Choice.bindSnd (fun _ ->
           x.request.header source
           |> Choice.bind (
             Choice.parser UInt16.TryParse "failed to parse X-Forwarded-Port")))
@@ -635,7 +635,7 @@ and HttpContext =
     if trustProxy then
       sources
       |> List.fold (fun state source ->
-        state |> Choice.bindError (fun _ ->
+        state |> Choice.bindSnd (fun _ ->
           x.request.header source))
         (Choice2Of2 "")
       |> Choice.orDefault (x.runtime.matchedBinding.scheme.ToString())

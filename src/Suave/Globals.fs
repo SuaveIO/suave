@@ -19,7 +19,7 @@ let internal compressedFilesMap = new ConcurrentDictionary<string,string>()
 
 [<assembly:System.Runtime.CompilerServices.InternalsVisibleToAttribute("Suave.Experimental")>]
 [<assembly:System.Runtime.CompilerServices.InternalsVisibleToAttribute("Suave.Tests")>]
-do()
+do ()
 
 module Internals =
 

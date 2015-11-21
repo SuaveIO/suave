@@ -7,6 +7,7 @@ open Suave.Types.Codes
 open Suave.Http
 open Suave.Http.Files
 open Suave.Utils
+open Suave.Utils.AsyncExtensions
 
 open RazorEngine
 

@@ -51,7 +51,7 @@ type SingleThreadSynchronizationContext(loop, runOnThisThreadHandler) =
     uv_async_init(loop, runOnThisThreadHandler, this.uv_handle_cb) |> checkStatus
 
 open Suave.Sockets
-open Suave.Utils.Async
+open Suave.Utils
 
 let isWinNT = Environment.OSVersion.Platform = PlatformID.Win32NT
 

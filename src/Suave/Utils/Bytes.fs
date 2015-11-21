@@ -3,31 +3,20 @@
 open System
 open System.IO
 open System.Text
-open Suave.Utils.Async
 
-module (* internal *) Bytes =
- 
-  /// Ordinally compare two strings in constant time, bounded by the length of the
-  /// longest string.
-  let constantTimeCompare (bits : byte []) (bobs : byte []) =
-    let mutable xx = uint32 bits.Length ^^^ uint32 bobs.Length
-    let mutable i = 0
-    while i < bits.Length && i < bobs.Length do
-      xx <- xx ||| uint32 (bits.[i] ^^^ bobs.[i])
-      i <- i + 1
-    xx = 0u
+type BufferSegment =
+  { buffer : ArraySegment<byte>
+    offset : int
+    length : int }
 
-  type BufferSegment =
-    { buffer : ArraySegment<byte>
-      offset : int
-      length : int }
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module BufferSegment =
+  
+  let inline mk buffer offset length =
+    if length < 0 then failwith (sprintf "BufferSegment.mk: length = %d < 0" length)
+    { buffer = buffer; offset = offset; length = length }
 
-  [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
-  module BufferSegment =
-    
-    let inline mk buffer offset length =
-      if length < 0 then failwith (sprintf "BufferSegment.mk: length = %d < 0" length)
-      { buffer = buffer; offset = offset; length = length }
+module internal Bytes =
 
   // for ci in (int '!')..(int '~') do printfn "%c" (char ci);;
   // https://en.wikipedia.org/wiki/HTTP_cookie#Setting_a_cookie
@@ -50,22 +39,14 @@ module (* internal *) Bytes =
     enc, dec
 
   /// The end-of-line literal, \r\n (CRLF)
-  let [<Literal>] eol = "\r\n"
+  [<Literal>]
+  let eol = "\r\n"
 
   /// The end-of-line 'literal' as bytes, the \r\n (CRLF) byte pair
   let EOL = ASCII.bytes eol
 
   /// The corresponding EOL array segment
   let eolArraySegment = new ArraySegment<_>(EOL, 0, 2)
-
-  let inline bytesToBuffer (s : string) (buff : byte []) (offset : int) =
-    Encoding.ASCII.GetBytes (s, 0, s.Length, buff, offset)
-
-  /// Fully transform the input stream to a byte array.
-  let readFully (input : Stream) =
-    use ms = new MemoryStream()
-    input.CopyTo ms
-    ms.ToArray()
 
   /// Asynchronously write from the 'from' stream to the 'to' stream, with an upper bound on
   /// amount to transfer by len

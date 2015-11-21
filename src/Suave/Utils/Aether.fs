@@ -1,4 +1,4 @@
-﻿module Suave.Utils.Aether
+﻿module internal Suave.Utils.Aether
 
 (* Types
 

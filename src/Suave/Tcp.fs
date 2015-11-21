@@ -7,7 +7,7 @@ open System.Net
 open System.Net.Sockets
 open Suave.Logging
 open Suave.Sockets
-open Suave.Utils.Async
+open Suave.Utils
 
 /// The max backlog of number of requests
 [<Literal>]
@@ -22,25 +22,6 @@ type StartedData =
     sprintf "%.3f ms with binding %O:%d"
       ((x.socketBoundUtc |> Option.fold (fun _ t -> t) x.startCalledUtc) - x.startCalledUtc).TotalMilliseconds
       x.binding.ip x.binding.port
-
-/// Disconnect a socket for reuse
-let closeSocket (s : Socket) =
-  try
-    if s <> null then
-      if s.Connected || s.IsBound then 
-        s.Disconnect true
-  with _ -> ()
-
-/// Shoots down a socket for good
-let shutdownSocket (s : Socket) =
-  try
-    if s <> null then
-      try
-        s.Shutdown(SocketShutdown.Both)
-      with _ -> ()
-      s.Close ()
-      s.Dispose ()
-  with _ -> ()
 
 /// Stop the TCP listener server
 let stopTcp (logger : Logger) reason (socket : Socket) =

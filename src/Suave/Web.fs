@@ -388,7 +388,7 @@ module internal ParsingAndControl =
 
   let internal addKeepAliveHeader (context : HttpContext) =
     match context.request.httpVersion, context.request.header "connection" with
-    | "HTTP/1.0", Choice1Of2 v when String.eqOrdCi v "keep-alive" ->
+    | "HTTP/1.0", Choice1Of2 v when String.equalsOrdinalCI v "keep-alive" ->
       { context with response = { context.response with headers = ("Connection","Keep-Alive") :: context.response.headers } }
     | _ -> context
 
@@ -557,7 +557,7 @@ module internal ParsingAndControl =
             | None -> ()
             | Some ctx ->
               match ctx.request.header "connection" with
-              | Choice1Of2 conn when String.eqOrdCi conn "keep-alive" ->
+              | Choice1Of2 conn when String.equalsOrdinalCI conn "keep-alive" ->
                 verbose "'Connection: keep-alive' recurse"
                 return! loop (cleanResponse ctx)
               | Choice1Of2 _ ->

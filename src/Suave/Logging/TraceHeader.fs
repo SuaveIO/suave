@@ -4,9 +4,9 @@ open Suave
 open Suave.Utils
 
 /// A record that keeps track of what request this is.
-/// In an uint64 there are 18 446 744 073 709 551 616 number
-/// of possible values, so you can be fairly certain a given request
-/// id is unique, given a good random number generator.
+/// In an uint64 there are 18 446 744 073 709 551 616 number of possible values,
+/// so you can be fairly certain a given request id is unique, given a good
+/// random number generator.
 type TraceHeader =
   { /// If this is the 'first' traced request, then traceId equals
     /// reqId. If it's the second, then traceId = reqParentId

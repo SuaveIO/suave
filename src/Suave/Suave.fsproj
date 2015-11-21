@@ -79,21 +79,21 @@
   <Import Project="$(FSharpTargetsPath)" Condition="Exists('$(FSharpTargetsPath)')" />
   <Import Project="..\..\tools\paket.targets" />
   <ItemGroup>
+    <Compile Include="..\..\paket-files\haf\YoLo\YoLo.fs">
+      <Paket>True</Paket>
+      <Link>Utils\YoLo.fs</Link>
+    </Compile>
     <Compile Include="Utils\Aether.fs" />
-    <Compile Include="Utils\Async.fs" />
+    <Compile Include="Utils\AsyncExtensions.fs" />
+    <Compile Include="Utils\AsyncResultCell.fs" />
     <Compile Include="Utils\Collections.fs" />
-    <Compile Include="Utils\UTF8.fs" />
     <Compile Include="Utils\ASCII.fs" />
-    <Compile Include="Utils\String.fs" />
-    <Compile Include="Utils\Option.fs" />
-    <Compile Include="Utils\Map.fs" />
     <Compile Include="Utils\Choice.fs" />
-    <Compile Include="Utils\Random.fs" />
+    <Compile Include="Utils\ThreadSafeRandom.fs" />
     <Compile Include="Utils\Bytes.fs" />
-    <Compile Include="Utils\Encoding.fs" />
+    <Compile Include="Utils\Compression.fs" />
     <Compile Include="Utils\Crypto.fs" />
     <Compile Include="Utils\Parsing.fs" />
-    <Compile Include="Utils\Serialisation.fs" />
     <Compile Include="Utils\OpenMemoryStream.fs" />
     <Compile Include="Globals.fs" />
     <Compile Include="Logging\LogLevel.fs" />
@@ -130,6 +130,7 @@
     <Compile Include="AssemblyVersionInfo.fs" Condition="Exists('AssemblyVersionInfo.fs')" />
     <None Include="paket.references" />
     <Content Include="App.config" />
+    <Compile Include="Utils\CookieSerialiser.fs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="mscorlib" />

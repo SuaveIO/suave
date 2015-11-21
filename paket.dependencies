@@ -11,8 +11,8 @@ nuget FsCheck = 2.0.7
 nuget Fuchu.FsCheck
 nuget Fuchu.PerfUtil ~> 0.6
 nuget Topshelf.FSharp
-nuget WebSharper.Owin
-nuget WebSharper.UI.Next
 nuget WebSocketSharp
 nuget openssl.redist
 nuget DotLiquid
+
+github haf/YoLo YoLo.fs
