@@ -117,6 +117,7 @@
     <Compile Include="Compression.fs" />
     <Compile Include="Operators.fsi" />
     <Compile Include="Operators.fs" />
+    <Compile Include="AsyncOption.fs" />
     <Compile Include="Monad.fs" />
     <Compile Include="WebPart.fsi" />
     <Compile Include="WebPart.fs" />

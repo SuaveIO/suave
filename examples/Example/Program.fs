@@ -4,6 +4,7 @@ open System
 open System.Net
 
 open Suave
+open Suave.AsyncOption
 open Suave.Sockets
 open Suave.Sockets.Control
 open Suave.Logging
