@@ -1,6 +1,6 @@
 ﻿namespace Suave.Http
 
-/// This module contact the correct operator definitions.
+/// This module contains the correct operator definitions.
 module Monad =
 
   /// The base monad
