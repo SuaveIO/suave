@@ -18,6 +18,9 @@ open System.Collections.Concurrent
 let internal compressedFilesMap = new ConcurrentDictionary<string,string>()
 
 [<assembly:System.Runtime.CompilerServices.InternalsVisibleToAttribute("Suave.Experimental")>]
+[<assembly:System.Runtime.CompilerServices.InternalsVisibleToAttribute("Suave.DotLiquid")>]
+[<assembly:System.Runtime.CompilerServices.InternalsVisibleToAttribute("Suave.Razor")>]
+[<assembly:System.Runtime.CompilerServices.InternalsVisibleToAttribute("Suave.Xsp")>]
 [<assembly:System.Runtime.CompilerServices.InternalsVisibleToAttribute("Suave.Tests")>]
 do ()
 

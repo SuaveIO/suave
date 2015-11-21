@@ -58,9 +58,9 @@ module Razor =
   let razor<'a> path (model : 'a) =
     fun r ->
       async {
-          let templatePath = resolvePath r.runtime.homeDirectory path
-          let! writeTime, razorTemplate = loadTemplateCached templatePath
-          let cacheKey = writeTime.Ticks.ToString() + "_" + templatePath
-          let content = razorService.RunCompile(razorTemplate, cacheKey, typeof<'a>, model)
-          return! Response.response HTTP_200 (UTF8.bytes content) r
+        let templatePath = resolvePath r.runtime.homeDirectory path
+        let! writeTime, razorTemplate = loadTemplateCached templatePath
+        let cacheKey = writeTime.Ticks.ToString() + "_" + templatePath
+        let content = razorService.RunCompile(razorTemplate, cacheKey, typeof<'a>, model)
+        return! Response.response HTTP_200 (UTF8.bytes content) r
         }

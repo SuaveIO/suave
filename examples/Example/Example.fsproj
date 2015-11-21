@@ -53,6 +53,10 @@
     <Content Include="eventsource.js">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Compile Include="..\..\paket-files\haf\YoLo\YoLo.fs">
+      <Paket>True</Paket>
+      <Link>paket-files/YoLo.fs</Link>
+    </Compile>
     <Compile Include="CounterDemo.fs" />
     <Compile Include="Program.fs" />
     <None Include="examples.png">
