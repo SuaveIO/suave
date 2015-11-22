@@ -5,7 +5,7 @@ open System.Runtime.Serialization.Json
 open System.Text
 
 open Suave.Http
-open Suave.Http.Operators
+open Suave.AsyncOption.Operators
 
 /// Convert the object to a JSON representation inside a byte array (can be made string of)
 let toJson<'T> (o: 'T) =
@@ -33,4 +33,4 @@ let mapJson f =
     f (fromJson r.rawForm) 
     |> toJson
     |> Successful.ok 
-    >>= Writers.setMimeType "application/json")
+    >=> Writers.setMimeType "application/json")

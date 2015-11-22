@@ -14,7 +14,6 @@ open Suave.Sockets.Control
 open Suave.Http
 open Suave.Tcp
 
-open Suave.Http.Operators
 open Suave.Http.Response
 open Suave.ParsingAndControl
 

@@ -3,7 +3,7 @@
 [<AutoOpen>]
 module WebPart =
 
-  open Operators
+  open Suave.AsyncOption.Operators
 
   let inline succeed x = async.Return (Some x)
 
@@ -44,7 +44,7 @@ module WebPart =
         let! res = p arg
         match res with
         | Some x ->
-          return! (postOp >>= q) x
+          return! (postOp >=> q) x
         | None   -> return! inject postOp tail arg
       }
 

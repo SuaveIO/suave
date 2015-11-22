@@ -5,7 +5,7 @@ module WebSocket =
   open Suave.Sockets
   open Suave.Sockets.Control
   open Suave.Http
-  open Suave.Http.Operators
+  open Suave.AsyncOption.Operators
   open Suave.Utils
   open Suave.Logging
 
@@ -23,9 +23,9 @@ module WebSocket =
 
   let handShakeResponse (handShakeToken : string) =
     Writers.setHeader "Upgrade" "websocket"
-    >>= Writers.setHeader "Connection" "Upgrade"
-    >>= Writers.setHeader "Sec-WebSocket-Accept" handShakeToken
-    >>= Response.response HTTP_101 [||] // HTTP 1xx responses  MUST NOT contain a body
+    >=> Writers.setHeader "Connection" "Upgrade"
+    >=> Writers.setHeader "Sec-WebSocket-Accept" handShakeToken
+    >=> Response.response HTTP_101 [||] // HTTP 1xx responses  MUST NOT contain a body
 
   type Opcode = Continuation | Text | Binary | Reserved | Close | Ping | Pong
 

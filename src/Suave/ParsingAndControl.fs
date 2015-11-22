@@ -14,7 +14,6 @@ module internal ParsingAndControl =
   open System.Security.Principal
   open System.Collections.Generic
 
-  open Suave.Http.Operators
   open Suave.Http
   open Suave.Globals
   open Suave.Http.Compression

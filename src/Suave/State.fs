@@ -2,7 +2,6 @@ module Suave.State
 
 open Suave.Utils
 open Suave.Http
-open Suave.Http.Operators
 open Suave.Log
 open Suave.Http.Cookie
 open Suave.Logging

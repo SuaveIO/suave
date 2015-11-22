@@ -1,7 +1,7 @@
 namespace Suave.Http
 
-open Operators
 open Suave
+open Suave.AsyncOption.Operators
 open Suave.Sockets
 
 module Response =
@@ -112,20 +112,20 @@ module Redirection =
 
   let moved_permanently location =
     setHeader "Location" location
-    >>= response HTTP_301 [||]
+    >=> response HTTP_301 [||]
 
   let MOVED_PERMANENTLY location = moved_permanently location
 
   let found location =
     setHeader "Location" location
-    >>= response HTTP_302 [||]
+    >=> response HTTP_302 [||]
 
   let FOUND location = found location
 
   let redirect url =
     setHeader "Location" url
-    >>= setHeader "Content-Type" "text/html; charset=utf-8"
-    >>= response HTTP_302 (
+    >=> setHeader "Content-Type" "text/html; charset=utf-8"
+    >=> response HTTP_302 (
       UTF8.bytes(sprintf "<html>
   <body>
     <a href=\"%s\">%s</a>
@@ -153,7 +153,7 @@ module RequestErrors =
   /// 401: see http://stackoverflow.com/questions/3297048/403-forbidden-vs-401-unauthorized-http-responses/12675357
   let unauthorized s =
     setHeader "WWW-Authenticate" "Basic realm=\"protected\""
-    >>= response HTTP_401 s
+    >=> response HTTP_401 s
 
   let UNAUTHORIZED s = unauthorized (UTF8.bytes s)
 
@@ -364,9 +364,9 @@ module ServeResource =
 
     let sendIt name compression =
       setHeader "Last-Modified" ((getLast key : DateTime).ToString("R"))
-      >>= setHeader "Vary" "Accept-Encoding"
-      >>= setMimeType name
-      >>= send key compression
+      >=> setHeader "Vary" "Accept-Encoding"
+      >=> setMimeType name
+      >=> send key compression
 
     if exists key then
       let mimes = ctx.runtime.mimeTypesMap (getExtension key)

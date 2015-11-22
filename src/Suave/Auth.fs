@@ -6,7 +6,6 @@ open System.Text
 open Suave
 open Suave.Http
 open Suave.Http.Cookie
-open Suave.Http.Operators
 open Suave.Logging
 open Suave.Utils
 

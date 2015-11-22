@@ -115,6 +115,7 @@
     <Compile Include="Sockets\AsyncSocket.fs" />
     <Compile Include="Tcp.fs" />
     <Compile Include="Sscanf.fs" />
+    <Compile Include="AsyncOption.fs" />
     <Compile Include="Http\Types.fs" />
     <Compile Include="Http\Operators.fsi" />
     <Compile Include="Http\Operators.fs" />
@@ -126,7 +127,7 @@
     <Compile Include="Http\Cookie.fsi" />
     <Compile Include="Http\Cookie.fs" />
     <Compile Include="Model.fs" />
-    <Compile Include="AsyncOption.fs" />
+
     <Compile Include="State.fs" />
     <Compile Include="Auth.fs" />
     <Compile Include="SuaveConfig.fs" />

@@ -7,8 +7,8 @@ module Cookie =
   open System.Globalization
 
   open Suave
+  open Suave.AsyncOption.Operators
   open Suave.Http
-  open Suave.Http.Operators
   open Suave.Logging
   open Suave.Utils
 
@@ -120,10 +120,10 @@ module Cookie =
       Log.log logger "Suave.Cookie.setPair" LogLevel.Debug
         (sprintf "setting cookie '%s' len '%d'" httpCookie.name httpCookie.value.Length)
       succeed)
-    >>= setCookie httpCookie >>= setCookie clientCookie
+    >=> setCookie httpCookie >=> setCookie clientCookie
 
   let unsetPair httpCookieName : WebPart =
-    unsetCookie httpCookieName >>= unsetCookie (String.Concat [ httpCookieName; "-client" ])
+    unsetCookie httpCookieName >=> unsetCookie (String.Concat [ httpCookieName; "-client" ])
 
   type CookiesState =
     { serverKey      : ServerKey
@@ -188,7 +188,7 @@ module Cookie =
                        csctx.relativeExpiry csctx.secure
                        plainText
       ||> setPair
-      >>= Writers.setUserData csctx.userStateKey plainText)
+      >=> Writers.setUserData csctx.userStateKey plainText)
 
   let cookieState (csctx : CookiesState)
                    // unit -> plain text to store OR something to run of your own!
@@ -205,21 +205,21 @@ module Cookie =
           generateCookies csctx.serverKey csctx.cookieName
                            csctx.relativeExpiry csctx.secure
                            plainText
-        setPair httpCookie clientCookie >>=
+        setPair httpCookie clientCookie >=>
           Writers.setUserData csctx.userStateKey plainText
 
       match readCookies csctx.serverKey csctx.cookieName ctx.request.cookies with
       | Choice1Of2 (httpCookie, plainText) ->
         log "existing cookie"
         refreshCookies csctx.relativeExpiry httpCookie
-          >>= Writers.setUserData csctx.userStateKey plainText
-          >>= fSuccess
+          >=> Writers.setUserData csctx.userStateKey plainText
+          >=> fSuccess
 
       | Choice2Of2 (NoCookieFound _) ->
         match noCookie () with
         | Choice1Of2 plainText ->
           log "no existing cookie, setting text"
-          setCookies plainText >>= fSuccess
+          setCookies plainText >=> fSuccess
         | Choice2Of2 wp_kont ->
           log "no existing cookie, calling app continuation"
           wp_kont
@@ -229,7 +229,7 @@ module Cookie =
         match decryptionFailure err with
         | Choice1Of2 plainText ->
           log "existing, broken cookie, setting cookie text anew"
-          setCookies plainText >>= fSuccess
+          setCookies plainText >=> fSuccess
         | Choice2Of2 wpKont    ->
           log "existing, broken cookie, unsetting it, forwarding to given failure web part"
-          wpKont >>= unsetPair csctx.cookieName)
+          wpKont >=> unsetPair csctx.cookieName)

@@ -13,8 +13,8 @@ open System.Security.Claims
 open System.Security.Principal
 open System.Runtime.InteropServices
 open Suave
+open Suave.AsyncOption.Operators
 open Suave.Logging
-open Suave.Http.Operators
 open Suave.Http
 open Suave.Sockets
 open Suave.Utils
@@ -723,7 +723,7 @@ module OwinApp =
   [<CompiledName "OfApp">]
   let ofApp (requestPathBase : string) (owin : OwinApp) : WebPart =
 
-    Applicatives.pathStarts requestPathBase >>=
+    Applicatives.pathStarts requestPathBase >=>
     fun (ctx : HttpContext) ->
       let verbose f =
         ctx.runtime.logger.Log LogLevel.Verbose (

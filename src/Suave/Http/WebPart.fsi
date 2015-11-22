@@ -3,8 +3,6 @@
 [<AutoOpen>]
 module WebPart =
 
-  open Operators
-
   /// Return success with some value
   val inline succeed : item:'T -> Async<'T option>
 
