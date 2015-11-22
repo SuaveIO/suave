@@ -1,7 +1,8 @@
-﻿namespace Suave
+﻿namespace Suave.Http
 
 module Compression =
 
+  open Suave
   open Suave.Http
   open Suave.Utils
   open Suave.Sockets

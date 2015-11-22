@@ -350,7 +350,6 @@ module ServeResource =
   open Writers
   open Redirection
   open RequestErrors
-  open Suave.Model
   open Suave.Utils
   open Suave.Logging
 

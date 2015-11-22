@@ -17,7 +17,7 @@ module internal ParsingAndControl =
   open Suave.Http.Operators
   open Suave.Http
   open Suave.Globals
-  open Suave.Compression
+  open Suave.Http.Compression
   open Suave.Sockets
   open Suave.Sockets.Connection
   open Suave.Sockets.Control
