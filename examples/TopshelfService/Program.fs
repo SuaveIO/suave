@@ -2,7 +2,7 @@ open Suave
 open Suave.Http.Successful
 open Suave.Web 
 open Suave.Http
-open Suave.Http.Operators
+open Suave.AsyncOption.Operators
 open Suave.Http.Applicatives
 open Topshelf
 open System
@@ -13,8 +13,8 @@ let main argv =
     printfn "%A" argv
 
 
-    let home = choose [path "/" >>= GET >>= OK "Hello world"]
-    let mind = choose [path "/mind" >>= GET >>= OK "Where is my mind?"]
+    let home = choose [path "/" >=> GET >=> OK "Hello world"]
+    let mind = choose [path "/mind" >=> GET >=> OK "Where is my mind?"]
     let app = choose [ home; mind ]
 
     let cancellationTokenSource = ref None

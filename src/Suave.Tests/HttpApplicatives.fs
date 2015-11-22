@@ -5,7 +5,7 @@ open System
 open Suave
 open Suave.Http
 open Suave.Http.WebPart.Operators
-open Suave.Http.Operators
+open Suave.AsyncOption.Operators
 open Suave.Http.Applicatives
 open Suave.Http.Successful
 open Suave.Http.ServerErrors
@@ -33,7 +33,7 @@ let applicativeTests cfg =
 
     testCase "when matching on Host but is forwarded" <| fun _ ->
       let app =
-        host ip >>= request (fun r -> OK r.host)
+        host ip >=> request (fun r -> OK r.host)
         <|> warbler (fun ctx -> INTERNAL_ERROR (sprintf "host: %s" ctx.request.clientHostTrustProxy))
 
       let res = runWithConfig app |> req HttpMethod.GET "/" None

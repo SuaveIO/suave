@@ -4,7 +4,6 @@ open Fuchu
 
 open Suave
 open Suave.Http
-open Suave.Http.Operators
 open Suave.Http.Successful
 open Suave.Http.Embedded
 

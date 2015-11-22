@@ -10,8 +10,8 @@ open System.Text
 open System.Threading
 
 open Suave
+open Suave.AsyncOption.Operators
 open Suave.Http
-open Suave.Http.Operators
 open Suave.Sockets
 open Suave.Sockets.Control
 open Suave.WebSocket
@@ -62,7 +62,7 @@ let websocketTests cfg =
         | _ -> ()
       }
 
-  let webPart = Applicatives.path "/websocket" >>= handShake websocketApp
+  let webPart = Applicatives.path "/websocket" >=> handShake websocketApp
 
   let testByteArray (sentSize:int) (bArray: byte []) = 
     if sentSize = bArray.Length then

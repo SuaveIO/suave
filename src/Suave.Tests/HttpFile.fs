@@ -9,7 +9,6 @@ open System.Net.Sockets
 
 open Suave
 open Suave.Http
-open Suave.Http.Operators
 open Suave.Http.Successful
 open Suave.Utils
 open Suave.Web

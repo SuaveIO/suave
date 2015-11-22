@@ -10,7 +10,6 @@ open System.Text
 
 open Suave
 open Suave.Http
-open Suave.Http.Operators
 open Suave.Json
 
 open Suave.Tests.TestUtilities

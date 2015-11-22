@@ -11,7 +11,7 @@ open System.Text
 
 open Suave
 open Suave.Http
-open Suave.Http.Operators
+open Suave.AsyncOption.Operators
 open Suave.Http.Applicatives
 open Suave.Http.Writers
 open Suave.Owin
@@ -144,9 +144,9 @@ let owinEndToEnd cfg =
 
   let composedApp =
     path "/owin"
-      >>= setHeader "X-Custom-Before" "Before OWIN"
-      >>= OwinApp.ofApp "/" owinHelloWorld
-      >>= setHeader "X-Custom-After" "After OWIN"
+      >=> setHeader "X-Custom-Before" "Before OWIN"
+      >=> OwinApp.ofApp "/" owinHelloWorld
+      >=> setHeader "X-Custom-After" "After OWIN"
 
   testList "e2e" [
     testCase "Hello, OWIN!" <| fun _ ->
@@ -313,7 +313,7 @@ let owinEndToEnd cfg =
         async.Return (Some ctx)
 
       let composedApp =
-        pathRegex "/owin(/.+)*" >>= OwinApp.ofApp "/owin" ok >>= postCondition
+        pathRegex "/owin(/.+)*" >=> OwinApp.ofApp "/owin" ok >=> postCondition
 
       let asserts (result : HttpResponseMessage) =
         eq "Http Status Code" HttpStatusCode.OK result.StatusCode

@@ -12,7 +12,6 @@ open System.Reflection
 
 open Suave
 open Suave.Web
-open Suave.Http.Operators
 open Suave.Logging
 
 open FsCheck

@@ -12,7 +12,7 @@ open Suave.Web
 open Suave.Utils
 open Suave.Logging
 open Suave.Http
-open Suave.Http.Operators
+open Suave.AsyncOption.Operators
 open Suave.Http.Applicatives
 open Suave.Http.RequestErrors
 open Suave.Testing
@@ -21,10 +21,10 @@ open Suave.Tests.TestUtilities
 let app =
   choose
     [ POST
-      >>= choose [
+      >=> choose [
           path "/gifs/echo"
-              >>= Writers.setMimeType "image/gif"
-              >>= warbler (fun ctx ->
+              >=> Writers.setMimeType "image/gif"
+              >=> warbler (fun ctx ->
                   let file = ctx.request.files.Head
                   //printfn "||| in suave, handing over to sendFile, file %s len %d"
                   //        file.tempFilePath (FileInfo(file.tempFilePath).Length)

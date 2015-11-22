@@ -11,7 +11,7 @@ open Suave
 open Suave.Logging
 open Suave.Http.Cookie
 open Suave.State.CookieStateStore
-open Suave.Http.Operators
+open Suave.AsyncOption.Operators
 open Suave.Web
 open Suave.Http
 open Suave.Http.Successful
@@ -96,14 +96,14 @@ let authTests cfg =
       Assert.Null("should not have auth cookie", cookies.[Auth.SessionAuthCookie])
 
     testCase "can set cookie" <| fun _ ->
-      let ctx = runWithConfig (Auth.authenticated Session false >>= OK "ACK")
+      let ctx = runWithConfig (Auth.authenticated Session false >=> OK "ACK")
       let cookies = ctx |> reqCookies' HttpMethod.GET "/"  None
       Assert.NotNull("should have auth cookie", cookies.[Auth.SessionAuthCookie])
 
     testCase "can set MaxAge cookie" <| fun _ ->
       let timespan = System.TimeSpan.FromDays(13.0)
       let maxAge = Cookie.CookieLife.MaxAge timespan
-      let ctx = runWithConfig (Auth.authenticated maxAge false >>= OK "ACK")
+      let ctx = runWithConfig (Auth.authenticated maxAge false >=> OK "ACK")
       let cookies = ctx |> reqCookies' HttpMethod.GET "/"  None
       Assert.NotNull("should have auth cookie", cookies.[Auth.SessionAuthCookie])
 
@@ -112,10 +112,10 @@ let authTests cfg =
       let ctx =
         runWithConfig (
           choose [
-            path "/" >>= OK "root"
-            path "/auth" >>= Auth.authenticated Session false >>= OK "authed"
+            path "/" >=> OK "root"
+            path "/auth" >=> Auth.authenticated Session false >=> OK "authed"
             path "/protected"
-              >>= Auth.authenticate Session false
+              >=> Auth.authenticate Session false
                                     (fun () ->
                                       Choice2Of2(FORBIDDEN "please authenticate"))
                                     (fun _ -> Choice2Of2(BAD_REQUEST "did you fiddle with our cipher text?"))
@@ -155,14 +155,14 @@ let authTests cfg =
       let ctx =
         runWithConfig ( 
           statefulForSession
-          >>= sessionState (fun store ->
+          >=> sessionState (fun store ->
               match store.get "counter" with
               | Some y ->
                 store.set "counter" (y + 1)
-                >>= OK ((y + 1).ToString())
+                >=> OK ((y + 1).ToString())
               | None ->
                 store.set "counter" 0
-                >>= OK "0"))
+                >=> OK "0"))
 
       let container = CookieContainer()
       let interact methd resource = interact methd resource container ctx
@@ -182,11 +182,11 @@ let authTests cfg =
       let ctx =
         runWithConfig ( 
           statefulForSession
-          >>= choose [
-            path "/a"     >>= sessionState (fun state -> state.set "a" "a" >>= OK "a" )
-            path "/b"     >>= sessionState (fun state -> state.set "b" "b" >>= OK "b" )
-            path "/get_a" >>= sessionState (fun state -> match state.get "a" with Some a -> OK a | None -> RequestErrors.BAD_REQUEST "fail")
-            path "/get_b" >>= sessionState (fun state -> match state.get "b" with Some a -> OK a | None -> RequestErrors.BAD_REQUEST "fail" )
+          >=> choose [
+            path "/a"     >=> sessionState (fun state -> state.set "a" "a" >=> OK "a" )
+            path "/b"     >=> sessionState (fun state -> state.set "b" "b" >=> OK "b" )
+            path "/get_a" >=> sessionState (fun state -> match state.get "a" with Some a -> OK a | None -> RequestErrors.BAD_REQUEST "fail")
+            path "/get_b" >=> sessionState (fun state -> match state.get "b" with Some a -> OK a | None -> RequestErrors.BAD_REQUEST "fail" )
             ])
 
       let container = CookieContainer()
@@ -209,10 +209,10 @@ let authTests cfg =
       // given
       let ctx =
         runWithConfig ( 
-          statefulForSession >>= choose [
-            path "/ab"     >>= sessionState (fun state -> state.set "a" "a" >>= sessionState ( fun state' -> state'.set "b" "b" >>= OK "a" ))
-            path "/get_a" >>= sessionState (fun state -> match state.get "a" with Some a -> OK a | None -> RequestErrors.BAD_REQUEST "fail")
-            path "/get_b" >>= sessionState (fun state -> match state.get "b" with Some a -> OK a | None -> RequestErrors.BAD_REQUEST "fail" )
+          statefulForSession >=> choose [
+            path "/ab"     >=> sessionState (fun state -> state.set "a" "a" >=> sessionState ( fun state' -> state'.set "b" "b" >=> OK "a" ))
+            path "/get_a" >=> sessionState (fun state -> match state.get "a" with Some a -> OK a | None -> RequestErrors.BAD_REQUEST "fail")
+            path "/get_b" >=> sessionState (fun state -> match state.get "b" with Some a -> OK a | None -> RequestErrors.BAD_REQUEST "fail" )
             ])
 
       let container = CookieContainer()

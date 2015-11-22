@@ -10,7 +10,6 @@ open Fuchu
 open Suave
 open Suave.Http
 open Suave.Model
-open Suave.Http.Operators
 open Suave.Http.Successful
 open Suave.Http.RequestErrors
 open Suave.Web

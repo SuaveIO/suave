@@ -10,7 +10,7 @@ open System.Text
 
 open Suave
 open Suave.Http
-open Suave.Http.Operators
+open Suave.AsyncOption.Operators
 open Suave.Http.Applicatives
 open Suave.Http.RequestErrors
 open Suave.Http.Successful
@@ -83,13 +83,13 @@ let parsingMultipart2 cfg =
   let app =
     choose
       [ POST
-        >>= choose [
-            path "/filecount" >>= warbler (fun ctx ->
+        >=> choose [
+            path "/filecount" >=> warbler (fun ctx ->
               OK (string ctx.request.files.Length))
 
             path "/filenames"
-              >>= Writers.setMimeType "application/json"
-              >>= warbler (fun ctx ->
+              >=> Writers.setMimeType "application/json"
+              >=> warbler (fun ctx ->
                   //printfn "inside suave"
                   ctx.request.files
                   |> List.map (fun f ->
@@ -99,7 +99,7 @@ let parsingMultipart2 cfg =
                   |> OK)
 
             path "/msgid"
-              >>= request (fun r ->
+              >=> request (fun r ->
                 match r.multiPartFields |> List.tryFind (fst >> (=) "messageId") with
                 | Some (_, yep) -> OK yep
                 | None -> NOT_FOUND "Nope... Not found"

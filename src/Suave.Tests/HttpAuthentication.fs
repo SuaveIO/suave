@@ -5,7 +5,7 @@ open System.Net
 open System.Net.Http.Headers
 open System.Text
 open Suave.Http
-open Suave.Http.Operators
+open Suave.AsyncOption.Operators
 open Suave.Http.Applicatives
 open Suave.Http.Authentication
 open Suave.Http.Successful
@@ -34,9 +34,9 @@ let authTests cfg =
 
       let app =
         choose [
-          GET >>= path "/non-protected1" >>= okUser
-          GET >>= path "/protected" >>= authenticateBasic ((=) ("foo", "bar")) okUser
-          GET >>= path "/non-protected2" >>= okUser ]
+          GET >=> path "/non-protected1" >=> okUser
+          GET >=> path "/protected" >=> authenticateBasic ((=) ("foo", "bar")) okUser
+          GET >=> path "/non-protected2" >=> okUser ]
 
       let req path reqMod = reqResp HttpMethod.GET path "" None None DecompressionMethods.None reqMod (fun res -> res.Content.ReadAsStringAsync().Result)
 

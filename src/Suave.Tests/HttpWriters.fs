@@ -9,7 +9,7 @@ open System.Net.Sockets
 
 open Suave
 open Suave.Http
-open Suave.Http.Operators
+open Suave.AsyncOption.Operators
 open Suave.Http.Successful
 open Suave.Http.Writers
 open Suave.Http.Types
@@ -42,21 +42,21 @@ let cookies cfg =
       Assert.Equal("expecting cookie value"
       , "42"
       , (reqCookies HttpMethod.GET "/" None
-        (runWithConfig (Cookie.setCookie basicCookie >>= OK "test")))
+        (runWithConfig (Cookie.setCookie basicCookie >=> OK "test")))
           .GetCookies(Uri(sprintf "http://%s" ip)).[0].Value)
 
     testCase "cookie name makes round trip" <| fun _ ->
       Assert.Equal("expecting cookie name"
       , "mycookie"
       , (reqCookies HttpMethod.GET "/" None
-          (runWithConfig (Cookie.setCookie basicCookie >>= OK "test")))
+          (runWithConfig (Cookie.setCookie basicCookie >=> OK "test")))
           .GetCookies(Uri(sprintf "http://%s" ip)).[0].Name)
 
     testCase "http_only cookie is http_only" <| fun _ ->
       Assert.Equal("expecting http_only"
       , true
       , (reqCookies HttpMethod.GET "/" None
-        (runWithConfig (Cookie.setCookie { basicCookie with httpOnly = true } >>= OK "test")))
+        (runWithConfig (Cookie.setCookie { basicCookie with httpOnly = true } >=> OK "test")))
           .GetCookies(Uri(sprintf "http://%s" ip)).[0].HttpOnly)
   ]
 
@@ -97,7 +97,7 @@ let headers cfg =
 
   testList "Headers basic tests" [
     testCase "setHeader adds header if it was not there" <| fun _ ->
-      let ctx = runWithConfig (Writers.setHeader "X-Custom-Header" "value" >>= OK "test")
+      let ctx = runWithConfig (Writers.setHeader "X-Custom-Header" "value" >=> OK "test")
       withContext (fun _ ->
         let hdrs = requestHeaders ()
         Assert.Equal("expecting header value"
@@ -107,9 +107,9 @@ let headers cfg =
     testCase "setHeader rewrites all instances of header with new single value" <| fun _ ->
       let ctx = runWithConfig (
                   Writers.setHeader "X-Custom-Header" "first"
-                  >>= Writers.setHeader "X-Custom-Header" "second"
-                  >>= Writers.setHeader "X-Custom-Header" "third"
-                  >>= OK "test")
+                  >=> Writers.setHeader "X-Custom-Header" "second"
+                  >=> Writers.setHeader "X-Custom-Header" "third"
+                  >=> OK "test")
       withContext (fun _ ->
         let hdrs = requestHeaders ()
         Assert.Equal("expecting header value"
@@ -119,8 +119,8 @@ let headers cfg =
     testCase "addHeader adds header and preserve order" <| fun _ ->
       let ctx = runWithConfig (
                   Writers.addHeader "X-Custom-Header" "first"
-                  >>= Writers.addHeader "X-Custom-Header" "second"
-                  >>= OK "test")
+                  >=> Writers.addHeader "X-Custom-Header" "second"
+                  >=> OK "test")
       withContext (fun _ ->
         let hdrs = requestHeaders ()
         Assert.Equal("expecting headers value"

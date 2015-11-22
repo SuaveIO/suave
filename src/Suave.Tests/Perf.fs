@@ -5,7 +5,6 @@ open System.Net.Http
 
 open Suave.Utils
 open Suave.Http
-open Suave.Http.Operators
 open Suave.Http.Successful
 open Suave.Web
 
