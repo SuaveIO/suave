@@ -11,7 +11,6 @@ open Suave.Sockets.Control
 open Suave.Logging
 open Suave.Web
 open Suave.Http.WebPart.Operators
-open Suave.Http.Monad
 open Suave.Http.EventSource
 open Suave.Http.Applicatives
 open Suave.Http.Writers

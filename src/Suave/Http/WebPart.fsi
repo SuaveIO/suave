@@ -41,6 +41,9 @@ module WebPart =
 
   val inline tryThen : first:WebPart -> second:WebPart -> WebPart
 
+  val inline concatenate : first:('a -> 'b option) -> second:('a -> 'b option) -> 'a -> 'b option
+
   module Operators =
 
     val inline (<|>) : first:WebPart -> second:WebPart -> WebPart
+    val inline (@@)  : first:('a -> 'b option) -> second:('a -> 'b option) -> ('a -> 'b option)

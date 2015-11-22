@@ -70,7 +70,14 @@ module WebPart =
           | r -> return r
         | r -> return r
       }
+
+  let inline concatenate a b = fun x ->
+      match a x with
+      | None   -> b x
+      | r      -> r
     
   module Operators =
 
     let inline (<|>) a b = tryThen a b
+
+    let inline (@@) a b = concatenate a b

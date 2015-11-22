@@ -118,7 +118,6 @@
     <Compile Include="Http\Types.fs" />
     <Compile Include="Http\Operators.fsi" />
     <Compile Include="Http\Operators.fs" />
-    <Compile Include="Http\Monad.fs" />
     <Compile Include="Http\WebPart.fsi" />
     <Compile Include="Http\WebPart.fs" />
     <Compile Include="Http\Compression.fs" />
