@@ -18,7 +18,7 @@ let setConnectionKeepAlive (r : HttpRequestMessage) =
   r
 
 [<Tests>]
-let tests cfg =
+let connectionTests cfg =
   testList "connecting" [
     testCase "connect with keep-alive default" <| fun _ ->
       let context = runWith cfg (OK "ACK")

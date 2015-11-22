@@ -16,7 +16,7 @@ open Suave.Testing
 open Fuchu
 
 [<Tests>]
-let tests cfg =
+let applicativeTests cfg =
   let runWithConfig = runWith cfg
   let ip, port =
     let binding = SuaveConfig.firstBinding cfg

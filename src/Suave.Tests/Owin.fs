@@ -29,7 +29,7 @@ let throws msg matcher fn =
   try fn () with e when matcher e -> ()
 
 [<Tests>]
-let unit =
+let owinUnit =
   let create (m : (string * string) list) =
     OwinApp.DeltaDictionary(m) :> IDictionary<string, string[]>
 
@@ -115,7 +115,7 @@ let unit =
     ]
 
 [<Tests>]
-let endToEnd cfg =
+let owinEndToEnd cfg =
   let runWithConfig = runWith cfg
 
   let owinHelloWorld (env : OwinEnvironment) =

@@ -1,7 +1,7 @@
-FSharp.Core
-
 group Tests
+FSharp.Core
 FSharp.Charting
+Fuchu
 Fuchu.FsCheck
 Fuchu.PerfUtil
 WebSocketSharp

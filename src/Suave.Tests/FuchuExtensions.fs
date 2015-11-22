@@ -13,21 +13,20 @@ let testFromMemberWithParam (param : 't) (m: MemberInfo): Test option =
   [m]
   |> List.filter (fun m -> m.HasAttributeType typeof<TestsAttribute>)
   |> List.choose (fun m ->
-                      match box m with
-                      | :? FieldInfo as m ->
-                          if m.FieldType = typeof<Test>
-                              then Some(unbox (m.GetValue(null)))
-                              else None
-                      | :? MethodInfo as m -> 
-                          if m.ReturnType = typeof<Test>
-                              then 
-                                Some(unbox (m.Invoke(null, [|param :> obj |])))
-                              else None
-                      | :? PropertyInfo as m -> 
-                          if m.PropertyType = typeof<Test>
-                              then Some(unbox (m.GetValue(null, null)))
-                              else None
-                      | _ -> None)
+    match box m with
+    | :? FieldInfo as m ->
+      if m.FieldType = typeof<Test>
+        then Some(unbox (m.GetValue(null)))
+        else None
+    | :? MethodInfo as m -> 
+      if m.ReturnType = typeof<Test>
+        then Some(unbox (m.Invoke(null, [| param :> obj |])))
+        else None
+    | :? PropertyInfo as m -> 
+      if m.PropertyType = typeof<Test>
+        then Some(unbox (m.GetValue(null, null)))
+        else None
+    | _ -> None)
   |> List.tryFind (fun _ -> true)
 
 let listToTestListOption = 
@@ -56,7 +55,8 @@ let testFromAssemblyWithFilterAndParam typeFilter (a: Assembly) param =
   |> listToTestListOption
 
 /// Scan tests marked with TestsAttribute from an assembly
-let testFromAssemblyWithParam asm param = testFromAssemblyWithFilterAndParam (fun _ -> true) asm param
+let testFromAssemblyWithParam asm param =
+  testFromAssemblyWithFilterAndParam (fun _ -> true) asm param
 
 let defaultMainThisAssemblyWithParam param args = 
 

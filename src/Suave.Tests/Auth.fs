@@ -87,7 +87,7 @@ let sessionState f =
     | Some store -> f store )
 
 [<Tests>]
-let tests cfg =
+let authTests cfg =
   let runWithConfig = runWith { cfg with logger = Loggers.saneDefaultsFor LogLevel.Warn }
   testList "auth tests" [
     testCase "baseline, no auth cookie" <| fun _ ->

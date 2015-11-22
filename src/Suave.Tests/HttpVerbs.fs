@@ -1,4 +1,4 @@
-﻿module Suave.Tests.Common
+﻿module Suave.Tests.HttpVerbs
 
 open System
 open System.Text
@@ -20,27 +20,27 @@ open Fuchu
 let gets cfg =
   let runWithConfig = runWith cfg
   testList "getting basic responses" [
-      testCase "200 OK returns 'a'" <| fun _ ->
-        Assert.Equal("expecting non-empty response", "a", runWithConfig (OK "a") |> req HttpMethod.GET "/" None)
+    testCase "200 OK returns 'a'" <| fun _ ->
+      Assert.Equal("expecting non-empty response", "a", runWithConfig (OK "a") |> req HttpMethod.GET "/" None)
 
-      testCase "200 OK returning url" <| fun _ ->
-        Assert.Equal("expecting correct url from binding",
-                     SuaveConfig.firstBindingUri cfg "/" "" |> string,
-                     runWithConfig (request (fun r -> OK (r.url.ToString())))
-                     |> req HttpMethod.GET "/" None)
+    testCase "200 OK returning url" <| fun _ ->
+      Assert.Equal("expecting correct url from binding",
+                   SuaveConfig.firstBindingUri cfg "/" "" |> string,
+                   runWithConfig (request (fun r -> OK (r.url.ToString())))
+                   |> req HttpMethod.GET "/" None)
 
-      testPropertyWithConfig fsCheckConfig "200 OK returns equivalent" <| fun respStr ->
-        (runWithConfig (OK respStr) |> req HttpMethod.GET "/hello" None) = respStr
+    testPropertyWithConfig fsCheckConfig "200 OK returns equivalent" <| fun respStr ->
+      (runWithConfig (OK respStr) |> req HttpMethod.GET "/hello" None) = respStr
 
-      testCase "204 No Content empty body" <| fun _ ->
-        Assert.Equal("empty string should always be returned by 204 No Content",
-                     "", (runWithConfig NO_CONTENT |> req HttpMethod.GET "/" None))
+    testCase "204 No Content empty body" <| fun _ ->
+      Assert.Equal("empty string should always be returned by 204 No Content",
+                   "", (runWithConfig NO_CONTENT |> req HttpMethod.GET "/" None))
 
-      testCase "302 FOUND sends content-length header" <| fun _ ->
-        let headers = reqContentHeaders HttpMethod.GET "/" None (runWithConfig (Redirection.FOUND "/url"))
-        Assert.Equal("302 FOUND sends content-length header",
-                     true,
-                     headers.Contains("Content-Length"))
+    testCase "302 FOUND sends content-length header" <| fun _ ->
+      let headers = reqContentHeaders HttpMethod.GET "/" None (runWithConfig (Redirection.FOUND "/url"))
+      Assert.Equal("302 FOUND sends content-length header",
+                   true,
+                   headers.Contains("Content-Length"))
     ]
 
 [<Tests>]

@@ -87,6 +87,4 @@
       </ItemGroup>
     </When>
   </Choose>
-  <ItemGroup>
-  </ItemGroup>
 </Project>
