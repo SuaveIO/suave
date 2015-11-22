@@ -5,6 +5,7 @@ type AsyncOption<'a> = Async<'a option>
 
 module AsyncOption =
 
+  /// Classic bind
   let bind (f: 'a -> AsyncOption<'b>) (a: AsyncOption<'a>) = async {
     let! p = a
     match p with
@@ -15,13 +16,10 @@ module AsyncOption =
       return! r
     }
 
-  /// Classic bind
-  let (>>=) a b = bind b a
-
-  /// Left-to-right Kleisli composition of monads.
-  let (>=>) (first : 'a -> AsyncOption<'b>)  (second : 'b -> AsyncOption<'c>) : 'a -> AsyncOption<'c> =
+  /// Left-to-right Kleisli composition.
+  let compose (first : 'a -> AsyncOption<'b>)  (second : 'b -> AsyncOption<'c>) : 'a -> AsyncOption<'c> =
     fun x ->
-      bind second (first x)
+        bind second (first x)
 
   type AsyncOptionBuilder() =
     member this.Return(x:'a) : AsyncOption<'a> = async { return Some x }
@@ -42,4 +40,10 @@ module AsyncOption =
   ///
 
   let asyncOption = AsyncOptionBuilder()
+
+  module Operators =
+
+    let (>>=) a b = bind b a
+
+    let (>=>) a b = compose a b
 
