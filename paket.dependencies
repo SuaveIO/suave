@@ -17,7 +17,7 @@ group Tests
   source https://nuget.org/api/v2
   nuget FSharp.Core ~> 3.1.2
   nuget WebSocketSharp
-  nuget FsCheck
+  nuget FsCheck = 2.1.0
   nuget Fuchu.FsCheck
   nuget Fuchu.PerfUtil
   nuget Http.fs-prerelease
