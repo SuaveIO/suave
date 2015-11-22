@@ -19,6 +19,11 @@ suave_description = 'Suave is a simple web development F# library providing a li
 Configuration = ENV['CONFIGURATION'] || 'Release'
 Platform = ENV['MSBUILD_PLATFORM'] || 'Any CPU'
 
+task :yolo do
+  return if Albacore.windows?
+  system %{ruby -pi.bak -e "gsub(/module internal YoLo/, 'module internal Suave.Utils.YoLo')" paket-files/haf/YoLo/YoLo.fs}
+end
+
 desc "Restore paket.exe"
 task :restore_paket do
   system 'tools/paket.bootstrapper.exe', clr_command: true unless
@@ -26,7 +31,7 @@ task :restore_paket do
 end
 
 desc "Restore all packages"
-task :restore => [:restore_paket] do
+task :restore => [:restore_paket, :yolo] do
   system 'tools/paket.exe', 'restore', clr_command: true
 end
 

@@ -1,5 +1,13 @@
-[<AutoOpen>]
-module Suave.Utils.Async
+/// For F# 3.0, you can open this module to get extensions for Async<'a>:
+///
+/// - Support for bind on Task<'a> in async{}
+/// - Async.WithTimeout : TimeSpan * Async<'a> -> _
+/// - Async.AsyncRaise : exn -> _
+/// - Async.AwaitTask : Task -> _
+///
+/// For F# 4.0 these things are mostly implemented, so you can choose not to
+/// open this module.
+module Suave.Utils.AsyncExtensions
 
 open System
 open System.IO
@@ -16,8 +24,8 @@ let internal invokeOnce funcs =
   (invokeOnce' a, invokeOnce' b, invokeOnce' c)
 
 type Microsoft.FSharp.Control.Async with
-  /// Spawn an async with a timeout, throwing <see cref="System.TimeoutException" /> after
-  /// the timeout.
+  /// Spawn an async with a timeout, throwing <see cref="System.TimeoutException" />
+  /// after the timeout.
   static member WithTimeout(timeout : TimeSpan, computation : Async<'T>) : Async<'T> =
     let callback (success, error, cancellation) =
       let (success, error, cancellation) = invokeOnce (success, error, cancellation)
@@ -37,7 +45,7 @@ type Microsoft.FSharp.Control.Async with
 
     Async.FromContinuations callback
 
-  /// Raise an exception on the async computation/workflow. 
+  /// Raise an exception on the async computation/workflow.
   static member AsyncRaise (e : exn) = 
     Async.FromContinuations(fun (_,econt,_) -> econt e) 
 
@@ -55,7 +63,6 @@ type Microsoft.FSharp.Control.Async with
     tcs.Task |> Async.AwaitTask |> rewrapAsyncExn
 
 type Microsoft.FSharp.Control.AsyncBuilder with
-
   /// An extension method that overloads the standard 'Bind' of the 'async' builder. The new overload awaits on
   /// a standard .NET task
   member x.Bind(t : Task<'T>, f:'T -> Async<'R>) : Async<'R> = async.Bind(Async.AwaitTask t, f)
@@ -63,28 +70,3 @@ type Microsoft.FSharp.Control.AsyncBuilder with
   /// An extension method that overloads the standard 'Bind' of the 'async' builder. The new overload awaits on
   /// a standard .NET task which does not commpute a value
   member x.Bind(t : Task, f : unit -> Async<'R>) : Async<'R> = async.Bind(Async.AwaitTask t, f)
-
-/// Haskell's TVar but without the STM.
-type AsyncResultCell<'T>() =
-  let source = new TaskCompletionSource<'T>()
-
-  /// Complete the async result cell, setting the value. If this invocation was the first
-  /// invocation, returns true, otherwise if there already is a value set, return false.
-  member x.Complete result =
-    source.TrySetResult result
-
-  /// Await the result of the AsyncResultCell, yielding Some(:'T)
-  /// after the timeout or otherwise None.
-  member x.AwaitResult(?timeout : TimeSpan) = async {
-    match timeout with
-    | None ->
-      let! res = source.Task
-      return Some res
-    | Some time ->
-      try
-        let! res = Async.WithTimeout(time, Async.AwaitTask(source.Task))
-        return Some res
-      with
-      | :? TimeoutException as e ->
-        return None
-    }

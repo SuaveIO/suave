@@ -388,7 +388,7 @@ module internal ParsingAndControl =
 
   let internal addKeepAliveHeader (context : HttpContext) =
     match context.request.httpVersion, context.request.header "connection" with
-    | "HTTP/1.0", Choice1Of2 v when String.eqOrdCi v "keep-alive" ->
+    | "HTTP/1.0", Choice1Of2 v when String.equalsOrdinalCI v "keep-alive" ->
       { context with response = { context.response with headers = ("Connection","Keep-Alive") :: context.response.headers } }
     | _ -> context
 
@@ -557,7 +557,7 @@ module internal ParsingAndControl =
             | None -> ()
             | Some ctx ->
               match ctx.request.header "connection" with
-              | Choice1Of2 conn when String.eqOrdCi conn "keep-alive" ->
+              | Choice1Of2 conn when String.equalsOrdinalCI conn "keep-alive" ->
                 verbose "'Connection: keep-alive' recurse"
                 return! loop (cleanResponse ctx)
               | Choice1Of2 _ ->
@@ -705,15 +705,37 @@ type SuaveConfig =
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module SuaveConfig =
+
+  /// Convert the Suave configuration to a runtime that the web server understands.
+  /// You will normally not have to use this function as a consumer from the
+  /// library, but it may be useful for unit testing with the HttpRuntime record.
   let toRuntime config contentFolder compressionFolder parsePostData =
     HttpRuntime.mk config.serverKey
-                    config.errorHandler
-                    config.mimeTypesMap
-                    contentFolder
-                    compressionFolder
-                    config.logger
-                    parsePostData
-                    config.cookieSerialiser
+                   config.errorHandler
+                   config.mimeTypesMap
+                   contentFolder
+                   compressionFolder
+                   config.logger
+                   parsePostData
+                   config.cookieSerialiser
+
+  /// Finds an endpoint that is configured from the given configuration. Throws
+  /// an exception if the configuration has no bindings. Useful if you make
+  /// the suave configuration parametised, because it is then enough for your
+  /// software to find a valid endpoint to make HTTP/ES/WebSocket requests to.
+  let firstBinding (cfg : SuaveConfig) =
+    match cfg.bindings with
+    | [] ->
+      failwith "No bindings found for SuaveConfig."
+
+    | b :: _ ->
+      b
+
+  /// Construct a `System.Uri` from the first binding available in Suave, by
+  /// giving a path and a uri.
+  let firstBindingUri (cfg : SuaveConfig) path query =
+    let binding = firstBinding cfg
+    binding.uri path query
 
 /// Starts the web server asynchronously.
 ///

@@ -15,6 +15,7 @@ open Suave.Http.Operators
 open Suave.Sockets
 open Suave.Sockets.Control
 open Suave.WebSocket
+open Suave.Web
 open Suave.Utils
 open Suave.Tests.TestUtilities
 open Suave.Testing
@@ -26,6 +27,10 @@ type PayloadSize =
 
 [<Tests>]
 let websocketTests cfg =
+  let ip, port =
+    let binding = SuaveConfig.firstBinding cfg
+    string binding.socketBinding.ip,
+    int binding.socketBinding.port
 
   let runWithConfig = runWith cfg
 
@@ -78,7 +83,7 @@ let websocketTests cfg =
         let message = "Hello Websocket World!"
         let echo : string ref = ref ""
 
-        use clientWebSocket = new WebSocketSharp.WebSocket("ws://127.0.0.1:8083/websocket")
+        use clientWebSocket = new WebSocketSharp.WebSocket(sprintf "ws://%s:%i/websocket" ip port)
 
         clientWebSocket.OnMessage.Add(fun e ->
           echo := e.Data
@@ -99,7 +104,7 @@ let websocketTests cfg =
         let message = "BinaryRequest7bit"
         let echo : byte array ref = ref [||]
 
-        use clientWebSocket = new WebSocketSharp.WebSocket("ws://127.0.0.1:8083/websocket")
+        use clientWebSocket = new WebSocketSharp.WebSocket(sprintf "ws://%s:%i/websocket" ip port)
 
         clientWebSocket.OnMessage.Add(fun e ->
           echo:= e.RawData
@@ -120,7 +125,7 @@ let websocketTests cfg =
         let message = "BinaryRequest16bit"
         let echo : byte array ref = ref [||]
 
-        use clientWebSocket = new WebSocketSharp.WebSocket("ws://127.0.0.1:8083/websocket")
+        use clientWebSocket = new WebSocketSharp.WebSocket(sprintf "ws://%s:%i/websocket" ip port)
 
         clientWebSocket.OnMessage.Add(fun e ->
           echo:= e.RawData
@@ -141,7 +146,7 @@ let websocketTests cfg =
         let message = "BinaryRequest32bit"
         let echo : byte array ref = ref [||]
 
-        use clientWebSocket = new WebSocketSharp.WebSocket("ws://127.0.0.1:8083/websocket")
+        use clientWebSocket = new WebSocketSharp.WebSocket(sprintf "ws://%s:%i/websocket" ip port)
 
         clientWebSocket.OnMessage.Add(fun e ->
           echo:= e.RawData

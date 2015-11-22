@@ -67,7 +67,7 @@ module Cookie =
 
     member x.cookies =
       x.headers
-      |> List.filter (fst >> (String.eqOrdCi "Set-Cookie"))
+      |> List.filter (fst >> (String.equalsOrdinalCI "Set-Cookie"))
       |> List.map (snd >> String.trim)
       |> List.map parseResultCookie
       |> List.fold (fun cookies cookie ->
@@ -95,7 +95,7 @@ module Cookie =
 
   let setCookie (cookie : HttpCookie) (ctx : HttpContext) =
     let notSetCookie : string * string -> bool =
-      fst >> (String.eqOrdCi "Set-Cookie" >> not)
+      fst >> (String.equalsOrdinalCI "Set-Cookie" >> not)
     let cookieHeaders =
       ctx.response.cookies
       |> Map.put cookie.name cookie // possibly overwrite
@@ -164,7 +164,7 @@ module Cookie =
     | Choice1Of2 (cookie, cipherData) ->
       cipherData
       |> Crypto.secretboxOpen key
-      |> Choice.mapError DecryptionError
+      |> Choice.mapSnd DecryptionError
       |> Choice.map (fun plainText -> cookie, plainText)
     | Choice2Of2 x -> Choice2Of2 x
 

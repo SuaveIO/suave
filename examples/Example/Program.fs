@@ -180,8 +180,10 @@ let main argv =
     OpenSSL.X509.X509Certificate.FromDER bio*)
 
   startWebServer
-    { bindings              = [ HttpBinding.mk' HTTP "127.0.0.1" 8082
-                                //HttpBinding.mk' (HTTPS (Provider.open_ssl cert)) "127.0.0.1" 8443
+    { bindings              = [ HttpBinding.mkSimple HTTP "127.0.0.1" 8082
+                                // see https://github.com/SuaveIO/suave/issues/291
+                                // and https://github.com/exira/static-mailer/blob/72fdebf37bafc48ea7277ee4a6b2a758df5c3b3d/src/Program.fs#L28-L31
+                                //HttpBinding.mkSimple (HTTPS (Provider.open_ssl cert)) "127.0.0.1" 8443
                               ]
       serverKey             = Utils.Crypto.generateKey HttpRuntime.ServerKeyLength
       errorHandler          = defaultErrorHandler

@@ -1,4 +1,6 @@
 FSharp.Core
+
+group Tests
 FSharp.Charting
 Fuchu.FsCheck
 Fuchu.PerfUtil

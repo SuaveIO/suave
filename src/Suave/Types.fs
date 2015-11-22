@@ -406,7 +406,7 @@ type HttpRequest =
     if trustProxy then
       sources
       |> List.fold (fun state source ->
-        state |> Choice.bindError (fun _ -> x.header source))
+        state |> Choice.bindSnd (fun _ -> x.header source))
         (Choice2Of2 "")
       |> Choice.orDefault x.host
     else
@@ -422,9 +422,9 @@ module HttpRequest =
 
   let empty =
     { httpVersion     = "HTTP/1.1"
-      url             = Uri("http://localhost/")
+      url             = Uri "http://localhost/"
       host            = "localhost"
-      ``method``      = HttpMethod.OTHER("")
+      ``method``      = HttpMethod.OTHER ""
       headers         = []
       rawForm         = Array.empty
       rawQuery        = ""
@@ -438,17 +438,19 @@ type HttpBinding =
   { scheme        : Protocol
     socketBinding : SocketBinding }
 
-  member x.uri path query =
+  member x.uri (path : string) query =
+    let path' = if path.StartsWith "/" then path else "/" + path
     String.Concat [
       x.scheme.ToString(); "://"; x.socketBinding.ToString()
-      path
+      path'
       (match query with | "" -> "" | qs -> "?" + qs)
     ]
     |> fun x -> Uri x
 
-  /// Overrides the default ToString() method to provide an implementation that is assignable
-  /// to a BaseUri for a RestClient/HttpClient.
-  override x.ToString() = String.Concat [ x.scheme.ToString(); "://"; x.socketBinding.ToString() ]
+  /// Overrides the default ToString() method to provide an implementation that
+  /// is assignable to a BaseUri for a RestClient/HttpClient.
+  override x.ToString() =
+    String.Concat [ x.scheme.ToString(); "://"; x.socketBinding.ToString() ]
 
   static member scheme_ = Property<HttpBinding,_> (fun x -> x.scheme) (fun v x -> { x with scheme = v })
   static member socketBinding_ = Property<HttpBinding,_> (fun x -> x.socketBinding) (fun v x -> { x with socketBinding=v })
@@ -463,14 +465,14 @@ module HttpBinding =
       socketBinding = SocketBinding.mk IPAddress.Loopback DefaultBindingPort }
 
   /// Create a HttpBinding for the given protocol, an IP address to bind to and
-  /// a port to listen on.
-  let mk scheme (ip:IPAddress) (port:Port) = 
+  /// a port to listen on – this is the strongly typed overload.
+  let mk scheme (ip : IPAddress) (port : Port) = 
     { scheme        = scheme
       socketBinding = SocketBinding.mk ip port }
 
   /// Create a HttpBinding for the given protocol, an IP address to bind to and
-  /// a port to listen on.
-  let mk' scheme ip (port : int) = 
+  /// a port to listen on – this is the "stringly typed" overload.
+  let mkSimple scheme ip (port : int) = 
     { scheme        = scheme
       socketBinding = SocketBinding.mk (IPAddress.Parse ip) (uint16 port) } 
 
@@ -589,7 +591,7 @@ and HttpContext =
     if trustProxy then
       sources
       |> List.fold (fun state source ->
-        state |> Choice.bindError (fun _ ->
+        state |> Choice.bindSnd (fun _ ->
           x.request.header source |> Choice.bindUnit IPAddress.TryParseC))
         (Choice2Of2 ())
       |> Choice.orDefault x.connection.ipAddr
@@ -618,7 +620,7 @@ and HttpContext =
     if trustProxy then
       sources
       |> List.fold (fun state source ->
-        state |> Choice.bindError (fun _ ->
+        state |> Choice.bindSnd (fun _ ->
           x.request.header source
           |> Choice.bind (
             Choice.parser UInt16.TryParse "failed to parse X-Forwarded-Port")))
@@ -634,7 +636,7 @@ and HttpContext =
     if trustProxy then
       sources
       |> List.fold (fun state source ->
-        state |> Choice.bindError (fun _ ->
+        state |> Choice.bindSnd (fun _ ->
           x.request.header source))
         (Choice2Of2 "")
       |> Choice.orDefault (x.runtime.matchedBinding.scheme.ToString())

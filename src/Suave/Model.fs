@@ -57,15 +57,15 @@ module Binding =
 
   let header key f (req : HttpRequest) =
     (getFirst req.headers key)
-    |> Choice.mapError (fun _ -> sprintf "Missing header '%s'" key)
+    |> Choice.mapSnd (fun _ -> sprintf "Missing header '%s'" key)
     |> Choice.bind f
 
   let form formKey f (req : HttpRequest) =
     req.formData formKey
-    |> Choice.mapError (fun _ -> sprintf "Missing form field '%s'" formKey)
+    |> Choice.mapSnd (fun _ -> sprintf "Missing form field '%s'" formKey)
     |> Choice.bind f
 
   let query queryKey f (req : HttpRequest) =
     req.queryParam queryKey
-    |> Choice.mapError (fun _ -> sprintf "Missing query string key '%s'" queryKey)
+    |> Choice.mapSnd (fun _ -> sprintf "Missing query string key '%s'" queryKey)
     |> Choice.bind f

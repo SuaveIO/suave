@@ -234,8 +234,8 @@ module ServerErrors =
   let INVALID_HTTP_VERSION = invalid_http_version (UTF8.bytes HTTP_505.message)
 
 module Applicatives =
-
   open Suave.Utils
+  open Suave.Utils.AsyncExtensions
   open Suave.Logging
   open System
   open System.Text.RegularExpressions
@@ -264,10 +264,10 @@ module Applicatives =
   let urlRegex x = pathRegex x
 
   let host hostname (x : HttpContext) =
-    async.Return (Option.iff (String.eqOrdCi x.request.clientHostTrustProxy hostname) x)
+    async.Return (Option.iff (String.equalsOrdinalCI x.request.clientHostTrustProxy hostname) x)
 
   let serverHost hostname (x : HttpContext) =
-    async.Return (Option.iff (String.eqOrdCi x.request.host hostname) x)
+    async.Return (Option.iff (String.equalsOrdinalCI x.request.host hostname) x)
 
   let clientHost hostname x = host hostname x
 

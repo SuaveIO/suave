@@ -1,18 +1,29 @@
 framework: NET45
 source https://nuget.org/api/v2
 
-nuget FSharp.Charting
 nuget FSharp.Core ~> 3.1.2
-nuget Http.fs-prerelease
-nuget Nancy.Owin
-nuget RazorEngine
-nuget NuGet.CommandLine
-nuget FsCheck = 2.0.7
-nuget Fuchu.FsCheck
-nuget Fuchu.PerfUtil ~> 0.6
-nuget Topshelf.FSharp
-nuget WebSharper.Owin
-nuget WebSharper.UI.Next
-nuget WebSocketSharp
 nuget openssl.redist
 nuget DotLiquid
+nuget RazorEngine
+
+github haf/YoLo YoLo.fs
+
+group Build
+  source https://nuget.org/api/v2
+  nuget NuGet.CommandLine
+
+group Tests
+  framework: NET45
+  source https://nuget.org/api/v2
+  nuget WebSocketSharp
+  nuget FsCheck = 2.0.7
+  nuget Fuchu.FsCheck
+  nuget Fuchu.PerfUtil ~> 0.6
+  nuget Http.fs-prerelease
+  nuget FSharp.Charting
+
+group Examples
+  framework: NET45
+  source https://nuget.org/api/v2
+  nuget Topshelf.FSharp
+  nuget Nancy.Owin

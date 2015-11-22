@@ -14,7 +14,7 @@ open Suave.Http.Successful
 open Suave.Testing
 
 let setConnectionKeepAlive (r : HttpRequestMessage) =
-  r.Headers.ConnectionClose <- Nullable(false)
+  r.Headers.ConnectionClose <- Nullable false
   r
 
 [<Tests>]

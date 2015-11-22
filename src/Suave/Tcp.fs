@@ -7,7 +7,7 @@ open System.Net
 open System.Net.Sockets
 open Suave.Logging
 open Suave.Sockets
-open Suave.Utils.Async
+open Suave.Utils
 
 /// The max backlog of number of requests
 [<Literal>]
@@ -22,25 +22,6 @@ type StartedData =
     sprintf "%.3f ms with binding %O:%d"
       ((x.socketBoundUtc |> Option.fold (fun _ t -> t) x.startCalledUtc) - x.startCalledUtc).TotalMilliseconds
       x.binding.ip x.binding.port
-
-/// Disconnect a socket for reuse
-let closeSocket (s : Socket) =
-  try
-    if s <> null then
-      if s.Connected || s.IsBound then 
-        s.Disconnect true
-  with _ -> ()
-
-/// Shoots down a socket for good
-let shutdownSocket (s : Socket) =
-  try
-    if s <> null then
-      try
-        s.Shutdown(SocketShutdown.Both)
-      with _ -> ()
-      s.Close ()
-      s.Dispose ()
-  with _ -> ()
 
 /// Stop the TCP listener server
 let stopTcp (logger : Logger) reason (socket : Socket) =
@@ -173,12 +154,13 @@ let runServer logger maxConcurrentOps bufferSize (binding: SocketBinding) startD
             { ip = rep.Address; port = uint16 rep.Port }
           let transport = new TcpTransport(acceptArgs, a, b, c)
           Async.Start (job logger serveClient remoteBinding transport bufferManager, token)
-        | Choice2Of2 e -> failwith "failed to accept."
+        | Choice2Of2 e ->
+          failwithf "Socket failed to accept client, error: %A" e
       with ex -> "failed to accept a client" |> Log.interne logger "Suave.Tcp.tcpIpServer" ex
     return ()
   with ex ->
-    "tcp server failed" |> Log.interne logger "Suave.Tcp.tcpIpServer" ex
-    return ()
+    "tcp server failed" |> Log.infoe logger "Suave.Tcp.tcpIpServer" TraceHeader.empty ex
+    return raise ex
 }
 
 /// Start a new TCP server with a specific IP, Port and with a serve_client worker

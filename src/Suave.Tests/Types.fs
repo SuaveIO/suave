@@ -51,6 +51,11 @@ let httpBinding (_ : SuaveConfig) =
       let binding = HttpBinding.mk HTTP IPAddress.Loopback 80us
       Assert.Equal("uri", "http://127.0.0.1/",
                    binding.uri "/" "" |> sprintf "%O")
+
+    testCase "IPv4 uri 4" <| fun _ ->
+      let binding = HttpBinding.mk HTTP IPAddress.Loopback 80us
+      Assert.Equal("uri", "http://127.0.0.1/",
+                   binding.uri "" "" |> sprintf "%O")
     ]
 
 

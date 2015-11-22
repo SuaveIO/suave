@@ -5,7 +5,7 @@ open System.Text
 
 open Suave
 open Suave.Utils
-open Suave.Utils.Encoding
+open Suave.Utils.Compression
 open Suave.Utils.Parsing
 
 open Fuchu
@@ -24,7 +24,7 @@ let utilities (_: SuaveConfig) =
     testCase "loopback ipv6" <| fun _ ->
       Assert.Equal("::0 is a local address", true, isLocalAddress "::1")
 
-    testPropertyWithConfig fsCheckConfig "gzip_encode/gzip_decode" <| fun str ->
+    testPropertyWithConfig fsCheckConfig "gzipEncode/gzipDecode" <| fun str ->
       let get_bytes  = Encoding.UTF8.GetBytes  : string -> byte []
       let from_bytes = Encoding.UTF8.GetString : byte [] -> string
       Assert.Equal(
@@ -41,7 +41,7 @@ let utilities (_: SuaveConfig) =
         ] do
         Assert.Equal("should have same as normal str equal",
                      str1.Equals str2,
-                     String.eqConstTime str1 str2)
+                     String.equalsConstantTime str1 str2)
 
     /// is 0.078125 KiB long (and that *1.375 when base-64 encoded)
     testCase "crypto hello world" <| fun _ ->

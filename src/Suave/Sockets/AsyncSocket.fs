@@ -1,8 +1,7 @@
 ﻿[<AutoOpen>]
 module Suave.Sockets.AsyncSocket
 
-open Suave.Utils.Bytes
-open Suave.Utils.Async
+open Suave.Utils
 open Suave.Sockets
 open Suave.Sockets.Connection
 open Suave.Sockets.Control
@@ -23,17 +22,17 @@ let asyncWrite (connection : Connection) (s : string) : SocketOp<unit> =
   async {
     if s.Length > 0 then
       let buff = connection.lineBuffer
-      let c = bytesToBuffer s buff.Array buff.Offset
+      let c = ASCII.bytesToBuffer s buff.Array buff.Offset
       return! send connection (new ArraySegment<_>(buff.Array, buff.Offset, c))
     else return Choice1Of2 ()
   }
 
 let asyncWriteNewLine (connection : Connection) = 
-  send connection eolArraySegment
+  send connection Bytes.eolArraySegment
 
 let asyncWriteLn (connection : Connection) (s : string) : SocketOp<unit> = 
   socket {
-    do! asyncWrite connection (s + eol)
+    do! asyncWrite connection (s + Bytes.eol)
   }
 
 /// Write the string s to the stream asynchronously from a byte array

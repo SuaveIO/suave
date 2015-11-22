@@ -10,11 +10,11 @@ type NameValueList = (string * string) list
 /// A (string * string option) list, use (^^) to access
 type NameOptionValueList = (string * string option) list
 
-type IDictionary<'b,'a> with 
+type IDictionary<'b,'a> with
   member dict.TryLookup key = 
     match dict.TryGetValue key with
     | true, v  -> Choice1Of2 v
-    | false, _ -> Choice2Of2 "Key was not present"
+    | false, _ -> Choice2Of2 (sprintf "Key %A was not present" key)
 
 let getFirst (target : NameValueList) (key : string) =
   match target |> List.tryPick (fun (a, b) -> if a.Equals key then Some b else None) with
@@ -34,6 +34,5 @@ let tryGetChoice1 f x =
 let (%%) target key = getFirst target key
 let (^^) target key = getFirstOpt target key
 
-type Property<'T,'P> = Suave.Utils.Aether.Lens<'T, 'P>
-
+type internal Property<'T,'P> = Suave.Utils.Aether.Lens<'T, 'P>
 let internal Property<'T,'P> getter setter : Property<'T,'P> = (getter, setter)

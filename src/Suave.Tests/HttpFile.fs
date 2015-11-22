@@ -53,15 +53,19 @@ let compression cfg =
 [<Tests>]
 let ``http HEAD method`` cfg =
   let runWithConfig = runWith cfg
+  let ip, port =
+    let binding = SuaveConfig.firstBinding cfg
+    string binding.socketBinding.ip,
+    int binding.socketBinding.port
 
   testList "HEAD on `file`" [
     testCase  "HEAD does not return content" <| fun _ ->
 
-      let ctx = runWithConfig (Files.browseFileHome "test-text-file.txt") 
+      let ctx = runWithConfig (Files.browseFileHome "test-text-file.txt")
 
       withContext (fun _ ->
-        let client = new TcpClient("127.0.0.1",8083)
-        let message = sprintf "HEAD %s HTTP/1.1\r\nHost: %s\r\nConnection: Close\r\n\r\n" "/foo" "127.0.0.1"
+        let client = new TcpClient(ip, port)
+        let message = sprintf "HEAD %s HTTP/1.1\r\nHost: %s\r\nConnection: Close\r\n\r\n" "/foo" ip
         let outputData = ASCII.bytes message
         let stream = client.GetStream()
         stream.Write(outputData, 0, outputData.Length)

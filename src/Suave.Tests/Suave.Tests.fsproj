@@ -77,8 +77,6 @@
     <Content Include="PerfLab.fsx" />
     <Compile Include="AssemblyVersionInfo.fs" Condition="Exists('AssemblyVersionInfo.fs')" />
     <Compile Include="TestUtilities.fs" />
-    <Content Include="regressions\Bug106-ReadingInputData.txt" />
-    <Content Include="regressions\Bug105-StopsResponding.verbose.txt" />
     <Content Include="regressions\Bug105-StopsResponding.fsx" />
     <Compile Include="regressions\Bug256-FormDataParsing.fs" />
     <Content Include="regressions\pix.gif">
@@ -169,28 +167,6 @@
   <Choose>
     <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
       <ItemGroup>
-        <Reference Include="FsCheck">
-          <HintPath>..\..\packages\FsCheck\lib\net45\FsCheck.dll</HintPath>
-          <Private>True</Private>
-          <Paket>True</Paket>
-        </Reference>
-      </ItemGroup>
-    </When>
-  </Choose>
-  <Choose>
-    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
-      <ItemGroup>
-        <Reference Include="FSharp.Charting">
-          <HintPath>..\..\packages\FSharp.Charting\lib\net40\FSharp.Charting.dll</HintPath>
-          <Private>True</Private>
-          <Paket>True</Paket>
-        </Reference>
-      </ItemGroup>
-    </When>
-  </Choose>
-  <Choose>
-    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
-      <ItemGroup>
         <Reference Include="FSharp.Core">
           <HintPath>..\..\packages\FSharp.Core\lib\net40\FSharp.Core.dll</HintPath>
           <Private>True</Private>
@@ -202,8 +178,41 @@
   <Choose>
     <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
       <ItemGroup>
+        <Reference Include="FsCheck">
+          <HintPath>..\..\packages\tests\FsCheck\lib\net45\FsCheck.dll</HintPath>
+          <Private>True</Private>
+          <Paket>True</Paket>
+        </Reference>
+      </ItemGroup>
+    </When>
+  </Choose>
+  <Choose>
+    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
+      <ItemGroup>
+        <Reference Include="FSharp.Charting">
+          <HintPath>..\..\packages\tests\FSharp.Charting\lib\net40\FSharp.Charting.dll</HintPath>
+          <Private>True</Private>
+          <Paket>True</Paket>
+        </Reference>
+      </ItemGroup>
+    </When>
+  </Choose>
+  <Choose>
+    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
+      <ItemGroup>
+        <Reference Include="FSharp.Core">
+          <HintPath>..\..\packages\tests\FSharp.Core\lib\net40\FSharp.Core.dll</HintPath>
+          <Private>True</Private>
+          <Paket>True</Paket>
+        </Reference>
+      </ItemGroup>
+    </When>
+  </Choose>
+  <Choose>
+    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
+      <ItemGroup>
         <Reference Include="Fuchu">
-          <HintPath>..\..\packages\Fuchu\lib\Fuchu.dll</HintPath>
+          <HintPath>..\..\packages\tests\Fuchu\lib\Fuchu.dll</HintPath>
           <Private>True</Private>
           <Paket>True</Paket>
         </Reference>
@@ -214,7 +223,7 @@
     <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
       <ItemGroup>
         <Reference Include="Fuchu.FsCheck">
-          <HintPath>..\..\packages\Fuchu.FsCheck\lib\Fuchu.FsCheck.dll</HintPath>
+          <HintPath>..\..\packages\tests\Fuchu.FsCheck\lib\Fuchu.FsCheck.dll</HintPath>
           <Private>True</Private>
           <Paket>True</Paket>
         </Reference>
@@ -225,7 +234,7 @@
     <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
       <ItemGroup>
         <Reference Include="Fuchu.PerfUtil">
-          <HintPath>..\..\packages\Fuchu.PerfUtil\lib\Fuchu.PerfUtil.dll</HintPath>
+          <HintPath>..\..\packages\tests\Fuchu.PerfUtil\lib\Fuchu.PerfUtil.dll</HintPath>
           <Private>True</Private>
           <Paket>True</Paket>
         </Reference>
@@ -236,7 +245,7 @@
     <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
       <ItemGroup>
         <Reference Include="HttpFs">
-          <HintPath>..\..\packages\Http.fs-prerelease\lib\net40\HttpFs.dll</HintPath>
+          <HintPath>..\..\packages\tests\Http.fs-prerelease\lib\net40\HttpFs.dll</HintPath>
           <Private>True</Private>
           <Paket>True</Paket>
         </Reference>
@@ -247,7 +256,7 @@
     <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
       <ItemGroup>
         <Reference Include="PerfUtil">
-          <HintPath>..\..\packages\PerfUtil\lib\net40\PerfUtil.dll</HintPath>
+          <HintPath>..\..\packages\tests\PerfUtil\lib\net40\PerfUtil.dll</HintPath>
           <Private>True</Private>
           <Paket>True</Paket>
         </Reference>
@@ -258,7 +267,7 @@
     <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
       <ItemGroup>
         <Reference Include="websocket-sharp">
-          <HintPath>..\..\packages\WebSocketSharp\lib\websocket-sharp.dll</HintPath>
+          <HintPath>..\..\packages\tests\WebSocketSharp\lib\websocket-sharp.dll</HintPath>
           <Private>True</Private>
           <Paket>True</Paket>
         </Reference>
