@@ -1,5 +1,8 @@
 ﻿namespace Suave.Http
 
+open System
+
+[<Obsolete("Use combinators from AsyncOption module")>]
 module Operators =
 
   open Suave.Sockets

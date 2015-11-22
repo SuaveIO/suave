@@ -1,8 +1,5 @@
 ﻿namespace Suave.Http
 
-open System
-
-[<Obsolete("Use combinators from AsyncOption type")>]
 module Operators =
 
   let inline bind (second : 'b -> Async<'c option>) (first : 'a -> Async<'b option>) : 'a -> Async<'c option> =
