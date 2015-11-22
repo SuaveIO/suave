@@ -117,7 +117,7 @@
     <Compile Include="Types.fs" />
     <Compile Include="Model.fs" />
     <Compile Include="Compression.fs" />
-	<Compile Include="Operators.fsi" />
+    <Compile Include="Operators.fsi" />
     <Compile Include="Operators.fs" />
     <Compile Include="AsyncOption.fs" />
     <Compile Include="Monad.fs" />
@@ -129,6 +129,7 @@
     <Compile Include="Cookie.fs" />
     <Compile Include="State.fs" />
     <Compile Include="Auth.fs" />
+    <Compile Include="SuaveConfig.fs" />
     <Compile Include="Web.fs" />
     <Compile Include="Owin.fs" />
     <Compile Include="WebSocket.fs" />
