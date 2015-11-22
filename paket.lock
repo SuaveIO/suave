@@ -23,6 +23,7 @@ FRAMEWORK: NET45
 NUGET
   remote: https://nuget.org/api/v2
   specs:
+    FSharp.Core (4.0.0.1)
     Nancy (1.4.1)
     Nancy.Owin (1.4.1)
       Nancy (>= 1.4.1)
@@ -31,7 +32,10 @@ NUGET
     Topshelf (3.2.0)
     Topshelf.FSharp (2.1.0)
       Topshelf (>= 3.2.0)
-
+GITHUB
+  remote: haf/YoLo
+  specs:
+    YoLo.fs (59c81dd98bed0eabe28b3d365687a6d09ca8b8c0)
 GROUP Tests
 FRAMEWORK: NET45
 NUGET
@@ -40,7 +44,7 @@ NUGET
     FsCheck (2.0.7)
       FSharp.Core (>= 3.1.2.5)
     FSharp.Charting (0.90.13)
-    FSharp.Core (4.0.0.1)
+    FSharp.Core (3.1.2.5)
     Fuchu (1.0.1)
       FSharp.Core (>= 3.1.2.1)
     Fuchu.FsCheck (0.6.0)
