@@ -50,13 +50,13 @@ let private parse = function
   match genT, value with
   | t, value when t = typeof<String> -> Choice1Of2 value |> Choice.map (Some >> box)
   | t, value when t = typeof<Password> -> Password value |> Choice1Of2 |> Choice.map (Some >> box)
-  | t, value when t = typeof<Decimal> -> Suave.Model.Parse.decimal value |> Choice.map (Some >> box)
+  | t, value when t = typeof<Decimal> -> Parse.decimal value |> Choice.map (Some >> box)
   | t, value when t = typeof<MailAddress> -> MailAddress.Create value |> Choice.map (Some >> box)
   | t, _ -> failwithf "not supported type: %s" t.FullName
 
 | t, value when t = typeof<String> -> Choice1Of2 value |> Choice.map box
 | t, value when t = typeof<Password> -> Password value |> Choice1Of2 |> Choice.map box
-| t, value when t = typeof<Decimal> -> Suave.Model.Parse.decimal value |> Choice.map box
+| t, value when t = typeof<Decimal> -> Parse.decimal value |> Choice.map box
 | t, value when t = typeof<MailAddress> -> MailAddress.Create value |> Choice.map box
 | t, _ -> failwithf "not supported type: %s" t.FullName
 

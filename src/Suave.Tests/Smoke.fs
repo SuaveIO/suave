@@ -1,6 +1,6 @@
 ﻿module Suave.Tests.Smoke
 
-open Suave.Web
+open Suave
 open Fuchu
 
 [<Tests>]

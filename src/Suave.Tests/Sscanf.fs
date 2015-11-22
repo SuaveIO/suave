@@ -2,7 +2,7 @@
 
 open Fuchu
 
-open Suave.Web
+open Suave
 open Suave.Sscanf
 
 [<Tests>]

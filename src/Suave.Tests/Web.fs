@@ -3,8 +3,8 @@
 open Fuchu
 
 open Suave.Http
-open Suave.Web
-open Suave.Web.ParsingAndControl
+open Suave
+open Suave.ParsingAndControl
 open Suave.Logging
 
 let private (=>) a b = a, b

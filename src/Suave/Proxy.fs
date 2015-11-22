@@ -12,12 +12,11 @@ open Suave.Utils.Bytes
 open Suave.Sockets
 open Suave.Sockets.Control
 open Suave.Http
-open Suave.Web
 open Suave.Tcp
 
 open Suave.Http.Operators
 open Suave.Http.Response
-open Suave.Web.ParsingAndControl
+open Suave.ParsingAndControl
 
 /// Copies the headers from 'headers1' to 'headers2'
 let private toHeaderList (headers : WebHeaderCollection) =

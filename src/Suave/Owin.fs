@@ -236,7 +236,7 @@ module OwinApp =
   open Suave.Utils.Aether.Operators
   open Suave.Utils
   open Suave.Sockets.Control
-  open Suave.Web.ParsingAndControl
+  open Suave.ParsingAndControl
   open System.Text
   open System.Globalization
   open System.Diagnostics
@@ -756,10 +756,10 @@ module OwinApp =
         let ctx = wrapper.Finalise()
 
         verbose (fun _ -> "writing preamble")
-        do! Web.ParsingAndControl.writePreamble ctx
+        do! writePreamble ctx
 
         verbose (fun _ -> "writing body")
-        do! Web.ParsingAndControl.writeContent ctx ctx.response.content
+        do! writeContent ctx ctx.response.content
       }
 
       { ctx with
@@ -839,12 +839,12 @@ module OwinServerFactory =
     let serverCts = new CancellationTokenSource()
 
     let conf =
-      { Web.defaultConfig with
+      { defaultConfig with
           bindings          = bindings
           cancellationToken = serverCts.Token }
 
     let started, listening =
-      Web.startWebServerAsync conf (OwinApp.ofAppFunc "/" app)
+      startWebServerAsync conf (OwinApp.ofAppFunc "/" app)
 
     let _ = started |> Async.RunSynchronously
 

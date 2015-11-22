@@ -6,7 +6,7 @@ open System.Net
 open Fuchu
 
 open Suave.Sockets
-open Suave.Web
+open Suave
 open Suave.Http
 open System.Net.Http
 open Suave.Testing

@@ -6,7 +6,6 @@ open System.Text
 
 open Suave.Http
 open Suave.Http.Operators
-open Suave.Web
 
 /// Convert the object to a JSON representation inside a byte array (can be made string of)
 let toJson<'T> (o: 'T) =
