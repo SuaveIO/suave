@@ -57,3 +57,20 @@ module WebPart =
     | Choice1Of2 x -> f x a
     | Choice2Of2 _ -> g a
 
+
+  let inline tryThen (a : WebPart) (b : WebPart) : WebPart =
+    fun x ->
+      async {
+        let! e = a x
+        match e with
+        | None ->
+          let! result = b x
+          match result with
+          | None -> return None
+          | r -> return r
+        | r -> return r
+      }
+    
+  module Operators =
+
+    let inline (<|>) a b = tryThen a b

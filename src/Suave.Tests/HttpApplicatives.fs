@@ -4,6 +4,7 @@ open System
 
 open Suave
 open Suave.Http
+open Suave.Http.WebPart.Operators
 open Suave.Http.Operators
 open Suave.Http.Applicatives
 open Suave.Http.Successful

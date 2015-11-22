@@ -38,3 +38,9 @@ module WebPart =
   /// The conditional function that applies f x a if there's a value in d,
   /// or otherwise, applies g a, if there is no value in d.
   val cond : item:Choice<'T, _> -> f:('T -> 'U -> 'V) -> g:('U -> 'V) -> 'U -> 'V
+
+  val inline tryThen : first:WebPart -> second:WebPart -> WebPart
+
+  module Operators =
+
+    val inline (<|>) : first:WebPart -> second:WebPart -> WebPart

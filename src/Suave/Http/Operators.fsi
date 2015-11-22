@@ -16,6 +16,4 @@ module Operators =
   /// Left-to-right Kleisli composition of monads.
   val inline (>=>) : first:('T -> 'U option) -> second:('T -> 'U option) -> input:'T -> 'U option
 
-  /// Left-to-right Kleisli composition of web parts.
-  val inline (<|>) : first:WebPart -> second:WebPart -> WebPart
 
