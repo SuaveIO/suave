@@ -33,7 +33,6 @@ open Fuchu
 
 open Suave
 open Suave.Http
-open Suave.Web
 
 [<AutoOpen>]
 module ResponseData =

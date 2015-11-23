@@ -6,10 +6,8 @@ open System.Net
 open Suave
 open Suave.AsyncOption
 open Suave.AsyncOption.Operators
-open Suave.Sockets
 open Suave.Sockets.Control
 open Suave.Logging
-open Suave.Web
 open Suave.Http.WebPart.Operators
 open Suave.Http.EventSource
 open Suave.Http.Applicatives
@@ -18,7 +16,6 @@ open Suave.Http.Files
 open Suave.Http.Successful
 open Suave.Http
 open Suave.State.CookieStateStore
-open Suave.Utils
 
 let basicAuth =
   Authentication.authenticateBasic ((=) ("foo", "bar"))

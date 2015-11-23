@@ -2,8 +2,7 @@
 open System.Net
 
 open Suave
-open Suave.Web
-open Suave.Http.Operators
+open Suave.AsyncOption.Operators
 open Suave.Http
 open Suave.Http.Applicatives
 open Suave.Http.Files
@@ -18,7 +17,7 @@ let config =
       maxOps     = 10000
       logger     = logger }
 
-let listening, server = startWebServerAsync config (choose [ GET >>= browseHome ])
+let listening, server = startWebServerAsync config (choose [ GET >=> browseHome ])
 Async.Start server
 
 // wait for the server to start listening

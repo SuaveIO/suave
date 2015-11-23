@@ -4,7 +4,6 @@ open System
 open System.IO
 open Suave.Http
 open Suave.Http.Types.Codes
-open Suave.Http.Operators
 open Suave.Http.Files
 open Suave.Utils
 open Suave.Utils.AsyncExtensions

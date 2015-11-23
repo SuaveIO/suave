@@ -1,6 +1,5 @@
 open Suave
 open Suave.Http.Successful
-open Suave.Web 
 open Suave.Http
 open Suave.AsyncOption.Operators
 open Suave.Http.Applicatives

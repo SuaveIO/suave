@@ -1,13 +1,12 @@
 ﻿
 open Suave
 open Suave.Http
-open Suave.Http.Operators
+open Suave.AsyncOption.Operators
 open Suave.Http.Applicatives
 open Suave.Http.Successful
 open Suave.Http.Files
 open Suave.Http.RequestErrors
 open Suave.Logging
-open Suave.Web
 open Suave.Utils
 
 open System
@@ -36,8 +35,8 @@ let echo (webSocket : WebSocket) =
 
 let app : WebPart =
   choose [
-    path "/websocket" >>= handShake echo
-    GET >>= choose [ path "/" >>= file "index.html"; browseHome ];
+    path "/websocket" >=> handShake echo
+    GET >=> choose [ path "/" >=> file "index.html"; browseHome ];
     NOT_FOUND "Found no handlers."
     ]
 

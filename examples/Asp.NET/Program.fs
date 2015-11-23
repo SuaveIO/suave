@@ -1,8 +1,5 @@
 ﻿
 open Suave
-open Suave.Web
-open Suave.Logging
-
 open System.IO
 open System.Net
 

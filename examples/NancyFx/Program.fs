@@ -1,6 +1,6 @@
 ﻿namespace Suave.NancyFx
 
-open Suave.Web
+open Suave
 open Suave.Owin
 open Nancy
 open Nancy.Owin
