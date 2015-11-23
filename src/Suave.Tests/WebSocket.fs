@@ -25,9 +25,13 @@ type PayloadSize =
   | Bit32 = 66000
 
 [<Tests>]
-let websocketTests =
+let websocketTests cfg =
+  let ip, port =
+    let binding = SuaveConfig.firstBinding cfg
+    string binding.socketBinding.ip,
+    int binding.socketBinding.port
 
-  let runWithConfig = runWith defaultConfig
+  let runWithConfig = runWith cfg
 
   let websocketApp (webSocket : WebSocket) =
     fun cx -> socket {
@@ -78,7 +82,7 @@ let websocketTests =
         let message = "Hello Websocket World!"
         let echo : string ref = ref ""
 
-        use clientWebSocket = new WebSocketSharp.WebSocket("ws://127.0.0.1:8083/websocket")
+        use clientWebSocket = new WebSocketSharp.WebSocket(sprintf "ws://%s:%i/websocket" ip port)
 
         clientWebSocket.OnMessage.Add(fun e ->
           echo := e.Data
@@ -99,7 +103,7 @@ let websocketTests =
         let message = "BinaryRequest7bit"
         let echo : byte array ref = ref [||]
 
-        use clientWebSocket = new WebSocketSharp.WebSocket("ws://127.0.0.1:8083/websocket")
+        use clientWebSocket = new WebSocketSharp.WebSocket(sprintf "ws://%s:%i/websocket" ip port)
 
         clientWebSocket.OnMessage.Add(fun e ->
           echo:= e.RawData
@@ -120,7 +124,7 @@ let websocketTests =
         let message = "BinaryRequest16bit"
         let echo : byte array ref = ref [||]
 
-        use clientWebSocket = new WebSocketSharp.WebSocket("ws://127.0.0.1:8083/websocket")
+        use clientWebSocket = new WebSocketSharp.WebSocket(sprintf "ws://%s:%i/websocket" ip port)
 
         clientWebSocket.OnMessage.Add(fun e ->
           echo:= e.RawData
@@ -141,7 +145,7 @@ let websocketTests =
         let message = "BinaryRequest32bit"
         let echo : byte array ref = ref [||]
 
-        use clientWebSocket = new WebSocketSharp.WebSocket("ws://127.0.0.1:8083/websocket")
+        use clientWebSocket = new WebSocketSharp.WebSocket(sprintf "ws://%s:%i/websocket" ip port)
 
         clientWebSocket.OnMessage.Add(fun e ->
           echo:= e.RawData

@@ -25,7 +25,7 @@ module Connection =
 
   let empty : Connection =
     { socketBinding = SocketBinding.mk IPAddress.IPv6Loopback 8083us
-      transport     = { socket = null; readArgs = null; writeArgs = null }
+      transport     = null
       bufferManager = null
       lineBuffer    = ArraySegment<byte>()
       segments      = [] }

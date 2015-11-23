@@ -11,6 +11,7 @@ open Suave.Utils.Aether
 open Suave.Utils.Aether.Operators
 open Suave.Utils.Collections
 open Suave.Sockets
+open Suave.Tcp
 open Suave.Utils
 open Suave.Log
 open Suave.Logging
@@ -341,12 +342,14 @@ type HttpRequest =
   static member multipartFields_ = Property<HttpRequest,_> (fun x -> x.multiPartFields) (fun v x -> { x with multiPartFields = v })
   static member trace_           = Property<HttpRequest,_> (fun x -> x.trace) (fun v x -> { x with trace = v })
 
-  /// Gets the query string from the HttpRequest. Use
-  /// queryParam to try to fetch data for individual items.
+  /// Gets the query string from the HttpRequest. Use queryParam to try to fetch
+  /// data for individual items.
   member x.query =
     Parsing.parseData x.rawQuery
 
-  /// Finds the key k from the query string in the HttpRequest
+  /// Finds the key k from the query string in the HttpRequest. To access form
+  /// data, use either `formData` to access normal form data, or `fieldData` to
+  /// access the multipart-fields.
   member x.queryParam (k : string) =
     getFirstOpt x.query k
 
@@ -354,15 +357,23 @@ type HttpRequest =
   member x.header k =
     getFirst x.headers k
 
-  /// Gets the form as a ((string*string option list) from the HttpRequest. 
-  /// Use formData to get the data for a particular key or use the indexed property in the HttpRequest
-  member x.form  =
+  /// Gets the form as a ((string * string option) list) from the HttpRequest.
+  /// Use formData to get the data for a particular key or use the indexed
+  /// property in the HttpRequest.
+  member x.form =
     Parsing.parseData (ASCII.toString x.rawForm)
 
-  /// Finds the key k from the form in the HttpRequest
-  /// Match Choice1Of2 to get the value and Choice2Of2 to get an error message
+  /// Finds the key k from the form of the HttpRequest. To access query string
+  /// parameters, use `queryParam` or to access multipart form fields, use
+  /// `fieldData`.
   member x.formData (k : string) =
     getFirstOpt x.form k
+
+  /// Finds the key k from the multipart-form of the HttpRequest. To access
+  /// query string parameters, use `queryParam` or to access regular form data,
+  /// use `formData`.
+  member x.fieldData (k : string) =
+    getFirst x.multiPartFields k
 
   /// Syntactic Sugar to retrieve query string, form or multi-field values from HttpRequest 
   member this.Item
@@ -373,8 +384,8 @@ type HttpRequest =
         | Some x' -> Some x'
         | None -> f2 x
 
-      let params' = 
-        (tryGetChoice1 this.queryParam) 
+      let params' =
+        (tryGetChoice1 this.queryParam)
           >>= (tryGetChoice1 this.formData) 
           >>= (tryGetChoice1 <| getFirst this.multiPartFields)
 
@@ -405,9 +416,9 @@ module HttpRequest =
 
   let empty =
     { httpVersion     = "HTTP/1.1"
-      url             = Uri("http://localhost/")
+      url             = Uri "http://localhost/"
       host            = "localhost"
-      ``method``      = HttpMethod.OTHER("")
+      ``method``      = HttpMethod.OTHER ""
       headers         = []
       rawForm         = Array.empty
       rawQuery        = ""
@@ -421,17 +432,19 @@ type HttpBinding =
   { scheme        : Protocol
     socketBinding : SocketBinding }
 
-  member x.uri path query =
+  member x.uri (path : string) query =
+    let path' = if path.StartsWith "/" then path else "/" + path
     String.Concat [
       x.scheme.ToString(); "://"; x.socketBinding.ToString()
-      path
+      path'
       (match query with | "" -> "" | qs -> "?" + qs)
     ]
     |> fun x -> Uri x
 
-  /// Overrides the default ToString() method to provide an implementation that is assignable
-  /// to a BaseUri for a RestClient/HttpClient.
-  override x.ToString() = String.Concat [ x.scheme.ToString(); "://"; x.socketBinding.ToString() ]
+  /// Overrides the default ToString() method to provide an implementation that
+  /// is assignable to a BaseUri for a RestClient/HttpClient.
+  override x.ToString() =
+    String.Concat [ x.scheme.ToString(); "://"; x.socketBinding.ToString() ]
 
   static member scheme_ = Property<HttpBinding,_> (fun x -> x.scheme) (fun v x -> { x with scheme = v })
   static member socketBinding_ = Property<HttpBinding,_> (fun x -> x.socketBinding) (fun v x -> { x with socketBinding=v })
@@ -446,14 +459,14 @@ module HttpBinding =
       socketBinding = SocketBinding.mk IPAddress.Loopback DefaultBindingPort }
 
   /// Create a HttpBinding for the given protocol, an IP address to bind to and
-  /// a port to listen on.
-  let mk scheme (ip:IPAddress) (port:Port) = 
+  /// a port to listen on – this is the strongly typed overload.
+  let mk scheme (ip : IPAddress) (port : Port) = 
     { scheme        = scheme
       socketBinding = SocketBinding.mk ip port }
 
   /// Create a HttpBinding for the given protocol, an IP address to bind to and
-  /// a port to listen on.
-  let mk' scheme ip (port : int) = 
+  /// a port to listen on – this is the "stringly typed" overload.
+  let mkSimple scheme ip (port : int) = 
     { scheme        = scheme
       socketBinding = SocketBinding.mk (IPAddress.Parse ip) (uint16 port) } 
 
@@ -721,6 +734,9 @@ let context f (a : HttpContext) = f a a
 
 open System.Threading
 
+type TcpServerFactory =
+  abstract member create  : Logger * int * int * HttpBinding -> TcpServer
+
 /// The core configuration of suave. See also Suave.Web.default_config which
 /// you can use to bootstrap the configuration:
 /// <code>{ default_config with bindings = [ ... ] }</code>
@@ -751,17 +767,25 @@ type SuaveConfig =
     maxOps                 : int
 
     /// MIME types
-    mimeTypesMap          : MimeTypesMap
+    mimeTypesMap           : MimeTypesMap
 
     /// Home or root directory
     homeFolder             : string option
 
     /// Folder for temporary compressed files
-    compressedFilesFolder : string option
+    compressedFilesFolder  : string option
 
-    /// A logger to log with
-    logger                  : Logger
+    /// Suave's logger. You can override the default instance if you wish to
+    /// ship your logs, e.g. using https://www.nuget.org/packages/Logary.Adapters.Suave/
+    logger                 : Logger
 
+    /// Pluggable TCP async sockets implementation. You can choose betwee libuv
+    /// and CLR's Async Socket Event Args. Currently defaults to the managed-only
+    /// implementation.
+    tcpServerFactory       : TcpServerFactory
+
+    /// The cookie serialiser to use for converting the data you save in cookies
+    /// from your application into a byte array.
     cookieSerialiser        : Utils.CookieSerialiser }
 
   static member bindings_              = Property<SuaveConfig,_> (fun x -> x.bindings)              (fun v x -> { x with bindings = v })
@@ -775,9 +799,14 @@ type SuaveConfig =
   static member homeFolder_            = Property<SuaveConfig,_> (fun x -> x.homeFolder)            (fun v x -> { x with homeFolder = v })
   static member compressedFilesFolder_ = Property<SuaveConfig,_> (fun x -> x.compressedFilesFolder) (fun v x -> { x with compressedFilesFolder = v })
   static member logger_                = Property<SuaveConfig,_> (fun x -> x.logger)                (fun v x -> { x with logger = v })
+  static member tcpServerFactory_      = Property<SuaveConfig,_> (fun x -> x.tcpServerFactory)      (fun v x -> { x with tcpServerFactory = v })
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module SuaveConfig =
+
+  /// Convert the Suave configuration to a runtime that the web server understands.
+  /// You will normally not have to use this function as a consumer from the
+  /// library, but it may be useful for unit testing with the HttpRuntime record.
   let toRuntime config contentFolder compressionFolder parsePostData =
     HttpRuntime.mk config.serverKey
                    config.errorHandler
@@ -787,3 +816,21 @@ module SuaveConfig =
                    config.logger
                    parsePostData
                    config.cookieSerialiser
+
+  /// Finds an endpoint that is configured from the given configuration. Throws
+  /// an exception if the configuration has no bindings. Useful if you make
+  /// the suave configuration parametised, because it is then enough for your
+  /// software to find a valid endpoint to make HTTP/ES/WebSocket requests to.
+  let firstBinding (cfg : SuaveConfig) =
+    match cfg.bindings with
+    | [] ->
+      failwith "No bindings found for SuaveConfig."
+
+    | b :: _ ->
+      b
+
+  /// Construct a `System.Uri` from the first binding available in Suave, by
+  /// giving a path and a uri.
+  let firstBindingUri (cfg : SuaveConfig) path query =
+    let binding = firstBinding cfg
+    binding.uri path query

@@ -11,6 +11,7 @@ open Suave.Web
 open Suave.Utils
 open Suave.Logging
 open Suave.Http
+open Suave.Types
 open Suave.Http.Applicatives
 open Suave.Http.RequestErrors
 open Suave.Testing
@@ -36,10 +37,11 @@ let pathOf relativePath =
   Path.Combine(here, relativePath)
 
 [<Tests>]
-let tests =
-  let config = defaultConfig //{ defaultConfig with logger = Loggers.ConsoleWindowLogger(LogLevel.Verbose) }
-  let runWithConfig = runWith config
-  let uriFor (res : string) = Uri (sprintf "http://localhost:8083/%s" (res.TrimStart('/')))
+let tests (cfg : SuaveConfig) =
+  let runWithConfig = runWith cfg
+  let uriFor (res : string) =
+    SuaveConfig.firstBindingUri cfg res ""
+
   let postTo res = createRequest Post (uriFor res) |> withKeepAlive false
 
   testCase "can send/receive" <| fun _ ->

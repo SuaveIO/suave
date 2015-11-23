@@ -11,14 +11,14 @@ open System.Net.Http
 open Suave.Testing
 
 [<Tests>]
-let socketBinding =
+let socketBinding (_ : SuaveConfig) =
   testList "SocketBinding" [
     testCase "on IPv6" <| fun _ ->
       Assert.Equal("", "[::]:3050", (SocketBinding.mk IPAddress.IPv6Any 3050us).ToString())
     ]
 
 [<Tests>]
-let httpBinding =
+let httpBinding (_ : SuaveConfig) =
   testList "HttpBinding" [
     testCase "assumption about IPV4 loopback" <| fun _ ->
       Assert.Equal("", "127.0.0.1", IPAddress.Loopback.ToString())
@@ -50,11 +50,16 @@ let httpBinding =
       let binding = HttpBinding.mk HTTP IPAddress.Loopback 80us
       Assert.Equal("uri", "http://127.0.0.1/",
                    binding.uri "/" "" |> sprintf "%O")
+
+    testCase "IPv4 uri 4" <| fun _ ->
+      let binding = HttpBinding.mk HTTP IPAddress.Loopback 80us
+      Assert.Equal("uri", "http://127.0.0.1/",
+                   binding.uri "" "" |> sprintf "%O")
     ]
 
 
 [<Tests>]
-let httpReqIndexedPropertyFormData =
+let httpReqIndexedPropertyFormData (_ : SuaveConfig) =
 
   let createReq (data : FormUrlEncodedContent) = 
     {HttpRequest.empty with rawForm = data.ReadAsByteArrayAsync().Result}
@@ -71,7 +76,7 @@ let httpReqIndexedPropertyFormData =
   ]
   
 [<Tests>]
-let httpReqIndexedPropertyQueryStringData =
+let httpReqIndexedPropertyQueryStringData (_ : SuaveConfig) =
 
   let createReq rawQuery = 
     {HttpRequest.empty with rawQuery = rawQuery}
@@ -90,7 +95,7 @@ let httpReqIndexedPropertyQueryStringData =
   ]
 
 [<Tests>]
-let httpReqIndexedPropertyMultiPartFieldsData =
+let httpReqIndexedPropertyMultiPartFieldsData (_ : SuaveConfig) =
 
   let createReq multiPartFields = 
     {HttpRequest.empty with multiPartFields = multiPartFields}

@@ -19,8 +19,8 @@ open Suave.Testing
 type Foo = { bar : string }
 
 [<Tests>]
-let razorTest =
-  let runWithConfig = runWith defaultConfig
+let razorTest (cfg :SuaveConfig) =
+  let runWithConfig = runWith cfg
 
   testList "razor test" [
     testCase "simple test" <| fun _ ->

@@ -2,13 +2,14 @@
 
 open Fuchu
 
+open Suave.Types
 open Suave.Web.ParsingAndControl
 open Suave.Logging
 
 let private (=>) a b = a, b
 
 [<Tests>]
-let parsing_tests =
+let parsing_tests (_: SuaveConfig) =
   testList "when parsing headers for tracing" [
     // https://github.com/twitter/zipkin/blob/master/doc/collector-api.md#http
     // Parsing these headers are as good as anything, we don't have to use ZipKin
@@ -33,3 +34,29 @@ let parsing_tests =
       Assert.Equal("should parse trace id", expected.traceId, (parseTraceHeaders headers).traceId)
       Assert.Equal("should parse span id to parent span id", expected.reqParentId, (parseTraceHeaders headers).reqParentId)
     ]
+
+[<Tests>]
+let keepAliveTests =
+  let genKeepAliveTest httpVersion connectionHeader shouldAddKeepAlive =
+    let connectionHeaderDesc, reqHeaders =
+      match connectionHeader with
+      | Some v -> sprintf "a 'Connection: %s' header" v, [("connection", v)]
+      | None -> "no Connection header", []
+    testCase (sprintf "for an %s request with %s" httpVersion connectionHeaderDesc) <| fun _ ->
+      let reqContext = { HttpContext.empty with request = { HttpContext.empty.request with httpVersion = httpVersion; headers = reqHeaders } }
+      let message, expected =
+        if shouldAddKeepAlive then
+          "should add a keep-alive header to the response", { reqContext with response = { reqContext.response with headers = ("Connection","Keep-Alive") :: reqContext.response.headers } }
+        else
+          "should not modify the response headers", reqContext
+      let actual = addKeepAliveHeader reqContext
+      Assert.Equal(message, expected.response.headers, actual.response.headers)
+
+  testList "when processing keep-alive directives" [
+    genKeepAliveTest "HTTP/1.0" None false
+    genKeepAliveTest "HTTP/1.0" (Some "close") false
+    genKeepAliveTest "HTTP/1.0" (Some "Keep-Alive") true
+    genKeepAliveTest "HTTP/1.1" None false
+    genKeepAliveTest "HTTP/1.1" (Some "close") false
+    genKeepAliveTest "HTTP/1.1" (Some "Keep-Alive") false
+  ]

@@ -1,4 +1,4 @@
-﻿module Suave.Tests.HttpWriters
+module Suave.Tests.HttpWriters
 
 open Fuchu
 
@@ -17,57 +17,69 @@ open Suave.Utils
 open Suave.Tests.TestUtilities
 open Suave.Testing
 
-let runWithConfig = runWith defaultConfig
-
 [<Tests>]
-let cookies =
-  let basic_cookie =
-    { name      = "mycookie"
-    ; value     = "42"
-    ; expires   = None
-    ; domain    = None
-    ; path      = Some "/"
-    ; httpOnly = false
-    ; secure    = false }
+let cookies cfg =
+  let runWithConfig = runWith cfg
+
+  let basicCookie =
+    { name     = "mycookie"
+      value    = "42"
+      expires  = None
+      domain   = None
+      path     = Some "/"
+      httpOnly = false
+      secure   = false }
+
+  let ip, port =
+    let binding = SuaveConfig.firstBinding cfg
+    string binding.socketBinding.ip,
+    int binding.socketBinding.port
 
   testList "Cookies basic tests" [
-      testCase "cookie data makes round trip" <| fun _ ->
-        Assert.Equal("expecting cookie value"
-        , "42"
-        , (reqCookies HttpMethod.GET "/" None
-          (runWithConfig (Cookie.setCookie basic_cookie >>= OK "test")))
-            .GetCookies(Uri("http://127.0.0.1")).[0].Value)
+    testCase "cookie data makes round trip" <| fun _ ->
+      Assert.Equal("expecting cookie value"
+      , "42"
+      , (reqCookies HttpMethod.GET "/" None
+        (runWithConfig (Cookie.setCookie basicCookie >>= OK "test")))
+          .GetCookies(Uri(sprintf "http://%s" ip)).[0].Value)
 
-      testCase "cookie name makes round trip" <| fun _ ->
-        Assert.Equal("expecting cookie name"
-        , "mycookie"
-        , (reqCookies HttpMethod.GET "/" None
-            (runWithConfig (Cookie.setCookie basic_cookie >>= OK "test")))
-            .GetCookies(Uri("http://127.0.0.1")).[0].Name)
+    testCase "cookie name makes round trip" <| fun _ ->
+      Assert.Equal("expecting cookie name"
+      , "mycookie"
+      , (reqCookies HttpMethod.GET "/" None
+          (runWithConfig (Cookie.setCookie basicCookie >>= OK "test")))
+          .GetCookies(Uri(sprintf "http://%s" ip)).[0].Name)
 
-      testCase "http_only cookie is http_only" <| fun _ ->
-        Assert.Equal("expecting http_only"
-        , true
-        , (reqCookies HttpMethod.GET "/" None
-          (runWithConfig (Cookie.setCookie { basic_cookie with httpOnly = true } >>= OK "test")))
-            .GetCookies(Uri("http://127.0.0.1")).[0].HttpOnly)
-    ]
+    testCase "http_only cookie is http_only" <| fun _ ->
+      Assert.Equal("expecting http_only"
+      , true
+      , (reqCookies HttpMethod.GET "/" None
+        (runWithConfig (Cookie.setCookie { basicCookie with httpOnly = true } >>= OK "test")))
+          .GetCookies(Uri(sprintf "http://%s" ip)).[0].HttpOnly)
+  ]
 
 [<Tests>]
-let headers =
+let headers cfg =
+  let runWithConfig = runWith cfg
+
   let requestHeaders () =
-    use client = new TcpClient("127.0.0.1",8083)
-    let outputData = ASCII.bytes "GET / HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: Close\r\n\r\n"
+    let ip, port =
+      let binding = SuaveConfig.firstBinding cfg
+      string binding.socketBinding.ip,
+      int binding.socketBinding.port
+
+    use client = new TcpClient(ip, port)
+    let outputData = ASCII.bytes (sprintf "GET / HTTP/1.1\r\nHost: %s\r\nConnection: Close\r\n\r\n" ip)
     use stream = client.GetStream()
     stream.Write(outputData, 0, outputData.Length)
 
     use streamReader = new StreamReader(stream)
-    
+
     let splitHeader (line: string) =
-        let ind = line.IndexOf(':')
-        let name = line.Substring(0, ind)
-        let value = line.Substring(ind + 1)
-        name.Trim(), value.Trim()
+      let ind = line.IndexOf(':')
+      let name = line.Substring(0, ind)
+      let value = line.Substring(ind + 1)
+      name.Trim(), value.Trim()
 
     // skip 200 OK
     streamReader.ReadLine() |> ignore
