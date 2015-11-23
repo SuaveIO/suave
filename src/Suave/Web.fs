@@ -60,11 +60,6 @@ module Web =
   let startWebServer (config : SuaveConfig) (webpart : WebPart) =
     Async.RunSynchronously(startWebServerAsync config webpart |> snd, cancellationToken = config.cancellationToken)
 
-  type DefaultTcpServerFactory() =
-    interface Tcp.TcpServerFactory with
-      member this.create (logger,maxOps, bufferSize,binding) =
-        Tcp.runServer logger maxOps bufferSize binding
-
   /// The default configuration binds on IPv4, 127.0.0.1:8083 with a regular 500 Internal Error handler,
   /// with a timeout of one minute for computations to run. Waiting for 2 seconds for the socket bind
   /// to succeed.
@@ -80,5 +75,5 @@ module Web =
       homeFolder            = None
       compressedFilesFolder = None
       logger                = Loggers.saneDefaultsFor LogLevel.Info
-      tcpServerFactory      = new DefaultTcpServerFactory()
+      tcpServerFactory      = new Tcp.DefaultTcpServerFactory()
       cookieSerialiser      = new Utils.BinaryFormatterSerialiser() }
