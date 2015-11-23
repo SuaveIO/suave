@@ -1,5 +1,6 @@
 ﻿
 open Suave
+open Suave.Logging
 open System.IO
 open System.Net
 
