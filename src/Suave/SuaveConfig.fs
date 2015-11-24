@@ -68,6 +68,19 @@ type SuaveConfig =
   static member logger_                = Property<SuaveConfig,_> (fun x -> x.logger)                (fun v x -> { x with logger = v })
   static member tcpServerFactory_      = Property<SuaveConfig,_> (fun x -> x.tcpServerFactory)      (fun v x -> { x with tcpServerFactory = v })
 
+  member x.withBindings(v)              = { x with bindings = v }
+  member x.withServerKey(v)             = { x with serverKey = v }
+  member x.withErrorHandler(v)          = { x with errorHandler = v }
+  member x.withListenTimeout(v)         = { x with listenTimeout = v }
+  member x.withCt(v)                    = { x with cancellationToken = v }
+  member x.withBufferSize(v)            = { x with bufferSize = v }
+  member x.withMaxOps(v)                = { x with maxOps = v }
+  member x.withMimeTypesMap(v)          = { x with mimeTypesMap = v }
+  member x.withHomeFolder(v)            = { x with homeFolder = v }
+  member x.withCompressedFilesFolder(v) = { x with compressedFilesFolder = v }
+  member x.withLogger(v)                = { x with logger = v }
+  member x.withTcpServerFactory(v)      = { x with tcpServerFactory = v }
+
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module SuaveConfig =
 
