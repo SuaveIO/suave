@@ -7,7 +7,7 @@ module Cookie =
   open System.Globalization
 
   open Suave
-  open Suave.AsyncOption.Operators
+  open Suave.Operators
   open Suave.Http
   open Suave.Logging
   open Suave.Utils

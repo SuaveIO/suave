@@ -1,6 +1,6 @@
 ﻿namespace Suave.Http
 
-module Operators =
+module Classic =
 
   let inline bind (second : 'b -> Async<'c option>) (first : 'a -> Async<'b option>) : 'a -> Async<'c option> =
     fun x -> 

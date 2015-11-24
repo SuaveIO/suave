@@ -1,7 +1,7 @@
 ﻿
 open Suave
 open Suave.Http
-open Suave.AsyncOption.Operators
+open Suave.Operators
 open Suave.Http.Applicatives
 open Suave.Http.Successful
 open Suave.Http.Files

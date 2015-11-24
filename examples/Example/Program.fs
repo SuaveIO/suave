@@ -4,11 +4,9 @@ open System
 open System.Net
 
 open Suave
-open Suave.AsyncOption
-open Suave.AsyncOption.Operators
 open Suave.Sockets.Control
 open Suave.Logging
-open Suave.Http.WebPart.Operators
+open Suave.Operators
 open Suave.Http.EventSource
 open Suave.Http.Applicatives
 open Suave.Http.Writers
@@ -24,7 +22,7 @@ let logger = Loggers.ConsoleWindowLogger LogLevel.Verbose
 
 ///  With this workflow you can write WebParts like this
 let task : WebPart =
-  fun ctx -> asyncOption {
+  fun ctx -> WebPart.asyncOption {
     let! ctx = GET ctx
     let! ctx = Writers.setHeader "foo" "bar" ctx
     return ctx

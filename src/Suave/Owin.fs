@@ -13,7 +13,7 @@ open System.Security.Claims
 open System.Security.Principal
 open System.Runtime.InteropServices
 open Suave
-open Suave.AsyncOption.Operators
+open Suave.Operators
 open Suave.Logging
 open Suave.Http
 open Suave.Sockets

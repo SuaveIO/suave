@@ -12,7 +12,7 @@ open System.Text
 
 open Suave.Web
 open Suave.Html
-open Suave.Http.Operators
+open Suave.Operators
 
 /// Load an object from its name
 let loadObject (str : string) =

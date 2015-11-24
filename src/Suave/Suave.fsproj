@@ -115,19 +115,16 @@
     <Compile Include="Sockets\AsyncSocket.fs" />
     <Compile Include="Tcp.fs" />
     <Compile Include="Sscanf.fs" />
-    <Compile Include="AsyncOption.fs" />
+    <Compile Include="WebPart.fsi" />
+    <Compile Include="WebPart.fs" />
+    <Compile Include="Operators.fs" />
     <Compile Include="Http\Types.fs" />
-    <Compile Include="Http\Operators.fsi" />
-    <Compile Include="Http\Operators.fs" />
-    <Compile Include="Http\WebPart.fsi" />
-    <Compile Include="Http\WebPart.fs" />
     <Compile Include="Http\Compression.fs" />
     <Compile Include="Http\Http.fsi" />
     <Compile Include="Http\Http.fs" />
     <Compile Include="Http\Cookie.fsi" />
     <Compile Include="Http\Cookie.fs" />
     <Compile Include="Model.fs" />
-
     <Compile Include="State.fs" />
     <Compile Include="Auth.fs" />
     <Compile Include="SuaveConfig.fs" />
@@ -140,6 +137,8 @@
     <Compile Include="AssemblyVersionInfo.fs" Condition="Exists('AssemblyVersionInfo.fs')" />
     <None Include="paket.references" />
     <Content Include="App.config" />
+    <Compile Include="Http\Classic.fsi" />
+    <Compile Include="Http\Classic.fs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="mscorlib" />

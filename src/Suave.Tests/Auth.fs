@@ -11,7 +11,7 @@ open Suave
 open Suave.Logging
 open Suave.Http.Cookie
 open Suave.State.CookieStateStore
-open Suave.AsyncOption.Operators
+open Suave.Operators
 open Suave.Web
 open Suave.Http
 open Suave.Http.Successful

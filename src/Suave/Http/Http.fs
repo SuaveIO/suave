@@ -1,7 +1,7 @@
 namespace Suave.Http
 
 open Suave
-open Suave.AsyncOption.Operators
+open Suave.Operators
 open Suave.Sockets
 
 module Response =

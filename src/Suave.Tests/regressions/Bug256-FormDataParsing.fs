@@ -12,7 +12,7 @@ open Suave.Web
 open Suave.Utils
 open Suave.Logging
 open Suave.Http
-open Suave.AsyncOption.Operators
+open Suave.Operators
 open Suave.Http.Applicatives
 open Suave.Http.RequestErrors
 open Suave.Testing

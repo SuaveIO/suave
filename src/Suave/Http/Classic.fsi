@@ -2,8 +2,8 @@
 
 open System
 
-[<Obsolete("Use combinators from AsyncOption module")>]
-module Operators =
+[<Obsolete("Use operators from Suave.Operators module instead")>]
+module Classic =
 
   open Suave.Sockets
 

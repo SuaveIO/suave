@@ -7,6 +7,7 @@ open System.Collections.Generic
 open System.Net.Sockets
 open System.Net
 open System.Text
+open Suave
 open Suave.Utils
 open Suave.Utils.Aether
 open Suave.Utils.Aether.Operators
@@ -657,19 +658,13 @@ and HttpContext =
 
 /// A WebPart is an asynchronous function that transforms the HttpContext.  An asynchronous return
 /// value of None indicates 'did not handle'. 
-and WebPart = HttpContext -> Async<HttpContext option>
 
 /// An error handler takes the exception, a programmer-provided message, a
 /// request (that failed) and returns an asynchronous workflow for the handling
 /// of the error.
-and ErrorHandler = Exception -> String -> WebPart
+and ErrorHandler = Exception -> String -> WebPart<HttpContext>
 
-/// A session store is a reader and a writer function pair keyed on strings.
-type StateStore =
-  /// Get an item from the state store
-  abstract get<'T> : string -> 'T option
-  /// Set an item in the state store
-  abstract set<'T> : string -> 'T -> WebPart
+type WebPart = WebPart<HttpContext>
 
 /// a module that gives you the `empty` (beware) and `mk` functions for creating
 /// a HttpRuntime

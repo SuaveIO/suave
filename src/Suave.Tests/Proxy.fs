@@ -14,7 +14,7 @@ open Suave.Http.Successful
 open Suave.Http.Redirection
 open Suave.Http.ServerErrors
 open Suave.Http.Applicatives
-open Suave.AsyncOption.Operators
+open Suave.Operators
 open Suave.Proxy
 
 open Suave.Tests.TestUtilities

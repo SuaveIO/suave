@@ -1,17 +1,54 @@
-﻿namespace Suave.Http
+﻿namespace Suave
+
 
 [<AutoOpen>]
 module WebPart =
 
-  open Suave.AsyncOption.Operators
+  type WebPart<'a> = 'a -> Async<'a option>
 
   let inline succeed x = async.Return (Some x)
 
-  let fail = async.Return None
+  let fail<'a> : Async<'a option> = async.Return (Option<'a>.None)
 
-  let never : WebPart = fun x -> fail
+  let never : WebPart<'a> = fun x -> fail
 
-  let rec choose (options : WebPart list) : WebPart =
+  /// Classic bind
+  let bind (f: 'a -> Async<'b option>) (a: Async<'a option>) = async {
+    let! p = a
+    match p with
+    | None ->
+      return None
+    | Some q ->
+      let r = f q
+      return! r
+    }
+
+  /// Left-to-right Kleisli composition.
+  let compose (first : 'a -> Async<'b option>)  (second : 'b -> Async<'c option>) : 'a -> Async<'c option> =
+    fun x ->
+        bind second (first x)
+
+  type AsyncOptionBuilder() =
+    member this.Return(x:'a) : Async<'a option> = async { return Some x }
+    member this.Zero() : Async<unit option> = this.Return()
+    member this.ReturnFrom(x : Async<'a option>) = x
+    member this.Delay(f: unit ->  Async<'a option>) = async { return! f () }
+    member this.Bind(x :Async<'a option>, f : 'a -> Async<'b option>) : Async<'b option> = bind f x
+
+  ///  With this workflow you can write WebParts like this
+  ///  let task ctx = asyncOption {
+  ///    let! _ = GET ctx
+  ///    let! ctx = Writers.setHeader "foo" "bar"
+  ///    return ctx
+  ///  }
+  ///
+  ///  we can still use the old symbol but now has a new meaning
+  ///  let foo ctx = GET ctx >>= OK "hello"
+  ///
+
+  let asyncOption = AsyncOptionBuilder()
+
+  let rec choose (options : WebPart<'a> list) : WebPart<'a> =
     fun arg -> async {
     match options with
     | []        -> return None
@@ -36,7 +73,7 @@ module WebPart =
   /// | url "/b"    +---------+                       +---------+  cont3       |
   /// +-------------+                                           +--------------+
 
-  let rec inject (postOp : WebPart) (pairs : (WebPart*WebPart) list) : WebPart =
+  let rec inject (postOp : WebPart<'a>) (pairs : (WebPart<'a>*WebPart<'a>) list) : WebPart<'a> =
     fun arg -> async {
       match pairs with
       | []        -> return None
@@ -44,7 +81,7 @@ module WebPart =
         let! res = p arg
         match res with
         | Some x ->
-          return! (postOp >=> q) x
+          return! (compose postOp q) x
         | None   -> return! inject postOp tail arg
       }
 
@@ -57,8 +94,7 @@ module WebPart =
     | Choice1Of2 x -> f x a
     | Choice2Of2 _ -> g a
 
-
-  let inline tryThen (a : WebPart) (b : WebPart) : WebPart =
+  let inline tryThen (a : WebPart<'a>) (b : WebPart<'a>) : WebPart<'a> =
     fun x ->
       async {
         let! e = a x
@@ -75,9 +111,3 @@ module WebPart =
       match a x with
       | None   -> b x
       | r      -> r
-    
-  module Operators =
-
-    let inline (<|>) a b = tryThen a b
-
-    let inline (@@) a b = concatenate a b

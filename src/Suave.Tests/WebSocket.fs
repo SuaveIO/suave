@@ -10,7 +10,7 @@ open System.Text
 open System.Threading
 
 open Suave
-open Suave.AsyncOption.Operators
+open Suave.Operators
 open Suave.Http
 open Suave.Sockets
 open Suave.Sockets.Control

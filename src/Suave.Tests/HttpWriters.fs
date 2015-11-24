@@ -9,7 +9,7 @@ open System.Net.Sockets
 
 open Suave
 open Suave.Http
-open Suave.AsyncOption.Operators
+open Suave.Operators
 open Suave.Http.Successful
 open Suave.Http.Writers
 open Suave.Http.Types

@@ -5,7 +5,7 @@ open System.Runtime.Serialization.Json
 open System.Text
 
 open Suave.Http
-open Suave.AsyncOption.Operators
+open Suave.Operators
 
 /// Convert the object to a JSON representation inside a byte array (can be made string of)
 let toJson<'T> (o: 'T) =

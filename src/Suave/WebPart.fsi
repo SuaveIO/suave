@@ -1,22 +1,36 @@
-﻿namespace Suave.Http
+﻿namespace Suave
+
 
 [<AutoOpen>]
 module WebPart =
 
-  /// Return success with some value
-  val inline succeed : item:'T -> Async<'T option>
+  type WebPart<'a> = 'a -> Async<'a option>
 
-  /// Return failure without any value
-  val fail : Async<HttpContext option> 
+  val inline succeed : WebPart<'a>
 
-  /// Return failure with a value that is ignored
-  val never : WebPart
+  val fail<'a>  : Async<'a option>
+
+  val never : WebPart<'a>
+
+  val bind : f:('a -> Async<'b option>) -> a: Async<'a option> -> Async<'b option>
+
+  val compose : first:('a -> Async<'b option>) -> second:('b -> Async<'c option>) ->  'a -> Async<'c option> 
+
+  type AsyncOptionBuilder =
+    new : unit -> AsyncOptionBuilder
+    member Return : 'a -> Async<'a option>
+    member Zero : unit -> Async<unit option>
+    member ReturnFrom : Async<'a option> -> Async<'a option>
+    member Delay : (unit ->  Async<'a option>) -> Async<'a option>
+    member Bind : Async<'a option> * ('a -> Async<'b option>) ->  Async<'b option>
+
+  val asyncOption : AsyncOptionBuilder
 
   /// Entry-point for composing the applicative routes of the http application,
   /// by iterating the options, applying the context, arg, to the predicate
   /// from the list of options, until there's a match/a Some(x) which can be
   /// run.
-  val choose : options : WebPart list -> WebPart
+  val choose : options : WebPart<'a> list -> WebPart<'a>
 
   /// Pipe the request through to a bird that can peck at it.
   ///
@@ -37,11 +51,6 @@ module WebPart =
   /// or otherwise, applies g a, if there is no value in d.
   val cond : item:Choice<'T, _> -> f:('T -> 'U -> 'V) -> g:('U -> 'V) -> 'U -> 'V
 
-  val inline tryThen : first:WebPart -> second:WebPart -> WebPart
+  val inline tryThen : first:WebPart<'a> -> second:WebPart<'a> -> WebPart<'a>
 
   val inline concatenate : first:('a -> 'b option) -> second:('a -> 'b option) -> 'a -> 'b option
-
-  module Operators =
-
-    val inline (<|>) : first:WebPart -> second:WebPart -> WebPart
-    val inline (@@)  : first:('a -> 'b option) -> second:('a -> 'b option) -> ('a -> 'b option)

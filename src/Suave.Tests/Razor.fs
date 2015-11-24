@@ -11,7 +11,7 @@ open System.Text
 open Suave
 open Suave.Web
 open Suave.Http
-open Suave.Http.Operators
+open Suave.Operators
 open Suave.Razor
 
 open Suave.Tests.TestUtilities

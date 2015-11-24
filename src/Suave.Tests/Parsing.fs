@@ -10,7 +10,7 @@ open System.Text
 
 open Suave
 open Suave.Http
-open Suave.AsyncOption.Operators
+open Suave.Operators
 open Suave.Http.Applicatives
 open Suave.Http.RequestErrors
 open Suave.Http.Successful

@@ -2,7 +2,7 @@
 open System.Net
 
 open Suave
-open Suave.AsyncOption.Operators
+open Suave.Operators
 open Suave.Http
 open Suave.Http.Applicatives
 open Suave.Http.Files

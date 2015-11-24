@@ -6,6 +6,13 @@ open Suave.Log
 open Suave.Http.Cookie
 open Suave.Logging
 
+/// A session store is a reader and a writer function pair keyed on strings.
+type StateStore =
+  /// Get an item from the state store
+  abstract get<'T> : string -> 'T option
+  /// Set an item in the state store
+  abstract set<'T> : string -> 'T -> WebPart
+
 module CookieStateStore =
 
   open System
