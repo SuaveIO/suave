@@ -5,9 +5,7 @@ open System.Text
 open System.Net.Http
 
 open Suave
-open Suave.Http
-open Suave.Web
-open Suave.Http.Successful
+open Suave.Successful
 open Suave.Utils
 
 open Suave.Tests.TestUtilities

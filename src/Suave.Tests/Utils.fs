@@ -9,8 +9,6 @@ open Suave.Utils.Compression
 open Suave.Utils.Parsing
 
 open Fuchu
-
-open Suave.Web
 open TestUtilities
 
 #nowarn "25"

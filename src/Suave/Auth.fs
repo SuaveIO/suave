@@ -3,9 +3,7 @@
 open System
 open System.Text
 
-open Suave
-open Suave.Http
-open Suave.Http.Cookie
+open Suave.Cookie
 open Suave.Logging
 open Suave.Utils
 

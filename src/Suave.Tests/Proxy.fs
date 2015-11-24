@@ -8,12 +8,10 @@ open System
 open System.Net
 
 open Suave
-open Suave.Web
-open Suave.Http
-open Suave.Http.Successful
-open Suave.Http.Redirection
-open Suave.Http.ServerErrors
-open Suave.Http.Applicatives
+open Suave.Successful
+open Suave.Redirection
+open Suave.ServerErrors
+open Suave.Applicatives
 open Suave.Operators
 open Suave.Proxy
 

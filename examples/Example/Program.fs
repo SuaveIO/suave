@@ -7,11 +7,11 @@ open Suave
 open Suave.Sockets.Control
 open Suave.Logging
 open Suave.Operators
-open Suave.Http.EventSource
-open Suave.Http.Applicatives
-open Suave.Http.Writers
-open Suave.Http.Files
-open Suave.Http.Successful
+open Suave.EventSource
+open Suave.Applicatives
+open Suave.Writers
+open Suave.Files
+open Suave.Successful
 open Suave.Http
 open Suave.State.CookieStateStore
 

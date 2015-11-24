@@ -6,7 +6,6 @@ module Web =
   open System
   open System.IO
   open System.Net
-  open Suave.Http
   open Suave.Utils
   open Suave.Logging
 

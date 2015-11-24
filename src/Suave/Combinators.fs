@@ -1,6 +1,5 @@
-namespace Suave.Http
+namespace Suave
 
-open Suave
 open Suave.Operators
 open Suave.Sockets
 

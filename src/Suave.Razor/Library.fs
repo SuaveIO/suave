@@ -3,8 +3,8 @@
 open System
 open System.IO
 open Suave.Http
-open Suave.Http.Types.Codes
-open Suave.Http.Files
+open Suave.Http.Codes
+open Suave.Files
 open Suave.Utils
 open Suave.Utils.AsyncExtensions
 

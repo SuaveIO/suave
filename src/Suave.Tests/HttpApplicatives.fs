@@ -3,12 +3,10 @@
 open System
 
 open Suave
-open Suave.Http
 open Suave.Operators
-open Suave.Http.Applicatives
-open Suave.Http.Successful
-open Suave.Http.ServerErrors
-open Suave.Web
+open Suave.Applicatives
+open Suave.Successful
+open Suave.ServerErrors
 
 open Suave.Tests.TestUtilities
 open Suave.Testing

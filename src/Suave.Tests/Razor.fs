@@ -9,8 +9,6 @@ open System.Net.Http.Headers
 open System.Text
 
 open Suave
-open Suave.Web
-open Suave.Http
 open Suave.Operators
 open Suave.Razor
 

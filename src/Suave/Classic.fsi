@@ -1,11 +1,9 @@
-﻿namespace Suave.Http
+﻿namespace Suave
 
 open System
 
 [<Obsolete("Use operators from Suave.Operators module instead")>]
 module Classic =
-
-  open Suave.Sockets
 
   /// Compose (bind) two arguments, 'first' and 'second', so that the result of
   /// the composition can be applied to an argument of 'input' and then passed

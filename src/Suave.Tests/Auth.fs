@@ -9,14 +9,12 @@ open Fuchu
 
 open Suave
 open Suave.Logging
-open Suave.Http.Cookie
+open Suave.Cookie
 open Suave.State.CookieStateStore
 open Suave.Operators
-open Suave.Web
-open Suave.Http
-open Suave.Http.Successful
-open Suave.Http.Applicatives
-open Suave.Http.RequestErrors
+open Suave.Successful
+open Suave.Applicatives
+open Suave.RequestErrors
 
 open Suave.Testing
 

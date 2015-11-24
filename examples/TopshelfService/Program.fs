@@ -1,8 +1,8 @@
 open Suave
-open Suave.Http.Successful
+open Suave.Successful
 open Suave.Http
 open Suave.Operators
-open Suave.Http.Applicatives
+open Suave.Applicatives
 open Topshelf
 open System
 open System.Threading

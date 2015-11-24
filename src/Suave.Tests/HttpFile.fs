@@ -8,10 +8,8 @@ open System.Text
 open System.Net.Sockets
 
 open Suave
-open Suave.Http
-open Suave.Http.Successful
+open Suave.Successful
 open Suave.Utils
-open Suave.Web
 
 open Suave.Tests.TestUtilities
 open Suave.Testing

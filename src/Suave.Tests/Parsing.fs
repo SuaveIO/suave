@@ -9,13 +9,11 @@ open System.Net.Http.Headers
 open System.Text
 
 open Suave
-open Suave.Http
 open Suave.Operators
-open Suave.Http.Applicatives
-open Suave.Http.RequestErrors
-open Suave.Http.Successful
+open Suave.Applicatives
+open Suave.RequestErrors
+open Suave.Successful
 open Suave.Utils
-open Suave.Web
 
 open Suave.Tests.TestUtilities
 open Suave.Testing

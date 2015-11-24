@@ -8,13 +8,10 @@ open System.Linq
 open System.Net.Sockets
 
 open Suave
-open Suave.Http
 open Suave.Operators
-open Suave.Http.Successful
-open Suave.Http.Writers
-open Suave.Http.Types
+open Suave.Successful
+open Suave.Writers
 open Suave.Utils
-open Suave.Web
 
 open Suave.Tests.TestUtilities
 open Suave.Testing

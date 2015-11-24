@@ -1,4 +1,4 @@
-﻿namespace Suave.Http
+﻿namespace Suave
 
 module Classic =
 

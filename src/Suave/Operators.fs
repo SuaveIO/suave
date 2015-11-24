@@ -1,7 +1,5 @@
 ﻿namespace Suave
 
-open Suave
-
 module Operators =
 
   let (>>=) a b = WebPart.bind b a

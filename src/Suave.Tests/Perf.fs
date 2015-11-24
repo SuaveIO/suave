@@ -3,10 +3,9 @@
 open System.Reflection
 open System.Net.Http
 
+open Suave
 open Suave.Utils
-open Suave.Http
-open Suave.Http.Successful
-open Suave.Web
+open Suave.Successful
 
 open Suave.Tests.TestUtilities
 open Suave.Testing

@@ -4,8 +4,8 @@ open System.Net
 open Suave
 open Suave.Operators
 open Suave.Http
-open Suave.Http.Applicatives
-open Suave.Http.Files
+open Suave.Applicatives
+open Suave.Files
 open Suave.Logging
 
 let logger = Loggers.saneDefaultsFor LogLevel.Verbose

@@ -8,13 +8,11 @@ open System.IO
 open System.Reflection
 
 open Suave
-open Suave.Web
 open Suave.Utils
 open Suave.Logging
-open Suave.Http
 open Suave.Operators
-open Suave.Http.Applicatives
-open Suave.Http.RequestErrors
+open Suave.Applicatives
+open Suave.RequestErrors
 open Suave.Testing
 open Suave.Tests.TestUtilities  
 

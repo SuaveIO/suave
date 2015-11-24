@@ -9,7 +9,6 @@ open System.Net.Http.Headers
 open System.Text
 
 open Suave
-open Suave.Http
 open Suave.Json
 
 open Suave.Tests.TestUtilities

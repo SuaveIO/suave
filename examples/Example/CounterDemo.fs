@@ -21,7 +21,7 @@ open Suave
 open Suave.Sockets
 open Suave.Sockets.Control
 open Suave.Http
-open Suave.Http.EventSource
+open Suave.EventSource
 open Suave.Utils
 
 open Helpers

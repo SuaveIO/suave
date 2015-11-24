@@ -4,7 +4,6 @@ open System.IO
 open System.Runtime.Serialization.Json
 open System.Text
 
-open Suave.Http
 open Suave.Operators
 
 /// Convert the object to a JSON representation inside a byte array (can be made string of)

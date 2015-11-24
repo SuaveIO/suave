@@ -2,10 +2,10 @@
 open Suave
 open Suave.Http
 open Suave.Operators
-open Suave.Http.Applicatives
-open Suave.Http.Successful
-open Suave.Http.Files
-open Suave.Http.RequestErrors
+open Suave.Applicatives
+open Suave.Successful
+open Suave.Files
+open Suave.RequestErrors
 open Suave.Logging
 open Suave.Utils
 

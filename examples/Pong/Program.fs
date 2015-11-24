@@ -1,6 +1,6 @@
 ﻿open Suave
 open Suave.Http
-open Suave.Http.Successful
+open Suave.Successful
 open System
 open System.Net
 open System.Threading

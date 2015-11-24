@@ -3,9 +3,8 @@
 open Fuchu
 
 open Suave
-open Suave.Http
-open Suave.Http.Successful
-open Suave.Http.Embedded
+open Suave.Successful
+open Suave.Embedded
 
 open Suave.Tests.TestUtilities
 open Suave.Testing

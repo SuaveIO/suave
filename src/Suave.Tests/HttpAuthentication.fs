@@ -5,12 +5,11 @@ open System.Net
 open System.Net.Http.Headers
 open System.Text
 open Suave
-open Suave.Http
 open Suave.Operators
-open Suave.Http.Applicatives
-open Suave.Http.Authentication
-open Suave.Http.Successful
-open Suave.Http.ServerErrors
+open Suave.Applicatives
+open Suave.Authentication
+open Suave.Successful
+open Suave.ServerErrors
 
 open Suave.Tests.TestUtilities
 open Suave.Testing

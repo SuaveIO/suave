@@ -1,6 +1,5 @@
 ﻿namespace Suave
 
-open Suave.Http
 open Suave.Logging
 open Suave.Utils
 open System

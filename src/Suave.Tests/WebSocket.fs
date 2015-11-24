@@ -11,11 +11,9 @@ open System.Threading
 
 open Suave
 open Suave.Operators
-open Suave.Http
 open Suave.Sockets
 open Suave.Sockets.Control
 open Suave.WebSocket
-open Suave.Web
 open Suave.Utils
 open Suave.Tests.TestUtilities
 open Suave.Testing

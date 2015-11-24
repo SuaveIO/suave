@@ -7,9 +7,7 @@ open System.Net.Http
 open Fuchu
 
 open Suave
-open Suave.Web
-open Suave.Http
-open Suave.Http.Successful
+open Suave.Successful
 
 open Suave.Testing
 

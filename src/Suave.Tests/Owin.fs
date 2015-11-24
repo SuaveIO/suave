@@ -10,10 +10,9 @@ open System.Net.Http.Headers
 open System.Text
 
 open Suave
-open Suave.Http
 open Suave.Operators
-open Suave.Http.Applicatives
-open Suave.Http.Writers
+open Suave.Applicatives
+open Suave.Writers
 open Suave.Owin
 
 open Suave.Tests.TestUtilities

@@ -4,7 +4,6 @@ module WebSocket =
 
   open Suave.Sockets
   open Suave.Sockets.Control
-  open Suave.Http
   open Suave.Operators
   open Suave.Utils
   open Suave.Logging

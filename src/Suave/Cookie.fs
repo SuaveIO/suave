@@ -1,4 +1,4 @@
-﻿namespace Suave.Http
+﻿namespace Suave
 
 module Cookie =
 
@@ -6,9 +6,7 @@ module Cookie =
   open System.Text
   open System.Globalization
 
-  open Suave
   open Suave.Operators
-  open Suave.Http
   open Suave.Logging
   open Suave.Utils
 

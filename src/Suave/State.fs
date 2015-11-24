@@ -1,9 +1,8 @@
 module Suave.State
 
 open Suave.Utils
-open Suave.Http
 open Suave.Log
-open Suave.Http.Cookie
+open Suave.Cookie
 open Suave.Logging
 
 /// A session store is a reader and a writer function pair keyed on strings.

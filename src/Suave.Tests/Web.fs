@@ -2,7 +2,6 @@
 
 open Fuchu
 
-open Suave.Http
 open Suave
 open Suave.ParsingAndControl
 open Suave.Logging

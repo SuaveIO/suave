@@ -12,10 +12,9 @@ open System.Threading.Tasks
 open System.Security.Claims
 open System.Security.Principal
 open System.Runtime.InteropServices
-open Suave
+
 open Suave.Operators
 open Suave.Logging
-open Suave.Http
 open Suave.Sockets
 open Suave.Utils
 

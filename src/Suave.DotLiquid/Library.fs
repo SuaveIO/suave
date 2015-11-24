@@ -6,7 +6,7 @@ open DotLiquid
 open Microsoft.FSharp.Reflection
 open Suave.Utils
 open Suave.Http
-open Suave.Http.Files
+open Suave.Files
 
 // -------------------------------------------------------------------------------------------------
 // Registering things with DotLiquid

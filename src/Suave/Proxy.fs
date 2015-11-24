@@ -11,10 +11,9 @@ open Suave.Utils.Bytes
 
 open Suave.Sockets
 open Suave.Sockets.Control
-open Suave.Http
 open Suave.Tcp
 
-open Suave.Http.Response
+open Suave.Response
 open Suave.ParsingAndControl
 
 /// Copies the headers from 'headers1' to 'headers2'
