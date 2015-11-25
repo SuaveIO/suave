@@ -31,7 +31,7 @@ if not (File.Exists "paket.exe") then
     use wc = new Net.WebClient()
     let tmp = Path.GetTempFileName()
     wc.DownloadFile(url, tmp)
-    File.Move(tmp,Path.GetFileName url)
+    File.Move(tmp,Path.GetFileName url);;
  
 // Step 1. Resolve and install the packages
  
@@ -40,23 +40,15 @@ if not (File.Exists "paket.exe") then
 Paket.Dependencies.Install """
 source https://nuget.org/api/v2
 nuget Suave
-nuget FSharp.Data
-nuget FSharp.Charting
 """;;
  
 // Step 2. Use the packages
  
 #r "packages/Suave/lib/net40/Suave.dll"
-#r "packages/FSharp.Data/lib/net40/FSharp.Data.dll"
-#r "packages/FSharp.Charting/lib/net40/FSharp.Charting.dll"
- 
-let ctxt = FSharp.Data.WorldBankData.GetDataContext()
- 
-let data = ctxt.Countries.Algeria.Indicators.``GDP (current US$)``
  
 open Suave // always open suave
 open Suave.Http.Successful // for OK-result
 open Suave.Web // for config
  
-startWebServer defaultConfig (OK (sprintf "Hello World! In 2010 Algeria earned %f " data.[2010]))
+startWebServer defaultConfig (OK "Hello World!")
 {% endhighlight %}
