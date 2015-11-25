@@ -6,18 +6,19 @@
     <meta http-equiv="X-UA-Compatible" content="chrome=1" />
     <meta name="description" content="Suave : Suave is a simple web development F# library providing a lightweight web server and a set of combinators to manipulate route flow and task composition." />
     <link href='http://fonts.googleapis.com/css?family=Roboto+Slab' rel='stylesheet' type='text/css'>
+    <script src="https://netdna.bootstrapcdn.com/twitter-bootstrap/2.2.1/js/bootstrap.min.js"></script>
+    <link href="https://netdna.bootstrapcdn.com/twitter-bootstrap/2.2.1/css/bootstrap-combined.min.css" rel="stylesheet">
     <link rel="stylesheet" type="text/css" media="screen" href="stylesheets/stylesheet.css">
-
     <title>Suave.IO</title>
   </head>
 
   <body>
 
     <!-- HEADER -->
-    <div id="header_wrap" class="outer">
-
+    <div id="header_wrap" class="row">
+<div class="container">
         <div class="inner">
-         
+
           <div id="logo" >
             <img src="images/logo.gif" border="0" alt="Suave.IO">
           </div>
@@ -31,28 +32,68 @@
             </section>
 
           <a id="forkme_banner" href="https://github.com/SuaveIO/suave">View on GitHub</a>
-          
+
+        </div>
         </div>
     </div>
     <div style="clear:both;"></div>
     <!-- MAIN CONTENT -->
-    <div id="main_content_wrap" class="outer">
-      <section id="main_content" class="inner">
+    <div id="main_content_wrap" class="row">
+    <div class="container">
+    <div class="row">
+      <div id="main_content" class="span9">
         {{ content }}
-      </section>
+      </div>
+      <div class="span3">
+
+          <ul class="nav nav-list" id="menu">
+
+            <li class="divider"></li>
+            <li><a href="http://suave.io/index.html">Home page</a></li>
+            <li class="divider"></li>
+
+            <li><a href="http://www.nuget.org/packages/Suave">Get Suave via NuGet</a></li>
+            <li><a href="https://github.com/SuaveIO/suave">Source Code on GitHub</a></li>
+            <li><a href="https://github.com/SuaveIO/suave/blob/master/COPYING">License (Apache 2.0)</a></li>
+            <li><a href="https://github.com/SuaveIO/suave/releases/latest">Release Notes</a></li>
+            <li><a href="https://twitter.com/search?q=suave.io&src=typd&vertical=default&f=tweets">Who is using Suave?</a></li>
+            <li><a href="http://stackoverflow.com/questions/tagged/suave">Ask a question</a></li>
+            <li class="nav-header">Documentation</li>
+            <li><a href="http://suave.io/index.html">Getting started</a></li>
+            <li><a href="http://suave.io/routing.html">Routing HTTP requests</a></li>
+            <li><a href="http://suave.io/async.html">Async computation expressions and »=</a></li>
+            <li><a href="http://suave.io/composing.html">Composing bigger programs: combinators</a></li>
+            <li><a href="http://suave.io/applicatives.html">More Applicatives and HTTP combinators</a></li>
+            <li><a href="http://suave.io/fish.html">Programming with fish (custom operator reference)</a></li>
+            <li><a href="http://suave.io/typed.html">Typed routes</a></li>
+            <li><a href="http://suave.io/bindings.html">Multiple bindings and SSL support</a></li>
+            <li><a href="http://suave.io/api.html">API</a></li>
+            <li><a href="http://suave.io/files.html">Serving static files, HTTP Compression and MIME types</a></li>
+            <li><a href="http://suave.io/heroku.html">Deploying Suave to Heroku</a></li>
+            <li><a href="http://suave.io/logs.html">Getting Hold of Suave’s Logs</a></li>
+            <li><a href="http://suave.io/paket.html">Suave + Paket = ♥</a></li>
+            <li class="nav-header">Reference</li>
+
+            <li><a href="http://suave.io/reference/index.html">API Reference</a></li>
+          </ul>
+        </div>
+        </div>
+        </div>
       <br/>
     </div>
 
     <!-- FOOTER  -->
     <div id="footer_wrap" class="outer">
+    <div class="container">
       <footer class="inner">
         <p class="copyright">Suave maintained by
           <a href="https://github.com/ademar">ademar</a> and
           <a href="https://github.com/haf">haf</a>.
         </p>
       </footer>
+      </div>
     </div>
-
+</div>
               <script type="text/javascript">
             var gaJsHost = (("https:" == document.location.protocol) ? "https://ssl." : "http://www.");
             document.write(unescape("%3Cscript src='" + gaJsHost + "google-analytics.com/ga.js' type='text/javascript'%3E%3C/script%3E"));
