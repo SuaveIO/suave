@@ -53,7 +53,6 @@ Theme Styles
 
 body {
   color:#373737;
-  background: #f26822;
   font-size: 16px;
   font-family: 'Myriad Pro', Calibri, Helvetica, Arial, sans-serif;
   line-height: 1.5;
@@ -183,11 +182,6 @@ ul, ol, dl {
   margin-bottom: 15px
 }
 
-ul li {
-  list-style: inside;
-  padding-left: 20px;
-}
-
 ol li {
   list-style: decimal inside;
   padding-left: 20px;
@@ -249,7 +243,6 @@ Full-Width Styles
   position: relative;
   top:0px;
   left:0px;
-  max-width: 800px;
   margin: 0 auto;
 }
 
@@ -272,6 +265,7 @@ Full-Width Styles
 }
 
 #header_wrap {
+  background: #f26822;
 }
 
 #project_tagline {
@@ -326,9 +320,12 @@ Full-Width Styles
 }
 
 #footer_wrap {
+  background: #f26822;
 }
 
-
+#menu {
+  margin-top: 60px;
+}
 
 /*******************************************************************************
 Small Device Styles
