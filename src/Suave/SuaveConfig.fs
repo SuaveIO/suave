@@ -72,7 +72,7 @@ type SuaveConfig =
   member x.withServerKey(v)             = { x with serverKey = v }
   member x.withErrorHandler(v)          = { x with errorHandler = v }
   member x.withListenTimeout(v)         = { x with listenTimeout = v }
-  member x.withCt(v)                    = { x with cancellationToken = v }
+  member x.withCancellationToken(v)     = { x with cancellationToken = v }
   member x.withBufferSize(v)            = { x with bufferSize = v }
   member x.withMaxOps(v)                = { x with maxOps = v }
   member x.withMimeTypesMap(v)          = { x with mimeTypesMap = v }
