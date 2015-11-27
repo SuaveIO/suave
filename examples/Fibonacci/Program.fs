@@ -1,6 +1,6 @@
 ﻿open Suave
 open Suave.Http
-open Suave.Applicatives
+open Suave.Filters
 open Suave.Successful
 
 open System.Net

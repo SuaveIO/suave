@@ -1008,7 +1008,7 @@ module ServerErrors =
 /// Module that deals with the applicatives of suave - use functions from this module
 /// to filter what requests a given route responds to.
 /// Functions have signature f :: params... -> HttpContext -> HttpContext option.
-module Applicatives =
+module Filters =
 
   open Suave.Logging
 

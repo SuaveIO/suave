@@ -11,7 +11,7 @@ open System.Text
 
 open Suave
 open Suave.Operators
-open Suave.Applicatives
+open Suave.Filters
 open Suave.Writers
 open Suave.Owin
 

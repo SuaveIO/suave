@@ -4,7 +4,7 @@ open System
 
 open Suave
 open Suave.Operators
-open Suave.Applicatives
+open Suave.Filters
 open Suave.Successful
 open Suave.ServerErrors
 

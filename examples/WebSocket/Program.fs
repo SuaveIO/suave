@@ -2,7 +2,7 @@
 open Suave
 open Suave.Http
 open Suave.Operators
-open Suave.Applicatives
+open Suave.Filters
 open Suave.Successful
 open Suave.Files
 open Suave.RequestErrors

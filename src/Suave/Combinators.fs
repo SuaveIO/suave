@@ -232,7 +232,7 @@ module ServerErrors =
 
   let INVALID_HTTP_VERSION = invalid_http_version (UTF8.bytes HTTP_505.message)
 
-module Applicatives =
+module Filters =
   open Suave.Utils
   open Suave.Utils.AsyncExtensions
   open Suave.Logging

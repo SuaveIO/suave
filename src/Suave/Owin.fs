@@ -722,7 +722,7 @@ module OwinApp =
   [<CompiledName "OfApp">]
   let ofApp (requestPathBase : string) (owin : OwinApp) : WebPart =
 
-    Applicatives.pathStarts requestPathBase >=>
+    Filters.pathStarts requestPathBase >=>
     fun (ctx : HttpContext) ->
       let verbose f =
         ctx.runtime.logger.Log LogLevel.Verbose (

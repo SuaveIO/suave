@@ -8,7 +8,7 @@ open Suave.Sockets.Control
 open Suave.Logging
 open Suave.Operators
 open Suave.EventSource
-open Suave.Applicatives
+open Suave.Filters
 open Suave.Writers
 open Suave.Files
 open Suave.Successful

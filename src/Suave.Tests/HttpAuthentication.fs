@@ -6,7 +6,7 @@ open System.Net.Http.Headers
 open System.Text
 open Suave
 open Suave.Operators
-open Suave.Applicatives
+open Suave.Filters
 open Suave.Authentication
 open Suave.Successful
 open Suave.ServerErrors

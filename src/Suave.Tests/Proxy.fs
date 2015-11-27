@@ -11,7 +11,7 @@ open Suave
 open Suave.Successful
 open Suave.Redirection
 open Suave.ServerErrors
-open Suave.Applicatives
+open Suave.Filters
 open Suave.Operators
 open Suave.Proxy
 

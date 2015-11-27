@@ -39,7 +39,7 @@ let scanTests (_ : SuaveConfig) =
     ]
 
 open Suave.Http
-open Suave.Applicatives
+open Suave.Filters
 open Suave.Successful
 open Suave.Tests.TestUtilities
 open Suave.Testing

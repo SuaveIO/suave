@@ -2,7 +2,7 @@ open Suave
 open Suave.Successful
 open Suave.Http
 open Suave.Operators
-open Suave.Applicatives
+open Suave.Filters
 open Topshelf
 open System
 open System.Threading

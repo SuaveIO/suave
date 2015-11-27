@@ -11,7 +11,7 @@ open Suave
 open Suave.Utils
 open Suave.Logging
 open Suave.Operators
-open Suave.Applicatives
+open Suave.Filters
 open Suave.RequestErrors
 open Suave.Testing
 open Suave.Tests.TestUtilities  

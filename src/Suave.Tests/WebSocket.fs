@@ -60,7 +60,7 @@ let websocketTests cfg =
         | _ -> ()
       }
 
-  let webPart = Applicatives.path "/websocket" >=> handShake websocketApp
+  let webPart = Filters.path "/websocket" >=> handShake websocketApp
 
   let testByteArray (sentSize:int) (bArray: byte []) = 
     if sentSize = bArray.Length then

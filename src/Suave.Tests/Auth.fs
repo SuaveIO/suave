@@ -13,7 +13,7 @@ open Suave.Cookie
 open Suave.State.CookieStateStore
 open Suave.Operators
 open Suave.Successful
-open Suave.Applicatives
+open Suave.Filters
 open Suave.RequestErrors
 
 open Suave.Testing
