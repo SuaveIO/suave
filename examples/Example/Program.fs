@@ -189,7 +189,7 @@ let main argv =
 
   startWebServer
     { bindings              = [ HttpBinding.mkSimple HTTP "127.0.0.1" 8082
-                                HttpBinding.mkSimple (HTTPS (cert)) "127.0.0.1" 8443
+                                HttpBinding.mkSimple (HTTPS cert) "127.0.0.1" 8443
                               ]
       serverKey             = Utils.Crypto.generateKey HttpRuntime.ServerKeyLength
       errorHandler          = defaultErrorHandler
