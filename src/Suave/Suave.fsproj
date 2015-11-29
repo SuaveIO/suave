@@ -113,6 +113,7 @@
     <Compile Include="Sockets\Connection.fs" />
     <Compile Include="Sockets\SocketMonad.fs" />
     <Compile Include="Sockets\AsyncSocket.fs" />
+    <Compile Include="Sockets\TransportStream.fs" />
     <Compile Include="Tcp.fs" />
     <Compile Include="Sscanf.fs" />
     <Compile Include="WebPart.fsi" />
@@ -121,6 +122,7 @@
     <Compile Include="Classic.fsi" />
     <Compile Include="Classic.fs" />
     <Compile Include="Http.fs" />
+    <Compile Include="DefaultTlsProvider.fs" />
     <Compile Include="Compression.fs" />
     <Compile Include="Combinators.fsi" />
     <Compile Include="Combinators.fs" />

@@ -167,6 +167,8 @@ let app =
 open OpenSSL.Core
 open System.Security.Cryptography.X509Certificates*)
 
+open System.Security.Cryptography.X509Certificates
+
 [<EntryPoint>]
 let main argv =
   (*let cert =
@@ -175,11 +177,13 @@ let main argv =
     bio.Write cert
     OpenSSL.X509.X509Certificate.FromDER bio*)
 
+  let cert = X509Certificate2("suave.p12","easy")
+
   startWebServer
     { bindings              = [ HttpBinding.mkSimple HTTP "127.0.0.1" 8082
                                 // see https://github.com/SuaveIO/suave/issues/291
                                 // and https://github.com/exira/static-mailer/blob/72fdebf37bafc48ea7277ee4a6b2a758df5c3b3d/src/Program.fs#L28-L31
-                                //HttpBinding.mkSimple (HTTPS (Provider.open_ssl cert)) "127.0.0.1" 8443
+                                HttpBinding.mkSimple (HTTPS (cert)) "127.0.0.1" 8443
                               ]
       serverKey             = Utils.Crypto.generateKey HttpRuntime.ServerKeyLength
       errorHandler          = defaultErrorHandler
@@ -192,6 +196,7 @@ let main argv =
       compressedFilesFolder = None
       logger                = logger
       tcpServerFactory      = new Tcp.DefaultTcpServerFactory()
-      cookieSerialiser      = new Utils.BinaryFormatterSerialiser() }
+      cookieSerialiser      = new Utils.BinaryFormatterSerialiser()
+      tlsProvider           = DefaultTlsProvider() }
     app
   0

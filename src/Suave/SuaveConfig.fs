@@ -53,7 +53,10 @@ type SuaveConfig =
 
     /// The cookie serialiser to use for converting the data you save in cookies
     /// from your application into a byte array.
-    cookieSerialiser        : Suave.Utils.CookieSerialiser }
+    cookieSerialiser        : Suave.Utils.CookieSerialiser
+
+    /// A TLS provider
+    tlsProvider       : ITlsProvider }
 
   static member bindings_              = Property<SuaveConfig,_> (fun x -> x.bindings)              (fun v x -> { x with bindings = v })
   static member serverKey_             = Property<SuaveConfig,_> (fun x -> x.serverKey)             (fun v x -> { x with serverKey = v })
@@ -96,6 +99,7 @@ module SuaveConfig =
                    config.logger
                    parsePostData
                    config.cookieSerialiser
+                   config.tlsProvider
 
   /// Finds an endpoint that is configured from the given configuration. Throws
   /// an exception if the configuration has no bindings. Useful if you make

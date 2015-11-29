@@ -16,15 +16,13 @@ type TlsTransport(cn : Connection, ssl) =
     member this.shutdown() =
       cn.transport.shutdown()
 
-type OpenSSLProvider(cert : X509Certificate) = 
+type OpenSSLProvider() = 
 
   interface ITlsProvider with
 
-    member this.Wrap(connection : Connection) = socket {
-      let ssl = authenticateAsServer cert
+    member this.Wrap(connection : Connection, cert : obj) = socket {
+      let ssl = authenticateAsServer (cert :?> X509Certificate)
       do! accept connection ssl
       let tls_transport = new TlsTransport(connection, ssl)
       return { connection with transport = tls_transport}
     }
-
-let open_ssl cert = new OpenSSLProvider(cert)
