@@ -495,12 +495,12 @@ module internal ParsingAndControl =
   /// Load a readable plain-text stream, based on the protocol in use. If plain HTTP
   /// is being used, the stream is returned as it, otherwise a new SslStream is created
   /// to decipher the stream, without client certificates.
-  let inline loadConnection (logger : Logger) proto (connection : Connection) = socket{
-    match proto with
-    | HTTP       ->
+  let inline loadConnection (runtime : HttpRuntime) (connection : Connection) = socket{
+    match runtime.matchedBinding.scheme with
+    | HTTP    ->
       return connection
-    | HTTPS sslProvider -> 
-      return! sslProvider.Wrap connection
+    | HTTPS o -> 
+      return! runtime.tlsProvider.Wrap (connection,o)
     }
 
   open System.Net.Sockets
@@ -595,7 +595,7 @@ module internal ParsingAndControl =
     (connection : Connection) =
     let verbose  = Log.verbose runtime.logger "Suave.Web.httpLoop.loop" TraceHeader.empty
     async {
-      let! result = loadConnection runtime.logger runtime.matchedBinding.scheme connection
+      let! result = loadConnection runtime connection
       match result with
       | Choice1Of2 connection' ->
         do! httpLoop { HttpContext.empty with runtime = runtime; connection = connection' } consumer

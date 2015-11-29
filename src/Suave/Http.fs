@@ -292,15 +292,16 @@ module Http =
     static member mimeType_ = Property<HttpUpload,_> (fun x -> x.mimeType) (fun v x -> { x with mimeType = v })
     static member tempFilePath_ = Property<HttpUpload,_> (fun x -> x.tempFilePath) (fun v x -> { x with tempFilePath = v })
 
+  [<AllowNullLiteral>]
   type ITlsProvider =
-    abstract member Wrap : Connection -> SocketOp<Connection>
+    abstract member Wrap : Connection * obj -> SocketOp<Connection>
 
   /// Gets the supported protocols, HTTP and HTTPS with a certificate
   type Protocol = 
     /// The HTTP protocol is the core protocol
     | HTTP
     /// The HTTP protocol tunneled in a TLS tunnel
-    | HTTPS of ITlsProvider
+    | HTTPS of obj
       
     member x.secure = 
       match x with
@@ -559,7 +560,8 @@ module Http =
       logger            : Logger
       matchedBinding    : HttpBinding
       parsePostData     : bool
-      cookieSerialiser  : Suave.Utils.CookieSerialiser }
+      cookieSerialiser  : Suave.Utils.CookieSerialiser
+      tlsProvider       : ITlsProvider }
 
     static member serverKey_ = Property (fun x -> x.serverKey) (fun v x -> { x with serverKey = v })
     static member errorHandler_ = Property (fun x -> x.errorHandler) (fun v x -> { x with errorHandler = v })
@@ -688,10 +690,11 @@ module Http =
         logger            = Loggers.saneDefaultsFor LogLevel.Debug
         matchedBinding    = HttpBinding.defaults
         parsePostData     = false
-        cookieSerialiser  = new BinaryFormatterSerialiser() }
+        cookieSerialiser  = new BinaryFormatterSerialiser()
+        tlsProvider       = null }
 
     /// make a new HttpRuntime from the given parameters
-    let mk serverKey errorHandler mimeTypes homeDirectory compressionFolder logger parsePostData cookieSerialiser binding =
+    let mk serverKey errorHandler mimeTypes homeDirectory compressionFolder logger parsePostData cookieSerialiser tlsProvider binding =
       { serverKey         = serverKey
         errorHandler      = errorHandler
         mimeTypesMap      = mimeTypes
@@ -700,7 +703,8 @@ module Http =
         logger            = logger
         matchedBinding    = binding
         parsePostData     = parsePostData
-        cookieSerialiser  = cookieSerialiser }
+        cookieSerialiser  = cookieSerialiser
+        tlsProvider       = tlsProvider }
 
   /// A module that provides functions to create a new HttpContext.
   [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]

@@ -3,6 +3,7 @@ obj/
 packages/
 build/
 gh-pages/
+docs/output/
 miTLS/
 .bundle/
 

@@ -75,4 +75,5 @@ module Web =
       compressedFilesFolder = None
       logger                = Loggers.saneDefaultsFor LogLevel.Info
       tcpServerFactory      = new Tcp.DefaultTcpServerFactory()
-      cookieSerialiser      = new Utils.BinaryFormatterSerialiser() }
+      cookieSerialiser      = new Utils.BinaryFormatterSerialiser()
+      tlsProvider           = new DefaultTlsProvider() }
