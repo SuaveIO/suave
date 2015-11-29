@@ -33,6 +33,7 @@ end
 desc "Restore all packages"
 task :restore => [:restore_paket, :yolo] do
   system 'tools/paket.exe', 'restore', clr_command: true
+  system 'tools/paket.exe', %w|restore group Build|, clr_command: true
 end
 
 desc 'create assembly infos'
