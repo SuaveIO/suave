@@ -120,7 +120,7 @@ nugets_pack :create_nuget_quick => [:versioning, 'build/pkg'] do |p|
   p.configuration = Configuration
   p.files   = FileList['src/**/*.fsproj'].exclude(/Tests/)
   p.out     = 'build/pkg'
-  p.exe     = 'packages/NuGet.CommandLine/tools/NuGet.exe'
+  p.exe     = 'packages/build/NuGet.CommandLine/tools/NuGet.exe'
   p.with_metadata do |m|
     m.version       = ENV['NUGET_VERSION']
     m.authors       = 'Ademar Gonzalez, Henrik Feldt'
@@ -151,7 +151,7 @@ end
 Albacore::Tasks::Release.new :release,
                              pkg_dir: 'build/pkg',
                              depend_on: [:compile, :nugets],
-                             nuget_exe: 'packages/NuGet.CommandLine/tools/NuGet.exe',
+                             nuget_exe: 'packages/build/NuGet.CommandLine/tools/NuGet.exe',
                              api_key: ENV['NUGET_KEY']
 
 namespace :docs do
