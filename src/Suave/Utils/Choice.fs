@@ -4,6 +4,15 @@ open System
 
 let create x = Choice1Of2 x
 
+let bind (f : 'a -> Choice<'b, 'c>) (v : Choice<'a, 'c>) =
+  match v with
+  | Choice1Of2 v -> f v
+  | Choice2Of2 c -> Choice2Of2 c
+
+let bindError f = function
+    | Choice1Of2 x -> Choice1Of2 x
+    | Choice2Of2 y -> f y
+
 let bindUnit f = function
   | Choice1Of2 x -> f x
   | Choice2Of2 _ -> Choice2Of2 ()

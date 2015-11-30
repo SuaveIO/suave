@@ -3,7 +3,6 @@ open System.Net
 
 open Suave
 open Suave.Operators
-open Suave.Http
 open Suave.Filters
 open Suave.Files
 open Suave.Logging
