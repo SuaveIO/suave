@@ -3,6 +3,8 @@ obj/
 packages/
 build/
 gh-pages/
+docs/output/
+paket-files/
 _site/
 miTLS/
 .bundle/
