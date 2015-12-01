@@ -122,7 +122,6 @@
     <Compile Include="Classic.fsi" />
     <Compile Include="Classic.fs" />
     <Compile Include="Http.fs" />
-    <Compile Include="Types.fs" />
     <Compile Include="DefaultTlsProvider.fs" />
     <Compile Include="Compression.fs" />
     <Compile Include="Combinators.fsi" />

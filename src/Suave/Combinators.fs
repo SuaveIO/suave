@@ -2,7 +2,6 @@ namespace Suave
 
 open Suave.Operators
 open Suave.Sockets
-open Suave.WebPart
 
 module Response =
 
