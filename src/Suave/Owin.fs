@@ -17,6 +17,7 @@ open Suave.Logging
 open Suave.Http
 open Suave.Types
 open Suave.Sockets
+open Suave.Utils
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module OwinConstants =
@@ -572,13 +573,6 @@ module OwinApp =
         OwinKey OwinConstants.MSFT.traceFactoryDelegate,    HttpContext.runtime_ >--> HttpRuntime.logger_ >--> ((fun x -> traceFactory x), (fun v x -> x)) <--> untyped
       ]
 
-  type UnclosableMemoryStream() =
-    inherit IO.MemoryStream()
-    // I can't be bothered to do a full delegation... R# needed for that.
-    override x.Close () = ()
-    member x.Dispose() = ()
-    member x.RealDispose() = base.Dispose()
-
   type internal OwinDictionary(requestPathBase, initialState) =
     // TODO: support streaming optionally
       //let impl conn = AsyncSocket.transferStream conn v
@@ -608,7 +602,7 @@ module OwinApp =
                 | Some v -> v)),
       (fun v x -> invalidOp "setting ResponseHeaders IDictionary<string, string[]> is not supported")
 
-    let responseStream = new UnclosableMemoryStream()
+    let responseStream = new OpenMemoryStream()
     let responseStreamLens : Property<HttpContent, IO.Stream> =
       (fun x ->
         let bs = Lens.getPartialOrElse HttpContent.BytesPLens [||] x
@@ -659,7 +653,7 @@ module OwinApp =
       let setRequestHeaders (rhs : DeltaDictionary) =
         Lens.set reqHeaders_ rhs.DeltaList
 
-      let setResponseData (ms : IO.MemoryStream) =
+      let setResponseData (ms : OpenMemoryStream) =
         ms.Seek(0L, IO.SeekOrigin.Begin) |> ignore
         Lens.setPartial bytes_ (ms.ToArray())
 
@@ -670,7 +664,6 @@ module OwinApp =
       |> Option.foldBack setResponseHeaders !responseHeaders
       |> setResponseData responseStream
 
-      
     interface IDictionary<string, obj> with
       member x.Remove k =
         invalidOp "Remove not supported"

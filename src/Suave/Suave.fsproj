@@ -59,7 +59,8 @@
     <ConsolePause>false</ConsolePause>
     <WarningLevel>3</WarningLevel>
     <DocumentationFile>bin\Release\Suave.xml</DocumentationFile>
-    <DefineConstants />
+    <DefineConstants>
+    </DefineConstants>
     <DebugType>pdbonly</DebugType>
     <PlatformTarget>x86</PlatformTarget>
   </PropertyGroup>
@@ -93,6 +94,7 @@
     <Compile Include="Utils\Crypto.fs" />
     <Compile Include="Utils\Parsing.fs" />
     <Compile Include="Utils\Serialisation.fs" />
+    <Compile Include="Utils\OpenMemoryStream.fs" />
     <Compile Include="Globals.fs" />
     <Compile Include="Logging\LogLevel.fs" />
     <Compile Include="Logging\TraceHeader.fs" />

@@ -3,6 +3,7 @@ module Suave.Tests.Program
 open Suave.Types
 open Suave.Web
 open Suave.Logging
+open Suave.LibUv
 open FuchuExtensions
 
 open System
@@ -17,18 +18,20 @@ let main args =
     , arch Environment.Is64BitProcess
     , arch Environment.Is64BitOperatingSystem)
 
-  let defaultConfig =
-    { defaultConfig with logger = Loggers.saneDefaultsFor LogLevel.Warn}
+  let testConfig =
+    { defaultConfig with
+        bindings = [ HttpBinding.mkSimple HTTP "127.0.0.1" 9001 ]
+        logger   = Loggers.saneDefaultsFor LogLevel.Warn }
 
   Console.WriteLine "Running tests with default TCP engine."
-  let firstRun = defaultMainThisAssemblyWithParam defaultConfig args
+  let firstRun = defaultMainThisAssemblyWithParam testConfig args
   Console.WriteLine "Done."
-  
+
   if firstRun <> 0 then
     firstRun
   else
     Console.WriteLine "Running tests with LibUv TCP engine."
-    let libUvConfig = { defaultConfig with tcpServerFactory = Suave.LibUv.Tcp.LibUvServerFactory() }
+    let libUvConfig = { testConfig with tcpServerFactory = Tcp.LibUvServerFactory() }
     let r = defaultMainThisAssemblyWithParam libUvConfig args
     Console.WriteLine "Done."
     r

@@ -29,6 +29,7 @@
     </PlatformTarget>
     <DefineConstants>
     </DefineConstants>
+    <DebugSymbols>true</DebugSymbols>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|x86' ">
     <DebugSymbols>true</DebugSymbols>
@@ -104,13 +105,6 @@
   </Choose>
   <Choose>
     <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
-      <PropertyGroup>
-        <__paket__WebSharper_targets>WebSharper</__paket__WebSharper_targets>
-      </PropertyGroup>
-    </When>
-  </Choose>
-  <Choose>
-    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
       <ItemGroup>
         <Reference Include="WebSharper.Collections">
           <HintPath>..\..\packages\WebSharper\lib\net40\WebSharper.Collections.dll</HintPath>
@@ -172,6 +166,14 @@
   </Choose>
   <Choose>
     <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
+      <PropertyGroup>
+        <__paket__WebSharper_targets>WebSharper</__paket__WebSharper_targets>
+      </PropertyGroup>
+    </When>
+  </Choose>
+  <Import Project="..\..\packages\WebSharper\build\$(__paket__WebSharper_targets).targets" Condition="Exists('..\..\packages\WebSharper\build\$(__paket__WebSharper_targets).targets')" Label="Paket" />
+  <Choose>
+    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
       <ItemGroup>
         <Reference Include="HttpMultipartParser">
           <HintPath>..\..\packages\WebSharper.Owin\lib\net45\HttpMultipartParser.dll</HintPath>
@@ -217,5 +219,4 @@
       </ItemGroup>
     </When>
   </Choose>
-  <Import Project="..\..\packages\WebSharper\build\$(__paket__WebSharper_targets).targets" Condition="Exists('..\..\packages\WebSharper\build\$(__paket__WebSharper_targets).targets')" Label="Paket" />
 </Project>
