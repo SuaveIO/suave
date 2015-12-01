@@ -26,7 +26,7 @@ Or with [Paket](https://github.com/fsprojects/Paket) in paket.dependencies:
 
 {% highlight dosbatch %}
 source https://nuget.org/api/v2
-nuget Suave 0.16.0
+nuget Suave 0.33.0
 {% endhighlight %}
 
 The simplest possible application: Hello World!
