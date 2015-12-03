@@ -854,11 +854,11 @@ module Http =
                 let allowedOrigin = isAllowedOrigin config originValue
                 match req.``method`` with
                 | HttpMethod.OPTIONS ->
-                    match req.header AccessControlRequestMethod with
+                    match req.header (AccessControlRequestMethod.ToLowerInvariant()) with
                     | Choice1Of2 requestMethodHeaderValue -> // Preflight request
                         // Does the request have an Access-Control-Request-Headers header? If so, validate. If not, proceed.
                         let setAccessControlRequestHeaders =
-                            match req.allHeaders AccessControlRequestHeaders with
+                            match req.allHeaders (AccessControlRequestHeaders.ToLowerInvariant()) with
                                 | Choice1Of2 list -> 
                                     Writers.setHeader AccessControlAllowHeaders (list |> String.concat ", ")
                                 | Choice2Of2 _ -> succeed
@@ -871,7 +871,7 @@ module Http =
                                     >>= setMaxAgeHeader config
                                     >>= setAllowCredentialsHeader config
                                     >>= setAllowOriginHeader originValue
-                                    >>= OK ""
+                                    >>= NO_CONTENT
                                 )
                         else
                             succeed ctx                        
