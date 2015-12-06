@@ -20,6 +20,11 @@ module Writers =
 
   open System
 
+  let setStatus s : WebPart = 
+    fun ctx ->
+      { ctx with response = { ctx.response with status = s }}
+      |> succeed
+
   let setHeader key value (ctx : HttpContext) =
     { ctx with response = { ctx.response with headers = (key, value) :: (ctx.response.headers |> List.filter (fun (k,_) -> k <> key))  } }
     |> succeed

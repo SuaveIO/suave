@@ -38,6 +38,9 @@ module Response =
 /// Functions have signature f :: params... -> HttpContext -> HttpContext.
 module Writers =
 
+  /// Sets the HTTP response status
+  val setStatus : status:HttpCode -> WebPart
+
   /// Ensures that the key header has the given value
   val setHeader : key:string -> value:string -> WebPart
 
