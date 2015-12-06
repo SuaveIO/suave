@@ -19,9 +19,6 @@ module Http =
   open Suave.Log
   open Suave.Logging
 
-  /// <summary>
-  /// These are the known HTTP methods. See http://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html
-  /// </summary>
   [<RequireQualifiedAccess>]
   type HttpMethod =
     | GET
@@ -33,7 +30,7 @@ module Http =
     | PATCH
     | TRACE
     | OPTIONS
-    | OTHER of string // This represents a method string that isn't one of the standard methods.
+    | OTHER of string
 
     override x.ToString() =
       match x with
@@ -178,7 +175,7 @@ module Http =
       | HTTP_504 -> "The gateway server did not receive a timely response"
       | HTTP_505 -> "Cannot fulfill request."
 
-    member x.Describe () =
+    member x.describe () =
       sprintf "%d %s: %s" x.code x.reason x.message
 
     static member TryParse (code: int) =
@@ -190,23 +187,14 @@ module Http =
         Microsoft.FSharp.Reflection.FSharpType.GetUnionCases(typeof<HttpCode>)
         |> Array.map (fun case -> case.Name, Microsoft.FSharp.Reflection.FSharpValue.MakeUnion(case, [||]) :?> HttpCode)
         |> Map.ofArray
-    
-  module Codes =
-    type X = HttpCode
-    [<System.Obsolete("Use Suave.Types.HttpCode")>]
-    type HttpCode = X
 
-  /// HTTP cookie
   type HttpCookie =
     { name     : string
       value    : string
       expires  : DateTimeOffset option
       path     : string option
-      /// This cookies is only valid for the given domain
       domain   : string option
-      /// This cookie is not forwarded over plaintext transports
       secure   : bool
-      /// This cookie is not readable from JavaScript
       httpOnly : bool }
 
     static member name_     = (fun x -> x.name),    fun v x -> { x with name = v }
@@ -220,7 +208,6 @@ module Http =
   [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
   module HttpCookie =
 
-    /// Create a new HttpCookie with all the given values.
     let mk name value expires path domain secure httpOnly =
       { name      = name
         value     = value
@@ -230,21 +217,7 @@ module Http =
         secure    = secure
         httpOnly = httpOnly }
 
-    /// Create a new cookie with the given name, value, and defaults:
-    ///
-    /// - no explicit expiry time
-    /// - path at "/", so that it's global to the domain that it's created under.
-    /// - no specific domain (defaults to the current domain plus its subdomains)
-    /// - secure = false (you can set it over plain text HTTP - change to true in SSL terminator)
-    /// - http_only = true - the cookie can be read from JS - change this to
-    ///   false if you want to only be able to read the cookie from JS, but
-    ///   Good default if you're implementing session handling.
-    /// - version: an optional version field
-    ///
-    /// More reading:
-    /// - http://www.nczonline.net/blog/2009/05/05/http-cookies-explained/
-    /// - https://developer.mozilla.org/en-US/docs/Web/API/document.cookie
-    ///
+
     let mkKV name value =
       { name      = name
         value     = value
@@ -254,10 +227,8 @@ module Http =
         secure    = false
         httpOnly = true }
 
-    /// An empty cookie value
     let empty = mkKV "" ""
 
-    /// Assumes only valid characters go in, see http://tools.ietf.org/html/rfc6265#section-4.1.1
     let toHeader (x : HttpCookie) =
       let app (sb : StringBuilder) (value : string) = sb.Append value |> ignore
       let sb = new StringBuilder(String.Concat [ x.name; "="; x.value ])
@@ -270,7 +241,6 @@ module Http =
       if x.secure    then app "Secure"
       sb.ToString ()
 
-  /// A file's mime type and if compression is enabled or not
   type MimeType =
     { name         : string
       compression  : bool }
@@ -280,11 +250,10 @@ module Http =
 
   type MimeTypesMap = string -> MimeType option
 
-  /// A holder for uploaded file meta-data
   type HttpUpload =
-    { fieldName     : string
-      fileName      : string
-      mimeType      : string
+    { fieldName    : string
+      fileName     : string
+      mimeType     : string
       tempFilePath : string }
 
     static member fieldName_ = Property<HttpUpload,_> (fun x -> x.fieldName) (fun v x -> { x with fieldName = v })
@@ -296,41 +265,25 @@ module Http =
   type ITlsProvider =
     abstract member Wrap : Connection * obj -> SocketOp<Connection>
 
-  /// Gets the supported protocols, HTTP and HTTPS with a certificate
   type Protocol = 
-    /// The HTTP protocol is the core protocol
     | HTTP
-    /// The HTTP protocol tunneled in a TLS tunnel
     | HTTPS of obj
       
     member x.secure = 
       match x with
       | HTTP    -> false
       | HTTPS _ -> true
-    
+
     override x.ToString() = 
       match x with
       | HTTP    -> "http"
       | HTTPS _ -> "https"
 
-  /// Type alias for string. This is the host as seen from the server; not
-  /// necessarily as seen from the client.
   type Host = string
 
-  /// A holder for the data extracted from the request.
   type HttpRequest =
     { httpVersion     : string
       url             : Uri
-      /// The Host that the web server responds to; not necessarily the host called
-      /// by the client, as the request may have traversed proxies. As Suave
-      /// binds to an IP rather than IP+Hostname, this can be anything the client
-      /// has passed as the Host header. If you're behind a proxy, it may be the
-      /// DNS name of the node that the reverse proxy forwards to, or if you're
-      /// exposing Suave publically, it should match the public DNS name of the
-      /// node.
-      ///
-      /// To ensure the correct host-name is being called, you can use `Http.host`
-      /// in your web app.
       host            : Host
       ``method``      : HttpMethod
       headers         : (string * string) list
@@ -351,40 +304,24 @@ module Http =
     static member multipartFields_ = Property<HttpRequest,_> (fun x -> x.multiPartFields) (fun v x -> { x with multiPartFields = v })
     static member trace_           = Property<HttpRequest,_> (fun x -> x.trace) (fun v x -> { x with trace = v })
 
-    /// Gets the query string from the HttpRequest. Use queryParam to try to fetch
-    /// data for individual items.
     member x.query =
       Parsing.parseData x.rawQuery
 
-    /// Finds the key k from the query string in the HttpRequest. To access form
-    /// data, use either `formData` to access normal form data, or `fieldData` to
-    /// access the multipart-fields.
     member x.queryParam (k : string) =
       getFirstOpt x.query k
 
-    /// Gets the header for the given key in the HttpRequest
     member x.header k =
       getFirst x.headers k
 
-    /// Gets the form as a ((string * string option) list) from the HttpRequest.
-    /// Use formData to get the data for a particular key or use the indexed
-    /// property in the HttpRequest.
     member x.form =
       Parsing.parseData (ASCII.toString x.rawForm)
 
-    /// Finds the key k from the form of the HttpRequest. To access query string
-    /// parameters, use `queryParam` or to access multipart form fields, use
-    /// `fieldData`.
     member x.formData (k : string) =
       getFirstOpt x.form k
 
-    /// Finds the key k from the multipart-form of the HttpRequest. To access
-    /// query string parameters, use `queryParam` or to access regular form data,
-    /// use `formData`.
     member x.fieldData (k : string) =
       getFirst x.multiPartFields k
 
-    /// Syntactic Sugar to retrieve query string, form or multi-field values from HttpRequest 
     member this.Item
       with get(x) =
 
@@ -400,11 +337,6 @@ module Http =
 
         params' x
 
-    /// Get the client's view of what host is being called. If you trust your
-    /// proxy the value will be fetched from X-Forwarded-Host, then the Host
-    /// headers. If you don't explicitly overwrite these headers in the proxy
-    /// you may be open to clients spoofing the headers. Hence the explicit
-    /// interfaces which force you as a developer to think abou the problem.
     member x.clientHost trustProxy sources : string =
       if trustProxy then
         sources
@@ -435,8 +367,6 @@ module Http =
         multiPartFields = []
         trace           = TraceHeader.empty }
 
-  /// A HTTP binding is a protocol is the product of HTTP or HTTP, a DNS or IP
-  /// binding and a port number.
   type HttpBinding =
     { scheme        : Protocol
       socketBinding : SocketBinding }
@@ -450,8 +380,6 @@ module Http =
       ]
       |> fun x -> Uri x
 
-    /// Overrides the default ToString() method to provide an implementation that
-    /// is assignable to a BaseUri for a RestClient/HttpClient.
     override x.ToString() =
       String.Concat [ x.scheme.ToString(); "://"; x.socketBinding.ToString() ]
 
@@ -467,33 +395,17 @@ module Http =
       { scheme        = HTTP
         socketBinding = SocketBinding.mk IPAddress.Loopback DefaultBindingPort }
 
-    /// Create a HttpBinding for the given protocol, an IP address to bind to and
-    /// a port to listen on – this is the strongly typed overload.
     let mk scheme (ip : IPAddress) (port : Port) = 
       { scheme        = scheme
         socketBinding = SocketBinding.mk ip port }
 
-    /// Create a HttpBinding for the given protocol, an IP address to bind to and
-    /// a port to listen on – this is the "stringly typed" overload.
     let mkSimple scheme ip (port : int) = 
       { scheme        = scheme
         socketBinding = SocketBinding.mk (IPAddress.Parse ip) (uint16 port) } 
 
   type HttpContent =
-    /// This is the default HttpContent. If you place this is a HttpResult the web
-    /// server won't be that happy. It's assumed by Suave that you place a proper
-    /// Bytes or SocketTask content as the value – all built-in Http applicates
-    /// do this properly.
     | NullContent
-    /// This tells Suave to respond with an array of bytes. Since most responses
-    /// are small enough to fit into memory, this is the most used HttpContent
-    /// used as results. If you want a streaming result, use SocketTask instead;
-    /// useful when you're serving large files through Suave.
     | Bytes of byte []
-    /// This task, especially with the `writePreamble`-flag lets your WebPart
-    /// control the flow of bytes by using a SocketOp. Contrasting with Bytes,
-    /// setting the HttpContent as this discriminated union type lets you stream
-    /// data back to the client through Suave.
     | SocketTask of (Connection * HttpResult -> SocketOp<unit>)
 
     static member NullContentPIso =
@@ -518,9 +430,6 @@ module Http =
     static member SocketTaskPLens : PLens<HttpContent, Connection * HttpResult -> SocketOp<unit>> =
       Aether.idLens <-?> HttpContent.SocketTaskPIso
 
-  /// The HttpResult is the structure that you work with to tell Suave how to
-  /// send the response. Have a look at the docs for HttpContent for further
-  /// details on what is possible.
   and HttpResult =
     { status        : HttpCode
       headers       : (string * string) list
@@ -532,7 +441,6 @@ module Http =
     static member content_ = Property<HttpResult,_> (fun x -> x.content) (fun v x -> { x with content = v })
     static member writePreamble_ = Property<HttpResult,_> (fun x -> x.writePreamble) (fun v x -> { x with writePreamble = v })
 
-  /// A server-key is a 256 bit key with high entropy
   type ServerKey = byte []
 
   type IPAddress with
@@ -541,9 +449,6 @@ module Http =
       | false, _ -> Choice2Of2 ()
       | _, ip    -> Choice1Of2 ip
 
-  /// The HttpRuntime is created from the SuaveConfig structure when the web
-  /// server starts. You can also use the `HttpRuntime` module to create a new
-  /// value yourself, or use the `empty` one.
   type HttpRuntime =
     { serverKey         : ServerKey
       errorHandler      : ErrorHandler
@@ -564,26 +469,16 @@ module Http =
     static member logger_ = Property (fun x -> x.logger) (fun v x -> { x with logger = v })
     static member matchedBinding_ = Property (fun x -> x.matchedBinding) (fun v x -> { x with matchedBinding = v })
     static member parsePostData_ = Property (fun x -> x.parsePostData) (fun v x -> { x with parsePostData = v })
+    static member cookieSerialiser_ = Property (fun x -> x.cookieSerialiser) (fun v x -> { x with cookieSerialiser = v })
+    static member tlsProvider_ = Property (fun x -> x.tlsProvider) (fun v x -> { x with tlsProvider = v })
 
-  /// The HttpContext is the container of the request, runtime, user-state and
-  /// response.
   and HttpContext =
-    { /// The HTTP request being processed
-      request    : HttpRequest
-
-      /// The HttpRuntime for the request being processed
+    { request    : HttpRequest
       runtime    : HttpRuntime
-
-      /// The connection for the request being processed
       connection : Connection
-
-      /// The user state for the request being processed
       userState  : Map<string, obj>
-
-      /// The response for the request being processed
       response   : HttpResult }
 
-    /// Get the IP of the client from the HttpContext.
     member x.clientIp trustProxy sources =
       if trustProxy then
         sources
@@ -595,18 +490,6 @@ module Http =
       else
         x.connection.ipAddr
 
-    /// Warning; if you don't write these headers in your rev.proxy, the client will
-    /// be able to spoof them. Related headers:
-    /// - client-ip
-    /// - x-forwarded-for: the "X-Forwarded-For" client request header field with
-    ///   the $remote_addr variable appended to it, separated by a comma. If the
-    ///   "X-Forwarded-For" field is not present in the client request header, the
-    ///   $proxy_add_x_forwarded_for variable is equal to the $remote_addr variable.
-    ///   from http://nginx.org/en/docs/http/ngx_http_proxy_module.html
-    ///
-    /// Related blog entry, with suggestion on nginx module to use to recursively
-    /// tell all upstream proxies to overwrite X-Real-IP:
-    /// http://distinctplace.com/infrastructure/2014/04/23/story-behind-x-forwarded-for-and-x-real-ip-headers/
     member x.clientIpTrustProxy =
       x.clientIp true [ "x-real-ip" ]
 
@@ -644,20 +527,17 @@ module Http =
       x.clientProto true [ "x-forwarded-proto" ]
 
     static member request_     = Property (fun x -> x.request) (fun v x -> { x with request = v })
-    static member userState_   = Property (fun x -> x.userState) (fun v x -> { x with userState = v })
     static member runtime_     = Property (fun x -> x.runtime) (fun v x -> { x with runtime = v })
+    static member connection_  = Property (fun x -> x.connection) (fun v x -> x)
+    static member userState_   = Property (fun x -> x.userState) (fun v x -> { x with userState = v })
     static member response_    = Property (fun x -> x.response) (fun v x -> { x with response = v })
+
+    // read-only
     static member clientIp_    = Property (fun (x : HttpContext) -> x.clientIpTrustProxy) (fun v x -> x)
     static member isLocal_     = Property (fun (x : HttpContext) -> x.isLocal) (fun v x -> x)
     static member clientPort_  = Property (fun (x : HttpContext) -> x.clientPortTrustProxy) (fun v x -> x)
     static member clientProto_ = Property (fun (x : HttpContext) -> x.clientProtoTrustProxy) (fun v x -> x)
 
-  /// A WebPart is an asynchronous function that transforms the HttpContext.  An asynchronous return
-  /// value of None indicates 'did not handle'. 
-
-  /// An error handler takes the exception, a programmer-provided message, a
-  /// request (that failed) and returns an asynchronous workflow for the handling
-  /// of the error.
   and ErrorHandler = Exception -> String -> WebPart<HttpContext>
 
   type WebPart = WebPart<HttpContext>
@@ -678,13 +558,8 @@ module Http =
   [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
   module HttpRuntime =
 
-    /// The key length in bytes, references Crypto.KeyLength which is appropriate
-    /// for the underlying AES-256 bit symmetric crypto in use.
-    let ServerKeyLength = Crypto.KeyLength
+    let ServerKeyLength : uint16 = Crypto.KeyLength
 
-    /// warn: this is not to be played around with; prefer using the config
-    /// defaults instead, from Web.fs, as they contain the logic for printing to
-    /// the output stream correctly.
     let empty =
       { serverKey         = Crypto.generateKey ServerKeyLength
         errorHandler      = fun _ _ -> fun _ -> async.Return None
@@ -697,7 +572,6 @@ module Http =
         cookieSerialiser  = new BinaryFormatterSerialiser()
         tlsProvider       = null }
 
-    /// make a new HttpRuntime from the given parameters
     let mk serverKey errorHandler mimeTypes homeDirectory compressionFolder logger parsePostData cookieSerialiser tlsProvider binding =
       { serverKey         = serverKey
         errorHandler      = errorHandler
@@ -710,12 +584,8 @@ module Http =
         cookieSerialiser  = cookieSerialiser
         tlsProvider       = tlsProvider }
 
-  /// A module that provides functions to create a new HttpContext.
   [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
   module HttpContext =
-    /// The empty HttpContext is fairly useless for doing real work; you'd be well
-    /// adviced to write some of the properties. However, it can be quite useful
-    /// in unit tests.
     let empty =
       { request    = HttpRequest.empty
         userState  = Map.empty

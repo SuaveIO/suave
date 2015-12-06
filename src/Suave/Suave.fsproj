@@ -31,8 +31,7 @@
     <ConsolePause>false</ConsolePause>
     <WarningLevel>3</WarningLevel>
     <DocumentationFile>bin\Release\Suave.xml</DocumentationFile>
-    <DefineConstants>
-    </DefineConstants>
+    <DefineConstants></DefineConstants>
     <DebugType>pdbonly</DebugType>
   </PropertyGroup>
   <PropertyGroup>
@@ -59,8 +58,7 @@
     <ConsolePause>false</ConsolePause>
     <WarningLevel>3</WarningLevel>
     <DocumentationFile>bin\Release\Suave.xml</DocumentationFile>
-    <DefineConstants>
-    </DefineConstants>
+    <DefineConstants></DefineConstants>
     <DebugType>pdbonly</DebugType>
     <PlatformTarget>x86</PlatformTarget>
   </PropertyGroup>
@@ -96,6 +94,7 @@
     <Compile Include="Utils\Parsing.fs" />
     <Compile Include="Utils\CookieSerialiser.fs" />
     <Compile Include="Utils\OpenMemoryStream.fs" />
+    <Compile Include="Utils\Property.fs" />
     <Compile Include="Utils\Parse.fs" />
     <Compile Include="Globals.fs" />
     <Compile Include="Logging\LogLevel.fs" />
@@ -119,8 +118,7 @@
     <Compile Include="WebPart.fsi" />
     <Compile Include="WebPart.fs" />
     <Compile Include="Operators.fs" />
-    <Compile Include="Classic.fsi" />
-    <Compile Include="Classic.fs" />
+    <Compile Include="Http.fsi" />
     <Compile Include="Http.fs" />
     <Compile Include="DefaultTlsProvider.fs" />
     <Compile Include="Compression.fs" />
@@ -138,6 +136,8 @@
     <Compile Include="WebSocket.fs" />
     <Compile Include="Json.fs" />
     <Compile Include="Proxy.fs" />
+    <Compile Include="Classic.fsi" />
+    <Compile Include="Classic.fs" />
     <Compile Include="AssemblyVersionInfo.fs" Condition="Exists('AssemblyVersionInfo.fs')" />
     <None Include="paket.references" />
     <Content Include="App.config" />

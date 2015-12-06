@@ -185,9 +185,9 @@ let startTcpIpServerAsync (serveClient : TcpWorker<unit>)
     , runServer startData acceptingConnections serveClient
 
 type TcpServerFactory =
-  abstract member create  : Logger * int * int * SocketBinding -> TcpServer
+  abstract member create  : logger:Logger * maxOps:int * int * SocketBinding -> TcpServer
 
 type DefaultTcpServerFactory() =
   interface TcpServerFactory with
-    member this.create (logger,maxOps, bufferSize,binding) =
+    member this.create (logger, maxOps, bufferSize,binding) =
       runServer logger maxOps bufferSize binding

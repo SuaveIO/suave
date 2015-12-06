@@ -2,7 +2,8 @@
 
 open System
 open System.Net
-open Suave.Utils.Collections
+open System.Net.Sockets
+open Suave.Utils
 
 /// A port is an unsigned short (uint16) structure
 type Port = uint16
@@ -11,11 +12,11 @@ type SocketBinding =
   { ip   : IPAddress
     port : Port }
 
-  member x.endpoint = new IPEndPoint(x.ip, int x.port)
+  member x.endpoint =
+    new IPEndPoint(x.ip, int x.port)
 
   override x.ToString() =
-    let isv6 = (x.ip.AddressFamily = Sockets.AddressFamily.InterNetworkV6)
-    if isv6 then
+    if x.ip.AddressFamily = AddressFamily.InterNetworkV6 then
       String.Concat [ "["; x.ip.ToString(); "]:"; x.port.ToString() ]
     else
       String.Concat [ x.ip.ToString(); ":"; x.port.ToString() ]
@@ -25,4 +26,6 @@ type SocketBinding =
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module SocketBinding =
-  let mk ip port = { ip = ip; port = port }
+
+  let mk ip port =
+    { ip = ip; port = port }

@@ -19,7 +19,7 @@ type LogLine =
     ``exception`` : exn option
     /// timestamp when this log line was created
     tsUTCTicks    : int64 }
-    
+
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module LogLine =
   let mk path level trace ex message =

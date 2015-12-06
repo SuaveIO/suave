@@ -15,7 +15,7 @@ let HMACAlgorithm = "HMACSHA256"
 
 /// The length of the HMAC value in number of bytes
 [<Literal>]
-let HMACLength = 32 // = 256 / 8
+let HMACLength = 32us // = 256 / 8
 
 /// Calculate the HMAC of the passed data given a private key
 let hmacAtOffset (key : byte []) offset count (data : byte[]) =
@@ -32,17 +32,17 @@ let hmacOfText (key : byte []) (data : seq<string>) =
   hmacOfBytes key (String.Concat data |> UTF8.bytes)
 
 /// # bits in key
-let KeySize   = 256
+let KeySize   = 256us
 
 /// # bytes in key
-let KeyLength = KeySize / 8
+let KeyLength = KeySize / 8us
 
 /// # bits in block
-let BlockSize = 128
+let BlockSize = 128us
 
 /// # bytes in IV
 /// 16 bytes for 128 bit blocks
-let IVLength = BlockSize / 8
+let IVLength = BlockSize / 8us
 
 /// the global crypto-random pool for uniform and therefore cryptographically
 /// secure random values
@@ -54,14 +54,14 @@ let randomize (bytes : byte []) =
   bytes
 
 /// Generates a string key from the available characters with the given key size.
-let generateKey keyLength =
-  Array.zeroCreate<byte> keyLength |> randomize
+let generateKey (keyLength : uint16) =
+  Array.zeroCreate<byte> (int keyLength) |> randomize
 
 let generateStdKey () =
   generateKey KeyLength
 
-let generateIV ivLength =
-  Array.zeroCreate<byte> ivLength |> randomize
+let generateIV (ivLength : uint16) =
+  Array.zeroCreate<byte> (int ivLength) |> randomize
 
 let generateStdIV () =
   generateIV IVLength
@@ -81,8 +81,8 @@ type SecretboxDecryptionError =
 
 let private secretboxInit key iv =
   let aes = new AesManaged()
-  aes.KeySize   <- KeySize
-  aes.BlockSize <- BlockSize
+  aes.KeySize   <- int KeySize
+  aes.BlockSize <- int BlockSize
   aes.Mode      <- CipherMode.CBC
   aes.Padding   <- PaddingMode.PKCS7
   aes.IV        <- iv
@@ -124,13 +124,13 @@ let secretboxOfText (key : byte []) (msg : string) =
   secretbox key (msg |> UTF8.bytes)
 
 let secretboxOpen (key : byte []) (cipherText : byte []) =
-  let hmacCalc = hmacAtOffset key 0 (cipherText.Length - HMACLength) cipherText
-  let hmacGiven = Array.zeroCreate<byte> HMACLength
-  Array.blit cipherText (cipherText.Length - HMACLength) // from
-             hmacGiven  0                                 // to
-             HMACLength                                    // # bytes for hmac
+  let hmacCalc = hmacAtOffset key 0 (cipherText.Length - int HMACLength) cipherText
+  let hmacGiven = Array.zeroCreate<byte> (int HMACLength)
+  Array.blit cipherText (cipherText.Length - int HMACLength) // from
+             hmacGiven  0                                    // to
+             (int HMACLength)                                // # bytes for hmac
 
-  if cipherText.Length < HMACLength + IVLength then
+  if cipherText.Length < int (HMACLength + IVLength) then
     Choice2Of2 (
       TruncatedMessage (
         sprintf "cipher text length was %d but expected >= %d"
@@ -138,15 +138,15 @@ let secretboxOpen (key : byte []) (cipherText : byte []) =
   elif not (Bytes.equalsConstantTime hmacCalc hmacGiven) then
     Choice2Of2 (AlteredOrCorruptMessage "calculated HMAC does not match expected/given")
   else
-    let iv = Array.zeroCreate<byte> IVLength
+    let iv = Array.zeroCreate<byte> (int IVLength)
     Array.blit cipherText 0
                iv 0
-               IVLength
+               (int IVLength)
     use aes     = secretboxInit key iv
     use denc    = aes.CreateDecryptor(key, iv)
     use plain   = new MemoryStream()
     use crypto  = new CryptoStream(plain, denc, CryptoStreamMode.Write)
-    crypto.Write(cipherText, IVLength, cipherText.Length - IVLength - HMACLength)
+    crypto.Write(cipherText, int IVLength, cipherText.Length - int IVLength - int HMACLength)
     crypto.FlushFinalBlock()
     Choice1Of2 (plain.ToArray() |> Compression.gzipDecode)
 

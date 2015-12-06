@@ -33,6 +33,3 @@ let tryGetChoice1 f x =
 
 let (%%) target key = getFirst target key
 let (^^) target key = getFirstOpt target key
-
-type internal Property<'T,'P> = Suave.Utils.Aether.Lens<'T, 'P>
-let internal Property<'T,'P> getter setter : Property<'T,'P> = (getter, setter)
