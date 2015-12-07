@@ -560,12 +560,14 @@ module internal ParsingAndControl =
                 return! loop (cleanResponse ctx)
               | Choice1Of2 _ ->
                 free "Suave.Web.httpLoop.loop (case Choice1Of2 _)" ctx.connection
+                verbose "Connection: close"
               | Choice2Of2 _ ->
                 if ctx.request.httpVersion.Equals("HTTP/1.1") then
                   verbose "'Connection: keep-alive' recurse (!)"
                   return! loop (cleanResponse ctx)
                 else
                   free "Suave.Web.httpLoop.loop (case Choice2Of2, else branch)" ctx.connection
+                  verbose "Connection: close"
                   return ()
           | Choice2Of2 err ->
             verbose (sprintf "Socket error while running webpart, exiting: %A" err)
