@@ -22,27 +22,31 @@ module SampleApp =
               Languages = Some [ en ] }
           Data = Encoding.UTF8.GetBytes x }
 
-    let ok =
-            Freya.Optic.set Response.reasonPhrase_ (Some "Hey Folks!")
-         *> Freya.init (represent "Hey, folks!")
+    let ok = freya {
+        do! Freya.Optic.set Response.reasonPhrase_ (Some "Hey Folks!")
+        let! stream = Freya.Optic.get Response.body_
+        let out = "Hello, folks!"B
+        stream.Write(out, 0, out.Length)
+    }
+         //*> Freya.init (represent "Hey, folks!")
 
-    let common =
-        freyaMachine {
-            using http
-            charsetsSupported Charset.Utf8
-            languagesSupported en
-            mediaTypesSupported MediaType.Text }
-
-    let home =
-        freyaMachine {
-            using http
-            //including common
-            methodsSupported GET
-            handleOk ok }
+//    let common =
+//        freyaMachine {
+//            using http
+//            charsetsSupported Charset.Utf8
+//            languagesSupported en
+//            mediaTypesSupported MediaType.Text }
+//
+//    let home =
+//        freyaMachine {
+//            using http
+//            //including common
+//            methodsSupported GET
+//            handleOk ok }
 
     let routes =
         freyaRouter {
-            resource "/" home }
+            resource "/" ok }
 
 module SelfHostedServer =
     open Freya.Core
