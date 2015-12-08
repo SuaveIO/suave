@@ -2,20 +2,102 @@ FRAMEWORK: NET45
 NUGET
   remote: https://nuget.org/api/v2
   specs:
+    Aether (8.0.0-rc2) - framework: net45
+    Arachne.Core (2.3.27) - framework: net45
+      FParsec
+    Arachne.Http (2.3.27) - framework: net45
+      Arachne.Core (>= 2.3.27)
+      Arachne.Language (>= 2.3.27)
+      Arachne.Uri (>= 2.3.27)
+      FParsec
+    Arachne.Http.Cors (2.3.27) - framework: net45
+      Arachne.Core (>= 2.3.27)
+      Arachne.Http (>= 2.3.27)
+      Arachne.Uri (>= 2.3.27)
+      FParsec
+    Arachne.Language (2.3.27) - framework: net45
+      Arachne.Core (>= 2.3.27)
+      FParsec
+    Arachne.Uri (2.3.27) - framework: net45
+      Arachne.Core (>= 2.3.27)
+      FParsec
+    Arachne.Uri.Template (2.3.27) - framework: net45
+      Arachne.Core (>= 2.3.27)
+      Arachne.Uri (>= 2.3.27)
+      FParsec
     DotLiquid (1.8.0)
+    FParsec (1.0.2) - framework: net45
+    Freya (2.0.201)
+      Freya.Core (>= 2.0.201)
+      Freya.Lenses.Http (>= 2.0.201)
+      Freya.Lenses.Http.Cors (>= 2.0.201)
+      Freya.Machine (>= 2.0.201)
+      Freya.Machine.Extensions.Http (>= 2.0.201)
+      Freya.Machine.Extensions.Http.Cors (>= 2.0.201)
+      Freya.Machine.Router (>= 2.0.201)
+      Freya.Recorder (>= 2.0.201)
+      Freya.Router (>= 2.0.201)
+    Freya.Core (2.0.201) - framework: net45
+      Aether (8.0.0-rc2)
+    Freya.Lenses.Http (2.0.201) - framework: net45
+      Aether (8.0.0-rc2)
+      Arachne.Http (>= 2.3.25)
+      Freya.Core (>= 2.0.201)
+    Freya.Lenses.Http.Cors (2.0.201) - framework: net45
+      Aether (8.0.0-rc2)
+      Arachne.Http.Cors
+      Freya.Core (>= 2.0.201)
+      Freya.Lenses.Http (>= 2.0.201)
+    Freya.Machine (2.0.201) - framework: net45
+      Aether (8.0.0-rc2)
+      Freya.Core (>= 2.0.201)
+      Freya.Recorder (>= 2.0.201)
+      Hekate (2.0.0-rc2)
+    Freya.Machine.Extensions.Http (2.0.201) - framework: net45
+      Aether (8.0.0-rc2)
+      Arachne.Http (>= 2.3.25)
+      Freya.Core (>= 2.0.201)
+      Freya.Lenses.Http (>= 2.0.201)
+      Freya.Machine (>= 2.0.201)
+    Freya.Machine.Extensions.Http.Cors (2.0.201) - framework: net45
+      Aether (8.0.0-rc2)
+      Arachne.Http.Cors
+      Freya.Core (>= 2.0.201)
+      Freya.Lenses.Http (>= 2.0.201)
+      Freya.Lenses.Http.Cors (>= 2.0.201)
+      Freya.Machine (>= 2.0.201)
+      Freya.Machine.Extensions.Http (>= 2.0.201)
+    Freya.Machine.Router (2.0.201) - framework: net45
+      Arachne.Http (>= 2.3.25)
+      Arachne.Uri.Template
+      Freya.Core (>= 2.0.201)
+      Freya.Router (>= 2.0.201)
+    Freya.Recorder (2.0.201) - framework: net45
+      Aether (8.0.0-rc2)
+      Freya.Core (>= 2.0.201)
+    Freya.Router (2.0.201) - framework: net45
+      Aether (8.0.0-rc2)
+      Arachne.Http (>= 2.3.25)
+      Arachne.Uri.Template
+      Freya.Core (>= 2.0.201)
+      Freya.Lenses.Http (>= 2.0.201)
+      Freya.Recorder (>= 2.0.201)
+      Hekate (2.0.0-rc2)
     FsCheck (2.0.7)
       FSharp.Core (>= 3.1.2.5)
     FSharp.Charting (0.90.12)
     FSharp.Core (3.1.2.5)
     Fuchu (0.6.0)
     Fuchu.FsCheck (0.6.0)
-      FsCheck (>= 1.0.4)
       FSharp.Core (>= 3.1.2.1)
+      FsCheck (>= 1.0.4)
       Fuchu (>= 0.6.0.0)
     Fuchu.PerfUtil (0.6.0)
       FSharp.Core (>= 3.1.2.1)
       Fuchu (>= 0.6.0.0)
       PerfUtil (>= 0.1.8)
+    Hekate (2.0.0-rc2) - framework: net45
+      Aether (8.0.0-rc2)
     Http.fs-prerelease (2.3.0)
       FSharp.Core (>= 3.1.2.1)
     Microsoft.AspNet.Razor (3.2.3)
@@ -41,4 +123,4 @@ NUGET
       WebSharper (>= 3.5.12.213)
     WebSharper.UI.Next (3.5.16.190)
       WebSharper (>= 3.5.12.213)
-    WebSocketSharp (1.0.3-rc9)
+    WebSocketSharp (1.0.3-rc10)
