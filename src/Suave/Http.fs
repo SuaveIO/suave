@@ -527,13 +527,6 @@ module Http =
       content       : HttpContent
       writePreamble : bool }
 
-    /// The empty HttpResult, with a 404 and a HttpContent.NullContent content
-    static member empty =
-      { status        = HTTP_404
-        headers       = []
-        content       = HttpContent.NullContent
-        writePreamble = true }
-
     static member status_ = Property<HttpResult,_> (fun x -> x.status) (fun v x -> { x with status = v })
     static member headers_ = Property<HttpResult,_> (fun x -> x.headers) (fun v x -> { x with headers = v })
     static member content_ = Property<HttpResult,_> (fun x -> x.content) (fun v x -> { x with content = v })
@@ -668,6 +661,17 @@ module Http =
   and ErrorHandler = Exception -> String -> WebPart<HttpContext>
 
   type WebPart = WebPart<HttpContext>
+
+  /// a module that gives you the `empty` result
+  [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+  module HttpResult =
+
+    /// The empty HttpResult, with a 404 and a HttpContent.NullContent content
+    let empty =
+      { status        = HTTP_404
+        headers       = []
+        content       = HttpContent.NullContent
+        writePreamble = true }
 
   /// a module that gives you the `empty` (beware) and `mk` functions for creating
   /// a HttpRuntime
