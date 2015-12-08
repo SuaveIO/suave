@@ -218,14 +218,6 @@ module String =
   let replace (find : string) (replacement : string) (str : string) =
     str.Replace(find, replacement)
 
-  let sha1 (str : string) =
-    use ms = new MemoryStream()
-    use sw = new StreamWriter(ms)
-    sw.Write str
-    ms.Seek(0L, SeekOrigin.Begin) |> ignore
-    use sha = SHA1.Create()
-    sha.ComputeHash ms |> BitConverter.ToString |> fun s -> s.Replace("-", "")
-
   let isEmpty (s : string) =
     s.Length = 0
 
@@ -252,6 +244,48 @@ module String =
   
   let substring index (s : string) =
     s.Substring index
+
+module Bytes =
+  open System.IO
+  open System.Linq
+  open System.Security.Cryptography
+
+  let hash (algo : HashAlgorithm) (bs : byte[]) =
+    use ms = new MemoryStream()
+    ms.Write(bs, 0, bs.Length)
+    ms.Seek(0L, SeekOrigin.Begin) |> ignore
+    use sha = algo
+    sha.ComputeHash ms
+
+  let sha1 =
+    hash (new SHA1Managed())
+
+  let sha256 =
+    hash (new SHA256Managed())
+
+  let sha512 =
+    hash (new SHA512Managed())
+
+  let toHex (bs : byte[]) =
+    BitConverter.ToString bs
+    |> String.replace "-" ""
+    |> String.toLowerInvariant
+
+  let fromHex (digestString : string) =
+    Enumerable.Range(0, digestString.Length)
+              .Where(fun x -> x % 2 = 0)
+              .Select(fun x -> Convert.ToByte(digestString.Substring(x, 2), 16))
+              .ToArray()
+
+  /// Compare two byte arrays in constant time, bounded by the length of the
+  /// longest byte array.
+  let equalsConstantTime (bits : byte []) (bobs : byte []) =
+    let mutable xx = uint32 bits.Length ^^^ uint32 bobs.Length
+    let mutable i = 0
+    while i < bits.Length && i < bobs.Length do
+      xx <- xx ||| uint32 (bits.[i] ^^^ bobs.[i])
+      i <- i + 1
+    xx = 0u
 
 module Map =
 
@@ -297,6 +331,24 @@ module UTF8 =
   let decodeBase64 : Base64String -> string =
     Convert.FromBase64String >> toString
 
+  let sha1 =
+    bytes >> Bytes.sha1
+
+  let sha1Hex =
+    bytes >> Bytes.sha1 >> Bytes.toHex
+
+  let sha256 =
+    bytes >> Bytes.sha256
+
+  let sha256Hex =
+    bytes >> Bytes.sha256 >> Bytes.toHex
+
+  let sha512 =
+    bytes >> Bytes.sha512
+
+  let sha512Hex =
+    bytes >> Bytes.sha512 >> Bytes.toHex
+
 module Comparisons =
 
   /// compare x to yobj mapped on selected value from function f
@@ -320,42 +372,6 @@ type Random with
     let buffer = Array.zeroCreate<byte> sizeof<UInt64>
     x.NextBytes buffer
     BitConverter.ToUInt64(buffer, 0)
-
-module Bytes =
-  open System.Linq
-  open System.IO
-  open System.Security.Cryptography
-
-  let toHex (bs : byte[]) =
-    BitConverter.ToString bs
-    |> String.replace "-" ""
-    |> String.toLowerInvariant
-
-  let fromHex (digestString : string) =
-    Enumerable.Range(0, digestString.Length)
-              .Where(fun x -> x % 2 = 0)
-              .Select(fun x -> Convert.ToByte(digestString.Substring(x, 2), 16))
-              .ToArray()
-
-  let hash (algo : HashAlgorithm) (bs : byte[]) =
-    use ms = new MemoryStream()
-    ms.Write(bs, 0, bs.Length)
-    ms.Seek(0L, SeekOrigin.Begin) |> ignore
-    use sha = algo
-    sha.ComputeHash ms |> toHex
-
-  let sha1 =
-    hash (SHA1.Create())
-    
-  /// Compare two byte arrays in constant time, bounded by the length of the
-  /// longest byte array.
-  let equalsConstantTime (bits : byte []) (bobs : byte []) =
-    let mutable xx = uint32 bits.Length ^^^ uint32 bobs.Length
-    let mutable i = 0
-    while i < bits.Length && i < bobs.Length do
-      xx <- xx ||| uint32 (bits.[i] ^^^ bobs.[i])
-      i <- i + 1
-    xx = 0u
 
 module Array =
 
@@ -573,7 +589,8 @@ module App =
   open System.IO
   open System.Reflection
 
-  let Version =
+  /// Gets the calling assembly's informational version number as a string
+  let getVersion () =
     Assembly.GetCallingAssembly()
             .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
             .InformationalVersion
@@ -591,4 +608,3 @@ module App =
       use reader = new StreamReader(stream)
       reader.ReadToEnd ()
       |> Choice1Of2
-

@@ -11,7 +11,7 @@ NUGET
 GITHUB
   remote: haf/YoLo
   specs:
-    YoLo.fs (59c81dd98bed0eabe28b3d365687a6d09ca8b8c0)
+    YoLo.fs (0d120146e4c558b1b7cb1763161dcf33e31de22b)
 GROUP Build
 NUGET
   remote: https://nuget.org/api/v2
@@ -35,7 +35,7 @@ NUGET
 GITHUB
   remote: haf/YoLo
   specs:
-    YoLo.fs (59c81dd98bed0eabe28b3d365687a6d09ca8b8c0)
+    YoLo.fs (0d120146e4c558b1b7cb1763161dcf33e31de22b)
 GROUP Tests
 FRAMEWORK: NET45
 NUGET
