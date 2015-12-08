@@ -301,6 +301,7 @@ type LibUvServer(maxConcurrentOps, bufferManager, logger : Logger,
     this.initLoop()
     try
       uv_tcp_init(loop, server) |> checkStatus
+      uv_tcp_nodelay(server, 1) |> checkStatus
       uv_ip4_addr(ip, port, &addr) |> checkStatus
       uv_tcp_bind(server, &addr, 0) |> checkStatus
       let s = new LibUvSocket(opsPool, logger, serveClient, binding, loop,

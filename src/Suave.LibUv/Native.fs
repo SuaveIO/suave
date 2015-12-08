@@ -68,6 +68,9 @@ type uv_walk_cb  = delegate of IntPtr * IntPtr -> unit
 extern int uv_tcp_init(IntPtr loop, IntPtr handle)
 
 [<DllImport("libuv.dll", CallingConvention = CallingConvention.Cdecl)>]
+extern int uv_tcp_nodelay(IntPtr handle, int enable)
+
+[<DllImport("libuv.dll", CallingConvention = CallingConvention.Cdecl)>]
 extern int uv_ip4_addr(string ip, int port, [<Out>] sockaddr_in& address)
 
 [<DllImport("libuv.dll", CallingConvention = CallingConvention.Cdecl)>]

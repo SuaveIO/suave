@@ -124,6 +124,8 @@ let runServer logger maxConcurrentOps bufferSize (binding: SocketBinding) startD
     let a, b, c, bufferManager = createPools logger maxConcurrentOps bufferSize
 
     let listenSocket = new Socket(binding.endpoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp)
+    listenSocket.NoDelay <- true;
+
     aFewTimes (fun () -> listenSocket.Bind binding.endpoint)
     listenSocket.Listen MaxBacklog
 
