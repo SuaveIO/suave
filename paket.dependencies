@@ -3,6 +3,7 @@ source https://nuget.org/api/v2
 
 nuget FSharp.Charting
 nuget FSharp.Core ~> 3.1.2
+nuget Freya
 nuget Http.fs-prerelease
 nuget Nancy.Owin
 nuget RazorEngine
