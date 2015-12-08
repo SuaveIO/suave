@@ -29,4 +29,5 @@ group Examples
   nuget FSharp.Core ~> 4
   nuget Topshelf.FSharp
   nuget Nancy.Owin
+  nuget Freya
   github haf/YoLo YoLo.fs
