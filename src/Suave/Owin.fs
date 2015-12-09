@@ -846,6 +846,7 @@ module OwinServerFactory =
     let started, listening =
       Web.startWebServerAsync conf (OwinApp.ofAppFunc "/" app)
 
+    listening |> Async.Start
     let _ = started |> Async.RunSynchronously
 
     { new IDisposable with
