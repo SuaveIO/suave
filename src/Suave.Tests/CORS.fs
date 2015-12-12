@@ -18,7 +18,6 @@ open Suave.Http.Applicatives
 open Suave.Http.RequestErrors
 open Suave.Http.Writers
 open Suave.Http.CORS
-
 open Suave.Testing
 
 // For true CORS testing, a browser is necessary. Under the testing, in certain scenarios, the CORS module will return success, where in
