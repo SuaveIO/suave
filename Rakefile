@@ -138,6 +138,9 @@ desc 'create suave nuget'
 task :nugets => ['build/pkg', :versioning, :compile, :create_nuget_quick]
 
 desc 'compile, gen versions, test and create nuget'
+task :appveyor => [:compile, :'tests:unit', :nugets]
+
+desc 'compile, gen versions, test'
 task :default => [:compile, :'tests:unit']
 
 task :increase_version_number do

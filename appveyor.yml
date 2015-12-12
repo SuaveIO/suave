@@ -16,7 +16,8 @@ build_script:
  - cmd: gem sources -r https://rubygems.org/
  - cmd: gem install bundler --no-ri --no-rdoc --source http://rubygems.org/
  - cmd: bundle install
- - cmd: bundle exec rake
+ - cmd: bundle exec rake appveyor
+ - cmd: appveyor PushArtifact build/pkg/Suave.nupkg
 
 test:  off
 
