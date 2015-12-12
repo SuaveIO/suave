@@ -18,7 +18,7 @@ build_script:
  - cmd: bundle install
  - cmd: bundle exec rake appveyor
  
- artifacts:
+artifacts:
  - path: build\pkg\*.nupkg 
 
 test:  off
