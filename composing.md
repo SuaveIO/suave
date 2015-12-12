@@ -14,7 +14,7 @@ In functional programming parlance, a "combinator" either combines several thing
 
 Together these are used to create web parts, combine them to produce new webparts, and ultimately combine them all into a single webpart passed as an argument used to initialise the web server.
 
-We have already seen several examples of combinators. The `choose` function seen above takes a list of `WebPart`, and combines them all into a single new `WebPart`:
+We have already seen several examples of combinators. The `choose` function seen below takes a list of `WebPart`, and combines them all into a single new `WebPart`:
 
 {% highlight fsharp %}
 val choose : (options : WebPart list) -> WebPart
