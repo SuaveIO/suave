@@ -23,3 +23,7 @@ artifacts:
 
 test:  off
 
+nuget:
+  project_feed: true
+
+
