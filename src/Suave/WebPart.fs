@@ -45,7 +45,6 @@ module WebPart =
   ///  we can still use the old symbol but now has a new meaning
   ///  let foo ctx = GET ctx >>= OK "hello"
   ///
-
   let asyncOption = AsyncOptionBuilder()
 
   let rec choose (options : WebPart<'a> list) : WebPart<'a> =

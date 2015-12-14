@@ -90,7 +90,7 @@ let private secretboxInit key iv =
   aes
 
 let secretbox (key : byte []) (msg : byte []) =
-  if key.Length <> KeyLength then
+  if key.Length <> int KeyLength then
     Choice2Of2 (InvalidKeyLength (sprintf "key should be %d bytes but was %d bytes" KeyLength (key.Length)))
   elif msg.Length = 0 then
     Choice2Of2 EmptyMessageGiven
