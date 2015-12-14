@@ -155,8 +155,14 @@ namespace :docs do
   end
 
   desc 'build documentation'
-  task :compile => :clean do
+  task :build => [:clean, :restore_paket] do
+    Dir.chdir 'docs/tools' do
+      system '../../tools/paket.exe', 'restore', clr_command: true
+      system "#{Albacore.windows? ? 'fsi' : 'fsharpi'} generate.fsx" # pricken över i
+    end
     system 'git clone https://github.com/SuaveIO/suave.git -b gh-pages gh-pages' unless Dir.exists? 'gh-pages'
+    system 'rm -fr gh-pages/*' 
+    system 'cp -pr docs/output/* gh-pages/' 
     Dir.chdir 'gh-pages' do
       Bundler.with_clean_env do
         system 'bundle'

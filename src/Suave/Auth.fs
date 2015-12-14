@@ -1,4 +1,4 @@
-﻿module Suave.Auth
+module Suave.Auth
 
 open System
 open System.Text
@@ -94,7 +94,7 @@ let authenticated relativeExpiry secure : WebPart =
 
 //  let deauthenticate : WebPart =
 //    Cookies.unset_cookies
-  
+
 module HttpContext =
 
   let sessionId x =

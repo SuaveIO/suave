@@ -1,4 +1,4 @@
-﻿namespace Suave
+namespace Suave
 
 module Cookie =
   open System
@@ -82,7 +82,7 @@ module Cookie =
   val updateCookies :  csctx:CookiesState ->
                        fPlainText : (byte [] option -> byte []) ->
                        WebPart
-  
+
   val cookieState : csctx:CookiesState ->
                     noCookie:(unit -> Choice<byte [], WebPart>) ->
                     decryptionFailure:(Crypto.SecretboxDecryptionError -> Choice<byte [], WebPart>) ->

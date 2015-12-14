@@ -23,7 +23,7 @@ module internal ParsingAndControl =
   open Suave.Sockets.Control
   open Suave.Sockets.SocketOpOperators
   open Suave.Tcp
-  
+
   open Suave.Utils
   open Suave.Utils.Bytes
   open Suave.Utils.Parsing

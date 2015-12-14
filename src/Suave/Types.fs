@@ -187,11 +187,6 @@ and private HttpCodeStatics() =
       Microsoft.FSharp.Reflection.FSharpType.GetUnionCases(typeof<HttpCode>)
       |> Array.map (fun case -> case.Name, Microsoft.FSharp.Reflection.FSharpValue.MakeUnion(case, [||]) :?> HttpCode)
       |> Map.ofArray
-  
-module Codes =
-  type X = HttpCode
-  [<System.Obsolete("Use Suave.Types.HttpCode")>]
-  type HttpCode = X
 
 /// HTTP cookie
 type HttpCookie =
