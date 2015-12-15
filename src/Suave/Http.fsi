@@ -1,5 +1,6 @@
 ﻿namespace Suave
 
+[<AutoOpen>]
 module Http =
 
   open System
@@ -258,7 +259,7 @@ module Http =
     /// data back to the client through Suave.
     | SocketTask of (Connection * HttpResult -> SocketOp<unit>)
 
-    static member NullContentPIso : PIso<HttpContent, unit>
+    static member NullContentPIso : (HttpContent -> unit option) * // TODO
     static member BytesPIso : PIso<HttpContent, byte[]>
     static member SocketTaskPIso : PIso<HttpContent, Connection * HttpResult -> SocketOp<unit>>
 
