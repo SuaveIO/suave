@@ -21,6 +21,12 @@ let getFirst (target : NameValueList) (key : string) =
   | Some b -> Choice1Of2 b
   | None   -> Choice2Of2 (sprintf "Couldn't find key '%s' in NameValueList" key)
 
+/// Headers are lowercased, so can use string.Equals
+let getAll (target : NameValueList) (key : string) =
+  match target |> List.choose (fun (a, b) -> if a.Equals key then Some b else None) with
+  | [] -> Choice2Of2 (sprintf "Couldn't find key '%s' in NameValueList" key)
+  | l -> Choice1Of2 l
+
 let getFirstOpt (target : NameOptionValueList) (key : string) =
   match target |> List.tryPick (fun (a,b) -> if a.Equals key then b else None) with
   | Some b -> Choice1Of2 b

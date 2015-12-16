@@ -30,7 +30,7 @@ NUGET
     Owin (1.0.0)
     PerfUtil (0.1.8)
     RazorEngine (3.7.3)
-      Microsoft.AspNet.Razor (>= 3.0.0) - framework: >= net45
+      Microsoft.AspNet.Razor (>= 3.0.0)
     Topshelf (3.2.0)
     Topshelf.FSharp (2.1.0)
       Topshelf (>= 3.2.0)

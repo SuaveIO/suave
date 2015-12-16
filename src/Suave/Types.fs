@@ -362,6 +362,10 @@ type HttpRequest =
   member x.header k =
     getFirst x.headers k
 
+  /// Gets all headers for the given key in the HttpRequest
+  member x.allHeaders k =
+    getAll x.headers k
+
   /// Gets the form as a ((string * string option) list) from the HttpRequest.
   /// Use formData to get the data for a particular key or use the indexed
   /// property in the HttpRequest.
@@ -839,3 +843,33 @@ module SuaveConfig =
   let firstBindingUri (cfg : SuaveConfig) path query =
     let binding = firstBinding cfg
     binding.uri path query
+
+[<RequireQualifiedAccess>]
+type InclusiveOption<'T> =
+  | None
+  | Some of 'T
+  | All
+
+/// The configuration values for CORS
+type CORSConfig =
+  {
+    /// The list of allowed Uri(s) for requests.
+    allowedUris             : InclusiveOption<string list>
+
+    /// The list of allowed HttpMethods for the request.
+    allowedMethods          : InclusiveOption<HttpMethod list>
+    
+    /// Allow cookies? This is sent in the AccessControlAllowCredentials header.
+    allowCookies            : bool
+
+    /// Should response headers be exposed to the client? This is sent in AccessControlExposeHeaders header. 
+    exposeHeaders           : bool
+    
+    /// Max age in seconds the user agent is allowed to cache the result of the request.
+    maxAge                  : int option }
+  
+  static member allowedUris_           = Property<CORSConfig,_> (fun x -> x.allowedUris)           (fun v x -> { x with allowedUris = v })
+  static member allowedMethods_        = Property<CORSConfig,_> (fun x -> x.allowedMethods)        (fun v x -> { x with allowedMethods = v })
+  static member allowCookies_          = Property<CORSConfig,_> (fun x -> x.allowCookies)          (fun v x -> { x with allowCookies = v })
+  static member exposeHeaders_         = Property<CORSConfig,_> (fun x -> x.exposeHeaders)         (fun v x -> { x with exposeHeaders = v })
+  static member maxAge_                = Property<CORSConfig,_> (fun x -> x.maxAge)                (fun v x -> { x with maxAge = v })

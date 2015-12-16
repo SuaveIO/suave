@@ -1584,3 +1584,14 @@ module Http =
     /// <remarks>
     /// </remarks>
     val CLOSE : WebPart
+
+  module CORS =
+
+    /// <summary><para>
+    /// This WebPart handles CORS requests.
+    /// </para><para>
+    /// </para><para>
+    /// </para></summary>
+    /// <remarks>
+    /// </remarks>
+    val cors : CORSConfig:(CORSConfig) -> WebPart

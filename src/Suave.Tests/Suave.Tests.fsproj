@@ -92,6 +92,7 @@
     <Compile Include="HttpVerbs.fs" />
     <Compile Include="HttpApplicatives.fs" />
     <Compile Include="HttpAuthentication.fs" />
+    <Compile Include="CORS.fs" />
     <Compile Include="Parsing.fs" />
     <Compile Include="Model.fs" />
     <Compile Include="Perf.fs" />

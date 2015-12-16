@@ -700,3 +700,10 @@ let defaultConfig =
     logger                = Loggers.saneDefaultsFor LogLevel.Info
     tcpServerFactory      = new DefaultTcpServerFactory()
     cookieSerialiser      = new Utils.BinaryFormatterSerialiser() }
+
+let defaultCORSConfig =
+  { allowedUris           = InclusiveOption.All
+    allowedMethods        = InclusiveOption.All
+    allowCookies          = true
+    exposeHeaders         = true
+    maxAge                = None }
