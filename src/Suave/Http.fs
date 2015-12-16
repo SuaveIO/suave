@@ -813,12 +813,12 @@ module Http =
     [<Literal>]
     let AccessControlMaxAge = "Access-Control-Max-Age"
 
-    let private isAllowedOrigin config value = 
+    let private isAllowedOrigin config (value : string) = 
       match config.allowedUris with
       | InclusiveOption.All -> true
       | InclusiveOption.None -> false
       | InclusiveOption.Some uris ->
-        List.exists (fun a -> a = value) uris
+        List.exists (fun (uri : string) -> uri.ToLowerInvariant() = value.ToLowerInvariant()) uris
 
     let private setMaxAgeHeader config =
       match config.maxAge with
@@ -832,13 +832,15 @@ module Http =
       match config.allowedMethods with
       | InclusiveOption.None -> succeed
       | InclusiveOption.All -> Writers.setHeader AccessControlAllowMethods "*"
-      | InclusiveOption.Some methods -> 
-        let exists = List.exists (fun m -> m.ToString() = value) methods
+      | InclusiveOption.Some (m :: ms) -> 
+        let exists = m.ToString() = value || List.exists (fun m -> m.ToString() = value) ms
         if exists then
-          let header = sprintf "%s,%s" (methods.Head.ToString()) (methods.Tail |> Seq.map (fun i -> i.ToString()) |> String.concat( ", "))
+          let header = sprintf "%s,%s" (m.ToString()) (ms |> Seq.map (fun i -> i.ToString()) |> String.concat( ", "))
           Writers.setHeader AccessControlAllowMethods header
         else
           succeed
+      | InclusiveOption.Some ([]) ->
+        succeed
 
     let private setAllowOriginHeader value = 
       Writers.setHeader AccessControlAllowOrigin value
@@ -874,7 +876,7 @@ module Http =
                                     >>= NO_CONTENT
                                 )
                         else
-                            succeed ctx                        
+                            succeed ctx
                     | Choice2Of2 _ -> succeed ctx
                 | _ ->
                     if allowedOrigin then
