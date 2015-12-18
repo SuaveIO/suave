@@ -11,6 +11,7 @@ module SampleApp =
     open Freya.Machine.Extensions.Http
     open Freya.Machine.Router
     open Freya.Router
+    open Arachne.Uri.Template
 
     let en = LanguageTag.Parse "en"
 
@@ -23,46 +24,49 @@ module SampleApp =
           Data = Encoding.UTF8.GetBytes x }
 
     let ok =
-            Freya.Optic.set Response.reasonPhrase_ (Some "Hey Folks!")
+            Freya.Lens.setPartial Response.ReasonPhrase_ "Hey Folks!"
          *> Freya.init (represent "Hey, folks!")
 
     let common =
         freyaMachine {
             using http
-            charsetsSupported Charset.Utf8
-            languagesSupported en
-            mediaTypesSupported MediaType.Text }
+            charsetsSupported (Freya.init [ Charset.Utf8 ])
+            languagesSupported (Freya.init [ en ])
+            mediaTypesSupported (Freya.init [ MediaType.Text ]) }
 
     let home =
         freyaMachine {
             using http
             //including common
-            methodsSupported GET
-            handleOk ok }
+            methodsSupported (Freya.init [ GET ])
+            handleOk (fun _ -> ok) }
 
     let routes =
         freyaRouter {
-            resource "/" home }
+            resource (UriTemplate.Parse "/") (home |> FreyaMachine.toPipeline) }
+        |> FreyaRouter.toPipeline
 
 module SelfHostedServer =
-    open Freya.Core
-    open Suave
-    open Suave.Logging
-    open Suave.Owin
-    open SampleApp
+  open Freya.Core
+  open Suave
+  open Suave.Logging
+  open Suave.Owin
+  open SampleApp
 
-    [<EntryPoint>]
-    let main _ =
+  [<EntryPoint>]
+  let main _ =
 
-        let app =
-            OwinApp.ofAppFunc "/" (OwinAppFunc.ofFreya routes)
+    printfn "w00t"
 
-        let config =
-            { defaultConfig with
-                bindings = [ HttpBinding.mkSimple HTTP "127.0.0.1" 7000 ]
-                logger = Loggers.saneDefaultsFor LogLevel.Verbose }
+    let app =
+      OwinApp.ofAppFunc "/" (OwinAppFunc.ofFreya routes)
 
-        printfn "Listening on port 7000"
-        startWebServer config app
+    let config =
+      { defaultConfig with
+          bindings = [ HttpBinding.mkSimple HTTP "127.0.0.1" 7000 ]
+          logger = Loggers.saneDefaultsFor LogLevel.Verbose }
 
-        0
+    printfn "Listening on port 7000"
+    startWebServer config app
+
+    0
