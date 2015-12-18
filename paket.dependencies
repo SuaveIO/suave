@@ -30,4 +30,6 @@ group Examples
   nuget Topshelf.FSharp
   nuget Nancy.Owin
   nuget Freya ~> 3.0.0-b
+  nuget Microsoft.Owin.Hosting 
+  nuget Owin
   github haf/YoLo YoLo.fs
