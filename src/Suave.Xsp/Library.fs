@@ -52,12 +52,12 @@ module Xsp =
     override this.SendUnknownResponseHeader(name: string, value : string) =
       let bytes = UTF8.bytes <| String.concat "" [ name; ": "; value; "\r\n" ]
       this.Write(bytes,bytes.Length)
-    override this.SendResponseFromMemory(data : byte [], lenght : int) =
-      // NOTE: on Mono HttpRuntime sends the connection close header and the content-lenght
+    override this.SendResponseFromMemory(data : byte [], length : int) =
+      // NOTE: on Mono HttpRuntime sends the connection close header and the content-length
       this.SendUnknownResponseHeader("Connection","close")
       let bytes = UTF8.bytes  "\r\n"
       this.Write(bytes, bytes.Length)
-      this.Write(data, lenght)
+      this.Write(data, length)
     override this.GetHttpVerbName() = httpVerb
     override this.GetKnownRequestHeader(index : int) : string =
       match index with
@@ -75,15 +75,15 @@ module Xsp =
     override this.GetFilePathTranslated() = this.MapPath(page)
     override this.MapPath(path : string) =
       let separator = Path.DirectorySeparatorChar
-      let path = 
+      let path =
         if separator = '\\' then path.Replace('/','\\') else path
       Path.Combine(homeDirectory, path.TrimStart(separator))
     member this.SendResponseFromFileStream(f : FileStream, offset : int64, length : int64) =
       let fileSize = f.Length;
       this.SendUnknownResponseHeader("Content-length",fileSize.ToString())
-      let lenght = if (length = -1L) then fileSize - offset else length
+      let length = if (length = -1L) then fileSize - offset else length
       if not (length = 0L || offset < 0L || length > fileSize - offset) then
-        if (offset > 0L) then 
+        if (offset > 0L) then
           f.Seek(offset, SeekOrigin.Begin) |> ignore
         if (length <= (int64(maxChunkLength))) then
           let fileBytes = Array.zeroCreate (int(length))
@@ -163,7 +163,7 @@ module Xsp =
 
   /// Creates and configures an application domain for hosting ASP.NET.
   let createApplication directory =
-    // NOTE: using an application host requires deploying the dll into the bin directory of the ASPX application 
+    // NOTE: using an application host requires deploying the dll into the bin directory of the ASPX application
     // or registering Suave.Xsp in the GAC
     let binDir = Path.Combine(directory,"bin")
     if not(Directory.Exists(binDir)) then

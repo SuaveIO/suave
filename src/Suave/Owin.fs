@@ -594,7 +594,10 @@ module OwinApp =
         upcast (match !requestHeaders with
                 | None   -> let v = DeltaDictionary x in requestHeaders := Some v ; v
                 | Some v -> v)),
-      (fun v x -> invalidOp "setting RequestHeaders IDictionary<string, string[]> is not supported")
+      (fun v x ->
+        match !requestHeaders with
+        | Some v' when Object.ReferenceEquals (v, v') -> x
+        | _ -> invalidOp "setting RequestHeaders IDictionary<string, string[]> is not supported")
 
     let responseHeaders : DeltaDictionary option ref = ref None
     let responseHeadersLens : Property<(string * string) list, IDictionary<string, string[]>> =
@@ -602,7 +605,10 @@ module OwinApp =
         upcast (match !responseHeaders with
                 | None   -> let v = DeltaDictionary x in responseHeaders := Some v ; v
                 | Some v -> v)),
-      (fun v x -> invalidOp "setting ResponseHeaders IDictionary<string, string[]> is not supported")
+      (fun v x ->
+        match !responseHeaders with
+        | Some v' when Object.ReferenceEquals (v, v') -> x
+        | _ -> invalidOp "setting ResponseHeaders IDictionary<string, string[]> is not supported")
 
     let responseStream = new OpenMemoryStream()
     let responseStreamLens : Property<HttpContent, IO.Stream> =
@@ -610,7 +616,10 @@ module OwinApp =
         let bs = Lens.getPartialOrElse HttpContent.Bytes_ [||] x
         responseStream.Write(bs, 0, bs.Length)
         upcast responseStream),
-      (fun _ x -> invalidOp "setting responseStream to a value is not supported in OWIN")
+      (fun v x ->
+        match responseStream with
+        | v' when Object.ReferenceEquals (v, v') -> x
+        | _ -> invalidOp "setting responseStream to a value is not supported in OWIN")
 
     let sendingHeaders : ((obj -> unit) * obj) list ref = ref []
     let onSendingHeadersLens : Property<HttpContext, Action<Action<obj>, obj>> =
@@ -618,7 +627,10 @@ module OwinApp =
         Action<_, _>(fun (cb : Action<obj>) (st : obj) ->
           sendingHeaders := (cb.Invoke, st) :: !sendingHeaders
           ())),
-      (fun v x -> invalidOp "cannot set onSendingHeadersAction")
+      (fun v x ->
+        match !sendingHeaders with
+        | v'  when Object.ReferenceEquals (v, v') -> x
+        | _ -> invalidOp "cannot set onSendingHeadersAction")
 
     let owinMap = SirLensALot.owinMap cts.Token requestPathBase
                                       requestHeadersLens responseHeadersLens

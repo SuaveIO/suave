@@ -84,7 +84,7 @@ module WebSocket =
 
   let internal frame (opcode : Opcode) (data : byte[])  (fin : bool) =
 
-    let firstByte = 
+    let firstByte =
       match opcode with
       | Continuation -> 0uy
       | Text -> 1uy
@@ -103,11 +103,11 @@ module WebSocket =
     ms.WriteByte(firstByte)
 
     match strLen with
-    | l when l >= 65536 -> 
+    | l when l >= 65536 ->
       let lengthBytes = BitConverter.GetBytes(uint64 data.Length) |> Array.rev
       ms.WriteByte(127uy)
       ms.Write(lengthBytes, 0, lengthBytes.Length)
-    | l when l >= 126 -> 
+    | l when l >= 126 ->
       let lengthBytes = BitConverter.GetBytes(uint16 data.Length) |> Array.rev
       ms.WriteByte(126uy)
       ms.Write(lengthBytes, 0, lengthBytes.Length)
@@ -158,20 +158,20 @@ module WebSocket =
       assert (List.length connection.segments = 0)
       let! arr = readBytes connection.transport 2
       let header = exctractHeader arr
-      let! extendedLenght = readExtendedLength header
+      let! extendedLength = readExtendedLength header
 
       assert(header.hasMask)
       let! mask = readBytes connection.transport 4
 
-      if extendedLenght > uint64 Int32.MaxValue then
-        let reason = sprintf "Frame size of %d bytes exceeds maximun accepted frame size (2 GB)" extendedLenght
+      if extendedLength > uint64 Int32.MaxValue then
+        let reason = sprintf "Frame size of %d bytes exceeds maximum accepted frame size (2 GB)" extendedLength
         let data =
           [| yield! BitConverter.GetBytes (CloseCode.CLOSE_TOO_LARGE.code)
              yield! UTF8.bytes reason |]
         do! sendFrame Close data true
         return! SocketOp.abort (InputDataError reason)
       else
-        let! frame = readBytes connection.transport (int extendedLenght)
+        let! frame = readBytes connection.transport (int extendedLength)
         // Messages from the client MUST be masked
         let data = if header.hasMask then frame |> Array.mapi (fun i x -> x ^^^ mask.[i % 4]) else frame
         return (header.opcode, data, header.fin)
@@ -194,13 +194,13 @@ module WebSocket =
     let r = ctx.request
     if r.``method`` <> HttpMethod.GET then
       return! RequestErrors.METHOD_NOT_ALLOWED "Method not allowed" ctx
-    elif r.header "upgrade"  |> Choice.map (fun s -> s.ToLower()) <> Choice1Of2 "websocket" then 
+    elif r.header "upgrade"  |> Choice.map (fun s -> s.ToLower()) <> Choice1Of2 "websocket" then
       return! RequestErrors.BAD_REQUEST "Bad Request" ctx
     else
       match r.header "connection" with
       // rfc 6455 - Section 4.1.6 : The request MUST contain a |Connection| header field whose value
       // MUST include the "Upgrade" token.
-      | Choice1Of2 str when String.contains "Upgrade" str -> 
+      | Choice1Of2 str when String.contains "Upgrade" str ->
         match r.header "sec-websocket-key" with
         | Choice1Of2 webSocketKey ->
           let! a = handShakeAux webSocketKey continuation ctx
