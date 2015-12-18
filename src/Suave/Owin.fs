@@ -583,6 +583,7 @@ module OwinApp =
 
     let cts = new CancellationTokenSource()
     let state : HttpContext ref = ref initialState //externally owned
+    let canDispose = ref true
 
     // NOTE: I cannot make OwinDictionary immutable, because the Task OWIN returns doesn't have
     // a proper return value (only unit)
@@ -654,8 +655,15 @@ module OwinApp =
     member x.Interface =
       x :> OwinEnvironment
 
+    /// Lock down the OWIN environment so that overly eager OWIN apps don't pick
+    /// too much on our internal state using casting/reflection.
+    member x.beStoic f =
+      canDispose := false
+      try f ()
+      finally canDispose := true
+
     /// Calling this returns a valid HttpResult that we can use for Suave
-    member x.Finalise() =
+    member x.finalise() =
       let reqHeaders_, respHeaders_, bytes_ =
         HttpContext.request_ >--> HttpRequest.headers_,
         HttpContext.response_ >--> HttpResult.headers_,
@@ -731,8 +739,9 @@ module OwinApp =
 
     interface IDisposable with
       member x.Dispose() =
-        responseStream.RealDispose()
-        (cts :> IDisposable).Dispose()
+        if !canDispose then
+          responseStream.RealDispose()
+          (cts :> IDisposable).Dispose()
 
   [<CompiledName "OfApp">]
   let ofApp (requestPathBase : string) (owin : OwinApp) : WebPart =
@@ -763,11 +772,12 @@ module OwinApp =
                 request = { ctx.request with url = owinRequestUri.Uri }
                 response = { response with status = HTTP_200 } })
 
-        verbose (fun _ -> "yielding to OWIN middleware")
+        //do! wrapper.beStoic <| fun _ ->
+        //  verbose (fun _ -> "yielding to OWIN middleware")
         do! SocketOp.ofAsync (owin wrapper.Interface)
 
         verbose (fun _ -> "suave back in control")
-        let ctx = wrapper.Finalise()
+        let ctx = wrapper.finalise()
 
         verbose (fun _ -> "writing preamble")
         do! writePreamble ctx

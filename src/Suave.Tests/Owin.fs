@@ -10,6 +10,7 @@ open System.Net.Http.Headers
 open System.Text
 
 open Suave
+open Suave.Utils.AsyncExtensions
 open Suave.Operators
 open Suave.Filters
 open Suave.Writers
@@ -28,7 +29,9 @@ let throws msg matcher fn =
   try fn () with e when matcher e -> ()
 
 [<Tests>]
-let owinUnit =
+let owinUnit cfg =
+  let runWithConfig = runWith cfg
+
   let create (m : (string * string) list) =
     OwinApp.DeltaDictionary(m) :> IDictionary<string, string[]>
 
@@ -120,6 +123,31 @@ let owinUnit =
         | false, _ -> ()
         | true, null -> Tests.failtest "errenously returned (true, null)"
         | true, otherwise -> Tests.failtestf "errenously returned %A" otherwise
+    ]
+
+    testList "OWIN server state" [
+      testCase "cannot dispose OwinEnvironment from Webpart" <| fun _ ->
+        let misbehaving (env : OwinEnvironment) =
+          match box env with
+          | :? IDisposable as disposable ->
+            disposable.Dispose()
+          | _ ->
+            ()
+          let content = Encoding.UTF8.GetBytes "Afterwards"
+          let stream : IO.Stream = unbox env.[OwinConstants.responseBody]
+          stream.WriteAsync(content, 0, content.Length) |> Async.AwaitTask
+
+        let composedApp =
+          path "/owin" >=> OwinApp.ofApp "/" misbehaving
+
+        let asserts (result : HttpResponseMessage) =
+          eq "Http Status Code" HttpStatusCode.OK result.StatusCode
+          eq "Reason Phrase set by server" "Afterwards" (result.Content.ReadAsStringAsync().Result)
+
+        runWithConfig composedApp
+        |> reqResp HttpMethod.GET "/owin" "" None None DecompressionMethods.GZip
+                   id asserts
+
     ]
   ]
 
