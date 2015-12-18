@@ -165,7 +165,7 @@ module internal ParsingAndControl =
         Array.blit a.Array a.Offset buf.Array (buf.Offset + !offset) count
         offset := !offset + count
       })
-    let result = ASCII.toStringAtOffset buf.Array buf.Offset count
+    let result = UTF8.toStringAtOffset buf.Array buf.Offset count
     return result, connection
   }
 
@@ -180,7 +180,7 @@ module internal ParsingAndControl =
           offset := !offset + count
         })
       if count <> 0 then
-        let line = ASCII.toStringAtOffset buf.Array buf.Offset count
+        let line = UTF8.toStringAtOffset buf.Array buf.Offset count
         let indexOfColon = line.IndexOf(':')
         let header = (line.Substring(0, indexOfColon).ToLower(), line.Substring(indexOfColon+1).TrimStart())
         return! loop connection (header :: headers)
