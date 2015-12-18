@@ -12,7 +12,6 @@ open Suave.Filters
 open Suave.Writers
 open Suave.Files
 open Suave.Successful
-open Suave.Http
 open Suave.State.CookieStateStore
 
 let basicAuth =

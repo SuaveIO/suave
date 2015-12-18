@@ -2,10 +2,9 @@
 
 open Suave.Sockets
 open Suave.Sockets.Control
-
 open System.Security.Authentication
-open System.Security.Cryptography.X509Certificates;
-open System.Net.Security;
+open System.Security.Cryptography.X509Certificates
+open System.Net.Security
 
 type DefaultTlsTransport(cn : Connection, ssl : SslStream) =
   interface ITransport with

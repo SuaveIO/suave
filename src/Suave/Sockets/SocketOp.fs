@@ -95,19 +95,19 @@ module SocketOp =
     return Choice1Of2 s
     }
 
-module SocketOpOperators =
+  module Operators =
 
-  /// See SocketOp.orInputError
-  let (@|!) c errorMsg =
-    SocketOp.orInputError errorMsg c
+    /// See SocketOp.orInputError
+    let (@|!) c errorMsg =
+      orInputError errorMsg c
 
-  /// See SocketOp.orInputErrorf
-  let (@|!!) c fErrorMsg =
-    SocketOp.orInputErrorf fErrorMsg c
+    /// See SocketOp.orInputErrorf
+    let (@|!!) c fErrorMsg =
+      orInputErrorf fErrorMsg c
 
-  /// See SocketOp.bindError
-  let (@|>) c fError =
-    SocketOp.bindError fError c
+    /// See SocketOp.bindError
+    let (@|>) c fError =
+      bindError fError c
 
 [<AutoOpen>]
 module Utils =

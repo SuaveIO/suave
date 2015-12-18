@@ -31,7 +31,8 @@
     <ConsolePause>false</ConsolePause>
     <WarningLevel>3</WarningLevel>
     <DocumentationFile>bin\Release\Suave.xml</DocumentationFile>
-    <DefineConstants></DefineConstants>
+    <DefineConstants>
+    </DefineConstants>
     <DebugType>pdbonly</DebugType>
   </PropertyGroup>
   <PropertyGroup>
@@ -58,7 +59,8 @@
     <ConsolePause>false</ConsolePause>
     <WarningLevel>3</WarningLevel>
     <DocumentationFile>bin\Release\Suave.xml</DocumentationFile>
-    <DefineConstants></DefineConstants>
+    <DefineConstants>
+    </DefineConstants>
     <DebugType>pdbonly</DebugType>
     <PlatformTarget>x86</PlatformTarget>
   </PropertyGroup>
@@ -136,7 +138,6 @@
     <Compile Include="WebSocket.fs" />
     <Compile Include="Json.fs" />
     <Compile Include="Proxy.fs" />
-    <Compile Include="Classic.fsi" />
     <Compile Include="Classic.fs" />
     <Compile Include="AssemblyVersionInfo.fs" Condition="Exists('AssemblyVersionInfo.fs')" />
     <None Include="paket.references" />
