@@ -250,7 +250,7 @@
     <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
       <ItemGroup>
         <Reference Include="Hekate">
-          <HintPath>..\..\packages\examples\Hekate\lib\net40\Hekate.dll</HintPath>
+          <HintPath>..\..\packages\examples\Hekate\lib\net35\Hekate.dll</HintPath>
           <Private>True</Private>
           <Paket>True</Paket>
         </Reference>
