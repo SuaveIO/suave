@@ -772,9 +772,9 @@ module OwinApp =
                 request = { ctx.request with url = owinRequestUri.Uri }
                 response = { response with status = HTTP_200 } })
 
-        //do! wrapper.beStoic <| fun _ ->
-        //  verbose (fun _ -> "yielding to OWIN middleware")
-        do! SocketOp.ofAsync (owin wrapper.Interface)
+        do! wrapper.beStoic <| fun _ ->
+          verbose (fun _ -> "yielding to OWIN middleware")
+          SocketOp.ofAsync (owin wrapper.Interface)
 
         verbose (fun _ -> "suave back in control")
         let ctx = wrapper.finalise()
