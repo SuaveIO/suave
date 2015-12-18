@@ -420,29 +420,29 @@ module Http =
     | Bytes of byte []
     | SocketTask of (Connection * HttpResult -> SocketOp<unit>)
 
-    static member NullContentPIso =
+    static member NullContent__ =
       (function | NullContent -> Some ()
                 | _ -> None),
       fun _ -> NullContent
 
-    static member BytesPIso =
+    static member Bytes__ =
       (function | Bytes bs -> Some bs
                 | _ -> None),
       Bytes
 
-    static member SocketTaskPIso =
+    static member SocketTask__ =
       (function | SocketTask cb -> Some cb
                 | _ -> None),
       (fun cb -> SocketTask cb)
 
-    static member NullContentPLens : PLens<HttpContent, unit> =
-      Aether.idLens <-?> HttpContent.NullContentPIso
+    static member NullContent_ : PLens<HttpContent, unit> =
+      Aether.idLens <-?> HttpContent.NullContent__
 
-    static member BytesPLens : PLens<HttpContent, byte[]> =
-      Aether.idLens <-?> HttpContent.BytesPIso
+    static member Bytes_ : PLens<HttpContent, byte[]> =
+      Aether.idLens <-?> HttpContent.Bytes__
 
-    static member SocketTaskPLens : PLens<HttpContent, Connection * HttpResult -> SocketOp<unit>> =
-      Aether.idLens <-?> HttpContent.SocketTaskPIso
+    static member SocketTask_ : PLens<HttpContent, Connection * HttpResult -> SocketOp<unit>> =
+      Aether.idLens <-?> HttpContent.SocketTask__
 
   and HttpResult =
     { status        : HttpCode

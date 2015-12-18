@@ -269,17 +269,17 @@ module Http =
     /// data back to the client through Suave.
     | SocketTask of (Connection * HttpResult -> SocketOp<unit>)
 
-    static member NullContentPIso : (HttpContent -> unit option) * (unit -> HttpContent)
-    static member BytesPIso       : (HttpContent -> byte [] option) * (byte [] -> HttpContent)
-    static member SocketTaskPIso  : (HttpContent -> (Connection * HttpResult -> SocketOp<unit>) option)
-                                   * ((Connection * HttpResult -> SocketOp<unit>) -> HttpContent)
+    static member NullContent__  : (HttpContent -> unit option) * (unit -> HttpContent)
+    static member Bytes__       : (HttpContent -> byte [] option) * (byte [] -> HttpContent)
+    static member SocketTask__  : (HttpContent -> (Connection * HttpResult -> SocketOp<unit>) option)
+                                * ((Connection * HttpResult -> SocketOp<unit>) -> HttpContent)
 
-    static member NullContentPLens : (HttpContent -> unit option)
-                                     * (unit -> HttpContent -> HttpContent)
-    static member BytesPLens : (HttpContent -> byte [] option)
-                               * (byte [] -> HttpContent -> HttpContent)
-    static member SocketTaskPLens : (HttpContent -> (Connection * HttpResult -> SocketOp<unit>) option)
-                                    * ((Connection * HttpResult -> SocketOp<unit>) -> HttpContent -> HttpContent)
+    static member NullContent_ : (HttpContent -> unit option)
+                               * (unit -> HttpContent -> HttpContent)
+    static member Bytes_ : (HttpContent -> byte [] option)
+                         * (byte [] -> HttpContent -> HttpContent)
+    static member SocketTask_ : (HttpContent -> (Connection * HttpResult -> SocketOp<unit>) option)
+                              * ((Connection * HttpResult -> SocketOp<unit>) -> HttpContent -> HttpContent)
 
   /// The HttpResult is the structure that you work with to tell Suave how to
   /// send the response. Have a look at the docs for HttpContent for further

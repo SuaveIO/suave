@@ -607,7 +607,7 @@ module OwinApp =
     let responseStream = new OpenMemoryStream()
     let responseStreamLens : Property<HttpContent, IO.Stream> =
       (fun x ->
-        let bs = Lens.getPartialOrElse HttpContent.BytesPLens [||] x
+        let bs = Lens.getPartialOrElse HttpContent.Bytes_ [||] x
         responseStream.Write(bs, 0, bs.Length)
         upcast responseStream),
       (fun _ x -> invalidOp "setting responseStream to a value is not supported in OWIN")
@@ -647,7 +647,7 @@ module OwinApp =
       let reqHeaders_, respHeaders_, bytes_ =
         HttpContext.request_ >--> HttpRequest.headers_,
         HttpContext.response_ >--> HttpResult.headers_,
-        HttpContext.response_ >--> HttpResult.content_ >-?> HttpContent.BytesPLens
+        HttpContext.response_ >--> HttpResult.content_ >-?> HttpContent.Bytes_
 
       let setResponseHeaders (rhs : DeltaDictionary) =
         Lens.set respHeaders_ rhs.DeltaList
