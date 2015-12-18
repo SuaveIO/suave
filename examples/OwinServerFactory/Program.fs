@@ -26,7 +26,7 @@ module Main =
     try
       let port = 8080
       let options = StartOptions ()
-      options.Port <- port |> Nullable<int>
+      options.Port <-  Nullable<int>(port)
       options.ServerFactory <- "Suave.Owin+OwinServerFactory"
       use app = WebApp.Start<OwinStartup.Startup>(options)
       printfn "Server started on port %d" port
