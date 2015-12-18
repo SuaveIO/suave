@@ -33,3 +33,10 @@ group Examples
   nuget Microsoft.Owin.Hosting 
   nuget Owin
   github haf/YoLo YoLo.fs
+
+group Docs
+  framework: NET45
+  source https://nuget.org/api/v2
+  nuget FSharp.Core ~> 4
+  nuget FSharp.Formatting
+  nuget FSharp.Formatting.CommandTool
