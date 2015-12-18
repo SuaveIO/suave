@@ -34,10 +34,12 @@ let private sendWebResponse (data : HttpWebResponse) ({ request = { trace = t };
   let ctxNext =
     { ctx with response = { resp with headers = resp.headers @ headers } }
 
-  let composed = 
-    response (HttpCode.TryParse(int data.StatusCode) |> Option.get) bytes
+  let code =
+    match data.StatusCode |> int |> HttpCode.TryParse with
+    | Choice1Of2 x -> x
+    | Choice2Of2 err -> failwith err
 
-  return! composed ctxNext
+  return! response code bytes ctxNext
   }
 
 /// Forward the HttpRequest 'p' to the 'ip':'port'

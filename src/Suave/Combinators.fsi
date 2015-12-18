@@ -77,16 +77,18 @@ module Writers =
   /// </remarks>
   val setMimeType : mimeType:string -> WebPart
 
-
 // http://www.web-cache.com/Writings/http-status-codes.html
 
-/// Intermediate responses - SUAVE TODO
-/// Functions have signature f :: TODO
+/// Control-flow functions, such as 100 Continue and 101 Switching Protocol.
 module Intermediate =
-  /// TODO
+
+  /// This is not supported. If you wish to use it, please send a PR to
+  /// https://github.com/suaveio/suave
   val CONTINUE : WebPart
 
-  /// TODO
+  /// This is not supported. If you wish to use it, please send a PR to
+  /// https://github.com/suaveio/suave – or are you looking for EventSource or
+  /// WebSocket? They are modules in the global namespace.
   val SWITCHING_PROTO : WebPart
 
 /// <summary><para>
@@ -106,7 +108,7 @@ module Successful =
   /// </para></summary>
   /// <remarks>
   /// </remarks>
-  val ok : s:byte [] -> WebPart
+  val ok : bytes:byte [] -> WebPart
 
   /// <summary><para>
   /// 200
@@ -115,7 +117,7 @@ module Successful =
   /// </para></summary>
   /// <remarks>
   /// </remarks>
-  val OK : a:string -> WebPart
+  val OK : body:string -> WebPart
 
   /// <summary><para>
   /// 201
@@ -138,7 +140,7 @@ module Successful =
   /// the current value of the entity tag for the requested variant just
   /// created, see section 14.19.
   /// </para></summary>
-  val created : s:byte [] -> WebPart
+  val created : bytes:byte [] -> WebPart
 
   /// <summary><para>
   /// 201
@@ -159,7 +161,7 @@ module Successful =
   /// the current value of the entity tag for the requested variant just
   /// created, see section 14.19.
   /// </para></summary>
-  val CREATED : s:string -> WebPart
+  val CREATED : body:string -> WebPart
 
   /// <summary><para>
   /// 202
@@ -179,7 +181,7 @@ module Successful =
   /// and either a pointer to a status monitor or some estimate of when the
   /// user can expect the request to be fulfilled.
   /// </para></summary>
-  val accepted : s:byte [] -> WebPart
+  val accepted : bytes:byte [] -> WebPart
 
   /// <summary><para>
   /// 202
@@ -199,7 +201,7 @@ module Successful =
   /// and either a pointer to a status monitor or some estimate of when the
   /// user can expect the request to be fulfilled.
   /// </para></summary>
-  val ACCEPTED : s:string -> WebPart
+  val ACCEPTED : body:string -> WebPart
 
   /// <summary><para>
   /// 204
@@ -514,7 +516,7 @@ module RequestErrors =
   /// syntax. The client SHOULD NOT repeat the request without
   /// modifications.
   /// </para></summary>
-  val bad_request : s:byte [] -> WebPart
+  val bad_request : bytes:byte [] -> WebPart
 
   /// <summary><para>
   /// 400
@@ -523,7 +525,7 @@ module RequestErrors =
   /// syntax. The client SHOULD NOT repeat the request without
   /// modifications.
   /// </para></summary>
-  val BAD_REQUEST : s:string -> WebPart
+  val BAD_REQUEST : body:string -> WebPart
 
   /// <summary><para>
   /// 401
@@ -544,7 +546,7 @@ module RequestErrors =
   /// </para></summary>
   /// <remarks>
   /// </remarks>
-  val unauthorized : s:byte [] -> WebPart
+  val unauthorized : bytes:byte [] -> WebPart
 
   /// <summary><para>
   /// 401
@@ -565,7 +567,7 @@ module RequestErrors =
   /// </para></summary>
   /// <remarks>
   /// </remarks>
-  val UNAUTHORIZED : s:string -> WebPart
+  val UNAUTHORIZED : body:string -> WebPart
 
   /// <summary><para>
   /// Composite:
@@ -594,7 +596,7 @@ module RequestErrors =
   /// make this information available to the client, the status code 404
   /// (Not Found) can be used instead.
   /// </para></summary>
-  val forbidden : s:byte [] -> WebPart
+  val forbidden : bytes:byte [] -> WebPart
 
   /// <summary><para>
   /// 403
@@ -607,7 +609,7 @@ module RequestErrors =
   /// make this information available to the client, the status code 404
   /// (Not Found) can be used instead.
   /// </para></summary>
-  val FORBIDDEN : s:string -> WebPart
+  val FORBIDDEN : body:string -> WebPart
 
   /// <summary><para>
   /// 404
@@ -623,7 +625,7 @@ module RequestErrors =
   /// reveal exactly why the request has been refused, or when no other
   /// response is applicable.
   /// </para></summary>
-  val not_found : message:byte [] -> WebPart
+  val not_found : bytes:byte [] -> WebPart
   
   /// <summary><para>
   /// 404
@@ -640,7 +642,7 @@ module RequestErrors =
   /// reveal exactly why the request has been refused, or when no other
   /// response is applicable.
   /// </para></summary>
-  val NOT_FOUND : message:string -> WebPart
+  val NOT_FOUND : body:string -> WebPart
 
   /// <summary><para>
   /// 405
@@ -650,7 +652,7 @@ module RequestErrors =
   /// Allow header containing a list of valid methods for the requested
   /// resource.
   /// </para></summary>
-  val method_not_allowed : s:byte [] -> WebPart
+  val method_not_allowed : bytes:byte [] -> WebPart
 
   /// <summary><para>
   /// 405
@@ -660,7 +662,7 @@ module RequestErrors =
   /// Allow header containing a list of valid methods for the requested
   /// resource.
   /// </para></summary>
-  val METHOD_NOT_ALLOWED : s:string -> WebPart
+  val METHOD_NOT_ALLOWED : body:string -> WebPart
 
   /// <summary><para>
   /// 406
@@ -691,7 +693,7 @@ module RequestErrors =
   /// </para></summary>
   /// <remarks>
   /// </remarks>
-  val not_acceptable : s:byte[] -> WebPart
+  val not_acceptable : bytes:byte[] -> WebPart
   
   /// <summary><para>
   /// 406
@@ -722,7 +724,7 @@ module RequestErrors =
   /// </para></summary>
   /// <remarks>
   /// </remarks>
-  val NOT_ACCEPTABLE : s:string -> WebPart
+  val NOT_ACCEPTABLE : body:string -> WebPart
 
   /// <summary><para>
   /// 408
@@ -754,7 +756,7 @@ module RequestErrors =
   /// between the two versions in a format defined by the response
   /// Content-Type.
   /// </para></summary>
-  val conflict : byte[] -> WebPart
+  val conflict : bytes:byte[] -> WebPart
   
   /// <summary><para>
   /// 409
@@ -777,7 +779,7 @@ module RequestErrors =
   /// between the two versions in a format defined by the response
   /// Content-Type.
   /// </para></summary>
-  val CONFLICT : string -> WebPart
+  val CONFLICT : body:string -> WebPart
 
   /// <summary><para>
   /// 410
@@ -800,7 +802,7 @@ module RequestErrors =
   /// to keep the mark for any length of time -- that is left to the
   /// discretion of the server owner.
   /// </para></summary>
-  val gone : s:byte [] -> WebPart
+  val gone : bytes:byte [] -> WebPart
   
   /// <summary><para>
   /// 410
@@ -823,7 +825,7 @@ module RequestErrors =
   /// to keep the mark for any length of time -- that is left to the
   /// discretion of the server owner.
   /// </para></summary>
-  val GONE : s:string -> WebPart
+  val GONE : body:string -> WebPart
 
   /// <summary><para>
   /// 415
@@ -832,7 +834,7 @@ module RequestErrors =
   /// the request is in a format not supported by the requested resource
   /// for the requested method.
   /// </para></summary>
-  val unsupported_media_type : s:byte [] -> WebPart
+  val unsupported_media_type : bytes:byte [] -> WebPart
 
   /// <summary><para>
   /// 415
@@ -841,7 +843,7 @@ module RequestErrors =
   /// the request is in a format not supported by the requested resource
   /// for the requested method.
   /// </para></summary>
-  val UNSUPPORTED_MEDIA_TYPE : s:string -> WebPart
+  val UNSUPPORTED_MEDIA_TYPE : body:string -> WebPart
 
   /// <summary><para>
   /// 422
@@ -850,7 +852,7 @@ module RequestErrors =
   /// </para><para>
   /// </para></summary>
   /// <remarks>(WebDAV; RFC 4918)</remarks>
-  val unprocessable_entity : s:byte [] -> WebPart
+  val unprocessable_entity : bytes:byte [] -> WebPart
 
   /// <summary><para>
   /// 422
@@ -859,7 +861,7 @@ module RequestErrors =
   /// </para><para>
   /// </para></summary>
   /// <remarks>(WebDAV; RFC 4918)</remarks>
-  val UNPROCESSABLE_ENTITY : s:string -> WebPart
+  val UNPROCESSABLE_ENTITY : body:string -> WebPart
 
   /// <summary><para>
   /// 428
@@ -896,7 +898,7 @@ module RequestErrors =
   /// <remarks>
   /// https://tools.ietf.org/html/rfc6585
   /// </remarks>
-  val precondition_required : byte[] -> WebPart
+  val precondition_required : bytes:byte[] -> WebPart
 
   /// <summary><para>
   /// 428
@@ -933,7 +935,7 @@ module RequestErrors =
   /// <remarks>
   /// https://tools.ietf.org/html/rfc6585
   /// </remarks>
-  val PRECONDITION_REQUIRED : string -> WebPart
+  val PRECONDITION_REQUIRED : body:string -> WebPart
 
   /// <summary><para>
   /// 429
@@ -945,7 +947,7 @@ module RequestErrors =
   /// <remarks>
   /// https://tools.ietf.org/html/rfc6585
   /// </remarks>
-  val too_many_requests : s:byte [] -> WebPart
+  val too_many_requests : bytes:byte [] -> WebPart
   
   /// <summary><para>
   /// 429
@@ -957,7 +959,7 @@ module RequestErrors =
   /// <remarks>
   /// https://tools.ietf.org/html/rfc6585
   /// </remarks>
-  val TOO_MANY_REQUESTS : s:string -> WebPart
+  val TOO_MANY_REQUESTS : body:string -> WebPart
 
 /// 10.5 Server Error 5xx
 /// Response status codes beginning with the digit "5" indicate cases in
@@ -975,7 +977,7 @@ module ServerErrors =
   /// The server encountered an unexpected condition which prevented it
   /// from fulfilling the request.
   /// </para></summary>
-  val internal_error : arr:byte [] -> WebPart
+  val internal_error : bytes:byte [] -> WebPart
 
   /// <summary><para>
   /// 500
@@ -983,27 +985,28 @@ module ServerErrors =
   /// The server encountered an unexpected condition which prevented it
   /// from fulfilling the request.
   /// </para></summary>
-  val INTERNAL_ERROR : message:string -> WebPart
+  val INTERNAL_ERROR : body:string -> WebPart
 
   /// An upstream server that suave communicated with did not respond in a timely fashion
-  val bad_gateway : arr:byte [] -> WebPart
+  val bad_gateway : bytes:byte [] -> WebPart
+
   /// An upstream server that suave communicated with did not respond in a timely fashion
-  val BAD_GATEWAY : message:string -> WebPart
+  val BAD_GATEWAY : body:string -> WebPart
 
   /// The service is currently under too much load and cannot service the request
-  val service_unavailable : arr:byte [] -> WebPart
+  val service_unavailable : bytes:byte [] -> WebPart
 
   /// The service is currently under too much load and cannot service the request
-  val SERVICE_UNAVAILABLE : message:string -> WebPart
+  val SERVICE_UNAVAILABLE : body:string -> WebPart
 
   /// An upstream server that suave communicated with did not respond in a timely fashion
-  val gateway_timeout : arr:byte [] -> WebPart
+  val gateway_timeout : bytes:byte [] -> WebPart
 
   /// An upstream server that suave communicated with did not respond in a timely fashion
-  val GATEWAY_TIMEOUT : message:string -> WebPart
+  val GATEWAY_TIMEOUT : body:string -> WebPart
 
   /// Only used internally in Suave.
-  val invalid_http_version : arr:byte [] -> WebPart
+  val invalid_http_version : bytes:byte [] -> WebPart
 
   /// Only used internally in Suave.
   val INVALID_HTTP_VERSION : WebPart
@@ -1016,19 +1019,19 @@ module Filters =
   open Suave.Logging
 
   /// Match on the path
-  val path : s:string -> WebPart
+  val path : pathAfterDomain:string -> WebPart
 
   /// Match on the initial path
-  val pathStarts : s:string -> WebPart
+  val pathStarts : pathAfterDomainSubstr:string -> WebPart
 
   /// Match on the method
   val ``method`` : ``method``:HttpMethod -> WebPart
 
-  /// Match on the protocol
+  /// Match on the protocol being HTTPS
   val isSecure : WebPart
 
   /// Applies the regex to the path and matches on the result
-  val pathRegex : s:string -> WebPart
+  val pathRegex : pathAfterDomainRegex:string -> WebPart
 
   /// Match on the hostname (which is a required header for a Http client to send)
   /// -> allows you to have multiple sites with a single application.
@@ -1071,9 +1074,11 @@ module Filters =
   val logFormat : ctx:HttpContext -> string
 
   /// <summary><para>
-  /// Log the HttpRequest to the given logger.
+  /// Log the HttpRequest to the given logger, given the Suave Logger and a
+  /// message formatter that can inspect the context and produce a message to
+  /// send to the logger.
   /// </para></summary>
-  val log : Logger -> (HttpContext -> string) -> WebPart
+  val log : logger:Logger -> messageFun:(HttpContext -> string) -> WebPart
 
   /// <summary><para>
   /// Strongly typed route matching! Matching the uri can be used with the 'parsers'
@@ -1099,7 +1104,7 @@ module Filters =
   val pathScan : pf:PrintfFormat<'a,'b,'c,'d,'t> -> h:('t -> WebPart) -> WebPart
 
   /// <summary> Fails the WebPart after x seconds</summary>
-  val timeoutWebPart : x:System.TimeSpan -> WebPart -> WebPart
+  val timeoutWebPart : timeout:System.TimeSpan -> child:WebPart -> WebPart
 
   /// <summary>
   /// Match on GET requests.

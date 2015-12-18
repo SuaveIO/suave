@@ -35,7 +35,7 @@ module Binding =
       | Choice2Of2 err -> fErr err)
 
   let bindReq f fCont fErr =
-    bind (HttpContext.request >> f) fCont fErr
+    bind (Aether.Lens.get HttpContext.request_ >> f) fCont fErr
 
   let header key f (req : HttpRequest) =
     (getFirst req.headers key)

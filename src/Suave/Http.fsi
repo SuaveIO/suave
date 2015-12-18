@@ -37,7 +37,17 @@ module Http =
     | HTTP_400 | HTTP_401 | HTTP_402 | HTTP_403 | HTTP_404 | HTTP_405 | HTTP_406
     | HTTP_407 | HTTP_408 | HTTP_409 | HTTP_410 | HTTP_411 | HTTP_412 | HTTP_413
     | HTTP_422 | HTTP_428 | HTTP_429 | HTTP_414 | HTTP_415 | HTTP_416 | HTTP_417
-    | HTTP_500 | HTTP_501 | HTTP_502 | HTTP_503 | HTTP_504 | HTTP_505
+    | HTTP_451 | HTTP_500 | HTTP_501 | HTTP_502 | HTTP_503 | HTTP_504 | HTTP_505
+
+    member code : int
+
+    member reason : string
+
+    member message : string
+
+    member describe : unit -> string
+
+    static member TryParse : code:int -> Choice<HttpCode, string>
 
   /// HTTP cookie
   type HttpCookie =
@@ -94,12 +104,12 @@ module Http =
 
   /// A file's mime type and if compression is enabled or not
   type MimeType =
-    { name         : string
-      compression  : bool }
+    { name        : string
+      compression : bool }
     /// MimeType name lens
-    static member name_ : Property<HttpCookie, string>
+    static member name_ : Property<MimeType, string>
     /// MimeType compression lens
-    static member compression_ : Property<HttpCookie, bool>
+    static member compression_ : Property<MimeType, bool>
 
   type MimeTypesMap = string -> MimeType option
 
@@ -110,10 +120,10 @@ module Http =
       mimeType     : string
       tempFilePath : string }
 
-    static member fieldName_ : Property<HttpCookie, string>
-    static member fileName_ : Property<HttpCookie, string>
-    static member mimeType_ : Property<HttpCookie, string>
-    static member tempFilePath_ : Property<HttpCookie, string>
+    static member fieldName_ : Property<HttpUpload, string>
+    static member fileName_ : Property<HttpUpload, string>
+    static member mimeType_ : Property<HttpUpload, string>
+    static member tempFilePath_ : Property<HttpUpload, string>
 
   [<AllowNullLiteral>]
   type ITlsProvider =
@@ -168,15 +178,15 @@ module Http =
 
     /// Gets the query string from the HttpRequest. Use queryParam to try to fetch
     /// data for individual items.
-    member query : string
+    member query : (string * string option) list
 
     /// Finds the key k from the query string in the HttpRequest. To access form
     /// data, use either `formData` to access normal form data, or `fieldData` to
     /// access the multipart-fields.
-    member queryParam : key:string -> obj
+    member queryParam : key:string -> Choice<string, string>
 
     /// Gets the header for the given key in the HttpRequest
-    member header : string -> string
+    member header : key:string -> Choice<string, string>
 
     /// Gets the form as a ((string * string option) list) from the HttpRequest.
     /// Use formData to get the data for a particular key or use the indexed
@@ -186,23 +196,23 @@ module Http =
     /// Finds the key k from the form of the HttpRequest. To access query string
     /// parameters, use `queryParam` or to access multipart form fields, use
     /// `fieldData`.
-    member formData : key:string -> string
+    member formData : key:string -> Choice<string, string>
 
     /// Finds the key k from the multipart-form of the HttpRequest. To access
     /// query string parameters, use `queryParam` or to access regular form data,
     /// use `formData`.
-    member fieldData : key:string -> string
+    member fieldData : key:string -> Choice<string, string>
 
     /// Syntactic Sugar to retrieve query string, form or multi-field values
     /// from HttpRequest 
-    member get_Item : key:string -> string
+    member Item : key:string -> string option with get
 
     /// Get the client's view of what host is being called. If you trust your
     /// proxy the value will be fetched from X-Forwarded-Host, then the Host
     /// headers. If you don't explicitly overwrite these headers in the proxy
     /// you may be open to clients spoofing the headers. Hence the explicit
     /// interfaces which force you as a developer to think abou the problem.
-    member clientHost : trustProxy:bool -> sources:_ list -> Host
+    member clientHost : trustProxy:bool -> sources:string list -> Host
 
     /// See docs on clientHost
     member clientHostTrustProxy : Host
@@ -240,7 +250,7 @@ module Http =
 
     /// Create a HttpBinding for the given protocol, an IP address to bind to and
     /// a port to listen on – this is the "stringly typed" overload.
-    val mkSimple : scheme:Protocol -> ip:IPAddress -> port:int -> HttpBinding
+    val mkSimple : scheme:Protocol -> ip:string -> port:int -> HttpBinding
 
   type HttpContent =
     /// This is the default HttpContent. If you place this is a HttpResult the web
@@ -259,13 +269,17 @@ module Http =
     /// data back to the client through Suave.
     | SocketTask of (Connection * HttpResult -> SocketOp<unit>)
 
-    static member NullContentPIso : (HttpContent -> unit option) * // TODO
-    static member BytesPIso : PIso<HttpContent, byte[]>
-    static member SocketTaskPIso : PIso<HttpContent, Connection * HttpResult -> SocketOp<unit>>
+    static member NullContentPIso : (HttpContent -> unit option) * (unit -> HttpContent)
+    static member BytesPIso       : (HttpContent -> byte [] option) * (byte [] -> HttpContent)
+    static member SocketTaskPIso  : (HttpContent -> (Connection * HttpResult -> SocketOp<unit>) option)
+                                   * ((Connection * HttpResult -> SocketOp<unit>) -> HttpContent)
 
-    static member NullContentPLens : PLens<HttpContent, unit>
-    static member BytesPLens  : PLens<HttpContent, byte[]>
-    static member SocketTaskPLens : PLens<HttpContent, Connection * HttpResult -> SocketOp<unit>>
+    static member NullContentPLens : (HttpContent -> unit option)
+                                     * (unit -> HttpContent -> HttpContent)
+    static member BytesPLens : (HttpContent -> byte [] option)
+                               * (byte [] -> HttpContent -> HttpContent)
+    static member SocketTaskPLens : (HttpContent -> (Connection * HttpResult -> SocketOp<unit>) option)
+                                    * ((Connection * HttpResult -> SocketOp<unit>) -> HttpContent -> HttpContent)
 
   /// The HttpResult is the structure that you work with to tell Suave how to
   /// send the response. Have a look at the docs for HttpContent for further
@@ -276,12 +290,16 @@ module Http =
       content       : HttpContent
       writePreamble : bool }
 
-    /// The empty HttpResult, with a 404 and a HttpContent.NullContent content
-    static member empty : HttpResult
     static member status_ : Property<HttpResult,HttpCode>
     static member headers_ : Property<HttpResult,(string * string) list>
     static member content_ : Property<HttpResult, HttpContent>
     static member writePreamble_ : Property<HttpResult, bool>
+
+  [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+  module HttpResult =
+
+    /// The empty HttpResult, with a 404 and a HttpContent.NullContent content
+    val empty : HttpResult
 
   /// A server-key is a 256 bit key with high entropy
   type ServerKey = byte []
@@ -359,7 +377,7 @@ module Http =
 
     member clientProto : trustProxy:bool -> sources:string list -> string
 
-    member clientProtoTrustProxy : bool
+    member clientProtoTrustProxy : string
 
     static member request_     : Property<HttpContext, HttpRequest>
     static member runtime_     : Property<HttpContext, HttpRuntime>
@@ -370,7 +388,7 @@ module Http =
     static member response_    : Property<HttpContext, HttpResult>
 
     /// read-only
-    static member clientIp_    : Property<HttpContext, string>
+    static member clientIp_    : Property<HttpContext, IPAddress>
 
     /// read-only
     static member isLocal_     : Property<HttpContext, bool>
@@ -409,7 +427,7 @@ module Http =
     val mk : serverKey:ServerKey -> errorHandler:ErrorHandler
           -> mimeTypes:MimeTypesMap -> homeDirectory:string
           -> compressionFolder:string -> logger:Logger
-          -> parsePostData:bool -> cookieSerialiser:Serialiser
+          -> parsePostData:bool -> cookieSerialiser:Suave.Utils.CookieSerialiser
           -> tlsProvider:ITlsProvider -> binding:HttpBinding
           -> HttpRuntime
 
@@ -425,5 +443,5 @@ module Http =
           -> writePreamble:bool
           -> HttpContext
 
-  val request : apply:(HttpRequest -> WebPart) -> context:HttpContext -> WebPart
-  val context : apply:(HttpContext -> WebPart) -> context:HttpContext -> WebPart
+  val request : apply:(HttpRequest -> HttpContext -> 'a) -> context:HttpContext -> 'a
+  val context : apply:(HttpContext -> HttpContext -> 'a) -> context:HttpContext -> 'a

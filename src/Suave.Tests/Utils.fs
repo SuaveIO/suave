@@ -55,14 +55,16 @@ let utilities (_: SuaveConfig) =
       let ca (str : string) = str.ToCharArray() |> Array.map (string<<int) |> String.concat ","
       let key = Crypto.generateStdKey ()
       let (Choice1Of2 cipher) = Crypto.secretboxOfText key str
-      cipher.[cipher.Length - Crypto.HMACLength - 1] <- 0uy
-      cipher.[cipher.Length - Crypto.HMACLength - 2] <- 0uy
-      cipher.[cipher.Length - Crypto.HMACLength - 3] <- 0uy
-      cipher.[cipher.Length - Crypto.HMACLength - 4] <- 0uy
-      cipher.[cipher.Length - Crypto.HMACLength - 5] <- 0uy
-      cipher.[cipher.Length - Crypto.HMACLength - 6] <- 0uy
-      cipher.[cipher.Length - Crypto.HMACLength - 7] <- 0uy
-      cipher.[cipher.Length - Crypto.HMACLength - 8] <- 0uy
+      let dataFromEnd negOffset =
+        int (uint16 cipher.Length - Crypto.HMACLength - negOffset)
+      cipher.[dataFromEnd 1us] <- 0uy
+      cipher.[dataFromEnd 2us] <- 0uy
+      cipher.[dataFromEnd 3us] <- 0uy
+      cipher.[dataFromEnd 4us] <- 0uy
+      cipher.[dataFromEnd 5us] <- 0uy
+      cipher.[dataFromEnd 6us] <- 0uy
+      cipher.[dataFromEnd 7us] <- 0uy
+      cipher.[dataFromEnd 8us] <- 0uy
       match Crypto.secretboxOpen key cipher with
       | Choice1Of2 _ -> Tests.failtest "should not decrypt successfully"
       | Choice2Of2 (Crypto.AlteredOrCorruptMessage(msg) as aocm) -> ()

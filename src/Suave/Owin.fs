@@ -487,7 +487,10 @@ module OwinApp =
 
     let i2sc : Property<HttpCode, int> =
       (fun x -> x.code),
-      (fun v x -> HttpCode.TryParse v |> Option.get) // NOTE: assumes user only sets valid codes
+      // NOTE: assumes user only sets valid codes
+      (fun v x -> HttpCode.TryParse v |> function
+        | Choice1Of2 x -> x
+        | Choice2Of2 err -> failwith err)
 
     let constant x =
       ((fun _ -> x),

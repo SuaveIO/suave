@@ -47,8 +47,9 @@ module Http =
 
   [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
   module HttpMethod =
-    let parse (str:string) =
-      match str.ToUpperInvariant() with
+
+    let parse (methodString:string) =
+      match methodString.ToUpperInvariant() with
         | "GET"     -> HttpMethod.GET
         | "POST"    -> HttpMethod.POST
         | "DELETE"  -> HttpMethod.DELETE
@@ -67,7 +68,7 @@ module Http =
     | HTTP_400 | HTTP_401 | HTTP_402 | HTTP_403 | HTTP_404 | HTTP_405 | HTTP_406
     | HTTP_407 | HTTP_408 | HTTP_409 | HTTP_410 | HTTP_411 | HTTP_412 | HTTP_413
     | HTTP_422 | HTTP_428 | HTTP_429 | HTTP_414 | HTTP_415 | HTTP_416 | HTTP_417
-    | HTTP_500 | HTTP_501 | HTTP_502 | HTTP_503 | HTTP_504 | HTTP_505
+    | HTTP_451 | HTTP_500 | HTTP_501 | HTTP_502 | HTTP_503 | HTTP_504 | HTTP_505
 
     member x.code = 
       match x with 
@@ -80,8 +81,8 @@ module Http =
       | HTTP_408 -> 408 | HTTP_409 -> 409 | HTTP_410 -> 410 | HTTP_411 -> 411
       | HTTP_412 -> 412 | HTTP_413 -> 413 | HTTP_414 -> 414 | HTTP_415 -> 415
       | HTTP_416 -> 416 | HTTP_417 -> 417 | HTTP_422 -> 422 | HTTP_428 -> 428
-      | HTTP_429 -> 429 | HTTP_500 -> 500 | HTTP_501 -> 501 | HTTP_502 -> 502
-      | HTTP_503 -> 503 | HTTP_504 -> 504 | HTTP_505 -> 505
+      | HTTP_429 -> 429 | HTTP_451 -> 451 | HTTP_500 -> 500 | HTTP_501 -> 501
+      | HTTP_502 -> 502 | HTTP_503 -> 503 | HTTP_504 -> 504 | HTTP_505 -> 505
 
     member x.reason = 
       match x with
@@ -122,6 +123,7 @@ module Http =
       | HTTP_422 -> "Unprocessable Entity"
       | HTTP_428 -> "Precondition Required"
       | HTTP_429 -> "Too Many Requests"
+      | HTTP_451 -> "Unavailable For Legal Reasons"
       | HTTP_500 -> "Internal Server Error"
       | HTTP_501 -> "Not Implemented"
       | HTTP_502 -> "Bad Gateway"
@@ -168,6 +170,7 @@ module Http =
       | HTTP_422 -> "The entity sent to the server was invalid."
       | HTTP_428 -> "You should verify the server accepts the request before sending it."
       | HTTP_429 -> "Request rate too high, chill out please."
+      | HTTP_451 -> "The server is subject to legal restrictions which prevent it servicing the request"
       | HTTP_500 -> "Server got itself in trouble"
       | HTTP_501 -> "Server does not support this operation"
       | HTTP_502 -> "Invalid responses from another server/proxy."
@@ -178,8 +181,17 @@ module Http =
     member x.describe () =
       sprintf "%d %s: %s" x.code x.reason x.message
 
-    static member TryParse (code: int) =
-      HttpCodeStatics.mapCases.Force() |> Map.tryFind ("HTTP_" + string code)
+    static member TryParse (code : int) =
+      let found =
+        HttpCodeStatics.mapCases.Force()
+        |> Map.tryFind ("HTTP_" + string code)
+
+      match found with
+      | Some x ->
+        Choice1Of2 x
+
+      | None ->
+        Choice2Of2 (sprintf "Couldn't convert %i to HttpCode. Please send a PR to https://github.com/suaveio/suave if you want it" code)
 
   and private HttpCodeStatics() =
     static member val mapCases : Lazy<Map<string,HttpCode>> =
@@ -242,8 +254,8 @@ module Http =
       sb.ToString ()
 
   type MimeType =
-    { name         : string
-      compression  : bool }
+    { name        : string
+      compression : bool }
 
     static member name_ = Property (fun x -> x.name) (fun v (x : MimeType) -> { x with name = v })
     static member compression_ = Property (fun x -> x.compression) (fun v (x : MimeType) -> { x with compression = v })
@@ -307,17 +319,17 @@ module Http =
     member x.query =
       Parsing.parseData x.rawQuery
 
-    member x.queryParam (k : string) =
-      getFirstOpt x.query k
+    member x.queryParam (key : string) =
+      getFirstOpt x.query key
 
-    member x.header k =
-      getFirst x.headers k
+    member x.header key =
+      getFirst x.headers key
 
     member x.form =
       Parsing.parseData (ASCII.toString x.rawForm)
 
-    member x.formData (k : string) =
-      getFirstOpt x.form k
+    member x.formData (key : string) =
+      getFirstOpt x.form key
 
     member x.fieldData (k : string) =
       getFirst x.multiPartFields k
@@ -410,11 +422,13 @@ module Http =
 
     static member NullContentPIso =
       (function | NullContent -> Some ()
-                | _ -> None), fun _ -> NullContent
+                | _ -> None),
+      fun _ -> NullContent
 
     static member BytesPIso =
       (function | Bytes bs -> Some bs
-                | _ -> None), Bytes
+                | _ -> None),
+      Bytes
 
     static member SocketTaskPIso =
       (function | SocketTask cb -> Some cb
@@ -424,7 +438,7 @@ module Http =
     static member NullContentPLens : PLens<HttpContent, unit> =
       Aether.idLens <-?> HttpContent.NullContentPIso
 
-    static member BytesPLens  : PLens<HttpContent, byte[]> =
+    static member BytesPLens : PLens<HttpContent, byte[]> =
       Aether.idLens <-?> HttpContent.BytesPIso
 
     static member SocketTaskPLens : PLens<HttpContent, Connection * HttpResult -> SocketOp<unit>> =
@@ -608,6 +622,5 @@ module Http =
     let runtime x = x.runtime
     let response x = x.response
 
-  let request f (a : HttpContext) = f a.request a
-
-  let context f (a : HttpContext) = f a a
+  let request apply (a : HttpContext) = apply a.request a
+  let context apply (a : HttpContext) = apply a a
