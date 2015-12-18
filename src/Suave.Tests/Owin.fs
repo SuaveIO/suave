@@ -88,7 +88,7 @@ let owinUnit =
 
         subject.["a"] <- [| "a-1" |]
         eqs "has a once more" ["a-1"] subject.["a"]
-      ]
+    ]
 
     testList "OwinDictionary" [
       testCase "read/write HttpMethod" <| fun _ ->
@@ -110,8 +110,18 @@ let owinUnit =
         let subj = createOwin ()
         subj.["testing.MyKey"] <- "oh yeah"
         eq "read back" "oh yeah" (subj.["Testing.MyKey"] |> unbox)
-      ]
     ]
+
+    testList "OWIN response headers" [
+      testCase "get x-not-here response-header fails" <| fun _ ->
+        let subj = createOwin ()
+        let headers : IDictionary<string, string[]> = subj.[OwinConstants.responseHeaders] |> unbox
+        match headers.TryGetValue "x-not-here" with
+        | false, _ -> ()
+        | true, null -> Tests.failtest "errenously returned (true, null)"
+        | true, otherwise -> Tests.failtestf "errenously returned %A" otherwise
+    ]
+  ]
 
 [<Tests>]
 let owinEndToEnd cfg =
