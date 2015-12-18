@@ -136,7 +136,7 @@ let app =
           sprintf """
           ödlan: %A
           小: %A
-          """ (r.formData "ödlan") (r.formData "小")
+          """ (getFirst r.multiPartFields "ödlan") (getFirst r.multiPartFields "小") 
           |> OK >>= Writers.setMimeType "text/plain"
         )
         PUT >>= path "/upload2"
