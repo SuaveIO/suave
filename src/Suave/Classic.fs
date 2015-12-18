@@ -9,7 +9,7 @@ let inline bind (second : 'b -> Async<'c option>) (first : 'a -> Async<'b option
 
 let inline (>>=) (first : 'a -> Async<'b option>)  (second : 'b -> Async<'c option>) : 'a -> Async<'c option> =
   fun x ->
-    WebPart.compose second first x
+    WebPart.compose first second x
 
 let inline (>=>) a b = fun x ->
   match a x with
