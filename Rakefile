@@ -153,12 +153,6 @@ task :increase_version_number do
   ENV['NUGET_VERSION'] = s.format("%M.%m.%p%s")
 end
 
-Albacore::Tasks::Release.new :release,
-                             pkg_dir: 'build/pkg',
-                             depend_on: [:compile, :nugets],
-                             nuget_exe: 'packages/build/NuGet.CommandLine/tools/NuGet.exe',
-                             api_key: ENV['NUGET_KEY']
-
 namespace :docs do
   desc 'clean generated documentation'
   task :clean do
@@ -180,6 +174,17 @@ namespace :docs do
 
   desc 'build documentation'
   task :build => [:clean, :restore_paket, :jekyll, :reference]
+
+  desc 'deploy the suave.io site'
+  task :deploy => :build do
+    system %{rsync -crvz --delete-after --delete-excluded docs/_site/ suaveio@suave.io:}
+  end
 end
 
 task :docs => :'docs:build'
+
+Albacore::Tasks::Release.new :release,
+                             pkg_dir: 'build/pkg',
+                             depend_on: [:compile, :nugets, :'docs:deploy'],
+                             nuget_exe: 'packages/build/NuGet.CommandLine/tools/NuGet.exe',
+                             api_key: ENV['NUGET_KEY']
