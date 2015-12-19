@@ -1,4 +1,4 @@
-﻿namespace Suave.Utils
+﻿namespace Suave
 
 open System.IO
 open System.Runtime.Serialization.Formatters.Binary

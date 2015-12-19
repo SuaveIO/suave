@@ -320,7 +320,7 @@ module Http =
       logger            : Logger
       matchedBinding    : HttpBinding
       parsePostData     : bool
-      cookieSerialiser  : Suave.Utils.CookieSerialiser
+      cookieSerialiser  : CookieSerialiser
       tlsProvider       : TlsProvider
       hideHeader        : bool }
 
@@ -332,7 +332,7 @@ module Http =
     static member logger_ : Property<HttpRuntime, Logger>
     static member matchedBinding_ : Property<HttpRuntime, HttpBinding>
     static member parsePostData_ : Property<HttpRuntime, bool>
-    static member cookieSerialiser_ : Property<HttpRuntime, Suave.Utils.CookieSerialiser>
+    static member cookieSerialiser_ : Property<HttpRuntime, CookieSerialiser>
     static member tlsProvider_ : Property<HttpRuntime, TlsProvider>
     static member hideHeader_ : Property<HttpRuntime, bool>
 
@@ -429,7 +429,7 @@ module Http =
     val mk : serverKey:ServerKey -> errorHandler:ErrorHandler
           -> mimeTypes:MimeTypesMap -> homeDirectory:string
           -> compressionFolder:string -> logger:Logger
-          -> parsePostData:bool -> cookieSerialiser:Suave.Utils.CookieSerialiser
+          -> parsePostData:bool -> cookieSerialiser:CookieSerialiser
           -> tlsProvider:TlsProvider -> hideHeader:bool -> binding:HttpBinding
           -> HttpRuntime
 

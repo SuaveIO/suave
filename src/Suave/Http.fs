@@ -472,7 +472,7 @@ module Http =
       logger            : Logger
       matchedBinding    : HttpBinding
       parsePostData     : bool
-      cookieSerialiser  : Suave.Utils.CookieSerialiser
+      cookieSerialiser  : CookieSerialiser
       tlsProvider       : TlsProvider
       hideHeader        : bool }
 

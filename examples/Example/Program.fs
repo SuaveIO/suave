@@ -200,9 +200,9 @@ let main argv =
       homeFolder            = None
       compressedFilesFolder = None
       logger                = logger
-      tcpServerFactory      = new Tcp.DefaultTcpServerFactory()
-      cookieSerialiser      = new Utils.BinaryFormatterSerialiser()
-      tlsProvider           = DefaultTlsProvider()
+      tcpServerFactory      = new DefaultTcpServerFactory()
+      cookieSerialiser      = new BinaryFormatterSerialiser()
+      tlsProvider           = new DefaultTlsProvider()
       hideHeader            = false }
     app
   0

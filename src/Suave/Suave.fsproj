@@ -94,11 +94,11 @@
     <Compile Include="Utils\Compression.fs" />
     <Compile Include="Utils\Crypto.fs" />
     <Compile Include="Utils\Parsing.fs" />
-    <Compile Include="Utils\CookieSerialiser.fs" />
     <Compile Include="Utils\OpenMemoryStream.fs" />
     <Compile Include="Utils\Property.fs" />
     <Compile Include="Utils\Parse.fs" />
     <Compile Include="Globals.fs" />
+    <Compile Include="CookieSerialiser.fs" />
     <Compile Include="Logging\LogLevel.fs" />
     <Compile Include="Logging\TraceHeader.fs" />
     <Compile Include="Logging\LogLine.fs" />
@@ -116,6 +116,7 @@
     <Compile Include="Sockets\AsyncSocket.fs" />
     <Compile Include="Sockets\TransportStream.fs" />
     <Compile Include="Tcp.fs" />
+    <Compile Include="TcpServerFactory.fs" />
     <Compile Include="Sscanf.fs" />
     <Compile Include="WebPart.fsi" />
     <Compile Include="WebPart.fs" />

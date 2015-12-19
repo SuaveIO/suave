@@ -49,11 +49,11 @@ type SuaveConfig =
     /// Pluggable TCP async sockets implementation. You can choose betwee libuv
     /// and CLR's Async Socket Event Args. Currently defaults to the managed-only
     /// implementation.
-    tcpServerFactory      : Tcp.TcpServerFactory
+    tcpServerFactory      : TcpServerFactory
 
     /// The cookie serialiser to use for converting the data you save in cookies
     /// from your application into a byte array.
-    cookieSerialiser      : Suave.Utils.CookieSerialiser
+    cookieSerialiser      : CookieSerialiser
 
     /// A TLS provider
     tlsProvider           : TlsProvider
