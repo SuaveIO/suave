@@ -166,18 +166,7 @@ namespace :docs do
   end
 
   task :reference => :restore_paket do
-    system 'packages/docs/FSharp.Formatting.CommandTool/tools/fsformatting.exe',
-      %W|metadataFormat
-          --generate --dllFiles src/Suave/bin/Release/Suave.dll
-          --outDir docs/output/reference
-          --layoutRoots packages/docs/FSharp.Formatting/templates/reference
-          --parameters page-author #{"Henrik Feldt, Ademar Gonzales"}
-                       page-description #{suave_description}
-                       github-link https://github.com/suaveio/suave
-                       project-name Suave
-                       root http://suave.io/
-      |,
-      clr_command: true
+    system 'packages/docs/FsLibTool/tools/FsLibTool.exe', %W|src|, clr_command: true
   end
 
   task :gh_pages do
