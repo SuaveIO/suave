@@ -553,7 +553,7 @@ module OwinApp =
         OwinKey OwinConstants.CommonKeys.capabilities,      constant (
           Map [
             OwinKey "owin.Version", "1.0.1"
-            OwinKey "suave.Version", Globals.Internals.SuaveVersion
+            OwinKey "suave.Version", Globals.SuaveVersion
           ]
           |> Map.map (fun key value -> box value)
           :> IDictionary<OwinKey, obj>

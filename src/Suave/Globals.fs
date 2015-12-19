@@ -17,18 +17,18 @@ open System.Collections.Concurrent
 /// by writing these to disk instead
 let internal compressedFilesMap = new ConcurrentDictionary<string,string>()
 
+open System
+open System.Reflection
+
+/// This returns the assembly version of Suave
+let SuaveVersion = Assembly.GetExecutingAssembly().GetName().Version.ToString()
+
+/// This is the server header
+let ServerHeader = String.Concat [| "Server: Suave (http://suave.io)" |]
+
 [<assembly:System.Runtime.CompilerServices.InternalsVisibleToAttribute("Suave.Experimental")>]
 [<assembly:System.Runtime.CompilerServices.InternalsVisibleToAttribute("Suave.DotLiquid")>]
 [<assembly:System.Runtime.CompilerServices.InternalsVisibleToAttribute("Suave.Razor")>]
 [<assembly:System.Runtime.CompilerServices.InternalsVisibleToAttribute("Suave.Xsp")>]
 [<assembly:System.Runtime.CompilerServices.InternalsVisibleToAttribute("Suave.Tests")>]
 do ()
-
-module Internals =
-
-  open System
-  open System.Reflection
-
-  let SuaveVersion = Assembly.GetExecutingAssembly().GetName().Version.ToString()
-
-  let serverHeader = String.Concat [| "Server: Suave/"; SuaveVersion; " (http://suave.io)" |]
