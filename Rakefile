@@ -1,3 +1,5 @@
+# Encoding: utf-8
+
 require 'bundler/setup'
 
 require 'albacore'
@@ -44,7 +46,7 @@ asmver_files :asmver => :versioning do |a|
   ]
   a.attributes assembly_description: suave_description,
                assembly_configuration: Configuration,
-               assembly_company: 'Suave.IO',
+               assembly_company: 'Suave.io',
                assembly_copyright: "(c) #{Time.now.year} by Ademar Gonzalez, Henrik Feldt",
                assembly_version: ENV['LONG_VERSION'],
                assembly_file_version: ENV['LONG_VERSION'],
@@ -141,7 +143,7 @@ desc 'compile, gen versions, test and create nuget'
 task :appveyor => [:compile, :'tests:unit', :nugets]
 
 desc 'compile, gen versions, test'
-task :default => [:compile, :'tests:unit']
+task :default => [:compile, :'tests:unit', :'docs:build']
 
 task :increase_version_number do
   # inc patch version in .semver
@@ -163,9 +165,15 @@ namespace :docs do
     FileUtils.rm_rf 'gh-pages' if Dir.exists? 'gh-pages'
   end
 
-  desc 'build documentation'
-  task :compile => :clean do
-    system 'git clone https://github.com/SuaveIO/suave.git -b gh-pages gh-pages' unless Dir.exists? 'gh-pages'
+  task :reference => :restore_paket do
+    system 'packages/docs/FsLibTool/tools/FsLibTool.exe', %W|src|, clr_command: true
+  end
+
+  task :gh_pages do
+    system 'git clone https://github.com/SuaveIO/suave.git -b gh-pages gh-pages' \
+      unless Dir.exists? 'gh-pages'
+    system 'rm -fr gh-pages/*' 
+    system 'cp -pr docs/output/* gh-pages/' 
     Dir.chdir 'gh-pages' do
       Bundler.with_clean_env do
         system 'bundle'
@@ -173,6 +181,9 @@ namespace :docs do
       end
     end
   end
+
+  desc 'build documentation'
+  task :build => %i|clean restore_paket reference gh_pages|
 
   desc 'build and push docs'
   task :push => :'docs:build' do

@@ -126,8 +126,8 @@ module Http =
     static member tempFilePath_ : Property<HttpUpload, string>
 
   [<AllowNullLiteral>]
-  type ITlsProvider =
-    abstract member Wrap : Connection * obj -> SocketOp<Connection>
+  type TlsProvider =
+    abstract wrap : Connection * obj -> SocketOp<Connection>
 
   /// Gets the supported protocols, HTTP and HTTPS with a certificate
   type Protocol = 
@@ -321,7 +321,7 @@ module Http =
       matchedBinding    : HttpBinding
       parsePostData     : bool
       cookieSerialiser  : Suave.Utils.CookieSerialiser
-      tlsProvider       : ITlsProvider }
+      tlsProvider       : TlsProvider }
 
     static member serverKey_ : Property<HttpRuntime, ServerKey>
     static member errorHandler_ : Property<HttpRuntime, ErrorHandler>
@@ -332,7 +332,7 @@ module Http =
     static member matchedBinding_ : Property<HttpRuntime, HttpBinding>
     static member parsePostData_ : Property<HttpRuntime, bool>
     static member cookieSerialiser_ : Property<HttpRuntime, Suave.Utils.CookieSerialiser>
-    static member tlsProvider_ : Property<HttpRuntime, ITlsProvider>
+    static member tlsProvider_ : Property<HttpRuntime, TlsProvider>
 
   /// The HttpContext is the container of the request, runtime, user-state and
   /// response.
@@ -428,7 +428,7 @@ module Http =
           -> mimeTypes:MimeTypesMap -> homeDirectory:string
           -> compressionFolder:string -> logger:Logger
           -> parsePostData:bool -> cookieSerialiser:Suave.Utils.CookieSerialiser
-          -> tlsProvider:ITlsProvider -> binding:HttpBinding
+          -> tlsProvider:TlsProvider -> binding:HttpBinding
           -> HttpRuntime
 
   /// A module that provides functions to create a new HttpContext.

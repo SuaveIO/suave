@@ -1508,16 +1508,6 @@ module Authentication =
   val UserNameKey : string
 
   /// <summary><para>
-  /// Parse the authentication type, the user name and the password from
-  /// the token string
-  /// </para><para>
-  /// </para><para>
-  /// </para></summary>
-  /// <remarks>
-  /// </remarks>
-  val internal parseAuthenticationToken : token:string -> string * string * string
-
-  /// <summary><para>
   /// Perform basic authentication on the request, applying a predicate
   /// to check the request for authentication tokens such as 'username'
   /// and 'password'. Otherwise, if failing, challenge the client again.

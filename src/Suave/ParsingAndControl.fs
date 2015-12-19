@@ -500,7 +500,7 @@ module internal ParsingAndControl =
     | HTTP    ->
       return connection
     | HTTPS o -> 
-      return! runtime.tlsProvider.Wrap (connection,o)
+      return! runtime.tlsProvider.wrap (connection,o)
     }
 
   open System.Net.Sockets

@@ -53,37 +53,35 @@ module Cookie =
              cookieName:string ->
              userStateKey:string ->
              relativeExpiry:CookieLife ->
-             secure:bool ->
-             CookiesState
+             secure:bool -> CookiesState
 
 
   /// Generate one server-side cookie, and another client-side cookie with
   /// name "${server-side-name}-client"
-  val generateCookies : serverKey:ServerKey ->
-                        cookieName:string ->
-                        relativeExpiry:CookieLife ->
-                        secure:bool ->
-                        plainData:byte[] ->
-                        HttpCookie * HttpCookie
+  val generateCookies : serverKey:ServerKey
+                      -> cookieName:string
+                      -> relativeExpiry:CookieLife
+                      -> secure:bool
+                      -> plainData:byte[]
+                      -> HttpCookie * HttpCookie
 
   /// Tries to read the cookie of the given name from the HttpContext, and
   /// returns the cookie and its plaintext value if successful.
-  val readCookies : key:ServerKey ->
-                    cookieName:string ->
-                    cookies:Map<string, HttpCookie> ->
-                    Choice<HttpCookie * byte [], CookieError>
+  val readCookies : key:ServerKey
+                  -> cookieName:string
+                  -> cookies:Map<string, HttpCookie>
+                  -> Choice<HttpCookie * byte [], CookieError>
 
   /// Bumps the expiry dates for all the cookies.
-  val refreshCookies : expiry:CookieLife ->
-                       cookie:HttpCookie ->
-                       WebPart
+  val refreshCookies : expiry:CookieLife
+                     -> cookie:HttpCookie
+                     -> WebPart
 
   val updateCookies :  csctx:CookiesState ->
-                       fPlainText : (byte [] option -> byte []) ->
-                       WebPart
+                       fPlainText : (byte [] option -> byte []) -> WebPart
   
-  val cookieState : csctx:CookiesState ->
-                    noCookie:(unit -> Choice<byte [], WebPart>) ->
-                    decryptionFailure:(Crypto.SecretboxDecryptionError -> Choice<byte [], WebPart>) ->
-                    fSuccess:WebPart ->
-                    WebPart
+  val cookieState : csctx:CookiesState
+                  -> noCookie:(unit -> Choice<byte [], WebPart>)
+                  -> decryptionFailure:(Crypto.SecretboxDecryptionError -> Choice<byte [], WebPart>)
+                  -> fSuccess:WebPart
+                  -> WebPart
