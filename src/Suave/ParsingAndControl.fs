@@ -401,7 +401,7 @@ module internal ParsingAndControl =
     let connection = context.connection
 
     do! asyncWriteLn connection (String.concat " " [ "HTTP/1.1"; r.status.code.ToString(); r.status.reason ])
-    do! asyncWriteLn connection Internals.serverHeader
+    if not context.runtime.hideHeader then do! asyncWriteLn connection ServerHeader
     do! asyncWriteLn connection (String.Concat( [| "Date: "; Globals.utcNow().ToString("R") |]))
 
     do! writeHeaders connection r.headers

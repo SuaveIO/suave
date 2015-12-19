@@ -473,7 +473,8 @@ module Http =
       matchedBinding    : HttpBinding
       parsePostData     : bool
       cookieSerialiser  : Suave.Utils.CookieSerialiser
-      tlsProvider       : TlsProvider }
+      tlsProvider       : TlsProvider
+      hideHeader        : bool }
 
     static member serverKey_ = Property (fun x -> x.serverKey) (fun v x -> { x with serverKey = v })
     static member errorHandler_ = Property (fun x -> x.errorHandler) (fun v x -> { x with errorHandler = v })
@@ -485,6 +486,7 @@ module Http =
     static member parsePostData_ = Property (fun x -> x.parsePostData) (fun v x -> { x with parsePostData = v })
     static member cookieSerialiser_ = Property (fun x -> x.cookieSerialiser) (fun v x -> { x with cookieSerialiser = v })
     static member tlsProvider_ = Property (fun x -> x.tlsProvider) (fun v x -> { x with tlsProvider = v })
+    static member hideHeader_ = Property (fun x -> x.hideHeader) (fun v x -> { x with hideHeader = v })
 
   and HttpContext =
     { request    : HttpRequest
@@ -584,9 +586,11 @@ module Http =
         matchedBinding    = HttpBinding.defaults
         parsePostData     = false
         cookieSerialiser  = new BinaryFormatterSerialiser()
-        tlsProvider       = null }
+        tlsProvider       = null
+        hideHeader        = false }
 
-    let mk serverKey errorHandler mimeTypes homeDirectory compressionFolder logger parsePostData cookieSerialiser tlsProvider binding =
+    let mk serverKey errorHandler mimeTypes homeDirectory compressionFolder
+           logger parsePostData cookieSerialiser tlsProvider hideHeader binding =
       { serverKey         = serverKey
         errorHandler      = errorHandler
         mimeTypesMap      = mimeTypes
@@ -596,7 +600,8 @@ module Http =
         matchedBinding    = binding
         parsePostData     = parsePostData
         cookieSerialiser  = cookieSerialiser
-        tlsProvider       = tlsProvider }
+        tlsProvider       = tlsProvider
+        hideHeader        = hideHeader }
 
   [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
   module HttpContext =

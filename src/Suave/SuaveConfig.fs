@@ -56,7 +56,11 @@ type SuaveConfig =
     cookieSerialiser      : Suave.Utils.CookieSerialiser
 
     /// A TLS provider
-    tlsProvider           : TlsProvider }
+    tlsProvider           : TlsProvider
+
+    /// Make this true, if you want Suave not to display its server header in
+    /// every response. Defaults to false.
+    hideHeader            : bool }
 
   static member bindings_              = Property<SuaveConfig,_> (fun x -> x.bindings)              (fun v x -> { x with bindings = v })
   static member serverKey_             = Property<SuaveConfig,_> (fun x -> x.serverKey)             (fun v x -> { x with serverKey = v })
@@ -70,6 +74,7 @@ type SuaveConfig =
   static member compressedFilesFolder_ = Property<SuaveConfig,_> (fun x -> x.compressedFilesFolder) (fun v x -> { x with compressedFilesFolder = v })
   static member logger_                = Property<SuaveConfig,_> (fun x -> x.logger)                (fun v x -> { x with logger = v })
   static member tcpServerFactory_      = Property<SuaveConfig,_> (fun x -> x.tcpServerFactory)      (fun v x -> { x with tcpServerFactory = v })
+  static member hideHeader_            = Property<SuaveConfig,_> (fun x -> x.hideHeader)            (fun v x -> { x with hideHeader = v })
 
   member x.withBindings(v)              = { x with bindings = v }
   member x.withServerKey(v)             = { x with serverKey = v }
@@ -83,6 +88,7 @@ type SuaveConfig =
   member x.withCompressedFilesFolder(v) = { x with compressedFilesFolder = v }
   member x.withLogger(v)                = { x with logger = v }
   member x.withTcpServerFactory(v)      = { x with tcpServerFactory = v }
+  member x.withHiddenHeader()           = { x with hideHeader = true }
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module SuaveConfig =
@@ -100,6 +106,7 @@ module SuaveConfig =
                    parsePostData
                    config.cookieSerialiser
                    config.tlsProvider
+                   config.hideHeader
 
   /// Finds an endpoint that is configured from the given configuration. Throws
   /// an exception if the configuration has no bindings. Useful if you make

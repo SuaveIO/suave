@@ -321,7 +321,8 @@ module Http =
       matchedBinding    : HttpBinding
       parsePostData     : bool
       cookieSerialiser  : Suave.Utils.CookieSerialiser
-      tlsProvider       : TlsProvider }
+      tlsProvider       : TlsProvider
+      hideHeader        : bool }
 
     static member serverKey_ : Property<HttpRuntime, ServerKey>
     static member errorHandler_ : Property<HttpRuntime, ErrorHandler>
@@ -333,6 +334,7 @@ module Http =
     static member parsePostData_ : Property<HttpRuntime, bool>
     static member cookieSerialiser_ : Property<HttpRuntime, Suave.Utils.CookieSerialiser>
     static member tlsProvider_ : Property<HttpRuntime, TlsProvider>
+    static member hideHeader_ : Property<HttpRuntime, bool>
 
   /// The HttpContext is the container of the request, runtime, user-state and
   /// response.
@@ -428,7 +430,7 @@ module Http =
           -> mimeTypes:MimeTypesMap -> homeDirectory:string
           -> compressionFolder:string -> logger:Logger
           -> parsePostData:bool -> cookieSerialiser:Suave.Utils.CookieSerialiser
-          -> tlsProvider:TlsProvider -> binding:HttpBinding
+          -> tlsProvider:TlsProvider -> hideHeader:bool -> binding:HttpBinding
           -> HttpRuntime
 
   /// A module that provides functions to create a new HttpContext.

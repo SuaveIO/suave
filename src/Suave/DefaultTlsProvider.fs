@@ -20,6 +20,6 @@ type DefaultTlsProvider() =
     member this.wrap(connection : Connection, cert : obj) = socket {
       let sslStream = new SslStream(new TransportStream(connection.transport))
       sslStream.AuthenticateAsServer (cert :?> X509Certificate)
-      let tls_transport = new DefaultTlsTransport(connection, sslStream)
-      return { connection with transport = tls_transport}
+      let tlsTransport = new DefaultTlsTransport(connection, sslStream)
+      return { connection with transport = tlsTransport }
     }

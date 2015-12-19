@@ -76,4 +76,5 @@ module Web =
       logger                = Loggers.saneDefaultsFor LogLevel.Info
       tcpServerFactory      = new Tcp.DefaultTcpServerFactory()
       cookieSerialiser      = new Utils.BinaryFormatterSerialiser()
-      tlsProvider           = new DefaultTlsProvider() }
+      tlsProvider           = new DefaultTlsProvider()
+      hideHeader            = false }

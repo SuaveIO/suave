@@ -202,6 +202,7 @@ let main argv =
       logger                = logger
       tcpServerFactory      = new Tcp.DefaultTcpServerFactory()
       cookieSerialiser      = new Utils.BinaryFormatterSerialiser()
-      tlsProvider           = DefaultTlsProvider() }
+      tlsProvider           = DefaultTlsProvider()
+      hideHeader            = false }
     app
   0
