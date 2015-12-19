@@ -162,7 +162,7 @@ Albacore::Tasks::Release.new :release,
 namespace :docs do
   desc 'clean generated documentation'
   task :clean do
-    FileUtils.rm_rf 'gh-pages' if Dir.exists? 'gh-pages'
+    FileUtils.rm_rf 'docs/gh-pages' if Dir.exists? 'docs/gh-pages'
   end
 
   task :reference => :restore_paket do
@@ -170,11 +170,9 @@ namespace :docs do
   end
 
   task :gh_pages do
-    system 'git clone https://github.com/SuaveIO/suave.git -b gh-pages gh-pages' \
-      unless Dir.exists? 'gh-pages'
-    system 'rm -fr gh-pages/*' 
-    system 'cp -pr docs/output/* gh-pages/' 
-    Dir.chdir 'gh-pages' do
+    system 'git clone https://github.com/SuaveIO/suave.git -b gh-pages docs/gh-pages' \
+      unless Dir.exists? 'docs/gh-pages'
+    Dir.chdir 'docs/gh-pages' do
       Bundler.with_clean_env do
         system 'bundle'
         system 'bundle exec jekyll build'
@@ -183,7 +181,7 @@ namespace :docs do
   end
 
   desc 'build documentation'
-  task :build => %i|clean restore_paket reference gh_pages|
+  task :build => [:clean, :restore_paket, :gh_pages, :reference]
 
   desc 'build and push docs'
   task :push => :'docs:build' do
@@ -192,3 +190,5 @@ namespace :docs do
       silent: true
   end
 end
+
+task :docs => :'docs:build'
