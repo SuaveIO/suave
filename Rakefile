@@ -162,17 +162,15 @@ Albacore::Tasks::Release.new :release,
 namespace :docs do
   desc 'clean generated documentation'
   task :clean do
-    FileUtils.rm_rf 'docs/gh-pages' if Dir.exists? 'docs/gh-pages'
+    FileUtils.rm_rf 'docs/_site' if Dir.exists? 'docs/_site'
   end
 
   task :reference => :restore_paket do
-    system 'packages/docs/FsLibTool/tools/FsLibTool.exe', %W|src|, clr_command: true
+    system 'packages/docs/FsLibTool/tools/FsLibTool.exe', %W|src docs/_site|, clr_command: true
   end
 
-  task :gh_pages do
-    system 'git clone https://github.com/SuaveIO/suave.git -b gh-pages docs/gh-pages' \
-      unless Dir.exists? 'docs/gh-pages'
-    Dir.chdir 'docs/gh-pages' do
+  task :jekyll do
+    Dir.chdir 'docs' do
       Bundler.with_clean_env do
         system 'bundle'
         system 'bundle exec jekyll build'
@@ -181,14 +179,7 @@ namespace :docs do
   end
 
   desc 'build documentation'
-  task :build => [:clean, :restore_paket, :gh_pages, :reference]
-
-  desc 'build and push docs'
-  task :push => :'docs:build' do
-    system "sshpass -p #{ENV['SUAVE_SERVER_PASS']} scp -P #{ENV['SUAVE_SERVER_PORT']} -r _site/* suave@northpole.cloudapp.net:/home/suave/site",
-      work_dir: 'gh-pages',
-      silent: true
-  end
+  task :build => [:clean, :restore_paket, :jekyll, :reference]
 end
 
 task :docs => :'docs:build'
