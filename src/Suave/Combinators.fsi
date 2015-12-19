@@ -1502,22 +1502,6 @@ module EventSource =
   /// to start a new event-stream protocol session with the browser.
   val handShake : fCont:(Connection -> SocketOp<unit>) -> WebPart
 
-module Authentication =
-
-  /// The key of the username placed in the userState map if present in the request
-  val UserNameKey : string
-
-  /// <summary><para>
-  /// Perform basic authentication on the request, applying a predicate
-  /// to check the request for authentication tokens such as 'username'
-  /// and 'password'. Otherwise, if failing, challenge the client again.
-  /// </para><para>
-  /// </para><para>
-  /// </para></summary>
-  /// <remarks>
-  /// </remarks>
-  val authenticateBasic : f:(string * string -> bool) -> protectedPart:WebPart -> WebPart
-
 module Control =
 
   /// <summary><para>

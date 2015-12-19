@@ -1,11 +1,34 @@
-﻿module Suave.Auth
+﻿module Suave.Authentication
 
 open System
 open System.Text
-
-open Suave.Cookie
-open Suave.Logging
+open Suave.RequestErrors
 open Suave.Utils
+open Suave.Logging
+open Suave.Cookie
+
+let UserNameKey = "userName"
+
+let internal parseAuthenticationToken (token : string) =
+  let parts = token.Split (' ')
+  let enc = parts.[1].Trim()
+  let decoded = ASCII.decodeBase64 enc
+  let indexOfColon = decoded.IndexOf(':')
+  (parts.[0].ToLower(), decoded.Substring(0,indexOfColon), decoded.Substring(indexOfColon+1))
+
+let inline private addUserName username ctx = { ctx with userState = ctx.userState |> Map.add UserNameKey (box username) }
+
+let authenticateBasic f (protectedPart : WebPart) (ctx : HttpContext) =
+  let p = ctx.request
+  match p.header "authorization" with
+  | Choice1Of2 header ->
+    let (typ, username, password) = parseAuthenticationToken header
+    if (typ.Equals("basic")) && f (username, password) then
+      protectedPart (addUserName username ctx)
+    else
+      challenge (addUserName username ctx)
+  | Choice2Of2 _ ->
+    challenge ctx
 
 module internal Utils =
   /// Generates a string key from the available characters with the given key size
@@ -19,15 +42,10 @@ module internal Utils =
     |> Array.iter (fun (b : byte) -> result.Append alpha.[int b % alpha.Length] |> ignore)
     result.ToString()
 
-[<Literal>]
 let SessionAuthCookie = "auth"
 
-/// The key used in `context.user_state` to save the session id for downstream
-/// web parts.
-[<Literal>]
 let StateStoreType = "Suave.Auth"
 
-[<Literal>]
 let SessionIdLength = 40
 
 /// Extracts the actual session id and the mac value from the cookie's data.
@@ -35,7 +53,9 @@ let parseData (textBlob : string) =
   match textBlob.Split '\n' with
   | [| sessionId; ipAddress; userAgent |] ->
     sessionId
-  | _ -> failwith "internal error; should not have successfully decrypted data"
+
+  | _ ->
+    failwith "internal error; should not have successfully decrypted data"
 
 /// Returns a list of the hmac data to use, from the request.
 let generateData (ctx : HttpContext) =
@@ -70,17 +90,6 @@ let authenticateWithLogin relativeExpiry loginPage fSuccess : WebPart =
                (sprintf "%A" >> RequestErrors.BAD_REQUEST >> Choice2Of2)
                fSuccess
 
-/// Set server-signed cookies to make the response contain a cookie
-/// with a valid session id. It's worth having in mind that when you use this web
-/// part, you're setting cookies on the response; so you'll need to have the
-/// client re-send a request if you require authentication for it, after this
-/// web part has run.
-///
-/// Parameters:
-///  - `relativeExpiry`: how long does the authentication cookie last?
-/// - `secure`: HttpsOnly?
-///
-/// Always succeeds.
 let authenticated relativeExpiry secure : WebPart =
   context (fun ctx ->
     let data = generateData ctx |> UTF8.bytes

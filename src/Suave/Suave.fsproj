@@ -31,8 +31,7 @@
     <ConsolePause>false</ConsolePause>
     <WarningLevel>3</WarningLevel>
     <DocumentationFile>bin\Release\Suave.xml</DocumentationFile>
-    <DefineConstants>
-    </DefineConstants>
+    <DefineConstants></DefineConstants>
     <DebugType>pdbonly</DebugType>
   </PropertyGroup>
   <PropertyGroup>
@@ -59,8 +58,7 @@
     <ConsolePause>false</ConsolePause>
     <WarningLevel>3</WarningLevel>
     <DocumentationFile>bin\Release\Suave.xml</DocumentationFile>
-    <DefineConstants>
-    </DefineConstants>
+    <DefineConstants></DefineConstants>
     <DebugType>pdbonly</DebugType>
     <PlatformTarget>x86</PlatformTarget>
   </PropertyGroup>
@@ -131,7 +129,8 @@
     <Compile Include="Cookie.fs" />
     <Compile Include="Model.fs" />
     <Compile Include="State.fs" />
-    <Compile Include="Auth.fs" />
+    <Compile Include="Authentication.fsi" />
+    <Compile Include="Authentication.fs" />
     <Compile Include="SuaveConfig.fs" />
     <Compile Include="ParsingAndControl.fs" />
     <Compile Include="Web.fs" />

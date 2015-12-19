@@ -652,34 +652,6 @@ module EventSource =
     }
     |> succeed
 
-module Authentication =
-
-  open RequestErrors
-  open Suave.Utils
-
-  let UserNameKey = "userName"
-
-  let internal parseAuthenticationToken (token : string) =
-    let parts = token.Split (' ')
-    let enc = parts.[1].Trim()
-    let decoded = ASCII.decodeBase64 enc
-    let indexOfColon = decoded.IndexOf(':')
-    (parts.[0].ToLower(), decoded.Substring(0,indexOfColon), decoded.Substring(indexOfColon+1))
-
-  let inline private addUserName username ctx = { ctx with userState = ctx.userState |> Map.add UserNameKey (box username) }
-
-  let authenticateBasic f (protectedPart : WebPart) (ctx : HttpContext) =
-    let p = ctx.request
-    match p.header "authorization" with
-    | Choice1Of2 header ->
-      let (typ, username, password) = parseAuthenticationToken header
-      if (typ.Equals("basic")) && f (username, password) then
-        protectedPart (addUserName username ctx)
-      else
-        challenge (addUserName username ctx)
-    | Choice2Of2 _ ->
-      challenge ctx
-
 module Control =
 
   let CLOSE (ctx : HttpContext) =

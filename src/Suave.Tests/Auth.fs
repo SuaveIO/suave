@@ -15,6 +15,7 @@ open Suave.Operators
 open Suave.Successful
 open Suave.Filters
 open Suave.RequestErrors
+open Suave.Authentication
 
 open Suave.Testing
 
@@ -91,19 +92,19 @@ let authTests cfg =
     testCase "baseline, no auth cookie" <| fun _ ->
       let ctx = runWithConfig (OK "ACK")
       let cookies = ctx |> reqCookies' HttpMethod.GET "/"  None
-      Assert.Null("should not have auth cookie", cookies.[Auth.SessionAuthCookie])
+      Assert.Null("should not have auth cookie", cookies.[SessionAuthCookie])
 
     testCase "can set cookie" <| fun _ ->
-      let ctx = runWithConfig (Auth.authenticated Session false >=> OK "ACK")
+      let ctx = runWithConfig (authenticated Session false >=> OK "ACK")
       let cookies = ctx |> reqCookies' HttpMethod.GET "/"  None
-      Assert.NotNull("should have auth cookie", cookies.[Auth.SessionAuthCookie])
+      Assert.NotNull("should have auth cookie", cookies.[SessionAuthCookie])
 
     testCase "can set MaxAge cookie" <| fun _ ->
       let timespan = System.TimeSpan.FromDays(13.0)
       let maxAge = Cookie.CookieLife.MaxAge timespan
-      let ctx = runWithConfig (Auth.authenticated maxAge false >=> OK "ACK")
+      let ctx = runWithConfig (authenticated maxAge false >=> OK "ACK")
       let cookies = ctx |> reqCookies' HttpMethod.GET "/"  None
-      Assert.NotNull("should have auth cookie", cookies.[Auth.SessionAuthCookie])
+      Assert.NotNull("should have auth cookie", cookies.[SessionAuthCookie])
 
     testCase "can access authenticated contents" <| fun _ ->
       // given
@@ -111,13 +112,13 @@ let authTests cfg =
         runWithConfig (
           choose [
             path "/" >=> OK "root"
-            path "/auth" >=> Auth.authenticated Session false >=> OK "authed"
+            path "/auth" >=> authenticated Session false >=> OK "authed"
             path "/protected"
-              >=> Auth.authenticate Session false
-                                    (fun () ->
-                                      Choice2Of2(FORBIDDEN "please authenticate"))
-                                    (fun _ -> Choice2Of2(BAD_REQUEST "did you fiddle with our cipher text?"))
-                                    (OK "You have reached the place of your dreams!")
+              >=> authenticate Session false
+                               (fun () ->
+                                 Choice2Of2(FORBIDDEN "please authenticate"))
+                               (fun _ -> Choice2Of2(BAD_REQUEST "did you fiddle with our cipher text?"))
+                               (OK "You have reached the place of your dreams!")
             NOT_FOUND "arghhh"
             ])
 
@@ -131,7 +132,7 @@ let authTests cfg =
         use res = interact HttpMethod.GET "/"
         Assert.Equal("should allow root request", "root", contentString res)
 
-        match cookies.[Auth.SessionAuthCookie] with
+        match cookies.[SessionAuthCookie] with
         | null -> ()
         | cookie -> Tests.failtestf "should not have auth cookie, but was %A" cookie
 
