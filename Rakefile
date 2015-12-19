@@ -181,7 +181,7 @@ namespace :docs do
     # Host suave.io
     #    User suaveio
     #    IdentityFile ~/.ssh/suaveio_deployer
-    system %{rsync -crvz --delete-after --delete-excluded docs/_site/ suaveio@suave.io:}
+    system %{rsync -crvz --delete-after --exclude server --delete-excluded docs/_site/ suaveio@suave.io:}
   end
 end
 
