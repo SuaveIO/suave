@@ -6,11 +6,11 @@
 // --------------------------------------------------------------------------------------
 
 // Binaries that have XML documentation (in a corresponding generated XML file)
-let referenceBinaries = [ "Suave.dll" ; "Suave.Testing.dll" ; "Suave.Razor.dll" ; "Suave.OpenSSL.dll" ]
+let referenceBinaries = [ "Suave.dll" ; "Suave.Testing.dll" ]
 // Web site location for the generated documentation
 let website = "http://suave.io"
 
-let githubLink = "http://github.com/SuaveIO/suave"
+let githubLink = "https://github.com/SuaveIO/suave"
 
 // Specify more information about your project
 let info =
