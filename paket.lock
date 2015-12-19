@@ -23,14 +23,12 @@ FRAMEWORK: NET45
 NUGET
   remote: https://nuget.org/api/v2
   specs:
-    FSharp.Compiler.Service (1.4.0.6)
     FSharp.Core (4.0.0.1)
-    FSharp.Formatting (2.12.0)
-      FSharp.Compiler.Service (1.4.0.6)
-      FSharpVSPowerTools.Core (2.1.0)
-    FSharp.Formatting.CommandTool (2.12.0)
-    FSharpVSPowerTools.Core (2.1.0)
-      FSharp.Compiler.Service (>= 1.4.0.6)
+    FsLibTool (0.1.0)
+      FSharp.Core (>= 4.0.0.1)
+      PPrint (>= 1.4.3)
+    PPrint (1.4.3)
+      FSharp.Core (>= 4.0.0.1)
 
 GROUP Examples
 FRAMEWORK: NET45

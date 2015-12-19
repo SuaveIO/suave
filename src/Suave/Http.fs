@@ -274,13 +274,13 @@ module Http =
     static member tempFilePath_ = Property<HttpUpload,_> (fun x -> x.tempFilePath) (fun v x -> { x with tempFilePath = v })
 
   [<AllowNullLiteral>]
-  type ITlsProvider =
-    abstract member Wrap : Connection * obj -> SocketOp<Connection>
+  type TlsProvider =
+    abstract member wrap : Connection * obj -> SocketOp<Connection>
 
   type Protocol = 
     | HTTP
     | HTTPS of obj
-      
+
     member x.secure = 
       match x with
       | HTTP    -> false
@@ -473,7 +473,7 @@ module Http =
       matchedBinding    : HttpBinding
       parsePostData     : bool
       cookieSerialiser  : Suave.Utils.CookieSerialiser
-      tlsProvider       : ITlsProvider }
+      tlsProvider       : TlsProvider }
 
     static member serverKey_ = Property (fun x -> x.serverKey) (fun v x -> { x with serverKey = v })
     static member errorHandler_ = Property (fun x -> x.errorHandler) (fun v x -> { x with errorHandler = v })

@@ -16,8 +16,8 @@ type DefaultTlsTransport(cn : Connection, ssl : SslStream) =
       cn.transport.shutdown()
 
 type DefaultTlsProvider() = 
-  interface ITlsProvider with
-    member this.Wrap(connection : Connection, cert : obj) = socket {
+  interface TlsProvider with
+    member this.wrap(connection : Connection, cert : obj) = socket {
       let sslStream = new SslStream(new TransportStream(connection.transport))
       sslStream.AuthenticateAsServer (cert :?> X509Certificate)
       let tls_transport = new DefaultTlsTransport(connection, sslStream)
