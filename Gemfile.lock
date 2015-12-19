@@ -114,7 +114,7 @@ GEM
       sawyer (~> 0.6.0, >= 0.5.3)
     parslet (1.5.0)
       blankslate (~> 2.0)
-    posix-spawn (0.3.11)
+    posix-spawn (0.3.8)
     public_suffix (1.5.3)
     pygments.rb (0.6.3)
       posix-spawn (~> 0.3.6)
@@ -147,6 +147,7 @@ PLATFORMS
 DEPENDENCIES
   albacore
   github-pages
+  posix-spawn (= 0.3.8)
   rake
 
 BUNDLED WITH
