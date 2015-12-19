@@ -39,3 +39,4 @@ group Docs
   source https://nuget.org/api/v2
   nuget FSharp.Core ~> 4
   nuget FsLibTool
+  nuget Argu

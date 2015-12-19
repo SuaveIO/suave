@@ -13,7 +13,7 @@ module SampleApp =
     open Freya.Router
     open Arachne.Uri.Template
 
-    let en = LanguageTag.Parse "en"
+    let en = LanguageTag.parse "en"
 
     let inline represent (x : string) =
         { Description =
