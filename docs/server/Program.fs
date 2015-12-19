@@ -18,8 +18,8 @@ with
 
 let app : WebPart =
   choose [
-    Files.browseFileHome "index.html"
     Files.browseHome
+    Files.browseFileHome "index.html"
     request (fun r ->INTERNAL_ERROR (sprintf "No file found at path %s" r.url.AbsolutePath))
   ]
 
