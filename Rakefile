@@ -46,7 +46,7 @@ asmver_files :asmver => :versioning do |a|
   ]
   a.attributes assembly_description: suave_description,
                assembly_configuration: Configuration,
-               assembly_company: 'Suave.IO',
+               assembly_company: 'Suave.io',
                assembly_copyright: "(c) #{Time.now.year} by Ademar Gonzalez, Henrik Feldt",
                assembly_version: ENV['LONG_VERSION'],
                assembly_file_version: ENV['LONG_VERSION'],
