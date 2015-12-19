@@ -188,7 +188,7 @@ let sslReceive (con : Connection) (context, readBio, writeBio) (bu : ByteSegment
       let decryptedBytesRead = SSL_read (context, buff, SSL3_RT_MAX_PACKET_SIZE)
       if decryptedBytesRead < 0  then 
         let error = SSL_get_error (context, decryptedBytesRead)
-        failwith "SSL_get_error <- %d" error
+        failwithf "SSL_get_error <- %d" error
       else
         //copy them to buf
         Array.blit buff 0 bu.Array bu.Offset decryptedBytesRead
