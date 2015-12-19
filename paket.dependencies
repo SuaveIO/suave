@@ -40,3 +40,4 @@ group Docs
   nuget FSharp.Core ~> 4
   nuget FSharp.Formatting
   nuget FSharp.Formatting.CommandTool
+  nuget FAKE

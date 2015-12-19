@@ -1,18 +1,8 @@
 
 
-// --------------------------------------------------------------------------------------
-// Builds the documentation from `.fsx` and `.md` files in the 'docs/content' directory
-// (the generated documentation is stored in the 'docs/output' directory)
-// --------------------------------------------------------------------------------------
-
-// Binaries that have XML documentation (in a corresponding generated XML file)
 let referenceBinaries = [ "Suave.dll" ; "Suave.Testing.dll" ]
-// Web site location for the generated documentation
 let website = "http://suave.io"
-
 let githubLink = "https://github.com/SuaveIO/suave"
-
-// Specify more information about your project
 let info =
   [ "project-name", "Suave.IO"
     "project-author", "Henrik Feldt, Ademar Gonzalez"
@@ -20,17 +10,17 @@ let info =
     "project-github", githubLink
     "project-nuget", "http://www.nuget.org/packages/Suave" ]
 
+#I "../../src/Suave/bin/Release"
+#I "../../src/Suave.Testing/bin/Release"
+
 // --------------------------------------------------------------------------------------
 // For typical project, no changes are needed below
 // --------------------------------------------------------------------------------------
 
-#I "../../src/Suave/bin/Release"
-#I "../../src/Suave.OpenSSL/bin/Release"
-#I "../../src/Suave.Testing/bin/Release"
 
-#I "packages/FSharp.Compiler.Service/lib/net40"
-#I "packages/FAKE/tools"
-#load "packages/FSharp.Formatting/FSharp.Formatting.fsx"
+#I "../../packages/docs/FSharp.Compiler.Service/lib/net40"
+#I "../../packages/docs/FAKE/tools"
+#load "../../packages/docs/FSharp.Formatting/FSharp.Formatting.fsx"
 #r "FakeLib.dll"
 #r "FSharp.Markdown.dll"
 #r "FSharp.Literate.dll"
@@ -51,7 +41,7 @@ let root = website
 let content    = __SOURCE_DIRECTORY__ @@ ".." @@ "content"
 let output     = __SOURCE_DIRECTORY__ @@ ".." @@ "output"
 let files      = __SOURCE_DIRECTORY__ @@ ".." @@ "files"
-let formatting = __SOURCE_DIRECTORY__ @@ "packages/FSharp.Formatting/"
+let formatting = __SOURCE_DIRECTORY__ @@ "../../packages/docs/FSharp.Formatting/"
 
 let layoutRoots =
   [ files @@ "_fs_formatting"
