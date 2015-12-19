@@ -181,7 +181,7 @@ module Http =
     member x.describe () =
       sprintf "%d %s: %s" x.code x.reason x.message
 
-    static member TryParse (code : int) =
+    static member tryParse (code : int) =
       let found =
         HttpCodeStatics.mapCases.Force()
         |> Map.tryFind ("HTTP_" + string code)
@@ -458,7 +458,7 @@ module Http =
   type ServerKey = byte []
 
   type IPAddress with
-    static member TryParseC str =
+    static member tryParseC str =
       match IPAddress.TryParse str with
       | false, _ -> Choice2Of2 ()
       | _, ip    -> Choice1Of2 ip
@@ -500,7 +500,7 @@ module Http =
         sources
         |> List.fold (fun state source ->
           state |> Choice.bindSnd (fun _ ->
-            x.request.header source |> Choice.bindUnit IPAddress.TryParseC))
+            x.request.header source |> Choice.bindUnit IPAddress.tryParseC))
           (Choice2Of2 ())
         |> Choice.orDefault x.connection.ipAddr
       else

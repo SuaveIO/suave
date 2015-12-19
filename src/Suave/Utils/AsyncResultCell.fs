@@ -13,12 +13,12 @@ type AsyncResultCell<'T>() =
   /// Complete the async result cell, setting the value. If this invocation was
   /// the first invocation, returns true, otherwise if there already is a value
   /// set, return false.
-  member x.Complete result =
+  member x.complete result =
     source.TrySetResult result
 
   /// Await the result of the AsyncResultCell, yielding Some(:'T)
   /// after the timeout or otherwise None.
-  member x.AwaitResult(?timeout : TimeSpan) = async {
+  member x.awaitResult(?timeout : TimeSpan) = async {
     match timeout with
     | None ->
       let! res = source.Task

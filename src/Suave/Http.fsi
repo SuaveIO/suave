@@ -47,7 +47,7 @@ module Http =
 
     member describe : unit -> string
 
-    static member TryParse : code:int -> Choice<HttpCode, string>
+    static member tryParse : code:int -> Choice<HttpCode, string>
 
   /// HTTP cookie
   type HttpCookie =
@@ -306,7 +306,7 @@ module Http =
 
   type IPAddress with
     /// Try parse the IP address from a string, returning a choice.
-    static member TryParseC : ip:string -> Choice<IPAddress, unit>
+    static member tryParseC : ip:string -> Choice<IPAddress, unit>
 
   /// The HttpRuntime is created from the SuaveConfig structure when the web
   /// server starts. You can also use the `HttpRuntime` module to create a new

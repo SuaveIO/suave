@@ -488,7 +488,7 @@ module OwinApp =
     let i2sc : Property<HttpCode, int> =
       (fun x -> x.code),
       // NOTE: assumes user only sets valid codes
-      (fun v x -> HttpCode.TryParse v |> function
+      (fun v x -> HttpCode.tryParse v |> function
         | Choice1Of2 x -> x
         | Choice2Of2 err -> failwith err)
 

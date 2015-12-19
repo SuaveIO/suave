@@ -133,7 +133,7 @@ let runServer logger maxConcurrentOps bufferSize (binding: SocketBinding) startD
     let! token = Async.CancellationToken
 
     let startData = { startData with socketBoundUtc = Some (Globals.utcNow()) }
-    acceptingConnections.Complete startData |> ignore
+    acceptingConnections.complete startData |> ignore
 
     logger.Log LogLevel.Info <| fun _ ->
       { path          = "Suave.Tcp.tcpIpServer"
@@ -181,5 +181,5 @@ let startTcpIpServerAsync (serveClient : TcpWorker<unit>)
           socketBoundUtc = None
           binding        = binding }
 
-  acceptingConnections.AwaitResult()
+  acceptingConnections.awaitResult()
     , runServer startData acceptingConnections serveClient

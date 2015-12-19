@@ -247,7 +247,7 @@ type LibUvSocket(pool : ConcurrentPool<OperationPair>,
     aFewTimes(fun () -> bindSocket server this.uv_connection_cb)
 
     let startData = { startData with socketBoundUtc = Some (Globals.utcNow()) }
-    acceptingConnections.Complete startData |> ignore
+    acceptingConnections.complete startData |> ignore
     
     logger.Log LogLevel.Info <| fun _ ->
         { path          = "Suave.LibUv.Tcp.LibUvSocket.run"
@@ -389,8 +389,3 @@ let runServerLibUv logger maxConcurrentOps bufferSize (binding: SocketBinding) s
     let! _ = Async.AwaitWaitHandle (exitEvent)
     return ()
   }
-
-type LibUvServerFactory() =
-  interface TcpServerFactory with
-    member this.create (logger, maxOps, bufferSize, binding) =
-      runServerLibUv logger maxOps bufferSize binding
