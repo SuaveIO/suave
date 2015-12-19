@@ -31,7 +31,7 @@ let main args =
     firstRun
   else
     Console.WriteLine "Running tests with LibUv TCP engine."
-    let libUvConfig = { testConfig with tcpServerFactory = Tcp.LibUvServerFactory() }
+    let libUvConfig = { testConfig with tcpServerFactory = LibUvServerFactory() }
     let r = defaultMainThisAssemblyWithParam libUvConfig args
     Console.WriteLine "Done."
     r

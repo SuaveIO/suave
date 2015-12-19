@@ -30,7 +30,7 @@
     <PlatformTarget>
     </PlatformTarget>
     <ConsolePause>false</ConsolePause>
-    <Commandlineparameters>--binding 127.0.0.1 9001 --home ../../_site</Commandlineparameters>
+    <Commandlineparameters>--binding 127.0.0.1 9001 --home ../../../_site</Commandlineparameters>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="mscorlib" />

@@ -56,9 +56,6 @@ val authenticated : relativeExpiry:CookieLife
                   -> secure:bool
                   -> WebPart
 
-
-//val deauthenticate : WebPart
-
 module HttpContext =
 
   /// Read the session id from the HttpContext

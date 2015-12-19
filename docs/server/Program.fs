@@ -3,6 +3,8 @@
 open Nessos.Argu
 open Suave
 open Suave.Http
+open Suave.ServerErrors
+open System.IO
 
 type Arguments =
   | [<Mandatory>] Binding of string * int
@@ -18,6 +20,7 @@ let app : WebPart =
   choose [
     Files.browseFileHome "index.html"
     Files.browseHome
+    request (fun r ->INTERNAL_ERROR (sprintf "No file found at path %s" r.url.AbsolutePath))
   ]
 
 [<EntryPoint>]
@@ -25,7 +28,9 @@ let main argv =
   let parser = ArgumentParser.Create("""mono server.exe --binding <ip4oripv6> <port> --home <homedir>""")
   let parsed = parser.Parse argv
   let (host, port) = parsed.GetResult <@ Binding @>
-  let home = parsed.GetResult <@ Home @>
+  let home = parsed.GetResult <@ Home @> |> Path.GetFullPath
+
+  printfn "Root path: %s" home
 
   let config =
     { defaultConfig with
