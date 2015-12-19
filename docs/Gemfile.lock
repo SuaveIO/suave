@@ -9,11 +9,6 @@ GEM
       thread_safe (~> 0.3, >= 0.3.4)
       tzinfo (~> 1.1)
     addressable (2.3.8)
-    albacore (2.5.6)
-      map (~> 6.5)
-      nokogiri (~> 1.5)
-      rake (~> 10)
-      semver2 (~> 3.4)
     blankslate (2.1.2.4)
     classifier-reborn (2.0.4)
       fast-stemmer (~> 1.0)
@@ -101,7 +96,6 @@ GEM
     listen (3.0.5)
       rb-fsevent (>= 0.9.3)
       rb-inotify (>= 0.9)
-    map (6.5.5)
     maruku (0.7.0)
     mercenary (0.3.5)
     mini_portile2 (2.0.0)
@@ -130,7 +124,6 @@ GEM
     sawyer (0.6.0)
       addressable (~> 2.3.5)
       faraday (~> 0.8, < 0.10)
-    semver2 (3.4.2)
     terminal-table (1.5.2)
     thread_safe (0.3.5)
     toml (0.1.2)
@@ -145,7 +138,6 @@ PLATFORMS
   ruby
 
 DEPENDENCIES
-  albacore
   github-pages
   posix-spawn (= 0.3.8)
   rake
