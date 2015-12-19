@@ -165,13 +165,24 @@ namespace :docs do
     FileUtils.rm_rf 'gh-pages' if Dir.exists? 'gh-pages'
   end
 
-  desc 'build documentation'
-  task :build => [:clean, :restore_paket] do
-    Dir.chdir 'docs/tools' do
-      system '../../tools/paket.exe', 'restore', clr_command: true
-      system "#{Albacore.windows? ? 'fsi' : 'fsharpi'} generate.fsx" # pricken över i
-    end
-    system 'git clone https://github.com/SuaveIO/suave.git -b gh-pages gh-pages' unless Dir.exists? 'gh-pages'
+  task :reference => :restore_paket do
+    system 'packages/docs/FSharp.Formatting.CommandTool/tools/fsformatting.exe',
+      %W|metadataFormat
+          --generate --dllFiles src/Suave/bin/Release/Suave.dll
+          --outDir docs/output/reference
+          --layoutRoots packages/docs/FSharp.Formatting/templates/reference
+          --parameters page-author #{"Henrik Feldt, Ademar Gonzales"}
+                       page-description #{suave_description}
+                       github-link https://github.com/suaveio/suave
+                       project-name Suave
+                       root http://suave.io/
+      |,
+      clr_command: true
+  end
+
+  task :gh_pages do
+    system 'git clone https://github.com/SuaveIO/suave.git -b gh-pages gh-pages' \
+      unless Dir.exists? 'gh-pages'
     system 'rm -fr gh-pages/*' 
     system 'cp -pr docs/output/* gh-pages/' 
     Dir.chdir 'gh-pages' do
@@ -181,6 +192,9 @@ namespace :docs do
       end
     end
   end
+
+  desc 'build documentation'
+  task :build => %i|clean restore_paket reference gh_pages|
 
   desc 'build and push docs'
   task :push => :'docs:build' do
