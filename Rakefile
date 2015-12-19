@@ -177,6 +177,10 @@ namespace :docs do
 
   desc 'deploy the suave.io site'
   task :deploy => :build do
+    # In ~/.ssh/config:
+    # Host suave.io
+    #    User suaveio
+    #    IdentityFile ~/.ssh/suaveio_deployer
     system %{rsync -crvz --delete-after --delete-excluded docs/_site/ suaveio@suave.io:}
   end
 end
