@@ -15,18 +15,19 @@ Authentication, Keep-Alive and HTTP compression.
 NuGet
 -----
 
-To install Suave, run the following command in the
-[Package Manager Console](http://docs.nuget.org/docs/start-here/using-the-package-manager-console)
-
-{% highlight dosbatch %}
-PM> Install-Package Suave
-{% endhighlight %}
-
-Or with [Paket](https://github.com/fsprojects/Paket) in paket.dependencies:
+To install Suave, add the following to your
+[paket](https://github.com/fsprojects/Paket).dependencies:
 
 {% highlight dosbatch %}
 source https://nuget.org/api/v2
-nuget Suave 0.33.0
+nuget Suave
+{% endhighlight %}
+
+Or you can use the legacy NuGet command line [Package Manager
+Console](http://docs.nuget.org/docs/start-here/using-the-package-manager-console):
+
+{% highlight dosbatch %}
+PM> Install-Package Suave
 {% endhighlight %}
 
 The simplest possible application: Hello World!
@@ -36,20 +37,19 @@ The simplest Suave application is a simple HTTP server that greets all visitors
 with the string `"Hello World!"`
 
 {% highlight fsharp %}
-open Suave                 // always open suave
+open Suave.Http            // for config
 open Suave.Http.Successful // for OK-result
-open Suave.Web             // for config
 
 startWebServer defaultConfig (OK "Hello World!")
 {% endhighlight %}
 
 The above statement will start a web server on default port 8083 over HTTP.
-`startWebServer` takes a configuration record and the WebPart `(OK "Hello World")`
-It's worth noting that with the above, your application will block on the
-function call, until you cancel the `Async.DefaultCancellationToken`. If you
+`startWebServer` takes a configuration record and the WebPart `(OK "Hello
+World")` It's worth noting that with the above, your application will block on
+the function call, until you cancel the `Async.DefaultCancellationToken`. If you
 want to handle disposal of the async yourself, have a look at
 `startWebServerAsync`.
 
 In suave, we have opted to write a lot of documentation inside the code; so just
 hover the function in your IDE or use an assembly browser to bring out the XML
-docs. 
+docs. You can also browse [our API reference](/Suave.html).
