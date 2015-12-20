@@ -348,6 +348,7 @@ module Filters =
           return! Response.response HttpCode.HTTP_408 (UTF8.bytes "Request Timeout") ctx
           }
 
+/// not part of the public API at this point
 module ServeResource =
   open System
 
