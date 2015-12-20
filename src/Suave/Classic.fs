@@ -23,6 +23,9 @@ module Suave =
   [<Obsolete "Replace 'open Suave.Auth' with 'open Suave.Authentication'">]
   module Auth =
     ()
+  [<Obsolete "Replace 'open Suave.Types' with 'open Suave.Http' or 'open Suave'">]
+  module Types =
+    ()
   module Http =
     [<Obsolete "Replace 'open Suave.Http.Response' with 'open Suave.Response'">]
     module Response =
