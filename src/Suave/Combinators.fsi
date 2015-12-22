@@ -82,13 +82,21 @@ module Writers =
 /// Control-flow functions, such as 100 Continue and 101 Switching Protocol.
 module Intermediate =
 
-  /// This is not supported. If you wish to use it, please send a PR to
-  /// https://github.com/suaveio/suave
+  /// <summary><para>
+  /// 100
+  /// </para><para>
+  /// The purpose of the 100 (Continue) status is to allow a client that is sending a request message with a
+  /// request body to determine if the origin server is willing to accept the request (based on the request headers)
+  /// before the client sends the request body
+  /// </para></summary>
   val CONTINUE : WebPart
 
-  /// This is not supported. If you wish to use it, please send a PR to
-  /// https://github.com/suaveio/suave – or are you looking for EventSource or
-  /// WebSocket? They are modules in the global namespace.
+  /// <summary><para>
+  /// 101
+  /// </para><para>
+  /// The server will switch protocols to those defined by the response's Upgrade header field immediately after the
+  /// empty line which terminates the 101 response.
+  /// </para></summary>
   val SWITCHING_PROTO : WebPart
 
 /// <summary><para>
