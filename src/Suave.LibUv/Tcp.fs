@@ -3,6 +3,7 @@
 #nowarn "9"
 
 open System
+open System.Net.Sockets
 open System.Runtime.InteropServices
 
 open Native
@@ -282,6 +283,7 @@ type LibUvServer(maxConcurrentOps, bufferManager, logger : Logger,
   [<DefaultValue>] val mutable uv_walk_cb          : uv_walk_cb
 
   let mutable addr = sockaddr_in( a = 0L, b= 0L, c = 0L, d = 0L)
+  let mutable addrV6 = sockaddr_in6( a = 0, b= 0, c = 0, d = 0, e = 0, f = 0, g = 0)
 
   let loop = createHandle <| uv_loop_size()
   let server = createHandle <| uv_handle_size(uv_handle_type.UV_TCP)
@@ -302,8 +304,12 @@ type LibUvServer(maxConcurrentOps, bufferManager, logger : Logger,
     try
       uv_tcp_init(loop, server) |> checkStatus
       uv_tcp_nodelay(server, 1) |> checkStatus
-      uv_ip4_addr(ip, port, &addr) |> checkStatus
-      uv_tcp_bind(server, &addr, 0) |> checkStatus
+      if binding.ip.AddressFamily = AddressFamily.InterNetworkV6 then
+        uv_ip6_addr(ip, port, &addrV6) |> checkStatus
+        uv_tcp_bind6(server, &addrV6, 0u) |> checkStatus
+      else
+        uv_ip4_addr(ip, port, &addr) |> checkStatus
+        uv_tcp_bind(server, &addr, 0) |> checkStatus
       let s = new LibUvSocket(opsPool, logger, serveClient, binding, loop,
                               bufferManager, startData, acceptingConnections,
                               this.synchronizationContext)

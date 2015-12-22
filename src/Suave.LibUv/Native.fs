@@ -29,7 +29,7 @@ type sockaddr_in6 =
   struct
     val mutable a : int
     val mutable b : int
-    val mutable c : int 
+    val mutable c : int
     val mutable d : int
     val mutable e : int
     val mutable f : int
@@ -79,7 +79,7 @@ extern int uv_ip6_addr(string ip, int port, [<Out>] sockaddr_in6& address)
 [<DllImport("libuv.dll", CallingConvention = CallingConvention.Cdecl)>]
 extern int uv_tcp_bind(IntPtr handle, sockaddr_in& sockaddr, int flags)
 
-[<DllImport("libuv.dll", CallingConvention = CallingConvention.Cdecl)>]
+[<DllImport("libuv.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "uv_tcp_bind")>]
 extern int uv_tcp_bind6(IntPtr handle, sockaddr_in6&  sockaddr, uint32 flags)
 
 [<DllImport("libuv.dll", CallingConvention = CallingConvention.Cdecl)>]
