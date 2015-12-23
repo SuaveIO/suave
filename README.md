@@ -29,9 +29,9 @@ The simplest Suave application is a simple HTTP server that greets all visitors
 with the string `"Hello World!"`
 
 ``` fsharp
-open Suave.Successful // for OK-result
-open Suave.Http       // for config & web server
-startWebServer defaultConfig (OK "Hello World!")
+open Suave
+
+startWebServer defaultConfig (Successful.OK "Hello World!")
 ```
 
 Now that you've discovered how to do "Hello World!", go read the
