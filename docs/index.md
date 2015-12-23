@@ -37,10 +37,9 @@ The simplest Suave application is a simple HTTP server that greets all visitors
 with the string `"Hello World!"`
 
 {% highlight fsharp %}
-open Suave.Http            // for config
-open Suave.Http.Successful // for OK-result
+open Suave
 
-startWebServer defaultConfig (OK "Hello World!")
+startWebServer defaultConfig (Successful.OK "Hello World!")
 {% endhighlight %}
 
 The above statement will start a web server on default port 8083 over HTTP.
