@@ -38,7 +38,7 @@ ademar@nascio:~$ curl -X POST -d '{"foo":"xyz"}' http://localhost:8083/ -w "\n"
 Or you can bring your own JSON serializer like Chiron:https://github.com/xyncro/chiron
 
 {% highlight fsharp %}
-Type A = { a : int }
+type A = { a : int }
 with
   static member ToJson (x : A) =
     Json.writer "a" x.a
