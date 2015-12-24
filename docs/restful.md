@@ -29,6 +29,7 @@ type Bar =
 startWebServer defaultConfig (mapJson (fun (a:Foo) -> { bar = a.foo }))
 {% endhighlight %}
 
+
 {% highlight bash %}
 ademar@nascio:~$ curl -X POST -d '{"foo":"xyz"}' http://localhost:8083/ -w "\n"
 {"bar":"xyz"}
@@ -37,16 +38,18 @@ ademar@nascio:~$ curl -X POST -d '{"foo":"xyz"}' http://localhost:8083/ -w "\n"
 Or you can bring your own JSON serializer like Chiron:https://github.com/xyncro/chiron
 
 {% highlight fsharp %}
-ype A = { a : int }
+Type A = { a : int }
 with
   static member ToJson (x : A) =
     Json.writer "a" x.a
 {% endhighlight %}
+
 {% highlight bash %}
 Json.format (Json.serialize { a = 42 })
 
 val it = """{"a":42}"""
 {% endhighlight %}
+
 {% highlight fsharp %}
 let app =
   GET >=> path "/test"
