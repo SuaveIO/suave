@@ -17,7 +17,7 @@ type WebPart = HttpContext -> SuaveTask<HttpContext>
 
 This function has a single parameter of type `HttpContext`. This is an F# record type that includes the HTTP request, the HTTP response, and a few other things. This should be pretty familiar to anyone who has done any web programming before.
 
-A WebPart function returns an asynchronous workflow which itself ultimately returns an `HttpContext option`. Asynchronous workflows are hopefully already somewhat familiar. The `HttpContext option` returned by the asynchronous workflow is either `Some HttpContext` record or `None`, and it is the option that is used to determine routing. Here is a web server with some simple routing logic. You can ignore the `>>=` operator and the exact workings of `choose` for now (both are explained in more detail later), just focus on the tree-like structure of the code:
+A WebPart function returns an asynchronous workflow which itself ultimately returns an `HttpContext option`. Asynchronous workflows are hopefully already somewhat familiar. The `HttpContext option` returned by the asynchronous workflow is either `Some HttpContext` record or `None`, and it is the option that is used to determine routing. Here is a web server with some simple routing logic. You can ignore the `>=>` operator and the exact workings of `choose` for now (both are explained in more detail later), just focus on the tree-like structure of the code:
 
 {% highlight fsharp %}        
 open Suave
@@ -28,12 +28,12 @@ open Suave.Web
 
 let app =
   choose
-    [ GET >>= choose
-        [ path "/hello" >>= OK "Hello GET"
-          path "/goodbye" >>= OK "Good bye GET" ]
-      POST >>= choose
-        [ path "/hello" >>= OK "Hello POST"
-          path "/goodbye" >>= OK "Good bye POST" ] ]
+    [ GET >=> choose
+        [ path "/hello" >=> OK "Hello GET"
+          path "/goodbye" >=> OK "Good bye GET" ]
+      POST >=> choose
+        [ path "/hello" >=> OK "Hello POST"
+          path "/goodbye" >=> OK "Good bye POST" ] ]
 
 startWebServer defaultConfig app
 {% endhighlight %}
