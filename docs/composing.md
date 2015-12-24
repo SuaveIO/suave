@@ -22,7 +22,7 @@ val choose : (options : WebPart list) -> WebPart
 
 The `choose` combinator is implemented such that it will execute each webpart in the list until one returns success.
 
-`>>=` is also a combinator, one that combines exactly two web parts. It runs the first, waits for it to finish, and then either passes the result into the second part, or short circuits if the first part returns `None`.
+`>=>` is also a combinator, one that combines exactly two web parts. It runs the first, waits for it to finish, and then either passes the result into the second part, or short circuits if the first part returns `None`.
 
 `OK` is a combinator of the second type. It always succeeds and writes its argument to the underlying response stream. It has type `string -> WebPart`.
 
@@ -33,9 +33,9 @@ let greetings q =
   defaultArg (Option.ofChoice(q ^^ "name")) "World" |> sprintf "Hello %s"
 
 let sample : WebPart = 
-    path "/hello" >>= choose [
-      GET  >>= request(fun r -> OK <| greetings r.query)
-      POST >>= request(fun r -> OK <| greetings r.form)
+    path "/hello" >=> choose [
+      GET  >=> request(fun r -> OK <| greetings r.query)
+      POST >=> request(fun r -> OK <| greetings r.form)
       RequestErrors.NOT_FOUND "Found no handlers" ]
 {% endhighlight %}
 
@@ -46,10 +46,10 @@ To protect a route with HTTP Basic Authentication the combinator `authenticateBa
 {% highlight fsharp %}
 let requiresAuthentication _ =
   choose
-    [ GET >>= path "/public" >>= OK "Hello anonymous"
+    [ GET >=> path "/public" >=> OK "Hello anonymous"
       // access to handlers after this one will require authentication
       authenticateBasic (fun (user, pass) -> user = "foo" && pass = "bar")
-      GET >>= path "/protected" >>= context (fun x -> OK ("Hello " + x.userState.["userName"])) ]
+      GET >=> path "/protected" >=> context (fun x -> OK ("Hello " + x.userState.["userName"])) ]
 {% endhighlight %}
 
 Your web parts are "values" in the sense that they evaluate

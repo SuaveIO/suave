@@ -31,7 +31,7 @@ You can register additional MIME extensions by creating a new mime map in the fo
 // Adds a new mime type to the default map
 let mimeTypes =
   defaultMimeTypesMap
-    >=> (function | ".avi" -> mkMimeType "video/avi" false | _ -> None)
+    @@ (function | ".avi" -> mkMimeType "video/avi" false | _ -> None)
 
 let webConfig = { defaultConfig with mimeTypesMap = mimeTypes }
 {% endhighlight %}

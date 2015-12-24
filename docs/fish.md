@@ -5,7 +5,7 @@ layout: default
 Programming with fish (custom operator reference)
 ----------------------------------------
 
-Functional programming tends to involve custom operators. An excessive number of custom operators makes for cryptic, illegible code, but a few well chosen ones allow logic to be more succint and readable. We have already seen `>>=`, and happily suave does not use either ><<*> or <*)))>{
+Functional programming tends to involve custom operators. An excessive number of custom operators makes for cryptic, illegible code, but a few well chosen ones allow logic to be more succint and readable. We have already seen `>=>`, and happily suave does not use either ><<*> or <*)))>{
 
 The other custom operators it declares are:
 

@@ -23,7 +23,7 @@ let cfg =
         ]
       timeout = TimeSpan.FromMilliseconds 3000. }
 choose
-  [ path "/hello" >>= OK "Hello World"
+  [ path "/hello" >=> OK "Hello World"
     NOT_FOUND "Found no handlers" ]
 |> startWebServer cfg
 {% endhighlight %}
