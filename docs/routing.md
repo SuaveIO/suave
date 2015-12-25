@@ -10,9 +10,9 @@ Most .NET web frameworks are based on the object-oriented paradigm. This means t
 Suave is designed to fit in with F#'s functional programming paradigm, so routing does not use any of these routing methods. Instead routing takes place using a single function, itself composed from many smaller functions. This function has the signature `WebPart`:
 
 {% highlight fsharp %}
-type SuaveTask<'a> = Async<'a option>
-type WebPart = HttpContext -> SuaveTask<HttpContext>
-// hence: WebPart = HttpContext -> Async<HttpContext option>
+
+type WebPart = HttpContext -> Async<HttpContext>
+
 {% endhighlight %}
 
 This function has a single parameter of type `HttpContext`. This is an F# record type that includes the HTTP request, the HTTP response, and a few other things. This should be pretty familiar to anyone who has done any web programming before.
@@ -21,10 +21,8 @@ A WebPart function returns an asynchronous workflow which itself ultimately retu
 
 {% highlight fsharp %}        
 open Suave
-open Suave.Http
-open Suave.Http.Applicatives
-open Suave.Http.Successful
-open Suave.Web
+open Suave.Filters
+open Suave.Successful
 
 let app =
   choose
