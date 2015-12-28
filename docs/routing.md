@@ -11,7 +11,7 @@ Suave is designed to fit in with F#'s functional programming paradigm, so routin
 
 {% highlight fsharp %}
 
-type WebPart = HttpContext -> Async<HttpContext>
+type WebPart = HttpContext -> Async<HttpContext option>
 
 {% endhighlight %}
 
