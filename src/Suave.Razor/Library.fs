@@ -23,7 +23,7 @@ module Razor =
   open RazorEngine.Templating
 
   let cachingProvider = new InvalidatingCachingProvider(fun t -> ())
-  let writeTimeCache = new System.Collections.Concurrent.ConcurrentDictionary<string, DateTime>()
+  let internal writeTimeCache = new System.Collections.Concurrent.ConcurrentDictionary<string, DateTime>()
   let isTemplateUpdated templatePath =
     let lastWriteTime = File.GetLastWriteTime templatePath
     let mutable wasUpdated = false
@@ -31,11 +31,10 @@ module Razor =
       wasUpdated <- lastWriteTime > oldDate
       lastWriteTime) |> ignore
     wasUpdated
-  let (@@) a b = Path.Combine(a, b)
+  let private (@@) a b = Path.Combine(a, b)
 
-  let viewPath = "Views"
   let resolveView r templatePath =
-   resolvePath (r.runtime.homeDirectory @@ viewPath) templatePath
+   resolvePath (r.runtime.homeDirectory @@ "Views") templatePath
    |> Path.GetFullPath
 
 
