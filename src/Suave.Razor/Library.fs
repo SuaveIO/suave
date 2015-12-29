@@ -55,13 +55,13 @@ module Razor =
           |> Seq.choose (fst >> Headers.parseCultureInfo)
 
         let resolvePaths =
-          r.request.url.Segments
-          |> Seq.fold (fun paths item ->
-            match paths with
-            | h :: _ -> (h @@ item) :: paths
-            | _ -> [ item ]) []
-          |> Seq.map (resolveView r)
-          |> Seq.toList
+          (r.request.url.Segments
+           |> Seq.fold (fun paths item ->
+             match paths with
+             | h :: _ -> (h @@ item) :: paths
+             | _ -> [ item ]) []
+           |> Seq.map (resolveView r)
+           |> Seq.toList)
           @ [ resolvePath r.runtime.homeDirectory "." |> Path.GetFullPath ]
 
         let serviceConfiguration = TemplateServiceConfiguration()
