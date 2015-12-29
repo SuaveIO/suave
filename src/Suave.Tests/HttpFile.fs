@@ -21,6 +21,8 @@ let ``canonicalization attacks`` (_: SuaveConfig) =
       Assert.Raise("'../../passwd' is not a valid path",
         typeof<Exception>,
         fun _ -> Files.resolvePath currentPath "../../passwd" |> ignore)
+    testCase "can use dot" <| fun _ ->
+      Assert.Equal("expect currentPath", currentPath, Files.resolvePath currentPath ".")
   ]
 
 [<Tests>]
