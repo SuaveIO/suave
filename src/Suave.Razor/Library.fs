@@ -61,7 +61,9 @@ module Razor =
             match paths with
             | h :: _ -> (h @@ item) :: paths
             | _ -> [ item ]) []
+          |> Seq.map (resolveView r)
           |> Seq.toList
+          @ [ resolvePath r.runtime.homeDirectory "." |> Path.GetFullPath ]
 
         let serviceConfiguration = TemplateServiceConfiguration()
         // generate compiled templates in memory instead of on disk as temporary files
@@ -88,7 +90,6 @@ module Razor =
                     |> Seq.collect (fun path ->
                       pathsWithExtension
                       |> Seq.map (fun pathWithExtension -> path @@ pathWithExtension))
-                    |> Seq.map (resolveView r)
                     |> Seq.filter File.Exists
                     |> Seq.tryFind (fun _ -> true)
                     // |> Seq.tryHead // F# 4
