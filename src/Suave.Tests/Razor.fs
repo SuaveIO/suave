@@ -23,5 +23,11 @@ let razorTest (cfg :SuaveConfig) =
 
   testList "razor test" [
     testCase "simple test" <| fun _ ->
-      Assert.Equal("process razor file", "Hello Foo", 
-        runWithConfig (razor<Foo> "razor.cshtml" { bar = "Foo" }) |> req HttpMethod.GET "/" None) ]
+      Assert.Equal("process razor file", "Hello Foo",
+        runWithConfig (razor<Foo> "razor.cshtml" { bar = "Foo" }) |> req HttpMethod.GET "/" None)
+    testCase "simple test without extension" <| fun _ ->
+      Assert.Equal("process razor file", "Hello test",
+        runWithConfig (razor<Foo> "razor" { bar = "test" }) |> req HttpMethod.GET "/" None)
+    testCase "simple test for fallback" <| fun _ ->
+      Assert.Equal("process razor file", "Hello test",
+        runWithConfig (razor<Foo> "fallback" { bar = "test" }) |> req HttpMethod.GET "/" None) ]

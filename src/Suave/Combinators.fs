@@ -441,11 +441,11 @@ module Files =
     let fileName =
       if Path.DirectorySeparatorChar.Equals('/') then fileName
       else fileName.Replace('/', Path.DirectorySeparatorChar)
-    let calculatedPath = Path.Combine(rootPath, fileName.TrimStart([| Path.DirectorySeparatorChar; Path.AltDirectorySeparatorChar |]))
-    if calculatedPath = Path.GetFullPath(calculatedPath) then
-      if calculatedPath.StartsWith rootPath then
-        calculatedPath
-      else raise <| Exception("File canonalization issue.")
+    let calculatedPath =
+      Path.Combine(rootPath, fileName.TrimStart([| Path.DirectorySeparatorChar; Path.AltDirectorySeparatorChar |]))
+      |> Path.GetFullPath
+    if calculatedPath.StartsWith rootPath then
+      calculatedPath
     else raise <| Exception("File canonalization issue.")
 
   let browseFile rootPath fileName =

@@ -123,6 +123,7 @@
     <Compile Include="Operators.fs" />
     <Compile Include="Http.fsi" />
     <Compile Include="Http.fs" />
+    <Compile Include="Headers.fs" />
     <Compile Include="DefaultTlsProvider.fs" />
     <Compile Include="Compression.fs" />
     <Compile Include="Combinators.fsi" />
