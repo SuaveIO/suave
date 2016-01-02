@@ -2,6 +2,8 @@
 
 /// Inspired by https://github.com/NancyFx/Nancy/blob/45860c82e4df8e2d380997ddf1d19d61400fb145/src/Nancy/RequestHeaders.cs
 module Headers =
+  let private toLower (s:string) = s.ToLowerInvariant()
+
   /// Parse a DateTime as given in the 'Date' Header field.
   let parseDateTime s =
     match System.DateTime.TryParseExact(s, "R", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None) with
@@ -34,15 +36,17 @@ module Headers =
 
   /// Return the first header value with the given name.
   let getFirstHeader name ctx =
+    let lowerName = toLower name
     ctx.request.headers
-    |> Seq.tryFind (fst >> (=) name)
+    |> Seq.tryFind (fst >> (=) lowerName)
     |> Option.map snd
 
   /// Return all headers with the given name.
   let getHeader name ctx =
+    let lowerName = toLower name
     ctx.request.headers
-    |> Seq.filter (fst >> (=) name)
-    |> Seq.map fst
+    |> Seq.filter (fst >> (=) lowerName)
+    |> Seq.map snd
 
   /// group headers by name and collect all headers in a dictionary.
   let getHeaders ctx =
@@ -50,6 +54,8 @@ module Headers =
     |> Seq.groupBy fst
     |> Seq.map (fun (k,v) -> k, Seq.map fst v)
     |> dict
+    |> fun d -> new System.Collections.Generic.Dictionary<_,_>(d, System.StringComparer.OrdinalIgnoreCase)
+    :> System.Collections.Generic.IDictionary<_,_>
 
   /// Split the given header values.
   let getSplitValues headers =

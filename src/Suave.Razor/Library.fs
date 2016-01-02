@@ -83,7 +83,7 @@ module Razor =
                     let pathsWithExtension =
                       languageOptions
                       |> Seq.map (fun ci -> sprintf "%s-%s.cshtml" pathWithoutExtension ci.IetfLanguageTag)
-                      |> Seq.append [ sprintf "%s.cshtml" pathWithoutExtension ]
+                      |> fun langOpts -> Seq.append langOpts [ sprintf "%s.cshtml" pathWithoutExtension ]
 
                     resolvePaths
                     |> Seq.collect (fun path ->
