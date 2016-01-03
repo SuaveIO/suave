@@ -1,5 +1,8 @@
 language: objective-c
 
+notifications:
+  email: false
+
 env:
  matrix:
   - MONO_VERSION="4.2.1"
