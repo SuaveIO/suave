@@ -21,7 +21,7 @@ let cfg =
         [ HttpBinding.mk HTTP IPAddress.Loopback 80us
           HttpBinding.mk (HTTPS (openSsl sslCert)) (IPAddress.Parse "0.0.0.0") 443us
         ]
-      timeout = TimeSpan.FromMilliseconds 3000. }
+      listenTimeout = TimeSpan.FromMilliseconds 3000. }
 choose
   [ path "/hello" >=> OK "Hello World"
     NOT_FOUND "Found no handlers" ]
