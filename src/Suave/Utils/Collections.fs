@@ -2,6 +2,7 @@
 [<AutoOpen>]
 module Suave.Utils.Collections
 
+open System
 open System.Collections.Generic
 
 /// A (string * string) list, use (%%) to access
@@ -18,6 +19,11 @@ type IDictionary<'b,'a> with
 
 let getFirst (target : NameValueList) (key : string) =
   match target |> List.tryPick (fun (a, b) -> if a.Equals key then Some b else None) with
+  | Some b -> Choice1Of2 b
+  | None   -> Choice2Of2 (sprintf "Couldn't find key '%s' in NameValueList" key)
+
+let getFirstIgnoreCase (target : NameValueList) (key : string) =
+  match target |> List.tryPick (fun (a, b) -> if a.Equals (key, StringComparison.InvariantCultureIgnoreCase) then Some b else None) with
   | Some b -> Choice1Of2 b
   | None   -> Choice2Of2 (sprintf "Couldn't find key '%s' in NameValueList" key)
 
