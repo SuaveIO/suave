@@ -38,7 +38,7 @@ module Binding =
     bind (Aether.Lens.get HttpContext.request_ >> f) fCont fErr
 
   let header key f (req : HttpRequest) =
-    (getFirst req.headers key)
+    req.header key
     |> Choice.mapSnd (fun _ -> sprintf "Missing header '%s'" key)
     |> Choice.bind f
 

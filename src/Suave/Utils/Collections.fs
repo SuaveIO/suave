@@ -21,6 +21,11 @@ let getFirst (target : NameValueList) (key : string) =
   | Some b -> Choice1Of2 b
   | None   -> Choice2Of2 (sprintf "Couldn't find key '%s' in NameValueList" key)
 
+let getFirstCaseInsensitve (target : NameValueList) (key : string) =
+  match target |> List.tryPick (fun (a, b) -> if String.equalsCaseInsensitve a key then Some b else None) with
+  | Some b -> Choice1Of2 b
+  | None   -> Choice2Of2 (sprintf "Couldn't find key '%s' in NameValueList" key)
+
 let getFirstOpt (target : NameOptionValueList) (key : string) =
   match target |> List.tryPick (fun (a,b) -> if a.Equals key then b else None) with
   | Some b -> Choice1Of2 b

@@ -323,7 +323,8 @@ module Http =
       getFirstOpt x.query key
 
     member x.header key =
-      getFirst x.headers key
+      // Field names are case-insensitive (RFC 2616 section 4.2)
+      getFirstCaseInsensitve x.headers key
 
     member x.form =
       Parsing.parseData (ASCII.toString x.rawForm)
