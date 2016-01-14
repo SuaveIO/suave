@@ -45,11 +45,14 @@ To protect a route with HTTP Basic Authentication the combinator `authenticateBa
 
 {% highlight fsharp %}
 let requiresAuthentication _ =
-  choose
-    [ GET >=> path "/public" >=> OK "Hello anonymous"
-      // access to handlers after this one will require authentication
-      authenticateBasic (fun (user, pass) -> user = "foo" && pass = "bar")
-      GET >=> path "/protected" >=> context (fun x -> OK ("Hello " + x.userState.["userName"])) ]
+    choose
+        [ GET >=> path "/public" >=> OK "Default GET"
+          // access to handlers after this one will require authentication
+          Authentication.authenticateBasic ((=) ("foo", "bar")) <|
+            choose [
+                GET >=> path "/whereami" >=> OK (sprintf "Hello authenticated person ")
+                GET >=> path "/" >=> dirHome
+                GET >=> browseHome //serves file if exists ]]
 {% endhighlight %}
 
 Your web parts are "values" in the sense that they evaluate
