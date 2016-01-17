@@ -22,6 +22,7 @@ A WebPart function returns an asynchronous workflow which itself ultimately retu
 {% highlight fsharp %}        
 open Suave
 open Suave.Filters
+open Suave.Operators
 open Suave.Successful
 
 let app =
