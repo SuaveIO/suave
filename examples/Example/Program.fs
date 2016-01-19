@@ -196,6 +196,7 @@ let main argv =
       cancellationToken     = Async.DefaultCancellationToken
       bufferSize            = 2048
       maxOps                = 100
+      autoGrow              = true
       mimeTypesMap          = mimeTypes
       homeFolder            = None
       compressedFilesFolder = None

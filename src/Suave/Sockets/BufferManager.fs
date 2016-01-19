@@ -2,6 +2,7 @@
 
 open System
 open System.Collections.Generic
+open System.Collections.Concurrent
 
 open Suave
 
@@ -13,35 +14,54 @@ open Suave
 ///
 /// The operations exposed on the BufferManager class are not thread safe.
 [<AllowNullLiteral>]
-type BufferManager(totalBytes, bufferSize, logger) =
+type BufferManager(totalBytes, bufferSize, logger, autoGrow) =
+
   do Log.internf logger "Suave.Socket.BufferManager" (fun fmt ->
     fmt "initialising BufferManager with %d bytes" totalBytes)
 
-  /// the underlying byte array maintained by the Buffer Manager
-  let buffer = Array.zeroCreate totalBytes
-  let freeOffsets = new Stack<int>()
+  /// underlying list of byte arrays maintained by the Buffer Manager
+  let buffers = new List<byte array>()
+  let segments = new ConcurrentStack<ArraySegment<byte>>()
+
+  /// something to lock on when creating a new buffer
+  let creatingSegment = obj()
+
+  let chunksPerSegment = totalBytes/bufferSize
+
+  /// Initialise a segment of memory
+  member x.createBuffer() =
+    lock creatingSegment (fun _ ->
+      if segments.Count < chunksPerSegment/2 then 
+        let buffer = Array.zeroCreate totalBytes
+        buffers.Add buffer
+        let mutable runningOffset = 0
+        while runningOffset < totalBytes - bufferSize do
+          segments.Push (ArraySegment(buffer, runningOffset, bufferSize))
+          runningOffset <- runningOffset + bufferSize)
 
   /// Pops a buffer from the buffer pool
   member x.PopBuffer(?context : string) : ArraySegment<byte> =
-    let offset, freeCount = lock freeOffsets (fun _ ->
-      freeOffsets.Pop(), freeOffsets.Count)
-    Log.internf logger "Suave.Socket.BufferManager" (fun fmt ->
-      fmt "reserving buffer: %d, free count: %d [%s]" offset freeCount (defaultArg context "no-ctx"))
-    ArraySegment(buffer, offset, bufferSize)
+    let rec loop tries =
+      if tries = 0 then
+        raise (Exception "Could not adquire a buffer, too many tries.")
+      else
+        match segments.TryPop() with
+        | true, s ->
+          Log.internf logger "Suave.Socket.BufferManager" (fun fmt ->
+            fmt "reserving buffer: %d, free count: %d [%s]" s.Offset segments.Count (defaultArg context "no-ctx"))
+          s
+        | false, _ ->
+          if autoGrow then x.createBuffer ()
+          loop (tries - 1)
+    loop 100
 
   /// Initialise the memory required to use this BufferManager
-  member x.Init() =
-    lock freeOffsets (fun _ ->
-      let mutable runningOffset = 0
-      while runningOffset < totalBytes - bufferSize do
-        freeOffsets.Push runningOffset
-        runningOffset <- runningOffset + bufferSize)
+  member x.Init() = x.createBuffer()
 
   /// Frees the buffer back to the buffer pool
   member x.FreeBuffer(args : ArraySegment<_>, ?context : string) =
-    let freeCount = lock freeOffsets (fun _ ->
-      if freeOffsets.Contains args.Offset then failwithf "double free buffer %d" args.Offset
-      freeOffsets.Push args.Offset
-      freeOffsets.Count)
+    // Not trivial to check for double frees now
+    //if segments. args then failwithf "double free buffer %d" args.Offset
+    segments.Push args
     Log.internf logger "Suave.Socket.BufferManager" (fun fmt ->
-      fmt "freeing buffer: %d, free count: %d [%s]" args.Offset freeCount (defaultArg context "no-ctx"))
+      fmt "freeing buffer: %d, free count: %d [%s]" args.Offset segments.Count (defaultArg context "no-ctx"))

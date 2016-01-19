@@ -32,13 +32,13 @@ let stopTcp (logger : Logger) reason (socket : Socket) =
   with ex ->
     "failure stopping tcp server" |> Log.interne logger "Tcp.stopTcp" ex
 
-let createPools logger maxOps bufferSize =
+let createPools logger maxOps bufferSize autoGrow =
 
   let acceptAsyncArgsPool = new ConcurrentPool<SocketAsyncEventArgs>()
   let readAsyncArgsPool   = new ConcurrentPool<SocketAsyncEventArgs>()
   let writeAsyncArgsPool  = new ConcurrentPool<SocketAsyncEventArgs>()
 
-  let bufferManager = new BufferManager(bufferSize * (maxOps + 1), bufferSize, logger)
+  let bufferManager = new BufferManager(bufferSize * (maxOps + 1), bufferSize, logger, autoGrow)
   bufferManager.Init()
 
   for x = 0 to maxOps - 1 do
@@ -118,10 +118,10 @@ let job logger
 
 type TcpServer = StartedData -> AsyncResultCell<StartedData> -> TcpWorker<unit> -> Async<unit>
 
-let runServer logger maxConcurrentOps bufferSize (binding: SocketBinding) startData
+let runServer logger maxConcurrentOps bufferSize autoGrow (binding: SocketBinding) startData
               (acceptingConnections: AsyncResultCell<StartedData>) serveClient = async {
   try
-    let a, b, c, bufferManager = createPools logger maxConcurrentOps bufferSize
+    let a, b, c, bufferManager = createPools logger maxConcurrentOps bufferSize autoGrow
 
     let listenSocket = new Socket(binding.endpoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp)
     listenSocket.NoDelay <- true;
