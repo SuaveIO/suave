@@ -45,7 +45,7 @@ module Web =
         (config.bufferSize, config.maxOps) 
         webpart
         runtime 
-        (config.tcpServerFactory.create(config.logger, config.maxOps, config.bufferSize,runtime.matchedBinding.socketBinding))
+        (config.tcpServerFactory.create(config.logger, config.maxOps, config.bufferSize,config.autoGrow,runtime.matchedBinding.socketBinding))
 
     let servers = 
        List.map (toRuntime >> startWebWorkerAsync) config.bindings
@@ -70,6 +70,7 @@ module Web =
       cancellationToken     = Async.DefaultCancellationToken
       bufferSize            = 8192 // 8 KiB
       maxOps                = 100
+      autoGrow              = true
       mimeTypesMap          = Writers.defaultMimeTypesMap
       homeFolder            = None
       compressedFilesFolder = None

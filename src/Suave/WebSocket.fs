@@ -180,13 +180,33 @@ module WebSocket =
     member this.read () = readFrame ()
     member this.send opcode bs fin = sendFrame  opcode bs fin
 
-  let internal handShakeAux webSocketKey continuation (ctx : HttpContext) =
+  let internal handShakeAux webSocketKey (subprotos : string list) continuation (ctx : HttpContext) =
     socket {
       let webSocketHash = sha1 <| webSocketKey + magicGUID
       let handShakeToken = Convert.ToBase64String webSocketHash
-      let! something = ParsingAndControl.run ctx <| handShakeResponse handShakeToken
-      let webSocket = new WebSocket(ctx.connection)
-      do! continuation webSocket ctx
+      match subprotos with
+      | [] ->
+        let! something = ParsingAndControl.run ctx (handShakeResponse handShakeToken)
+        match something with
+        | Some ctx' ->
+          let webSocket = new WebSocket(ctx'.connection)
+          do! continuation webSocket ctx'
+        | None -> ()
+      | _ ->
+        let swsp = "sec-websocket-protocol"
+        let r = ctx.request
+        match r.header swsp with
+        // Is it the supported sub-protocol?
+        | Choice1Of2 str when List.choose (fun x -> if x = str then Some str else None) subprotos = [str] ->
+          // Yes, make sure the response has that subprotocol
+          let! ctx' = Writers.addHeader swsp str ctx |> SocketOp.ofAsync
+          ()
+        | Choice1Of2 x ->
+          // unsuported protocol
+          ()
+        | Choice2Of2 x ->
+          // there is no such header
+          ()
     }
 
   /// The handShake combinator captures a WebSocket and pass it to the provided `continuation`
@@ -203,7 +223,33 @@ module WebSocket =
       | Choice1Of2 str when String.contains "Upgrade" str ->
         match r.header "sec-websocket-key" with
         | Choice1Of2 webSocketKey ->
-          let! a = handShakeAux webSocketKey continuation ctx
+          let! a = handShakeAux webSocketKey [] continuation ctx
+          match a with
+          | Choice1Of2 _ ->
+            do ()
+          | Choice2Of2 err ->
+            Log.log ctx.runtime.logger "Suave.Websocket.handShake" LogLevel.Info (sprintf "websocket disconnected: %A" err)
+          return! Control.CLOSE ctx
+        | _ ->
+          return! RequestErrors.BAD_REQUEST "Missing 'sec-websocket-key' header" ctx
+      | _ ->
+        return! RequestErrors.BAD_REQUEST "Bad Request" ctx
+    }
+
+  let handShakeWithSubProtocols (protocols : string list) (continuation : WebSocket -> HttpContext -> SocketOp<unit>) (ctx : HttpContext) = async {
+    let r = ctx.request
+    if r.``method`` <> HttpMethod.GET then
+      return! RequestErrors.METHOD_NOT_ALLOWED "Method not allowed" ctx
+    elif r.header "upgrade"  |> Choice.map (fun s -> s.ToLower()) <> Choice1Of2 "websocket" then
+      return! RequestErrors.BAD_REQUEST "Bad Request" ctx
+    else
+      match r.header "connection" with
+      // rfc 6455 - Section 4.1.6 : The request MUST contain a |Connection| header field whose value
+      // MUST include the "Upgrade" token.
+      | Choice1Of2 str when String.contains "Upgrade" str ->
+        match r.header "sec-websocket-key" with
+        | Choice1Of2 webSocketKey ->
+          let! a = handShakeAux webSocketKey protocols continuation ctx
           match a with
           | Choice1Of2 _ ->
             do ()
