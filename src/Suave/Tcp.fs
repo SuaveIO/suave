@@ -32,32 +32,37 @@ let stopTcp (logger : Logger) reason (socket : Socket) =
   with ex ->
     "failure stopping tcp server" |> Log.interne logger "Tcp.stopTcp" ex
 
+open Suave.Sockets
+
+let createTransport transportPool listenSocket =
+  let readEventArg = new SocketAsyncEventArgs()
+  let userToken = new AsyncUserToken()
+  readEventArg.UserToken <- userToken
+  readEventArg.add_Completed(fun a b -> userToken.Continuation b)
+
+  let writeEventArg = new SocketAsyncEventArgs()
+  let userToken = new AsyncUserToken()
+  writeEventArg.UserToken <- userToken
+  writeEventArg.add_Completed(fun a b -> userToken.Continuation b)
+
+  let acceptArg = new SocketAsyncEventArgs()
+  let userToken = new AsyncUserToken()
+  acceptArg.UserToken <- userToken
+  acceptArg.add_Completed(fun a b -> userToken.Continuation b)
+
+  new TcpTransport(acceptArg,readEventArg,writeEventArg, transportPool,listenSocket)
+
 let createPools listenSocket logger maxOps bufferSize autoGrow =
 
   let transportPool = new ConcurrentPool<TcpTransport>()
+  transportPool.ObjectGenerator <- (fun _ -> createTransport transportPool listenSocket)
 
   let bufferManager = new BufferManager(bufferSize * (maxOps + 1), bufferSize, logger, autoGrow)
   bufferManager.Init()
 
+  //Pre-allocate a set of reusable transportObjects
   for x = 0 to maxOps - 1 do
-
-    //Pre-allocate a set of reusable SocketAsyncEventArgs
-    let readEventArg = new SocketAsyncEventArgs()
-    let userToken = new AsyncUserToken()
-    readEventArg.UserToken <- userToken
-    readEventArg.add_Completed(fun a b -> userToken.Continuation b)
-
-    let writeEventArg = new SocketAsyncEventArgs()
-    let userToken = new AsyncUserToken()
-    writeEventArg.UserToken <- userToken
-    writeEventArg.add_Completed(fun a b -> userToken.Continuation b)
-
-    let acceptArg = new SocketAsyncEventArgs()
-    let userToken = new AsyncUserToken()
-    acceptArg.UserToken <- userToken
-    acceptArg.add_Completed(fun a b -> userToken.Continuation b)
-
-    let transport = new TcpTransport(acceptArg,readEventArg,writeEventArg, transportPool,listenSocket)
+    let transport = createTransport transportPool listenSocket
     transportPool.Push transport
 
   (transportPool, bufferManager)

@@ -20,7 +20,7 @@ type BufferManager(totalBytes, bufferSize, logger, autoGrow) =
     fmt "initialising BufferManager with %d bytes" totalBytes)
 
   /// underlying list of byte arrays maintained by the Buffer Manager
-  let segments = new ConcurrentStack<ArraySegment<byte>>()
+  let segments = new ConcurrentBag<ArraySegment<byte>>()
 
   /// something to lock on when creating a new buffer
   let creatingSegment = obj()
@@ -34,7 +34,7 @@ type BufferManager(totalBytes, bufferSize, logger, autoGrow) =
         let buffer = Array.zeroCreate totalBytes
         let mutable runningOffset = 0
         while runningOffset < totalBytes - bufferSize do
-          segments.Push (ArraySegment(buffer, runningOffset, bufferSize))
+          segments.Add (ArraySegment(buffer, runningOffset, bufferSize))
           runningOffset <- runningOffset + bufferSize)
 
   /// Pops a buffer from the buffer pool
@@ -43,7 +43,7 @@ type BufferManager(totalBytes, bufferSize, logger, autoGrow) =
       if tries = 0 then
         raise (Exception "Could not adquire a buffer, too many tries.")
       else
-        match segments.TryPop() with
+        match segments.TryTake() with
         | true, s ->
           Log.internf logger "Suave.Socket.BufferManager" (fun fmt ->
             fmt "reserving buffer: %d, free count: %d [%s]" s.Offset segments.Count (defaultArg context "no-ctx"))
@@ -60,6 +60,6 @@ type BufferManager(totalBytes, bufferSize, logger, autoGrow) =
   member x.FreeBuffer(args : ArraySegment<_>, ?context : string) =
     // Not trivial to check for double frees now
     //if segments. args then failwithf "double free buffer %d" args.Offset
-    segments.Push args
+    segments.Add args
     Log.internf logger "Suave.Socket.BufferManager" (fun fmt ->
       fmt "freeing buffer: %d, free count: %d [%s]" args.Offset segments.Count (defaultArg context "no-ctx"))
