@@ -20,7 +20,6 @@ type BufferManager(totalBytes, bufferSize, logger, autoGrow) =
     fmt "initialising BufferManager with %d bytes" totalBytes)
 
   /// underlying list of byte arrays maintained by the Buffer Manager
-  let buffers = new List<byte array>()
   let segments = new ConcurrentStack<ArraySegment<byte>>()
 
   /// something to lock on when creating a new buffer
@@ -33,7 +32,6 @@ type BufferManager(totalBytes, bufferSize, logger, autoGrow) =
     lock creatingSegment (fun _ ->
       if segments.Count < chunksPerSegment/2 then 
         let buffer = Array.zeroCreate totalBytes
-        buffers.Add buffer
         let mutable runningOffset = 0
         while runningOffset < totalBytes - bufferSize do
           segments.Push (ArraySegment(buffer, runningOffset, bufferSize))
