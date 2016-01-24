@@ -1,15 +1,17 @@
 namespace Suave.Sockets
 
 open System
-open System.Collections.Generic
-open System.Net.Sockets
+open System.Collections.Concurrent
 
-type ConcurrentPool<'T>() =
+type ConcurrentPool<'T when 'T:(new: unit -> 'T)>() =
 
-  let pool = new Stack<'T>()
-
-  member x.Push(item : 'T) =
-    lock pool (fun _ -> pool.Push item)
+  let objects = ConcurrentBag<'T> ()
 
   member x.Pop() =
-    lock pool (fun _ -> pool.Pop())
+   match objects.TryTake()with
+   | true, item ->
+     item
+   | _,_ -> new 'T()
+
+  member x.Push(item) =
+      objects.Add(item)
