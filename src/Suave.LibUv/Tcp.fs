@@ -123,7 +123,15 @@ type WriteOp() =
     let request = Marshal.AllocCoTaskMem(uv_req_size(uv_request_type.UV_WRITE))
     uv_write(request, cn, this.wrbuffArray, 1, this.uv_write_cb ) |> checkStatus
 
-type OperationPair = ReadOp*WriteOp
+type OperationPair() =
+  let readOp = new ReadOp()
+  let writeOp = new WriteOp()
+  do readOp.initialize()
+  do writeOp.initialize()
+  member this.ReadOp
+    with get () = readOp
+  member this.WriteOp
+    with get () = writeOp
 
 open Suave.Logging
 
@@ -137,11 +145,11 @@ type LibUvTransport(pool : ConcurrentPool<OperationPair>,
   [<DefaultValue>] val mutable cont : unit -> unit
   [<DefaultValue>] val mutable pin : GCHandle
 
-  let (readOp,writeOp) = pool.Pop()
- 
+  let op = pool.Pop()
+
   member this.closeCallback _ =
     destroyHandle client
-    pool.Push (readOp,writeOp)
+    pool.Push op
     this.cont ()
 
   member this.close cont =
@@ -160,32 +168,24 @@ type LibUvTransport(pool : ConcurrentPool<OperationPair>,
   interface ITransport with
     member this.read (buf : ByteSegment) =
       Async.FromContinuations <| fun (ok, _, _) ->
-        synchronizationContext.Post(SendOrPostCallback(fun o -> readOp.readStart client buf ok),null)
+        synchronizationContext.Post(SendOrPostCallback(fun o -> op.ReadOp.readStart client buf ok),null)
         synchronizationContext.Send()
 
     member this.write(buf : ByteSegment) =
       Async.FromContinuations <| fun (ok, _, _) ->
-        synchronizationContext.Post(SendOrPostCallback(fun o -> writeOp.writeStart client buf ok),null)
+        synchronizationContext.Post(SendOrPostCallback(fun o -> op.WriteOp.writeStart client buf ok),null)
         synchronizationContext.Send()
 
     member this.shutdown() = async{
       do! this.shutdown()
       do this.pin.Free()
       }
-      
 
 let createLibUvOpsPool maxOps =
 
   let opsPool = new ConcurrentPool<OperationPair>()
-
   for x = 0 to maxOps - 1 do
-
-    let readOp = new ReadOp()
-    let writeOp = new WriteOp()
-    readOp.initialize()
-    writeOp.initialize()
-    opsPool.Push (readOp,writeOp)
-
+    opsPool.Push(new OperationPair())
   opsPool
 
 open System.Runtime.InteropServices
