@@ -379,8 +379,8 @@ type LibUvServer(maxConcurrentOps, bufferManager, logger : Logger,
     uv_close(synchronizationContextCallback, this.uv_close_cb_thread)
     Log.info logger "Suave.LibUv.Tcp.LibUvServer.destroyLoopCallback" TraceHeader.empty "<--"
 
-let runServerLibUv logger maxConcurrentOps bufferSize (binding: SocketBinding) startData (acceptingConnections: AsyncResultCell<StartedData>) serveClient =
-  let bufferManager = new BufferManager(bufferSize * (maxConcurrentOps + 1), bufferSize, logger)
+let runServerLibUv logger maxConcurrentOps bufferSize autoGrow (binding: SocketBinding) startData (acceptingConnections: AsyncResultCell<StartedData>) serveClient =
+  let bufferManager = new BufferManager(bufferSize * (maxConcurrentOps + 1), bufferSize, logger, autoGrow)
   bufferManager.Init()
 
   let exitEvent = new ManualResetEvent(false)

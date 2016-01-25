@@ -84,6 +84,7 @@
     </Content>
     <Compile Include="Smoke.fs" />
     <Compile Include="Utils.fs" />
+    <Compile Include="Pools.fs" />
     <Compile Include="Web.fs" />
     <Compile Include="HttpWriters.fs" />
     <Compile Include="HttpFile.fs" />

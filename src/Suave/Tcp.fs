@@ -32,39 +32,40 @@ let stopTcp (logger : Logger) reason (socket : Socket) =
   with ex ->
     "failure stopping tcp server" |> Log.interne logger "Tcp.stopTcp" ex
 
-let createPools logger maxOps bufferSize =
+open Suave.Sockets
 
-  let acceptAsyncArgsPool = new ConcurrentPool<SocketAsyncEventArgs>()
-  let readAsyncArgsPool   = new ConcurrentPool<SocketAsyncEventArgs>()
-  let writeAsyncArgsPool  = new ConcurrentPool<SocketAsyncEventArgs>()
+let createTransport transportPool listenSocket =
+  let readEventArg = new SocketAsyncEventArgs()
+  let userToken = new AsyncUserToken()
+  readEventArg.UserToken <- userToken
+  readEventArg.add_Completed(fun a b -> userToken.Continuation b)
 
-  let bufferManager = new BufferManager(bufferSize * (maxOps + 1), bufferSize, logger)
+  let writeEventArg = new SocketAsyncEventArgs()
+  let userToken = new AsyncUserToken()
+  writeEventArg.UserToken <- userToken
+  writeEventArg.add_Completed(fun a b -> userToken.Continuation b)
+
+  let acceptArg = new SocketAsyncEventArgs()
+  let userToken = new AsyncUserToken()
+  acceptArg.UserToken <- userToken
+  acceptArg.add_Completed(fun a b -> userToken.Continuation b)
+
+  new TcpTransport(acceptArg,readEventArg,writeEventArg, transportPool,listenSocket)
+
+let createPools listenSocket logger maxOps bufferSize autoGrow =
+
+  let transportPool = new ConcurrentPool<TcpTransport>()
+  transportPool.ObjectGenerator <- (fun _ -> createTransport transportPool listenSocket)
+
+  let bufferManager = new BufferManager(bufferSize * (maxOps + 1), bufferSize, logger, autoGrow)
   bufferManager.Init()
 
+  //Pre-allocate a set of reusable transportObjects
   for x = 0 to maxOps - 1 do
-    //Pre-allocate a set of reusable SocketAsyncEventArgs
-    let readEventArg = new SocketAsyncEventArgs()
-    let userToken = new AsyncUserToken()
-    readEventArg.UserToken <- userToken
-    readEventArg.add_Completed(fun a b -> userToken.Continuation b)
+    let transport = createTransport transportPool listenSocket
+    transportPool.Push transport
 
-    readAsyncArgsPool.Push readEventArg
-
-    let writeEventArg = new SocketAsyncEventArgs()
-    let userToken = new AsyncUserToken()
-    writeEventArg.UserToken <- userToken
-    writeEventArg.add_Completed(fun a b -> userToken.Continuation b)
-
-    writeAsyncArgsPool.Push writeEventArg
-
-    let acceptArg = new SocketAsyncEventArgs()
-    let userToken = new AsyncUserToken()
-    acceptArg.UserToken <- userToken
-    acceptArg.add_Completed(fun a b -> userToken.Continuation b)
-
-    acceptAsyncArgsPool.Push(acceptArg)
-
-  (acceptAsyncArgsPool, readAsyncArgsPool, writeAsyncArgsPool, bufferManager)
+  (transportPool, bufferManager)
 
 // NOTE: performance tip, on mono set nursery-size with a value larger than MAX_CONCURRENT_OPS * BUFFER_SIZE
 // i.e: export MONO_GC_PARAMS=nursery-size=128m
@@ -118,13 +119,14 @@ let job logger
 
 type TcpServer = StartedData -> AsyncResultCell<StartedData> -> TcpWorker<unit> -> Async<unit>
 
-let runServer logger maxConcurrentOps bufferSize (binding: SocketBinding) startData
+let runServer logger maxConcurrentOps bufferSize autoGrow (binding: SocketBinding) startData
               (acceptingConnections: AsyncResultCell<StartedData>) serveClient = async {
   try
-    let a, b, c, bufferManager = createPools logger maxConcurrentOps bufferSize
 
     let listenSocket = new Socket(binding.endpoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp)
     listenSocket.NoDelay <- true;
+
+    let transportPool, bufferManager = createPools listenSocket logger maxConcurrentOps bufferSize autoGrow
 
     aFewTimes (fun () -> listenSocket.Bind binding.endpoint)
     listenSocket.Listen MaxBacklog
@@ -145,16 +147,11 @@ let runServer logger maxConcurrentOps bufferSize (binding: SocketBinding) startD
 
     while not (token.IsCancellationRequested) do
       try
-        let acceptArgs = a.Pop()
-        let! r = accept listenSocket acceptArgs
+        let transport = transportPool.Pop()
+        let! r = transport.accept()
         match r with
-        | Choice1Of2 s ->
+        | Choice1Of2 remoteBinding ->
           // start a new async worker for each accepted TCP client
-          let socket = acceptArgs.AcceptSocket
-          let remoteBinding =
-            let rep = socket.RemoteEndPoint :?> IPEndPoint
-            { ip = rep.Address; port = uint16 rep.Port }
-          let transport = new TcpTransport(acceptArgs, a, b, c)
           Async.Start (job logger serveClient remoteBinding transport bufferManager, token)
         | Choice2Of2 e ->
           failwithf "Socket failed to accept client, error: %A" e

@@ -30,6 +30,9 @@ type SuaveConfig =
     /// buffer size for socket operations
     bufferSize             : int
 
+    /// Buffer manager auto grow
+    autoGrow               : bool
+
     /// max number of concurrent socket operations
     maxOps                 : int
 

@@ -1,38 +1,43 @@
 ﻿namespace Suave.Sockets
 
 open System
+open System.Net
 open System.Net.Sockets
 
 type TcpTransport(acceptArgs     : SocketAsyncEventArgs,
-                  acceptArgsPool : ConcurrentPool<SocketAsyncEventArgs>,
-                  readArgsPool   : ConcurrentPool<SocketAsyncEventArgs>,
-                  writeArgsPool  : ConcurrentPool<SocketAsyncEventArgs>) =
-  let socket = acceptArgs.AcceptSocket
-  let readArgs = readArgsPool.Pop()
-  let writeArgs = writeArgsPool.Pop()
+                  readArgs     : SocketAsyncEventArgs,
+                  writeArgs     : SocketAsyncEventArgs,
+                  transportPool : ConcurrentPool<TcpTransport>,
+                  listenSocket : Socket) =
+
   let shutdownSocket _ =
     try
-      if socket <> null then
+      if acceptArgs.AcceptSocket <> null then
         try
-          socket.Shutdown(SocketShutdown.Both)
+          acceptArgs.AcceptSocket.Shutdown(SocketShutdown.Both)
         with _ ->
           ()
 
-        socket.Dispose ()
+        acceptArgs.AcceptSocket.Dispose ()
     with _ -> ()
+
+  let remoteBinding (socket : Socket) =
+    let rep = socket.RemoteEndPoint :?> IPEndPoint
+    { ip = rep.Address; port = uint16 rep.Port }
+
+  member this.accept() =
+      asyncDo listenSocket.AcceptAsync ignore (fun a -> remoteBinding a.AcceptSocket) acceptArgs
 
   interface ITransport with
     member this.read (buf : ByteSegment) =
-      asyncDo socket.ReceiveAsync (setBuffer buf) (fun a -> a.BytesTransferred) readArgs
+      asyncDo acceptArgs.AcceptSocket.ReceiveAsync (setBuffer buf) (fun a -> a.BytesTransferred) readArgs
 
     member this.write (buf : ByteSegment) =
-      asyncDo socket.SendAsync (setBuffer buf) ignore writeArgs
+      asyncDo acceptArgs.AcceptSocket.SendAsync (setBuffer buf) ignore writeArgs
 
     member this.shutdown() = async {
       shutdownSocket ()
       acceptArgs.AcceptSocket <- null
-      acceptArgsPool.Push acceptArgs
-      readArgsPool.Push readArgs
-      writeArgsPool.Push writeArgs
+      transportPool.Push(this)
       return ()
       }
