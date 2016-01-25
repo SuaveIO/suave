@@ -158,7 +158,7 @@ let runServer logger maxConcurrentOps bufferSize autoGrow (binding: SocketBindin
       with ex -> "failed to accept a client" |> Log.interne logger "Suave.Tcp.tcpIpServer" ex
     return ()
   with ex ->
-    "tcp server failed" |> Log.infoe logger "Suave.Tcp.tcpIpServer" TraceHeader.empty ex
+    Log.infoe logger "Suave.Tcp.tcpIpServer" TraceHeader.empty ex "tcp server failed"
     return raise ex
 }
 
