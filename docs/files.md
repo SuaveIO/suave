@@ -14,7 +14,7 @@ let app : WebPart =
     ]
 {% endhighlight %}
 
-The main file combinators are `file`, `browseHome` and variations of these. To learn about all of them check out the documentation here https://suave.io/Suave.html#def:module%20Suave.Files
+The main file combinators are `file`, `browseHome` and variations of these. To learn about all of them check out the Files module [documentation](https://suave.io/Suave.html#def:module%20Suave.Files)
 
 `file` will take the relative or absolute path for the file we want to serve to the client. It will set MIME-type headers based on the file extension.
 
