@@ -4,9 +4,31 @@ layout: default
 
 ## Serving static files, HTTP Compression and MIME types
 
+A typical static file serving Suave application would look somewhat like this:
+
+{% highlight fsharp %}
+let app : WebPart =
+  choose [
+    Filters.GET >=> choose [ Filters.path "/" >=> Files.file "index.html"; Files.browseHome ]
+    RequestErrors.NOT_FOUND "Page not found." 
+    ]
+{% endhighlight %}
+
+The main file combinators are `file`, `browseHome` and variations of these. To learn about all of them check out the documentation here https://suave.io/Suave.html#def:module%20Suave.Files
+
+`file` will take the relative or absolute path for the file we want to serve to the client. It will set MIME-type headers based on the file extension.
+
+`browseHome` will match existing files in the `homeDirectory` based on the `Url` property and will serve them via the `file` combinator; `homeDirectory` is a configuration parameter and can be set in the configuration record.
+
+{% highlight fsharp %}
+startWebServer { defaultConfig with homeDirectory = Some @"C:\MyFiles" } app
+{% endhighlight %}
+
 Suave supports **gzip** and **deflate** http compression encodings. Http
 compression is configured via the MIME types map in the server configuration
-record. By default Suave does not serve files with extensions not registered in
+record. 
+
+By default Suave does not serve files with extensions not registered in
 the mime types map.
 
 The default mime types map `defaultMimeTypesMap` looks like this.
