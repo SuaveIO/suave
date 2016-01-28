@@ -18,10 +18,10 @@ The main file combinators are `file`, `browseHome` and variations of these. To l
 
 `file` will take the relative or absolute path for the file we want to serve to the client. It will set MIME-type headers based on the file extension.
 
-`browseHome` will match existing files in the `homeDirectory` based on the `Url` property and will serve them via the `file` combinator; `homeDirectory` is a configuration parameter and can be set in the configuration record.
+`browseHome` will match existing files in the `homeFolder` based on the `Url` property and will serve them via the `file` combinator; `homeFolder` is a configuration parameter and can be set in the configuration record.
 
 {% highlight fsharp %}
-startWebServer { defaultConfig with homeDirectory = Some @"C:\MyFiles" } app
+startWebServer { defaultConfig with homeFolder = Some @"C:\MyFiles" } app
 {% endhighlight %}
 
 Suave supports **gzip** and **deflate** http compression encodings. Http
