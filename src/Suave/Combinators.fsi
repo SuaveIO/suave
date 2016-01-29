@@ -1508,7 +1508,7 @@ module EventSource =
 
   /// This function composes the passed function f with the hand-shake required
   /// to start a new event-stream protocol session with the browser.
-  val handShake : fCont:(Connection -> SocketOp<unit>) -> WebPart
+  val handShake : fCont:(Connection -> SocketOp<Connection>) -> WebPart
 
 module Control =
 

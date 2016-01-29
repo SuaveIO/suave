@@ -12,7 +12,8 @@ type Connection =
     transport     : ITransport
     bufferManager : BufferManager
     lineBuffer    : ArraySegment<byte>
-    segments      : BufferSegment list }
+    segments      : BufferSegment list
+    lineBufferCount : int }
 
   member x.ipAddr : IPAddress =
     x.socketBinding.ip
@@ -28,7 +29,8 @@ module Connection =
       transport     = null
       bufferManager = null
       lineBuffer    = ArraySegment<byte>()
-      segments      = [] }
+      segments      = []
+      lineBufferCount = 0 }
 
   let inline receive (cn : Connection) (buf : ByteSegment) =
     cn.transport.read buf

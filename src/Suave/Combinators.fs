@@ -414,13 +414,22 @@ module Files =
     let writeFile file (conn, _) = socket {
       let getFs = fun path -> new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite) :> Stream
       let getLm = fun path -> FileInfo(path).LastWriteTime
-      use! fs = Compression.transformStream file getFs getLm compression ctx.runtime.compressionFolder ctx conn
+      let! (encoding,fs) = Compression.transformStream file getFs getLm compression ctx.runtime.compressionFolder ctx
 
-      do! asyncWriteLn conn (sprintf "Content-Length: %d" (fs : Stream).Length)
-      do! asyncWriteLn conn ""
-
-      if  ctx.request.``method`` <> HttpMethod.HEAD && fs.Length > 0L then
-        do! transferStream conn fs
+      match encoding with
+      | Some n ->
+        let! (_,conn) = asyncWriteLn (String.Concat [| "Content-Encoding: "; n.ToString() |]) conn
+        let! (_,conn) = asyncWriteLn (sprintf "Content-Length: %d\r\n" (fs : Stream).Length) conn
+        let! conn = flush conn
+        if  ctx.request.``method`` <> HttpMethod.HEAD && fs.Length > 0L then
+         do! transferStream conn fs
+        return conn
+      | None ->
+        let! (_,conn) = asyncWriteLn (sprintf "Content-Length: %d\r\n" (fs : Stream).Length) conn
+        let! conn = flush conn
+        if  ctx.request.``method`` <> HttpMethod.HEAD && fs.Length > 0L then
+         do! transferStream conn fs
+        return conn
     }
     { ctx with
         response =
@@ -528,13 +537,24 @@ module Embedded =
     let writeResource name (conn, _) = socket {
       let getFs = fun name -> assembly.GetManifestResourceStream(name)
       let getLm = fun _ -> lastModified assembly
-      use! fs = Compression.transformStream name getFs getLm compression ctx.runtime.compressionFolder ctx conn
+      let! encoding,fs = Compression.transformStream name getFs getLm compression ctx.runtime.compressionFolder ctx
 
-      do! asyncWriteLn conn (sprintf "Content-Length: %d" (fs: Stream).Length)
-      do! asyncWriteLn conn ""
-
-      if ctx.request.``method`` <> HttpMethod.HEAD && fs.Length > 0L then
-        do! transferStream conn fs
+      match encoding with
+      | Some n ->
+        let! (_,conn) =  asyncWriteLn (String.Concat [| "Content-Encoding: "; n.ToString() |]) conn
+        let! (_,conn) = asyncWriteLn (sprintf "Content-Length: %d\r\n" (fs: Stream).Length) conn
+        let! conn = flush conn
+        if ctx.request.``method`` <> HttpMethod.HEAD && fs.Length > 0L then
+          do! transferStream conn fs
+        fs.Dispose()
+        return conn
+      | None ->
+        let! (_,conn) = asyncWriteLn (sprintf "Content-Length: %d\r\n" (fs: Stream).Length) conn
+        let! conn = flush conn
+        if ctx.request.``method`` <> HttpMethod.HEAD && fs.Length > 0L then
+          do! transferStream conn fs
+        fs.Dispose()
+        return conn
     }
     { ctx with
         response =
@@ -627,7 +647,7 @@ module EventSource =
 
   let private handShakeAux f (out : Connection, _) =
     socket {
-      do! asyncWriteLn out "" // newline after headers
+      let! (_,out) = asyncWriteLn "" out// newline after headers
 
       // Buggy Internet Explorer; 2kB of comment padding for IE
       do! String.replicate 2000 " " |> comment out

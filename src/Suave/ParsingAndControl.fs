@@ -379,9 +379,9 @@ module internal ParsingAndControl =
     | Choice2Of2 _ -> return Some ctx
     }
 
-  let internal writeContentType connection (headers : (string*string) list) = socket {
+  let internal writeContentType (headers : (string*string) list) = withConnection {
     if not(List.exists(fun (x : string,_) -> x.ToLower().Equals("content-type")) headers )then
-      do! asyncWriteLn connection "Content-Type: text/html"
+      do! asyncWriteLn "Content-Type: text/html"
   }
 
   let internal addKeepAliveHeader (context : HttpContext) =
@@ -390,38 +390,55 @@ module internal ParsingAndControl =
       { context with response = { context.response with headers = ("Connection","Keep-Alive") :: context.response.headers } }
     | _ -> context
 
-  let internal writeHeaders connection (headers : (string*string) seq) = socket {
+  let internal writeHeaders (headers : (string*string) seq) = withConnection {
     for x,y in headers do
       if not (List.exists (fun y -> x.ToLower().Equals(y)) ["server";"date";"content-length"]) then
-        do! asyncWriteLn connection (String.Concat [| x; ": "; y |])
+        do! asyncWriteLn (String.Concat [| x; ": "; y |])
     }
 
-  let writePreamble (context: HttpContext) = socket{
+  let writePreamble (context: HttpContext) = withConnection {
+
     let r = context.response
-    let connection = context.connection
 
-    do! asyncWriteLn connection (String.concat " " [ "HTTP/1.1"; r.status.code.ToString(); r.status.reason ])
-    if not context.runtime.hideHeader then do! asyncWriteLn connection ServerHeader
-    do! asyncWriteLn connection (String.Concat( [| "Date: "; Globals.utcNow().ToString("R") |]))
+    do! asyncWriteLn (String.concat " " [ "HTTP/1.1"; r.status.code.ToString(); r.status.reason ])
+    if not context.runtime.hideHeader then do! asyncWriteLn ServerHeader
+    do! asyncWriteLn (String.Concat( [| "Date: "; Globals.utcNow().ToString("R") |]))
 
-    do! writeHeaders connection r.headers
-    do! writeContentType connection r.headers
+    do! writeHeaders r.headers
+    do! writeContentType r.headers
     }
 
   let writeContent context = function
     | Bytes b -> socket {
       let connection = context.connection
-      let! (content : byte []) = Compression.transform b context connection
-      // http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.13
-      do! asyncWriteLn connection (String.Concat [| "Content-Length: "; content.Length.ToString() |])
-      do! asyncWriteLn connection ""
-      if context.request.``method`` <> HttpMethod.HEAD && content.Length > 0 then
-        do! send connection (new ArraySegment<_>(content, 0, content.Length))
+      let! (encoding, content : byte []) = Compression.transform b context connection
+      match encoding with
+      | Some n ->
+        let! (_, connection) = asyncWriteLn (String.Concat [| "Content-Encoding: "; n.ToString() |]) connection
+        // http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.13
+        let! (_, connection) = asyncWriteLn (String.Concat [| "Content-Length: "; content.Length.ToString(); Bytes.eol |]) connection
+        if context.request.``method`` <> HttpMethod.HEAD && content.Length > 0 then
+          let! (_,connection) = asyncWriteBufferedBytes content connection
+          let! connection = flush connection
+          return connection
+        else
+          let! connection = flush connection
+          return connection
+      | None ->
+        // http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.13
+        let! (_, connection) = asyncWriteLn (String.Concat [| "Content-Length: "; content.Length.ToString(); Bytes.eol |]) connection
+        if context.request.``method`` <> HttpMethod.HEAD && content.Length > 0 then
+          let! (_,connection) = asyncWriteBufferedBytes content connection
+          let! connection = flush connection
+          return connection
+        else
+          let! connection = flush connection
+          return connection
       }
     | SocketTask f -> socket {
         return! f (context.connection, context.response)
       }
-    | NullContent -> socket.Return()
+    | NullContent -> socket { return context.connection }
 
   let executeTask ctx r errorHandler = async {
     try
@@ -439,9 +456,12 @@ module internal ParsingAndControl =
       match result with 
       | Some newCtx ->
         if newCtx.response.writePreamble then
-          do! writePreamble newCtx
-        do! writeContent newCtx newCtx.response.content
-        return Some newCtx
+          let! (_, connection) = writePreamble newCtx newCtx.connection
+          let! connection = writeContent { newCtx with connection = connection } newCtx.response.content
+          return Some { newCtx with connection = connection }
+        else
+          let! connection =  writeContent newCtx newCtx.response.content
+          return Some { newCtx with connection = connection }
       | None -> return None
   }
 
@@ -505,18 +525,11 @@ module internal ParsingAndControl =
 
   open System.Net.Sockets
 
-  /// response_f writes the HTTP headers regardles of the setting of context.writePreamble
-  /// it is currently only used in Proxy.fs
-  let response_f (context: HttpContext) = socket {
-    do! writePreamble context
-    do! writeContent context context.response.content
-    }
-
   type HttpConsumer =
     | WebPart of WebPart
     | SocketPart of (HttpContext -> Async<(HttpContext -> SocketOp<HttpContext option>) option >)
 
-  let operate consumer ctx = socket {
+  let internal operate consumer ctx = socket {
     match consumer with
     | WebPart webPart ->
       return! run ctx webPart

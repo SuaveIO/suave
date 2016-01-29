@@ -96,6 +96,7 @@ let job logger
       bufferManager = bufferManager
       lineBuffer    = bufferManager.PopBuffer "Suave.Tcp.job" // buf allocate
       segments      = []
+      lineBufferCount = 0
     }
   try
     use! oo = Async.OnCancel (fun () -> intern "disconnected client (async cancel)"

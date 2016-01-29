@@ -419,7 +419,7 @@ module Http =
   type HttpContent =
     | NullContent
     | Bytes of byte []
-    | SocketTask of (Connection * HttpResult -> SocketOp<unit>)
+    | SocketTask of (Connection * HttpResult -> SocketOp<Connection>)
 
     static member NullContent__ =
       (function | NullContent -> Some ()
@@ -442,7 +442,7 @@ module Http =
     static member Bytes_ : PLens<HttpContent, byte[]> =
       Aether.idLens <-?> HttpContent.Bytes__
 
-    static member SocketTask_ : PLens<HttpContent, Connection * HttpResult -> SocketOp<unit>> =
+    static member SocketTask_ : PLens<HttpContent, Connection * HttpResult -> SocketOp<Connection>> =
       Aether.idLens <-?> HttpContent.SocketTask__
 
   and HttpResult =
