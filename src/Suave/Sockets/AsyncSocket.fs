@@ -70,17 +70,20 @@ let asyncWriteBufferedBytes (b : byte[]) (connection : Connection) : SocketOp<un
     else return (),connection
   }
 
-/// Asynchronously write from the 'from' stream to the 'to' stream.
-let transferStream (toStream : Connection) (from : Stream) : SocketOp<unit> =
-  let buf = toStream.bufferManager.PopBuffer()
+let transferStreamWithBufer (buf: ArraySegment<_>) (toStream : Connection) (from : Stream) : SocketOp<unit> =
   let rec doBlock () = socket {
     let! read = SocketOp.ofAsync <| from.AsyncRead (buf.Array, buf.Offset, buf.Count)
     if read <= 0 then
+      toStream.bufferManager.FreeBuffer buf
       return ()
     else
-      do! send toStream (new ArraySegment<_>(buf.Array,buf.Offset,read))
+      do! send toStream (new ArraySegment<_>(buf.Array, buf.Offset, read))
       return! doBlock () }
-  try
-    doBlock ()
-  finally 
-    toStream.bufferManager.FreeBuffer buf
+  doBlock ()
+
+/// Asynchronously write from the 'from' stream to the 'to' stream.
+let transferStream (toStream : Connection) (from : Stream) : SocketOp<unit> =
+  socket {
+    let buf = toStream.bufferManager.PopBuffer()
+    do! finalize (transferStreamWithBufer buf toStream from) (fun () -> toStream.bufferManager.FreeBuffer buf)
+  }
