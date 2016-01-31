@@ -48,34 +48,6 @@ module internal Bytes =
   /// The corresponding EOL array segment
   let eolArraySegment = new ArraySegment<_>(EOL, 0, 2)
 
-  /// Asynchronously write from the 'from' stream to the 'to' stream, with an upper bound on
-  /// amount to transfer by len
-  let transferBounded (toStream : Stream) (from : Stream) len =
-    let bufSize = 0x2000
-    let buf = Array.zeroCreate<byte> bufSize
-    let rec doBlock left = async {
-      let! read = from.AsyncRead(buf, 0, Math.Min(bufSize, left))
-      if read <= 0 || left - read = 0 then
-        do! toStream.FlushAsync()
-        return ()
-      else
-        do! toStream.AsyncWrite(buf, 0, read)
-        return! doBlock (left - read) }
-    doBlock len
-
-  /// Asynchronously write from the 'from' stream to the 'to' stream.
-  let transfer (toStream : Stream) (from : Stream) =
-    let buf = Array.zeroCreate<byte> 0x2000
-    let rec doBlock () = async {
-      let! read = from.AsyncRead buf
-      if read <= 0 then
-        do! toStream.FlushAsync()
-        return ()
-      else
-        do! toStream.AsyncWrite(buf, 0, read)
-        return! doBlock () }
-    doBlock ()
-
   /// Knuth-Morris-Pratt algorithm
   /// http://caml.inria.fr/pub/old_caml_site/Examples/oc/basics/kmp.ml
   let initNext p =

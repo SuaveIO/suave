@@ -84,17 +84,3 @@ let transferStream (toStream : Connection) (from : Stream) : SocketOp<unit> =
     doBlock ()
   finally 
     toStream.bufferManager.FreeBuffer buf
-
-/// Asynchronously write from the 'from' stream to the 'to' stream, with an upper bound on
-/// amount to transfer by len
-let transferStreamBounded (toStream : Connection) (from : Stream) len =
-  let bufSize = 0x2000
-  let buf = Array.zeroCreate<byte> bufSize
-  let rec doBlock left = socket {
-    let! read = SocketOp.ofAsync <| from.AsyncRead(buf, 0, Math.Min(bufSize, left))
-    if read <= 0 || left - read = 0 then
-      return ()
-    else
-      do! send toStream (new ArraySegment<_>(buf,0,read))
-      return! doBlock (left - read) }
-  doBlock len
