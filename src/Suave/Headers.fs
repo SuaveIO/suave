@@ -93,3 +93,11 @@ module Headers =
       mediaRange, quality)
     //|> Seq.sortByDescending snd // TODO: F# 4
     |> Seq.sortBy (fun (_, q) -> -q)
+
+  open Suave.Utils
+
+  /// Headers are lowercased, so can use string.Equals
+  let getAll (target : NameValueList) (key : string) =
+    match target |> List.choose (fun (a, b) -> if a.Equals key then Some b else None) with
+    | [] -> Choice2Of2 (sprintf "Couldn't find key '%s' in NameValueList" key)
+    | l  -> Choice1Of2 l

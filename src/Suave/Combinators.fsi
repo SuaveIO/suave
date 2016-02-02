@@ -1520,3 +1520,50 @@ module Control =
   /// <remarks>
   /// </remarks>
   val CLOSE : WebPart
+
+module CORS =
+
+  open Utils
+
+  [<RequireQualifiedAccess>]
+  type InclusiveOption<'T> =
+    | None
+    | Some of 'T
+    | All
+
+  /// The configuration values for CORS
+  type CORSConfig =
+    {
+      /// The list of allowed Uri(s) for requests.
+      allowedUris             : InclusiveOption<string list>
+
+      /// The list of allowed HttpMethods for the request.
+      allowedMethods          : InclusiveOption<HttpMethod list>
+      
+      /// Allow cookies? This is sent in the AccessControlAllowCredentials header.
+      allowCookies            : bool
+
+      /// Should response headers be exposed to the client? This is sent in AccessControlExposeHeaders header. 
+      exposeHeaders           : bool
+      
+      /// Max age in seconds the user agent is allowed to cache the result of the request.
+      maxAge                  : int option }
+    
+    static member allowedUris_           : Property<CORSConfig, InclusiveOption<string list>>
+    static member allowedMethods_        : Property<CORSConfig, InclusiveOption<HttpMethod list>>
+    static member allowCookies_          : Property<CORSConfig, bool>
+    static member exposeHeaders_         : Property<CORSConfig, bool>
+    static member maxAge_                : Property<CORSConfig, int option>
+
+
+
+  /// <summary><para>
+  /// This WebPart handles CORS requests.
+  /// </para><para>
+  /// </para><para>
+  /// </para></summary>
+  /// <remarks>
+  /// </remarks>
+  val cors : CORSConfig:(CORSConfig) -> WebPart
+
+  val defaultCORSConfig : CORSConfig
