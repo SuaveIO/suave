@@ -74,7 +74,6 @@ let transferStreamWithBufer (buf: ArraySegment<_>) (toStream : Connection) (from
   let rec doBlock () = socket {
     let! read = SocketOp.ofAsync <| from.AsyncRead (buf.Array, buf.Offset, buf.Count)
     if read <= 0 then
-      toStream.bufferManager.FreeBuffer buf
       return ()
     else
       do! send toStream (new ArraySegment<_>(buf.Array, buf.Offset, read))
