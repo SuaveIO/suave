@@ -156,7 +156,7 @@ let runServer logger maxConcurrentOps bufferSize autoGrow (binding: SocketBindin
           Async.Start (job logger serveClient remoteBinding transport bufferManager, token)
         | Choice2Of2 e ->
           failwithf "Socket failed to accept client, error: %A" e
-      with ex -> "failed to accept a client" |> Log.interne logger "Suave.Tcp.tcpIpServer" ex
+      with ex -> Log.interne logger "Suave.Tcp.tcpIpServer" ex "failed to accept a client"
     return ()
   with ex ->
     Log.infoe logger "Suave.Tcp.tcpIpServer" TraceHeader.empty ex "tcp server failed"
