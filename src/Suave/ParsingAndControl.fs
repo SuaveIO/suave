@@ -33,7 +33,7 @@ module internal ParsingAndControl =
   let internal free context connection =
     List.iter (fun x -> connection.bufferManager.FreeBuffer (x.buffer, context)) connection.segments
 
-  let skipBuffers (pairs : BufferSegment list) (number : int) :  BufferSegment list =
+  let inline internal skipBuffers (pairs : BufferSegment list) (number : int) :  BufferSegment list =
     let rec loop xxs acc = 
       match xxs with
       | [] -> []
@@ -44,7 +44,7 @@ module internal ParsingAndControl =
         else loop tail (acc + x.length)
     loop pairs 0
 
-  let split index connection select markerLength : Async<int * Connection> =
+  let internal split index connection select markerLength : Async<int * Connection> =
     let rec loop connection acc count =  async {
       match connection.segments with
       | [] -> return count, connection
