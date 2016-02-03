@@ -91,6 +91,12 @@ let owinUnit cfg =
 
         subject.["a"] <- [| "a-1" |]
         eqs "has a once more" ["a-1"] subject.["a"]
+
+      testCase "TryGetValue" <| fun _ ->
+        let subj = create [ "a", "a-1" ]
+        match subj.TryGetValue "a" with
+        | true, x -> eq "should be a-1" [|"a-1"|] x
+        | false, _ -> Tests.failtest "key 'a' not found"
     ]
 
     testList "OwinDictionary" [
