@@ -153,6 +153,26 @@ let owinUnit cfg =
 
         subj.["Testing.MyKey"] <- "oh no"
         eq "read again" "oh no" (subj.["testing.MyKey"] |> unbox)
+
+      testCase "try read/write custom" <| fun _ ->
+        let subj = createOwin ()
+        subj.["testing.MyKey"] <- "oh yeah"
+        eq "read back" (true, "oh yeah") (let succ, res = subj.TryGetValue("testing.MyKey") in succ, unbox res)
+
+      testCase "case insensitive try lookup for custom key" <| fun _ ->
+        let subj = createOwin ()
+        subj.["testing.MyKey"] <- "oh yeah"
+        eq "custom key found" true (subj.ContainsKey "Testing.MyKey")
+        eq "read back" (true, "oh yeah") (let succ, res = subj.TryGetValue("Testing.MyKey") in succ, unbox res)
+
+      testCase "interaction/set and try retrieve with case insensitivity" <| fun _ ->
+        let subj = createOwin ()
+        subj.["testing.MyKey"] <- "oh yeah"
+        eq "custom key found" true (subj.ContainsKey "Testing.MyKey")
+        eq "read back" (true, "oh yeah") (let succ, res = subj.TryGetValue("Testing.MyKey") in succ, unbox res)
+
+        subj.["Testing.MyKey"] <- "oh no"
+        eq "read again" (true, "oh no") (let succ, res = subj.TryGetValue("testing.MyKey") in succ, unbox res)
     ]
 
     testList "OWIN response headers" [
