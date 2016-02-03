@@ -4,17 +4,26 @@ open System
 open System.IO
 open System.Text
 
-type BufferSegment =
-  { buffer : ArraySegment<byte>
-    offset : int
-    length : int }
+type BufferSegment = struct
+  val public buffer : ArraySegment<byte>
+  val public offset : int
+  val public length : int
+
+  new (buffer, offset, length) = {
+    buffer = buffer
+    offset = offset
+    length = length
+    }
+end
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module BufferSegment =
   
   let inline mk buffer offset length =
+    #if DEBUG
     if length < 0 then failwith (sprintf "BufferSegment.mk: length = %d < 0" length)
-    { buffer = buffer; offset = offset; length = length }
+    #endif
+    new BufferSegment(buffer, offset, length)
 
 module internal Bytes =
 

@@ -31,10 +31,10 @@ module internal ParsingAndControl =
 
   /// Free up a list of buffers
   let internal free context connection =
-    List.iter (fun x -> connection.bufferManager.FreeBuffer (x.buffer, context)) connection.segments
+    List.iter (fun (x: BufferSegment) -> connection.bufferManager.FreeBuffer (x.buffer, context)) connection.segments
 
   let inline internal skipBuffers (pairs : BufferSegment list) (number : int) :  BufferSegment list =
-    let rec loop xxs acc = 
+    let rec loop (xxs: BufferSegment list) acc = 
       match xxs with
       | [] -> []
       | x :: tail ->
@@ -104,7 +104,7 @@ module internal ParsingAndControl =
   let readData (connection : Connection) buff = socket {
     let! b = receive connection buff
     if b > 0 then
-      return { buffer = buff; offset = buff.Offset; length = b }
+      return BufferSegment(buff, buff.Offset, b)
     else
       return! SocketOp.abort (Error.SocketError SocketError.Shutdown)
     }
@@ -186,7 +186,7 @@ module internal ParsingAndControl =
     }
     loop connection []
 
-  let inline arraySegmentFromBufferSegment b =
+  let inline arraySegmentFromBufferSegment (b: BufferSegment) =
     ArraySegment(b.buffer.Array, b.offset, b.length)
 
   /// Read the post data from the stream, given the number of bytes that makes up the post data.
@@ -197,8 +197,8 @@ module internal ParsingAndControl =
         match connection.segments with
         | segment :: tail ->
           if segment.length > n then
-            do! SocketOp.ofAsync <| select (arraySegmentFromBufferSegment { segment with offset = n }) n
-            return { connection with segments = { buffer = segment.buffer; offset = segment.offset + n; length = segment.length - n } :: tail }
+            do! SocketOp.ofAsync <| select (arraySegmentFromBufferSegment(BufferSegment(segment.buffer,n,segment.length))) n
+            return { connection with segments = BufferSegment(segment.buffer, segment.offset + n, segment.length - n):: tail }
           else
             do! SocketOp.ofAsync <| select (arraySegmentFromBufferSegment segment) segment.length
             do connection.bufferManager.FreeBuffer(segment.buffer, "Suave.Web.readPostData.loop")
