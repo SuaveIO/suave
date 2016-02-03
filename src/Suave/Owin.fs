@@ -406,7 +406,7 @@ module OwinApp =
         (x.Delta :> IDictionary<_, _>).ContainsKey(OwinKey key)
       member x.Add (key, value) = invalidOp "Add is not supported"
       member x.TryGetValue (key, [<Out>] res : byref<string[]>) =
-        (x.Delta :> IDictionary<_, _>).TryGetValue(OwinKey key, ref res)
+        (x.Delta :> IDictionary<_, _>).TryGetValue(OwinKey key, &res)
 
     interface ICollection<KeyValuePair<string, string[]>> with
       member x.Add kvp = invalidOp "Add is not supported"
