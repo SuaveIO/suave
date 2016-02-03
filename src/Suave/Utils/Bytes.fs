@@ -50,7 +50,7 @@ module internal Bytes =
 
   /// Knuth-Morris-Pratt algorithm
   /// http://caml.inria.fr/pub/old_caml_site/Examples/oc/basics/kmp.ml
-  let initNext p =
+  let inline initNext p =
     let m = Array.length p
     let next = Array.create m 0
     let i = ref 1
@@ -120,10 +120,7 @@ module internal Bytes =
       done;
       if !j >= m then Some(!i - m) else None
 
-  let kmpZ p =
-    let next = initNext p
-    let m = Array.length p
-    fun (xs : BufferSegment list) ->
+  let inline _kmpZ (p: byte []) (next: int []) m (xs : BufferSegment list) =
       let a = uniteArrayBufferSegment xs
       let n = List.fold (fun acc (x :  BufferSegment) -> acc + x.length) 0 xs
       let  i = ref 0
@@ -133,6 +130,11 @@ module internal Bytes =
         if !j = 0 then incr i else j := next.[!j]
       done;
       if !j >= m then Some(!i - m) else None
+
+  let kmpZ p (xs : BufferSegment list) =
+    let next = initNext p
+    let m = Array.length p
+    _kmpZ p next m xs
 
   let inline unite (a : ArraySegment<_>) (b : ArraySegment<_>) =
     fun (i : int) ->
