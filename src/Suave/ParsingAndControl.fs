@@ -450,7 +450,7 @@ module internal ParsingAndControl =
 
   /// Check if the web part can perform its work on the current request. If it
   /// can't it will return None and the run method will return.
-  let inline run ctx (webPart : WebPart) = 
+  let inline run (webPart : WebPart) ctx = 
     socket {
       let! result = SocketOp.ofAsync <| executeTask ctx (webPart ctx) ctx.runtime.errorHandler
       match result with 
@@ -501,7 +501,7 @@ module internal ParsingAndControl =
         trace            = parseTraceHeaders headers }
 
     if request.headers %% "expect" = Choice1Of2 "100-continue" then
-      let! _ = run ctx <| Intermediate.CONTINUE
+      let! _ = run Intermediate.CONTINUE ctx
       verbose "sent 100-continue response"
 
     if ctx.runtime.parsePostData then
@@ -525,26 +525,10 @@ module internal ParsingAndControl =
 
   open System.Net.Sockets
 
-  type HttpConsumer =
-    | WebPart of WebPart
-    | SocketPart of (HttpContext -> Async<(HttpContext -> SocketOp<HttpContext option>) option >)
-
-  let inline operate consumer ctx = socket {
-    match consumer with
-    | WebPart webPart ->
-      return! run ctx webPart
-    | SocketPart writer ->
-      let! intermediate = SocketOp.ofAsync <| writer ctx
-      match intermediate with
-      | Some task ->
-        return! task ctx
-      | None -> return Some ctx
-    }
-
   let inline cleanResponse (ctx : HttpContext) =
     { ctx with response = HttpResult.empty }
 
-  let httpLoop (ctxOuter : HttpContext) (consumer : HttpConsumer) =
+  let httpLoop (ctxOuter : HttpContext) (consumer : WebPart) =
 
     let runtime = ctxOuter.runtime
 
@@ -561,7 +545,7 @@ module internal ParsingAndControl =
         match result with
         | None -> verbose "'result = None', exiting"
         | Some ctx ->
-          let! result'' = addKeepAliveHeader ctx |> operate consumer
+          let! result'' = addKeepAliveHeader ctx |> run consumer
           match result'' with
           | Choice1Of2 result -> 
             match result with
@@ -588,7 +572,7 @@ module internal ParsingAndControl =
         match err with
         | InputDataError msg ->
           verbose (sprintf "Error parsing http request: %s" msg)
-          let! result''' = run ctx (RequestErrors.BAD_REQUEST msg)
+          let! result''' = run (RequestErrors.BAD_REQUEST msg) ctx
           match result''' with
           | Choice1Of2 _ ->
             verbose "Exiting http loop"
@@ -606,7 +590,7 @@ module internal ParsingAndControl =
   /// communication -- getting the initial request stream.
   let inline requestLoop
     (runtime    : HttpRuntime)
-    (consumer   : HttpConsumer)
+    (consumer   : WebPart)
     (connection : Connection) =
     let verbose  = Log.verbose runtime.logger "Suave.Web.httpLoop.loop" TraceHeader.empty
     async {
@@ -622,7 +606,7 @@ module internal ParsingAndControl =
 
   /// Starts a new web worker, given the configuration and a web part to serve.
   let startWebWorkerAsync (bufferSize, maxOps) (webpart : WebPart) (runtime : HttpRuntime) runServer =
-    startTcpIpServerAsync (requestLoop runtime (WebPart webpart))
+    startTcpIpServerAsync (requestLoop runtime webpart)
                           runtime.matchedBinding.socketBinding
                           runServer
 
