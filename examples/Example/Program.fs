@@ -133,6 +133,7 @@ let app =
             do! msg |> send out
             let msg = { id = "2"; data = "Second Message"; ``type`` = None }
             do! msg |> send out
+            return out
           }))
         GET >=> path "/events" >=> request (fun r -> EventSource.handShake (CounterDemo.counterDemo r))
         GET >=> browseHome //serves file if exists

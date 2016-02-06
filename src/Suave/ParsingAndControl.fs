@@ -30,11 +30,11 @@ module internal ParsingAndControl =
   let BadRequestPrefix = "__suave_BAD_REQUEST"
 
   /// Free up a list of buffers
-  let internal free context connection =
-    List.iter (fun x -> connection.bufferManager.FreeBuffer (x.buffer, context)) connection.segments
+  let inline free context connection =
+    List.iter (fun (x: BufferSegment) -> connection.bufferManager.FreeBuffer (x.buffer, context)) connection.segments
 
-  let skipBuffers (pairs : BufferSegment list) (number : int) :  BufferSegment list =
-    let rec loop xxs acc = 
+  let inline internal skipBuffers (pairs : BufferSegment list) (number : int) :  BufferSegment list =
+    let rec loop (xxs: BufferSegment list) acc = 
       match xxs with
       | [] -> []
       | x :: tail ->
@@ -101,15 +101,15 @@ module internal ParsingAndControl =
       return NeedMore, { connection with segments = ret }
     }
 
-  let readData (connection : Connection) buff = socket {
+  let inline readData (connection : Connection) buff = socket {
     let! b = receive connection buff
     if b > 0 then
-      return { buffer = buff; offset = buff.Offset; length = b }
+      return BufferSegment(buff, buff.Offset, b)
     else
       return! SocketOp.abort (Error.SocketError SocketError.Shutdown)
     }
 
-  let readMoreData connection = async {
+  let inline readMoreData connection = async {
     let buff = connection.bufferManager.PopBuffer("Suave.Web.readMoreData")
     let! result = readData connection buff
     match result with
@@ -137,12 +137,12 @@ module internal ParsingAndControl =
     loop connection
 
   /// returns the number of bytes read and the connection
-  let readUntilEOL (connection : Connection) select =
+  let inline readUntilEOL (connection : Connection) select =
     readUntilPattern connection (scanMarker EOL select)
 
   /// Read the stream until the marker appears and return the number of bytes
   /// read.
-  let readUntil (marker : byte []) (select : ArraySegment<_> -> int -> Async<unit>) (connection : Connection) =
+  let inline readUntil (marker : byte []) (select : ArraySegment<_> -> int -> Async<unit>) (connection : Connection) =
     readUntilPattern connection (scanMarker marker select)
 
   let parseTraceHeaders (headers : NameValueList) =
@@ -155,7 +155,7 @@ module internal ParsingAndControl =
     TraceHeader.mk trace parent
 
   /// Read a line from the stream, calling ASCII.toString on the bytes before the EOL marker
-  let readLine (connection : Connection) = socket {
+  let inline readLine (connection : Connection) = socket {
     let offset = ref 0
     let buf = connection.lineBuffer
     let! count, connection =
@@ -168,7 +168,7 @@ module internal ParsingAndControl =
   }
 
   /// Read all headers from the stream, returning a dictionary of the headers found
-  let readHeaders connection =
+  let inline readHeaders connection =
     let rec loop (connection : Connection) headers = socket {
       let offset = ref 0
       let buf = connection.lineBuffer
@@ -186,7 +186,7 @@ module internal ParsingAndControl =
     }
     loop connection []
 
-  let inline arraySegmentFromBufferSegment b =
+  let inline arraySegmentFromBufferSegment (b: BufferSegment) =
     ArraySegment(b.buffer.Array, b.offset, b.length)
 
   /// Read the post data from the stream, given the number of bytes that makes up the post data.
@@ -197,8 +197,8 @@ module internal ParsingAndControl =
         match connection.segments with
         | segment :: tail ->
           if segment.length > n then
-            do! SocketOp.ofAsync <| select (arraySegmentFromBufferSegment { segment with offset = n }) n
-            return { connection with segments = { buffer = segment.buffer; offset = segment.offset + n; length = segment.length - n } :: tail }
+            do! SocketOp.ofAsync <| select (arraySegmentFromBufferSegment(BufferSegment(segment.buffer,n,segment.length))) n
+            return { connection with segments = BufferSegment(segment.buffer, segment.offset + n, segment.length - n):: tail }
           else
             do! SocketOp.ofAsync <| select (arraySegmentFromBufferSegment segment) segment.length
             do connection.bufferManager.FreeBuffer(segment.buffer, "Suave.Web.readPostData.loop")
@@ -379,51 +379,68 @@ module internal ParsingAndControl =
     | Choice2Of2 _ -> return Some ctx
     }
 
-  let internal writeContentType connection (headers : (string*string) list) = socket {
+  let inline writeContentType (headers : (string*string) list) = withConnection {
     if not(List.exists(fun (x : string,_) -> x.ToLower().Equals("content-type")) headers )then
-      do! asyncWriteLn connection "Content-Type: text/html"
+      do! asyncWriteLn "Content-Type: text/html"
   }
 
-  let internal addKeepAliveHeader (context : HttpContext) =
+  let addKeepAliveHeader (context : HttpContext) =
     match context.request.httpVersion, context.request.header "connection" with
     | "HTTP/1.0", Choice1Of2 v when String.equalsOrdinalCI v "keep-alive" ->
       { context with response = { context.response with headers = ("Connection","Keep-Alive") :: context.response.headers } }
     | _ -> context
 
-  let internal writeHeaders connection (headers : (string*string) seq) = socket {
+  let inline writeHeaders (headers : (string*string) seq) = withConnection {
     for x,y in headers do
       if not (List.exists (fun y -> x.ToLower().Equals(y)) ["server";"date";"content-length"]) then
-        do! asyncWriteLn connection (String.Concat [| x; ": "; y |])
+        do! asyncWriteLn (String.Concat [| x; ": "; y |])
     }
 
-  let writePreamble (context: HttpContext) = socket{
+  let inline writePreamble (context: HttpContext) = withConnection {
+
     let r = context.response
-    let connection = context.connection
 
-    do! asyncWriteLn connection (String.concat " " [ "HTTP/1.1"; r.status.code.ToString(); r.status.reason ])
-    if not context.runtime.hideHeader then do! asyncWriteLn connection ServerHeader
-    do! asyncWriteLn connection (String.Concat( [| "Date: "; Globals.utcNow().ToString("R") |]))
+    do! asyncWriteLn (String.concat " " [ "HTTP/1.1"; r.status.code.ToString(); r.status.reason ])
+    if not context.runtime.hideHeader then do! asyncWriteLn ServerHeader
+    do! asyncWriteLn (String.Concat( [| "Date: "; Globals.utcNow().ToString("R") |]))
 
-    do! writeHeaders connection r.headers
-    do! writeContentType connection r.headers
+    do! writeHeaders r.headers
+    do! writeContentType r.headers
     }
 
-  let writeContent context = function
+  let inline writeContent context = function
     | Bytes b -> socket {
       let connection = context.connection
-      let! (content : byte []) = Compression.transform b context connection
-      // http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.13
-      do! asyncWriteLn connection (String.Concat [| "Content-Length: "; content.Length.ToString() |])
-      do! asyncWriteLn connection ""
-      if context.request.``method`` <> HttpMethod.HEAD && content.Length > 0 then
-        do! send connection (new ArraySegment<_>(content, 0, content.Length))
+      let! (encoding, content : byte []) = Compression.transform b context connection
+      match encoding with
+      | Some n ->
+        let! (_, connection) = asyncWriteLn (String.Concat [| "Content-Encoding: "; n.ToString() |]) connection
+        // http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.13
+        let! (_, connection) = asyncWriteLn (String.Concat [| "Content-Length: "; content.Length.ToString(); Bytes.eol |]) connection
+        if context.request.``method`` <> HttpMethod.HEAD && content.Length > 0 then
+          let! (_,connection) = asyncWriteBufferedBytes content connection
+          let! connection = flush connection
+          return connection
+        else
+          let! connection = flush connection
+          return connection
+      | None ->
+        // http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.13
+        let! (_, connection) = asyncWriteLn (String.Concat [| "Content-Length: "; content.Length.ToString(); Bytes.eol |]) connection
+        if context.request.``method`` <> HttpMethod.HEAD && content.Length > 0 then
+          let! (_,connection) = asyncWriteBufferedBytes content connection
+          let! connection = flush connection
+          return connection
+        else
+          let! connection = flush connection
+          return connection
       }
     | SocketTask f -> socket {
         return! f (context.connection, context.response)
       }
-    | NullContent -> socket.Return()
+    | NullContent -> socket { return context.connection }
 
-  let executeTask ctx r errorHandler = async {
+  let inline executeTask ctx r errorHandler = async {
     try
       let! q  = r
       return q
@@ -433,15 +450,18 @@ module internal ParsingAndControl =
 
   /// Check if the web part can perform its work on the current request. If it
   /// can't it will return None and the run method will return.
-  let internal run ctx (webPart : WebPart) = 
+  let inline run (webPart : WebPart) ctx = 
     socket {
       let! result = SocketOp.ofAsync <| executeTask ctx (webPart ctx) ctx.runtime.errorHandler
       match result with 
       | Some newCtx ->
         if newCtx.response.writePreamble then
-          do! writePreamble newCtx
-        do! writeContent newCtx newCtx.response.content
-        return Some newCtx
+          let! (_, connection) = writePreamble newCtx newCtx.connection
+          let! connection = writeContent { newCtx with connection = connection } newCtx.response.content
+          return Some { newCtx with connection = connection }
+        else
+          let! connection =  writeContent newCtx newCtx.response.content
+          return Some { newCtx with connection = connection }
       | None -> return None
   }
 
@@ -481,7 +501,7 @@ module internal ParsingAndControl =
         trace            = parseTraceHeaders headers }
 
     if request.headers %% "expect" = Choice1Of2 "100-continue" then
-      let! _ = run ctx <| Intermediate.CONTINUE
+      let! _ = run Intermediate.CONTINUE ctx
       verbose "sent 100-continue response"
 
     if ctx.runtime.parsePostData then
@@ -505,33 +525,10 @@ module internal ParsingAndControl =
 
   open System.Net.Sockets
 
-  /// response_f writes the HTTP headers regardles of the setting of context.writePreamble
-  /// it is currently only used in Proxy.fs
-  let response_f (context: HttpContext) = socket {
-    do! writePreamble context
-    do! writeContent context context.response.content
-    }
-
-  type HttpConsumer =
-    | WebPart of WebPart
-    | SocketPart of (HttpContext -> Async<(HttpContext -> SocketOp<HttpContext option>) option >)
-
-  let operate consumer ctx = socket {
-    match consumer with
-    | WebPart webPart ->
-      return! run ctx webPart
-    | SocketPart writer ->
-      let! intermediate = SocketOp.ofAsync <| writer ctx
-      match intermediate with
-      | Some task ->
-        return! task ctx
-      | None -> return Some ctx
-    }
-
-  let cleanResponse (ctx : HttpContext) =
+  let inline cleanResponse (ctx : HttpContext) =
     { ctx with response = HttpResult.empty }
 
-  let httpLoop (ctxOuter : HttpContext) (consumer : HttpConsumer) =
+  let httpLoop (ctxOuter : HttpContext) (consumer : WebPart) =
 
     let runtime = ctxOuter.runtime
 
@@ -548,7 +545,7 @@ module internal ParsingAndControl =
         match result with
         | None -> verbose "'result = None', exiting"
         | Some ctx ->
-          let! result'' = addKeepAliveHeader ctx |> operate consumer
+          let! result'' = addKeepAliveHeader ctx |> run consumer
           match result'' with
           | Choice1Of2 result -> 
             match result with
@@ -575,7 +572,7 @@ module internal ParsingAndControl =
         match err with
         | InputDataError msg ->
           verbose (sprintf "Error parsing http request: %s" msg)
-          let! result''' = run ctx (RequestErrors.BAD_REQUEST msg)
+          let! result''' = run (RequestErrors.BAD_REQUEST msg) ctx
           match result''' with
           | Choice1Of2 _ ->
             verbose "Exiting http loop"
@@ -591,9 +588,9 @@ module internal ParsingAndControl =
   /// incoming stream and possibly pass the request to the web parts, a protocol,
   /// a web part, an error handler and a Connection to use for read-write
   /// communication -- getting the initial request stream.
-  let requestLoop
+  let inline requestLoop
     (runtime    : HttpRuntime)
-    (consumer   : HttpConsumer)
+    (consumer   : WebPart)
     (connection : Connection) =
     let verbose  = Log.verbose runtime.logger "Suave.Web.httpLoop.loop" TraceHeader.empty
     async {
@@ -609,7 +606,7 @@ module internal ParsingAndControl =
 
   /// Starts a new web worker, given the configuration and a web part to serve.
   let startWebWorkerAsync (bufferSize, maxOps) (webpart : WebPart) (runtime : HttpRuntime) runServer =
-    startTcpIpServerAsync (requestLoop runtime (WebPart webpart))
+    startTcpIpServerAsync (requestLoop runtime webpart)
                           runtime.matchedBinding.socketBinding
                           runServer
 

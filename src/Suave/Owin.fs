@@ -755,7 +755,7 @@ module OwinApp =
           f >> LogLine.mk "Suave.Owin" LogLevel.Verbose ctx.request.trace None
         )
 
-      let impl (conn, response) : SocketOp<unit> = socket {
+      let impl (conn, response) : SocketOp<Connection> = socket {
         let owinRequestUri = UriBuilder ctx.request.url
 
         owinRequestUri.Path <-
@@ -782,10 +782,11 @@ module OwinApp =
         let ctx = wrapper.finalise()
 
         verbose (fun _ -> "writing preamble")
-        do! writePreamble ctx
+        let! (_, connection) = writePreamble ctx ctx.connection
 
         verbose (fun _ -> "writing body")
-        do! writeContent ctx ctx.response.content
+        let! connection = writeContent { ctx with connection = connection } ctx.response.content
+        return connection
       }
 
       { ctx with

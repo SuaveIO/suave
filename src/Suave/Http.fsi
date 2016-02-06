@@ -267,19 +267,19 @@ module Http =
     /// control the flow of bytes by using a SocketOp. Contrasting with Bytes,
     /// setting the HttpContent as this discriminated union type lets you stream
     /// data back to the client through Suave.
-    | SocketTask of (Connection * HttpResult -> SocketOp<unit>)
+    | SocketTask of (Connection * HttpResult -> SocketOp<Connection>)
 
     static member NullContent__  : (HttpContent -> unit option) * (unit -> HttpContent)
     static member Bytes__       : (HttpContent -> byte [] option) * (byte [] -> HttpContent)
-    static member SocketTask__  : (HttpContent -> (Connection * HttpResult -> SocketOp<unit>) option)
-                                * ((Connection * HttpResult -> SocketOp<unit>) -> HttpContent)
+    static member SocketTask__  : (HttpContent -> (Connection * HttpResult -> SocketOp<Connection>) option)
+                                * ((Connection * HttpResult -> SocketOp<Connection>) -> HttpContent)
 
     static member NullContent_ : (HttpContent -> unit option)
                                * (unit -> HttpContent -> HttpContent)
     static member Bytes_ : (HttpContent -> byte [] option)
                          * (byte [] -> HttpContent -> HttpContent)
-    static member SocketTask_ : (HttpContent -> (Connection * HttpResult -> SocketOp<unit>) option)
-                              * ((Connection * HttpResult -> SocketOp<unit>) -> HttpContent -> HttpContent)
+    static member SocketTask_ : (HttpContent -> (Connection * HttpResult -> SocketOp<Connection>) option)
+                              * ((Connection * HttpResult -> SocketOp<Connection>) -> HttpContent -> HttpContent)
 
   /// The HttpResult is the structure that you work with to tell Suave how to
   /// send the response. Have a look at the docs for HttpContent for further

@@ -140,3 +140,11 @@ module Utils =
   
   let trans (a : SocketAsyncEventArgs) =
     new ArraySegment<_>(a.Buffer, a.Offset, a.BytesTransferred)
+   
+  /// Makes sure the finalizer is called regardless of the result of executing body
+  let finalize (body: SocketOp<unit>) (finalizer: unit -> unit) =
+    async {
+      let! result = body
+      do finalizer()
+      return result
+      }

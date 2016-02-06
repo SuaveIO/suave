@@ -47,4 +47,5 @@ let counterDemo (req : HttpRequest) (out : Connection) =
         (lastEvtId - 1u)
 
     for a in actions do
-      do! a }
+      do! a
+    return out }

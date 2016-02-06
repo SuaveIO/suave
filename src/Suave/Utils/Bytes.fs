@@ -4,17 +4,26 @@ open System
 open System.IO
 open System.Text
 
-type BufferSegment =
-  { buffer : ArraySegment<byte>
-    offset : int
-    length : int }
+type BufferSegment = struct
+  val public buffer : ArraySegment<byte>
+  val public offset : int
+  val public length : int
+
+  new (buffer, offset, length) = {
+    buffer = buffer
+    offset = offset
+    length = length
+    }
+end
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module BufferSegment =
   
   let inline mk buffer offset length =
+    #if DEBUG
     if length < 0 then failwith (sprintf "BufferSegment.mk: length = %d < 0" length)
-    { buffer = buffer; offset = offset; length = length }
+    #endif
+    new BufferSegment(buffer, offset, length)
 
 module internal Bytes =
 
@@ -48,37 +57,9 @@ module internal Bytes =
   /// The corresponding EOL array segment
   let eolArraySegment = new ArraySegment<_>(EOL, 0, 2)
 
-  /// Asynchronously write from the 'from' stream to the 'to' stream, with an upper bound on
-  /// amount to transfer by len
-  let transferBounded (toStream : Stream) (from : Stream) len =
-    let bufSize = 0x2000
-    let buf = Array.zeroCreate<byte> bufSize
-    let rec doBlock left = async {
-      let! read = from.AsyncRead(buf, 0, Math.Min(bufSize, left))
-      if read <= 0 || left - read = 0 then
-        do! toStream.FlushAsync()
-        return ()
-      else
-        do! toStream.AsyncWrite(buf, 0, read)
-        return! doBlock (left - read) }
-    doBlock len
-
-  /// Asynchronously write from the 'from' stream to the 'to' stream.
-  let transfer (toStream : Stream) (from : Stream) =
-    let buf = Array.zeroCreate<byte> 0x2000
-    let rec doBlock () = async {
-      let! read = from.AsyncRead buf
-      if read <= 0 then
-        do! toStream.FlushAsync()
-        return ()
-      else
-        do! toStream.AsyncWrite(buf, 0, read)
-        return! doBlock () }
-    doBlock ()
-
   /// Knuth-Morris-Pratt algorithm
   /// http://caml.inria.fr/pub/old_caml_site/Examples/oc/basics/kmp.ml
-  let initNext p =
+  let inline initNext p =
     let m = Array.length p
     let next = Array.create m 0
     let i = ref 1
@@ -148,10 +129,7 @@ module internal Bytes =
       done;
       if !j >= m then Some(!i - m) else None
 
-  let kmpZ p =
-    let next = initNext p
-    let m = Array.length p
-    fun (xs : BufferSegment list) ->
+  let inline _kmpZ (p: byte []) (next: int []) m (xs : BufferSegment list) =
       let a = uniteArrayBufferSegment xs
       let n = List.fold (fun acc (x :  BufferSegment) -> acc + x.length) 0 xs
       let  i = ref 0
@@ -161,6 +139,11 @@ module internal Bytes =
         if !j = 0 then incr i else j := next.[!j]
       done;
       if !j >= m then Some(!i - m) else None
+
+  let kmpZ p (xs : BufferSegment list) =
+    let next = initNext p
+    let m = Array.length p
+    _kmpZ p next m xs
 
   let inline unite (a : ArraySegment<_>) (b : ArraySegment<_>) =
     fun (i : int) ->
