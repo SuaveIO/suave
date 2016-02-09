@@ -140,7 +140,6 @@
     <Compile Include="Owin.fs" />
     <Compile Include="WebSocket.fs" />
     <Compile Include="Json.fs" />
-    <Compile Include="Classic.fs" />
     <Compile Include="AssemblyVersionInfo.fs" Condition="Exists('AssemblyVersionInfo.fs')" />
     <None Include="paket.references" />
     <Content Include="App.config" />
