@@ -70,11 +70,7 @@ let inline tryThen (a : WebPart<'a>) (b : WebPart<'a>) : WebPart<'a> =
     async {
       let! e = a x
       match e with
-      | None ->
-        let! result = b x
-        match result with
-        | None -> return None
-        | r -> return r
+      | None -> return! b x
       | r -> return r
     }
 
