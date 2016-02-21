@@ -25,7 +25,7 @@ let applicativeTests cfg =
     
     testCase "url with spaces" <| fun _ ->
 
-      let res = runWithConfig (path "get by" >=> OK "A") |> req HttpMethod.GET "/get by" None
+      let res = runWithConfig (path "/get by" >=> OK "A") |> req HttpMethod.GET "/get by" None
       Assert.Equal("should return A", "A", res)
 
     testCase "when not matching on Host" <| fun _ ->
