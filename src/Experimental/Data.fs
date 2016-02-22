@@ -16,12 +16,14 @@ let eval<'T> (reader : DbDataReader) =
     let fieldCount = FSharpType.GetRecordFields(recordType).Length
     let vals = Array.create<obj> fieldCount null
     ignore (reader.GetValues(vals))
+    vals |> Array.iteri ( fun i x -> if x.GetType() = typeof<System.DBNull> then vals.[i] <- null)
     let dataObj = FSharpValue.MakeRecord(recordType, vals) :?> 'T
     dataObj
   else if FSharpType.IsTuple recordType then
     let fieldCount = FSharpType.GetTupleElements(recordType).Length
     let vals = Array.create<obj> fieldCount null
     ignore (reader.GetValues(vals))
+    vals |> Array.iteri ( fun i x -> if x.GetType() = typeof<System.DBNull> then vals.[i] <- null)
     let dataObj = FSharpValue.MakeTuple(vals, recordType) :?> 'T
     dataObj
   else
