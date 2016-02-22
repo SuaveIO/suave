@@ -22,6 +22,17 @@ let applicativeTests cfg =
     int binding.socketBinding.port
 
   testList "primitives: Host applicative" [
+    
+    testCase "url with spaces: path" <| fun _ ->
+
+      let res = runWithConfig (path "/get by" >=> OK "A") |> req HttpMethod.GET "/get by" None
+      Assert.Equal("should return A", "A", res)
+
+    testCase "url with spaces: pathScan" <| fun _ ->
+
+      let res = runWithConfig (pathScan "/foo/%s" (fun s -> OK s)) |> req HttpMethod.GET "/foo/get by" None
+      Assert.Equal("should return 'get buy'", "get by", res)
+
     testCase "when not matching on Host" <| fun _ ->
       let app = request (fun r -> OK r.host)
 
