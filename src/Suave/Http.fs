@@ -304,7 +304,6 @@ module Http =
       files           : HttpUpload list
       multiPartFields : (string * string) list
       trace           : TraceHeader }
-
     static member httpVersion_     = Property<HttpRequest,_> (fun x -> x.httpVersion) (fun v (x : HttpRequest) -> { x with httpVersion = v })
     static member url_             = Property<HttpRequest,_> (fun x -> x.url) (fun v x -> { x with url = v })
     static member host_            = Property<HttpRequest,_> (fun x -> x.host) (fun v x -> { x with host = v })
@@ -362,6 +361,9 @@ module Http =
 
     member x.clientHostTrustProxy =
       x.clientHost true [ "x-forwarded-host" ]
+
+    member x.path =
+      System.Web.HttpUtility.UrlDecode x.url.AbsolutePath
 
   [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
   module HttpRequest =

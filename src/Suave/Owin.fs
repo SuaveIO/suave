@@ -759,10 +759,10 @@ module OwinApp =
         let owinRequestUri = UriBuilder ctx.request.url
 
         owinRequestUri.Path <-
-          if ctx.request.url.AbsolutePath.StartsWith requestPathBase then
-            ctx.request.url.AbsolutePath.Substring requestPathBase.Length
+          if ctx.request.path.StartsWith requestPathBase then
+            ctx.request.path.Substring requestPathBase.Length
           else
-            ctx.request.url.AbsolutePath
+            ctx.request.path
 
         // disposable because it buffers what the OwinApp writes to the stream
         // also, OWIN expects the default HTTP status code to be 200 OK

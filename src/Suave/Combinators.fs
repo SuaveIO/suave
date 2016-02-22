@@ -249,10 +249,10 @@ module Filters =
       if b then Some x else None
 
   let path s (x : HttpContext) =
-    async.Return (Option.iff (s = x.request.url.AbsolutePath) x)
+    async.Return (Option.iff (s = x.request.path) x)
 
   let pathStarts s (x : HttpContext) =
-    async.Return (Option.iff (x.request.url.AbsolutePath.StartsWith s) x)
+    async.Return (Option.iff (x.request.path.StartsWith s) x)
 
   let url x = path x
 
@@ -263,7 +263,7 @@ module Filters =
     async.Return (Option.iff x.runtime.matchedBinding.scheme.secure x)
 
   let pathRegex regex (x : HttpContext) =
-    async.Return (Option.iff (Regex.IsMatch(x.request.url.AbsolutePath, regex)) x)
+    async.Return (Option.iff (Regex.IsMatch(x.request.path, regex)) x)
 
   let urlRegex x = pathRegex x
 
@@ -329,7 +329,7 @@ module Filters =
       with _ -> None
 
     let F (r:HttpContext) =
-      match scan r.request.url.AbsolutePath with
+      match scan r.request.path with
       | Some p ->
         let part = h p
         part r 
@@ -472,7 +472,7 @@ module Files =
         TraceHeader.empty
         (sprintf "Files.browse trying file (local file url:'%s' root:'%s')"
           ctx.request.url.AbsolutePath rootPath)
-      file (resolvePath rootPath ctx.request.url.AbsolutePath))
+      file (resolvePath rootPath ctx.request.path))
 
   let browseHome : WebPart =
     warbler (fun ctx -> browse ctx.runtime.homeDirectory)
@@ -480,9 +480,7 @@ module Files =
   let dir rootPath (ctx : HttpContext) =
     let req = ctx.request
 
-    let url = req.url
-
-    let dirname = resolvePath rootPath url.AbsolutePath
+    let dirname = resolvePath rootPath req.path
     let result = new StringBuilder()
 
     let filesize  (x : FileSystemInfo) =
@@ -578,7 +576,7 @@ module Embedded =
     resource defaultSourceAssembly name
 
   let browse assembly =
-    warbler (fun ctx -> resource assembly (ctx.request.url.AbsolutePath.TrimStart [|'/'|]))
+    warbler (fun ctx -> resource assembly (ctx.request.path.TrimStart [|'/'|]))
 
   let browseDefaultAsssembly =
     browse defaultSourceAssembly

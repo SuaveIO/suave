@@ -217,6 +217,9 @@ module Http =
     /// See docs on clientHost
     member clientHostTrustProxy : Host
 
+    /// path is equal to UrlDecode(url.AbsolutePath)
+    member path : string
+
   [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
   module HttpRequest =
     val empty : HttpRequest
