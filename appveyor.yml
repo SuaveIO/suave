@@ -2,10 +2,6 @@ version: 1.0.{build}
 
 environment:
   matrix:
-   - arch: "x86"
-     MSBUILD_PLATFORM: x86
-   - arch: "x64"
-     MSBUILD_PLATFORM: "Any CPU"
    - arch: "x64"
      MSBUILD_PLATFORM: "Any CPU"
      USE_DOTNET_CLI: 1
