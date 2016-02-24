@@ -618,7 +618,11 @@ module App =
 
   /// Get the assembly resource
   let resource name =
+#if DNXCORE50
+    let assembly = typeof<Random>.GetTypeInfo().Assembly
+#else
     let assembly = Assembly.GetExecutingAssembly ()
+#endif
     use stream = assembly.GetManifestResourceStream name
     if stream = null then
       assembly.GetManifestResourceNames()
