@@ -20,6 +20,7 @@
         "Utils/OpenMemoryStream.fs",
         "Utils/Property.fs",
         "Utils/Parse.fs",
+        "Utils/CultureInfoCache.fs",
         "Globals.fs",
         "CookieSerialiser.fs",
         "Logging/LogLevel.fs",
@@ -88,8 +89,6 @@
                 "System.Numerics": "",
                 "System.Runtime.Caching": "",
                 "System.Runtime.Serialization": "",
-                "System.Web": "",
-                "System.Web.Extensions": "",
                 "System.Xml": "",
             }
         }
