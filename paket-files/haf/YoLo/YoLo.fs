@@ -189,14 +189,23 @@ type Base64String = string
 module String =
   open System.IO
   open System.Security.Cryptography
+  open System.Globalization
 
   /// Also, invariant culture
   let equals (a : string) (b : string) =
+#if DNXCORE50
+    (CultureInfo.InvariantCulture.CompareInfo.GetStringComparer(CompareOptions.None)).Equals(a, b)
+#else
     a.Equals(b, StringComparison.InvariantCulture)
+#endif
 
   /// Also, invariant culture
   let equalsCaseInsensitve (a : string) (b : string) =
+#if DNXCORE50
+    (CultureInfo.InvariantCulture.CompareInfo.GetStringComparer(CompareOptions.IgnoreCase)).Equals(a, b)
+#else
     a.Equals(b, StringComparison.InvariantCultureIgnoreCase)
+#endif
     
   /// Compare ordinally with ignore case.
   let equalsOrdinalCI (str1 : string) (str2 : string) =
