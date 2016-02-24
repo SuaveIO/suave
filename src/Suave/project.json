@@ -69,6 +69,7 @@
         "dnxcore50": { 
             "dependencies": {
                 "System.Data.Common": "4.0.1-rc2-23811",
+                "System.Security.Cryptography.Primitives": "4.0.0-rc2-23811",
                 "System.IO.Compression": "4.1.0-rc2-23811",
                 "Microsoft.FSharp.Core.netcore": "1.0.0-alpha-151221",
                 "NETStandard.Library": "1.0.0-rc2-23811"
