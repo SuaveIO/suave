@@ -214,13 +214,13 @@ module internal ParsingAndControl =
 
   let readFilePart boundary ctx (headerParams : Dictionary<string,string>) fieldName contentType = socket {
     let tempFilePath = Path.GetTempFileName()
-    use tempFile = new FileStream(tempFilePath, FileMode.Truncate)
+    let tempFile = new FileStream(tempFilePath, FileMode.Truncate)
     let! a, connection =
       readUntil (ASCII.bytes (eol + boundary)) (fun x y -> async {
           do! tempFile.AsyncWrite(x.Array, x.Offset, y)
           }) ctx.connection
     let fileLength = tempFile.Length
-    tempFile.Close()
+    tempFile.Dispose()
 
     if fileLength > 0L then
       let! filename =
