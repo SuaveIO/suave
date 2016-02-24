@@ -363,7 +363,7 @@ module Http =
       x.clientHost true [ "x-forwarded-host" ]
 
     member x.path =
-      System.Web.HttpUtility.UrlDecode x.url.AbsolutePath
+      System.Net.WebUtility.UrlDecode x.url.AbsolutePath
 
   [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
   module HttpRequest =
