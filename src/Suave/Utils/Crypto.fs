@@ -80,7 +80,11 @@ type SecretboxDecryptionError =
   | AlteredOrCorruptMessage of string
 
 let private secretboxInit key iv =
+#if DNXCORE50
+  let aes = Aes.Create()
+#else
   let aes = new AesManaged()
+#endif
   aes.KeySize   <- int KeySize
   aes.BlockSize <- int BlockSize
   aes.Mode      <- CipherMode.CBC

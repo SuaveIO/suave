@@ -258,13 +258,25 @@ module Bytes =
     sha.ComputeHash ms
 
   let sha1 =
+#if DNXCORE50
+    hash (SHA1.Create())
+#else
     hash (new SHA1Managed())
+#endif
 
   let sha256 =
+#if DNXCORE50
+    hash (SHA256.Create())
+#else
     hash (new SHA256Managed())
+#endif
 
   let sha512 =
+#if DNXCORE50
+    hash (SHA512.Create())
+#else
     hash (new SHA512Managed())
+#endif
 
   let toHex (bs : byte[]) =
     BitConverter.ToString bs
