@@ -19,7 +19,11 @@ let HMACLength = 32us // = 256 / 8
 
 /// Calculate the HMAC of the passed data given a private key
 let hmacAtOffset (key : byte []) offset count (data : byte[]) =
+#if DNXCORE50
+  use hmac = new HMACSHA256()
+#else
   use hmac = HMAC.Create(HMACAlgorithm)
+#endif
   hmac.Key <- key
   hmac.ComputeHash (data, offset, count)
 
