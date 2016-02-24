@@ -303,8 +303,8 @@ module Filters =
       ctx.request.httpVersion
       ctx.response.status.code
       (match ctx.response.content with
-        | Bytes bs -> bs.LongLength
-        | _ -> 0L)
+        | Bytes bs -> bs.Length
+        | _ -> 0)
 
   let log (logger : Logger) (formatter : HttpContext -> string) (ctx : HttpContext) =
     logger.Log LogLevel.Debug <| fun _ ->
