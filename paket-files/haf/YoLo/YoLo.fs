@@ -612,7 +612,11 @@ module App =
 
   /// Gets the calling assembly's informational version number as a string
   let getVersion () =
+#if DNXCORE50
+    (typeof<Random>.GetTypeInfo().Assembly)
+#else
     Assembly.GetCallingAssembly()
+#endif
             .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
             .InformationalVersion
 
