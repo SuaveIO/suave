@@ -1410,6 +1410,7 @@ module Embedded =
   /// </remarks>
   val sendResource : source:Assembly -> resourceName:string -> compression:bool -> WebPart
 
+  #if !DNXCORE50
   /// <summary><para>
   /// Send an embedded resource as a response to the request
   /// </para><para>
@@ -1418,6 +1419,7 @@ module Embedded =
   /// <remarks>
   /// </remarks>
   val sendResourceFromDefaultAssembly : resourceName:string -> compression:bool -> WebPart
+  #endif
 
   /// <summary><para>
   /// Send the resource by the name given.
@@ -1427,6 +1429,7 @@ module Embedded =
   /// </remarks>
   val resource : source:Assembly -> name:string -> WebPart
 
+  #if !DNXCORE50
   /// <summary><para>
   /// Send the resource by the name given.
   /// Will also set the MIME type based on the file extension.
@@ -1434,6 +1437,7 @@ module Embedded =
   /// <remarks>
   /// </remarks>
   val resourceFromDefaultAssembly : name:string -> WebPart
+  #endif
 
   /// <summary><para>
   /// 'browse' the file in the sense that the contents of the file are sent based on the
@@ -1443,6 +1447,7 @@ module Embedded =
   /// </remarks>
   val browse : source:Assembly -> WebPart
 
+  #if !DNXCORE50
   /// <summary><para>
   /// 'browse' the file in the sense that the contents of the file are sent based on the
   /// request's Url property. Will serve from the executing assemblies resources.
@@ -1450,6 +1455,7 @@ module Embedded =
   /// <remarks>
   /// </remarks>
   val browseDefaultAsssembly : WebPart
+  #endif
 
 /// A module that implements the Server-Sent Event specification, which can be
 /// read at www.w3.org/TR/eventsource.
