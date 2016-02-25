@@ -590,7 +590,11 @@ module Http =
         logger            = Loggers.saneDefaultsFor LogLevel.Debug
         matchedBinding    = HttpBinding.defaults
         parsePostData     = false
+        #if DNXCORE50
+        cookieSerialiser  = new JsonFormatterSerialiser()
+        #else
         cookieSerialiser  = new BinaryFormatterSerialiser()
+        #endif
         tlsProvider       = null
         hideHeader        = false }
 
