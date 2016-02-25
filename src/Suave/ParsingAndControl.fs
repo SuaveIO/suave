@@ -610,9 +610,15 @@ module internal ParsingAndControl =
                           runtime.matchedBinding.socketBinding
                           runServer
 
+  open System.Reflection
+
   let resolveDirectory homeDirectory =
     match homeDirectory with
+#if DNXCORE50
+    | None   -> Path.GetDirectoryName(typeof<ScanResult>.GetTypeInfo().Assembly.Location)
+#else
     | None   -> Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location)
+#endif
     | Some s -> s
 
 ////////////////////////////////////////////////////

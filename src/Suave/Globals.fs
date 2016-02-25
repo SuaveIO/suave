@@ -21,7 +21,13 @@ open System
 open System.Reflection
 
 /// This returns the assembly version of Suave
+#if DNXCORE50
+type private ThisGlobal = { UsedByGetExecutingAssembly: string }
+
+let SuaveVersion = typeof<ThisGlobal>.GetTypeInfo().Assembly.GetName().Version.ToString()
+#else
 let SuaveVersion = Assembly.GetExecutingAssembly().GetName().Version.ToString()
+#endif
 
 /// This is the server header
 let ServerHeader = String.Concat [| "Server: Suave (https://suave.io)" |]

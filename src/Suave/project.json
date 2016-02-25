@@ -1,0 +1,97 @@
+{
+    "version": "1.0.0",
+    "compilationOptions": {
+    },
+
+    "compilerName": "fsc",
+    "compileFiles": [
+        "../../paket-files/haf/YoLo/YoLo.fs",
+        "Utils/Aether.fs",
+        "Utils/AsyncExtensions.fs",
+        "Utils/AsyncResultCell.fs",
+        "Utils/Collections.fs",
+        "Utils/ASCII.fs",
+        "Utils/Choice.fs",
+        "Utils/ThreadSafeRandom.fs",
+        "Utils/Bytes.fs",
+        "Utils/Compression.fs",
+        "Utils/Crypto.fs",
+        "Utils/Parsing.fs",
+        "Utils/OpenMemoryStream.fs",
+        "Utils/Property.fs",
+        "Utils/Parse.fs",
+        "Globals.fs",
+        "CookieSerialiser.fs",
+        "Logging/LogLevel.fs",
+        "Logging/TraceHeader.fs",
+        "Logging/LogLine.fs",
+        "Logging/Logger.fs",
+        "Log.fs",
+        "Sockets/SocketBinding.fs",
+        "Sockets/BufferManager.fs",
+        "Sockets/ConcurrentPool.fs",
+        "Sockets/AsyncUserToken.fs",
+        "Sockets/SocketOp.fs",
+        "Sockets/ITransport.fs",
+        "Sockets/TcpTransport.fs",
+        "Sockets/Connection.fs",
+        "Sockets/SocketMonad.fs",
+        "Sockets/AsyncSocket.fs",
+        "Sockets/TransportStream.fs",
+        "Tcp.fs",
+        "TcpServerFactory.fs",
+        "Sscanf.fs",
+        "WebPart.fsi",
+        "WebPart.fs",
+        "Operators.fs",
+        "Http.fsi",
+        "Http.fs",
+        "Headers.fs",
+        "DefaultTlsProvider.fs",
+        "Compression.fs",
+        "Combinators.fsi",
+        "Combinators.fs",
+        "Cookie.fsi",
+        "Cookie.fs",
+        "Model.fs",
+        "State.fs",
+        "Authentication.fsi",
+        "Authentication.fs",
+        "SuaveConfig.fs",
+        "ParsingAndControl.fs",
+        "Web.fs",
+        "Owin.fs",
+        "WebSocket.fs",
+        "Json.fs"
+    ],
+
+    "frameworks": {
+        "dnxcore50": { 
+            "dependencies": {
+                "System.Data.Common": "4.0.1-rc2-23811",
+                "System.Security.Cryptography.Primitives": "4.0.0-rc2-23811",
+                "System.IO.Compression": "4.1.0-rc2-23811",
+                "System.Net.Security": "4.0.0-rc2-23811",
+                "Microsoft.FSharp.Core.netcore": "1.0.0-alpha-151221",
+                "NETStandard.Library": "1.0.0-rc2-23811"
+            },
+        },
+        "net46" : { 
+            "dependencies": {
+                "FSharp.Core": "4.0.0.1"
+            },
+            "frameworkAssemblies": {
+                "System": "",
+                "System.Core": "",
+                "System.Data": "",
+                "System.Data.Linq": "",
+                "System.Numerics": "",
+                "System.Runtime.Caching": "",
+                "System.Runtime.Serialization": "",
+                "System.Web": "",
+                "System.Web.Extensions": "",
+                "System.Xml": "",
+            }
+        }
+    }
+}
