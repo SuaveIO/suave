@@ -238,11 +238,13 @@ module OwinApp =
   open Suave.ParsingAndControl
   open System.Text
   open System.Globalization
+
+  #if !DNXCORE50
   open System.Diagnostics
 
   /// http://www.tugberkugurlu.com/archive/logging-in-the-owin-world-with-microsoft-owin--introduction
   type TraceFactoryDelegate =
-    Func<string, Func<Diagnostics.TraceEventType, int, obj, Exception,
+    Func<string, Func<TraceEventType, int, obj, Exception,
                       Func<obj, Exception, string>,
                       bool>>
 
@@ -258,6 +260,7 @@ module OwinApp =
           true
       )
     new Func<_, _>(createLogger)
+  #endif
 
   let textWriter (suaveLogger : Logger) : IO.TextWriter =
     { new IO.TextWriter(CultureInfo.InvariantCulture) with
@@ -572,9 +575,11 @@ module OwinApp =
         // per-request storage
         OwinKey "suave.UserData",                           HttpContext.userState_ <--> untyped
 
+        #if !DNXCORE50
         // MSFT non standard
         // readable
         OwinKey OwinConstants.MSFT.traceFactoryDelegate,    HttpContext.runtime_ >--> HttpRuntime.logger_ >--> ((fun x -> traceFactory x), (fun v x -> x)) <--> untyped
+        #endif
       ]
 
   type internal OwinDictionary(requestPathBase, initialState) =
