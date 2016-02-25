@@ -269,6 +269,10 @@ module OwinApp =
           suaveLogger.Log LogLevel.Info (fun () ->
             LogLine.mk "Suave.Owin" LogLevel.Info TraceHeader.empty None str
           )
+        override x.Write (c : char) =
+          suaveLogger.Log LogLevel.Info (fun () ->
+            LogLine.mk "Suave.Owin" LogLevel.Info TraceHeader.empty None (c.ToString())
+          )
     }
 
   type private Clock = uint64
