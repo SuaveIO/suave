@@ -111,15 +111,15 @@ let owinUnit cfg =
         subj.["testing.MyKey"] <- "oh yeah"
         eq "read back" "oh yeah" (subj.["testing.MyKey"] |> unbox)
 
-      testCase "case insensitive lookup for OWIN key" <| fun _ ->
+      testCase "case sensitive lookup for OWIN key" <| fun _ ->
         let subj = createOwin ()
         subj.["owin.RequestPath"] <- "/owin"
-        eq "read back" "/owin" (subj.["owin.requestPath"] |> unbox)
+        eq "read back" "/owin" (subj.["owin.RequestPath"] |> unbox)
 
-      testCase "case insensitive lookup for custom key" <| fun _ ->
+      testCase "case sensitive lookup for custom key" <| fun _ ->
         let subj = createOwin ()
         subj.["testing.MyKey"] <- "oh yeah"
-        eq "read back" "oh yeah" (subj.["Testing.MyKey"] |> unbox)
+        eq "read back" "oh yeah" (subj.["testing.MyKey"] |> unbox)
     ]
 
     testList "OWIN response headers" [

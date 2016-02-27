@@ -280,7 +280,7 @@ module OwinApp =
 
     member inline x.Equals(other : string) =
       let (OwinKey key) = x
-      key.Equals(other, StringComparison.OrdinalIgnoreCase)
+      key.Equals(other, StringComparison.Ordinal)
 
     member inline x.Equals(OwinKey other) =
       x.Equals(other)
