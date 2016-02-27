@@ -46,9 +46,10 @@ let owinUnit cfg =
         let subject = create ["a", "a-1"]
         eq "has a" [|"a-1"|] subject.["a"]
 
-      testCase "case insensitive lookup" <| fun () ->
+      testCase "case sensitive lookup" <| fun () ->
         let subject = create ["a", "a-1"]
-        eq "has a" [|"a-1"|] subject.["A"]
+        eq "has a" [||] subject.["A"]
+        eq "has a" [|"a-1"|] subject.["a"]
 
       testCase "interaction set" <| fun _ ->
         let subject = create []
