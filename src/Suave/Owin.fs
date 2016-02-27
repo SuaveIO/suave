@@ -530,7 +530,7 @@ module OwinApp =
         OwinKey OwinConstants.responseStatusCode,   HttpContext.response_ >--> HttpResult.status_ >--> HttpStatus.code_ <--> untyped
         // TO CONSIDER: add support for modifying phrasing to Core?
         // writeable / value
-        OwinKey OwinConstants.responseReasonPhrase, constant "Changing the reason phrase is not supported in Suave"
+        OwinKey OwinConstants.responseReasonPhrase, HttpContext.response_ >--> HttpResult.status_ >--> HttpStatus.reason_ <--> untyped
         // writeable / value???
         OwinKey OwinConstants.responseProtocol,     HttpContext.request_ >--> HttpRequest.httpVersion_ >--> hv2p <--> untyped
         // !! mutation expected
