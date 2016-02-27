@@ -487,13 +487,6 @@ module OwinApp =
       ),
       (fun v x -> x |> Map.put "principal" (box v))
 
-    let i2sc : Property<HttpCode, int> =
-      (fun x -> x.code),
-      // NOTE: assumes user only sets valid codes
-      (fun v x -> HttpCode.tryParse v |> function
-        | Choice1Of2 x -> x
-        | Choice2Of2 err -> failwith err)
-
     let constant x =
       ((fun _ -> x),
        (fun v x -> x)
@@ -534,7 +527,7 @@ module OwinApp =
 
         // 3.2.2 Response Data
         // writeable / value
-        OwinKey OwinConstants.responseStatusCode,   HttpContext.response_ >--> HttpResult.status_ >--> i2sc <--> untyped
+        OwinKey OwinConstants.responseStatusCode,   HttpContext.response_ >--> HttpResult.status_ >--> HttpStatus.code_ <--> untyped
         // TO CONSIDER: add support for modifying phrasing to Core?
         // writeable / value
         OwinKey OwinConstants.responseReasonPhrase, constant "Changing the reason phrase is not supported in Suave"
@@ -772,7 +765,7 @@ module OwinApp =
             requestPathBase,
             { ctx with
                 request = { ctx.request with url = owinRequestUri.Uri }
-                response = { response with status = HTTP_200 } })
+                response = { response with status = HTTP_200.status } })
 
         do! wrapper.beStoic <| fun _ ->
           verbose (fun _ -> "yielding to OWIN middleware")

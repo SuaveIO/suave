@@ -61,6 +61,13 @@ module Http =
         | "OPTIONS" -> HttpMethod.OPTIONS
         | s         -> HttpMethod.OTHER s
 
+  type HttpStatus = 
+    { code   : int
+      reason : string
+    }
+    static member code_ = (fun x -> x.code), fun v x -> { x with code = v }
+    static member reason_ = (fun x -> x.reason), fun v x -> { x with reason = v }
+
   type HttpCode =
     | HTTP_100 | HTTP_101
     | HTTP_200 | HTTP_201 | HTTP_202 | HTTP_203 | HTTP_204 | HTTP_205 | HTTP_206
@@ -180,6 +187,8 @@ module Http =
 
     member x.describe () =
       sprintf "%d %s: %s" x.code x.reason x.message
+
+    member x.status = { code = x.code; reason = x.reason }
 
     static member tryParse (code : int) =
       let found =
@@ -448,7 +457,7 @@ module Http =
       Aether.idLens <-?> HttpContent.SocketTask__
 
   and HttpResult =
-    { status        : HttpCode
+    { status        : HttpStatus
       headers       : (string * string) list
       content       : HttpContent
       writePreamble : bool }
@@ -567,7 +576,7 @@ module Http =
 
     /// The empty HttpResult, with a 404 and a HttpContent.NullContent content
     let empty =
-      { status        = HTTP_404
+      { status        = HTTP_404.status
         headers       = []
         content       = HttpContent.NullContent
         writePreamble = true }
@@ -620,7 +629,7 @@ module Http =
         userState  = Map.empty
         runtime    = runtime
         connection = connection
-        response   = { status = HTTP_404
+        response   = { status = HTTP_404.status
                        headers = []
                        content = NullContent
                        writePreamble = writePreamble } }
