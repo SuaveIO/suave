@@ -294,7 +294,7 @@ module OwinApp =
 
     member inline x.CompareTo(other : string) =
       let (OwinKey key) = x
-      StringComparer.OrdinalIgnoreCase.Compare(key, other)
+      StringComparer.Ordinal.Compare(key, other)
 
     member inline x.CompareTo(OwinKey other) =
       x.CompareTo(other)
