@@ -244,6 +244,7 @@ let owinEndToEnd cfg =
     testCase "Completed Async signals completion with status code" <| fun _ ->
       let noContent (env : OwinEnvironment) =
         env.[OwinConstants.responseStatusCode] <- box 204
+        env.[OwinConstants.responseReasonPhrase] <- box "No Content"
         async.Return ()
 
       let composedApp =
@@ -258,6 +259,7 @@ let owinEndToEnd cfg =
     testCase "Completed Async signals completion with status code and headers" <| fun _ ->
       let noContent (env : OwinEnvironment) =
         env.[OwinConstants.responseStatusCode] <- box 204
+        env.[OwinConstants.responseReasonPhrase] <- box "No Content"
         let responseHeaders : IDictionary<string, string[]> = unbox env.[OwinConstants.responseHeaders]
         responseHeaders.["Content-Type"] <- [| "text/plain; charset=utf-8" |]
         async.Return ()
@@ -283,8 +285,7 @@ let owinEndToEnd cfg =
 
       let asserts (result : HttpResponseMessage) =
         eq "Http Status Code" HttpStatusCode.NoContent result.StatusCode
-        // TO CONSIDER: allow to change reason phrase
-        // eq "Reason Phrase" "Nothing to see here" result.ReasonPhrase
+        eq "Reason Phrase" "Nothing to see here" result.ReasonPhrase
 
       runWithConfig composedApp |> reqResp HttpMethod.GET "/" "" None None DecompressionMethods.GZip id asserts
 
@@ -292,6 +293,7 @@ let owinEndToEnd cfg =
       // This test case exists to show that a middleware will mount into Suave as an application.
       let noContent = OwinMidFunc(fun next -> OwinAppFunc(fun env ->
         env.[OwinConstants.responseStatusCode] <- box 204
+        env.[OwinConstants.responseReasonPhrase] <- box "No Content"
         Threading.Tasks.Task.FromResult() :> Threading.Tasks.Task
         ))
 
@@ -307,6 +309,7 @@ let owinEndToEnd cfg =
     testCase "Composed OWIN security middleware and app" <| fun _ ->
       let noContent = OwinAppFunc(fun env ->
         env.[OwinConstants.responseStatusCode] <- box 204
+        env.[OwinConstants.responseReasonPhrase] <- box "No Content"
         Threading.Tasks.Task.FromResult() :> Threading.Tasks.Task
         )
       
@@ -324,6 +327,7 @@ let owinEndToEnd cfg =
           task
         | _ ->
           env.[OwinConstants.responseStatusCode] <- box 401
+          env.[OwinConstants.responseReasonPhrase] <- box "Unauthorized"
           Threading.Tasks.Task.FromResult() :> Threading.Tasks.Task
         ))
 
@@ -348,6 +352,7 @@ let owinEndToEnd cfg =
         let requestPath : string = unbox env.[OwinConstants.requestPath]
         if requestPath <> "/app" then
           env.[OwinConstants.responseStatusCode] <- box 404
+          env.[OwinConstants.responseReasonPhrase] <- box "Not Found"
         else () // 200 OK
         async.Return ()
 
@@ -371,6 +376,7 @@ let owinEndToEnd cfg =
         let requestPath : string = unbox env.[OwinConstants.requestPath]
         if requestPath <> "/app" then
           env.[OwinConstants.responseStatusCode] <- box 404
+          env.[OwinConstants.responseReasonPhrase] <- box "Not Found"
         else () // 200 OK
         async.Return ()
 
