@@ -25,6 +25,16 @@ module Writers =
       { ctx with response = { ctx.response with status = s.status }}
       |> succeed
 
+  let setStatusCode (code : int) : WebPart = 
+    fun ctx ->
+      { ctx with response = { ctx.response with status = { ctx.response.status with code = code }}}
+      |> succeed
+
+  let setStatusReason (reason : string) : WebPart = 
+    fun ctx ->
+      { ctx with response = { ctx.response with status = { ctx.response.status with reason = reason }}}
+      |> succeed
+
   let setHeader key value (ctx : HttpContext) =
     { ctx with response = { ctx.response with headers = (key, value) :: (ctx.response.headers |> List.filter (fun (k,_) -> k <> key))  } }
     |> succeed
