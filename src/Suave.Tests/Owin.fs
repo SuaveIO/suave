@@ -33,7 +33,7 @@ let owinUnit cfg =
   let runWithConfig = runWith cfg
 
   let create (m : (string * string) list) =
-    OwinApp.DeltaDictionary(m) :> IDictionary<string, string[]>
+    dict(List.map (fun (a,b) -> a,[|b|]) m)// :> IDictionary<string, string[]>
 
   let createOwin () =
     let request = { HttpRequest.empty with ``method`` = HttpMethod.PUT }
