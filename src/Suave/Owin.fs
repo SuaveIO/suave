@@ -268,8 +268,6 @@ module OwinApp =
           )
     }
 
-  
-
   module internal SirLensALot =
 
     let untyped<'t> : Iso<'t, obj> =
@@ -415,6 +413,9 @@ module OwinApp =
 
   type HeadersDictionary = Dictionary<string, string[]>
 
+  let headersDictionary (a: (string * string) list) =
+    Dictionary (dict (Seq.map (fun (a,b) -> a,[|b|]) a), StringComparer.OrdinalIgnoreCase)
+
   type internal OwinDictionary(requestPathBase, initialState) =
     // TODO: support streaming optionally
       //let impl conn = AsyncSocket.transferStream conn v
@@ -425,8 +426,6 @@ module OwinApp =
     let state : HttpContext ref = ref initialState //externally owned
     let canDispose = ref true
 
-    let dict (a: (string * string) list) = Dictionary (dict (Seq.map (fun (a,b) -> a,[|b|]) a))
-
     // NOTE: I cannot make OwinDictionary immutable, because the Task OWIN returns doesn't have
     // a proper return value (only unit)
     //
@@ -435,7 +434,7 @@ module OwinApp =
     let requestHeadersLens : Property<(string * string) list, HeadersDictionary> =
       (fun x ->
         match !requestHeaders with
-                | None   -> let v = dict x in requestHeaders := Some v ; v
+                | None   -> let v = headersDictionary x in requestHeaders := Some v ; v
                 | Some v -> v),
       (fun v x ->
         match !requestHeaders with
@@ -446,7 +445,7 @@ module OwinApp =
     let responseHeadersLens : Property<(string * string) list, HeadersDictionary> =
       (fun x ->
         match !responseHeaders with
-                | None   -> let v = dict x in responseHeaders := Some v ; v
+                | None   -> let v = headersDictionary x in responseHeaders := Some v ; v
                 | Some v -> v),
       (fun v x ->
         match !responseHeaders with
@@ -478,16 +477,15 @@ module OwinApp =
     let owinMap = SirLensALot.owinMap cts.Token requestPathBase
                                       requestHeadersLens responseHeadersLens
                                       responseStreamLens onSendingHeadersLens
-    let owinKeys = owinMap |> List.map fst |> Set.ofSeq
-    let owinRW   = owinMap |> Map.ofList
 
-    let owinLensLens key : Lens<Map<string, Property<HttpContext, obj>>, Property<HttpContext, obj>> =
+    let owinRW   = Dictionary<string,Lens<HttpContext,obj>>(dict owinMap, StringComparer.Ordinal)
+
+    let owinLensLens key : Lens<Dictionary<string, Property<HttpContext, obj>>, Property<HttpContext, obj>> =
       let userDataItem_ = HttpContext.userState_ >--> SirLensALot.mapFindLens key <--> SirLensALot.untyped
       (fun x ->
-        x
-        |> Map.tryPick (fun k v -> if k.Equals(key) then Some v else None)
-        |> function | None -> userDataItem_
-                    | Some lens -> lens),
+        x.TryLookup key
+        |> function | Choice2Of2 _ -> userDataItem_
+                    | Choice1Of2 lens -> lens),
       (fun v x -> invalidOp "setting owin constants not supported")
 
     interface OwinRequest with
@@ -540,19 +538,20 @@ module OwinApp =
           state := Lens.set settable value !state
 
       member x.Keys =
-        owinKeys |> Set.map (fun (key) -> key) :> ICollection<_>
+        owinRW.Keys :> ICollection<_>
 
       member x.Values =
-        (owinRW |> Map.map (fun key valueLens -> Lens.get valueLens !state) :> IDictionary<_, _>).Values
+        let keyPairs = Seq.map (fun key -> key, Lens.get (owinRW.[key]) !state) owinRW.Keys
+        Dictionary<_,_>(dict keyPairs).Values :> ICollection<_>
 
       member x.ContainsKey k =
-        owinKeys.Contains(k)
+        owinRW.ContainsKey k
 
       member x.Add (key, v) =
         (x :> IDictionary<_, _>).[key] <- v
 
       member x.TryGetValue (key, [<Out>] res : byref<obj>) =
-        if owinKeys |> Set.contains (key) then
+        if owinRW.ContainsKey key then
           res <- (x :> IDictionary<_, _>).[key]
           true
         else
@@ -560,10 +559,10 @@ module OwinApp =
 
     interface ICollection<KeyValuePair<string, obj>> with
       member x.Add kvp = (x :> IDictionary<_, _>).Add(kvp.Key, kvp.Value)
-      member x.Count = owinKeys.Count
+      member x.Count = owinRW.Count
       member x.IsReadOnly = false
       member x.Clear() = invalidOp "Clear is not supported"
-      member x.Contains kvp = owinKeys.Contains(kvp.Key)
+      member x.Contains kvp = owinRW.ContainsKey(kvp.Key)
       member x.CopyTo (array, arrayIndex) = invalidOp "CopyTo is not supported"
       member x.Remove kvp = (x :> IDictionary<_, _>).Remove kvp.Key
 
