@@ -10,8 +10,6 @@ module internal ParsingAndControl =
   open System.Net.Sockets
   open System.Threading
   open System.Threading.Tasks
-  open System.Security.Permissions
-  open System.Security.Principal
   open System.Collections.Generic
 
   open Suave.Globals
@@ -214,13 +212,13 @@ module internal ParsingAndControl =
 
   let readFilePart boundary ctx (headerParams : Dictionary<string,string>) fieldName contentType = socket {
     let tempFilePath = Path.GetTempFileName()
-    use tempFile = new FileStream(tempFilePath, FileMode.Truncate)
+    let tempFile = new FileStream(tempFilePath, FileMode.Truncate)
     let! a, connection =
       readUntil (ASCII.bytes (eol + boundary)) (fun x y -> async {
           do! tempFile.AsyncWrite(x.Array, x.Offset, y)
           }) ctx.connection
     let fileLength = tempFile.Length
-    tempFile.Close()
+    tempFile.Dispose()
 
     if fileLength > 0L then
       let! filename =
@@ -610,9 +608,15 @@ module internal ParsingAndControl =
                           runtime.matchedBinding.socketBinding
                           runServer
 
+  open System.Reflection
+
   let resolveDirectory homeDirectory =
     match homeDirectory with
+#if DNXCORE50
+    | None   -> Path.GetDirectoryName(typeof<ScanResult>.GetTypeInfo().Assembly.Location)
+#else
     | None   -> Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location)
+#endif
     | Some s -> s
 
 ////////////////////////////////////////////////////

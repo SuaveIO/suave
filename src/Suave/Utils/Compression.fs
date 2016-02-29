@@ -6,9 +6,9 @@ open System.IO.Compression
 let private encode (mkStream : Stream * CompressionMode -> Stream) (bytes: byte[]) =
   if bytes.Length > 0 then
     use memory =  new MemoryStream()
-    use compressStream = mkStream(memory, CompressionMode.Compress)
+    let compressStream = mkStream(memory, CompressionMode.Compress)
     do compressStream.Write(bytes, 0, bytes.Length)
-    compressStream.Close()
+    compressStream.Dispose()
     memory.ToArray()
   else
     [||]

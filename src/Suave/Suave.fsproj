@@ -97,6 +97,7 @@
     <Compile Include="Utils\OpenMemoryStream.fs" />
     <Compile Include="Utils\Property.fs" />
     <Compile Include="Utils\Parse.fs" />
+    <Compile Include="Utils\CultureInfoCache.fs" />
     <Compile Include="Globals.fs" />
     <Compile Include="CookieSerialiser.fs" />
     <Compile Include="Logging\LogLevel.fs" />
@@ -153,8 +154,6 @@
     <Reference Include="System.Numerics" />
     <Reference Include="System.Runtime.Caching" />
     <Reference Include="System.Runtime.Serialization" />
-    <Reference Include="System.Web" />
-    <Reference Include="System.Web.Extensions" />
     <Reference Include="System.Xml" />
   </ItemGroup>
   <Choose>

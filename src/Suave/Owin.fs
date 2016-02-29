@@ -238,11 +238,13 @@ module OwinApp =
   open Suave.ParsingAndControl
   open System.Text
   open System.Globalization
+
+  #if !DNXCORE50
   open System.Diagnostics
 
   /// http://www.tugberkugurlu.com/archive/logging-in-the-owin-world-with-microsoft-owin--introduction
   type TraceFactoryDelegate =
-    Func<string, Func<Diagnostics.TraceEventType, int, obj, Exception,
+    Func<string, Func<TraceEventType, int, obj, Exception,
                       Func<obj, Exception, string>,
                       bool>>
 
@@ -258,6 +260,7 @@ module OwinApp =
           true
       )
     new Func<_, _>(createLogger)
+  #endif
 
   let textWriter (suaveLogger : Logger) : IO.TextWriter =
     { new IO.TextWriter(CultureInfo.InvariantCulture) with
@@ -265,6 +268,10 @@ module OwinApp =
         override x.WriteLine (str : string) =
           suaveLogger.Log LogLevel.Info (fun () ->
             LogLine.mk "Suave.Owin" LogLevel.Info TraceHeader.empty None str
+          )
+        override x.Write (c : char) =
+          suaveLogger.Log LogLevel.Info (fun () ->
+            LogLine.mk "Suave.Owin" LogLevel.Info TraceHeader.empty None (c.ToString())
           )
     }
 
@@ -406,9 +413,11 @@ module OwinApp =
         // per-request storage
         "suave.UserData",                           HttpContext.userState_ <--> untyped
 
+        #if !DNXCORE50
         // MSFT non standard
         // readable
         OwinConstants.MSFT.traceFactoryDelegate,    HttpContext.runtime_ >--> HttpRuntime.logger_ >--> ((fun x -> traceFactory x), (fun v x -> x)) <--> untyped
+        #endif
       ]
 
   type HeadersDictionary = Dictionary<string, string[]>

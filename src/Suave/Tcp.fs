@@ -27,7 +27,7 @@ type StartedData =
 let stopTcp (logger : Logger) reason (socket : Socket) =
   try
     Log.internf logger "Tcp.stopTcp" (fun fmt -> fmt "stopping tcp server, reason: '%s'" reason)
-    socket.Close()
+    socket.Dispose()
     "stopped tcp server" |> Log.intern logger "Tcp.stopTcp"
   with ex ->
     "failure stopping tcp server" |> Log.interne logger "Tcp.stopTcp" ex
@@ -124,7 +124,7 @@ let runServer logger maxConcurrentOps bufferSize autoGrow (binding: SocketBindin
               (acceptingConnections: AsyncResultCell<StartedData>) serveClient = async {
   try
 
-    let listenSocket = new Socket(binding.endpoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp)
+    use listenSocket = new Socket(binding.endpoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp)
     listenSocket.NoDelay <- true;
 
     let transportPool, bufferManager = createPools listenSocket logger maxConcurrentOps bufferSize autoGrow
@@ -132,7 +132,7 @@ let runServer logger maxConcurrentOps bufferSize autoGrow (binding: SocketBindin
     aFewTimes (fun () -> listenSocket.Bind binding.endpoint)
     listenSocket.Listen MaxBacklog
 
-    use! dd = Async.OnCancel(fun () -> stopTcp logger "tcpIpServer async cancelled" listenSocket)
+    use! disposable = Async.OnCancel(fun () -> stopTcp logger "tcpIpServer async cancelled" listenSocket)
     let! token = Async.CancellationToken
 
     let startData = { startData with socketBoundUtc = Some (Globals.utcNow()) }
