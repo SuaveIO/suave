@@ -99,11 +99,44 @@ let owinUnit cfg =
         | false, _ -> Tests.failtest "key 'a' not found"
     ]
 
+    // 3.2 Environment: Keys MUST be compared using StringComparer.Ordinal.
     testList "OwinDictionary" [
       testCase "read/write HttpMethod" <| fun _ ->
         let subj = createOwin ()
         eq "method" "PUT" (subj.[OwinConstants.requestMethod] |> unbox)
         subj.[OwinConstants.requestMethod] <- "get"
+
+      testCase "read request scheme" <| fun _ ->
+        let subj = createOwin ()
+        eq "request scheme" "http" (subj.[OwinConstants.requestScheme] |> unbox)
+
+      testCase "request uri matches original" <| fun _ ->
+        let requestUri = "http://localhost/path?q=a&b=c"
+        let subj =
+          let request =
+            { HttpRequest.empty with
+                url = Uri(requestUri)
+                headers = [("host","localhost")]
+                rawQuery = "q=a&b=c"
+              }
+          new OwinApp.OwinDictionary("", { HttpContext.empty with request = request })
+          :> IDictionary<string, obj>
+        let headers : IDictionary<string, string[]> =
+          unbox subj.[OwinConstants.requestHeaders]
+        let host : string =
+          if headers.ContainsKey("Host") then
+            headers.["Host"].[0]
+          else "localhost"
+        let queryString : string = 
+          unbox subj.[OwinConstants.requestQueryString]
+        let resultUri =
+          unbox subj.[OwinConstants.requestScheme] + "://" +
+          host +
+          unbox subj.[OwinConstants.requestPathBase] +
+          unbox subj.[OwinConstants.requestPath] +
+          if String.IsNullOrEmpty queryString then "" else "?" + queryString
+        eq "request uri" requestUri resultUri
+        eq "request path base" "" (unbox subj.[OwinConstants.requestPathBase])
 
       testCase "read/write custom" <| fun _ ->
         let subj = createOwin ()
@@ -131,6 +164,33 @@ let owinUnit cfg =
           | _ -> None
         Assert.Equal("TryGetValue should find custom key", Some "hello", hello)
 
+      testCase "interaction/set and retrieve with case insensitivity" <| fun _ ->
+        let subj = createOwin ()
+        subj.["testing.MyKey"] <- "oh yeah"
+        eq "read back" "oh yeah" (subj.["Testing.MyKey"] |> unbox)
+
+        subj.["Testing.MyKey"] <- "oh no"
+        eq "read again" "oh no" (subj.["testing.MyKey"] |> unbox)
+
+      testCase "try read/write custom" <| fun _ ->
+        let subj = createOwin ()
+        subj.["testing.MyKey"] <- "oh yeah"
+        eq "read back" (true, "oh yeah") (let succ, res = subj.TryGetValue("testing.MyKey") in succ, unbox res)
+
+      testCase "case sensitive try lookup for custom key" <| fun _ ->
+        let subj = createOwin ()
+        subj.["testing.MyKey"] <- "oh yeah"
+        eq "custom key found" false (subj.ContainsKey "Testing.MyKey")
+        eq "read back" (true, "oh yeah") (let succ, res = subj.TryGetValue("testing.MyKey") in succ, unbox res)
+
+      testCase "interaction/set and try retrieve with case sensitivity" <| fun _ ->
+        let subj = createOwin ()
+        subj.["testing.MyKey"] <- "oh yeah"
+        eq "custom key found" true (subj.ContainsKey "testing.MyKey")
+        eq "read back" (false, null) (let succ, res = subj.TryGetValue("Testing.MyKey") in succ, res)
+
+        subj.["Testing.MyKey"] <- "oh no"
+        eq "read again" (true, "oh no") (let succ, res = subj.TryGetValue("testing.MyKey") in succ, unbox res)
     ]
 
     testList "OWIN response headers" [
@@ -165,7 +225,6 @@ let owinUnit cfg =
         runWithConfig composedApp
         |> reqResp HttpMethod.GET "/owin" "" None None DecompressionMethods.GZip
                    id asserts
-
     ]
   ]
 
