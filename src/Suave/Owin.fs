@@ -554,6 +554,9 @@ module OwinApp =
         if owinRW.ContainsKey key then
           res <- (x :> IDictionary<_, _>).[key]
           true
+        elif ((!state).userState.ContainsKey key) then
+          res <- ((!state).userState).[key]
+          true
         else
           false
 

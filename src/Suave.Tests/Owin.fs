@@ -121,6 +121,16 @@ let owinUnit cfg =
         subj.["testing.MyKey"] <- "oh yeah"
         eq "read back" false (subj.ContainsKey("Testing.MyKey"))
         eq "read back" "oh yeah" (subj.["testing.MyKey"] |> unbox)
+
+      testCase "test for issue #387" <| fun _ ->
+        let subj = createOwin ()
+        subj.["someKey"] <- "hello"
+        let hello = 
+          match subj.TryGetValue "someKey" with
+          | true, o -> Some(unbox o)
+          | _ -> None
+        Assert.Equal("TryGetValue should find custom key", Some "hello", hello)
+
     ]
 
     testList "OWIN response headers" [
