@@ -538,14 +538,21 @@ module OwinApp =
           state := Lens.set settable value !state
 
       member x.Keys =
-        owinRW.Keys :> ICollection<_>
+        let unionKeys = seq {
+            for k in owinRW.Keys -> k
+            for k in ((!state).userState) -> k.Key
+          }
+        List<string>(unionKeys) :> ICollection<_>
 
       member x.Values =
-        let keyPairs = Seq.map (fun key -> key, Lens.get (owinRW.[key]) !state) owinRW.Keys
-        Dictionary<_,_>(dict keyPairs).Values :> ICollection<_>
+        let owinValues = Seq.map (fun key -> Lens.get (owinRW.[key]) !state) owinRW.Keys
+        let userValues = Seq.map (fun (a:KeyValuePair<_,_>) -> a.Value) (!state).userState
+        let unionValues = List<_>(owinValues) 
+        unionValues.AddRange userValues
+        unionValues :> ICollection<_>
 
       member x.ContainsKey k =
-        owinRW.ContainsKey k
+        owinRW.ContainsKey k || (!state).userState.ContainsKey k
 
       member x.Add (key, v) =
         (x :> IDictionary<_, _>).[key] <- v
@@ -565,7 +572,7 @@ module OwinApp =
       member x.Count = owinRW.Count
       member x.IsReadOnly = false
       member x.Clear() = invalidOp "Clear is not supported"
-      member x.Contains kvp = owinRW.ContainsKey(kvp.Key)
+      member x.Contains kvp = owinRW.ContainsKey(kvp.Key) || (!state).userState.ContainsKey kvp.Key
       member x.CopyTo (array, arrayIndex) = invalidOp "CopyTo is not supported"
       member x.Remove kvp = (x :> IDictionary<_, _>).Remove kvp.Key
 
