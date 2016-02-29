@@ -303,8 +303,8 @@ module Filters =
       ctx.request.httpVersion
       ctx.response.status.code
       (match ctx.response.content with
-        | Bytes bs -> bs.LongLength
-        | _ -> 0L)
+        | Bytes bs -> bs.Length
+        | _ -> 0)
 
   let log (logger : Logger) (formatter : HttpContext -> string) (ctx : HttpContext) =
     logger.Log LogLevel.Debug <| fun _ ->
@@ -485,7 +485,7 @@ module Files =
 
     let filesize  (x : FileSystemInfo) =
       if (x.Attributes ||| FileAttributes.Directory = FileAttributes.Directory) then
-        String.Format("{0,-14}",System.Web.HttpUtility.HtmlEncode("<DIR>"))
+        String.Format("{0,-14}",System.Net.WebUtility.HtmlEncode("<DIR>"))
       else
         String.Format("{0,14}", (new FileInfo(x.FullName)).Length)
 
@@ -516,11 +516,13 @@ module Embedded =
 
   open Response
   open ServeResource
-    
+  
+  #if !DNXCORE50
   let defaultSourceAssembly =
     if Assembly.GetEntryAssembly() = null
     then Assembly.GetCallingAssembly()
     else Assembly.GetEntryAssembly()
+  #endif
 
   let resources (assembly : Assembly) =
     assembly.GetManifestResourceNames()
@@ -561,8 +563,10 @@ module Embedded =
               content = SocketTask (writeResource resourceName) }}
     |> succeed
 
+  #if !DNXCORE50
   let sendResourceFromDefaultAssembly resourceName compression =
     sendResource defaultSourceAssembly resourceName compression
+  #endif
 
   let resource assembly name =
     resource
@@ -571,15 +575,19 @@ module Embedded =
       (fun _ -> lastModified assembly)
       (Path.GetExtension)
       (sendResource assembly)
-
+  
+  #if !DNXCORE50
   let resourceFromDefaultAssembly name =
     resource defaultSourceAssembly name
+  #endif
 
   let browse assembly =
     warbler (fun ctx -> resource assembly (ctx.request.path.TrimStart [|'/'|]))
 
+  #if !DNXCORE50
   let browseDefaultAsssembly =
     browse defaultSourceAssembly
+  #endif
 
 // See www.w3.org/TR/eventsource/#event-stream-interpretation
 module EventSource =

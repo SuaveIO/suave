@@ -18,7 +18,7 @@ let isLocalAddress (ip : string) =
 /// by the ampersand character.
 let parseData (s : string) =
   let parseArr (d : string array) =
-    if d.Length = 2 then (d.[0], Some <| System.Web.HttpUtility.UrlDecode(d.[1]))
+    if d.Length = 2 then (d.[0], Some <| System.Net.WebUtility.UrlDecode(d.[1]))
     else d.[0],None
   s.Split('&')
   |> Array.toList

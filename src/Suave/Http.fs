@@ -19,6 +19,8 @@ module Http =
   open Suave.Log
   open Suave.Logging
 
+  open Microsoft.FSharp.Reflection
+
   [<RequireQualifiedAccess>]
   type HttpMethod =
     | GET
@@ -196,8 +198,8 @@ module Http =
   and private HttpCodeStatics() =
     static member val mapCases : Lazy<Map<string,HttpCode>> =
       lazy
-        Microsoft.FSharp.Reflection.FSharpType.GetUnionCases(typeof<HttpCode>)
-        |> Array.map (fun case -> case.Name, Microsoft.FSharp.Reflection.FSharpValue.MakeUnion(case, [||]) :?> HttpCode)
+        FSharpType.GetUnionCases(typeof<HttpCode>)
+        |> Array.map (fun case -> case.Name, FSharpValue.MakeUnion(case, [||]) :?> HttpCode)
         |> Map.ofArray
 
   type HttpCookie =
@@ -363,7 +365,7 @@ module Http =
       x.clientHost true [ "x-forwarded-host" ]
 
     member x.path =
-      System.Web.HttpUtility.UrlDecode x.url.AbsolutePath
+      System.Net.WebUtility.UrlDecode x.url.AbsolutePath
 
   [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
   module HttpRequest =
@@ -588,7 +590,11 @@ module Http =
         logger            = Loggers.saneDefaultsFor LogLevel.Debug
         matchedBinding    = HttpBinding.defaults
         parsePostData     = false
+        #if DNXCORE50
+        cookieSerialiser  = new JsonFormatterSerialiser()
+        #else
         cookieSerialiser  = new BinaryFormatterSerialiser()
+        #endif
         tlsProvider       = null
         hideHeader        = false }
 

@@ -7,13 +7,10 @@ open System.IO
 
 /// An implementation of an "open" stream in that calls to Dispose and Close
 /// don't close the delegatee stream, taken as a parameter in the c'tor.
-type internal OpenStream<'T when 'T :> Stream>(stream : 'T) =
+type internal OpenStream(stream : MemoryStream) =
   inherit Stream()
 
   member internal x.stream = stream
-
-  override x.Close() =
-    ()
 
   member x.Dispose() =
     ()
@@ -24,6 +21,11 @@ type internal OpenStream<'T when 'T :> Stream>(stream : 'T) =
 
   member x.RealDispose() =
     stream.Dispose()
+
+  #if !DNXCORE50
+
+  override x.Close() =
+    ()
 
   override x.BeginRead(buffer, offset, count, callback, state) =
     stream.BeginRead(buffer, offset, count, callback, state)
@@ -36,6 +38,8 @@ type internal OpenStream<'T when 'T :> Stream>(stream : 'T) =
 
   override x.EndWrite ar =
     stream.EndWrite ar
+
+  #endif
 
   override x.CanRead =
     stream.CanRead
@@ -98,13 +102,15 @@ type internal OpenStream<'T when 'T :> Stream>(stream : 'T) =
     and set t = stream.WriteTimeout <- t
 
 type internal OpenMemoryStream() =
-  inherit OpenStream<MemoryStream>(new MemoryStream())
+  inherit OpenStream(new MemoryStream())
 
   member x.ToArray() =
     base.stream.ToArray()
-
+  
+  #if !DNXCORE50
   member x.GetBuffer() =
     base.stream.GetBuffer()
+  #endif
 
   member x.WriteTo(other : Stream) =
     base.stream.WriteTo other

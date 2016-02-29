@@ -27,3 +27,5 @@ paket.exe
 *.bak
 paket-files/
 docs/output/
+
+project.lock.json
