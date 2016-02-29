@@ -569,7 +569,7 @@ module OwinApp =
 
     interface ICollection<KeyValuePair<string, obj>> with
       member x.Add kvp = (x :> IDictionary<_, _>).Add(kvp.Key, kvp.Value)
-      member x.Count = owinRW.Count
+      member x.Count = owinRW.Count + (!state).userState.Count
       member x.IsReadOnly = false
       member x.Clear() = invalidOp "Clear is not supported"
       member x.Contains kvp = owinRW.ContainsKey(kvp.Key) || (!state).userState.ContainsKey kvp.Key
