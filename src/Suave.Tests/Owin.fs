@@ -190,7 +190,7 @@ let owinUnit cfg =
         eq "read back" (false, null) (let succ, res = subj.TryGetValue("Testing.MyKey") in succ, res)
 
         subj.["Testing.MyKey"] <- "oh no"
-        eq "read again" (true, "oh no") (let succ, res = subj.TryGetValue("testing.MyKey") in succ, unbox res)
+        eq "read again" (true, "oh no") (let succ, res = subj.TryGetValue("Testing.MyKey") in succ, unbox res)
     ]
 
     testList "OWIN response headers" [
