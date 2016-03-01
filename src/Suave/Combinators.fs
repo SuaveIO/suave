@@ -8,10 +8,10 @@ module Response =
   open System
   open System.IO
 
-  let response statusCode (cnt : byte []) =
+  let response (statusCode : HttpCode) (cnt : byte []) =
     fun (ctx : HttpContext) ->
       let response = 
-        { ctx.response with status = statusCode; content = Bytes cnt }
+        { ctx.response with status = statusCode.status; content = Bytes cnt }
       { ctx with response = response } |> succeed
 
 module Writers =
@@ -20,9 +20,19 @@ module Writers =
 
   open System
 
-  let setStatus s : WebPart = 
+  let setStatus (s : HttpCode) : WebPart = 
     fun ctx ->
-      { ctx with response = { ctx.response with status = s }}
+      { ctx with response = { ctx.response with status = s.status }}
+      |> succeed
+
+  let setStatusCode (code : int) : WebPart = 
+    fun ctx ->
+      { ctx with response = { ctx.response with status = { ctx.response.status with code = code }}}
+      |> succeed
+
+  let setStatusReason (reason : string) : WebPart = 
+    fun ctx ->
+      { ctx with response = { ctx.response with status = { ctx.response.status with reason = reason }}}
       |> succeed
 
   let setHeader key value (ctx : HttpContext) =
@@ -90,7 +100,7 @@ module Successful =
   open Response
     
   let ok s : WebPart = 
-    fun ctx -> { ctx with response = { ctx.response with status = HTTP_200; content = Bytes s }} |> succeed
+    fun ctx -> { ctx with response = { ctx.response with status = HTTP_200.status; content = Bytes s }} |> succeed
 
   let OK a = ok (UTF8.bytes a)
 
@@ -103,7 +113,7 @@ module Successful =
   let ACCEPTED s = accepted (UTF8.bytes s)
 
   let no_content : WebPart =
-    fun ctx -> { ctx with response = { status = HTTP_204; headers = ctx.response.headers; content = Bytes [||]; writePreamble = true }} |> succeed
+    fun ctx -> { ctx with response = { status = HTTP_204.status; headers = ctx.response.headers; content = Bytes [||]; writePreamble = true }} |> succeed
 
   let NO_CONTENT = no_content
 
@@ -138,7 +148,7 @@ module Redirection =
       url HTTP_302.message))
 
   let not_modified : WebPart =
-    fun ctx -> { ctx with response = {status = HTTP_304; headers = []; content = Bytes [||]; writePreamble = true }} |> succeed
+    fun ctx -> { ctx with response = {status = HTTP_304.status; headers = []; content = Bytes [||]; writePreamble = true }} |> succeed
 
   let NOT_MODIFIED : WebPart =
     not_modified
@@ -434,7 +444,7 @@ module Files =
     { ctx with
         response =
           { ctx.response with
-              status = HTTP_200
+              status = HTTP_200.status
               content = SocketTask (writeFile fileName) } }
     |> succeed
 
@@ -559,7 +569,7 @@ module Embedded =
     { ctx with
         response =
           { ctx.response with
-              status = HTTP_200
+              status = HTTP_200.status
               content = SocketTask (writeResource resourceName) }}
     |> succeed
 
@@ -665,7 +675,7 @@ module EventSource =
     { ctx with
         response =
           { ctx.response with
-              status = HTTP_200
+              status = HTTP_200.status
               headers =
                 ("Content-Type",                "text/event-stream; charset=utf-8")
                 :: ("Cache-Control",               "no-cache")

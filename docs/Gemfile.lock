@@ -141,6 +141,3 @@ DEPENDENCIES
   github-pages
   posix-spawn (= 0.3.8)
   rake
-
-BUNDLED WITH
-   1.10.6

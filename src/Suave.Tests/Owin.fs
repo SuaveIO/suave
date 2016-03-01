@@ -33,7 +33,7 @@ let owinUnit cfg =
   let runWithConfig = runWith cfg
 
   let create (m : (string * string) list) =
-    OwinApp.DeltaDictionary(m) :> IDictionary<string, string[]>
+    Dictionary(dict(List.map (fun (a,b) -> a,[|b|]) m), StringComparer.OrdinalIgnoreCase)
 
   let createOwin () =
     let request = { HttpRequest.empty with ``method`` = HttpMethod.PUT }
@@ -99,26 +99,98 @@ let owinUnit cfg =
         | false, _ -> Tests.failtest "key 'a' not found"
     ]
 
+    // 3.2 Environment: Keys MUST be compared using StringComparer.Ordinal.
     testList "OwinDictionary" [
       testCase "read/write HttpMethod" <| fun _ ->
         let subj = createOwin ()
         eq "method" "PUT" (subj.[OwinConstants.requestMethod] |> unbox)
         subj.[OwinConstants.requestMethod] <- "get"
 
+      testCase "read request scheme" <| fun _ ->
+        let subj = createOwin ()
+        eq "request scheme" "http" (subj.[OwinConstants.requestScheme] |> unbox)
+
+      testCase "request uri matches original" <| fun _ ->
+        let requestUri = "http://localhost/path?q=a&b=c"
+        let subj =
+          let request =
+            { HttpRequest.empty with
+                url = Uri(requestUri)
+                headers = [("host","localhost")]
+                rawQuery = "q=a&b=c"
+              }
+          new OwinApp.OwinDictionary("", { HttpContext.empty with request = request })
+          :> IDictionary<string, obj>
+        let headers : IDictionary<string, string[]> =
+          unbox subj.[OwinConstants.requestHeaders]
+        let host : string =
+          if headers.ContainsKey("Host") then
+            headers.["Host"].[0]
+          else "localhost"
+        let queryString : string = 
+          unbox subj.[OwinConstants.requestQueryString]
+        let resultUri =
+          unbox subj.[OwinConstants.requestScheme] + "://" +
+          host +
+          unbox subj.[OwinConstants.requestPathBase] +
+          unbox subj.[OwinConstants.requestPath] +
+          if String.IsNullOrEmpty queryString then "" else "?" + queryString
+        eq "request uri" requestUri resultUri
+        eq "request path base" "" (unbox subj.[OwinConstants.requestPathBase])
+
       testCase "read/write custom" <| fun _ ->
         let subj = createOwin ()
         subj.["testing.MyKey"] <- "oh yeah"
         eq "read back" "oh yeah" (subj.["testing.MyKey"] |> unbox)
 
-      testCase "case insensitive lookup for OWIN key" <| fun _ ->
+      testCase "case sensitive lookup for OWIN key" <| fun _ ->
         let subj = createOwin ()
         subj.["owin.RequestPath"] <- "/owin"
-        eq "read back" "/owin" (subj.["owin.requestPath"] |> unbox)
+        eq "read back" false (subj.ContainsKey("owin.requestPath"))
+        eq "read back" "/owin" (subj.["owin.RequestPath"] |> unbox)
 
-      testCase "case insensitive lookup for custom key" <| fun _ ->
+      testCase "case sensitive lookup for custom key" <| fun _ ->
+        let subj = createOwin ()
+        subj.["testing.MyKey"] <- "oh yeah"
+        eq "read back" false (subj.ContainsKey("Testing.MyKey"))
+        eq "read back" "oh yeah" (subj.["testing.MyKey"] |> unbox)
+
+      testCase "test for issue #387" <| fun _ ->
+        let subj = createOwin ()
+        subj.["someKey"] <- "hello"
+        let hello = 
+          match subj.TryGetValue "someKey" with
+          | true, o -> Some(unbox o)
+          | _ -> None
+        Assert.Equal("TryGetValue should find custom key", Some "hello", hello)
+
+      testCase "interaction/set and retrieve with case insensitivity" <| fun _ ->
         let subj = createOwin ()
         subj.["testing.MyKey"] <- "oh yeah"
         eq "read back" "oh yeah" (subj.["Testing.MyKey"] |> unbox)
+
+        subj.["Testing.MyKey"] <- "oh no"
+        eq "read again" "oh no" (subj.["testing.MyKey"] |> unbox)
+
+      testCase "try read/write custom" <| fun _ ->
+        let subj = createOwin ()
+        subj.["testing.MyKey"] <- "oh yeah"
+        eq "read back" (true, "oh yeah") (let succ, res = subj.TryGetValue("testing.MyKey") in succ, unbox res)
+
+      testCase "case sensitive try lookup for custom key" <| fun _ ->
+        let subj = createOwin ()
+        subj.["testing.MyKey"] <- "oh yeah"
+        eq "custom key found" false (subj.ContainsKey "Testing.MyKey")
+        eq "read back" (true, "oh yeah") (let succ, res = subj.TryGetValue("testing.MyKey") in succ, unbox res)
+
+      testCase "interaction/set and try retrieve with case sensitivity" <| fun _ ->
+        let subj = createOwin ()
+        subj.["testing.MyKey"] <- "oh yeah"
+        eq "custom key found" true (subj.ContainsKey "testing.MyKey")
+        eq "read back" (false, null) (let succ, res = subj.TryGetValue("Testing.MyKey") in succ, res)
+
+        subj.["Testing.MyKey"] <- "oh no"
+        eq "read again" (true, "oh no") (let succ, res = subj.TryGetValue("Testing.MyKey") in succ, unbox res)
     ]
 
     testList "OWIN response headers" [
@@ -153,7 +225,6 @@ let owinUnit cfg =
         runWithConfig composedApp
         |> reqResp HttpMethod.GET "/owin" "" None None DecompressionMethods.GZip
                    id asserts
-
     ]
   ]
 
@@ -244,6 +315,7 @@ let owinEndToEnd cfg =
     testCase "Completed Async signals completion with status code" <| fun _ ->
       let noContent (env : OwinEnvironment) =
         env.[OwinConstants.responseStatusCode] <- box 204
+        env.[OwinConstants.responseReasonPhrase] <- box "No Content"
         async.Return ()
 
       let composedApp =
@@ -258,6 +330,7 @@ let owinEndToEnd cfg =
     testCase "Completed Async signals completion with status code and headers" <| fun _ ->
       let noContent (env : OwinEnvironment) =
         env.[OwinConstants.responseStatusCode] <- box 204
+        env.[OwinConstants.responseReasonPhrase] <- box "No Content"
         let responseHeaders : IDictionary<string, string[]> = unbox env.[OwinConstants.responseHeaders]
         responseHeaders.["Content-Type"] <- [| "text/plain; charset=utf-8" |]
         async.Return ()
@@ -283,8 +356,7 @@ let owinEndToEnd cfg =
 
       let asserts (result : HttpResponseMessage) =
         eq "Http Status Code" HttpStatusCode.NoContent result.StatusCode
-        // TO CONSIDER: allow to change reason phrase
-        // eq "Reason Phrase" "Nothing to see here" result.ReasonPhrase
+        eq "Reason Phrase" "Nothing to see here" result.ReasonPhrase
 
       runWithConfig composedApp |> reqResp HttpMethod.GET "/" "" None None DecompressionMethods.GZip id asserts
 
@@ -292,6 +364,7 @@ let owinEndToEnd cfg =
       // This test case exists to show that a middleware will mount into Suave as an application.
       let noContent = OwinMidFunc(fun next -> OwinAppFunc(fun env ->
         env.[OwinConstants.responseStatusCode] <- box 204
+        env.[OwinConstants.responseReasonPhrase] <- box "No Content"
         Threading.Tasks.Task.FromResult() :> Threading.Tasks.Task
         ))
 
@@ -307,6 +380,7 @@ let owinEndToEnd cfg =
     testCase "Composed OWIN security middleware and app" <| fun _ ->
       let noContent = OwinAppFunc(fun env ->
         env.[OwinConstants.responseStatusCode] <- box 204
+        env.[OwinConstants.responseReasonPhrase] <- box "No Content"
         Threading.Tasks.Task.FromResult() :> Threading.Tasks.Task
         )
       
@@ -324,6 +398,7 @@ let owinEndToEnd cfg =
           task
         | _ ->
           env.[OwinConstants.responseStatusCode] <- box 401
+          env.[OwinConstants.responseReasonPhrase] <- box "Unauthorized"
           Threading.Tasks.Task.FromResult() :> Threading.Tasks.Task
         ))
 
@@ -348,6 +423,7 @@ let owinEndToEnd cfg =
         let requestPath : string = unbox env.[OwinConstants.requestPath]
         if requestPath <> "/app" then
           env.[OwinConstants.responseStatusCode] <- box 404
+          env.[OwinConstants.responseReasonPhrase] <- box "Not Found"
         else () // 200 OK
         async.Return ()
 
@@ -371,6 +447,7 @@ let owinEndToEnd cfg =
         let requestPath : string = unbox env.[OwinConstants.requestPath]
         if requestPath <> "/app" then
           env.[OwinConstants.responseStatusCode] <- box 404
+          env.[OwinConstants.responseReasonPhrase] <- box "Not Found"
         else () // 200 OK
         async.Return ()
 

@@ -29,6 +29,14 @@ module Http =
     /// Parse a string into a HttpMethod
     val parse : string -> HttpMethod
 
+  /// A HTTP status code and reason message
+  type HttpStatus = 
+    { code   : int
+      reason : string
+    }
+    static member code_ : Property<HttpStatus, int>
+    static member reason_ : Property<HttpStatus, string>
+
   /// The standard HTTP response codes
   type HttpCode =
     | HTTP_100 | HTTP_101
@@ -46,6 +54,8 @@ module Http =
     member message : string
 
     member describe : unit -> string
+
+    member status : HttpStatus
 
     static member tryParse : code:int -> Choice<HttpCode, string>
 
@@ -288,12 +298,12 @@ module Http =
   /// send the response. Have a look at the docs for HttpContent for further
   /// details on what is possible.
   and HttpResult =
-    { status        : HttpCode
+    { status        : HttpStatus
       headers       : (string * string) list
       content       : HttpContent
       writePreamble : bool }
 
-    static member status_ : Property<HttpResult,HttpCode>
+    static member status_ : Property<HttpResult,HttpStatus>
     static member headers_ : Property<HttpResult,(string * string) list>
     static member content_ : Property<HttpResult, HttpContent>
     static member writePreamble_ : Property<HttpResult, bool>
