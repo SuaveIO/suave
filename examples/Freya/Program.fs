@@ -37,7 +37,7 @@ module SampleApp =
     let home =
         freyaMachine {
             using http
-            //including common
+            including common
             methodsSupported GET
             handleOk ok }
 
