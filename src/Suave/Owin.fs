@@ -341,7 +341,7 @@ module OwinApp =
       ) <--> untyped
 
     let mapFindLens key : Property<Map<string, _>, _> =
-      (fun x -> x |> Map.pick (fun k v -> if k.Equals(key, StringComparison.OrdinalIgnoreCase) then Some v else None)),
+      (fun x -> x |> Map.pick (fun k v -> if k.Equals(key, StringComparison.Ordinal) then Some v else None)),
       (fun v x -> x |> Map.put key v)
 
     let stringlyTyped (toString : 'a -> string) (ofString : string -> 'a) : Iso<'a, string> =
