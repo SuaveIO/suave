@@ -59,6 +59,7 @@
         "Authentication.fsi",
         "Authentication.fs",
         "SuaveConfig.fs",
+        "HttpOutput.fs",
         "ParsingAndControl.fs",
         "Web.fs",
         "Owin.fs",
