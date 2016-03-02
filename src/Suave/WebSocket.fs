@@ -188,7 +188,7 @@ module WebSocket =
     socket {
       let webSocketHash = sha1 <| webSocketKey + magicGUID
       let handShakeToken = Convert.ToBase64String webSocketHash
-      let! something = ParsingAndControl.run (handShakeResponse handShakeToken) ctx
+      let! something = HttpOutput.run (handShakeResponse handShakeToken) ctx
       let webSocket = new WebSocket(ctx.connection)
       do! continuation webSocket ctx
     }

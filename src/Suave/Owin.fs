@@ -640,10 +640,10 @@ module OwinApp =
         let ctx = wrapper.finalise()
 
         verbose (fun _ -> "writing preamble")
-        let! (_, connection) = writePreamble ctx ctx.connection
+        let! (_, connection) = HttpOutput.writePreamble ctx ctx.connection
 
         verbose (fun _ -> "writing body")
-        let! connection = writeContent { ctx with connection = connection } ctx.response.content
+        let! connection = HttpOutput.writeContent { ctx with connection = connection } ctx.response.content
         return connection
       }
 

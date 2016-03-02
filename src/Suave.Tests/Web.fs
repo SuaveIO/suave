@@ -49,7 +49,7 @@ let keepAliveTests =
           "should add a keep-alive header to the response", { reqContext with response = { reqContext.response with headers = ("Connection","Keep-Alive") :: reqContext.response.headers } }
         else
           "should not modify the response headers", reqContext
-      let actual = addKeepAliveHeader reqContext
+      let actual = HttpOutput.addKeepAliveHeader reqContext
       Assert.Equal(message, expected.response.headers, actual.response.headers)
 
   testList "when processing keep-alive directives" [
