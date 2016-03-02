@@ -167,10 +167,18 @@ let owinUnit cfg =
       testCase "interaction/set and retrieve with case insensitivity" <| fun _ ->
         let subj = createOwin ()
         subj.["testing.MyKey"] <- "oh yeah"
-        eq "read back" "oh yeah" (subj.["Testing.MyKey"] |> unbox)
+
+        let upperCased = 
+          match subj.TryGetValue "Testing.MyKey" with
+          | true, o -> Some(unbox o)
+          | _ -> None
+
+        Assert.Equal("TryGetValue should not find upper cased key", None, upperCased)
+
+        eq "read back" "oh yeah" (subj.["testing.MyKey"] |> unbox)
 
         subj.["Testing.MyKey"] <- "oh no"
-        eq "read again" "oh no" (subj.["testing.MyKey"] |> unbox)
+        eq "read again" "oh no" (subj.["Testing.MyKey"] |> unbox)
 
       testCase "try read/write custom" <| fun _ ->
         let subj = createOwin ()
