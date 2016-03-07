@@ -8,7 +8,7 @@ Multiple bindings and SSL support
 Suave supports binding the application to multiple TCP/IP addresses and ports
 combinations. It also supports HTTPS via the interface `ITlsProvider`.
 
-There is an OpenSSL implementation at [https://github.com/SuaveIO/suave/tree/master/suave.OpenSsl](https://github.com/SuaveIO/suave/tree/master/suave.OpenSsl)
+There is an OpenSSL implementation at [https://github.com/SuaveIO/suave/tree/master/src/suave.OpenSsl](https://github.com/SuaveIO/suave/tree/master/src/suave.OpenSsl)
 
 {% highlight fsharp %}
 
