@@ -11,7 +11,7 @@ open System.Reflection
 open System.Text
 
 open Suave.Web
-open Suave.Html
+open Suave.Xml
 open Suave.Operators
 
 /// Load an object from its name

@@ -1,87 +1,85 @@
-﻿module Suave.Html
+module Suave.Html
 
 open System
 
 type Attribute = string * string
 
-/// Representation of the things that go into an HTML element
-type Element =
-  /// The element itself; a name, a xml namespace and an array of attribute-value pairs.
-  | Element of string * string * Attribute[]
-  /// A text element inside the HTML element
+type Element = string * string * Attribute[]
+/// A Node in Html have the following forms
+type Node =
+  /// A regular html element that can contain a list of other nodes
+  | Element of Element * Node list
+  /// A void element is one that can't have content, like link, br, hr, meta
+  /// See: https://dev.w3.org/html5/html-author/#void
+  | VoidElement of Element
+  /// A text value for a node
   | Text of string
   /// Whitespace for formatting
   | WhiteSpace of string
 
-/// XML is a list of nodes
-type Xml = Xml of Node list
-/// Each node has/is an element and then some other XML
-and Node = Element * Xml
-
-let tag tag attr (contents : Xml) = Xml [ (Element (tag,"", Array.ofList attr), contents) ]
-
-let empty = Xml[]
-
-let text s = Xml([Text s, Xml[]])
+let tag tag attr (contents : Node list) = Element ((tag,"", Array.ofList attr), contents)
+let voidTag tag attr = VoidElement (tag,"", Array.ofList attr)
+let text s = [Text s]
+let empty:Node list = []
 
 let emptyText = text ""
 
-/// HTML elements.
-/// If you need to pass attributes use the version sufixed by ` (funny quote symbol)
+let htmlAttr = tag "html"
+let html nodes = htmlAttr [ ] nodes
 
-/// Flattens an XML list
-let flatten xs = xs |> List.map (fun (Xml y) -> y) |> List.concat |> Xml
+let headAttr = tag "head"
+let head nodes = headAttr [ ] nodes
 
+let titleAttr attr s = tag "title" attr [(Text s)]
+let title = titleAttr [ ]
 
-let htmlAttr attr s = tag "html" attr s
-let html xs = htmlAttr [ ] (flatten xs)
+let scriptAttr = tag "script"
+let script = scriptAttr [ ]
 
-let headAttr attr s = tag "head" attr s
-let head xs = headAttr [ ] (flatten xs)
+let bodyAttr = tag "body"
+let body = bodyAttr [ ]
 
-let titleAttr attr s = tag "title" attr (Xml([Text s,Xml []]))
-let title  = titleAttr [ ]
+let divAttr = tag "div"
+let div = divAttr [ ]
 
-let linkAttr attr = tag "link" attr empty
-let link  = linkAttr [ ]
+let pAttr = tag "p"
+let p = pAttr [ ]
 
-let scriptAttr attr x = tag "script" attr (flatten x)
-let script  = scriptAttr [ ]
-
-let bodyAttr attr x = tag "body" attr (flatten x)
-let body  = bodyAttr [ ]
-
-let divAttr attr x = tag "div" attr (flatten x)
-let div  = divAttr [ ]
-
-let pAttr attr x = tag "p" attr (flatten x)
-let p  = pAttr [ ]
-
-let spanAttr attr x = tag "span" attr x
+let spanAttr = tag "span"
 let span  = spanAttr [ ]
 
 let imgAttr attr = tag "img" attr empty
 let img  = imgAttr [ ]
 
-let brAttr attr = tag "br" attr empty
-let br = brAttr [ ]
-
 let inputAttr attr = tag "input" attr empty
 let input = inputAttr [ ]
 
+// Void tags
+let linkAttr attr = voidTag "link" attr
+let link = linkAttr [ ]
+
+let metaAttr attr = voidTag "meta" attr
+let meta = linkAttr [ ]
+
+let hrAttr attr = voidTag "hr" attr
+let hr = linkAttr [ ]
+
+let brAttr attr = voidTag "br" attr
+let br = linkAttr [ ]
+
 /// Example
 
-let samplePage = 
-  html [ 
+let samplePage =
+  html [
     head [
       title "Little HTML DSL"
       linkAttr [ "rel", "https://instabt.com/instaBT.ico" ]
       scriptAttr [ "type", "text/javascript"; "src", "js/jquery-2.1.0.min.js" ] []
-      scriptAttr [ "type", "text/javascript" ] [ text "$().ready(function () { setup(); });" ]
-    ] 
+      scriptAttr [ "type", "text/javascript" ] (text "$().ready(function () { setup(); });" )
+    ]
     body [
-      divAttr ["id","content"] [ 
-        p [ text "Hello world." ]
+      divAttr ["id","content"] [
+        p (text "Hello world.")
         br
         imgAttr [ "src", "http://fsharp.org/img/logo/fsharp256.png"]
       ]
@@ -90,46 +88,30 @@ let samplePage =
 
 /// Rendering
 
-let internal leafElementToString = function
- | Text text -> text
- | WhiteSpace text -> text
- | Element (e,id, attributes) ->
-   if Array.length attributes = 0 then
-     sprintf "<%s/>" e
-   else
-     let ats = 
-       Array.map (fun (a,b) -> sprintf "%s=\"%s\"" a b) attributes
-       |> String.Concat
-     sprintf "<%s %s/>" e ats
+let rec htmlToString node =
 
-let internal beginElementToString = function
- | Text text -> failwith "invalid option"
- | WhiteSpace text -> failwith "invalid option"
- | Element (e,id, attributes) ->
-   if Array.length attributes = 0 then
-     sprintf "<%s>" e
-   else
-     let ats = 
-       Array.map (fun (a,b) -> sprintf "%s=\"%s\"" a b) attributes
-       |> String.Concat
-     sprintf "<%s %s>" e ats
+  let startElemToString (e, id, attributes) =
+    match attributes with
+    | [||] -> sprintf "<%s>" e
+    | xs ->
+      let attributeString =
+        attributes
+        |> Array.map (fun (k,v) -> sprintf "%s=\"%s\"" k v)
+        |> String.Concat
+      sprintf "<%s %s>" e attributeString
 
-let internal endElementToString = function
- | Text text -> failwith "invalid option"
- | WhiteSpace text -> failwith "invalid option"
- | Element (e,_, _) ->
-   sprintf "</%s>" e
+  let endElemToString (e, _, _) = sprintf "</%s>" e
 
-let rec internal nodeToString (element : Element, xml) =
-  match xml with
-  | Xml [] -> leafElementToString element
-  | _  ->
-    let inner = xmlToString xml
-    (beginElementToString element) + inner + (endElementToString element)
-
-and xmlToString (Xml xml) =
-  String.Concat (List.map nodeToString xml)
+  match node with
+  | Text text -> text
+  | WhiteSpace text -> text
+  | Element (e, nodes) ->
+    let inner = nodes |> List.map htmlToString |> String.Concat
+    let startTag = e |> startElemToString
+    let endTag = e |> endElemToString
+    sprintf "%s%s%s" startTag inner endTag
+  | VoidElement e -> e |> startElemToString
 
 ///
-/// let html = samplePage |> xmlToString
+///let sample = samplePage |> htmlToString
 ///

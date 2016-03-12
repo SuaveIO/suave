@@ -38,15 +38,15 @@ type Form<'a> = Form of FormProp<'a> list * ServerSideValidation<'a> list
 
 let formatDec (d : Decimal) = d.ToString(Globalization.CultureInfo.InvariantCulture)
 
-let (|Optional|_|) (typ : Type) = 
-  if typ.IsGenericType 
-     && typ.GetGenericTypeDefinition() = typedefof<option<_>> then 
+let (|Optional|_|) (typ : Type) =
+  if typ.IsGenericType
+     && typ.GetGenericTypeDefinition() = typedefof<option<_>> then
     Some(typ.GetGenericArguments().[0])
   else None
-  
+
 let private parse = function
 | Optional(t), "" -> Choice1Of2 None |> Choice.map box
-| Optional(genT), value -> 
+| Optional(genT), value ->
   match genT, value with
   | t, value when t = typeof<String> -> Choice1Of2 value |> Choice.map (Some >> box)
   | t, value when t = typeof<Password> -> Password value |> Choice1Of2 |> Choice.map (Some >> box)
@@ -62,7 +62,7 @@ let private parse = function
 
 let private validateSingle ((quotF, ((test, msg, _) : Validation<'b>)), value : 'a) =
   match quotF value with
-  | PropertyGet (Some (Value (:? 'a as v, _)), p, _) -> 
+  | PropertyGet (Some (Value (:? 'a as v, _)), p, _) ->
     let propVal = p.GetGetMethod().Invoke(v, [||]) :?> 'b
     if test propVal then Choice1Of2 value
     else Choice2Of2 (sprintf "%s %s" p.Name msg)
@@ -71,7 +71,7 @@ let private validateSingle ((quotF, ((test, msg, _) : Validation<'b>)), value : 
 let private getName (quotF : 'a -> Expr<'b>) =
   let n = Unchecked.defaultof<'a>
   match quotF n with
-  | PropertyGet (_, p, _) -> 
+  | PropertyGet (_, p, _) ->
     p.Name
   | _ -> failwith "unrecognized quotation"
 
@@ -80,9 +80,9 @@ let private validate ((quotF, validations), value : 'a) =
   |> List.fold
     (fun value validation ->
       value |> Choice.bind (fun value -> validateSingle ((quotF, validation), value)))
-    (Choice1Of2 value)  
+    (Choice1Of2 value)
 
-let private getQuotName = function 
+let private getQuotName = function
   | TextProp (q, _) -> getName q
   | PasswordProp (q, _) -> getName q
   | DecimalProp (q, _) -> getName q
@@ -111,8 +111,8 @@ let bindForm<'a> (form : Form<'a>) (req : HttpRequest) =
 
   binding {
     let! values = props |> bindMap getValue
-    let! recordFields = 
-      (types, values) 
+    let! recordFields =
+      (types, values)
       ||> List.zip
       |> bindMap parse
 
@@ -123,19 +123,19 @@ let bindForm<'a> (form : Form<'a>) (req : HttpRequest) =
       |> bindFold record (fun prop record -> validate' (prop, record))
     let! record =
       validations
-      |> bindFold 
-        record 
-        (fun (validation, msg) record -> 
-          if validation record 
-          then Choice1Of2 record 
+      |> bindFold
+        record
+        (fun (validation, msg) record ->
+          if validation record
+          then Choice1Of2 record
           else Choice2Of2 msg)
 
     return record
   }
 
-let maxLength max : Validation<string> = 
-  (fun s -> s.Length <= max), 
-  (sprintf "must be at most %d characters" max), 
+let maxLength max : Validation<string> =
+  (fun s -> s.Length <= max),
+  (sprintf "must be at most %d characters" max),
   ("maxlength", max.ToString())
 
 let matches pattern : Validation<string> =
@@ -158,9 +158,9 @@ let max max : Validation<decimal> =
   (sprintf "must be at most %M" max),
   ("max", formatDec max)
 
-let step step : Validation<decimal> = 
-  (fun d -> d % step = 0.0M), 
-  (sprintf "must be a multiply of %M" step), 
+let step step : Validation<decimal> =
+  (fun d -> d % step = 0.0M),
+  (sprintf "must be a multiply of %M" step),
   ("step", formatDec step)
 
 
@@ -193,11 +193,11 @@ let private getHtmlProps (Form (props,_)) (quotF : 'a -> Expr<'b>) : (string * s
 
 let input<'a, 'b> (quotF : 'a -> Expr<'b>) attrs (form : Form<'a>) =
   let name = getName quotF
-  let typ = 
+  let typ =
     match typeof<'b> with
-    | Optional(t) 
-    | t -> inputType t 
-  let required = 
+    | Optional(t)
+    | t -> inputType t
+  let required =
     match typeof<'b> with
     | Optional(_) -> []
     | _ -> ["required",""]
@@ -213,21 +213,21 @@ let private format : (obj -> string) = function
   | :? decimal as d -> formatDec d
   | t -> failwithf "unsupported type: %s" (t.GetType().FullName)
 
-let selectInput<'a, 'b when 'b : equality> 
-    (quotF : 'a -> Expr<'b>) 
+let selectInput<'a, 'b when 'b : equality>
+    (quotF : 'a -> Expr<'b>)
     (options : ('b * string) list)
-    (selected : 'b option) 
+    (selected : 'b option)
     (form : Form<'a>) =
-  let x = 
+  let x =
     options
     |> List.map (fun (value,txt) -> option (format value) txt (selected = Some value))
 
-  tag "select" ["name", getName quotF] (flatten x)
+  tag "select" ["name", getName quotF] x
 
 
 (*
 
-example: 
+example:
 
 type Register = {
   Username : string
@@ -238,10 +238,10 @@ type Register = {
 
 let pattern = @"(\w){6,20}"
 
-let passwordsMatch = 
+let passwordsMatch =
   (fun f -> f.Password = f.ConfirmPassword), "Passwords must match"
 
-let register : Form<Register> = 
+let register : Form<Register> =
   Form ([ TextProp ((fun f -> <@ f.Username @>), [ maxLength 30 ] )
       PasswordProp ((fun f -> <@ f.Password @>), [ passwordRegex pattern ] )
       PasswordProp ((fun f -> <@ f.ConfirmPassword @>), [ passwordRegex pattern ] )
