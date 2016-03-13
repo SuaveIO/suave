@@ -73,6 +73,7 @@
   <ItemGroup>
     <Compile Include="AssemblyVersionInfo.fs" Condition="Exists('AssemblyVersionInfo.fs')" />
     <Compile Include="Html.fs" />
+    <Compile Include="Xml.fs" />
     <Compile Include="Template.fs" />
     <Compile Include="Data.fs" />
     <Compile Include="Form.fs" />
