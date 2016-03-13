@@ -4,7 +4,7 @@ open System
 
 type Attribute = string * string
 
-type Element = string * string * Attribute[]
+type Element = string * Attribute[]
 /// A Node in Html have the following forms
 type Node =
   /// A regular html element that can contain a list of other nodes
@@ -17,8 +17,8 @@ type Node =
   /// Whitespace for formatting
   | WhiteSpace of string
 
-let tag tag attr (contents : Node list) = Element ((tag,"", Array.ofList attr), contents)
-let voidTag tag attr = VoidElement (tag,"", Array.ofList attr)
+let tag tag attr (contents : Node list) = Element ((tag, Array.ofList attr), contents)
+let voidTag tag attr = VoidElement (tag, Array.ofList attr)
 let text s = [Text s]
 let empty:Node list = []
 
@@ -90,7 +90,7 @@ let samplePage =
 
 let rec htmlToString node =
 
-  let startElemToString (e, id, attributes) =
+  let startElemToString (e, attributes) =
     match attributes with
     | [||] -> sprintf "<%s>" e
     | xs ->
@@ -100,7 +100,7 @@ let rec htmlToString node =
         |> String.Concat
       sprintf "<%s %s>" e attributeString
 
-  let endElemToString (e, _, _) = sprintf "</%s>" e
+  let endElemToString (e, _) = sprintf "</%s>" e
 
   match node with
   | Text text -> text
