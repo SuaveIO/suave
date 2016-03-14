@@ -45,6 +45,9 @@ let div = divAttr [ ]
 let pAttr = tag "p"
 let p = pAttr [ ]
 
+let aAttr href attr = tag "a" (("href",href)::attr)
+let a href = aAttr href [ ]
+
 let spanAttr = tag "span"
 let span  = spanAttr [ ]
 
