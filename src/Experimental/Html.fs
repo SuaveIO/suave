@@ -62,13 +62,13 @@ let linkAttr attr = voidTag "link" attr
 let link = linkAttr [ ]
 
 let metaAttr attr = voidTag "meta" attr
-let meta = linkAttr [ ]
+let meta = metaAttr [ ]
 
 let hrAttr attr = voidTag "hr" attr
-let hr = linkAttr [ ]
+let hr = hrAttr [ ]
 
 let brAttr attr = voidTag "br" attr
-let br = linkAttr [ ]
+let br = brAttr [ ]
 
 /// Example
 
