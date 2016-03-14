@@ -112,6 +112,8 @@ let rec htmlToString node =
     sprintf "%s%s%s" startTag inner endTag
   | VoidElement e -> e |> startElemToString
 
+let renderHtmlDocument document =
+  sprintf "<!DOCTYPE html>%s%s" (Environment.NewLine) (document |> htmlToString)
 ///
 ///let sample = samplePage |> htmlToString
 ///
