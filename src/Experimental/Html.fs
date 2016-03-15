@@ -45,6 +45,9 @@ let div = divAttr [ ]
 let pAttr = tag "p"
 let p = pAttr [ ]
 
+let aAttr href attr = tag "a" (("href",href)::attr)
+let a href = aAttr href [ ]
+
 let spanAttr = tag "span"
 let span  = spanAttr [ ]
 
@@ -59,13 +62,13 @@ let linkAttr attr = voidTag "link" attr
 let link = linkAttr [ ]
 
 let metaAttr attr = voidTag "meta" attr
-let meta = linkAttr [ ]
+let meta = metaAttr [ ]
 
 let hrAttr attr = voidTag "hr" attr
-let hr = linkAttr [ ]
+let hr = hrAttr [ ]
 
 let brAttr attr = voidTag "br" attr
-let br = linkAttr [ ]
+let br = brAttr [ ]
 
 /// Example
 
@@ -112,6 +115,8 @@ let rec htmlToString node =
     sprintf "%s%s%s" startTag inner endTag
   | VoidElement e -> e |> startElemToString
 
+let renderHtmlDocument document =
+  sprintf "<!DOCTYPE html>%s%s" (Environment.NewLine) (document |> htmlToString)
 ///
 ///let sample = samplePage |> htmlToString
 ///
