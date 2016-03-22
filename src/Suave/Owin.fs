@@ -613,7 +613,7 @@ module OwinApp =
       let ctx = x.finalise()
       // NOTE: if there is no content-lenght header we should buffer
       closeConnection <- not (List.exists (fun (p,q) -> String.equalsOrdinalCI p "content-length") ctx.response.headers)
-      let! (_, connection) = HttpOutput.writePreamble ctx ctx.connection
+      let! (_, connection) = HttpOutput.writePreamble [] ctx ctx.connection
       let! (_, connection) = AsyncSocket.asyncWriteLn "" connection
       let! connection = AsyncSocket.flush connection
       return connection
