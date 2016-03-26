@@ -92,6 +92,12 @@ let headers cfg =
         loop ((name, value) :: hdrs)
     loop []
 
+  let getRespHeaders key =
+    List.filter (fst >> (String.equalsCaseInsensitve key))
+
+  let getRespHeader key =
+    getRespHeaders key >> List.head
+
   testList "addHeader,setHeader,setHeaderValue tests" [
     testCase "setHeader adds header if it was not there" <| fun _ ->
       let ctx = runWithConfig (Writers.setHeader "X-Custom-Header" "value" >=> OK "test")
@@ -100,8 +106,8 @@ let headers cfg =
         let hdrs = requestHeaders ()
         Assert.Equal(
           "expecting header value",
-          ["X-Custom-Header", "value"],
-          hdrs |> List.filter (fun (n,_) -> n = "X-Custom-Header")))
+          [ "X-Custom-Header", "value" ],
+          hdrs |> getRespHeaders "X-Custom-Header"))
         ctx
 
     testCase "setHeader rewrites all instances of header with new single value" <| fun _ ->
@@ -116,8 +122,8 @@ let headers cfg =
         let hdrs = requestHeaders ()
         Assert.Equal(
           "expecting header value",
-          ["X-Custom-Header", "third"],
-          hdrs |> List.filter (fun (n,_) -> n = "X-Custom-Header")))
+          "third",
+          hdrs |> getRespHeader "X-Custom-Header" |> snd))
         ctx
 
     testCase "addHeader adds header and preserves the order" <| fun _ ->
@@ -131,8 +137,9 @@ let headers cfg =
         let hdrs = requestHeaders ()
         Assert.Equal(
           "expecting headers value",
-          ["X-Custom-Header", "first"; "X-Custom-Header", "second"],
-          hdrs |> List.filter (fun (n,_) -> n = "X-Custom-Header")))
+          [ "X-Custom-Header", "first"
+            "X-Custom-Header", "second"],
+          hdrs |> getRespHeaders "X-Custom-Header"))
         ctx
 
     testCase "setHeaderValue sets the first by-key found header's value so it includes the value" <| fun _ ->
@@ -160,7 +167,7 @@ let headers cfg =
         Assert.Equal(
           "expecting headers value",
           ["Vary", "Accept-Encoding,Accept-Language,Authorization,Cookie"],
-          hdrs |> List.filter (fun (n,_) -> n = "Vary")))
+          hdrs |> getRespHeaders "Vary"))
         ctx
 
     testCase "setHeaderValue only modifies ONE of the found headers; the first one" <| fun _ ->
@@ -176,9 +183,9 @@ let headers cfg =
         let hdrs = requestHeaders ()
         Assert.Equal(
           "expecting headers value",
-          [ "Vary", "Accept-Encoding,Authorization,Cookie"
+          [ "vary", "Accept-Encoding,Authorization,Cookie"
             "vary", "Accept-Language"
           ],
-          hdrs |> List.filter (fun (n,_) -> n = "Vary")))
+          hdrs |> getRespHeaders "Vary"))
         ctx
   ]
