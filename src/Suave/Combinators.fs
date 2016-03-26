@@ -39,7 +39,7 @@ module Writers =
   let setHeader key value (ctx : HttpContext) =
     let headers' =
       (key, value)
-      :: (ctx.response.headers |> List.filter (fun (k,_) -> k <> key))
+      :: (ctx.response.headers |> List.filter (fst >> String.equalsCaseInsensitve key >> not))
 
     { ctx with response = { ctx.response with headers = headers' } }
     |> succeed
@@ -50,7 +50,8 @@ module Writers =
         | [] ->
           [key, value]
 
-        | (existingKey, existingValue) :: hs when key = existingKey ->
+        | (existingKey, existingValue) :: hs
+          when String.equalsCaseInsensitve key existingKey ->
           // Deliberately side-stepping lowercase-uppercase and just doing a F# (=)
           // compare.
           // This can be changed via PR/discussion.

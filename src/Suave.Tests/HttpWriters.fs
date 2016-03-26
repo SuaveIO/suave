@@ -92,9 +92,8 @@ let headers cfg =
         loop ((name, value) :: hdrs)
     loop []
 
-  testList "Headers basic tests" [
+  testList "addHeader,setHeader,setHeaderValue tests" [
     testCase "setHeader adds header if it was not there" <| fun _ ->
-
       let ctx = runWithConfig (Writers.setHeader "X-Custom-Header" "value" >=> OK "test")
 
       withContext (fun _ ->
@@ -110,7 +109,7 @@ let headers cfg =
         runWithConfig
           (Writers.setHeader "X-Custom-Header" "first"
            >=> Writers.setHeader "X-Custom-Header" "second"
-           >=> Writers.setHeader "X-Custom-Header" "third"
+           >=> Writers.setHeader "x-custom-header" "third"
            >=> OK "test")
 
       withContext (fun _ ->
@@ -168,9 +167,9 @@ let headers cfg =
       let ctx =
         runWithConfig
           (Writers.addHeader "Vary" "Accept-Encoding"
-           >=> Writers.addHeader "Vary" "Accept-Language"
+           >=> Writers.addHeader "vary" "Accept-Language"
            >=> Writers.setHeaderValue "Vary" "Authorization"
-           >=> Writers.setHeaderValue "Vary" "Cookie"
+           >=> Writers.setHeaderValue "vary" "Cookie"
            >=> OK "test")
 
       withContext (fun _ ->
@@ -178,7 +177,7 @@ let headers cfg =
         Assert.Equal(
           "expecting headers value",
           [ "Vary", "Accept-Encoding,Authorization,Cookie"
-            "Vary", "Accept-Language"
+            "vary", "Accept-Language"
           ],
           hdrs |> List.filter (fun (n,_) -> n = "Vary")))
         ctx
