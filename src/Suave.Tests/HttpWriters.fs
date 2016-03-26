@@ -94,33 +94,92 @@ let headers cfg =
 
   testList "Headers basic tests" [
     testCase "setHeader adds header if it was not there" <| fun _ ->
+
       let ctx = runWithConfig (Writers.setHeader "X-Custom-Header" "value" >=> OK "test")
+
       withContext (fun _ ->
         let hdrs = requestHeaders ()
-        Assert.Equal("expecting header value"
-          , ["X-Custom-Header", "value"]
-          , hdrs |> List.filter (fun (n,_) -> n = "X-Custom-Header"))) ctx
+        Assert.Equal(
+          "expecting header value",
+          ["X-Custom-Header", "value"],
+          hdrs |> List.filter (fun (n,_) -> n = "X-Custom-Header")))
+        ctx
 
     testCase "setHeader rewrites all instances of header with new single value" <| fun _ ->
-      let ctx = runWithConfig (
-                  Writers.setHeader "X-Custom-Header" "first"
-                  >=> Writers.setHeader "X-Custom-Header" "second"
-                  >=> Writers.setHeader "X-Custom-Header" "third"
-                  >=> OK "test")
-      withContext (fun _ ->
-        let hdrs = requestHeaders ()
-        Assert.Equal("expecting header value"
-          , ["X-Custom-Header", "third"]
-          , hdrs |> List.filter (fun (n,_) -> n = "X-Custom-Header"))) ctx
+      let ctx =
+        runWithConfig
+          (Writers.setHeader "X-Custom-Header" "first"
+           >=> Writers.setHeader "X-Custom-Header" "second"
+           >=> Writers.setHeader "X-Custom-Header" "third"
+           >=> OK "test")
 
-    testCase "addHeader adds header and preserve order" <| fun _ ->
-      let ctx = runWithConfig (
-                  Writers.addHeader "X-Custom-Header" "first"
-                  >=> Writers.addHeader "X-Custom-Header" "second"
-                  >=> OK "test")
       withContext (fun _ ->
         let hdrs = requestHeaders ()
-        Assert.Equal("expecting headers value"
-          , ["X-Custom-Header", "first"; "X-Custom-Header", "second"]
-          , hdrs |> List.filter (fun (n,_) -> n = "X-Custom-Header"))) ctx
+        Assert.Equal(
+          "expecting header value",
+          ["X-Custom-Header", "third"],
+          hdrs |> List.filter (fun (n,_) -> n = "X-Custom-Header")))
+        ctx
+
+    testCase "addHeader adds header and preserves the order" <| fun _ ->
+      let ctx =
+        runWithConfig
+          (Writers.addHeader "X-Custom-Header" "first"
+           >=> Writers.addHeader "X-Custom-Header" "second"
+           >=> OK "test")
+
+      withContext (fun _ ->
+        let hdrs = requestHeaders ()
+        Assert.Equal(
+          "expecting headers value",
+          ["X-Custom-Header", "first"; "X-Custom-Header", "second"],
+          hdrs |> List.filter (fun (n,_) -> n = "X-Custom-Header")))
+        ctx
+
+    testCase "setHeaderValue sets the first by-key found header's value so it includes the value" <| fun _ ->
+      let ctx =
+        runWithConfig
+          (Writers.addHeader "Vary" "Accept-Encoding"
+           // e.g. in Suave.Locale:
+           >=> Writers.setHeaderValue "Vary" "Accept-Language"
+           // later, e.g. in Logibit.Hawk, since this turned out to be authenticated
+           // content:
+           >=> Writers.setHeaderValue "Vary" "Authorization"
+           // note on the above:
+           // with Hawk it will turn out to be a cache-busting mechanism since
+           // the Authorization header includes a nonce and a timestamp
+           // but it's the semantically correct interpretation.
+           // Meanwhile, the Cookie header gets changed as the cookie ages and
+           // expires.
+           >=> Writers.setHeaderValue "Vary" "Cookie"
+           // Note: it's up to the client to use optimistic concurrency control
+           // on its side for data requested under Hawk authorization
+           >=> OK "test")
+
+      withContext (fun _ ->
+        let hdrs = requestHeaders ()
+        Assert.Equal(
+          "expecting headers value",
+          ["Vary", "Accept-Encoding,Accept-Language,Authorization,Cookie"],
+          hdrs |> List.filter (fun (n,_) -> n = "Vary")))
+        ctx
+
+    testCase "setHeaderValue only modifies ONE of the found headers; the first one" <| fun _ ->
+      let ctx =
+        runWithConfig
+          (Writers.addHeader "Vary" "Accept-Encoding"
+           >=> Writers.addHeader "Vary" "Accept-Language"
+           >=> Writers.setHeaderValue "Vary" "Authorization"
+           >=> Writers.setHeaderValue "Vary" "Cookie"
+           >=> OK "test")
+
+      withContext (fun _ ->
+        let hdrs = requestHeaders ()
+        Assert.Equal(
+          "expecting headers value",
+          [ "Vary", "Accept-Encoding,Authorization,Cookie"
+            "Vary", "Accept-Language"
+          ],
+          hdrs |> List.filter (fun (n,_) -> n = "Vary")))
+        ctx
   ]

@@ -19,6 +19,7 @@ module Writers =
   // @ https://github.com/xyncro/aether and move closer to HttpContext.
 
   open System
+  open Suave.Utils
 
   let setStatus s : WebPart = 
     fun ctx ->
@@ -26,11 +27,41 @@ module Writers =
       |> succeed
 
   let setHeader key value (ctx : HttpContext) =
-    { ctx with response = { ctx.response with headers = (key, value) :: (ctx.response.headers |> List.filter (fun (k,_) -> k <> key))  } }
+    let headers' =
+      (key, value)
+      :: (ctx.response.headers |> List.filter (fun (k,_) -> k <> key))
+
+    { ctx with response = { ctx.response with headers = headers' } }
+    |> succeed
+
+  let setHeaderValue key value (ctx : HttpContext) =
+    let headers' =
+      let rec iter = function
+        | [] ->
+          [key, value]
+
+        | (existingKey, existingValue) :: hs when key = existingKey ->
+          // Deliberately side-stepping lowercase-uppercase and just doing a F# (=)
+          // compare.
+          // This can be changed via PR/discussion.
+          if Array.exists ((=) value) (String.splita ',' existingValue) then
+            ctx.response.headers
+          else
+            (key, String.Concat [| existingValue; ","; value |]) :: hs
+
+        | h :: hs ->
+          h :: iter hs
+
+      iter ctx.response.headers
+
+    { ctx with response = { ctx.response with headers = headers' } }
     |> succeed
 
   let addHeader key value (ctx : HttpContext) =
-    { ctx with response = { ctx.response with headers = List.append ctx.response.headers [key, value] } }
+    let headers' =
+       List.append ctx.response.headers [key, value]
+
+    { ctx with response = { ctx.response with headers = headers' } }
     |> succeed
 
   let setUserData key value (ctx : HttpContext) =
