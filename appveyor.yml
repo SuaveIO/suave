@@ -9,7 +9,7 @@ environment:
    - arch: "x64"
      MSBUILD_PLATFORM: "Any CPU"
      USE_DOTNET_CLI: 1
-     USE_DOTNET_CLI_VERSION: 1.0.0.001494
+     USE_DOTNET_CLI_VERSION: 1.0.0.001598
 
 install:
  - ps: Start-FileDownload 'https://github.com/libuv/libuv/archive/v1.7.5.zip'
