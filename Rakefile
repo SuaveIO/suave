@@ -73,8 +73,16 @@ task :libs do
     7z x v1.7.5.zip & cd libuv-1.7.5 & vcbuild.bat x86 shared debug
     mkdir src\\Suave.Tests\\bin\\Release\\ & cp libuv-1.7.5\\Debug\\libuv.dll src\\Suave.Tests\\bin\\Release\\libuv.dll
 
-  On Linux:
-    ...
+  On Linux Ubuntu/Debian:
+    sudo apt-get install automake libtool
+    curl -sSL https://github.com/libuv/libuv/archive/v1.7.5.tar.gz | sudo tar zxfv - -C /usr/local/src
+    cd /usr/local/src/libuv-1.7.5
+    sudo sh autogen.sh
+    sudo ./configure
+    sudo make 
+    sudo make install
+    sudo rm -rf /usr/local/src/libuv-1.7.5 && cd ~/
+    sudo ldconfig
   }
       end
     end
