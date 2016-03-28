@@ -4,12 +4,14 @@ require 'bundler/setup'
 
 require 'albacore'
 require 'albacore/nuget_model'
+require 'albacore/project'
+require 'albacore/tools'
 require 'albacore/tasks/versionizer'
 require 'albacore/tasks/release'
 require 'albacore/task_types/nugets_pack'
 require 'albacore/task_types/asmver'
 require 'albacore/ext/teamcity'
-
+require './tools/paket_pack'
 require 'semver'
 
 Albacore::Tasks::Versionizer.new :versioning
@@ -118,21 +120,42 @@ task :tests => [:'tests:stress', :'tests:unit']
 
 directory 'build/pkg'
 
-nugets_pack :create_nuget_quick => [:versioning, 'build/pkg'] do |p|
-  p.configuration = Configuration
-  p.files   = FileList['src/**/*.fsproj'].exclude(/Tests/)
-  p.out     = 'build/pkg'
-  p.exe     = 'packages/build/NuGet.CommandLine/tools/NuGet.exe'
-  p.with_metadata do |m|
-    m.version       = ENV['NUGET_VERSION']
-    m.authors       = 'Ademar Gonzalez, Henrik Feldt'
-    m.description   = suave_description
-    m.language      = 'en-GB'
-    m.copyright     = 'Ademar Gonzalez, Henrik Feldt'
-    m.license_url   = "https://github.com/SuaveIO/Suave/blob/master/COPYING"
-    m.project_url   = "http://suave.io"
-    m.icon_url      = 'https://raw.githubusercontent.com/SuaveIO/resources/master/images/head_trans.png'
-    # m.add_dependency 'Fuchu-suave', '0.5.0'
+task :create_nuget_quick => [:versioning, 'build/pkg'] do
+  projects = FileList['src/**/*.fsproj'].exclude(/Tests/)
+  knowns = Set.new(projects.map { |f| Albacore::Project.new f }.map { |p| p.id })
+  authors = "Ademar Gonzalez, Henrik Feldt"
+  projects.each do |f|
+    p = Albacore::Project.new f
+    n = create_nuspec p, knowns
+    d = get_dependencies n
+    fi = get_files n, p.proj_path_base
+    m = %{type file
+id #{p.id}
+version #{ENV['NUGET_VERSION']}
+title #{p.id}
+authors #{authors}
+owners #{authors}
+description #{suave_description}
+language en-GB
+copyright #{authors}
+licenseUrl https://github.com/SuaveIO/Suave/blob/master/COPYING
+projectUrl http://suave.io
+iconUrl https://raw.githubusercontent.com/SuaveIO/resources/master/images/head_trans.png
+files
+  #{p.proj_path_base}/bin/#{Configuration}/#{p.id}.* ==\> lib/net40
+releaseNotes
+  #{n.metadata.release_notes}
+dependencies
+  #{d}
+}
+    begin
+      File.open("paket.template", "w") do |template|
+        template.write m
+      end
+      system "tools/paket.exe", %w|pack output build/pkg|, clr_command: true
+    ensure
+      File.delete "paket.template"
+    end
   end
 end
 
