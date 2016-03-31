@@ -227,6 +227,37 @@ type OwinRequest =
   /// (Action<Action<obj>, obj>)
   abstract OnSendingHeaders<'State> : ('State -> unit) -> 'State -> unit
 
+type WebSocketFunc =
+        Func<IDictionary<string, obj>, Task>
+
+type WebSocketAccept =
+    Action<IDictionary<string, obj>, WebSocketFunc>
+
+type WebSocketSendAsync =
+        Func<ArraySegment<byte>,
+             int ,
+             bool ,
+             CancellationToken ,
+             Task>
+
+type WebSocketReceiveAsync =
+        Func<ArraySegment<byte> (* data *),
+             CancellationToken (* cancel *),
+             Task<Tuple<int (* messageType *),
+                        bool (* endOfMessage *),
+                        int (* count *)>>>
+
+type WebSocketReceiveTuple =
+        Tuple<int (* messageType *),
+              bool (* endOfMessage *),
+              int (* count *)>
+
+type WebSocketCloseAsync =
+        Func<int (* closeStatus *),
+             string (* closeDescription *),
+             CancellationToken (* cancel *),
+             Task>
+
 [<RequireQualifiedAccess>]
 [<CompilationRepresentation (CompilationRepresentationFlags.ModuleSuffix)>]
 module OwinApp =
@@ -348,6 +379,60 @@ module OwinApp =
       (fun x -> toString x),
       (fun v -> ofString v)
 
+    open WebSocket
+
+    let webSocketSendAsync (webSocket : WebSocket) =
+      new WebSocketSendAsync(
+        fun (data: ArraySegment<byte>) (messageType: int) fin ct -> 
+          let arr = Array.sub data.Array data.Offset data.Count
+          let send = webSocket.send (toOpcode (byte messageType)) arr fin
+          let task = Async.StartAsTask (send, TaskCreationOptions.None, ct)
+          task :> Task)
+
+    let webSocketReceiveAsync (webSocket : WebSocket) =
+      new WebSocketReceiveAsync(
+        fun (data: ArraySegment<byte>) ct -> 
+          let arr = Array.sub data.Array data.Offset data.Count
+          let receive = async {
+            let! result = webSocket.read ()
+            match result with
+            | Choice1Of2 (a,b,c) ->
+              Array.ConstrainedCopy(b, 0, data.Array, data.Offset, b.Length)
+              return Tuple<_,_,_>(int (fromOpcode a), true, b.Length)
+            | Choice2Of2 err ->
+              return failwith (err.ToString())
+            }
+          Async.StartAsTask (receive, TaskCreationOptions.None, ct))
+
+    let webSocketCloseAsync (webSocket : WebSocket) =
+      new WebSocketCloseAsync(
+        fun closeStatus closeDescription ct -> 
+          let close = async {
+            let! res = webSocket.send Close [||] true
+            return ()
+          }
+          Async.StartAsTask (close, TaskCreationOptions.None, ct) :> Task)
+
+    let continuation (runWebSocket : WebSocketFunc) (webSocket: WebSocket) ctx =
+      socket {
+        let webSocketDictionaryKeys = [
+          OwinConstants.WebSocket.version,       box "1.0"
+          OwinConstants.WebSocket.subProtocol,   box "TODO"
+          OwinConstants.WebSocket.sendAsync,     box (webSocketSendAsync webSocket)
+          OwinConstants.WebSocket.receiveAsync,  box (webSocketReceiveAsync webSocket)
+          OwinConstants.WebSocket.closeAsync,    box (webSocketCloseAsync webSocket)
+          OwinConstants.WebSocket.callCancelled, box (webSocketSendAsync webSocket)
+          ]
+        let dict = new Dictionary<string,obj>(Map.ofList webSocketDictionaryKeys)
+        let task = runWebSocket.Invoke dict
+        do! SocketOp.ofTask task
+      }
+
+    let webSocketAccept (ctx : HttpContext) : WebSocketAccept =
+
+      new Action<IDictionary<string, obj>, WebSocketFunc>
+        (fun dict runWebSocket -> WebSocket.handShake (continuation runWebSocket) ctx |> ignore)
+
     let owinMap ct requestPathBase
                 requestHeadersLens responseHeadersLens
                 responseStreamLens onSendingHeadersLens =
@@ -389,6 +474,9 @@ module OwinApp =
         // 3.2.3 Other Data
         OwinConstants.callCancelled,        constant ct // TODO: support cancellation token in HttpRequest signalling aborted request
         OwinConstants.owinVersion,          constant "1.3"
+
+        // Websocket
+        OwinConstants.WebSocket.accept,      ((fun x -> webSocketAccept x), (fun v x -> x)) <--> untyped
 
         // Common Keys
         OwinConstants.CommonKeys.addresses,         boundAddresses <--> untyped
