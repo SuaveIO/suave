@@ -84,6 +84,37 @@ let authenticate relativeExpiry secure
       decryptionFailure
       fSuccess)
 
+let internal validateAuthHeader validationFunction (ctx:HttpContext) =
+  let req = ctx.request
+  match req.header "authorization" with
+    | Choice1Of2 header ->
+      let (typ, username, password) = parseAuthenticationToken header
+      if (typ.Equals("basic")) && validationFunction (username,password) then
+        ASCII.bytes header |> Choice1Of2
+      else
+        challenge |> Choice2Of2
+    | Choice2Of2 _ ->
+      challenge |> Choice2Of2
+
+let authenticateBasicWithCookie relativeExpiry secure validationFunction (protectedPart:WebPart) =
+  let continuation =
+    context(fun ctx ->
+      match ctx.response.cookies |> readCookies ctx.runtime.serverKey SessionAuthCookie with
+      | Choice1Of2 (cookie, cookieValueBytes) ->
+        cookieValueBytes
+        |> ASCII.toString
+        |> parseAuthenticationToken
+        |> (fun(_,userName,_) -> addUserName userName ctx)
+        |> (fun ctx' -> (fun _ -> protectedPart ctx'))
+      | Choice2Of2 _ -> challenge)
+
+  context(fun ctx ->
+    authenticate relativeExpiry secure
+      (fun() -> validateAuthHeader validationFunction ctx)
+      (sprintf "%A" >> RequestErrors.BAD_REQUEST >> Choice2Of2)
+      continuation
+    )
+
 let authenticateWithLogin relativeExpiry loginPage fSuccess : WebPart =
   authenticate relativeExpiry false
                (fun () -> Choice2Of2(Redirection.FOUND loginPage))
@@ -100,7 +131,7 @@ let authenticated relativeExpiry secure : WebPart =
 
 //  let deauthenticate : WebPart =
 //    Cookies.unset_cookies
-  
+
 module HttpContext =
 
   let sessionId x =
