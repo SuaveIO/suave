@@ -15,14 +15,6 @@ install:
  - ps: Start-FileDownload 'https://github.com/libuv/libuv/archive/v1.7.5.zip'
  - cmd: 7z x v1.7.5.zip & cd libuv-1.7.5 & vcbuild.bat %arch% shared debug
  - cmd: mkdir src\Suave.Tests\bin\Release\ & cp libuv-1.7.5\Debug\libuv.dll src\Suave.Tests\bin\Release\libuv.dll
- 
-build_script:
- - cmd: gem sources -r https://rubygems.org/
- - cmd: gem install bundler --no-ri --no-rdoc --source http://rubygems.org/
- - cmd: bundle install
- - cmd: bundle exec rake appveyor
-
- # dotnet cli
  # Download install script to install .NET cli in .dotnet dir
  - ps: if ("$env:USE_DOTNET_CLI" -eq "1") { Invoke-WebRequest "https://raw.githubusercontent.com/dotnet/cli/rel/1.0.0/scripts/obtain/install.ps1" -OutFile ".\dotnet_cli_install.ps1" }
  - ps: if ("$env:USE_DOTNET_CLI" -eq "1") { $env:DOTNET_INSTALL_DIR = "$pwd\.dotnet" }
@@ -30,17 +22,21 @@ build_script:
  # set DOTNET_HOME env var and add dotnet bin to PATH
  - ps: if ("$env:USE_DOTNET_CLI" -eq "1") { $env:DOTNET_HOME = "$env:DOTNET_INSTALL_DIR\cli\bin" }
  - ps: if ("$env:USE_DOTNET_CLI" -eq "1") { $env:Path = "$env:DOTNET_HOME;$env:Path" }
+ 
+build_script:
+ - cmd: gem sources -r https://rubygems.org/
+ - cmd: gem install bundler --no-ri --no-rdoc --source http://rubygems.org/
+ - cmd: bundle install
+ - cmd: bundle exec rake appveyor
+ # dotnet cli
  # - restore
- - cmd: if "%USE_DOTNET_CLI%" == "1" dotnet restore
+ - cmd: if "%USE_DOTNET_CLI%" == "1" bundle exec rake dotnetcli:restore
  # - build Suave and test project
- - cmd: if "%USE_DOTNET_CLI%" == "1" cd "%APPVEYOR_BUILD_FOLDER%\src\Suave.DotnetCLI.Tests"
- - cmd: if "%USE_DOTNET_CLI%" == "1" dotnet build
+ - cmd: if "%USE_DOTNET_CLI%" == "1" bundle exec rake dotnetcli:build
  # - create Suave nugets packages
- - cmd: if "%USE_DOTNET_CLI%" == "1" cd "%APPVEYOR_BUILD_FOLDER%\src\Suave"
- - cmd: if "%USE_DOTNET_CLI%" == "1" dotnet pack -c Release
+ - cmd: if "%USE_DOTNET_CLI%" == "1" bundle exec rake dotnetcli:pack
  # - merge standard and dotnetcli nupkgs
- - cmd: if "%USE_DOTNET_CLI%" == "1" cd "%APPVEYOR_BUILD_FOLDER%"
- - cmd: if "%USE_DOTNET_CLI%" == "1" "dotnet mergenupkg --source build\pkg\Suave.2.0.0-alpha.nupkg --other src\Suave\bin\Release\Suave.2.0.0-alpha-dotnetcli.nupkg --framework netstandard1.5"
+ - cmd: if "%USE_DOTNET_CLI%" == "1" bundle exec rake dotnetcli:merge
  
 artifacts:
  - path: build\pkg\*.nupkg 
