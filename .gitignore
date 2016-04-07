@@ -29,3 +29,4 @@ paket-files/
 docs/output/
 
 project.lock.json
+*.project.lock.json
