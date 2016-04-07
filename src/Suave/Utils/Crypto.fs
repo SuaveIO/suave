@@ -19,7 +19,7 @@ let HMACLength = 32us // = 256 / 8
 
 /// Calculate the HMAC of the passed data given a private key
 let hmacAtOffset (key : byte []) offset count (data : byte[]) =
-#if DNXCORE50
+#if NETSTANDARD1_5
   use hmac = new HMACSHA256()
 #else
   use hmac = HMAC.Create(HMACAlgorithm)
@@ -84,7 +84,7 @@ type SecretboxDecryptionError =
   | AlteredOrCorruptMessage of string
 
 let private secretboxInit key iv =
-#if DNXCORE50
+#if NETSTANDARD1_5
   let aes = Aes.Create()
 #else
   let aes = new AesManaged()

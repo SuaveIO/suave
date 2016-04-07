@@ -21,7 +21,7 @@ open System
 open System.Reflection
 
 /// This returns the assembly version of Suave
-#if DNXCORE50
+#if NETSTANDARD1_5
 type private ThisGlobal = { UsedByGetExecutingAssembly: string }
 
 let SuaveVersion = typeof<ThisGlobal>.GetTypeInfo().Assembly.GetName().Version.ToString()

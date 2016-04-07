@@ -19,7 +19,7 @@ module Headers =
   /// Parse a culture info as given in the 'Accept-Language' Header field.
   let parseCultureInfo =
 
-  #if DNXCORE50
+  #if NETSTANDARD1_5
     let cultureNames =
       new System.Collections.Generic.HashSet<string>(Utils.CultureInfoCache.allCulturesList, System.StringComparer.OrdinalIgnoreCase)
   #else

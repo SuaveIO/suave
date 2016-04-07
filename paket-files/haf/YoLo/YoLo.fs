@@ -193,7 +193,7 @@ module String =
 
   /// Also, invariant culture
   let equals (a : string) (b : string) =
-#if DNXCORE50
+#if NETSTANDARD1_5
     (CultureInfo.InvariantCulture.CompareInfo.GetStringComparer(CompareOptions.None)).Equals(a, b)
 #else
     a.Equals(b, StringComparison.InvariantCulture)
@@ -201,7 +201,7 @@ module String =
 
   /// Also, invariant culture
   let equalsCaseInsensitve (a : string) (b : string) =
-#if DNXCORE50
+#if NETSTANDARD1_5
     (CultureInfo.InvariantCulture.CompareInfo.GetStringComparer(CompareOptions.IgnoreCase)).Equals(a, b)
 #else
     a.Equals(b, StringComparison.InvariantCultureIgnoreCase)
@@ -267,21 +267,21 @@ module Bytes =
     sha.ComputeHash ms
 
   let sha1 =
-#if DNXCORE50
+#if NETSTANDARD1_5
     hash (SHA1.Create())
 #else
     hash (new SHA1Managed())
 #endif
 
   let sha256 =
-#if DNXCORE50
+#if NETSTANDARD1_5
     hash (SHA256.Create())
 #else
     hash (new SHA256Managed())
 #endif
 
   let sha512 =
-#if DNXCORE50
+#if NETSTANDARD1_5
     hash (SHA512.Create())
 #else
     hash (new SHA512Managed())
@@ -612,7 +612,7 @@ module App =
 
   /// Gets the calling assembly's informational version number as a string
   let getVersion () =
-#if DNXCORE50
+#if NETSTANDARD1_5
     (typeof<Random>.GetTypeInfo().Assembly)
 #else
     Assembly.GetCallingAssembly()
@@ -622,7 +622,7 @@ module App =
 
   /// Get the assembly resource
   let resource name =
-#if DNXCORE50
+#if NETSTANDARD1_5
     let assembly = typeof<Random>.GetTypeInfo().Assembly
 #else
     let assembly = Assembly.GetExecutingAssembly ()

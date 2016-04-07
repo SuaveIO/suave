@@ -526,7 +526,7 @@ module internal ParsingAndControl =
 
   let resolveDirectory homeDirectory =
     match homeDirectory with
-#if DNXCORE50
+#if NETSTANDARD1_5
     | None   -> Path.GetDirectoryName(typeof<ScanResult>.GetTypeInfo().Assembly.Location)
 #else
     | None   -> Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location)

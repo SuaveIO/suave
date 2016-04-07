@@ -19,7 +19,7 @@ type DefaultTlsProvider() =
   interface TlsProvider with
     member this.wrap(connection : Connection, cert : obj) = socket {
       let sslStream = new SslStream(new TransportStream(connection.transport))
-      #if DNXCORE50
+      #if NETSTANDARD1_5
       do! SocketOp.ofTask <| sslStream.AuthenticateAsServerAsync (cert :?> X509Certificate)
       #else
       sslStream.AuthenticateAsServer (cert :?> X509Certificate)

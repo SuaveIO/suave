@@ -38,10 +38,12 @@ build_script:
  # - create Suave nugets packages
  - cmd: if "%USE_DOTNET_CLI%" == "1" cd "%APPVEYOR_BUILD_FOLDER%\src\Suave"
  - cmd: if "%USE_DOTNET_CLI%" == "1" dotnet pack -c Release
+ # - merge standard and dotnetcli nupkgs
+ - cmd: if "%USE_DOTNET_CLI%" == "1" cd "%APPVEYOR_BUILD_FOLDER%"
+ - cmd: if "%USE_DOTNET_CLI%" == "1" "dotnet mergenupkg --source build\pkg\Suave.2.0.0-alpha.nupkg --other src\Suave\bin\Release\Suave.2.0.0-alpha-dotnetcli.nupkg --framework netstandard1.5"
  
 artifacts:
  - path: build\pkg\*.nupkg 
- - path: src\Suave\bin\Release\*.nupkg 
 
 test:  off
 

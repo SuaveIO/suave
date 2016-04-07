@@ -67,8 +67,12 @@
         "Json.fs"
     ],
 
+    "tools": {
+        "dotnet-mergenupkg": { "target": "package", "version": "0.9.*" }	
+    },
+
     "frameworks": {
-        "dnxcore50": { 
+        "netstandard1.5": { 
             "dependencies": {
                 "System.Data.Common": "4.0.1-rc2-23811",
                 "System.Security.Cryptography.Primitives": "4.0.0-rc2-23811",
@@ -76,9 +80,13 @@
                 "System.Net.Security": "4.0.0-rc2-23811",
                 "Microsoft.FSharp.Core.netcore": "1.0.0-alpha-151221",
                 "NETStandard.Library": "1.0.0-rc2-23811",
-              "System.Security.Claims": "4.0.1-*",
-              "System.Runtime.Serialization.Json": "4.0.1-beta-23506"
-            }
+                "System.Security.Claims": "4.0.1-*",
+                "System.Runtime.Serialization.Json": "4.0.1-beta-23506"
+            },
+            "imports": [
+                "dnxcore50",
+                "portable-net45+win81"
+            ]
         },
         "net46" : { 
             "dependencies": {
