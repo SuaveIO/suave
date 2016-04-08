@@ -1,10 +1,5 @@
 {
     "version": "2.0.0-alpha-dotnetcli",
-    "compilationOptions": {
-        "define": [ 
-            "DNXCORE50"
-        ]
-    },
 
     "compilerName": "fsc",
     "compileFiles": [
@@ -76,6 +71,11 @@
 
     "frameworks": {
         "netstandard1.5": { 
+            "compilationOptions": {
+                "define": [
+                    "DNXCORE50"
+                ]
+            },
             "dependencies": {
                 "System.Data.Common": "4.0.1-rc2-23811",
                 "System.Security.Cryptography.Primitives": "4.0.0-rc2-23811",
