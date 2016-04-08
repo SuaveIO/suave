@@ -1,6 +1,9 @@
 {
     "version": "2.0.0-alpha-dotnetcli",
     "compilationOptions": {
+        "define": [ 
+            "DNXCORE50"
+        ]
     },
 
     "compilerName": "fsc",
