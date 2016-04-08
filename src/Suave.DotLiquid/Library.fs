@@ -87,6 +87,16 @@ let private loadTemplateCached =
 
 let mutable private templatesDir = None
 
+
+// Sets the DotLiquid naming convention to the Ruby style. F# values in camelCase
+// will be converted to not_camel_case in templates. This is the default
+let setRubyNamingConvention = 
+  Template.NamingConvention <- DotLiquid.NamingConventions.RubyNamingConvention()
+  
+// Sets the DotLiquid naming convetion to the CSharp style, will preserve camelCase
+let setCSharpNamingConvention = 
+  Template.NamingConvention <- DotLiquid.NamingConventions.CSharpNamingConvention()
+
 /// Set the root directory where DotLiquid is looking for templates. For example, you can 
 /// write something like this:
 ///
