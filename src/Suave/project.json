@@ -81,10 +81,10 @@
                 "System.Security.Cryptography.Primitives": "4.0.0-rc2-23811",
                 "System.IO.Compression": "4.1.0-rc2-23811",
                 "System.Net.Security": "4.0.0-rc2-23811",
-                "Microsoft.FSharp.Core.netcore": "1.0.0-alpha-151221",
+                "Microsoft.FSharp.Core.netcore": "1.0.0-alpha-160304",
                 "NETStandard.Library": "1.0.0-rc2-23811",
                 "System.Security.Claims": "4.0.1-*",
-                "System.Runtime.Serialization.Json": "4.0.1-beta-23506"
+                "System.Runtime.Serialization.Json": "4.0.1-beta-23516"
             },
             "imports": [
                 "dnxcore50",
