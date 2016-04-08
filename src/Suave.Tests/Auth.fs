@@ -106,7 +106,7 @@ let authTests cfg =
       let cookies = ctx |> reqCookies' HttpMethod.GET "/"  None
       Assert.NotNull("should have auth cookie", cookies.[SessionAuthCookie])
 
-    testCase "can access authenticated contents" <| fun _ ->
+    testCase "can access authenticated contents when authenticate, and not after deauthenticate" <| fun _ ->
       // given
       let ctx =
         runWithConfig (
@@ -119,6 +119,7 @@ let authTests cfg =
                                  Choice2Of2(FORBIDDEN "please authenticate"))
                                (fun _ -> Choice2Of2(BAD_REQUEST "did you fiddle with our cipher text?"))
                                (OK "You have reached the place of your dreams!")
+            path "/deauth" >=> deauthenticate() >=> OK "deauthed"
             NOT_FOUND "arghhh"
             ])
 
@@ -148,6 +149,12 @@ let authTests cfg =
         use res''' = interact HttpMethod.GET "/protected"
         Assert.Equal("should have access to protected", "You have reached the place of your dreams!", contentString res''')
         Assert.Equal("code 200 OK", HttpStatusCode.OK, statusCode res''')
+
+        use res'''' = interact HttpMethod.GET "/deauth"
+        Assert.Equal("should have logged out now", "deauthed", contentString res'''')
+
+        use res''''' = interact HttpMethod.GET "/protected"
+        Assert.Equal("should not have access to protected after logout","please authenticate", contentString res''''')
 
     testCase "test session is maintained across requests" <| fun _ ->
       // given
