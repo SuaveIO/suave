@@ -41,6 +41,13 @@ val authenticateWithLogin : relativeExpiry:CookieLife
                           -> fSuccess:WebPart
                           -> WebPart
 
+val deauthenticate : _
+                   -> WebPart
+
+val deauthenticateWithLogin : loginPage :string
+                            -> WebPart
+  
+
 /// Set server-signed cookies to make the response contain a cookie
 /// with a valid session id. It's worth having in mind that when you use this web
 /// part, you're setting cookies on the response; so you'll need to have the
