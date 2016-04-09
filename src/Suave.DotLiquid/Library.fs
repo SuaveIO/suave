@@ -88,21 +88,22 @@ let private loadTemplateCached =
 let mutable private templatesDir = None
 
 
-// Sets the DotLiquid naming convention to the Ruby style. F# values in camelCase
-// will be converted to not_camel_case in templates. This is the default
-let setRubyNamingConvention _ = 
+/// Sets the DotLiquid naming convention to the Ruby style. F# values in camelCase
+/// will be converted to not_camel_case in templates. This is the default
+let setRubyNamingConvention _ =
   Template.NamingConvention <- DotLiquid.NamingConventions.RubyNamingConvention()
-  
-// Sets the DotLiquid naming convetion to the CSharp style, will preserve camelCase
-let setCSharpNamingConvention _ = 
+
+/// Sets the DotLiquid naming convetion to the CSharp style, will preserve camelCase
+/// and should preserve whatever case convention you use
+let setCSharpNamingConvention _ =
   Template.NamingConvention <- DotLiquid.NamingConventions.CSharpNamingConvention()
 
-/// Set the root directory where DotLiquid is looking for templates. For example, you can 
+/// Set the root directory where DotLiquid is looking for templates. For example, you can
 /// write something like this:
 ///
 ///     DotLiquid.setTemplatesDir (__SOURCE_DIRECTORY__ + "/templates")
 ///
-/// The current directory is a global variable and so it should not change between 
+/// The current directory is a global variable and so it should not change between
 /// multiple HTTP requests. This is a DotLiquid limitation.
 let setTemplatesDir dir =
   if templatesDir <> Some dir then
@@ -114,10 +115,10 @@ let setTemplatesDir dir =
 /// any F# record type, seq<_> and list<_> without having to explicitly register the fields.
 ///
 ///     type Page = { Total : int }
-///     let app = page "index.html" { Total = 42 } 
+///     let app = page "index.html" { Total = 42 }
 ///
-let page<'T> path (model : 'T) r = async {  
-  let path = 
+let page<'T> path (model : 'T) r = async {
+  let path =
     match templatesDir with
     | None -> resolvePath r.runtime.homeDirectory path
     | Some root -> Path.Combine(root, path)
@@ -128,7 +129,7 @@ let page<'T> path (model : 'T) r = async {
 /// Register functions from a module as filters available in DotLiquid templates.
 /// For example, the following snippet lets you write `{{ model.Total | nuce_num }}`:
 ///
-///     module MyFilters = 
+///     module MyFilters =
 ///       let niceNum i = if i > 10 then "lot" else "not much"
 ///
 ///     do registerFiltersByName "MyFilters"
