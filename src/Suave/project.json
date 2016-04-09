@@ -78,16 +78,15 @@
             },
             "dependencies": {
                 "System.Data.Common": "4.0.1-rc2-23911",
-                "System.Diagnostics.Process": "4.1.0-rc-23911",
+                "System.Diagnostics.Process": "4.1.0-rc2-23925",
                 "System.Security.Cryptography.Primitives": "4.0.0-rc2-23911",
                 "System.IO.Compression": "4.1.0-rc2-23911",
                 "System.Net.Security": "4.0.0-rc2-23911",
-                "System.Globalization": "4.0.11-rc3-24008-00",
                 "System.Globalization.Extensions": "4.0.1-rc2-23911",
                 "Microsoft.FSharp.Core.netcore": "1.0.0-alpha-160316",
                 "NETStandard.Library": "1.5.0-rc2-23911",
                 "System.Security.Claims": "4.0.1-*",
-                "System.Runtime.Serialization.Json": "4.0.1-beta-23516"
+                "System.Runtime.Serialization.Json": "4.0.2-rc2-23911"
             },
             "imports": [
                 "dnxcore50",
