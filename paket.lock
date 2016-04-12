@@ -12,12 +12,6 @@ GITHUB
   remote: haf/YoLo
   specs:
     YoLo.fs (0d120146e4c558b1b7cb1763161dcf33e31de22b)
-GROUP Build
-NUGET
-  remote: https://nuget.org/api/v2
-  specs:
-    NuGet.CommandLine (3.3.0)
-
 GROUP Docs
 FRAMEWORK: NET45
 NUGET
