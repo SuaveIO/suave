@@ -6,6 +6,9 @@ open Suave.RequestErrors
 open Suave.Utils
 open Suave.Logging
 open Suave.Cookie
+open Suave.State.CookieStateStore
+open Suave.Operators
+
 
 let UserNameKey = "userName"
 
@@ -98,9 +101,14 @@ let authenticated relativeExpiry secure : WebPart =
                  (fun _ -> Choice1Of2 data)
                  succeed)
 
-//  let deauthenticate : WebPart =
-//    Cookies.unset_cookies
-  
+let deauthenticate : WebPart =
+ unsetPair SessionAuthCookie
+ >=> unsetPair StateCookie
+
+let deauthenticateWithLogin loginPage : WebPart =
+ deauthenticate
+ >=> Redirection.FOUND loginPage
+
 module HttpContext =
 
   let sessionId x =
