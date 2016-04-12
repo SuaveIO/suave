@@ -8,6 +8,10 @@ nuget RazorEngine
 
 github haf/YoLo YoLo.fs
 
+group Build
+  source https://nuget.org/api/v2
+  nuget NuGet.CommandLine
+
 group Tests
   framework: NET45
   source https://nuget.org/api/v2
