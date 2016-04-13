@@ -60,14 +60,15 @@ let parseResultCookie (_:SuaveConfig) =
 let parseRequestCookies (_ : SuaveConfig) =
     testList "parse request cookies" [
       testCase "parse valid cookies" <| fun _ ->
-        let sample = "session=2b14f6a69199243f570031bf94865bb6;abc=123"
+        let sample = "session=2b14f6a69199243f570031bf94865bb6;abc=123;alphaplusvalues=!#$%&'()*+-./:<=>?@[]^_`{|}~"
         let result = Cookie.parseCookies sample
         let expected = [HttpCookie.mkKV "session" "2b14f6a69199243f570031bf94865bb6"
-                        HttpCookie.mkKV "abc" "123"]
+                        HttpCookie.mkKV "abc" "123"
+                        HttpCookie.mkKV "alphaplusvalues" "!#$%&'()*+-./:<=>?@[]^_`{|}~"]
         Assert.Equal("cookies should eq", expected, result)
 
       testCase "ignore malformed cookies" <| fun _ ->
-        let sample = "session=;value;"
+        let sample = "session=;value;anothervalue= "
         let result = Cookie.parseCookies sample
         Assert.Equal("cookies should be ignored", [], result)
     ]
