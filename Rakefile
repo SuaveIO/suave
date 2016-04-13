@@ -213,7 +213,13 @@ task :increase_version_number do
   s = SemVer.find
   s.minor += 1
   s.save
-  ENV['NUGET_VERSION'] = s.format("%M.%m.%p%s")
+  version = s.format("%M.%m.%p%s")
+  ENV['NUGET_VERSION'] = version
+  projectjson = 'src/Suave/project.json'
+  contents = File.read(projectjson).gsub(/"version": ".*-dotnetcli"/, %{"version": "#{version}-dotnetcli"})
+  File.open(projectjson, 'w') do |out|
+    out << contents
+  end  
 end
 
 namespace :docs do
