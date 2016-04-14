@@ -108,7 +108,23 @@ build :compile_quick do |b|
 end
 
 namespace :dotnetcli do
-  task :restore do
+  task :coreclr_binaries do
+    case RUBY_PLATFORM
+    when /darwin/
+      system 'curl',
+        %W|-o tools/dotnet-dev-osx-x64.1.0.0-beta-002071.tar.gz
+           -L https://dotnetcli.blob.core.windows.net/dotnet/beta/Binaries/1.0.0-beta-002071/dotnet-dev-osx-x64.1.0.0-beta-002071.tar.gz|
+      system 'tar',
+        %W|xf tools/
+           --directory tools/coreclr|
+    when /windows/
+      puts 'TODO'
+    when /linux/
+      puts 'TODO'
+    end
+  end
+
+  task :restore => :corclr_binaries do
     system "dotnet restore"
   end
 
