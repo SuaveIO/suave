@@ -23,7 +23,8 @@ let flush (connection : Connection) : SocketOp<Connection> =
   socket {
     let buff = connection.lineBuffer
     let lineBufferCount = connection.lineBufferCount
-    do! send connection (new ArraySegment<_>(buff.Array, buff.Offset, lineBufferCount))
+    if lineBufferCount> 0  then
+      do! send connection (new ArraySegment<_>(buff.Array, buff.Offset, lineBufferCount))
     return { connection with lineBufferCount = 0 }
   }
 
