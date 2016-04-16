@@ -629,7 +629,6 @@ module OwinApp =
     /// Calling this returns a valid HttpResult that we can use for Suave
     member x.finalise() =
       let reqHeaders_, respHeaders_=
-      //let respHeaders_=
         HttpContext.request_ >--> HttpRequest.headers_,
         HttpContext.response_ >--> HttpResult.headers_
 
@@ -717,6 +716,7 @@ module OwinApp =
 
       async {
         let owinRequestUri = UriBuilder ctx.request.url
+        let originalUrl = ctx.request.url
 
         owinRequestUri.Path <-
           if ctx.request.path.StartsWith requestPathBase then
@@ -738,7 +738,7 @@ module OwinApp =
 
         let ctx = wrapper.finalise()
 
-        return! cont wrapper ctx
+        return! cont wrapper { ctx with request = { ctx.request with url = originalUrl }}
       }
   
   // Simple logic for now. If headers were sent lets asume the middleware did handle the request.
