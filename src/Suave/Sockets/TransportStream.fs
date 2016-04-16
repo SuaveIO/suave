@@ -9,8 +9,7 @@ type TransportStream(transport : ITransport) =
   override x.CanRead with get() = true
   override x.CanSeek with get() = false
   override x.CanWrite with get() = true
-  override x.Flush() =
-    raise (NotImplementedException())
+  override x.Flush() = ()
 
   override x.Seek(offset : int64, origin : SeekOrigin) =
     raise (NotImplementedException())
