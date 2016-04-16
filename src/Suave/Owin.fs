@@ -709,7 +709,7 @@ module OwinApp =
 
   let FALLBACK_KEY = "__suave.fallback"
 
-  let runOwin requestPathBase (owin : OwinApp) = 
+  let runOwin requestPathBase (owin : OwinApp) cont = 
     fun (ctx : HttpContext) ->
       
       let verbose f = ctx.runtime.logger.Log LogLevel.Verbose (f >> LogLine.mk "Suave.Owin" LogLevel.Verbose ctx.request.trace None)
@@ -736,22 +736,27 @@ module OwinApp =
 
         verbose (fun _ -> "suave back in control")
 
-        // Simple logic for now. If headers were sent lets asume the middleware did handle the request.
-        if wrapper.HeadersSent then
-          let request = 
-            if wrapper.CloseConnection then
-              { ctx.request with
-                  headers = [ "connection", "close" ]
-              } else ctx.request
-          return Some { ctx with response = { ctx.response with content = NullContent; writePreamble = false }; request = request  }
-        else
-          return None
+        return! cont wrapper ctx
       }
+  
+  // Simple logic for now. If headers were sent lets asume the middleware did handle the request.
+  let simpleLogic (wrapper: OwinContext)= 
+    fun ctx ->
+    async {
+      if wrapper.HeadersSent then
+        let request = 
+          if wrapper.CloseConnection then
+            { ctx.request with
+                headers = [ "connection", "close" ]
+            } else ctx.request
+        return Some { ctx with response = { ctx.response with content = NullContent; writePreamble = false }; request = request  }
+      else
+        return None
+    }
 
   [<CompiledName "OfApp">]
   let ofApp (requestPathBase : string) (owin : OwinApp) : WebPart =
-
-    Filters.pathStarts requestPathBase >=> runOwin requestPathBase owin
+    Filters.pathStarts requestPathBase >=> runOwin requestPathBase owin simpleLogic
 
   [<CompiledName "OfAppFunc">]
   let ofAppFunc requestPathBase (owin : OwinAppFunc) =
