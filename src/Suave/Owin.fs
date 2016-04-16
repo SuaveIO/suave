@@ -736,6 +736,8 @@ module OwinApp =
         do! owin wrapper.Interface
         verbose (fun _ -> "suave back in control")
 
+        let ctx = wrapper.finalise()
+
         return! cont wrapper ctx
       }
   
@@ -755,9 +757,19 @@ module OwinApp =
         return None
     }
 
+  let identity (wrapper: OwinContext)= 
+    fun ctx ->
+    async {
+      return Some ctx
+    }
+
   [<CompiledName "OfApp">]
+  let ofAppWithContinuation (requestPathBase : string) (owin : OwinApp) cont : WebPart =
+    Filters.pathStarts requestPathBase >=> runOwin requestPathBase owin cont
+
+  [<CompiledName "OfAppWithContinuation">]
   let ofApp (requestPathBase : string) (owin : OwinApp) : WebPart =
-    Filters.pathStarts requestPathBase >=> runOwin requestPathBase owin simpleLogic
+    ofAppWithContinuation requestPathBase owin simpleLogic
 
   [<CompiledName "OfAppFunc">]
   let ofAppFunc requestPathBase (owin : OwinAppFunc) =
