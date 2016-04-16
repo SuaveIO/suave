@@ -2,6 +2,7 @@
 
 open System
 open System.IO
+open System.Threading.Tasks
 
 type TransportStream(transport : ITransport) =
   inherit Stream()
@@ -26,6 +27,9 @@ type TransportStream(transport : ITransport) =
     match Async.RunSynchronously <| transport.write(ArraySegment(buffer,offset,count)) with
     | Choice1Of2 _ -> ()
     | Choice2Of2 x -> raise (Exception(x.ToString()))
+
+  override x.WriteAsync (buffer : byte[],offset : int,count : int, ct) =
+    Async.StartAsTask (transport.write(ArraySegment(buffer,offset,count)), TaskCreationOptions.AttachedToParent,ct) :> Task
 
   override x.Length
     with get() = raise (NotImplementedException())
