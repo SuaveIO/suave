@@ -37,7 +37,7 @@ let owinUnit cfg =
 
   let createOwin () =
     let request = { HttpRequest.empty with ``method`` = HttpMethod.PUT }
-    new OwinApp.OwinDictionary("/", { HttpContext.empty with request = request })
+    new OwinApp.OwinContext("/", { HttpContext.empty with request = request })
     :> IDictionary<string, obj>
 
   testList "infrastructure" [
@@ -100,7 +100,7 @@ let owinUnit cfg =
     ]
 
     // 3.2 Environment: Keys MUST be compared using StringComparer.Ordinal.
-    testList "OwinDictionary" [
+    testList "OwinContext" [
       testCase "read/write HttpMethod" <| fun _ ->
         let subj = createOwin ()
         eq "method" "PUT" (subj.[OwinConstants.requestMethod] |> unbox)
@@ -119,7 +119,7 @@ let owinUnit cfg =
                 headers = [("host","localhost")]
                 rawQuery = "q=a&b=c"
               }
-          new OwinApp.OwinDictionary("", { HttpContext.empty with request = request })
+          new OwinApp.OwinContext("", { HttpContext.empty with request = request })
           :> IDictionary<string, obj>
         let headers : IDictionary<string, string[]> =
           unbox subj.[OwinConstants.requestHeaders]
