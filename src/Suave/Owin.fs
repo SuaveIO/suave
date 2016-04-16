@@ -709,7 +709,7 @@ module OwinApp =
 
   let FALLBACK_KEY = "__suave.fallback"
 
-  let runOwin requestPathBase (owin : OwinAppFunc) = 
+  let runOwin requestPathBase (owin : OwinApp) = 
     fun (ctx : HttpContext) ->
       
       let verbose f = ctx.runtime.logger.Log LogLevel.Verbose (f >> LogLine.mk "Suave.Owin" LogLevel.Verbose ctx.request.trace None)
@@ -732,7 +732,7 @@ module OwinApp =
 
         verbose (fun _ -> "yielding to OWIN middleware")
           
-        do! owin.Invoke wrapper.Interface
+        do! owin wrapper.Interface
 
         verbose (fun _ -> "suave back in control")
 
@@ -749,17 +749,21 @@ module OwinApp =
       }
 
   [<CompiledName "OfApp">]
-  let ofApp (requestPathBase : string) (owin : OwinAppFunc) : WebPart =
+  let ofApp (requestPathBase : string) (owin : OwinApp) : WebPart =
 
     Filters.pathStarts requestPathBase >=> runOwin requestPathBase owin
 
   [<CompiledName "OfAppFunc">]
   let ofAppFunc requestPathBase (owin : OwinAppFunc) =
-    ofApp requestPathBase owin
+    ofApp requestPathBase (fun env -> Async.AwaitTask (owin.Invoke env))
+
+  [<CompiledName "OfMidFuncWithNext">]
+  let ofMidFuncWithNext requestPathBase (owin : OwinMidFunc) (next : OwinAppFunc) =
+    ofAppFunc requestPathBase (owin.Invoke(next))
 
   [<CompiledName "OfMidFunc">]
-  let ofMidFunc requestPathBase (owin : OwinMidFunc) (next : OwinAppFunc) =
-    ofAppFunc requestPathBase (owin.Invoke(next))
+  let ofMidFunc requestPathBase (owin : OwinMidFunc) =
+    ofAppFunc requestPathBase (owin.Invoke(fun env -> Task.FromResult(false) :> Task))
 
 open Suave.Web
 
