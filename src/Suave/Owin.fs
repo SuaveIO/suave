@@ -711,8 +711,10 @@ module OwinApp =
 
   let runOwin requestPathBase (owin : OwinApp) cont = 
     fun (ctx : HttpContext) ->
-      
-      let verbose f = ctx.runtime.logger.Log LogLevel.Verbose (f >> LogLine.mk "Suave.Owin" LogLevel.Verbose ctx.request.trace None)
+
+      let verbose f =
+        ctx.runtime.logger.Log LogLevel.Verbose (f >> LogLine.mk "Suave.Owin" LogLevel.Verbose ctx.request.trace None)
+
       async {
         let owinRequestUri = UriBuilder ctx.request.url
 
@@ -731,9 +733,7 @@ module OwinApp =
           new OwinContext(requestPathBase, initialState)
 
         verbose (fun _ -> "yielding to OWIN middleware")
-          
         do! owin wrapper.Interface
-
         verbose (fun _ -> "suave back in control")
 
         return! cont wrapper ctx
@@ -746,10 +746,11 @@ module OwinApp =
       if wrapper.HeadersSent then
         let request = 
           if wrapper.CloseConnection then
-            { ctx.request with
-                headers = [ "connection", "close" ]
-            } else ctx.request
-        return Some { ctx with response = { ctx.response with content = NullContent; writePreamble = false }; request = request  }
+            { ctx.request with headers = [ "connection", "close" ] } 
+          else
+            ctx.request
+        let response = { ctx.response with content = NullContent; writePreamble = false }
+        return Some { ctx with response = response; request = request  }
       else
         return None
     }
