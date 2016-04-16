@@ -4,6 +4,7 @@ module Suave.Owin
 // https://github.com/owin/owin/blob/master/spec/owin-1.1.0.md
 
 open System
+open System.IO
 open System.Net
 open System.Threading
 open System.Collections
@@ -513,11 +514,22 @@ module OwinApp =
   let headersDictionary (a: (string * string) list) =
     Dictionary (dict (Seq.map (fun (a,b) -> a,[|b|]) a), StringComparer.OrdinalIgnoreCase)
 
-  type internal OwinDictionary(requestPathBase, initialState) =
-    // TODO: support streaming optionally
-      //let impl conn = AsyncSocket.transferStream conn v
-      //SocketTask impl
-    // TODO: cancelled request
+  type OwinStream(transport, owinContext: OwinContext) =
+    inherit TransportStream(transport)
+
+    override x.Write (buffer : byte[],offset : int,count : int) =
+      if not owinContext.HeadersSent then
+        let r = Async.RunSynchronously (owinContext.sendHeaders())
+        ()
+      base.Write(buffer,offset,count)
+
+    override x.WriteAsync (buffer : byte[],offset : int,count : int, ct) =
+      if not owinContext.HeadersSent then
+        let r = Async.RunSynchronously (owinContext.sendHeaders())
+        ()
+      base.WriteAsync(buffer,offset,count,ct)
+
+  and OwinContext(requestPathBase, initialState) as owinCtx =
 
     let cts = new CancellationTokenSource()
     let state : HttpContext ref = ref initialState //externally owned
@@ -549,12 +561,9 @@ module OwinApp =
         | Some v' when Object.ReferenceEquals (v, v') -> x
         | _ -> invalidOp "setting ResponseHeaders IDictionary<string, string[]> is not supported")
 
-    let responseStream = new OpenMemoryStream()
+    let responseStream = new OwinStream(initialState.connection.transport, owinCtx)
     let responseStreamLens : Property<HttpContent, IO.Stream> =
-      (fun x ->
-        let bs = Lens.getPartialOrElse HttpContent.Bytes_ [||] x
-        responseStream.Write(bs, 0, bs.Length)
-        upcast responseStream),
+      (fun x -> upcast responseStream),
       (fun v x ->
         match responseStream with
         | v' when Object.ReferenceEquals (v, v') -> x
@@ -585,12 +594,30 @@ module OwinApp =
                     | Choice1Of2 lens -> lens),
       (fun v x -> invalidOp "setting owin constants not supported")
 
+    let mutable headersSent = false
+    let mutable closeConnection  = false
+
     interface OwinRequest with
       member x.OnSendingHeaders cb st =
         sendingHeaders := ((fun o -> cb (unbox o)), box st) :: !sendingHeaders
 
     member x.Interface =
       x :> OwinEnvironment
+
+    member x.HeadersSent with get () = headersSent
+    member x.CloseConnection with get () = closeConnection
+
+    member x.sendHeaders() = socket{
+      headersSent <- true
+      // collect headers
+      let ctx = x.finalise()
+      // NOTE: if there is no content-lenght header we should buffer
+      closeConnection <- not (List.exists (fun (p,q) -> String.equalsOrdinalCI p "content-length") ctx.response.headers)
+      let! (_, connection) = HttpOutput.writePreamble ctx ctx.connection
+      let! (_, connection) = AsyncSocket.asyncWriteLn "" connection
+      let! connection = AsyncSocket.flush connection
+      return connection
+      }
 
     /// Lock down the OWIN environment so that overly eager OWIN apps don't pick
     /// too much on our internal state using casting/reflection.
@@ -601,10 +628,10 @@ module OwinApp =
 
     /// Calling this returns a valid HttpResult that we can use for Suave
     member x.finalise() =
-      let reqHeaders_, respHeaders_, bytes_ =
+      let reqHeaders_, respHeaders_=
+      //let respHeaders_=
         HttpContext.request_ >--> HttpRequest.headers_,
-        HttpContext.response_ >--> HttpResult.headers_,
-        HttpContext.response_ >--> HttpResult.content_ >-?> HttpContent.Bytes_
+        HttpContext.response_ >--> HttpResult.headers_
 
       let setResponseHeaders (rhs : Dictionary<string, string[]>) =
         Lens.set respHeaders_ (Seq.map (fun k -> k, String.concat ", " rhs.[k]) rhs.Keys |> Seq.toList)
@@ -612,16 +639,11 @@ module OwinApp =
       let setRequestHeaders (rhs : Dictionary<string, string[]>) =
         Lens.set reqHeaders_ (Seq.map (fun k -> k, String.concat ", " rhs.[k]) rhs.Keys |> Seq.toList)
 
-      let setResponseData (ms : OpenMemoryStream) =
-        ms.Seek(0L, IO.SeekOrigin.Begin) |> ignore
-        Lens.setPartial bytes_ (ms.ToArray())
-
       List.foldBack (fun (cb, st) s -> cb st) !sendingHeaders ()
 
       !state
       |> Option.foldBack setRequestHeaders !requestHeaders
       |> Option.foldBack setResponseHeaders !responseHeaders
-      |> setResponseData responseStream
 
     interface IDictionary<string, obj> with
       member x.Remove k =
@@ -685,23 +707,13 @@ module OwinApp =
         |> Seq.map (fun key -> KeyValuePair(key, (x :> IDictionary<_, _>).[key]))
         |> fun seq -> (seq :> IEnumerable).GetEnumerator()
 
-    interface IDisposable with
-      member x.Dispose() =
-        if !canDispose then
-          responseStream.RealDispose()
-          (cts :> IDisposable).Dispose()
+  let FALLBACK_KEY = "__suave.fallback"
 
-  [<CompiledName "OfApp">]
-  let ofApp (requestPathBase : string) (owin : OwinApp) : WebPart =
-
-    Filters.pathStarts requestPathBase >=>
+  let runOwin requestPathBase (owin : OwinAppFunc) = 
     fun (ctx : HttpContext) ->
-      let verbose f =
-        ctx.runtime.logger.Log LogLevel.Verbose (
-          f >> LogLine.mk "Suave.Owin" LogLevel.Verbose ctx.request.trace None
-        )
-
-      let impl (conn, response) : SocketOp<Connection> = socket {
+      
+      let verbose f = ctx.runtime.logger.Log LogLevel.Verbose (f >> LogLine.mk "Suave.Owin" LogLevel.Verbose ctx.request.trace None)
+      async {
         let owinRequestUri = UriBuilder ctx.request.url
 
         owinRequestUri.Path <-
@@ -710,49 +722,46 @@ module OwinApp =
           else
             ctx.request.path
 
-        // disposable because it buffers what the OwinApp writes to the stream
-        // also, OWIN expects the default HTTP status code to be 200 OK
-        // could also set the status code after calling SocketOp.ofAsync if the value is not set
-        use wrapper =
-          new OwinDictionary(
-            requestPathBase,
-            { ctx with
+        let initialState =
+          { ctx with
                 request = { ctx.request with url = owinRequestUri.Uri }
-                response = { response with status = HTTP_200.status } })
+                response = { ctx.response with status = HTTP_200.status } }
 
-        do! wrapper.beStoic <| fun _ ->
-          verbose (fun _ -> "yielding to OWIN middleware")
-          SocketOp.ofAsync (owin wrapper.Interface)
+        let wrapper =
+          new OwinContext(requestPathBase, initialState)
+
+        verbose (fun _ -> "yielding to OWIN middleware")
+          
+        do! owin.Invoke wrapper.Interface
 
         verbose (fun _ -> "suave back in control")
-        let ctx = wrapper.finalise()
 
-        verbose (fun _ -> "writing preamble")
-        let! (_, connection) = HttpOutput.writePreamble ctx ctx.connection
-
-        verbose (fun _ -> "writing body")
-        let! connection = HttpOutput.writeContent { ctx with connection = connection } ctx.response.content
-        return connection
+        // Simple logic for now. If headers were sent lets asume the middleware did handle the request.
+        if wrapper.HeadersSent then
+          let request = 
+            if wrapper.CloseConnection then
+              { ctx.request with
+                  headers = [ "connection", "close" ]
+              } else ctx.request
+          return Some { ctx with response = { ctx.response with content = NullContent; writePreamble = false }; request = request  }
+        else
+          return None
       }
 
-      { ctx with
-          response =
-            { ctx.response with
-                content       = SocketTask impl
-                writePreamble = false
-            }
-      }
-      |> succeed
+  [<CompiledName "OfApp">]
+  let ofApp (requestPathBase : string) (owin : OwinAppFunc) : WebPart =
+
+    Filters.pathStarts requestPathBase >=> runOwin requestPathBase owin
 
   [<CompiledName "OfAppFunc">]
   let ofAppFunc requestPathBase (owin : OwinAppFunc) =
-    ofApp requestPathBase
-          (fun e -> Async.AwaitTask ((owin.Invoke e).ContinueWith<_>(fun x -> ())))
+    ofApp requestPathBase owin
 
   [<CompiledName "OfMidFunc">]
-  let ofMidFunc requestPathBase (owin : OwinMidFunc) =
-    ofAppFunc requestPathBase
-              (owin.Invoke(fun _ -> new Task(fun x -> ())))
+  let ofMidFunc requestPathBase (owin : OwinMidFunc) (next : OwinAppFunc) =
+    ofAppFunc requestPathBase (owin.Invoke(next))
+
+open Suave.Web
 
 module OwinServerFactory =
 
