@@ -118,9 +118,9 @@ namespace :dotnetcli do
         %W|xf tools/
            --directory tools/coreclr|
     when /linux/
-    #   system 'curl',
-    #     %W|-o tools/dotnet-dev-ubuntu-x64.1.0.0-beta-002071.tar.gz
-    #        -L https://dotnetcli.blob.core.windows.net/dotnet/beta/Binaries/1.0.0-beta-002071/dotnet-dev-ubuntu-x64.1.0.0-beta-002071.tar.gz|
+      system 'curl',
+        %W|-o tools/dotnet-dev-ubuntu-x64.1.0.0-beta-002071.tar.gz
+           -L https://dotnetcli.blob.core.windows.net/dotnet/beta/Binaries/1.0.0-beta-002071/dotnet-dev-ubuntu-x64.1.0.0-beta-002071.tar.gz|
       system 'mkdir', 'tools/coreclr'
       system 'tar',
         %W|xf tools/dotnet-dev-ubuntu-x64.1.0.0-beta-002071.tar.gz
