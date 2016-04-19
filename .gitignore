@@ -30,3 +30,4 @@ docs/output/
 
 project.lock.json
 *.project.lock.json
+dotnet-dev-*

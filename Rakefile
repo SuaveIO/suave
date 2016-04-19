@@ -117,15 +117,20 @@ namespace :dotnetcli do
       system 'tar',
         %W|xf tools/
            --directory tools/coreclr|
-    when /windows/
-      puts 'TODO'
     when /linux/
+      system 'curl',
+        %W|-o tools/dotnet-dev-ubuntu-x64.1.0.0-beta-002071.tar.gz
+           -L https://dotnetcli.blob.core.windows.net/dotnet/beta/Binaries/1.0.0-beta-002071/dotnet-dev-ubuntu-x64.1.0.0-beta-002071.tar.gz|
+      system 'tar',
+        %W|xf tools/
+           --directory tools/coreclr|
+    when /windows/
       puts 'TODO'
     end
   end
 
-  task :restore => :corclr_binaries do
-    system "dotnet restore"
+  task :restore => :coreclr_binaries do
+    system "tools/coreclr/dotnet restore"
   end
 
   # build Suave and test project
