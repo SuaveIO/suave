@@ -130,9 +130,7 @@ namespace :dotnetcli do
       system 'powershell',
         %W|Invoke-WebRequest "https://raw.githubusercontent.com/dotnet/cli/rel/1.0.0/scripts/obtain/install.ps1" -OutFile "dotnet_cli_install.ps1"|
       system 'powershell',
-        %W|$env:DOTNET_INSTALL_DIR = "tools/coreclr"|
-      system 'powershell',
-        %W|-ExecutionPolicy Unrestricted ./dotnet_cli_install.ps1 -Channel "beta" -version "1.0.0-beta-002071"|
+        %W|-ExecutionPolicy Unrestricted ./dotnet_cli_install.ps1 -InstallDir "tools/coreclr" -Channel "beta" -version "1.0.0-beta-002071"|
     end
   end
 
