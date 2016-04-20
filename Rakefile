@@ -137,25 +137,24 @@ namespace :dotnetcli do
   # build Suave and test project
   task :build do
     Dir.chdir("src/Suave.DotnetCLI.Tests") do
-      system "dotnet --verbose build"
+      system "tools/coreclr/dotnet --verbose build"
     end
   end
 
   # create Suave nugets packages
   task :pack do
     Dir.chdir("src/Suave") do
-      system "dotnet --verbose pack --configuration #{Configuration}"
+      system "tools/coreclr/dotnet --verbose pack --configuration #{Configuration}"
     end
   end
  
   # merge standard and dotnetcli nupkgs
   task :merge do
     Dir.chdir("src/Suave") do
-      #version = ENV['NUGET_VERSION']
       version = SemVer.find.format("%M.%m.%p%s")
       sourcenupkg = "../../build/pkg/Suave.#{version}.nupkg"
       clinupkg = "bin/#{Configuration}/Suave.#{version}-dotnetcli.nupkg"
-      system %Q[dotnet mergenupkg --source "#{sourcenupkg}" --other "#{clinupkg}" --framework netstandard1.5]
+      system %Q[tools/coreclr/dotnet mergenupkg --source "#{sourcenupkg}" --other "#{clinupkg}" --framework netstandard1.5]
     end
   end
 
