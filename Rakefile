@@ -125,8 +125,14 @@ namespace :dotnetcli do
       system 'tar',
         %W|xf tools/dotnet-dev-ubuntu-x64.1.0.0-beta-002071.tar.gz
            --directory tools/coreclr|
-    when /windows/
-      puts 'TODO'
+    end
+    if Gem.win_platform?
+      system 'powershell',
+        %W|Invoke-WebRequest "https://raw.githubusercontent.com/dotnet/cli/rel/1.0.0/scripts/obtain/install.ps1" -OutFile "dotnet_cli_install.ps1"|
+      system 'powershell',
+        %W|$env:DOTNET_INSTALL_DIR = "tools/coreclr"|
+      system 'powershell',
+        %W|-ExecutionPolicy Unrestricted ./dotnet_cli_install.ps1 -Channel "beta" -version "1.0.0-beta-002071"|
     end
   end
 
@@ -148,7 +154,7 @@ namespace :dotnetcli do
     end
   end
 
-  task :do_netcorepackage => [ :restore, :build, :package ]
+  task :do_netcorepackage => [ :restore, :build, :pack ]
  
   # merge standard and dotnetcli nupkgs
   task :merge do
