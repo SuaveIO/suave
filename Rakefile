@@ -147,6 +147,8 @@ namespace :dotnetcli do
       system "tools/coreclr/dotnet --verbose pack --configuration #{Configuration}"
     end
   end
+
+  task :do_netcorepackage => [ dotnetcli:restore, dotnetcli:build, dotnetcli:package ]
  
   # merge standard and dotnetcli nupkgs
   task :merge do

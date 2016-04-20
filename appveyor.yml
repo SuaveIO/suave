@@ -29,12 +29,8 @@ build_script:
  - cmd: bundle install
  - cmd: bundle exec rake appveyor
  # dotnet cli
- # - restore
- - cmd: if "%USE_DOTNET_CLI%" == "1" bundle exec rake dotnetcli:restore
- # - build Suave and test project
- - cmd: if "%USE_DOTNET_CLI%" == "1" bundle exec rake dotnetcli:build
- # - create Suave nugets packages
- - cmd: if "%USE_DOTNET_CLI%" == "1" bundle exec rake dotnetcli:pack
+ # - create Suave coreclr nugets packages
+ - cmd: if "%USE_DOTNET_CLI%" == "1" bundle exec rake dotnetcli:do_netcorepackage
  # - merge standard and dotnetcli nupkgs
  - cmd: if "%USE_DOTNET_CLI%" == "1" bundle exec rake dotnetcli:merge
  
