@@ -148,7 +148,7 @@ namespace :dotnetcli do
     end
   end
 
-  task :do_netcorepackage => [ dotnetcli:restore, dotnetcli:build, dotnetcli:package ]
+  task :do_netcorepackage => [ :restore, :build, :package ]
  
   # merge standard and dotnetcli nupkgs
   task :merge do
