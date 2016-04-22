@@ -109,29 +109,30 @@ end
 
 namespace :dotnetcli do
   task :coreclr_binaries do
+    dotnet_version = '1.0.0-beta-002071'
     case RUBY_PLATFORM
     when /darwin/
       system 'curl',
-        %W|-o tools/dotnet-dev-osx-x64.1.0.0-beta-002071.tar.gz
-           -L https://dotnetcli.blob.core.windows.net/dotnet/beta/Binaries/1.0.0-beta-002071/dotnet-dev-osx-x64.1.0.0-beta-002071.tar.gz|
+        %W|-o tools/dotnet-dev-osx-x64.#{dotnet_version}.tar.gz
+           -L https://dotnetcli.blob.core.windows.net/dotnet/beta/Binaries/#{dotnet_version}/dotnet-dev-osx-x64.#{dotnet_version}.tar.gz|
       system 'tar',
         %W|xf tools/
            --directory tools/coreclr|
     when /linux/
       system 'curl',
-        %W|-o tools/dotnet-dev-ubuntu-x64.1.0.0-beta-002071.tar.gz
-           -L https://dotnetcli.blob.core.windows.net/dotnet/beta/Binaries/1.0.0-beta-002071/dotnet-dev-ubuntu-x64.1.0.0-beta-002071.tar.gz|
+        %W|-o tools/dotnet-dev-ubuntu-x64.#{dotnet_version}.tar.gz
+           -L https://dotnetcli.blob.core.windows.net/dotnet/beta/Binaries/#{dotnet_version}/dotnet-dev-ubuntu-x64.#{dotnet_version}.tar.gz|
       system 'mkdir', 'tools/coreclr'
       system 'tar',
-        %W|xf tools/dotnet-dev-ubuntu-x64.1.0.0-beta-002071.tar.gz
+        %W|xf tools/dotnet-dev-ubuntu-x64.#{dotnet_version}.tar.gz
            --directory tools/coreclr|
     end
     if Gem.win_platform?
       system 'powershell',
         %W|Invoke-WebRequest "https://raw.githubusercontent.com/dotnet/cli/rel/1.0.0/scripts/obtain/install.ps1" -OutFile "dotnet_cli_install.ps1"|
       system 'powershell',
-        %W|-ExecutionPolicy Unrestricted ./dotnet_cli_install.ps1 -InstallDir "tools/coreclr" -Channel "beta" -version "1.0.0-beta-002071"|
-      ENV['PATH'] = %{#{Dir.pwd}/tools/coreclr/sdk/1.0.0-beta-002071;#{ENV['PATH']}} 
+        %W|-ExecutionPolicy Unrestricted ./dotnet_cli_install.ps1 -InstallDir "tools/coreclr" -Channel "beta" -version "#{dotnet_version}"|
+      ENV['PATH'] = %{#{Dir.pwd}/tools/coreclr/sdk/#{dotnet_version};#{ENV['PATH']}} 
     end
   end
 
