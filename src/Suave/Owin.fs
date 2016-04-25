@@ -781,7 +781,8 @@ module OwinApp =
 
   [<CompiledName "OfMidFunc">]
   let ofMidFunc requestPathBase (owin : OwinMidFunc) =
-    ofAppFunc requestPathBase (owin.Invoke(fun env -> Task.FromResult(false) :> Task))
+    let appFunc = owin.Invoke(fun env -> Task.FromResult(false) :> Task)
+    ofAppWithContinuation requestPathBase (fun env -> async{ do! appFunc.Invoke env}) identity
 
 open Suave.Web
 
