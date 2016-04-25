@@ -763,11 +763,11 @@ module OwinApp =
       return Some ctx
     }
 
-  [<CompiledName "OfApp">]
+  [<CompiledName "OfAppWithContinuation">]
   let ofAppWithContinuation (requestPathBase : string) (owin : OwinApp) cont : WebPart =
     Filters.pathStarts requestPathBase >=> runOwin requestPathBase owin cont
 
-  [<CompiledName "OfAppWithContinuation">]
+  [<CompiledName "OfApp">]
   let ofApp (requestPathBase : string) (owin : OwinApp) : WebPart =
     ofAppWithContinuation requestPathBase owin simpleLogic
 
