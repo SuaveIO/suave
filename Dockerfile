@@ -6,4 +6,4 @@ RUN apt-get update && \
 ADD . /suave-build
 WORKDIR /suave-build
 RUN bundle
-RUN bundle exec rake dotnetcli:restore dotnetcli:build
+RUN bundle exec rake dotnetcli:restore dotnetcli:build compile
