@@ -81,7 +81,7 @@ task :libs do
     cd /usr/local/src/libuv-1.7.5
     sudo sh autogen.sh
     sudo ./configure
-    sudo make 
+    sudo make
     sudo make install
     sudo rm -rf /usr/local/src/libuv-1.7.5 && cd ~/
     sudo ldconfig
@@ -124,12 +124,14 @@ namespace :dotnetcli do
         %W|xf tools/#{filename}
            --directory tools/coreclr|
     when /linux/
+      filename = "dotnet-dev-ubuntu-x64.#{dotnet_version}.tar.gz"
       system 'curl',
-        %W|-o tools/dotnet-dev-ubuntu-x64.#{dotnet_version}.tar.gz
-           -L https://dotnetcli.blob.core.windows.net/dotnet/beta/Binaries/#{dotnet_version}/dotnet-dev-ubuntu-x64.#{dotnet_version}.tar.gz|
-      system 'mkdir', 'tools/coreclr'
+        %W|-o tools/#{filename}
+           -L https://dotnetcli.blob.core.windows.net/dotnet/beta/Binaries/#{dotnet_version}/#{filename}| \
+        unless File.exists? filename
+
       system 'tar',
-        %W|xf tools/dotnet-dev-ubuntu-x64.#{dotnet_version}.tar.gz
+        %W|xf tools/#{filename}
            --directory tools/coreclr|
     end
     if Gem.win_platform?
@@ -137,7 +139,7 @@ namespace :dotnetcli do
         %W|Invoke-WebRequest "https://raw.githubusercontent.com/dotnet/cli/rel/1.0.0/scripts/obtain/install.ps1" -OutFile "dotnet_cli_install.ps1"|
       system 'powershell',
         %W|-ExecutionPolicy Unrestricted ./dotnet_cli_install.ps1 -InstallDir "tools/coreclr" -Channel "beta" -version "#{dotnet_version}"|
-      ENV['PATH'] = %{#{Dir.pwd}/tools/coreclr/sdk/#{dotnet_version};#{ENV['PATH']}} 
+      ENV['PATH'] = %{#{Dir.pwd}/tools/coreclr/sdk/#{dotnet_version};#{ENV['PATH']}}
     end
   end
 
@@ -161,7 +163,7 @@ namespace :dotnetcli do
   end
 
   task :do_netcorepackage => [ :restore, :build, :pack ]
- 
+
   # merge standard and dotnetcli nupkgs
   task :merge do
     Dir.chdir("src/Suave") do
@@ -253,7 +255,7 @@ task :increase_version_number do
   contents = File.read(projectjson).gsub(/"version": ".*-dotnetcli"/, %{"version": "#{version}-dotnetcli"})
   File.open(projectjson, 'w') do |out|
     out << contents
-  end  
+  end
 end
 
 namespace :docs do
