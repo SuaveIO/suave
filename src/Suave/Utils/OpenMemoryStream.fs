@@ -22,7 +22,7 @@ type internal OpenStream(stream : MemoryStream) =
   member x.RealDispose() =
     stream.Dispose()
 
-  #if !DNXCORE50
+  #if !NETSTANDARD1_5
 
   override x.Close() =
     ()
@@ -107,7 +107,7 @@ type internal OpenMemoryStream() =
   member x.ToArray() =
     base.stream.ToArray()
   
-  #if !DNXCORE50
+  #if !NETSTANDARD1_5
   member x.GetBuffer() =
     base.stream.GetBuffer()
   #endif

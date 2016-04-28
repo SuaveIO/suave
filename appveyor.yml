@@ -9,7 +9,6 @@ environment:
    - arch: "x64"
      MSBUILD_PLATFORM: "Any CPU"
      USE_DOTNET_CLI: 1
-     USE_DOTNET_CLI_VERSION: 1.0.0-beta-002071
 
 install:
  - ps: Start-FileDownload 'https://github.com/libuv/libuv/archive/v1.7.5.zip'
@@ -21,27 +20,14 @@ build_script:
  - cmd: gem install bundler --no-ri --no-rdoc --source http://rubygems.org/
  - cmd: bundle install
  - cmd: bundle exec rake appveyor
-
  # dotnet cli
- # Download install script to install .NET cli in .dotnet dir
- - ps: if ("$env:USE_DOTNET_CLI" -eq "1") { Invoke-WebRequest "https://raw.githubusercontent.com/dotnet/cli/rel/1.0.0/scripts/obtain/install.ps1" -OutFile ".\dotnet_cli_install.ps1" }
- - ps: if ("$env:USE_DOTNET_CLI" -eq "1") { $env:DOTNET_INSTALL_DIR = "$pwd\.dotnet" }
- - ps: 'if ("$env:USE_DOTNET_CLI" -eq "1") { & .\dotnet_cli_install.ps1 -Channel "beta" -version "$env:USE_DOTNET_CLI_VERSION" }'
- # set DOTNET_HOME env var and add dotnet bin to PATH
- - ps: if ("$env:USE_DOTNET_CLI" -eq "1") { $env:DOTNET_HOME = "$env:DOTNET_INSTALL_DIR\cli\bin" }
- - ps: if ("$env:USE_DOTNET_CLI" -eq "1") { $env:Path = "$env:DOTNET_HOME;$env:Path" }
- # - restore
- - cmd: if "%USE_DOTNET_CLI%" == "1" dotnet restore
- # - build Suave and test project
- - cmd: if "%USE_DOTNET_CLI%" == "1" cd "%APPVEYOR_BUILD_FOLDER%\src\Suave.DotnetCLI.Tests"
- - cmd: if "%USE_DOTNET_CLI%" == "1" dotnet build
- # - create Suave nugets packages
- - cmd: if "%USE_DOTNET_CLI%" == "1" cd "%APPVEYOR_BUILD_FOLDER%\src\Suave"
- - cmd: if "%USE_DOTNET_CLI%" == "1" dotnet pack -c Release
+ # - create Suave coreclr nugets packages
+ - cmd: if "%USE_DOTNET_CLI%" == "1" bundle exec rake dotnetcli:do_netcorepackage
+ # - merge standard and dotnetcli nupkgs
+ - cmd: if "%USE_DOTNET_CLI%" == "1" bundle exec rake dotnetcli:merge
  
 artifacts:
  - path: build\pkg\*.nupkg 
- - path: src\Suave\bin\Release\*.nupkg 
 
 test:  off
 

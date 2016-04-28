@@ -107,6 +107,67 @@ build :compile_quick do |b|
   b.prop 'Platform', Platform
 end
 
+namespace :dotnetcli do
+  task :coreclr_binaries do
+    dotnet_version = '1.0.0-beta-002071'
+    case RUBY_PLATFORM
+    when /darwin/
+      system 'curl',
+        %W|-o tools/dotnet-dev-osx-x64.#{dotnet_version}.tar.gz
+           -L https://dotnetcli.blob.core.windows.net/dotnet/beta/Binaries/#{dotnet_version}/dotnet-dev-osx-x64.#{dotnet_version}.tar.gz|
+      system 'tar',
+        %W|xf tools/
+           --directory tools/coreclr|
+    when /linux/
+      system 'curl',
+        %W|-o tools/dotnet-dev-ubuntu-x64.#{dotnet_version}.tar.gz
+           -L https://dotnetcli.blob.core.windows.net/dotnet/beta/Binaries/#{dotnet_version}/dotnet-dev-ubuntu-x64.#{dotnet_version}.tar.gz|
+      system 'mkdir', 'tools/coreclr'
+      system 'tar',
+        %W|xf tools/dotnet-dev-ubuntu-x64.#{dotnet_version}.tar.gz
+           --directory tools/coreclr|
+    end
+    if Gem.win_platform?
+      system 'powershell',
+        %W|Invoke-WebRequest "https://raw.githubusercontent.com/dotnet/cli/rel/1.0.0/scripts/obtain/install.ps1" -OutFile "dotnet_cli_install.ps1"|
+      system 'powershell',
+        %W|-ExecutionPolicy Unrestricted ./dotnet_cli_install.ps1 -InstallDir "tools/coreclr" -Channel "beta" -version "#{dotnet_version}"|
+      ENV['PATH'] = %{#{Dir.pwd}/tools/coreclr/sdk/#{dotnet_version};#{ENV['PATH']}} 
+    end
+  end
+
+  task :restore => :coreclr_binaries do
+    system "tools/coreclr/dotnet restore"
+  end
+
+  # build Suave and test project
+  task :build do
+    Dir.chdir("src/Suave.DotnetCLI.Tests") do
+      system "../../tools/coreclr/dotnet --verbose build"
+    end
+  end
+
+  # create Suave nugets packages
+  task :pack do
+    Dir.chdir("src/Suave") do
+      system "../../tools/coreclr/dotnet --verbose pack --configuration #{Configuration}"
+    end
+  end
+
+  task :do_netcorepackage => [ :restore, :build, :pack ]
+ 
+  # merge standard and dotnetcli nupkgs
+  task :merge do
+    Dir.chdir("src/Suave") do
+      version = SemVer.find.format("%M.%m.%p%s")
+      sourcenupkg = "../../build/pkg/Suave.#{version}.nupkg"
+      clinupkg = "bin/#{Configuration}/Suave.#{version}-dotnetcli.nupkg"
+      system %Q[../../tools/coreclr/dotnet mergenupkg --source "#{sourcenupkg}" --other "#{clinupkg}" --framework netstandard1.5]
+    end
+  end
+
+end
+
 namespace :tests do
   task :stress_quick do
     system "examples/Pong/bin/#{Configuration}/Pong.exe", clr_command: true
@@ -181,7 +242,13 @@ task :increase_version_number do
   s = SemVer.find
   s.minor += 1
   s.save
-  ENV['NUGET_VERSION'] = s.format("%M.%m.%p%s")
+  version = s.format("%M.%m.%p%s")
+  ENV['NUGET_VERSION'] = version
+  projectjson = 'src/Suave/project.json'
+  contents = File.read(projectjson).gsub(/"version": ".*-dotnetcli"/, %{"version": "#{version}-dotnetcli"})
+  File.open(projectjson, 'w') do |out|
+    out << contents
+  end  
 end
 
 namespace :docs do

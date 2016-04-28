@@ -599,7 +599,7 @@ module Http =
         logger            = Loggers.saneDefaultsFor LogLevel.Debug
         matchedBinding    = HttpBinding.defaults
         parsePostData     = false
-        #if DNXCORE50
+        #if NETSTANDARD1_5
         cookieSerialiser  = new JsonFormatterSerialiser()
         #else
         cookieSerialiser  = new BinaryFormatterSerialiser()
