@@ -60,8 +60,8 @@
         "HttpOutput.fs",
         "ParsingAndControl.fs",
         "Web.fs",
+        "WebSocket.fs",        
         "Owin.fs",
-        "WebSocket.fs",
         "Json.fs"
     ],
 

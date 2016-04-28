@@ -43,6 +43,15 @@ module WebSocket =
     | 11uy | 12uy | 13uy | 14uy | 15uy -> Reserved
     | _ -> failwith "Invalid opcode."
 
+  let fromOpcode = function
+    | Continuation -> 0uy
+    | Text -> 1uy
+    | Binary -> 2uy
+    | Close -> 8uy
+    | Ping -> 9uy
+    | Pong -> 10uy
+    | _ -> failwith "Invalid opcode usage."
+
   type CloseCode =
     | CLOSE_NORMAL
     | CLOSE_GOING_AWAY
@@ -88,15 +97,7 @@ module WebSocket =
 
   let internal frame (opcode : Opcode) (data : byte[])  (fin : bool) =
 
-    let firstByte =
-      match opcode with
-      | Continuation -> 0uy
-      | Text -> 1uy
-      | Binary -> 2uy
-      | Close -> 8uy
-      | Ping -> 9uy
-      | Pong -> 10uy
-      | _ -> failwith "Invalid opcode usage."
+    let firstByte = fromOpcode opcode
 
     let firstByte = if fin then firstByte ||| 128uy else firstByte
 

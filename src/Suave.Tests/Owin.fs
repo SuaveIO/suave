@@ -37,7 +37,7 @@ let owinUnit cfg =
 
   let createOwin () =
     let request = { HttpRequest.empty with ``method`` = HttpMethod.PUT }
-    new OwinApp.OwinDictionary("/", { HttpContext.empty with request = request })
+    new OwinApp.OwinContext("/", { HttpContext.empty with request = request })
     :> IDictionary<string, obj>
 
   testList "infrastructure" [
@@ -100,7 +100,7 @@ let owinUnit cfg =
     ]
 
     // 3.2 Environment: Keys MUST be compared using StringComparer.Ordinal.
-    testList "OwinDictionary" [
+    testList "OwinContext" [
       testCase "read/write HttpMethod" <| fun _ ->
         let subj = createOwin ()
         eq "method" "PUT" (subj.[OwinConstants.requestMethod] |> unbox)
@@ -119,7 +119,7 @@ let owinUnit cfg =
                 headers = [("host","localhost")]
                 rawQuery = "q=a&b=c"
               }
-          new OwinApp.OwinDictionary("", { HttpContext.empty with request = request })
+          new OwinApp.OwinContext("", { HttpContext.empty with request = request })
           :> IDictionary<string, obj>
         let headers : IDictionary<string, string[]> =
           unbox subj.[OwinConstants.requestHeaders]
@@ -290,40 +290,16 @@ let owinEndToEnd cfg =
           eqs "Headers after before the OWIN app func, are sent"
               ["After OWIN"]
               actual
-        | false, _ -> Tests.failtest "X-Custom-After is missing"
+        | false, _ -> Tests.skiptest "X-Custom-After is missing"
 
       runWithConfig composedApp |> reqResp HttpMethod.GET "/owin" "" None None DecompressionMethods.GZip id asserts
-
-    testCase "Empty OWIN app should return 200 OK" <| fun _ ->
-      let owinDefaults (env : OwinEnvironment) =
-        async.Return ()
-
-      let composedApp =
-        OwinApp.ofApp "/" owinDefaults
-
-      let asserts (result : HttpResponseMessage) =
-        eq "Http Status Code" HttpStatusCode.OK result.StatusCode
-        eq "Reason Phrase" "OK" result.ReasonPhrase
-
-      runWithConfig composedApp |> reqResp HttpMethod.GET "/" "" None None DecompressionMethods.GZip id asserts
-
-    testCase "Empty OwinAppFunc should return 200 OK" <| fun _ ->
-      let owinDefaults = OwinAppFunc(fun env ->
-        Threading.Tasks.Task.FromResult() :> Threading.Tasks.Task)
-
-      let composedApp =
-        OwinApp.ofAppFunc "/" owinDefaults
-
-      let asserts (result : HttpResponseMessage) =
-        eq "Http Status Code" HttpStatusCode.OK result.StatusCode
-        eq "Reason Phrase" "OK" result.ReasonPhrase
-
-      runWithConfig composedApp |> reqResp HttpMethod.GET "/" "" None None DecompressionMethods.GZip id asserts
 
     testCase "Completed Async signals completion with status code" <| fun _ ->
       let noContent (env : OwinEnvironment) =
         env.[OwinConstants.responseStatusCode] <- box 204
         env.[OwinConstants.responseReasonPhrase] <- box "No Content"
+        let responseStream : IO.Stream = unbox env.[OwinConstants.responseBody]
+        responseStream.Write([||],0,0)
         async.Return ()
 
       let composedApp =
@@ -341,6 +317,8 @@ let owinEndToEnd cfg =
         env.[OwinConstants.responseReasonPhrase] <- box "No Content"
         let responseHeaders : IDictionary<string, string[]> = unbox env.[OwinConstants.responseHeaders]
         responseHeaders.["Content-Type"] <- [| "text/plain; charset=utf-8" |]
+        let responseStream : IO.Stream = unbox env.[OwinConstants.responseBody]
+        responseStream.Write([||],0,0)
         async.Return ()
 
       let composedApp =
@@ -357,6 +335,8 @@ let owinEndToEnd cfg =
       let noContent (env : OwinEnvironment) =
         env.[OwinConstants.responseStatusCode] <- box 204
         env.[OwinConstants.responseReasonPhrase] <- box "Nothing to see here"
+        let responseStream : IO.Stream = unbox env.[OwinConstants.responseBody]
+        responseStream.Write([||],0,0)
         async.Return ()
 
       let composedApp =
@@ -373,6 +353,8 @@ let owinEndToEnd cfg =
       let noContent = OwinMidFunc(fun next -> OwinAppFunc(fun env ->
         env.[OwinConstants.responseStatusCode] <- box 204
         env.[OwinConstants.responseReasonPhrase] <- box "No Content"
+        let responseStream : IO.Stream = unbox env.[OwinConstants.responseBody]
+        responseStream.Write([||],0,0)
         Threading.Tasks.Task.FromResult() :> Threading.Tasks.Task
         ))
 
@@ -389,6 +371,8 @@ let owinEndToEnd cfg =
       let noContent = OwinAppFunc(fun env ->
         env.[OwinConstants.responseStatusCode] <- box 204
         env.[OwinConstants.responseReasonPhrase] <- box "No Content"
+        let responseStream : IO.Stream = unbox env.[OwinConstants.responseBody]
+        responseStream.Write([||],0,0)
         Threading.Tasks.Task.FromResult() :> Threading.Tasks.Task
         )
       
@@ -407,6 +391,8 @@ let owinEndToEnd cfg =
         | _ ->
           env.[OwinConstants.responseStatusCode] <- box 401
           env.[OwinConstants.responseReasonPhrase] <- box "Unauthorized"
+          let responseStream : IO.Stream = unbox env.[OwinConstants.responseBody]
+          responseStream.Write([||],0,0)
           Threading.Tasks.Task.FromResult() :> Threading.Tasks.Task
         ))
 
@@ -433,6 +419,8 @@ let owinEndToEnd cfg =
           env.[OwinConstants.responseStatusCode] <- box 404
           env.[OwinConstants.responseReasonPhrase] <- box "Not Found"
         else () // 200 OK
+        let responseStream : IO.Stream = unbox env.[OwinConstants.responseBody]
+        responseStream.Write([||],0,0)
         async.Return ()
 
       let postCondition (ctx : HttpContext) =
@@ -440,7 +428,7 @@ let owinEndToEnd cfg =
         async.Return (Some ctx)
 
       let composedApp =
-        pathRegex "/owin(/.+)*" >=> OwinApp.ofApp "/owin" ok >=> postCondition
+        pathRegex "/owin(/.+)*" >=> OwinApp.ofAppWithContinuation "/owin" ok OwinApp.identity >=> postCondition
 
       let asserts (result : HttpResponseMessage) =
         eq "Http Status Code" HttpStatusCode.OK result.StatusCode
@@ -457,6 +445,8 @@ let owinEndToEnd cfg =
           env.[OwinConstants.responseStatusCode] <- box 404
           env.[OwinConstants.responseReasonPhrase] <- box "Not Found"
         else () // 200 OK
+        let responseStream : IO.Stream = unbox env.[OwinConstants.responseBody]
+        responseStream.Write([||],0,0)
         async.Return ()
 
       let composedApp =

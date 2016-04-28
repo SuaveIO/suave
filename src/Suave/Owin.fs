@@ -4,6 +4,7 @@ module Suave.Owin
 // https://github.com/owin/owin/blob/master/spec/owin-1.1.0.md
 
 open System
+open System.IO
 open System.Net
 open System.Threading
 open System.Collections
@@ -227,6 +228,37 @@ type OwinRequest =
   /// (Action<Action<obj>, obj>)
   abstract OnSendingHeaders<'State> : ('State -> unit) -> 'State -> unit
 
+type WebSocketFunc =
+        Func<IDictionary<string, obj>, Task>
+
+type WebSocketAccept =
+    Action<IDictionary<string, obj>, WebSocketFunc>
+
+type WebSocketSendAsync =
+        Func<ArraySegment<byte>,
+             int ,
+             bool ,
+             CancellationToken ,
+             Task>
+
+type WebSocketReceiveAsync =
+        Func<ArraySegment<byte> (* data *),
+             CancellationToken (* cancel *),
+             Task<Tuple<int (* messageType *),
+                        bool (* endOfMessage *),
+                        int (* count *)>>>
+
+type WebSocketReceiveTuple =
+        Tuple<int (* messageType *),
+              bool (* endOfMessage *),
+              int (* count *)>
+
+type WebSocketCloseAsync =
+        Func<int (* closeStatus *),
+             string (* closeDescription *),
+             CancellationToken (* cancel *),
+             Task>
+
 [<RequireQualifiedAccess>]
 [<CompilationRepresentation (CompilationRepresentationFlags.ModuleSuffix)>]
 module OwinApp =
@@ -348,6 +380,60 @@ module OwinApp =
       (fun x -> toString x),
       (fun v -> ofString v)
 
+    open WebSocket
+
+    let webSocketSendAsync (webSocket : WebSocket) =
+      new WebSocketSendAsync(
+        fun (data: ArraySegment<byte>) (messageType: int) fin ct -> 
+          let arr = Array.sub data.Array data.Offset data.Count
+          let send = webSocket.send (toOpcode (byte messageType)) arr fin
+          let task = Async.StartAsTask (send, TaskCreationOptions.None, ct)
+          task :> Task)
+
+    let webSocketReceiveAsync (webSocket : WebSocket) =
+      new WebSocketReceiveAsync(
+        fun (data: ArraySegment<byte>) ct -> 
+          let arr = Array.sub data.Array data.Offset data.Count
+          let receive = async {
+            let! result = webSocket.read ()
+            match result with
+            | Choice1Of2 (a,b,c) ->
+              Array.ConstrainedCopy(b, 0, data.Array, data.Offset, b.Length)
+              return Tuple<_,_,_>(int (fromOpcode a), true, b.Length)
+            | Choice2Of2 err ->
+              return failwith (err.ToString())
+            }
+          Async.StartAsTask (receive, TaskCreationOptions.None, ct))
+
+    let webSocketCloseAsync (webSocket : WebSocket) =
+      new WebSocketCloseAsync(
+        fun closeStatus closeDescription ct -> 
+          let close = async {
+            let! res = webSocket.send Close [||] true
+            return ()
+          }
+          Async.StartAsTask (close, TaskCreationOptions.None, ct) :> Task)
+
+    let continuation (runWebSocket : WebSocketFunc) (webSocket: WebSocket) ctx =
+      socket {
+        let webSocketDictionaryKeys = [
+          OwinConstants.WebSocket.version,       box "1.0"
+          OwinConstants.WebSocket.subProtocol,   box "TODO"
+          OwinConstants.WebSocket.sendAsync,     box (webSocketSendAsync webSocket)
+          OwinConstants.WebSocket.receiveAsync,  box (webSocketReceiveAsync webSocket)
+          OwinConstants.WebSocket.closeAsync,    box (webSocketCloseAsync webSocket)
+          OwinConstants.WebSocket.callCancelled, box (webSocketSendAsync webSocket)
+          ]
+        let dict = new Dictionary<string,obj>(Map.ofList webSocketDictionaryKeys)
+        let task = runWebSocket.Invoke dict
+        do! SocketOp.ofTask task
+      }
+
+    let webSocketAccept (ctx : HttpContext) : WebSocketAccept =
+
+      new Action<IDictionary<string, obj>, WebSocketFunc>
+        (fun dict runWebSocket -> WebSocket.handShake (continuation runWebSocket) ctx |> ignore)
+
     let owinMap ct requestPathBase
                 requestHeadersLens responseHeadersLens
                 responseStreamLens onSendingHeadersLens =
@@ -390,6 +476,9 @@ module OwinApp =
         OwinConstants.callCancelled,        constant ct // TODO: support cancellation token in HttpRequest signalling aborted request
         OwinConstants.owinVersion,          constant "1.3"
 
+        // Websocket
+        OwinConstants.WebSocket.accept,      ((fun x -> webSocketAccept x), (fun v x -> x)) <--> untyped
+
         // Common Keys
         OwinConstants.CommonKeys.addresses,         boundAddresses <--> untyped
         OwinConstants.CommonKeys.serverName,        constant "Suave"
@@ -425,11 +514,22 @@ module OwinApp =
   let headersDictionary (a: (string * string) list) =
     Dictionary (dict (Seq.map (fun (a,b) -> a,[|b|]) a), StringComparer.OrdinalIgnoreCase)
 
-  type internal OwinDictionary(requestPathBase, initialState) =
-    // TODO: support streaming optionally
-      //let impl conn = AsyncSocket.transferStream conn v
-      //SocketTask impl
-    // TODO: cancelled request
+  type OwinStream(transport, owinContext: OwinContext) =
+    inherit TransportStream(transport)
+
+    override x.Write (buffer : byte[],offset : int,count : int) =
+      if not owinContext.HeadersSent then
+        let r = Async.RunSynchronously (owinContext.sendHeaders())
+        ()
+      base.Write(buffer,offset,count)
+
+    override x.WriteAsync (buffer : byte[],offset : int,count : int, ct) =
+      if not owinContext.HeadersSent then
+        let r = Async.RunSynchronously (owinContext.sendHeaders())
+        ()
+      base.WriteAsync(buffer,offset,count,ct)
+
+  and OwinContext(requestPathBase, initialState) as owinCtx =
 
     let cts = new CancellationTokenSource()
     let state : HttpContext ref = ref initialState //externally owned
@@ -461,12 +561,9 @@ module OwinApp =
         | Some v' when Object.ReferenceEquals (v, v') -> x
         | _ -> invalidOp "setting ResponseHeaders IDictionary<string, string[]> is not supported")
 
-    let responseStream = new OpenMemoryStream()
+    let responseStream = new OwinStream(initialState.connection.transport, owinCtx)
     let responseStreamLens : Property<HttpContent, IO.Stream> =
-      (fun x ->
-        let bs = Lens.getPartialOrElse HttpContent.Bytes_ [||] x
-        responseStream.Write(bs, 0, bs.Length)
-        upcast responseStream),
+      (fun x -> upcast responseStream),
       (fun v x ->
         match responseStream with
         | v' when Object.ReferenceEquals (v, v') -> x
@@ -497,12 +594,30 @@ module OwinApp =
                     | Choice1Of2 lens -> lens),
       (fun v x -> invalidOp "setting owin constants not supported")
 
+    let mutable headersSent = false
+    let mutable closeConnection  = false
+
     interface OwinRequest with
       member x.OnSendingHeaders cb st =
         sendingHeaders := ((fun o -> cb (unbox o)), box st) :: !sendingHeaders
 
     member x.Interface =
       x :> OwinEnvironment
+
+    member x.HeadersSent with get () = headersSent
+    member x.CloseConnection with get () = closeConnection
+
+    member x.sendHeaders() = socket{
+      headersSent <- true
+      // collect headers
+      let ctx = x.finalise()
+      // NOTE: if there is no content-lenght header we should buffer
+      closeConnection <- not (List.exists (fun (p,q) -> String.equalsOrdinalCI p "content-length") ctx.response.headers)
+      let! (_, connection) = HttpOutput.writePreamble ctx ctx.connection
+      let! (_, connection) = AsyncSocket.asyncWriteLn "" connection
+      let! connection = AsyncSocket.flush connection
+      return connection
+      }
 
     /// Lock down the OWIN environment so that overly eager OWIN apps don't pick
     /// too much on our internal state using casting/reflection.
@@ -513,10 +628,9 @@ module OwinApp =
 
     /// Calling this returns a valid HttpResult that we can use for Suave
     member x.finalise() =
-      let reqHeaders_, respHeaders_, bytes_ =
+      let reqHeaders_, respHeaders_=
         HttpContext.request_ >--> HttpRequest.headers_,
-        HttpContext.response_ >--> HttpResult.headers_,
-        HttpContext.response_ >--> HttpResult.content_ >-?> HttpContent.Bytes_
+        HttpContext.response_ >--> HttpResult.headers_
 
       let setResponseHeaders (rhs : Dictionary<string, string[]>) =
         Lens.set respHeaders_ (Seq.map (fun k -> k, String.concat ", " rhs.[k]) rhs.Keys |> Seq.toList)
@@ -524,16 +638,11 @@ module OwinApp =
       let setRequestHeaders (rhs : Dictionary<string, string[]>) =
         Lens.set reqHeaders_ (Seq.map (fun k -> k, String.concat ", " rhs.[k]) rhs.Keys |> Seq.toList)
 
-      let setResponseData (ms : OpenMemoryStream) =
-        ms.Seek(0L, IO.SeekOrigin.Begin) |> ignore
-        Lens.setPartial bytes_ (ms.ToArray())
-
       List.foldBack (fun (cb, st) s -> cb st) !sendingHeaders ()
 
       !state
       |> Option.foldBack setRequestHeaders !requestHeaders
       |> Option.foldBack setResponseHeaders !responseHeaders
-      |> setResponseData responseStream
 
     interface IDictionary<string, obj> with
       member x.Remove k =
@@ -597,24 +706,17 @@ module OwinApp =
         |> Seq.map (fun key -> KeyValuePair(key, (x :> IDictionary<_, _>).[key]))
         |> fun seq -> (seq :> IEnumerable).GetEnumerator()
 
-    interface IDisposable with
-      member x.Dispose() =
-        if !canDispose then
-          responseStream.RealDispose()
-          (cts :> IDisposable).Dispose()
+  let FALLBACK_KEY = "__suave.fallback"
 
-  [<CompiledName "OfApp">]
-  let ofApp (requestPathBase : string) (owin : OwinApp) : WebPart =
-
-    Filters.pathStarts requestPathBase >=>
+  let runOwin requestPathBase (owin : OwinApp) cont = 
     fun (ctx : HttpContext) ->
-      let verbose f =
-        ctx.runtime.logger.Log LogLevel.Verbose (
-          f >> LogLine.mk "Suave.Owin" LogLevel.Verbose ctx.request.trace None
-        )
 
-      let impl (conn, response) : SocketOp<Connection> = socket {
+      let verbose f =
+        ctx.runtime.logger.Log LogLevel.Verbose (f >> LogLine.mk "Suave.Owin" LogLevel.Verbose ctx.request.trace None)
+
+      async {
         let owinRequestUri = UriBuilder ctx.request.url
+        let originalUrl = ctx.request.url
 
         owinRequestUri.Path <-
           if ctx.request.path.StartsWith requestPathBase then
@@ -622,49 +724,67 @@ module OwinApp =
           else
             ctx.request.path
 
-        // disposable because it buffers what the OwinApp writes to the stream
-        // also, OWIN expects the default HTTP status code to be 200 OK
-        // could also set the status code after calling SocketOp.ofAsync if the value is not set
-        use wrapper =
-          new OwinDictionary(
-            requestPathBase,
-            { ctx with
+        let initialState =
+          { ctx with
                 request = { ctx.request with url = owinRequestUri.Uri }
-                response = { response with status = HTTP_200.status } })
+                response = { ctx.response with status = HTTP_200.status } }
 
-        do! wrapper.beStoic <| fun _ ->
-          verbose (fun _ -> "yielding to OWIN middleware")
-          SocketOp.ofAsync (owin wrapper.Interface)
+        let wrapper =
+          new OwinContext(requestPathBase, initialState)
 
+        verbose (fun _ -> "yielding to OWIN middleware")
+        do! owin wrapper.Interface
         verbose (fun _ -> "suave back in control")
+
         let ctx = wrapper.finalise()
 
-        verbose (fun _ -> "writing preamble")
-        let! (_, connection) = HttpOutput.writePreamble ctx ctx.connection
-
-        verbose (fun _ -> "writing body")
-        let! connection = HttpOutput.writeContent { ctx with connection = connection } ctx.response.content
-        return connection
+        return! cont wrapper { ctx with request = { ctx.request with url = originalUrl }}
       }
+  
+  // Simple logic for now. If headers were sent lets asume the middleware did handle the request.
+  let simpleLogic (wrapper: OwinContext)= 
+    fun ctx ->
+    async {
+      if wrapper.HeadersSent then
+        let request = 
+          if wrapper.CloseConnection then
+            { ctx.request with headers = [ "connection", "close" ] } 
+          else
+            ctx.request
+        let response = { ctx.response with content = NullContent; writePreamble = false }
+        return Some { ctx with response = response; request = request  }
+      else
+        return None
+    }
 
-      { ctx with
-          response =
-            { ctx.response with
-                content       = SocketTask impl
-                writePreamble = false
-            }
-      }
-      |> succeed
+  let identity (wrapper: OwinContext)= 
+    fun ctx ->
+    async {
+      return Some ctx
+    }
+
+  [<CompiledName "OfAppWithContinuation">]
+  let ofAppWithContinuation (requestPathBase : string) (owin : OwinApp) cont : WebPart =
+    Filters.pathStarts requestPathBase >=> runOwin requestPathBase owin cont
+
+  [<CompiledName "OfApp">]
+  let ofApp (requestPathBase : string) (owin : OwinApp) : WebPart =
+    ofAppWithContinuation requestPathBase owin simpleLogic
 
   [<CompiledName "OfAppFunc">]
   let ofAppFunc requestPathBase (owin : OwinAppFunc) =
-    ofApp requestPathBase
-          (fun e -> Async.AwaitTask ((owin.Invoke e).ContinueWith<_>(fun x -> ())))
+    ofApp requestPathBase (fun env -> Async.AwaitTask (owin.Invoke env))
+
+  [<CompiledName "OfMidFuncWithNext">]
+  let ofMidFuncWithNext requestPathBase (owin : OwinMidFunc) (next : OwinAppFunc) =
+    ofAppFunc requestPathBase (owin.Invoke(next))
 
   [<CompiledName "OfMidFunc">]
   let ofMidFunc requestPathBase (owin : OwinMidFunc) =
-    ofAppFunc requestPathBase
-              (owin.Invoke(fun _ -> new Task(fun x -> ())))
+    let appFunc = owin.Invoke(fun env -> Task.FromResult(false) :> Task)
+    ofAppWithContinuation requestPathBase (fun env -> async{ do! appFunc.Invoke env}) identity
+
+open Suave.Web
 
 module OwinServerFactory =
 

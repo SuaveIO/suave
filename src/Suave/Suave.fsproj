@@ -31,8 +31,7 @@
     <ConsolePause>false</ConsolePause>
     <WarningLevel>3</WarningLevel>
     <DocumentationFile>bin\Release\Suave.xml</DocumentationFile>
-    <DefineConstants>
-    </DefineConstants>
+    <DefineConstants></DefineConstants>
     <DebugType>pdbonly</DebugType>
   </PropertyGroup>
   <PropertyGroup>
@@ -59,8 +58,7 @@
     <ConsolePause>false</ConsolePause>
     <WarningLevel>3</WarningLevel>
     <DocumentationFile>bin\Release\Suave.xml</DocumentationFile>
-    <DefineConstants>
-    </DefineConstants>
+    <DefineConstants></DefineConstants>
     <DebugType>pdbonly</DebugType>
     <PlatformTarget>x86</PlatformTarget>
   </PropertyGroup>
@@ -81,7 +79,7 @@
   <ItemGroup>
     <Compile Include="..\..\paket-files\haf\YoLo\YoLo.fs">
       <Paket>True</Paket>
-      <Link>Utils\YoLo.fs</Link>
+      <Link>Utils/YoLo.fs</Link>
     </Compile>
     <Compile Include="Utils\Aether.fs" />
     <Compile Include="Utils\AsyncExtensions.fs" />
@@ -139,8 +137,8 @@
     <Compile Include="HttpOutput.fs" />
     <Compile Include="ParsingAndControl.fs" />
     <Compile Include="Web.fs" />
-    <Compile Include="Owin.fs" />
     <Compile Include="WebSocket.fs" />
+    <Compile Include="Owin.fs" />
     <Compile Include="Json.fs" />
     <Compile Include="AssemblyVersionInfo.fs" Condition="Exists('AssemblyVersionInfo.fs')" />
     <None Include="paket.references" />

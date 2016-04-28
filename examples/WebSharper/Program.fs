@@ -31,23 +31,38 @@ module SelfHostedServer =
   open global.Owin
   open System.Net
   open System
+  open System.IO
   open System.Diagnostics
+  open Suave
   open Suave.Web
   open Suave.Logging
   open Suave.Owin
   open WebSharper.Owin
 
+  open System.Threading.Tasks
+
+  let logger = Loggers.saneDefaultsFor LogLevel.Verbose
+
+  let exitOwin (env:OwinEnvironment) =
+    async {
+      Log.verbose logger "owin" TraceHeader.empty "exit WebSharper middleware."
+    }
+    |> Async.StartAsTask
+    :> Task
+
   [<EntryPoint>]
   let Main argv =
 
     let app =
-      let root = ".."
-      SiteletMiddleware<_>.AsMidFunc(Options.Create(root), SampleSite.MySampleWebsite)
-      |> Suave.Owin.OwinApp.ofMidFunc "/"
+      let root = "../.."
+      let binDir = typeof<SiteletMiddleware<_>>.Assembly.Location
+                |> Path.GetDirectoryName
+      let options = Options.Create(root,binDir)
+      OwinApp.ofAppFunc "" <| AppFunc(SiteletMiddleware(AppFunc(exitOwin), options, SampleSite.MySampleWebsite).Invoke)
 
     let config =
       { defaultConfig with
-          logger = Loggers.saneDefaultsFor LogLevel.Verbose }
+          logger = logger }
 
-    startWebServer config app
+    startWebServer config <| choose [ app; RequestErrors.NOT_FOUND "file not found." ]
     0
