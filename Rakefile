@@ -108,15 +108,20 @@ build :compile_quick do |b|
 end
 
 namespace :dotnetcli do
-  task :coreclr_binaries do
+  directory 'tools/coreclr'
+
+  task :coreclr_binaries => 'tools/coreclr'do
     dotnet_version = '1.0.0-beta-002071'
     case RUBY_PLATFORM
     when /darwin/
+      filename = "dotnet-dev-osx-x64.#{dotnet_version}.tar.gz"
       system 'curl',
-        %W|-o tools/dotnet-dev-osx-x64.#{dotnet_version}.tar.gz
-           -L https://dotnetcli.blob.core.windows.net/dotnet/beta/Binaries/#{dotnet_version}/dotnet-dev-osx-x64.#{dotnet_version}.tar.gz|
+        %W|-o #{filename}
+           -L https://dotnetcli.blob.core.windows.net/dotnet/beta/Binaries/#{dotnet_version}/#{filename}| \
+        unless File.exists? filename
+
       system 'tar',
-        %W|xf tools/
+        %W|xf tools/#{filename}
            --directory tools/coreclr|
     when /linux/
       system 'curl',
@@ -136,18 +141,19 @@ namespace :dotnetcli do
     end
   end
 
+  desc 'Restore the CoreCLR binaries'
   task :restore => :coreclr_binaries do
     system "tools/coreclr/dotnet restore"
   end
 
-  # build Suave and test project
+  desc 'Build Suave and test project'
   task :build do
     Dir.chdir("src/Suave.DotnetCLI.Tests") do
       system "../../tools/coreclr/dotnet --verbose build"
     end
   end
 
-  # create Suave nugets packages
+  desc 'Create Suave nugets packages'
   task :pack do
     Dir.chdir("src/Suave") do
       system "../../tools/coreclr/dotnet --verbose pack --configuration #{Configuration}"
@@ -197,7 +203,6 @@ task :create_nuget_quick => [:versioning, 'build/pkg'] do
     p = Albacore::Project.new f
     n = create_nuspec p, knowns
     d = get_dependencies n
-    fi = get_files n, p.proj_path_base
     m = %{type file
 id #{p.id}
 version #{ENV['NUGET_VERSION']}
