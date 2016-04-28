@@ -41,10 +41,29 @@ module Writers =
   /// Sets the HTTP response status
   val setStatus : status:HttpCode -> WebPart
 
-  /// Ensures that the key header has the given value
+  /// Ensures that the header named by the `key` parameter has the given value,
+  /// by removing any other headers with the same key from the response header
+  /// list.
   val setHeader : key:string -> value:string -> WebPart
 
-  /// Adds the header key with the given value to the list of returned headers, even if that header already exists
+  /// Ensures that the is unique in the comma-separated list of the response
+  /// header, denoted by `key`. This is useful for example for the "Vary" header
+  /// which should at the very minimum include "Accept-Encoding", but may also
+  /// include "Accept-Language" for multi-lingual sites (see Suave.Locale repo)
+  /// and "Authorization" and "Cookie" for authorized resources.
+  val setHeaderValue : key:string -> value:string -> WebPart
+
+  /// Adds the header key with the given value to the list of returned headers,
+  /// even if that header already exists. This means that Suave will serve a
+  /// a response with the header denoted by `key` with possibly different values.
+  ///
+  /// Also consider `setHeader` and `setHeaderValue` depending on what semantics
+  /// you'd like.
+  ///
+  /// Furthermore, Cookies must be set on separate header lines (using this
+  /// function) and not comma-concatenated. See
+  /// https://github.com/SuaveIO/suave/issues/338#issuecomment-156820747 for
+  /// defails.
   val addHeader : key:string -> value:string -> WebPart
 
   /// Sets a user data key-value pair with the key and value specified. Downstream
@@ -69,7 +88,10 @@ module Writers =
   val defaultMimeTypesMap : ext:string -> MimeType option
 
   /// <summary><para>
-  /// Set the Content-Type header to the mime type given
+  /// Set the Content-Type header to the mime type given. Remember that it should
+  /// include the encoding of your content. So for example, specifying a mimeType
+  /// value of 'application/json; charset=utf-8' is strongly recommended (but
+  /// replace 'json' with your own MIME type, of course ;))
   /// </para><para>
   /// </para><para>
   /// </para></summary>
@@ -1410,7 +1432,7 @@ module Embedded =
   /// </remarks>
   val sendResource : source:Assembly -> resourceName:string -> compression:bool -> WebPart
 
-  #if !DNXCORE50
+  #if !NETSTANDARD1_5
   /// <summary><para>
   /// Send an embedded resource as a response to the request
   /// </para><para>
@@ -1429,7 +1451,7 @@ module Embedded =
   /// </remarks>
   val resource : source:Assembly -> name:string -> WebPart
 
-  #if !DNXCORE50
+  #if !NETSTANDARD1_5
   /// <summary><para>
   /// Send the resource by the name given.
   /// Will also set the MIME type based on the file extension.
@@ -1447,7 +1469,7 @@ module Embedded =
   /// </remarks>
   val browse : source:Assembly -> WebPart
 
-  #if !DNXCORE50
+  #if !NETSTANDARD1_5
   /// <summary><para>
   /// 'browse' the file in the sense that the contents of the file are sent based on the
   /// request's Url property. Will serve from the executing assemblies resources.

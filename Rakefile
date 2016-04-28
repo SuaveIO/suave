@@ -4,12 +4,14 @@ require 'bundler/setup'
 
 require 'albacore'
 require 'albacore/nuget_model'
+require 'albacore/project'
+require 'albacore/tools'
 require 'albacore/tasks/versionizer'
 require 'albacore/tasks/release'
 require 'albacore/task_types/nugets_pack'
 require 'albacore/task_types/asmver'
 require 'albacore/ext/teamcity'
-
+require './tools/paket_pack'
 require 'semver'
 
 Albacore::Tasks::Versionizer.new :versioning
@@ -73,8 +75,16 @@ task :libs do
     7z x v1.7.5.zip & cd libuv-1.7.5 & vcbuild.bat x86 shared debug
     mkdir src\\Suave.Tests\\bin\\Release\\ & cp libuv-1.7.5\\Debug\\libuv.dll src\\Suave.Tests\\bin\\Release\\libuv.dll
 
-  On Linux:
-    ...
+  On Linux Ubuntu/Debian:
+    sudo apt-get install automake libtool
+    curl -sSL https://github.com/libuv/libuv/archive/v1.7.5.tar.gz | sudo tar zxfv - -C /usr/local/src
+    cd /usr/local/src/libuv-1.7.5
+    sudo sh autogen.sh
+    sudo ./configure
+    sudo make 
+    sudo make install
+    sudo rm -rf /usr/local/src/libuv-1.7.5 && cd ~/
+    sudo ldconfig
   }
       end
     end
@@ -95,6 +105,67 @@ build :compile_quick do |b|
   b.file = 'src/Suave.sln'
   b.prop 'Configuration', Configuration
   b.prop 'Platform', Platform
+end
+
+namespace :dotnetcli do
+  task :coreclr_binaries do
+    dotnet_version = '1.0.0-beta-002071'
+    case RUBY_PLATFORM
+    when /darwin/
+      system 'curl',
+        %W|-o tools/dotnet-dev-osx-x64.#{dotnet_version}.tar.gz
+           -L https://dotnetcli.blob.core.windows.net/dotnet/beta/Binaries/#{dotnet_version}/dotnet-dev-osx-x64.#{dotnet_version}.tar.gz|
+      system 'tar',
+        %W|xf tools/
+           --directory tools/coreclr|
+    when /linux/
+      system 'curl',
+        %W|-o tools/dotnet-dev-ubuntu-x64.#{dotnet_version}.tar.gz
+           -L https://dotnetcli.blob.core.windows.net/dotnet/beta/Binaries/#{dotnet_version}/dotnet-dev-ubuntu-x64.#{dotnet_version}.tar.gz|
+      system 'mkdir', 'tools/coreclr'
+      system 'tar',
+        %W|xf tools/dotnet-dev-ubuntu-x64.#{dotnet_version}.tar.gz
+           --directory tools/coreclr|
+    end
+    if Gem.win_platform?
+      system 'powershell',
+        %W|Invoke-WebRequest "https://raw.githubusercontent.com/dotnet/cli/rel/1.0.0/scripts/obtain/install.ps1" -OutFile "dotnet_cli_install.ps1"|
+      system 'powershell',
+        %W|-ExecutionPolicy Unrestricted ./dotnet_cli_install.ps1 -InstallDir "tools/coreclr" -Channel "beta" -version "#{dotnet_version}"|
+      ENV['PATH'] = %{#{Dir.pwd}/tools/coreclr/sdk/#{dotnet_version};#{ENV['PATH']}} 
+    end
+  end
+
+  task :restore => :coreclr_binaries do
+    system "tools/coreclr/dotnet restore"
+  end
+
+  # build Suave and test project
+  task :build do
+    Dir.chdir("src/Suave.DotnetCLI.Tests") do
+      system "../../tools/coreclr/dotnet --verbose build"
+    end
+  end
+
+  # create Suave nugets packages
+  task :pack do
+    Dir.chdir("src/Suave") do
+      system "../../tools/coreclr/dotnet --verbose pack --configuration #{Configuration}"
+    end
+  end
+
+  task :do_netcorepackage => [ :restore, :build, :pack ]
+ 
+  # merge standard and dotnetcli nupkgs
+  task :merge do
+    Dir.chdir("src/Suave") do
+      version = SemVer.find.format("%M.%m.%p%s")
+      sourcenupkg = "../../build/pkg/Suave.#{version}.nupkg"
+      clinupkg = "bin/#{Configuration}/Suave.#{version}-dotnetcli.nupkg"
+      system %Q[../../tools/coreclr/dotnet mergenupkg --source "#{sourcenupkg}" --other "#{clinupkg}" --framework netstandard1.5]
+    end
+  end
+
 end
 
 namespace :tests do
@@ -118,21 +189,42 @@ task :tests => [:'tests:stress', :'tests:unit']
 
 directory 'build/pkg'
 
-nugets_pack :create_nuget_quick => [:versioning, 'build/pkg'] do |p|
-  p.configuration = Configuration
-  p.files   = FileList['src/**/*.fsproj'].exclude(/Tests/)
-  p.out     = 'build/pkg'
-  p.exe     = 'packages/build/NuGet.CommandLine/tools/NuGet.exe'
-  p.with_metadata do |m|
-    m.version       = ENV['NUGET_VERSION']
-    m.authors       = 'Ademar Gonzalez, Henrik Feldt'
-    m.description   = suave_description
-    m.language      = 'en-GB'
-    m.copyright     = 'Ademar Gonzalez, Henrik Feldt'
-    m.license_url   = "https://github.com/SuaveIO/Suave/blob/master/COPYING"
-    m.project_url   = "http://suave.io"
-    m.icon_url      = 'https://raw.githubusercontent.com/SuaveIO/resources/master/images/head_trans.png'
-    # m.add_dependency 'Fuchu-suave', '0.5.0'
+task :create_nuget_quick => [:versioning, 'build/pkg'] do
+  projects = FileList['src/**/*.fsproj'].exclude(/Tests/)
+  knowns = Set.new(projects.map { |f| Albacore::Project.new f }.map { |p| p.id })
+  authors = "Ademar Gonzalez, Henrik Feldt"
+  projects.each do |f|
+    p = Albacore::Project.new f
+    n = create_nuspec p, knowns
+    d = get_dependencies n
+    fi = get_files n, p.proj_path_base
+    m = %{type file
+id #{p.id}
+version #{ENV['NUGET_VERSION']}
+title #{p.id}
+authors #{authors}
+owners #{authors}
+description #{suave_description}
+language en-GB
+copyright #{authors}
+licenseUrl https://github.com/SuaveIO/Suave/blob/master/COPYING
+projectUrl http://suave.io
+iconUrl https://raw.githubusercontent.com/SuaveIO/resources/master/images/head_trans.png
+files
+  #{p.proj_path_base}/bin/#{Configuration}/#{p.id}.* ==\> lib/net40
+releaseNotes
+  #{n.metadata.release_notes}
+dependencies
+  #{d}
+}
+    begin
+      File.open("paket.template", "w") do |template|
+        template.write m
+      end
+      system "tools/paket.exe", %w|pack output build/pkg|, clr_command: true
+    ensure
+      File.delete "paket.template"
+    end
   end
 end
 
@@ -150,7 +242,13 @@ task :increase_version_number do
   s = SemVer.find
   s.minor += 1
   s.save
-  ENV['NUGET_VERSION'] = s.format("%M.%m.%p%s")
+  version = s.format("%M.%m.%p%s")
+  ENV['NUGET_VERSION'] = version
+  projectjson = 'src/Suave/project.json'
+  contents = File.read(projectjson).gsub(/"version": ".*-dotnetcli"/, %{"version": "#{version}-dotnetcli"})
+  File.open(projectjson, 'w') do |out|
+    out << contents
+  end  
 end
 
 namespace :docs do

@@ -106,7 +106,7 @@ let authTests cfg =
       let cookies = ctx |> reqCookies' HttpMethod.GET "/"  None
       Assert.NotNull("should have auth cookie", cookies.[SessionAuthCookie])
 
-    testCase "can access authenticated contents" <| fun _ ->
+    testCase "can access authenticated contents when authenticate, and not after deauthenticate" <| fun _ ->
       // given
       let ctx =
         runWithConfig (
@@ -119,6 +119,7 @@ let authTests cfg =
                                  Choice2Of2(FORBIDDEN "please authenticate"))
                                (fun _ -> Choice2Of2(BAD_REQUEST "did you fiddle with our cipher text?"))
                                (OK "You have reached the place of your dreams!")
+            path "/deauth" >=> deauthenticate >=> OK "deauthed"
             NOT_FOUND "arghhh"
             ])
 
@@ -149,10 +150,16 @@ let authTests cfg =
         Assert.Equal("should have access to protected", "You have reached the place of your dreams!", contentString res''')
         Assert.Equal("code 200 OK", HttpStatusCode.OK, statusCode res''')
 
+        use res'''' = interact HttpMethod.GET "/deauth"
+        Assert.Equal("should have logged out now", "deauthed", contentString res'''')
+
+        use res''''' = interact HttpMethod.GET "/protected"
+        Assert.Equal("should not have access to protected after logout","please authenticate", contentString res''''')
+
     testCase "test session is maintained across requests" <| fun _ ->
       // given
       let ctx =
-        runWithConfig ( 
+        runWithConfig (
           statefulForSession
           >=> sessionState (fun store ->
               match store.get "counter" with
@@ -179,7 +186,7 @@ let authTests cfg =
     testCase "set more than one variable in the session" <| fun _ ->
       // given
       let ctx =
-        runWithConfig ( 
+        runWithConfig (
           statefulForSession
           >=> choose [
             path "/a"     >=> sessionState (fun state -> state.set "a" "a" >=> OK "a" )
@@ -203,11 +210,11 @@ let authTests cfg =
 
         use res''' = interact HttpMethod.GET "/get_b"
         Assert.Equal("should return b", "b", contentString res'''))
-        
+
     testCase "set two session values on the same request" <| fun _ ->
       // given
       let ctx =
-        runWithConfig ( 
+        runWithConfig (
           statefulForSession >=> choose [
             path "/ab"     >=> sessionState (fun state -> state.set "a" "a" >=> sessionState ( fun state' -> state'.set "b" "b" >=> OK "a" ))
             path "/get_a" >=> sessionState (fun state -> match state.get "a" with Some a -> OK a | None -> RequestErrors.BAD_REQUEST "fail")

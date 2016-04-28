@@ -21,12 +21,13 @@ module Cookie =
   let parseCookies (s : string) : HttpCookie list =
     s.Split([|';'|], StringSplitOptions.RemoveEmptyEntries)
     |> Array.toList
+    |> List.map (String.trim)
     |> List.map (fun (cookie : string) ->
-        let parts = cookie.Split([|'='|], StringSplitOptions.RemoveEmptyEntries)
-        if parts.Length > 1 then
-          Some (HttpCookie.mkKV (String.trim parts.[0]) (String.trim parts.[1]))
-        else
-          None)
+        match cookie.IndexOf("=") with
+        | idx when idx + 1 = cookie.Length -> None // no value is set
+        | idx when idx > 1 -> Some (HttpCookie.mkKV (String.trim (cookie.Substring(0, idx))) (String.trim (cookie.Substring(idx + 1))))
+        | _ -> None)
+
     |> List.choose id
 
   let parseResultCookie (s : string) : HttpCookie =

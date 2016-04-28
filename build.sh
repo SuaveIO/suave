@@ -29,4 +29,4 @@ echo 'Building'
 xbuild src/Suave.sln /p:Configuration=Release
 
 echo 'Running tests'
-mono src/Suave.Tests/bin/Debug/Suave.Tests.exe
+mono src/Suave.Tests/bin/Release/Suave.Tests.exe

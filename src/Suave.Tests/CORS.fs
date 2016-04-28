@@ -57,12 +57,12 @@ let tests cfg =
   testList "CORS tests" [
     testList "Preflight tests" [
       testCase "Can make valid preflight CORS request - without Access-Control-Request-Header" <| fun _ ->
-      
+
         let setHeaders (request : HttpRequestMessage) =
           request.Headers.Add("Origin", origin)
           request.Headers.Add("Access-Control-Request-Method", "GET")
           request
-         
+
         let asserts (result : HttpResponseMessage) =
           let content = result.Content.ReadAsStringAsync().Result
           eq "Content" "" content // Preflight request should not return content

@@ -6,7 +6,7 @@ type CookieSerialiser =
   abstract Serialise : Map<string, obj> -> byte []
   abstract Deserialise : byte [] -> Map<string, obj>
 
-#if DNXCORE50
+#if NETSTANDARD1_5
 open System.Runtime.Serialization.Json
 
 type JsonFormatterSerialiser() =

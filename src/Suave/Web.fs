@@ -76,7 +76,7 @@ module Web =
       compressedFilesFolder = None
       logger                = Loggers.saneDefaultsFor LogLevel.Info
       tcpServerFactory      = new DefaultTcpServerFactory()
-      #if DNXCORE50
+      #if NETSTANDARD1_5
       cookieSerialiser      = new JsonFormatterSerialiser()
       #else
       cookieSerialiser      = new BinaryFormatterSerialiser()

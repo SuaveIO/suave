@@ -13,6 +13,9 @@ Suave also takes advantage of F# asynchronous
 workflows to perform non-blocking IO. In fact, Suave is written in a completely
 non-blocking fashion throughout.
 
+Sponsored by
+[qvitoo – A.I. bookkeeping and Suave in production since many years](https://qvitoo.com/?utm_source=github&utm_campaign=suave).
+
 ## Build Status
 
 | Platform | Status         |

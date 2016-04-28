@@ -92,5 +92,7 @@ module HttpOutput =
         else
           let! connection =  writeContent newCtx newCtx.response.content
           return Some { newCtx with connection = connection }
-      | None -> return None
+
+      | None ->
+        return None
   }
