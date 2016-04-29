@@ -1,7 +1,7 @@
 POST /filenames HTTP/1.1
 Content-Type: multipart/form-data; boundary=/tkQKiFqMgZt:mHzua_JFrUFWHgNid
 Content-Length: 587
-Connection: keep-alive
+Connection: close
 Host: localhost:9001
 
 --/tkQKiFqMgZt:mHzua_JFrUFWHgNid
@@ -24,4 +24,3 @@ Content-Type: text/plain
 ...contents of file2.gif...
 ---idczlATz:FmvuIs'aHQSrGltky:Td--
 --/tkQKiFqMgZt:mHzua_JFrUFWHgNid--
-

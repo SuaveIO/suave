@@ -31,8 +31,8 @@ let parsing_tests (_: SuaveConfig) =
       // the server generates a new one with the client's as the parent?
       // is the semantics that client sends its SpanId and that
       let expected = TraceHeader.mk (Some 7654321UL) (Some 1234567UL)
-      Assert.Equal("should parse trace id", expected.traceId, (parseTraceHeaders headers).traceId)
-      Assert.Equal("should parse span id to parent span id", expected.reqParentId, (parseTraceHeaders headers).reqParentId)
+      Assert.Equal("should parse trace id", expected.traceId, (TraceHeader.parseTraceHeaders headers).traceId)
+      Assert.Equal("should parse span id to parent span id", expected.reqParentId, (TraceHeader.parseTraceHeaders headers).reqParentId)
     ]
 
 [<Tests>]
