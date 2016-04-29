@@ -19,7 +19,7 @@ open Suave.Utils.Bytes
 
 type ScanResult = NeedMore | Found of int
 
-module private Aux =
+module internal Aux =
 
   let inline skipBuffers (pairs : LinkedList<BufferSegment>) (number : int)  =
     let rec loop acc = 
@@ -41,16 +41,6 @@ module private Aux =
       return! SocketOp.abort (Error.SocketError SocketError.Shutdown)
     }
 
-  let inline parseTraceHeaders (headers : NameValueList) =
-    let tryParseUint64 x = 
-      match UInt64.TryParse x with 
-      | true, value -> Choice1Of2 value
-      | false, _    -> Choice2Of2 (sprintf "Couldn't parse '%s' to int64" x)
-    let parent = "x-b3-spanid"  |> getFirst headers |> Choice.bind tryParseUint64 |> Option.ofChoice
-    let trace  = "x-b3-traceid" |> getFirst headers |> Choice.bind tryParseUint64 |> Option.ofChoice
-    TraceHeader.mk trace parent
-
-
 type ConnectionFacade(ctx) =
 
   let BadRequestPrefix = "__suave_BAD_REQUEST"
@@ -67,6 +57,7 @@ type ConnectionFacade(ctx) =
   let multiPartFields = List<string*string>()
   let mutable _rawForm : byte array = [||]
 
+  /// Splits the segment list in two lits of ArraySegment; the first one containing a total of index bytes 
   let split index select markerLength : Async<int> =
     let rec loop acc count =  async {
       if segments.Count = 0 then 
@@ -99,6 +90,21 @@ type ConnectionFacade(ctx) =
       }
     loop 0 0
 
+  let freeArraySegments index select = socket {
+    let mutable n = 0
+    let mutable currentnode = segments.Last
+    while currentnode<>null do
+        let b = currentnode.Value
+        if n > 0 && n + b.length >= index then
+          //procees, free and remove
+          do! SocketOp.ofAsync <| select (ArraySegment(b.buffer.Array, b.offset, b.length)) b.length
+          do bufferManager.FreeBuffer( b.buffer,"Suave.Web.scanMarker" )
+          segments.Remove currentnode
+        n <- n + b.length
+        currentnode <- currentnode.Previous
+    }
+
+
   /// Iterates over a BufferSegment list looking for a marker, data before the marker 
   /// is sent to the function select and the corresponding buffers are released
   /// Returns the number of bytes read.
@@ -109,18 +115,7 @@ type ConnectionFacade(ctx) =
       let! res = SocketOp.ofAsync <| split x select marker.Length
       return Found res
     | None   ->
-      let mutable n = 0
-      let mutable currentnode = segments.Last
-      while currentnode<>null do
-          let b = currentnode.Value
-          if n > 0 && n + b.length >= marker.Length then
-            //procees, free and remove
-            do! SocketOp.ofAsync <| select (ArraySegment(b.buffer.Array, b.offset, b.length)) b.length
-            do bufferManager.FreeBuffer( b.buffer,"Suave.Web.scanMarker" )
-            segments.Remove currentnode
-          n <- n + b.length
-          currentnode <- currentnode.Previous
-
+      do! freeArraySegments marker.Length select
       return NeedMore
     }
 
@@ -152,6 +147,21 @@ type ConnectionFacade(ctx) =
     }
     loop
 
+  /// takes a pick at the next buffer segment in the parser queue
+  let pick =
+    let rec loop = socket {
+      if segments.Count > 0 then
+        return segments.First.Value
+      else
+        do! readMoreData
+        return! loop
+    }
+    loop
+
+  let skip n = socket {
+    return! SocketOp.ofAsync <| split n (fun a b -> async { return () }  ) 0
+    }
+
   /// returns the number of bytes read and the connection
   let readUntilEOL select =
     readUntilPattern (scanMarker EOL select)
@@ -171,6 +181,15 @@ type ConnectionFacade(ctx) =
       })
     let result = ASCII.toStringAtOffset lineBuffer.Array lineBuffer.Offset count
     return result
+  }
+
+  let skipLine = socket {
+    let offset = ref 0
+    let! _ =
+      readUntilEOL (fun a count -> async {
+        offset := !offset + count
+      })
+    return offset
   }
 
   /// Read all headers from the stream, returning a dictionary of the headers found
@@ -249,10 +268,15 @@ type ConnectionFacade(ctx) =
     let verbosef = Log.verbosef logger "Suave.Web.parseMultipartMixed" trace
 
     let rec loop = socket {
+
       let! firstLine = readLine
 
-      if not (firstLine.Equals("--")) then
+      if firstLine.Equals("--") then
+        return ()
+      else
+
         let! partHeaders = readHeaders
+
         let! (contentDisposition : string) =
           (partHeaders %% "content-disposition")
           @|! "Missing 'content-disposition'"
@@ -280,23 +304,17 @@ type ConnectionFacade(ctx) =
           let byts = mem.ToArray()
           multiPartFields.Add (fieldName, ASCII.toStringAtOffset byts 0 byts.Length)
           return! loop 
-      else
-        return ()
       }
-
     loop
 
   /// Parses multipart data from the stream, feeding it into the HttpRequest's property Files.
-  let parseMultipart boundary : SocketOp<unit> =
+  let parseMultipart (boundary:string) : SocketOp<unit> =
     let verbosef = Log.verbosef logger "Suave.Web.parseMultipart" trace
 
-    let rec loop  = socket {
-      let! firstLine = readLine
+    let  parsePart  = socket {
 
-      if firstLine.Equals("--") || firstLine.Equals(boundary + "--") || firstLine.Equals("--" + boundary) then
-        return ()
-      else
         let! partHeaders = readHeaders
+
         let! (contentDisposition : string) =
           (partHeaders %% "content-disposition")
           @|! "Missing 'content-disposition'"
@@ -315,7 +333,8 @@ type ConnectionFacade(ctx) =
         | Choice1Of2 x when String.startsWith "multipart/mixed" x ->
           let subboundary = "--" + (x.Substring(x.IndexOf('=') + 1) |> String.trimStart |> String.trimc '"')
           do! parseMultipartMixed fieldName subboundary
-          return! loop 
+          let! a = skip (boundary.Length)
+          return () 
 
         | Choice1Of2 contentType ->
           verbosef (fun f -> f "parsing content type %s -> readFilePart" contentType)
@@ -325,9 +344,9 @@ type ConnectionFacade(ctx) =
           match res with
           | Some upload ->
             files.Add(upload)
-            return! loop 
+            return () 
           | None ->
-            return! loop 
+            return () 
 
         | Choice2Of2 _ ->
           use mem = new MemoryStream()
@@ -337,10 +356,28 @@ type ConnectionFacade(ctx) =
               })
           let byts = mem.ToArray()
           multiPartFields.Add(fieldName, ASCII.toStringAtOffset byts 0 byts.Length)
-          return! loop 
+          return () 
       }
 
-    loop 
+    socket {
+      let mutable parsing = true
+      let! firstLine = readLine
+
+      assert(firstLine=boundary)
+      while parsing do
+        do! parsePart
+        //pick at the next two bytes and decide where to exit the loop
+        let! b = pick
+        if b.buffer.Array.[b.offset] = 45uy && b.buffer.Array.[b.offset+1] = 45uy then
+          let! a = skip 2
+          parsing <- false
+          return ()
+        elif b.buffer.Array.[b.offset] = EOL.[0] && b.buffer.Array.[b.offset+1] = EOL.[1] then
+          let! a = skip 2
+          return ()
+        else
+          failwith "invalid multipart format"
+    } 
 
   /// Reads raw POST data
   let getRawPostData contentLength =
@@ -427,7 +464,7 @@ type ConnectionFacade(ctx) =
         rawQuery         = rawQuery
         files            = Seq.toList files
         multiPartFields  = Seq.toList multiPartFields
-        trace            = Aux.parseTraceHeaders headers }
+        trace            = TraceHeader.parseTraceHeaders headers }
 
     return Some { ctx with request = request; connection = { ctx.connection with segments = Seq.toList segments } }
   }
