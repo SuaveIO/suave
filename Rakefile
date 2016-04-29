@@ -116,9 +116,9 @@ namespace :dotnetcli do
     when /darwin/
       filename = "dotnet-dev-osx-x64.#{dotnet_version}.tar.gz"
       system 'curl',
-        %W|-o #{filename}
+        %W|-o tools/#{filename}
            -L https://dotnetcli.blob.core.windows.net/dotnet/beta/Binaries/#{dotnet_version}/#{filename}| \
-        unless File.exists? filename
+        unless File.exists? "tools/#{filename}"
 
       system 'tar',
         %W|xf tools/#{filename}
@@ -128,7 +128,7 @@ namespace :dotnetcli do
       system 'curl',
         %W|-o tools/#{filename}
            -L https://dotnetcli.blob.core.windows.net/dotnet/beta/Binaries/#{dotnet_version}/#{filename}| \
-        unless File.exists? filename
+        unless File.exists? "tools/#{filename}"
 
       system 'tar',
         %W|xf tools/#{filename}
