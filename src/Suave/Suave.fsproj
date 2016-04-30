@@ -141,6 +141,7 @@
     <Compile Include="ParsingAndControl.fs" />
     <Compile Include="Web.fs" />
     <Compile Include="WebSocket.fs" />
+    <Compile Include="Http2.fs" />
     <Compile Include="Owin.fs" />
     <Compile Include="Json.fs" />
     <Compile Include="AssemblyVersionInfo.fs" Condition="Exists('AssemblyVersionInfo.fs')" />
