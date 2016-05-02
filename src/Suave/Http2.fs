@@ -84,10 +84,16 @@ module Http2 =
       Array.Reverse (b)
     b
 
-  type FrameHeader = { length : uint32;
-                ``type`` : byte;
-                flags : byte;
-                streamIdentifier : uint32 }
+  type FrameHeader = { 
+    // the length field allows payloads of up to 224224 bytes (~16MB) per frame
+    length : uint32;
+    ``type`` : byte;
+    flags : byte;
+    streamIdentifier : uint32 }
+
+  let get31Bit (data: byte []) =
+    data.[3] <- data.[3] &&& 128uy
+    BitConverter.ToUInt32 (ensureBigEndian data, 0)
 
   let readFrameHeader transport = socket{
 
@@ -104,13 +110,11 @@ module Http2 =
       let frameType  = bytes.[3]; // 4th byte in frame header is TYPE
       let frameFlags = bytes.[4]; // 5th byte is FLAGS
 
-      // we need to turn the stream id into a uint
       let frameStreamIdData = Array.zeroCreate<byte> 4
       Array.Copy (bytes, 5, frameStreamIdData, 0, 4)
 
       // turn of most significant bit
-      frameStreamIdData.[3] <- frameStreamIdData.[3] &&& 128uy
-      let streamIdentifier = BitConverter.ToUInt32 (ensureBigEndian frameStreamIdData, 0)
+      let streamIdentifier = get31Bit frameStreamIdData 
 
       return { length = frameLength;
                 ``type`` = frameType;
@@ -118,8 +122,49 @@ module Http2 =
                 streamIdentifier = streamIdentifier}
     }
 
+  type FramePayload =
+    | Data of byte [] * bool
+    | Headers of (uint32*byte) option * byte[]
+
+  type PayloadDecoder = FrameHeader -> byte [] -> FramePayload
+
+  let removePadding (header: FrameHeader) (payload: byte[]) =
+    let isPadded = (header.flags &&& 0x8uy) = 0x8uy
+    let i, padding = if isPadded then 1, payload.[0] else 0,0uy
+
+    let data = Array.zeroCreate(payload.Length - (i + (int padding)))
+    Array.Copy (payload, i, data, 0, data.Length);
+    data
+
+  let parseData (header: FrameHeader) (payload: byte[]) =
+    assert(header.``type`` = 0uy)
+    //  If a DATA frame is received whose stream identifier field is 0x0, 
+    // the recipient MUST respond with a connection error (Section 5.4.1) of type PROTOCOL_ERROR.
+    let isEndStream = (header.flags &&& 0x1uy) = 0x1uy
+    let data = removePadding header payload
+    Data (data, isEndStream)
+
+  let parseHeaders (header: FrameHeader) (payload: byte[]) =
+    assert(header.``type`` = 1uy)
+    let data = removePadding header payload
+    let priority = header.flags &&& 0x20uy = 0x20uy
+
+    if priority then
+      let dependecyData = Array.zeroCreate 4
+      Array.Copy(data, 0, dependecyData, 0, 4)
+      let dependency = get31Bit dependecyData 
+      let weight = data.[4]
+      let headerBlockFragment = Array.zeroCreate (data.Length - 5)
+      Headers (Some (dependency, weight), headerBlockFragment)
+    else
+      Headers (None, data)
+
+  let payloadDecoders : PayloadDecoder [] = 
+    [| parseData; parseHeaders |]
+
   let readFrame transport = socket {
     let! header = readFrameHeader transport
     let! payload = readBytes transport (int header.length)
+    let payload = payloadDecoders.[int header.``type``] header payload
     return header, payload
     }
