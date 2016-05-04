@@ -108,6 +108,7 @@ module Writers =
     | ".ttf" -> mkMimeType "application/x-font-ttf" true
     | ".otf" -> mkMimeType "application/font-sfnt" true
     | ".woff" -> mkMimeType "application/font-woff" false
+    | ".woff2" -> mkMimeType "application/font-woff2" false
     | ".eot" -> mkMimeType "application/vnd.ms-fontobject" false
     | _      -> None
 
