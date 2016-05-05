@@ -81,7 +81,7 @@
   <ItemGroup>
     <Compile Include="..\..\paket-files\haf\YoLo\YoLo.fs">
       <Paket>True</Paket>
-      <Link>Utils\YoLo.fs</Link>
+      <Link>Utils/YoLo.fs</Link>
     </Compile>
     <Compile Include="Utils\Aether.fs" />
     <Compile Include="Utils\AsyncExtensions.fs" />

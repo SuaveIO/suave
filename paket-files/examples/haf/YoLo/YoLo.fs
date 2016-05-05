@@ -68,7 +68,7 @@ module Choice =
 
   let injectSnd f = function
     | Choice1Of2 x -> Choice1Of2 x
-    | Choice2Of2 x -> f x; Choice1Of2 x
+    | Choice2Of2 x -> f x; Choice2Of2 x
 
   module Operators =
 
@@ -192,11 +192,19 @@ module String =
 
   /// Also, invariant culture
   let equals (a : string) (b : string) =
+#if DNXCORE50
+    (CultureInfo.InvariantCulture.CompareInfo.GetStringComparer(CompareOptions.None)).Equals(a, b)
+#else
     a.Equals(b, StringComparison.InvariantCulture)
+#endif
 
   /// Also, invariant culture
   let equalsCaseInsensitve (a : string) (b : string) =
+#if DNXCORE50
+    (CultureInfo.InvariantCulture.CompareInfo.GetStringComparer(CompareOptions.IgnoreCase)).Equals(a, b)
+#else
     a.Equals(b, StringComparison.InvariantCultureIgnoreCase)
+#endif
     
   /// Compare ordinally with ignore case.
   let equalsOrdinalCI (str1 : string) (str2 : string) =
@@ -258,20 +266,32 @@ module Bytes =
     sha.ComputeHash ms
 
   let sha1 =
+#if DNXCORE50
+    hash (SHA1.Create())
+#else
     hash (new SHA1Managed())
+#endif
 
   let sha256 =
+#if DNXCORE50
+    hash (SHA256.Create())
+#else
     hash (new SHA256Managed())
+#endif
 
   let sha512 =
+#if DNXCORE50
+    hash (SHA512.Create())
+#else
     hash (new SHA512Managed())
+#endif
 
   let toHex (bs : byte[]) =
     BitConverter.ToString bs
     |> String.replace "-" ""
     |> String.toLowerInvariant
 
-  let fromHex (digestString : string) =
+  let ofHex (digestString : string) =
     Enumerable.Range(0, digestString.Length)
               .Where(fun x -> x % 2 = 0)
               .Select(fun x -> Convert.ToByte(digestString.Substring(x, 2), 16))
@@ -591,13 +611,21 @@ module App =
 
   /// Gets the calling assembly's informational version number as a string
   let getVersion () =
+#if DNXCORE50
+    (typeof<Random>.GetTypeInfo().Assembly)
+#else
     Assembly.GetCallingAssembly()
+#endif
             .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
             .InformationalVersion
 
   /// Get the assembly resource
   let resource name =
+#if DNXCORE50
+    let assembly = typeof<Random>.GetTypeInfo().Assembly
+#else
     let assembly = Assembly.GetExecutingAssembly ()
+#endif
     use stream = assembly.GetManifestResourceStream name
     if stream = null then
       assembly.GetManifestResourceNames()
