@@ -55,14 +55,41 @@ module Http2 =
     | 0xd -> HTTP11Required
     | w   -> UnknownErrorCode w
 
-  type Settings = {
-    headerTableSize : int
+  type Settings = 
+    { headerTableSize : uint32
     ; enablePush : bool
-    ; maxConcurrentStreams : int option
-    ; initialWindowSize : int
-    ; maxFrameSize : int
-    ; maxHeaderBlockSize : int option
+    ; maxConcurrentStreams : uint32 option
+    ; initialWindowSize : uint32
+    ; maxFrameSize : uint32
+    ; maxHeaderBlockSize : uint32 option
     }
+
+  let defaultSetting =
+    { headerTableSize = 4096u
+    ; enablePush = true
+    ; maxConcurrentStreams = None
+    ; initialWindowSize = 4096u
+    ; maxFrameSize = 16384u
+    ; maxHeaderBlockSize = None
+    }
+
+  let setHeaderTableSize settings s =
+    { settings with headerTableSize = s }
+
+  let setEnablePush settings s =
+    { settings with enablePush = s }
+
+  let setMaxConcurrentStreams settings s =
+    { settings with maxConcurrentStreams = s }
+
+  let setInitialWindowSize settings s =
+    { settings with initialWindowSize = s }
+
+  let setMaxFrameSize settings s =
+    { settings with maxFrameSize = s }
+
+  let setMaxHeaderBlockSize settings s =
+    { settings with maxHeaderBlockSize = s }
 
   open System
   open Suave.Sockets
@@ -122,11 +149,28 @@ module Http2 =
                 streamIdentifier = streamIdentifier}
     }
 
+  type Priority = 
+    { exclusive : bool
+    ; streamIdentifier : uint32
+    ; weight: byte
+  }
+
   type FramePayload =
     | Data of byte [] * bool
-    | Headers of (uint32*byte) option * byte[]
+    | Headers of (Priority option * byte[])
+    | Priority of Priority option
+    | RstStream of ErrorCode
+    | Settings of bool * Settings
+    | PushPromise of uint32 * byte []
+    | Ping of bool * byte []
+    | GoAway of uint32 * ErrorCode * byte[]
+    | WindowUpdate of uint32
+    | Continuation
+    | Unknown of byte
 
   type PayloadDecoder = FrameHeader -> byte [] -> FramePayload
+
+  let isPriority bs = bs &&& 0x20uy = 0x20uy
 
   let removePadding (header: FrameHeader) (payload: byte[]) =
     let isPadded = (header.flags &&& 0x8uy) = 0x8uy
@@ -144,23 +188,100 @@ module Http2 =
     let data = removePadding header payload
     Data (data, isEndStream)
 
-  let parseHeaders (header: FrameHeader) (payload: byte[]) =
-    assert(header.``type`` = 1uy)
-    let data = removePadding header payload
-    let priority = header.flags &&& 0x20uy = 0x20uy
+  let priority (header: FrameHeader) (payload: byte []) =
+    let priority = isPriority header.flags
 
     if priority then
       let dependecyData = Array.zeroCreate 4
-      Array.Copy(data, 0, dependecyData, 0, 4)
+      Array.Copy(payload, 0, dependecyData, 0, 4)
       let dependency = get31Bit dependecyData 
-      let weight = data.[4]
-      let headerBlockFragment = Array.zeroCreate (data.Length - 5)
-      Headers (Some (dependency, weight), headerBlockFragment)
+      let weight = payload.[4]
+
+      Some ({ exclusive = true; streamIdentifier = dependency;weight = weight})
     else
+      None
+
+  let parseHeaders (header: FrameHeader) (payload: byte[]) =
+    assert(header.``type`` = 1uy)
+    let data = removePadding header payload
+
+    match priority header data with
+    | Some p ->
+      let headerBlockFragment = Array.zeroCreate (data.Length - 5)
+      Array.Copy(data,headerBlockFragment,data.Length - 5)
+      Headers (Some p, headerBlockFragment)
+    | None ->
       Headers (None, data)
 
+  let parsePriority (header: FrameHeader) (payload: byte[]) =
+    assert(header.``type`` = 2uy)
+    Priority (priority header payload)
+
+  let parseRstStream (header: FrameHeader) (payload: byte[]) =
+    assert(header.``type`` = 3uy)
+    RstStream (toErrorCode (int payload.[0]))
+
+  let parseSettings (header: FrameHeader) (payload: byte[]) =
+    assert(header.``type`` = 4uy)
+    // Receipt of a SETTINGS frame with the ACK flag set and a length field value other
+    // than 0 MUST be treated as a connection error
+    let ack = header.flags &&& 0x1uy = 0x1uy
+    let settings = ref defaultSetting
+    for i in 0 .. 6 .. payload.Length do
+      let settingIdentifier = BitConverter.ToUInt16 (payload, i)
+      let value = (BitConverter.ToUInt32 (payload, i + 2))
+      settings :=
+        match settingIdentifier with
+        | 1us -> setHeaderTableSize !settings value
+        | 2us -> setEnablePush !settings (value=1u)
+        | 3us -> setMaxConcurrentStreams !settings (Some value)
+        | 4us -> setInitialWindowSize !settings value
+        | 5us -> setMaxFrameSize !settings value
+        | 6us -> setMaxHeaderBlockSize !settings (Some value)
+        | _ -> failwith "invalid setting identifier"
+
+    Settings (ack, !settings)
+
+  let parsePushPromise (header: FrameHeader) (payload: byte[]) =
+    assert(header.``type`` = 5uy)
+    let data = removePadding header payload
+    let frameStreamIdData = Array.zeroCreate<byte> 4
+    Array.Copy (data, 0, frameStreamIdData, 0, 4)
+    // turn of most significant bit
+    let streamIdentifier = get31Bit frameStreamIdData
+    let headerBlockFragment = Array.zeroCreate (data.Length - 5)
+    Array.Copy(data,headerBlockFragment,data.Length - 5)
+    PushPromise (streamIdentifier,headerBlockFragment)
+
+  let parsePing (header: FrameHeader) (payload: byte[]) =
+    assert(header.``type`` = 6uy)
+    assert(header.length = 8u)
+    let ack = header.flags &&& 0x1uy = 0x1uy
+    Ping (ack, payload)
+
+  let parseGoAway (header: FrameHeader) (payload: byte[]) =
+    assert(header.``type`` = 7uy)
+    let idData = Array.zeroCreate<byte> 4
+    Array.Copy (payload, 0, idData, 0, 4)
+    let streamIdentifier = get31Bit idData
+    Array.Copy (payload, 4, idData, 0, 4)
+    let errorCode = BitConverter.ToUInt32 (ensureBigEndian idData, 0)
+    GoAway (streamIdentifier,toErrorCode (int errorCode), Array.sub payload 8 (payload.Length - 8))
+
+  let parseWindowUpdate (header: FrameHeader) (payload: byte[]) =
+    assert(header.``type`` = 8uy)
+    let idData = Array.zeroCreate<byte> 4
+    Array.Copy (payload, 0, idData, 0, 4)
+    let windowSizeIncrement = get31Bit idData
+    WindowUpdate windowSizeIncrement
+
+  let parseContinuation (header: FrameHeader) (payload: byte[]) =
+    assert(header.``type`` = 8uy)
+    Continuation payload
+
   let payloadDecoders : PayloadDecoder [] = 
-    [| parseData; parseHeaders |]
+    [| parseData; parseHeaders; parsePriority; parseRstStream; parseSettings; parsePushPromise; parsePing;
+       parseGoAway; parseWindowUpdate; parseContinuation |]
 
   let readFrame transport = socket {
     let! header = readFrameHeader transport
