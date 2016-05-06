@@ -22,6 +22,7 @@ let app : WebPart =
   GET
     >=> path "/monkey"
     >=> OK (Json.format (Json.serialize { sound = "ooh"; height = 1.53m }))
+    >=> Writers.setMimeType "application/json; charset=utf-8"
 
 [<EntryPoint>]
 let main argv =
