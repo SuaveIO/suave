@@ -244,7 +244,7 @@ type ConnectionFacade(ctx) =
           do! tempFile.AsyncWrite(x.Array, x.Offset, y)
           })
     let fileLength = tempFile.Length
-    tempFile.Close()
+    tempFile.Dispose()
 
     if fileLength > 0L then
       let! filename =
