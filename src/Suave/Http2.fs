@@ -165,8 +165,8 @@ module Http2 =
     | Ping of bool * byte []
     | GoAway of uint32 * ErrorCode * byte[]
     | WindowUpdate of uint32
-    | Continuation
-    | Unknown of byte
+    | Continuation of byte[]
+    | Unknown of byte * byte[]
 
   type PayloadDecoder = FrameHeader -> byte [] -> FramePayload
 
