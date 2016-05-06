@@ -58,6 +58,7 @@
         "Authentication.fs",
         "SuaveConfig.fs",
         "HttpOutput.fs",
+        "ConnectionFacade.fs",
         "ParsingAndControl.fs",
         "Web.fs",
         "WebSocket.fs",        
