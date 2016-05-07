@@ -55,6 +55,13 @@ module Http2 =
     | 0xd -> HTTP11Required
     | w   -> UnknownErrorCode w
 
+  type FrameHeader = { 
+    // the length field allows payloads of up to 224224 bytes (~16MB) per frame
+    length : uint32;
+    ``type`` : byte;
+    flags : byte;
+    streamIdentifier : uint32 }
+
   type Settings = 
     { headerTableSize : uint32
     ; enablePush : bool
@@ -111,42 +118,58 @@ module Http2 =
       Array.Reverse (b)
     b
 
-  type FrameHeader = { 
-    // the length field allows payloads of up to 224224 bytes (~16MB) per frame
-    length : uint32;
-    ``type`` : byte;
-    flags : byte;
-    streamIdentifier : uint32 }
-
   let get31Bit (data: byte []) =
     data.[3] <- data.[3] &&& 128uy
     BitConverter.ToUInt32 (ensureBigEndian data, 0)
 
+  let parseFrameHeader (bytes : byte[]) =
+    assert(bytes.Length = 9)
+    let flen = Array.zeroCreate<byte> 4
+    flen.[0] <- 0uy
+    flen.[1] <- bytes.[0]
+    flen.[2] <- bytes.[1]
+    flen.[3] <- bytes.[2]
+
+    let frameLength = BitConverter.ToUInt32 (ensureBigEndian flen, 0)
+
+    let frameType  = bytes.[3]; // 4th byte in frame header is TYPE
+    let frameFlags = bytes.[4]; // 5th byte is FLAGS
+
+    let frameStreamIdData = Array.zeroCreate<byte> 4
+    Array.Copy (bytes, 5, frameStreamIdData, 0, 4)
+
+    // turn of most significant bit
+    let streamIdentifier = get31Bit frameStreamIdData 
+
+    { length = frameLength;
+      ``type`` = frameType;
+      flags = frameFlags;
+      streamIdentifier = streamIdentifier }
+
+  let encodeFrameHeader (header : FrameHeader) =
+
+    let bytes = Array.zeroCreate<byte> 9
+
+    let encodedLength = BitConverter.GetBytes header.length
+    bytes.[0] <- encodedLength.[0]
+    bytes.[1] <- encodedLength.[1]
+    bytes.[2] <- encodedLength.[2]
+
+    bytes.[3] <- header.``type``
+    bytes.[4] <- header.flags
+
+    let encodedStreamIdentifier = BitConverter.GetBytes header.streamIdentifier
+
+    bytes.[5] <- encodedStreamIdentifier.[0]
+    bytes.[6] <- encodedStreamIdentifier.[1]
+    bytes.[7] <- encodedStreamIdentifier.[2]
+    bytes.[8] <- encodedStreamIdentifier.[3]
+
+    bytes
+
   let readFrameHeader transport = socket{
-
-      let! bytes = readBytes transport 9
-
-      let flen = Array.zeroCreate<byte> 4
-      flen.[0] <- 0uy
-      flen.[1] <- bytes.[0]
-      flen.[2] <- bytes.[1]
-      flen.[3] <- bytes.[2]
-
-      let frameLength = BitConverter.ToUInt32 (ensureBigEndian flen, 0)
-
-      let frameType  = bytes.[3]; // 4th byte in frame header is TYPE
-      let frameFlags = bytes.[4]; // 5th byte is FLAGS
-
-      let frameStreamIdData = Array.zeroCreate<byte> 4
-      Array.Copy (bytes, 5, frameStreamIdData, 0, 4)
-
-      // turn of most significant bit
-      let streamIdentifier = get31Bit frameStreamIdData 
-
-      return { length = frameLength;
-                ``type`` = frameType;
-                flags = frameFlags;
-                streamIdentifier = streamIdentifier}
+    let! bytes = readBytes transport 9
+    return parseFrameHeader bytes
     }
 
   type Priority = 

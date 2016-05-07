@@ -105,6 +105,7 @@
     <Compile Include="Cookie.fs" />
     <Compile Include="Types.fs" />
     <Compile Include="WebSocket.fs" />
+    <Compile Include="Http2.fs" />
     <Compile Include="Razor.fs" />
     <Compile Include="FuchuExtensions.fs" />
     <Compile Include="Program.fs" />
