@@ -113,14 +113,21 @@ module Http2 =
       }
     loop 0
 
-  let ensureBigEndian (b : byte []) =
+  let checkEndianness (b : byte []) =
     if (BitConverter.IsLittleEndian) then
-      Array.Reverse (b)
+      Array.Reverse b
     b
 
   let get31Bit (data: byte []) =
     data.[3] <- data.[3] &&& 128uy
-    BitConverter.ToUInt32 (ensureBigEndian data, 0)
+    BitConverter.ToUInt32(data, 0)
+
+  let get24BitBytes (value : UInt32) =
+    let bytes = BitConverter.GetBytes value
+    if BitConverter.IsLittleEndian then
+      [| bytes.[2]; bytes.[1]; bytes.[0] |]
+    else
+      [| bytes.[0]; bytes.[1]; bytes.[2] |]
 
   let parseFrameHeader (bytes : byte[]) =
     assert(bytes.Length = 9)
@@ -130,7 +137,7 @@ module Http2 =
     flen.[2] <- bytes.[1]
     flen.[3] <- bytes.[2]
 
-    let frameLength = BitConverter.ToUInt32 (ensureBigEndian flen, 0)
+    let frameLength = BitConverter.ToUInt32 (checkEndianness flen, 0)
 
     let frameType  = bytes.[3]; // 4th byte in frame header is TYPE
     let frameFlags = bytes.[4]; // 5th byte is FLAGS
@@ -139,7 +146,7 @@ module Http2 =
     Array.Copy (bytes, 5, frameStreamIdData, 0, 4)
 
     // turn of most significant bit
-    let streamIdentifier = get31Bit frameStreamIdData 
+    let streamIdentifier = get31Bit (checkEndianness frameStreamIdData)
 
     { length = frameLength;
       ``type`` = frameType;
@@ -150,7 +157,7 @@ module Http2 =
 
     let bytes = Array.zeroCreate<byte> 9
 
-    let encodedLength = BitConverter.GetBytes header.length
+    let encodedLength = get24BitBytes header.length
     bytes.[0] <- encodedLength.[0]
     bytes.[1] <- encodedLength.[1]
     bytes.[2] <- encodedLength.[2]
@@ -159,6 +166,10 @@ module Http2 =
     bytes.[4] <- header.flags
 
     let encodedStreamIdentifier = BitConverter.GetBytes header.streamIdentifier
+
+    encodedStreamIdentifier.[3] <- encodedStreamIdentifier.[3] &&& 128uy
+
+    let encodedStreamIdentifier = checkEndianness encodedStreamIdentifier
 
     bytes.[5] <- encodedStreamIdentifier.[0]
     bytes.[6] <- encodedStreamIdentifier.[1]
@@ -217,7 +228,7 @@ module Http2 =
     if priority then
       let dependecyData = Array.zeroCreate 4
       Array.Copy(payload, 0, dependecyData, 0, 4)
-      let dependency = get31Bit dependecyData 
+      let dependency = get31Bit (checkEndianness dependecyData)
       let weight = payload.[4]
 
       Some ({ exclusive = true; streamIdentifier = dependency;weight = weight})
@@ -270,8 +281,7 @@ module Http2 =
     let data = removePadding header payload
     let frameStreamIdData = Array.zeroCreate<byte> 4
     Array.Copy (data, 0, frameStreamIdData, 0, 4)
-    // turn of most significant bit
-    let streamIdentifier = get31Bit frameStreamIdData
+    let streamIdentifier = get31Bit (checkEndianness frameStreamIdData)
     let headerBlockFragment = Array.zeroCreate (data.Length - 5)
     Array.Copy(data,headerBlockFragment,data.Length - 5)
     PushPromise (streamIdentifier,headerBlockFragment)
@@ -286,16 +296,16 @@ module Http2 =
     assert(header.``type`` = 7uy)
     let idData = Array.zeroCreate<byte> 4
     Array.Copy (payload, 0, idData, 0, 4)
-    let streamIdentifier = get31Bit idData
+    let streamIdentifier = get31Bit (checkEndianness idData)
     Array.Copy (payload, 4, idData, 0, 4)
-    let errorCode = BitConverter.ToUInt32 (ensureBigEndian idData, 0)
+    let errorCode = BitConverter.ToUInt32 (checkEndianness idData, 0)
     GoAway (streamIdentifier,toErrorCode (int errorCode), Array.sub payload 8 (payload.Length - 8))
 
   let parseWindowUpdate (header: FrameHeader) (payload: byte[]) =
     assert(header.``type`` = 8uy)
     let idData = Array.zeroCreate<byte> 4
     Array.Copy (payload, 0, idData, 0, 4)
-    let windowSizeIncrement = get31Bit idData
+    let windowSizeIncrement = get31Bit (checkEndianness idData)
     WindowUpdate windowSizeIncrement
 
   let parseContinuation (header: FrameHeader) (payload: byte[]) =

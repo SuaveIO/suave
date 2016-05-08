@@ -23,7 +23,7 @@ let frameHeaders (_ : SuaveConfig) =
   testList "frame headers" [
     testCase "smoke" 
     <| fun _ ->
-       let originalHeader = { length = 500u; ``type`` = 0uy; flags = 0uy; streamIdentifier = 33u }
+       let originalHeader = { length = 500u; ``type`` = 2uy; flags = 1uy; streamIdentifier = 16777215u }
        let encoded = encodeFrameHeader originalHeader
        let header = parseFrameHeader encoded
        Assert.Equal("encode >> decode == id", originalHeader, header)
