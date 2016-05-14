@@ -148,17 +148,25 @@ namespace :dotnetcli do
     system "tools/coreclr/dotnet restore"
   end
 
-  desc 'Build Suave and test project'
-  task :build do
-    Dir.chdir("src/Suave.DotnetCLI.Tests") do
-      system "../../tools/coreclr/dotnet --verbose build"
+  task :build_tests do
+    Dir.chdir "src/Suave.DotnetCLI.Tests" do
+      system "../../tools/coreclr/dotnet", %W|--verbose build --configuration #{Configuration} -f netstandard1.5|
     end
   end
 
+  task :build_lib do
+    Dir.chdir "src/Suave" do
+      system "../../tools/coreclr/dotnet", %W|--verbose build --configuration #{Configuration} -f netstandard1.5|
+    end
+  end
+
+  desc 'Build Suave and test project'
+  task :build => [:build_lib]
+
   desc 'Create Suave nugets packages'
   task :pack do
-    Dir.chdir("src/Suave") do
-      system "../../tools/coreclr/dotnet --verbose pack --configuration #{Configuration}"
+    Dir.chdir "src/Suave"  do
+      system "../../tools/coreclr/dotnet", %W|--verbose pack --configuration #{Configuration} --no-build|
     end
   end
 
@@ -170,10 +178,9 @@ namespace :dotnetcli do
       version = SemVer.find.format("%M.%m.%p%s")
       sourcenupkg = "../../build/pkg/Suave.#{version}.nupkg"
       clinupkg = "bin/#{Configuration}/Suave.#{version}-dotnetcli.nupkg"
-      system %Q[../../tools/coreclr/dotnet mergenupkg --source "#{sourcenupkg}" --other "#{clinupkg}" --framework netstandard1.5]
+      system "../../tools/coreclr/dotnet", %W|mergenupkg --source "#{sourcenupkg}" --other "#{clinupkg}" --framework netstandard1.5|
     end
   end
-
 end
 
 namespace :tests do
