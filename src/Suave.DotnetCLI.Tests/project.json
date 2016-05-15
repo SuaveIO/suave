@@ -16,7 +16,7 @@
             },
             "frameworkAssemblies": {
                 "System": "",
-                "System.Core": "",
+                "System.Core": ""
             }
         }
     }

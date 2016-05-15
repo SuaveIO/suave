@@ -52,7 +52,10 @@ let testApp =
     RequestErrors.NOT_FOUND "Found no handlers"
   ]
 
+#if NETSTANDARD1_5
+#else
 System.Net.ServicePointManager.DefaultConnectionLimit <- Int32.MaxValue
+#endif
 
 // How to write a new primitive WebPart
 let sleep milliseconds message: WebPart =
@@ -203,7 +206,11 @@ let main argv =
       compressedFilesFolder = None
       logger                = logger
       tcpServerFactory      = new DefaultTcpServerFactory()
+#if NETSTANDARD1_5
+      cookieSerialiser      = new JsonFormatterSerialiser()
+#else
       cookieSerialiser      = new BinaryFormatterSerialiser()
+#endif
       tlsProvider           = new DefaultTlsProvider()
       hideHeader            = false }
     app
