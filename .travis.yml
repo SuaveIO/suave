@@ -5,6 +5,9 @@ notifications:
 
 env:
  matrix:
+  - alpha
+  - beta
+  - latest
   - MONO_VERSION="4.2.1"
 
 before_install:
