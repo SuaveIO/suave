@@ -93,7 +93,6 @@
                 "System.Data.Common": "4.0.1-rc2-23911",
                 "System.Diagnostics.Process": "4.1.0-rc2-23925",
                 "System.Security.Cryptography.Primitives": "4.0.0-rc2-23911",
-                "System.IO.Compression": "4.1.0-rc2-23911",
                 "System.Net.Security": "4.0.0-rc2-23911",
                 "System.Globalization.Extensions": "4.0.1-rc2-23911",
                 "Microsoft.FSharp.Core.netcore": "1.0.0-alpha-160316",
