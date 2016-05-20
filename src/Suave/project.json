@@ -79,7 +79,7 @@
                 "netstandard1.3"
             ]
         },
-        "dotnet-mergenupkg": { "target": "package", "version": "0.9.*" }
+        "dotnet-mergenupkg": { "target": "package", "version": "0.10.*" }
     },
 
     "frameworks": {
