@@ -111,7 +111,7 @@ namespace :dotnetcli do
   directory 'tools/coreclr'
 
   task :coreclr_binaries => 'tools/coreclr'do
-    dotnet_version = '1.0.0-beta-002071'
+    dotnet_version = '1.0.0-preview1-002702'
     case RUBY_PLATFORM
     when /darwin/
       filename = "dotnet-dev-osx-x64.#{dotnet_version}.tar.gz"
