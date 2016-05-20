@@ -84,7 +84,7 @@
 
     "frameworks": {
         "netstandard1.5": { 
-            "compilationOptions": {
+            "buildOptions": {
                 "define": [
                     "DNXCORE50"
                 ]
