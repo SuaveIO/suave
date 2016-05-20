@@ -1,25 +1,40 @@
 {
   "version": "1.0.0-*",
-  "compilationOptions": {
-    "emitEntryPoint": true
+  "buildOptions": {
+    "emitEntryPoint": true,
+    "compilerName": "fsc",
+    "compile": {
+       "includeFiles": [
+         "../../paket-files/haf/YoLo/YoLo.fs",
+         "CounterDemo.fs",
+         "Program.fs"
+       ]
+     }
   },
-  "compilerName": "fsc",
-  "compileFiles": [
-    "../../paket-files/haf/YoLo/YoLo.fs",
-    "CounterDemo.fs",
-    "Program.fs"
-  ],
+        
   "dependencies": {
-    "Microsoft.FSharp.Core.netcore": "1.0.0-alpha-160316",
-    "Suave": "2.0.0-alpha-dotnetcli",
+    "Microsoft.FSharp.Core.netcore": "1.0.0-alpha-160509",
+    "Suave": "2.0.0-alpha2-dotnetcli",
     "Microsoft.NETCore.App": {
       "type": "platform",
-      "version": "1.0.0-rc2-23925"
+      "version": "1.0.0-rc2-3002702"
     }
   },
+
+  "tools": {
+    "dotnet-compile-fsc": {
+      "version": "1.0.0-*",
+      "imports": [
+        "dnxcore50",
+        "portable-net45+win81",
+        "netstandard1.3"
+      ]
+    }
+  },
+  
   "frameworks": {
     "netstandard1.5": {
-      "compilationOptions": {
+      "buildOptions": {
           "define": [
               "DNXCORE50"  
           ]
