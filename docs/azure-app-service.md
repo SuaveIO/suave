@@ -14,7 +14,7 @@ Suave Web Sites in Azure App Service can be deployed either as an F# script with
 ### 1. Create a ``web.config`` file.
 This file instructs IIS to act as a passthrough and to redirect all traffic through to Suave.
 
-```xml
+{% highlight xml %}
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
   <system.webServer>
@@ -25,7 +25,7 @@ This file instructs IIS to act as a passthrough and to redirect all traffic thro
     <httpPlatform stdoutLogEnabled="true" stdoutLogFile=".\suave.log" startupTimeLimit="20" processPath="%HOME%\site\wwwroot\SuaveHost.exe" arguments="%HTTP_PLATFORM_PORT%"/>
   </system.webServer>
 </configuration>
-```
+{% endhighlight %}
 
 * Notice the use of the ``processPath`` attribute which tells IIS which executable to host. Change the content from SuaveHost.exe to the name of your application.
 * Also note the use of ``%HTTP_PLATFORM_PORT%`` as an argument to Suave. This tells Suave which port it should listen on for inbound HTTP traffic.
@@ -34,10 +34,10 @@ This file instructs IIS to act as a passthrough and to redirect all traffic thro
 ### 2. Create a ``.deployment`` file.
 This file tells Azure App Service what to do after downloading your application code i.e. your build script e.g.
 
-```ini
+{% highlight ini %}
 [config]
 command = build.cmd
-```
+{% endhighlight %}
 
 In this case, it will run ``build.cmd``. Of course, this can do anything you want. The output should be that your application is copied into the ``site\wwwroot`` folder.
  
