@@ -246,7 +246,7 @@ iconUrl https://raw.githubusercontent.com/SuaveIO/resources/master/images/head_t
 files
   #{p.proj_path_base}/bin/#{Configuration}/#{p.id}.* ==\> lib/net40
 releaseNotes
-  #{n.metadata.release_notes}
+  #{n.metadata.release_notes.each_line.reject{|x| x.strip == ""}.join}
 dependencies
   #{d}
 }
