@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
@@ -106,6 +106,7 @@
     <Compile Include="Types.fs" />
     <Compile Include="WebSocket.fs" />
     <Compile Include="Razor.fs" />
+    <Compile Include="DotLiquid.fs" />
     <Compile Include="FuchuExtensions.fs" />
     <Compile Include="Program.fs" />
     <None Include="paket.references" />
@@ -147,6 +148,15 @@
     <Content Include="fallback.cshtml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <None Include="liquid\hello.liquid">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="liquid\parent.liquid">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="liquid\child.liquid">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Reference Include="mscorlib" />
@@ -170,6 +180,10 @@
     <ProjectReference Include="..\Suave.LibUv\Suave.LibUv.fsproj">
       <Project>{7C787110-A146-4021-8163-40137E325DB4}</Project>
       <Name>Suave.LibUv</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\Suave.DotLiquid\Suave.DotLiquid.fsproj">
+      <Project>{4E3FE86D-FDB7-4DAA-8D58-13F06F75D240}</Project>
+      <Name>Suave.DotLiquid</Name>
     </ProjectReference>
   </ItemGroup>
   <Choose>
@@ -271,4 +285,7 @@
       </ItemGroup>
     </When>
   </Choose>
+  <ItemGroup>
+    <Folder Include="liquid\" />
+  </ItemGroup>
 </Project>
