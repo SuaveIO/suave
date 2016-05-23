@@ -170,7 +170,9 @@ namespace :dotnetcli do
 
   desc 'Restore the CoreCLR binaries'
   task :restore => :coreclr_binaries do
-    system dotnet_exe_path, "restore"
+    Dir.chdir "src" do
+      system dotnet_exe_path, "restore"
+    end
   end
 
   task :build_lib => :coreclr_binaries do
