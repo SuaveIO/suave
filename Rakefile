@@ -110,8 +110,32 @@ end
 namespace :dotnetcli do
   directory 'tools/coreclr'
 
-  task :coreclr_binaries => 'tools/coreclr'do
-    dotnet_version = '1.0.0-beta-002071'
+  dotnet_exe_path = "dotnet" #from PATH
+  
+  def get_installed_dotnet_version
+    begin
+      installed_dotnet_version = `dotnet --version`
+      return "" unless $?.success?
+      if installed_dotnet_version.nil? then "" else installed_dotnet_version.strip end
+    rescue
+      ""
+    end
+  end
+
+  task :coreclr_binaries => 'tools/coreclr' do
+    dotnet_version = '1.0.0-preview1-002702'
+    dotnet_installed_version = get_installed_dotnet_version
+    # check if required version of .net core sdk is already installed, otherwise download and install it
+    if dotnet_installed_version == dotnet_version then
+      puts ".NET Core SDK #{dotnet_version} already installed. Skip install"
+      dotnet_exe_path = "dotnet"
+      next
+    elsif dotnet_installed_version == "" then
+      puts ".NET Core SDK #{dotnet_version} not found. Downloading and installing in ./tools/coreclr"
+    else
+      puts "Found .NET Core SDK #{dotnet_installed_version} but require #{dotnet_version}. Downloading and installing in ./tools/coreclr"
+    end
+    
     case RUBY_PLATFORM
     when /darwin/
       filename = "dotnet-dev-osx-x64.#{dotnet_version}.tar.gz"
@@ -139,24 +163,27 @@ namespace :dotnetcli do
         %W|Invoke-WebRequest "https://raw.githubusercontent.com/dotnet/cli/rel/1.0.0/scripts/obtain/install.ps1" -OutFile "dotnet_cli_install.ps1"|
       system 'powershell',
         %W|-ExecutionPolicy Unrestricted ./dotnet_cli_install.ps1 -InstallDir "tools/coreclr" -Channel "beta" -version "#{dotnet_version}"|
-      ENV['PATH'] = %{#{Dir.pwd}/tools/coreclr/sdk/#{dotnet_version};#{ENV['PATH']}}
     end
+    
+    dotnet_exe_path = "#{Dir.pwd}/tools/coreclr/dotnet"
   end
 
   desc 'Restore the CoreCLR binaries'
   task :restore => :coreclr_binaries do
-    system "tools/coreclr/dotnet restore"
-  end
-
-  task :build_tests do
-    Dir.chdir "src/Suave.DotnetCLI.Tests" do
-      system "../../tools/coreclr/dotnet", %W|--verbose build --configuration #{Configuration} -f netstandard1.5|
+    Dir.chdir "src" do
+      system dotnet_exe_path, "restore"
     end
   end
 
-  task :build_lib do
+  task :build_tests => :coreclr_binaries do
+    Dir.chdir "src/Suave.DotnetCLI.Tests" do
+      system dotnet_exe_path, %W|--verbose build --configuration #{Configuration} -f netstandard1.5|
+    end
+  end
+
+  task :build_lib => :coreclr_binaries do
     Dir.chdir "src/Suave" do
-      system "../../tools/coreclr/dotnet", %W|--verbose build --configuration #{Configuration} -f netstandard1.5|
+      system dotnet_exe_path, %W|--verbose build --configuration #{Configuration} -f netstandard1.5|
     end
   end
 
@@ -164,9 +191,9 @@ namespace :dotnetcli do
   task :build => [:build_lib]
 
   desc 'Create Suave nugets packages'
-  task :pack do
+  task :pack => :coreclr_binaries do
     Dir.chdir "src/Suave"  do
-      system "../../tools/coreclr/dotnet", %W|--verbose pack --configuration #{Configuration} --no-build|
+      system dotnet_exe_path, %W|--verbose pack --configuration #{Configuration} --no-build|
     end
   end
 
@@ -178,7 +205,7 @@ namespace :dotnetcli do
       version = SemVer.find.format("%M.%m.%p%s")
       sourcenupkg = "../../build/pkg/Suave.#{version}.nupkg"
       clinupkg = "bin/#{Configuration}/Suave.#{version}-dotnetcli.nupkg"
-      system "../../tools/coreclr/dotnet", %W|mergenupkg --source "#{sourcenupkg}" --other "#{clinupkg}" --framework netstandard1.5|
+      system dotnet_exe_path, %W|mergenupkg --source "#{sourcenupkg}" --other "#{clinupkg}" --framework netstandard1.5|
     end
   end
 end
@@ -227,7 +254,7 @@ iconUrl https://raw.githubusercontent.com/SuaveIO/resources/master/images/head_t
 files
   #{p.proj_path_base}/bin/#{Configuration}/#{p.id}.* ==\> lib/net40
 releaseNotes
-  #{n.metadata.release_notes}
+  #{n.metadata.release_notes.each_line.reject{|x| x.strip == ""}.join}
 dependencies
   #{d}
 }
