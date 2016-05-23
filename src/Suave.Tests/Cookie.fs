@@ -2,6 +2,8 @@
 
 open Suave
 open Suave.Cookie
+open Suave.Logging
+open Suave.Testing
 
 open Fuchu
 
@@ -72,3 +74,45 @@ let parseRequestCookies (_ : SuaveConfig) =
         let result = Cookie.parseCookies sample
         Assert.Equal("cookies should be ignored", [], result)
     ]
+
+[<Tests>]
+let setCookie (_ : SuaveConfig) = 
+  testList "set cookie" [
+    testCase "set cookie - no warning when < 4k" <| fun _ ->
+      let log = InspectableLog()
+      let cookie =
+        { name      = "test cookie"
+          value     = String.replicate 4095 "x"
+          expires   = None
+          path      = Some "/"
+          domain    = None
+          secure    = true
+          httpOnly  = false }
+      let ctx = Cookie.setCookie cookie { HttpContext.empty with runtime = { HttpRuntime.empty with logger = log }}
+      Assert.Equal("should be no logs generated", true, List.isEmpty log.logs)
+    testCase "set cookie - no warning when = 4k" <| fun _ ->
+      let log = InspectableLog()
+      let cookie =
+        { name      = "test cookie"
+          value     = String.replicate 4096 "x"
+          expires   = None
+          path      = Some "/"
+          domain    = None
+          secure    = true
+          httpOnly  = false }
+      let ctx = Cookie.setCookie cookie { HttpContext.empty with runtime = { HttpRuntime.empty with logger = log }}
+      Assert.Equal("should be no logs generated", true, List.isEmpty log.logs)
+    testCase "set cookie - warning when > 4k" <| fun _ ->
+      let log = InspectableLog()
+      let cookie =
+        { name      = "test cookie"
+          value     = String.replicate 4097 "x"
+          expires   = None
+          path      = Some "/"
+          domain    = None
+          secure    = true
+          httpOnly  = false }
+      let ctx = Cookie.setCookie cookie { HttpContext.empty with runtime = { HttpRuntime.empty with logger = log }}
+      Assert.Equal("should be 1 log generated", 1, List.length log.logs)
+      Assert.Equal("should be a warning", LogLevel.Warn, (List.head log.logs).level)
+  ]
