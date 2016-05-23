@@ -172,8 +172,8 @@ namespace :dotnetcli do
 
   task :do_netcorepackage => [ :restore, :build, :pack ]
 
-  # merge standard and dotnetcli nupkgs
-  task :merge do
+  desc 'Merge standard and dotnetcli nupkgs; note the need to run :nugets before'
+  task :merge => :coreclr_binaries do
     Dir.chdir("src/Suave") do
       version = SemVer.find.format("%M.%m.%p%s")
       sourcenupkg = "../../build/pkg/Suave.#{version}.nupkg"
