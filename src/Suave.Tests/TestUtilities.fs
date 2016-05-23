@@ -45,3 +45,20 @@ type Assert with
       | _ when buf.[0] <> buf.[1] -> Tests.failtestf "Not equal at pos %d" pos
       | _ -> compare (pos + 1)
     compare 0
+
+/// Entry for the inspectable log
+type InspectableLogEntry =
+  {
+    /// The level of the entry logged
+    level : LogLevel
+    /// The function that provided the value for the log entry
+    value : unit -> LogLine
+  }
+
+/// A logger that can be inspected to see what was logged
+type InspectableLog() =
+  member val logs : InspectableLogEntry list = [] with get, set
+
+  interface Logger with
+    member x.Log level lineFunc =
+      x.logs <- { level = level; value = lineFunc } :: x.logs

@@ -106,6 +106,10 @@ module Cookie =
       |> List.fold (fun headers header ->
           ("Set-Cookie", header) :: headers)
           (ctx.response.headers |> List.filter notSetCookie)
+    if cookie.value.Length > 4096 then
+      Log.log ctx.runtime.logger "Suave.Cookie.setCookie" LogLevel.Warn
+        (sprintf "COOKIE '%s' TOO LARGE (%d bytes)! Lengths over 4,096 bytes risk corruption in some browsers; consider alternate storage"
+          cookie.name cookie.value.Length)
     { ctx with response = { ctx.response with headers = headers' } }
     |> succeed
 
