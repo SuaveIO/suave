@@ -697,6 +697,7 @@ module EventSource =
   let private handShakeAux f (out : Connection, _) =
     socket {
       let! (_,out) = asyncWriteLn "" out// newline after headers
+      let! out = flush out // must flush lines buffer before using asyncWriteBytes
 
       // Buggy Internet Explorer; 2kB of comment padding for IE
       do! String.replicate 2000 " " |> comment out
