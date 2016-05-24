@@ -272,8 +272,11 @@ end
 desc 'create suave nuget'
 task :nugets => ['build/pkg', :versioning, :compile, :create_nuget_quick]
 
+desc 'create suave nuget with .NET Core'
+task :nugets_with_netcore => [:nugets, 'dotnetcli:do_netcorepackage', 'dotnetcli:merge']
+
 desc 'compile, gen versions, test and create nuget'
-task :appveyor => [:compile, :'tests:unit', :nugets]
+task :appveyor => [:compile, :'tests:unit', :nugets_with_netcore]
 
 desc 'compile, gen versions, test'
 task :default => [:compile, :'tests:unit', :'docs:build']
