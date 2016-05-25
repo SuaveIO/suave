@@ -113,7 +113,7 @@ type Protocol =
   /// The HTTP protocol tunneled in a TLS tunnel
   | HTTPS of ITlsProvider
 
-/// A HTTP binding is a protocol is the product of HTTP or HTTP, a DNS or IP binding 
+/// A HTTP binding is a protocol is the product of HTTP or HTTP, a DNS or IP binding
 /// and a port number
 type HttpBinding =
   /// The scheme in use
@@ -126,7 +126,7 @@ type HttpBinding =
 type MimeType =
   /// The name of the mime type, i.e "text/plain"
   { name         : string
-    /// If the server will compress the file when clients ask for gzip or 
+    /// If the server will compress the file when clients ask for gzip or
     /// deflate in the `Accept-Encoding` header
     compression  : bool }
 {% endhighlight %}
