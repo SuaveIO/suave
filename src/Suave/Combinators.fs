@@ -790,7 +790,10 @@ module CORS =
       exposeHeaders           : bool
       
       /// Max age in seconds the user agent is allowed to cache the result of the request.
-      maxAge                  : int option }
+      maxAge                  : int option
+      
+      /// Should WebSocket connections be checked for origin?
+      checkWebSocketOrigin    : bool }
     
     static member allowedUris_           = Property<CORSConfig,_> (fun x -> x.allowedUris)           (fun v x -> { x with allowedUris = v })
     static member allowedMethods_        = Property<CORSConfig,_> (fun x -> x.allowedMethods)        (fun v x -> { x with allowedMethods = v })
@@ -878,7 +881,7 @@ module CORS =
 
           | Choice2Of2 _ ->
             succeed ctx
-
+        
         | _ ->
           if allowedOrigin then
             let composed =
@@ -888,7 +891,8 @@ module CORS =
               >=> setAllowMethodsHeader config "*"
             composed ctx
           else
-            succeed ctx // No headers will be sent. Browser will deny.
+            if (config.checkWebSocketOrigin && (req.header "upgrade"  |> Choice.map (fun s -> s.ToLower()) = Choice1Of2 "websocket")) then fail
+            else succeed ctx // No headers will be sent. Browser will deny.
 
       | Choice2Of2 _ ->
         succeed ctx // Not a CORS request
@@ -899,4 +903,5 @@ module CORS =
       allowedMethods        = InclusiveOption.All
       allowCookies          = true
       exposeHeaders         = true
-      maxAge                = None }
+      maxAge                = None
+      checkWebSocketOrigin  = false }

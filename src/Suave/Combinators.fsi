@@ -1575,7 +1575,10 @@ module CORS =
       exposeHeaders           : bool
       
       /// Max age in seconds the user agent is allowed to cache the result of the request.
-      maxAge                  : int option }
+      maxAge                  : int option
+      
+      /// Should WebSocket connections be checked for origin?
+      checkWebSocketOrigin    : bool }
     
     static member allowedUris_           : Property<CORSConfig, InclusiveOption<string list>>
     static member allowedMethods_        : Property<CORSConfig, InclusiveOption<HttpMethod list>>
