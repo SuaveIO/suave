@@ -800,6 +800,7 @@ module CORS =
     static member allowCookies_          = Property<CORSConfig,_> (fun x -> x.allowCookies)          (fun v x -> { x with allowCookies = v })
     static member exposeHeaders_         = Property<CORSConfig,_> (fun x -> x.exposeHeaders)         (fun v x -> { x with exposeHeaders = v })
     static member maxAge_                = Property<CORSConfig,_> (fun x -> x.maxAge)                (fun v x -> { x with maxAge = v })
+    static member checkWebSocketOrigin_  = Property<CORSConfig,_> (fun x -> x.checkWebSocketOrigin)  (fun v x -> { x with checkWebSocketOrigin = v })
 
   let private isAllowedOrigin config (value : string) = 
     match config.allowedUris with
@@ -891,7 +892,7 @@ module CORS =
               >=> setAllowMethodsHeader config "*"
             composed ctx
           else
-            if (config.checkWebSocketOrigin && (req.header "upgrade"  |> Choice.map (fun s -> s.ToLower()) = Choice1Of2 "websocket")) then fail
+            if config.checkWebSocketOrigin && (req.header "upgrade"  |> Choice.map (fun s -> s.ToLowerInvariant()) = Choice1Of2 "websocket") then fail
             else succeed ctx // No headers will be sent. Browser will deny.
 
       | Choice2Of2 _ ->
