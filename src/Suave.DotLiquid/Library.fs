@@ -1,85 +1,107 @@
-﻿module Suave.DotLiquid
+﻿/// A module for rendering DotLiquid template with Suave
+module Suave.DotLiquid
 
 open System
+open System.Reflection
+open System.Collections.Generic
+open System.Collections.Concurrent
 open System.IO
 open DotLiquid
+open DotLiquid.NamingConventions
 open Microsoft.FSharp.Reflection
+open Suave
 open Suave.Utils
-open Suave.Http
+open Suave.Successful
 open Suave.Files
 
 // -------------------------------------------------------------------------------------------------
 // Registering things with DotLiquid
 // -------------------------------------------------------------------------------------------------
 
-/// Represents a local file system relative to the specified 'root'
-let private localFileSystem root =
-  { new DotLiquid.FileSystems.IFileSystem with
-      member this.ReadTemplateFile(context, templateName) =
-        let templatePath = context.[templateName] :?> string
-        let fullPath = Path.Combine(root, templatePath)
-        if not (File.Exists(fullPath)) then failwithf "File not found: %s" fullPath
-        File.ReadAllText(fullPath) }
-
-/// Protects accesses to various DotLiquid internal things
-let private safe =
-  let o = obj()
-  fun f -> lock o f
-
-/// Given a type which is an F# record containing seq<_>, list<_> and other
-/// records, register the type with DotLiquid so that its fields are accessible
-let private registerTypeTree =
-  let registered = System.Collections.Generic.Dictionary<_, _>()
-  let rec loop ty =
-    if not (registered.ContainsKey ty) then
-      if FSharpType.IsRecord ty then
-        let fields = FSharpType.GetRecordFields(ty)
-        Template.RegisterSafeType(ty, [| for f in fields -> f.Name |])
-        for f in fields do loop f.PropertyType
-      elif ty.IsGenericType &&
-          ( let t = ty.GetGenericTypeDefinition()
-            in t = typedefof<seq<_>> || t = typedefof<list<_>> ) then
-        loop (ty.GetGenericArguments().[0])
-      registered.[ty] <- true
-  fun ty -> safe (fun () -> loop ty)
-
 /// Use the ruby naming convention by default
-do Template.NamingConvention <- DotLiquid.NamingConventions.RubyNamingConvention()
+do Template.NamingConvention <- RubyNamingConvention()
 
-// -------------------------------------------------------------------------------------------------
-// Parsing and loading DotLiquid templates and caching the results
-// -------------------------------------------------------------------------------------------------
+module internal Impl =
 
-/// Memoize asynchronous function. An item is recomputed when `isValid` returns `false`
-let private asyncMemoize isValid f =
-  let cache = Collections.Concurrent.ConcurrentDictionary<_ , _>()
-  fun x -> async {
-      match cache.TryGetValue(x) with
-      | true, res when isValid x res -> return res
+  /// Represents a local file system relative to the specified 'root'
+  let localFileSystem root =
+    { new DotLiquid.FileSystems.IFileSystem with
+        member this.ReadTemplateFile(context, templateName) =
+          let templatePath = context.[templateName] :?> string
+          let fullPath = Path.Combine(root, templatePath)
+          if not (File.Exists(fullPath)) then failwithf "File not found: %s" fullPath
+          File.ReadAllText(fullPath) }
+
+  /// Protects accesses to various DotLiquid internal things
+  let safe =
+    let o = obj()
+    fun f -> lock o f
+
+  /// Given a type which is an F# record containing seq<_>, list<_> and other
+  /// records, register the type with DotLiquid so that its fields are accessible
+  let tryRegisterTypeTree =
+    let registered = Dictionary<_, _>()
+    let rec loop ty =
+      if not (registered.ContainsKey ty) then
+        if FSharpType.IsRecord ty then
+          let fields = FSharpType.GetRecordFields ty
+          Template.RegisterSafeType(ty, [| for f in fields -> f.Name |])
+          for f in fields do loop f.PropertyType
+        elif ty.IsGenericType &&
+            ( let t = ty.GetGenericTypeDefinition()
+              in t = typedefof<seq<_>> || t = typedefof<list<_>> ) then
+          loop (ty.GetGenericArguments().[0])
+        registered.[ty] <- true
+    fun ty -> safe (fun () -> loop ty)
+
+  // -------------------------------------------------------------------------------------------------
+  // Parsing and loading DotLiquid templates and caching the results
+  // -------------------------------------------------------------------------------------------------
+
+  /// Memoize asynchronous function. An item is recomputed when `isValid` returns `false`
+  let asyncMemoize isValid f =
+    let cache = ConcurrentDictionary<_ , _>()
+    fun x -> async {
+      match cache.TryGetValue x with
+      | true, res when isValid x res ->
+        return res
+
       | _ ->
-          let! res = f x
-          cache.[x] <- res
-          return res }
+        let! res = f x
+        cache.[x] <- res
+        return res
+    }
 
-/// Parse the specified template & register the type that we want to use as "model"
-let private parseTemplate template ty =
-  registerTypeTree ty
-  let t = Template.Parse(template)
-  fun k v -> t.Render(Hash.FromDictionary(dict [k, v]))
+  type Renderer<'model> = string -> 'model -> string
 
-/// Asynchronously loads a template & remembers the last write time
-/// (so that we can automatically reload the template when file changes)
-let private loadTemplate (ty, fileName) = async {
-  let writeTime = File.GetLastWriteTime(fileName)
-  use file = new FileStream(fileName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite)
-  use reader = new StreamReader(file)
-  let! razorTemplate = reader.ReadToEndAsync() |> Async.AwaitTask
-  return writeTime, parseTemplate razorTemplate ty }
+  /// Parse the specified template & register the type that we want to use as "model"
+  let parseTemplate template typ : Renderer<'m> =
+    tryRegisterTypeTree typ
+    let t = Template.Parse template
+    fun k v ->
+      dict [k, box v] |> Hash.FromDictionary |> t.Render
 
-/// Load template & memoize & automatically reload when the file changes
-let private loadTemplateCached =
-  loadTemplate |> asyncMemoize (fun (_, templatePath) (lastWrite, _) ->
-    File.GetLastWriteTime(templatePath) <= lastWrite )
+  /// Asynchronously loads a template & remembers the last write time
+  /// (so that we can automatically reload the template when file changes)
+  let fileTemplate (typ, fileName) = async {
+    let writeTime = File.GetLastWriteTime fileName
+    use file = new FileStream(fileName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite)
+    use reader = new StreamReader(file)
+    let! razorTemplate = reader.ReadToEndAsync()
+    return writeTime, parseTemplate razorTemplate typ
+  }
+
+  /// Load template & memoize & automatically reload when the file changes
+  let fileTemplateMemoized =
+    fileTemplate
+    |> asyncMemoize (fun (_, templatePath) (lastWrite, _) ->
+      File.GetLastWriteTime templatePath <= lastWrite)
+
+  let stringTemplate (typ, stringTemplate) =
+    async.Return ((), parseTemplate stringTemplate typ)
+
+  let stringTemplateMemoized =
+    stringTemplate |> asyncMemoize (fun _ _ -> (* always valid *) true)
 
 // -------------------------------------------------------------------------------------------------
 // Public API
@@ -87,28 +109,44 @@ let private loadTemplateCached =
 
 let mutable private templatesDir = None
 
+/// The model you pass to your liquid templates will be available under this
+/// key.
+[<Literal>]
+let ModelKey = "model"
+
 /// Sets the DotLiquid naming convention to the Ruby style. F# values in camelCase
 /// will be converted to not_camel_case in templates. This is the default
 let setRubyNamingConvention _ =
-  Template.NamingConvention <- DotLiquid.NamingConventions.RubyNamingConvention()
+  Template.NamingConvention <- RubyNamingConvention()
 
 /// Sets the DotLiquid naming convetion to the CSharp style, will preserve camelCase
 /// and should preserve whatever case convention you use
 let setCSharpNamingConvention _ =
-  Template.NamingConvention <- DotLiquid.NamingConventions.CSharpNamingConvention()
-
+  Template.NamingConvention <- CSharpNamingConvention()
 
 /// Set the root directory where DotLiquid is looking for templates. For example, you can
 /// write something like this:
 ///
 ///     DotLiquid.setTemplatesDir (__SOURCE_DIRECTORY__ + "/templates")
 ///
-/// The current directory is a global variable and so it should not change between
-/// multiple HTTP requests. This is a DotLiquid limitation.
+/// The current directory is a global variable and so it should not change
+/// between multiple HTTP requests. This is a DotLiquid limitation.
 let setTemplatesDir dir =
   if templatesDir <> Some dir then
     templatesDir <- Some dir
-    safe (fun () -> Template.FileSystem <- localFileSystem dir)
+    Impl.safe (fun () -> Template.FileSystem <- Impl.localFileSystem dir)
+
+/// Renders the liquid template given.
+let renderPageString (template : string) (model : 'm) =
+  Impl.stringTemplateMemoized (typeof<'m>, template)
+  |> Async.map (fun (_, renderer) ->
+    renderer ModelKey (box model))
+
+/// Renders the liquid template given a full path.
+let renderPageFile fileFullPath (model : 'm) =
+  Impl.fileTemplateMemoized (typeof<'m>, fileFullPath)
+  |> Async.map (fun (writeTime, renderer) ->
+    renderer ModelKey (box model))
 
 /// Render a page using DotLiquid template. Takes a path (relative to the directory specified
 /// using `setTemplatesDir` and a value that is exposed as the "model" variable. You can use
@@ -117,14 +155,20 @@ let setTemplatesDir dir =
 ///     type Page = { Total : int }
 ///     let app = page "index.html" { Total = 42 }
 ///
-let page<'T> path (model : 'T) r = async {
-  let path =
-    match templatesDir with
-    | None -> resolvePath r.runtime.homeDirectory path
-    | Some root -> Path.Combine(root, path)
-  let! writeTime, renderer = loadTemplateCached (typeof<'T>, path)
-  let content = renderer "model" (box model)
-  return! Response.response HTTP_200 (UTF8.bytes content) r }
+let page fileName model : WebPart =
+  fun ctx ->
+    let fullPath =
+      match templatesDir with
+      | None ->
+        resolvePath ctx.runtime.homeDirectory fileName
+
+      | Some root ->
+        Path.Combine(root, fileName)
+
+    async {
+      let! rendered = renderPageFile fullPath model
+      return! OK rendered ctx
+    }
 
 /// Register functions from a module as filters available in DotLiquid templates.
 /// For example, the following snippet lets you write `{{ model.Total | nuce_num }}`:
@@ -135,14 +179,14 @@ let page<'T> path (model : 'T) r = async {
 ///     do registerFiltersByName "MyFilters"
 ///
 let registerFiltersByName name =
-  let asm = System.Reflection.Assembly.GetExecutingAssembly()
+  let asm = Assembly.GetExecutingAssembly()
   let typ =
     [ for t in asm.GetTypes() do
         if t.FullName.EndsWith(name) && not(t.FullName.Contains("<StartupCode")) then yield t ]
     |> Seq.last
-  Template.RegisterFilter(typ)
+  Template.RegisterFilter typ
 
-/// Similar to `registerFiltersByName`, but the module is speicfied by its `System.Type`
-/// (This is more cumbersome, but safer alternative.)
+/// Similar to `registerFiltersByName`, but the module is speicfied by its
+/// `System.Type` (This is more cumbersome, but safer alternative.)
 let registerFiltersByType typ =
-  Template.RegisterFilter(typ)
+  Template.RegisterFilter typ

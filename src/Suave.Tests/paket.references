@@ -6,3 +6,4 @@ Fuchu.FsCheck
 Fuchu.PerfUtil
 WebSocketSharp
 Http.fs-prerelease
+DotLiquid
