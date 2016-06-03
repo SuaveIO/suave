@@ -57,7 +57,6 @@ You can now use it:
 
 ``` fsharp
 open Suave
-open Suave.Types
 open Suave.Testing
 
 open Fuchu
