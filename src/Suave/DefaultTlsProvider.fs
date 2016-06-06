@@ -2,6 +2,7 @@
 
 open Suave.Sockets
 open Suave.Sockets.Control
+open Suave.Utils.AsyncExtensions
 open System.Security.Authentication
 open System.Security.Cryptography.X509Certificates
 open System.Net.Security
@@ -9,9 +10,23 @@ open System.Net.Security
 type DefaultTlsTransport(cn : Connection, ssl : SslStream) =
   interface ITransport with
     member this.read (buf : ByteSegment) =
-      socket { return ssl.Read(buf.Array,buf.Offset,buf.Count) }
-    member this.write(buf : ByteSegment) =
-      socket { return ssl.Write(buf.Array,buf.Offset,buf.Count) }
+      async {
+        try
+          let! a = ssl.ReadAsync(buf.Array,buf.Offset,buf.Count)
+          return Choice1Of2(a)
+        with ex ->
+          return Choice2Of2 <| ConnectionError (ex.ToString())
+        }
+
+     member this.write(buf : ByteSegment) =
+      async {
+        try 
+          do! ssl.WriteAsync(buf.Array,buf.Offset,buf.Count)
+          return Choice1Of2()
+        with ex ->
+          return Choice2Of2 <| ConnectionError (ex.ToString())
+        
+        }
     member this.shutdown() =
       cn.transport.shutdown()
 
