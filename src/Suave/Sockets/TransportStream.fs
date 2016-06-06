@@ -34,6 +34,7 @@ type TransportStream(transport : ITransport) =
       }
     Async.StartAsTask (task, TaskCreationOptions.AttachedToParent,ct)
 
+  #if !NETSTANDARD1_5
   override x.BeginRead(buffer : byte[],offset : int,count : int,  callback : AsyncCallback, state : obj) : IAsyncResult=
     let task = x.ReadAsync(buffer,offset,count)
     Task<_>.ToIAsyncResult(task,callback,state)
@@ -41,6 +42,7 @@ type TransportStream(transport : ITransport) =
   override x.EndRead(ar:IAsyncResult) =
     let task = ar :?> Task<int> 
     task.Result
+  #endif
 
   override x.Write (buffer : byte[],offset : int,count : int) =
     match Async.RunSynchronously <| transport.write(ArraySegment(buffer,offset,count)) with
@@ -56,6 +58,7 @@ type TransportStream(transport : ITransport) =
       }
     Async.StartAsTask (task, TaskCreationOptions.AttachedToParent,ct) :> Task
 
+  #if !NETSTANDARD1_5
   override x.BeginWrite(buffer : byte[],offset : int,count : int,  callback : AsyncCallback, state : obj) : IAsyncResult=
     let task = x.WriteAsync(buffer,offset,count)
     Task<_>.ToIAsyncResult(task :?> Task<unit>,callback,state)
@@ -63,6 +66,7 @@ type TransportStream(transport : ITransport) =
   override x.EndWrite(ar:IAsyncResult) =
     let task = ar :?> Task<unit> 
     task.Result
+  #endif
 
   override x.Length
     with get() = raise (NotImplementedException())
