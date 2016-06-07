@@ -199,7 +199,7 @@ module WebSocket =
     let r = ctx.request
     if r.``method`` <> HttpMethod.GET then
       return! RequestErrors.METHOD_NOT_ALLOWED "Method not allowed" ctx
-    elif r.header "upgrade"  |> Choice.map (fun s -> s.ToLower()) <> Choice1Of2 "websocket" then
+    elif r.header "upgrade"  |> Choice.map (fun s -> s.ToLowerInvariant()) <> Choice1Of2 "websocket" then
       return! RequestErrors.BAD_REQUEST "Bad Request" ctx
     else
       match r.header "connection" with

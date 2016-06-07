@@ -8,7 +8,7 @@ open Suave.Files
 open Suave.RequestErrors
 open Suave.Logging
 open Suave.Utils
-
+open Suave.CORS
 open System
 open System.Net
 
@@ -33,9 +33,11 @@ let echo (webSocket : WebSocket) =
       | _ -> ()
   }
 
+let corsConfig = { defaultCORSConfig with allowedUris = InclusiveOption.Some [ "http://localhost:8083" ]; checkWebSocketOrigin = false }
+
 let app : WebPart =
   choose [
-    path "/websocket" >=> handShake echo
+    path "/websocket" >=> cors corsConfig >=> handShake echo
     GET >=> choose [ path "/" >=> file "index.html"; browseHome ];
     NOT_FOUND "Found no handlers."
     ]
