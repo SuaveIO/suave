@@ -336,7 +336,7 @@ type ConnectionFacade(ctx) =
           let! a = skip (boundary.Length)
           return () 
 
-        | Choice1Of2 contentType ->
+        | Choice1Of2 contentType when headerParams.ContainsKey "filename" ->
           verbosef (fun f -> f "parsing content type %s -> readFilePart" contentType)
           let! res = readFilePart boundary  headerParams fieldName contentType
           verbosef (fun f -> f "parsing content type %s <- readFilePart" contentType)
@@ -348,7 +348,7 @@ type ConnectionFacade(ctx) =
           | None ->
             return () 
 
-        | Choice2Of2 _ ->
+        | Choice1Of2 _ | Choice2Of2 _ ->
           use mem = new MemoryStream()
           let! a =
             readUntil (ASCII.bytes(eol + boundary)) (fun x y -> async {
