@@ -14,7 +14,7 @@
         
   "dependencies": {
     "Microsoft.FSharp.Core.netcore": "1.0.0-alpha-160509",
-    "Suave": "2.0.0-alpha2",
+    "Suave": "2.0.0-alpha4",
     "Microsoft.NETCore.App": {
       "type": "platform",
       "version": "1.0.0-rc2-3002702"
