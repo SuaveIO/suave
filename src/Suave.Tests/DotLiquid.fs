@@ -2,6 +2,7 @@
 
 open Fuchu
 open Suave
+open System
 open System.IO
 
 type M1 =
@@ -23,7 +24,7 @@ let tests =
       let subject =
         DotLiquid.renderPageFile (combine "liquid/child.liquid") { M1.name = "haf2" }
         |> Async.RunSynchronously
-      Assert.Equal("should render parent and child", "Parent\nHi haf2", subject)
+      Assert.Equal("should render parent and child", (sprintf "Parent%sHi haf2" Environment.NewLine) , subject)
 
     yield testCase "can render from string" <| fun () ->
       let subject =
