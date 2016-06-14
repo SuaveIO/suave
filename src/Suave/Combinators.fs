@@ -465,13 +465,13 @@ module Files =
         let! (_,conn) = asyncWriteLn (sprintf "Content-Length: %d\r\n" (fs : Stream).Length) conn
         let! conn = flush conn
         if  ctx.request.``method`` <> HttpMethod.HEAD && fs.Length > 0L then
-         do! transferStream conn fs
+          do! transferStream conn fs
         return conn
       | None ->
         let! (_,conn) = asyncWriteLn (sprintf "Content-Length: %d\r\n" (fs : Stream).Length) conn
         let! conn = flush conn
         if  ctx.request.``method`` <> HttpMethod.HEAD && fs.Length > 0L then
-         do! transferStream conn fs
+          do! transferStream conn fs
         return conn
     }
     { ctx with

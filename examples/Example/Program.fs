@@ -91,6 +91,10 @@ module OwinSample =
 
     OwinApp.ofApp "/" owinApp
 
+open System.IO
+open Suave.Sockets
+open Suave.Sockets.Control
+
 let app =
   choose [
     GET >=> path "/hello" >=> never
@@ -98,6 +102,26 @@ let app =
     path "/neverme" >=> never >=> OK (Guid.NewGuid().ToString())
     path "/guid" >=> OK (Guid.NewGuid().ToString())
     path "/hello" >=> OK "Hello World"
+    path "/byte-stream" >=> (fun ctx ->
+
+      let write (conn, _) = socket {
+        use ms = new MemoryStream()
+        ms.Write([| 1uy; 2uy; 3uy |], 0, 3)
+        ms.Seek(0L, SeekOrigin.Begin) |> ignore
+        // do things here
+        let! (_,conn) = asyncWriteLn (sprintf "Content-Length: %d\r\n" ms.Length) conn
+        let! conn = flush conn
+        do! transferStream conn ms
+        return conn
+      }
+
+      { ctx with
+          response =
+            { ctx.response with
+                status = HTTP_200.status
+                content = SocketTask write } }
+      |> succeed
+    )
     (path "/apple" <|> path "/orange") >=> OK "Hello Fruit"
     GET >=> path "/query" >=> request( fun x -> cond (x.queryParam "name") (fun y -> OK ("Hello " + y)) never)
     GET >=> path "/query" >=> OK "Hello beautiful"
