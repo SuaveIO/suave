@@ -23,7 +23,7 @@ let tests =
       let subject =
         DotLiquid.renderPageFile (combine "liquid/child.liquid") { M1.name = "haf2" }
         |> Async.RunSynchronously
-      Assert.Equal("should render parent and child", "Parent\nHi haf2", subject)
+      Assert.Equal("should render parent and child", "Parent: Hi haf2" , subject)
 
     yield testCase "can render from string" <| fun () ->
       let subject =
