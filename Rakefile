@@ -303,6 +303,7 @@ namespace :docs do
 
   task :reference => :restore_paket do
     system 'packages/docs/FsLibTool/tools/FsLibTool.exe', %W|src docs/_site|, clr_command: true
+    puts "Reference docs generated successfully."
   end
 
   task :jekyll do
