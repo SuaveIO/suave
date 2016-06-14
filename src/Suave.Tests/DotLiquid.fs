@@ -2,7 +2,6 @@
 
 open Fuchu
 open Suave
-open System
 open System.IO
 
 type M1 =
