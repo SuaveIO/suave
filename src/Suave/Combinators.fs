@@ -349,16 +349,19 @@ module Filters =
         | Bytes bs -> bs.Length
         | _ -> 0)
 
-  let log (logger : Logger) (formatter : HttpContext -> string) (ctx : HttpContext) =
-    logger.Log LogLevel.Info <| fun _ ->
+  let logWithLevel (level : LogLevel) (logger : Logger) (formatter : HttpContext -> string) (ctx : HttpContext) =
+    logger.Log level <| fun _ ->
       { trace         = ctx.request.trace
         message       = formatter ctx
-        level         = LogLevel.Info
+        level         = level
         path          = "Suave.Http.web-requests"
         ``exception`` = None
         tsUTCTicks    = Suave.Globals.utcNow().Ticks }
 
     succeed ctx
+
+  let log (logger : Logger) (formatter : HttpContext -> string) =
+    logWithLevel LogLevel.Debug logger formatter
 
   open Suave.Sscanf
   open ServerErrors

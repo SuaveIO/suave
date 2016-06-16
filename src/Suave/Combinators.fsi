@@ -1104,9 +1104,14 @@ module Filters =
   val logFormat : ctx:HttpContext -> string
 
   /// <summary><para>
-  /// Log the HttpRequest to the given logger, given the Suave Logger and a
+  /// Log the HttpRequest to the given logger, given the Suave Logger, a LogLevel and a
   /// message formatter that can inspect the context and produce a message to
   /// send to the logger.
+  /// </para></summary>
+  val logWithLevel :  level:LogLevel -> logger:Logger -> messageFun:(HttpContext -> string) -> WebPart
+
+  /// <summary><para>
+  /// The function log is equivalent to `logWithLevel LogLevel.Debug`.
   /// </para></summary>
   val log : logger:Logger -> messageFun:(HttpContext -> string) -> WebPart
 
