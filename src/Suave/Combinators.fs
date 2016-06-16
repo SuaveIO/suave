@@ -350,10 +350,10 @@ module Filters =
         | _ -> 0)
 
   let log (logger : Logger) (formatter : HttpContext -> string) (ctx : HttpContext) =
-    logger.Log LogLevel.Debug <| fun _ ->
+    logger.Log LogLevel.Info <| fun _ ->
       { trace         = ctx.request.trace
         message       = formatter ctx
-        level         = LogLevel.Debug
+        level         = LogLevel.Info
         path          = "Suave.Http.web-requests"
         ``exception`` = None
         tsUTCTicks    = Suave.Globals.utcNow().Ticks }
