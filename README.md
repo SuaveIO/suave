@@ -93,6 +93,8 @@ bundle
 bundle exec rake
 ```
 
+After you managed to build with the rake script, you can also use `./build.sh` on any OS or `build.cmd` on Windows which only compile solution and run tests.
+
 ## Libuv installation
 
 On OS X:
@@ -117,8 +119,6 @@ On Linux Ubuntu/Debian:
     sudo make install
     sudo rm -rf /usr/local/src/libuv-1.7.5 && cd ~/
     sudo ldconfig
-
-After you managed to build with the rake script, you can also use `./build.sh` on any OS or `build.cmd` on Windows which only compile solution and run tests.
 
 # Coding Guidelines
 
