@@ -91,6 +91,13 @@ module OwinSample =
 
     OwinApp.ofApp "/" owinApp
 
+let unzipBody : WebPart =
+  fun ctx -> WebPart.asyncOption {
+    if ctx.request.header "content-encoding" = Choice1Of2 "gzip" then 
+      return { ctx with request = { ctx.request with rawForm = Utils.Compression.gzipDecode ctx.request.rawForm} } 
+    else 
+      return ctx }
+
 open System.IO
 open Suave.Sockets
 open Suave.Sockets.Control
