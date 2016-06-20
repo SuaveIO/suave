@@ -9,6 +9,7 @@ module WebSocket =
   open Suave.Logging
 
   open System
+  open System.Collections.Concurrent
   open System.Security.Cryptography
   open System.Text
 
@@ -127,8 +128,17 @@ module WebSocket =
       }
     loop 0
 
+  type internal Cont<'t> = 't -> unit
+
+  open System.Threading
+
+  let fork f = ThreadPool.QueueUserWorkItem(WaitCallback(f)) |> ignore
+
   /// This class represents a WebSocket connection, it provides an interface to read and write to a WebSocket.
   type WebSocket(connection : Connection) =
+    
+    let mutable writing = false
+    let mutable reading = false
 
     let readExtendedLength header = socket {
       if header.length = 126 then
@@ -148,11 +158,31 @@ module WebSocket =
           return uint64(header.length)
       }
 
-    let sendFrame opcode bs fin = socket {
-      let frame = frame opcode bs fin
-      let! _ = connection.transport.write <| ArraySegment (frame,0,frame.Length)
-      return ()
+    let writeQueue = new ConcurrentQueue<byte[]*Cont<Choice<unit,Error>>>()
+    let readQueue  = new ConcurrentQueue<Cont<Choice<Opcode*byte[]*bool,Error>>>()
+
+    let rec writeloop _ =
+      async{
+        try
+          match writeQueue.TryDequeue() with
+          | true, (frame, ok) ->
+            let! res = connection.transport.write <| ArraySegment (frame,0,frame.Length)
+            fork (fun _ -> ok res)
+            do! writeloop ()
+          | false, _ ->
+            lock writeQueue (fun _ -> writing <- false)
+        with ex ->
+          lock writeQueue (fun _ -> writing <- false)
       }
+
+    let sendFrame opcode bs fin =
+      let frame = frame opcode bs fin
+      Async.FromContinuations <| fun (ok,ex,cn) ->
+        writeQueue.Enqueue (frame,ok)
+        lock(writeQueue) (fun _ -> 
+          if not writing then
+            writing <- true
+            Async.Start <| writeloop ())
 
     let readFrame () = socket {
       assert (List.length connection.segments = 0)
@@ -177,8 +207,29 @@ module WebSocket =
         return (header.opcode, data, header.fin)
       }
 
-    member this.read () = readFrame ()
-    member this.send opcode bs fin = sendFrame  opcode bs fin
+    let rec readloop _ =
+      async{
+        try
+          match readQueue.TryDequeue() with
+          | true, ok ->
+            let! res = readFrame ()
+            fork (fun _ -> ok res)
+            do! readloop ()
+          | false, _ ->
+            lock readQueue (fun _ -> reading <- false)
+        with ex ->
+          lock readQueue (fun _ -> reading <- false)
+      }
+
+    member this.read () =
+       Async.FromContinuations <| fun (ok,ex,cn) ->
+        readQueue.Enqueue (ok)
+        lock(readQueue) (fun _ -> 
+          if not reading then
+            reading <- true
+            Async.Start <| readloop ())
+
+    member this.send opcode bs fin = sendFrame opcode bs fin
 
   let internal handShakeAux webSocketKey continuation (ctx : HttpContext) =
     socket {
