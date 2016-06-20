@@ -1,4 +1,4 @@
-﻿module internal Suave.Utils.Compression
+﻿module Suave.Utils.Compression
 
 open System.IO
 open System.IO.Compression
