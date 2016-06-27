@@ -21,6 +21,7 @@ open Suave.Files
 /// Use the ruby naming convention by default
 do Template.NamingConvention <- RubyNamingConvention()
 
+
 module internal Impl =
 
   /// Represents a local file system relative to the specified 'root'
@@ -179,12 +180,14 @@ let page fileName model : WebPart =
 ///     do registerFiltersByName "MyFilters"
 ///
 let registerFiltersByName name =
-  let asm = Assembly.GetExecutingAssembly()
-  let typ =
-    [ for t in asm.GetTypes() do
-        if t.FullName.EndsWith(name) && not(t.FullName.Contains("<StartupCode")) then yield t ]
-    |> Seq.last
+  let asm = Assembly.GetEntryAssembly()
+  let typ = 
+    asm.GetTypes()
+    |> Array.find (fun t -> t.FullName.EndsWith(name) && 
+                            not(t.FullName.Contains("<StartupCode")))
   Template.RegisterFilter typ
+
+  
 
 /// Similar to `registerFiltersByName`, but the module is speicfied by its
 /// `System.Type` (This is more cumbersome, but safer alternative.)
