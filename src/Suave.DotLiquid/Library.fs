@@ -37,7 +37,7 @@ module internal Impl =
     let o = obj()
     fun f -> lock o f
 
-  /// Given a type which is an F# record containing seq<_>, list<_> and other
+  /// Given a type which is an F# record containing seq<_>, list<_>, array<_> and other
   /// records, register the type with DotLiquid so that its fields are accessible
   let tryRegisterTypeTree =
     let registered = Dictionary<_, _>()
@@ -49,7 +49,7 @@ module internal Impl =
           for f in fields do loop f.PropertyType
         elif ty.IsGenericType &&
             ( let t = ty.GetGenericTypeDefinition()
-              in t = typedefof<seq<_>> || t = typedefof<list<_>> ) then
+              in t = typedefof<seq<_>> || t = typedefof<list<_>> || t = typedefof<array<_>> ) then
           loop (ty.GetGenericArguments().[0])
         registered.[ty] <- true
     fun ty -> safe (fun () -> loop ty)
@@ -87,8 +87,8 @@ module internal Impl =
     let writeTime = File.GetLastWriteTime fileName
     use file = new FileStream(fileName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite)
     use reader = new StreamReader(file)
-    let! razorTemplate = reader.ReadToEndAsync()
-    return writeTime, parseTemplate razorTemplate typ
+    let! dotLiquidTemplate = reader.ReadToEndAsync()
+    return writeTime, parseTemplate dotLiquidTemplate typ
   }
 
   /// Load template & memoize & automatically reload when the file changes
@@ -150,7 +150,7 @@ let renderPageFile fileFullPath (model : 'm) =
 
 /// Render a page using DotLiquid template. Takes a path (relative to the directory specified
 /// using `setTemplatesDir` and a value that is exposed as the "model" variable. You can use
-/// any F# record type, seq<_> and list<_> without having to explicitly register the fields.
+/// any F# record type, seq<_>, list<_>, and array<_> without having to explicitly register the fields.
 ///
 ///     type Page = { Total : int }
 ///     let app = page "index.html" { Total = 42 }
@@ -171,7 +171,7 @@ let page fileName model : WebPart =
     }
 
 /// Register functions from a module as filters available in DotLiquid templates.
-/// For example, the following snippet lets you write `{{ model.Total | nuce_num }}`:
+/// For example, the following snippet lets you write `{{ model.Total | nice_num }}`:
 ///
 ///     module MyFilters =
 ///       let niceNum i = if i > 10 then "lot" else "not much"
