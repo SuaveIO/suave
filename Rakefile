@@ -103,7 +103,7 @@ namespace :dotnetcli do
   end
 
   task :coreclr_binaries => 'tools/coreclr' do
-    dotnet_version = '1.0.0-preview1-002702'
+    dotnet_version = '1.0.0-preview2-003121'
     dotnet_installed_version = get_installed_dotnet_version
     # check if required version of .net core sdk is already installed, otherwise download and install it
     if dotnet_installed_version == dotnet_version then
@@ -121,17 +121,17 @@ namespace :dotnetcli do
       filename = "dotnet-dev-osx-x64.#{dotnet_version}.tar.gz"
       system 'curl',
         %W|-o tools/#{filename}
-           -L https://dotnetcli.blob.core.windows.net/dotnet/beta/Binaries/#{dotnet_version}/#{filename}| \
+           -L https://dotnetcli.blob.core.windows.net/dotnet/preview/Binaries/#{dotnet_version}/#{filename}| \
         unless File.exists? "tools/#{filename}"
 
       system 'tar',
         %W|xf tools/#{filename}
            --directory tools/coreclr|
     when /linux/
-      filename = "dotnet-dev-ubuntu-x64.#{dotnet_version}.tar.gz"
+      filename = "dotnet-dev-ubuntu.14.04-x64.#{dotnet_version}.tar.gz"
       system 'curl',
         %W|-o tools/#{filename}
-           -L https://dotnetcli.blob.core.windows.net/dotnet/beta/Binaries/#{dotnet_version}/#{filename}| \
+           -L https://dotnetcli.blob.core.windows.net/dotnet/preview/Binaries/#{dotnet_version}/#{filename}| \
         unless File.exists? "tools/#{filename}"
 
       system 'tar',
@@ -140,7 +140,7 @@ namespace :dotnetcli do
     end
     if Gem.win_platform?
       system 'powershell',
-        %W|Invoke-WebRequest "https://raw.githubusercontent.com/dotnet/cli/rel/1.0.0/scripts/obtain/install.ps1" -OutFile "dotnet_cli_install.ps1"|
+        %W|Invoke-WebRequest "https://raw.githubusercontent.com/dotnet/cli/rel/1.0.0-preview2/scripts/obtain/dotnet-install.ps1" -OutFile "dotnet_cli_install.ps1"|
       system 'powershell',
         %W|-ExecutionPolicy Unrestricted ./dotnet_cli_install.ps1 -InstallDir "tools/coreclr" -Channel "beta" -version "#{dotnet_version}"|
     end
