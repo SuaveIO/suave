@@ -37,8 +37,8 @@ module internal Impl =
     let o = obj()
     fun f -> lock o f
 
-  /// Given a type which is an F# record containing seq<_>, list<_>, array<_> and other
-  /// records, register the type with DotLiquid so that its fields are accessible
+  /// Given a type which is an F# record containing seq<_>, list<_>, array<_>, option and 
+  /// other records, register the type with DotLiquid so that its fields are accessible
   let tryRegisterTypeTree =
     let registered = Dictionary<_, _>()
     let rec loop ty =
@@ -155,7 +155,8 @@ let renderPageFile fileFullPath (model : 'm) =
 
 /// Render a page using DotLiquid template. Takes a path (relative to the directory specified
 /// using `setTemplatesDir` and a value that is exposed as the "model" variable. You can use
-/// any F# record type, seq<_>, list<_>, and array<_> without having to explicitly register the fields.
+/// any F# record type, seq<_>, list<_>, and array<_>  and option without having to explicitly 
+/// register the fields.
 ///
 ///     type Page = { Total : int }
 ///     let app = page "index.html" { Total = 42 }
