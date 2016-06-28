@@ -21,7 +21,6 @@ open Suave.Files
 /// Use the ruby naming convention by default
 do Template.NamingConvention <- RubyNamingConvention()
 
-
 module internal Impl =
 
   /// Represents a local file system relative to the specified 'root'
@@ -48,10 +47,15 @@ module internal Impl =
           let fields = FSharpType.GetRecordFields ty
           Template.RegisterSafeType(ty, [| for f in fields -> f.Name |])
           for f in fields do loop f.PropertyType
-        elif ty.IsGenericType &&
-            ( let t = ty.GetGenericTypeDefinition()
-              in t = typedefof<seq<_>> || t = typedefof<list<_>> || t = typedefof<array<_>> ) then
-          loop (ty.GetGenericArguments().[0])
+        elif ty.IsGenericType then
+          let t = ty.GetGenericTypeDefinition()
+          if t = typedefof<seq<_>> || t = typedefof<list<_>>  then
+            loop (ty.GetGenericArguments().[0])          
+          elif t = typedefof<option<_>> then
+            Template.RegisterSafeType(ty, [|"Value"|])
+            loop (ty.GetGenericArguments().[0])            
+        elif ty.IsArray then          
+          loop (ty.GetElementType())
         registered.[ty] <- true
     fun ty -> safe (fun () -> loop ty)
 
