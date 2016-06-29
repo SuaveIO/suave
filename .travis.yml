@@ -6,6 +6,7 @@ notifications:
 env:
  matrix:
   - MONO_VERSION="4.2.1"
+  - MONO_VERSION="4.4.1"
 
 before_install:
  - wget "http://download.mono-project.com/archive/${MONO_VERSION}/macos-10-x86/MonoFramework-MDK-${MONO_VERSION}.macos10.xamarin.x86.pkg"
