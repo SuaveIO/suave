@@ -4,6 +4,8 @@ language: csharp
 mono:
  - 4.2.3
  - 4.4.1
+ - latest # => "stable release"
+ - weekly # => "latest commits"
 
 install:
  - rvm install 2.2.3
