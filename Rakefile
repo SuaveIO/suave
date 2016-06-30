@@ -155,15 +155,9 @@ namespace :dotnetcli do
     end
   end
 
-  task :build_tests => :coreclr_binaries do
-    Dir.chdir "src/Suave.DotnetCLI.Tests" do
-      system dotnet_exe_path, %W|--verbose build --configuration #{Configuration} -f netstandard1.5|
-    end
-  end
-
   task :build_lib => :coreclr_binaries do
     Dir.chdir "src/Suave" do
-      system dotnet_exe_path, %W|--verbose build --configuration #{Configuration} -f netstandard1.5|
+      system dotnet_exe_path, %W|--verbose build --configuration #{Configuration} -f netstandard1.6|
     end
   end
 
@@ -185,7 +179,7 @@ namespace :dotnetcli do
       version = SemVer.find.format("%M.%m.%p%s")
       sourcenupkg = "../../build/pkg/Suave.#{version}.nupkg"
       clinupkg = "bin/#{Configuration}/Suave.#{version}-dotnetcli.nupkg"
-      system dotnet_exe_path, %W|mergenupkg --source "#{sourcenupkg}" --other "#{clinupkg}" --framework netstandard1.5|
+      system dotnet_exe_path, %W|mergenupkg --source "#{sourcenupkg}" --other "#{clinupkg}" --framework netstandard1.6|
     end
   end
 end
