@@ -75,7 +75,7 @@
             "version": "1.0.0-preview2-*",
             "imports": "dnxcore50"
         },
-        "dotnet-mergenupkg": { "version": "0.10.*" }
+        "dotnet-mergenupkg": { "version": "1.0.*" }
     },
 
     "frameworks": {
