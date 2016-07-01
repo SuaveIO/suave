@@ -12,8 +12,8 @@ install:
  - gem install bundler
  - sudo apt-get update -y
  - sudo apt-get install -y gnupg automake libtool
- - curl -sSL https://github.com/libuv/libuv/archive/v1.9.1.tar.gz | tar zxf - -C /usr/local/src
- - (cd libuv-1.9.1 && ./autogen.sh && ./configure && make && sudo make install)
+ - curl -sSL https://github.com/libuv/libuv/archive/v1.9.1.tar.gz | tar zxf - -C /tmp
+ - (cd /tmp/libuv-1.9.1/ && ./autogen.sh && ./configure && make && sudo make install)
  - sudo ldconfig
  # for apache bench (ab)
  - sudo apt-get install -qq apache2-utils
