@@ -20,13 +20,13 @@ module HttpOutput =
       { context with response = { context.response with headers = ("Connection","Keep-Alive") :: context.response.headers } }
     | _ -> context
 
-  let inline writeHeaders (headers : (string*string) seq) = withConnection {
+  let inline writeHeaders exclusions (headers : (string*string) seq) = withConnection {
     for x,y in headers do
-      if not (List.exists (fun y -> x.ToLower().Equals(y)) ["server";"date";"content-length"]) then
+      if not (List.exists (fun y -> x.ToLower().Equals(y)) exclusions) then
         do! asyncWriteLn (String.Concat [| x; ": "; y |])
     }
 
-  let inline writePreamble (context: HttpContext) = withConnection {
+  let inline writePreamble exclusions (context: HttpContext) = withConnection {
 
     let r = context.response
 
@@ -34,7 +34,7 @@ module HttpOutput =
     if not context.runtime.hideHeader then do! asyncWriteLn ServerHeader
     do! asyncWriteLn (String.Concat( [| "Date: "; Globals.utcNow().ToString("R") |]))
 
-    do! writeHeaders r.headers
+    do! writeHeaders exclusions r.headers
     do! writeContentType r.headers
     }
 
@@ -86,7 +86,7 @@ module HttpOutput =
       match result with 
       | Some newCtx ->
         if newCtx.response.writePreamble then
-          let! (_, connection) = writePreamble newCtx newCtx.connection
+          let! (_, connection) = writePreamble ["server";"date";"content-length"] newCtx newCtx.connection
           let! connection = writeContent { newCtx with connection = connection } newCtx.response.content
           return Some { newCtx with connection = connection }
         else
