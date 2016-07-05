@@ -45,7 +45,7 @@ let main _ =
   // wait for the server to start listening
   listening |> Async.RunSynchronously |> printfn "start stats: %A"
 
-  // launch httpref
+  // launch httperf
   let output = execute "httperf" (sprintf "--hog --server=localhost --port=%d --uri=/ --rate=1000 --num-conns=1000 --num-calls=1000 --burst-length=20" port)
 
   Console.WriteLine output
