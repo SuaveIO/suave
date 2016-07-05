@@ -20,3 +20,8 @@ install:
 
 script:
  - bundle && bundle exec rake
+
+matrix:
+  allow_failures:
+    - mono: latest
+    - mono: weekly
