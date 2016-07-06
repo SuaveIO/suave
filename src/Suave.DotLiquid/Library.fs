@@ -37,8 +37,8 @@ module internal Impl =
     let o = obj()
     fun f -> lock o f
 
-  /// Given a type which is an F# record containing seq<_>, list<_>, array<_> and other
-  /// records, register the type with DotLiquid so that its fields are accessible
+  /// Given a type which is an F# record containing seq<_>, list<_>, array<_>, option and 
+  /// other records, register the type with DotLiquid so that its fields are accessible
   let tryRegisterTypeTree =
     let registered = Dictionary<_, _>()
     let rec loop ty =
@@ -47,10 +47,15 @@ module internal Impl =
           let fields = FSharpType.GetRecordFields ty
           Template.RegisterSafeType(ty, [| for f in fields -> f.Name |])
           for f in fields do loop f.PropertyType
-        elif ty.IsGenericType &&
-            ( let t = ty.GetGenericTypeDefinition()
-              in t = typedefof<seq<_>> || t = typedefof<list<_>> || t = typedefof<array<_>> ) then
-          loop (ty.GetGenericArguments().[0])
+        elif ty.IsGenericType then
+          let t = ty.GetGenericTypeDefinition()
+          if t = typedefof<seq<_>> || t = typedefof<list<_>>  then
+            loop (ty.GetGenericArguments().[0])          
+          elif t = typedefof<option<_>> then
+            Template.RegisterSafeType(ty, [|"Value"|])
+            loop (ty.GetGenericArguments().[0])            
+        elif ty.IsArray then          
+          loop (ty.GetElementType())
         registered.[ty] <- true
     fun ty -> safe (fun () -> loop ty)
 
@@ -150,7 +155,8 @@ let renderPageFile fileFullPath (model : 'm) =
 
 /// Render a page using DotLiquid template. Takes a path (relative to the directory specified
 /// using `setTemplatesDir` and a value that is exposed as the "model" variable. You can use
-/// any F# record type, seq<_>, list<_>, and array<_> without having to explicitly register the fields.
+/// any F# record type, seq<_>, list<_>, and array<_>  and option without having to explicitly 
+/// register the fields.
 ///
 ///     type Page = { Total : int }
 ///     let app = page "index.html" { Total = 42 }
@@ -179,12 +185,14 @@ let page fileName model : WebPart =
 ///     do registerFiltersByName "MyFilters"
 ///
 let registerFiltersByName name =
-  let asm = Assembly.GetExecutingAssembly()
-  let typ =
-    [ for t in asm.GetTypes() do
-        if t.FullName.EndsWith(name) && not(t.FullName.Contains("<StartupCode")) then yield t ]
-    |> Seq.last
+  let asm = Assembly.GetEntryAssembly()
+  let typ = 
+    asm.GetTypes()
+    |> Array.find (fun t -> t.FullName.EndsWith(name) && 
+                            not(t.FullName.Contains("<StartupCode")))
   Template.RegisterFilter typ
+
+  
 
 /// Similar to `registerFiltersByName`, but the module is speicfied by its
 /// `System.Type` (This is more cumbersome, but safer alternative.)
