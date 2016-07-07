@@ -24,11 +24,11 @@ let echo (webSocket : WebSocket) =
       match msg with
       | (Text, data, true) ->
         let str = UTF8.toString data
-        do! webSocket.send Text data true
+        do! webSocket.send Text (ArraySegment data) true
       | (Ping, _, _) ->
-        do! webSocket.send Pong [||] true
+        do! webSocket.send Pong (ArraySegment([||])) true
       | (Close, _, _) ->
-        do! webSocket.send Close [||] true
+        do! webSocket.send Close (ArraySegment([||])) true
         loop := false
       | _ -> ()
   }

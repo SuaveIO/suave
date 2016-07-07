@@ -385,8 +385,7 @@ module OwinApp =
     let webSocketSendAsync (webSocket : WebSocket) =
       new WebSocketSendAsync(
         fun (data: ArraySegment<byte>) (messageType: int) fin ct -> 
-          let arr = Array.sub data.Array data.Offset data.Count
-          let send = webSocket.send (toOpcode (byte messageType)) arr fin
+          let send = webSocket.send (toOpcode (byte messageType)) data fin
           let task = Async.StartAsTask (send, TaskCreationOptions.None, ct)
           task :> Task)
 
@@ -409,7 +408,7 @@ module OwinApp =
       new WebSocketCloseAsync(
         fun closeStatus closeDescription ct -> 
           let close = async {
-            let! res = webSocket.send Close [||] true
+            let! res = webSocket.send Close (ByteSegment([||])) true
             return ()
           }
           Async.StartAsTask (close, TaskCreationOptions.None, ct) :> Task)
