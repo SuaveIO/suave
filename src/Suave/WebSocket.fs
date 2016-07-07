@@ -80,6 +80,12 @@ module WebSocket =
       hasMask : bool
       length  : int }
 
+  type Frame = {
+    OpcodeByte: byte
+    EncodedLength: byte[]
+    Data: ByteSegment
+    }
+
   let internal exctractHeader (arr: byte []) =
     let bytes x = arr.[x]
     let firstByte = bytes 0
@@ -96,31 +102,29 @@ module WebSocket =
       }
     header
 
-  let internal frame (opcode : Opcode) (data : byte[])  (fin : bool) =
+  let writeFrame (connection: Connection) (f: Frame) = socket {
+      do! connection.transport.write (ArraySegment([| f.OpcodeByte |], 0, 1))
+      do! connection.transport.write (ArraySegment(f.EncodedLength, 0, f.EncodedLength.Length))
+      do! connection.transport.write f.Data
+      }
+
+  let internal frame (opcode : Opcode) (data : ByteSegment)  (fin : bool) =
 
     let firstByte = fromOpcode opcode
 
     let firstByte = if fin then firstByte ||| 128uy else firstByte
 
-    let maxHeaderLength = 10
-    let strLen = data.Length
-    use ms = new IO.MemoryStream(maxHeaderLength + strLen)
-
-    ms.WriteByte(firstByte)
-
-    match strLen with
-    | l when l >= 65536 ->
-      let lengthBytes = BitConverter.GetBytes(uint64 data.Length) |> Array.rev
-      ms.WriteByte(127uy)
-      ms.Write(lengthBytes, 0, lengthBytes.Length)
-    | l when l >= 126 ->
-      let lengthBytes = BitConverter.GetBytes(uint16 data.Length) |> Array.rev
-      ms.WriteByte(126uy)
-      ms.Write(lengthBytes, 0, lengthBytes.Length)
-    | _ -> ms.WriteByte(byte strLen)
-
-    ms.Write(data,0,data.Length)
-    ms.ToArray()
+    let encodedLength = 
+        match data.Count with
+        | l when l >= 65536 ->
+          [| yield 127uy
+             yield! BitConverter.GetBytes(uint64 data.Count) |> Array.rev |]
+        | l when l >= 126 ->
+          [| yield 126uy
+             yield! BitConverter.GetBytes(uint16 data.Count) |> Array.rev |]
+        | _ -> [| byte (data.Count) |]
+    
+    { Frame.OpcodeByte = firstByte; EncodedLength = encodedLength; Data = data }
 
   let readBytes (transport : ITransport) (n : int) =
     let arr = Array.zeroCreate n
@@ -163,7 +167,7 @@ module WebSocket =
           return uint64(header.length)
       }
 
-    let writeQueue = new ConcurrentQueue<byte[]*Cont<Choice<unit,Error>>>()
+    let writeQueue = new ConcurrentQueue<Frame*Cont<Choice<unit,Error>>>()
     let readQueue  = new ConcurrentQueue<Cont<Choice<Opcode*byte[]*bool,Error>>>()
 
     let rec writeloop _ =
@@ -171,7 +175,7 @@ module WebSocket =
         try
           match writeQueue.TryDequeue() with
           | true, (frame, ok) ->
-            let! res = connection.transport.write <| ArraySegment (frame,0,frame.Length)
+            let! res = writeFrame connection frame 
             fork (fun _ -> ok res)
             do! writeloop ()
           | false, _ ->
@@ -203,7 +207,7 @@ module WebSocket =
         let data =
           [| yield! BitConverter.GetBytes (CloseCode.CLOSE_TOO_LARGE.code)
              yield! UTF8.bytes reason |]
-        do! sendFrame Close data true
+        do! sendFrame Close (ArraySegment(data)) true
         return! SocketOp.abort (InputDataError reason)
       else
         let! frame = readBytes connection.transport (int extendedLength)
