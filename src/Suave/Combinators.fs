@@ -461,21 +461,23 @@ module Files =
       let getFs = fun path -> new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite) :> Stream
       let getLm = fun path -> FileInfo(path).LastWriteTime
       let! (encoding,fs) = Compression.transformStream file getFs getLm compression ctx.runtime.compressionFolder ctx
-
-      match encoding with
-      | Some n ->
-        let! (_,conn) = asyncWriteLn (String.Concat [| "Content-Encoding: "; n.ToString() |]) conn
-        let! (_,conn) = asyncWriteLn (sprintf "Content-Length: %d\r\n" (fs : Stream).Length) conn
-        let! conn = flush conn
-        if  ctx.request.``method`` <> HttpMethod.HEAD && fs.Length > 0L then
-          do! transferStream conn fs
-        return conn
-      | None ->
-        let! (_,conn) = asyncWriteLn (sprintf "Content-Length: %d\r\n" (fs : Stream).Length) conn
-        let! conn = flush conn
-        if  ctx.request.``method`` <> HttpMethod.HEAD && fs.Length > 0L then
-          do! transferStream conn fs
-        return conn
+      try
+        match encoding with
+        | Some n ->
+          let! (_,conn) = asyncWriteLn (String.Concat [| "Content-Encoding: "; n.ToString() |]) conn
+          let! (_,conn) = asyncWriteLn (sprintf "Content-Length: %d\r\n" (fs : Stream).Length) conn
+          let! conn = flush conn
+          if  ctx.request.``method`` <> HttpMethod.HEAD && fs.Length > 0L then
+            do! transferStream conn fs
+          return conn
+        | None ->
+          let! (_,conn) = asyncWriteLn (sprintf "Content-Length: %d\r\n" (fs : Stream).Length) conn
+          let! conn = flush conn
+          if  ctx.request.``method`` <> HttpMethod.HEAD && fs.Length > 0L then
+            do! transferStream conn fs
+          return conn
+      finally
+        fs.Dispose()
     }
     { ctx with
         response =
