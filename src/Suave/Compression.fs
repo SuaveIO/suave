@@ -89,7 +89,6 @@ module Compression =
     if not (Directory.Exists compressionFolder) then Directory.CreateDirectory compressionFolder |> ignore
     let newPath = Path.Combine(compressionFolder,tempFileName)
     do! compress n newPath stream
-    stream.Dispose()
     return newPath
   }
 
