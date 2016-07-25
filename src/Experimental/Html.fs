@@ -99,7 +99,7 @@ let rec htmlToString node =
     | xs ->
       let attributeString =
         attributes
-        |> Array.map (fun (k,v) -> sprintf "%s=\"%s\"" k v)
+        |> Array.map (fun (k,v) -> sprintf " %s=\"%s\"" k v)
         |> String.Concat
       sprintf "<%s %s>" e attributeString
 
