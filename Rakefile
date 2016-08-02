@@ -26,6 +26,7 @@ Platform = ENV['MSBUILD_PLATFORM'] || 'Any CPU'
 task :yolo do
   system %{ruby -pi.bak -e "gsub(/module internal YoLo/, 'module internal Suave.Utils.YoLo')" paket-files/haf/YoLo/YoLo.fs} unless Albacore.windows?
   system %{ruby -pi.bak -e "gsub(/module internal YoLo/, 'module internal Suave.Utils.YoLo')" paket-files/examples/haf/YoLo/YoLo.fs} unless Albacore.windows?
+  system %{ruby -pi.bak -e "gsub(/namespace Logary.Facade/, 'namespace Suave.Logging')" paket-files/logary/logary/src/Logary.Facade/Facade.fs} unless Albacore.windows?
 end
 
 desc "Restore paket.exe"
