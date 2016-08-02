@@ -1,19 +1,28 @@
 ﻿namespace Suave
 
+/// The cookie module is geared towards the server having the client store state
+/// but the client not being able to read that state.
 module Cookie =
   open System
   open System.Text
   open System.Globalization
   open Suave.Utils
 
+  /// For how long should the cookie persist in the client's browser?
   type CookieLife =
+    /// Until the browser session ends.
     | Session
-    | MaxAge of TimeSpan
+    /// For the duration of the passed TimeSpan.
+    | MaxAge of duration:TimeSpan
 
+  /// There was an error reading or decrypting the cookie.
   type CookieError =
-    /// Gives you the cookie id
-    | NoCookieFound of string
-    | DecryptionError of Crypto.SecretboxDecryptionError
+    /// No cookie was found by the given cookie name.
+    | NoCookieFound of cookieName:string
+    /// The cookie existed but Suave was unable to decrypt its contents. Have
+    /// you the same key across servers and over time and deployments? Unless
+    /// you've specified the server key in your configuration, you won't.
+    | DecryptionError of error:Crypto.SecretboxDecryptionError
 
   /// Parse the cookie's name and data in the string into a dictionary.
   val parseCookies : cookieString:string -> HttpCookie list

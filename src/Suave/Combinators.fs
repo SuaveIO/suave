@@ -338,7 +338,7 @@ module Filters =
     sprintf "%O %s %s [%s] \"%s %s %s\" %d %d"
       ctx.clientIpTrustProxy
       processId //TODO: obtain connection owner via Ident protocol
-                        // Authentication.UserNameKey
+                         // Authentication.UserNameKey
       (match Map.tryFind "userName" ctx.userState with Some x -> x :?> string | None -> "-")
       (DateTime.UtcNow.ToString("dd/MMM/yyyy:hh:mm:ss %K", ci))
       (string ctx.request.``method``)
@@ -346,17 +346,16 @@ module Filters =
       ctx.request.httpVersion
       ctx.response.status.code
       (match ctx.response.content with
-        | Bytes bs -> bs.Length
-        | _ -> 0)
+      | Bytes bs -> bs.Length
+      | _ -> 0)
 
   let logWithLevel (level : LogLevel) (logger : Logger) (formatter : HttpContext -> string) (ctx : HttpContext) =
-    logger.Log level <| fun _ ->
-      { trace         = ctx.request.trace
-        message       = formatter ctx
+    logger.log level <| fun _ ->
+      { value         = Event (formatter ctx)
         level         = level
-        path          = "Suave.Http.web-requests"
-        ``exception`` = None
-        tsUTCTicks    = Suave.Globals.utcNow().Ticks }
+        name          = [| "Suave"; "Http"; "requests" |]
+        fields        = Map.empty
+        timestamp     = Suave.Logging.Global.timestamp() }
 
     succeed ctx
 
@@ -396,6 +395,7 @@ module Filters =
 
 /// not part of the public API at this point
 module ServeResource =
+
   open System
 
   open Writers
@@ -403,6 +403,7 @@ module ServeResource =
   open RequestErrors
   open Suave.Utils
   open Suave.Logging
+  open Suave.Logging.Message
 
   // If a response includes both an Expires header and a max-age directive,
   // the max-age directive overrides the Expires header, even if the Expires header is more restrictive
@@ -411,7 +412,9 @@ module ServeResource =
                 (send : string -> bool -> WebPart)
                 ctx =
     let log =
-      Log.verbose ctx.runtime.logger "Suave.Http.ServeResource.resource" TraceHeader.empty
+      event Verbose
+      >> setSingleName "Suave.Http.ServeResource.resource"
+      >> ctx.runtime.logger.logSimple
 
     let sendIt name compression =
       setHeader "Last-Modified" ((getLast key : DateTime).ToString("R"))
@@ -448,6 +451,7 @@ module Files =
 
   open Suave.Utils
   open Suave.Logging
+  open Suave.Logging.Message
   open Suave.Sockets.Control
 
   open Response
@@ -515,11 +519,11 @@ module Files =
     
   let browse rootPath : WebPart =
     warbler (fun ctx ->
-      Log.verbose ctx.runtime.logger
-        "Suave.Http.Files.browse"
-        TraceHeader.empty
-        (sprintf "Files.browse trying file (local file url:'%s' root:'%s')"
-          ctx.request.url.AbsolutePath rootPath)
+      ctx.runtime.logger.verbose (
+        eventX "Files.browser trying {localFileUrl} at {rootPath}"
+        >> setFieldValue "localFileUrl" ctx.request.url.AbsolutePath
+        >> setFieldValue "rootPath" rootPath
+        >> setSingleName "Suave.Http.Files.browse")
       file (resolvePath rootPath ctx.request.path))
 
   let browseHome : WebPart =

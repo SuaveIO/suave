@@ -1,9 +1,9 @@
 module Suave.State
 
 open Suave.Utils
-open Suave.Log
 open Suave.Cookie
 open Suave.Logging
+open Suave.Logging.Message
 
 /// A session store is a reader and a writer function pair keyed on strings.
 type StateStore =
@@ -26,32 +26,46 @@ module CookieStateStore =
   [<Literal>]
   let StateCookie = "st"
 
-  let write relativeExpiry (key : string) (value : 'T) =
+  let write relativeExpiry (cookieName : string) (value : 'T) =
     context (fun ctx ->
-      log ctx.runtime.logger "Suave.State.CookieStateStore.write" LogLevel.Debug (sprintf "writing to key '%s'" key)
-      updateCookies
+      let event message =
+        eventX message
+        >> setFieldValue "cookieName" cookieName
+        >> setSingleName "Suave.State.CookieStateStore.write"
+
+      let debug eventFactory =
+        ctx.runtime.logger.debug eventFactory
+
+      let cookieState =
         { serverKey      = ctx.runtime.serverKey
           cookieName     = StateCookie
           userStateKey   = StateStoreType
           relativeExpiry = relativeExpiry
           secure         = false }
-        (function
-         | None      ->
-           log ctx.runtime.logger "Suave.State.CookieStateStore.write" LogLevel.Debug "in fPlainText, no existing"
+
+      debug (event "Writing to {cookieName}")
+      updateCookies cookieState (function
+         | None ->
+           debug (event "In fPlainText, no existing cookie")
+
            Map.empty
-           |> Map.add key (box value)
-           |> ctx.runtime.cookieSerialiser.Serialise
+           |> Map.add cookieName (box value)
+           |> ctx.runtime.cookieSerialiser.serialise
+
          | Some data ->
-           let m = ctx.runtime.cookieSerialiser.Deserialise data
-           log ctx.runtime.logger "Suave.State.CookieStateStore.write" LogLevel.Debug
-             (sprintf "in fPlainText, has existing %A" m)
+           let m = ctx.runtime.cookieSerialiser.deserialise data
+           debug (event "In fPlainText, has existing {cookie}"
+                  >> setFieldValue "cookie" m)
+
            m
-           |> Map.add key (box value)
-           |> ctx.runtime.cookieSerialiser.Serialise))
+           |> Map.add cookieName (box value)
+           |> ctx.runtime.cookieSerialiser.serialise))
 
   let stateful relativeExpiry secure : WebPart =
     context (fun ctx ->
-      log ctx.runtime.logger "Suave.State.CookieStateStore.stateful" LogLevel.Debug "ensuring cookie state"
+      ctx.runtime.logger.debug (
+        eventX "Ensuring cookie state"
+        >> setSingleName "Suave.State.CookieStateStore.stateful")
 
       let cipherTextCorrupt =
         sprintf "%A" >> RequestErrors.BAD_REQUEST >> Choice2Of2
@@ -65,11 +79,10 @@ module CookieStateStore =
           userStateKey   = StateStoreType
           relativeExpiry = relativeExpiry
           secure         = secure }
-        (fun () -> Choice1Of2(Map.empty<string, obj> |> ctx.runtime.cookieSerialiser.Serialise))
+        (fun () -> Choice1Of2(Map.empty<string, obj> |> ctx.runtime.cookieSerialiser.serialise))
         cipherTextCorrupt
         setExpiry)
 
-  ///
   ///
   /// Only save the state for the duration of the browser session.
   let statefulForSession : WebPart =
@@ -80,7 +93,7 @@ module CookieStateStore =
     let private mkStateStore (serialiser : CookieSerialiser) (userState : Map<string, obj>) (ss : obj) =
       { new StateStore with
           member x.get key =
-            serialiser.Deserialise (ss :?> byte []) |> Map.tryFind key
+            serialiser.deserialise (ss :?> byte []) |> Map.tryFind key
             |> Option.map (fun x -> Convert.ChangeType(x, typeof<'T>) :?> 'T)
           member x.set key value =
             let expiry = userState |> Map.find (StateStoreType + "-expiry") :?> CookieLife

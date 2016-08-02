@@ -16,7 +16,6 @@ module Http =
   open Suave.Sockets
   open Suave.Tcp
   open Suave.Utils
-  open Suave.Log
   open Suave.Logging
 
   open Microsoft.FSharp.Reflection
@@ -220,8 +219,8 @@ module Http =
       secure   : bool
       httpOnly : bool }
 
-    static member name_     = (fun x -> x.name),    fun v x -> { x with name = v }
-    static member value_    = (fun x -> x.value), fun v x -> { x with value = v }
+    static member name_     = (fun x -> x.name),    fun v (x : HttpCookie) -> { x with name = v }
+    static member value_    = (fun x -> x.value), fun v (x : HttpCookie) -> { x with value = v }
     static member expires_  = (fun x -> x.expires), fun v x -> { x with expires = v }
     static member path_     = (fun x -> x.path), fun v (x : HttpCookie) -> { x with path = v }
     static member domain_   = (fun x -> x.domain), fun v x -> { x with domain = v }
@@ -596,7 +595,7 @@ module Http =
         mimeTypesMap      = fun _ -> None
         homeDirectory     = "."
         compressionFolder = "."
-        logger            = Loggers.saneDefaultsFor LogLevel.Debug
+        logger            = Targets.create Debug
         matchedBinding    = HttpBinding.defaults
         parsePostData     = false
         #if NETSTANDARD1_5
