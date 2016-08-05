@@ -155,7 +155,7 @@ let runServer maxConcurrentOps bufferSize autoGrow (binding: SocketBinding) star
     acceptingConnections.complete startData |> ignore
 
     logger.info (
-      eventX "Listener started in {startData} ms"
+      eventX (sprintf "Listener started in %O" startData)
       >> setFieldValue "startData" startData
       >> setSingleName "Suave.Tcp.runServer")
 

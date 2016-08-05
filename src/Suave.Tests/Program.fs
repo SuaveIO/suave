@@ -18,10 +18,13 @@ let main args =
     , arch Environment.Is64BitProcess
     , arch Environment.Is64BitOperatingSystem)
 
+  let warnTarget = Targets.create Warn
+  Global.initialise { Global.DefaultConfig with getLogger = fun _ -> warnTarget }
+
   let testConfig =
     { defaultConfig with
         bindings = [ HttpBinding.mkSimple HTTP "127.0.0.1" 9001 ]
-        logger   = Targets.create Warn }
+        logger   = warnTarget }
 
   Console.WriteLine "Running tests with default TCP engine."
   let firstRun = defaultMainThisAssemblyWithParam testConfig args
