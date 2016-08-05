@@ -3,7 +3,7 @@ version: 2.0.{build}
 environment:
   matrix:
    - arch: "x86"
-     MSBUILD_PLATFORM: x86
+     MSBUILD_PLATFORM: "Any CPU"
    - arch: "x64"
      MSBUILD_PLATFORM: "Any CPU"
 
