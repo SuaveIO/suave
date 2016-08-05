@@ -46,19 +46,28 @@ type Assert with
       | _ -> compare (pos + 1)
     compare 0
 
+type LogMethod =
+  | Factory of (LogLevel -> Message)
+  | Plain of Message
+
 /// Entry for the inspectable log
 type InspectableLogEntry =
-  {
-    /// The level of the entry logged
+  { /// The level of the entry logged
     level : LogLevel
     /// The function that provided the value for the log entry
-    value : unit -> LogLine
-  }
+    value : LogMethod }
 
 /// A logger that can be inspected to see what was logged
 type InspectableLog() =
   member val logs : InspectableLogEntry list = [] with get, set
 
   interface Logger with
-    member x.Log level lineFunc =
-      x.logs <- { level = level; value = lineFunc } :: x.logs
+    member x.log level msgFactory =
+      x.logs <- { level = level; value = Factory msgFactory } :: x.logs
+
+    member x.logSimple msg =
+      x.logs <- { level = msg.level; value = Plain msg } :: x.logs
+
+    member x.logWithAck level msgFactory : Async<unit> =
+      x.logs <- { level = level; value = Factory msgFactory } :: x.logs
+      async.Return ()

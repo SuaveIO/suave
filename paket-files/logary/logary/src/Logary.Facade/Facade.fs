@@ -200,7 +200,7 @@ type Logger =
   /// behind this facade.
   abstract member logSimple : Message -> unit
 
-/// Syntactic sugar on top of Logger.
+/// Syntactic sugar on top of Logger for F# libraries.
 [<AutoOpen>]
 module internal LoggerEx =
   type Logger with
@@ -470,7 +470,7 @@ module Message =
     x |> setName name'
 
   /// Sets the value of the field on the log message.
-  let setFieldValue (key : string) (value : obj) (x : Message) =
+  let setField (key : string) (value : obj) (x : Message) =
     let put k v m =
       match m |> Map.tryFind k with
       | None ->
@@ -480,6 +480,9 @@ module Message =
         m |> Map.remove k |> Map.add k v
 
     { x with fields = x.fields |> put key value }
+
+  /// Alias to `setField`
+  let setFieldValue = setField
 
   /// Sets the timestamp on the log message.
   let setTimestamp (ts : EpochNanoSeconds) (x : Message) =

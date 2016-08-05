@@ -64,7 +64,7 @@ let createPools listenSocket logger maxOps bufferSize autoGrow =
   let transportPool = new ConcurrentPool<TcpTransport>()
   transportPool.ObjectGenerator <- (fun _ -> createTransport transportPool listenSocket)
 
-  let bufferManager = new BufferManager(bufferSize * (maxOps + 1), bufferSize, logger, autoGrow)
+  let bufferManager = new BufferManager(bufferSize * (maxOps + 1), bufferSize, autoGrow)
   bufferManager.Init()
 
   //Pre-allocate a set of reusable transportObjects

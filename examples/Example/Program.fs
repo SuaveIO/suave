@@ -17,7 +17,7 @@ open Suave.State.CookieStateStore
 let basicAuth =
   Authentication.authenticateBasic ((=) ("foo", "bar"))
 
-let logger = Loggers.ConsoleWindowLogger LogLevel.Verbose
+let logger = Targets.create Verbose
 
 ///  With this workflow you can write WebParts like this
 let task : WebPart =

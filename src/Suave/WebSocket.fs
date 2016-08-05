@@ -7,6 +7,7 @@ module WebSocket =
   open Suave.Operators
   open Suave.Utils
   open Suave.Logging
+  open Suave.Logging.Message
 
   open System
   open System.Collections.Concurrent
@@ -267,8 +268,13 @@ module WebSocket =
           match a with
           | Choice1Of2 _ ->
             do ()
+
           | Choice2Of2 err ->
-            Log.log ctx.runtime.logger "Suave.Websocket.handShake" LogLevel.Info (sprintf "websocket disconnected: %A" err)
+            ctx.runtime.logger.info (
+              eventX "WebSocket disconnected"
+              >> setSingleName "Suave.Websocket.handShake"
+              >> setFieldValue "error" err)
+
           return! Control.CLOSE ctx
         | _ ->
           return! RequestErrors.BAD_REQUEST "Missing 'sec-websocket-key' header" ctx

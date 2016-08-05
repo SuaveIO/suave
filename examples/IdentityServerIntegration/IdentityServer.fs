@@ -3,17 +3,15 @@
 module IdentityServer =  
 
   open System.Collections.Generic
-
   open Owin
   open Microsoft.Owin.Builder
-
   open Suave
+  open Suave.Logging
+  open Suave.Logging.Message
   open Suave.Owin
   open Suave.Filters
   open Suave.Operators
   open Suave.Successful
-  open Suave.Log
-
   open IdentityServer3.Core.Configuration
   open IdentityServer3.Core.Models
   open IdentityServer3.Core.Services.InMemory  
@@ -68,15 +66,18 @@ module IdentityServer =
     choose [
       path "/hello" >=> OK "Hello!"
       securityMiddleware
-      ]
+    ]
 
   [<EntryPoint>]
-  let main _ =    
-
-    let logger = Suave.Logging.Loggers.ConsoleWindowLogger(LogLevel.Verbose)
+  let main _ =
+    let logger = Targets.create Verbose
 
     let loggedWebApp context = async {
-      log logger String.Empty LogLevel.Debug (sprintf "[%A] %A" context.request.``method`` context.request.url)
+      logger.log Debug (
+        eventX "Received request {method} {url}"
+        >> setField "method" context.request.``method``
+        >> setField "url" context.request.url)
+
       let! response = webApp context
       return response }
 

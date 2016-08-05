@@ -9,9 +9,9 @@ NUGET
       Microsoft.AspNet.Razor (>= 3.0)
 GITHUB
   remote: haf/YoLo
-    YoLo.fs (1973b6171f7bc183339f04f7e6ef526ea18c3f5b)
+    YoLo.fs (f122eebb2ab82e06ac31ce51f3b4632fb26fd130)
   remote: logary/logary
-    src/Logary.Facade/Facade.fs (27b2c604e6a801132166057def15508854a3773f)
+    src/Logary.Facade/Facade.fs (f69088683010087e09a142900cbf916ee4fc2fee)
 GROUP Build
 NUGET
   remote: https://www.nuget.org/api/v2
@@ -142,7 +142,7 @@ NUGET
       Topshelf (>= 3.2)
 GITHUB
   remote: haf/YoLo
-    YoLo.fs (1973b6171f7bc183339f04f7e6ef526ea18c3f5b)
+    YoLo.fs (f122eebb2ab82e06ac31ce51f3b4632fb26fd130)
 GROUP Tests
 FRAMEWORK: NET45
 NUGET
@@ -162,7 +162,7 @@ NUGET
       FSharp.Core (>= 3.1.2.1)
       Fuchu (>= 1.0.3)
       PerfUtil (>= 0.1.8)
-    Hopac (0.3.1)
+    Hopac (0.3.3)
       FSharp.Core (>= 3.1.2.5)
     Http.fs-prerelease (3.0.5)
       FSharp.Core (>= 3.1.2.5)

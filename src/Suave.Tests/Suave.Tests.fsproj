@@ -106,9 +106,7 @@
     <Compile Include="Auth.fs" />
     <Compile Include="LogLevel.fs" />
     <Compile Include="TraceHeader.fs" />
-    <Compile Include="LogLine.fs" />
     <Compile Include="Logger.fs" />
-    <Compile Include="Log.fs" />
     <Compile Include="Cookie.fs" />
     <Compile Include="Types.fs" />
     <Compile Include="WebSocket.fs" />

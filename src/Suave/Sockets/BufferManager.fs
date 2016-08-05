@@ -14,7 +14,7 @@ open Suave.Logging
 ///
 /// The operations exposed on the BufferManager class are not thread safe.
 [<AllowNullLiteral>]
-type BufferManager(totalBytes, bufferSize, logger, autoGrow) =
+type BufferManager(totalBytes, bufferSize, autoGrow) =
   static let logger = Log.create "Suave.Sockets.BufferManager"
 
   do logger.log Debug (

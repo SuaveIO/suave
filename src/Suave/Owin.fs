@@ -1,5 +1,7 @@
 module Suave.Owin
 
+#nowarn "3190"
+
 // Following the specification:
 // https://github.com/owin/owin/blob/master/spec/owin-1.1.0.md
 
@@ -16,6 +18,7 @@ open System.Runtime.InteropServices
 
 open Suave.Operators
 open Suave.Logging
+open Suave.Logging.Message
 open Suave.Sockets
 open Suave.Utils
 
@@ -286,8 +289,10 @@ module OwinApp =
       new Func<TraceEventType, int, obj, exn, Func<obj, exn, string>, bool>(
         fun eventType eventId state ex formatter ->
           let exo = match ex with | null -> None | eee -> Some eee
-          suaveLogger.Log LogLevel.Info (fun () ->
-            LogLine.mk "Suave.Owin" LogLevel.Info TraceHeader.empty exo (formatter.Invoke (state, ex))
+          suaveLogger.info (
+            eventX (formatter.Invoke (state, ex))
+            >> setSingleName "Suave.Owin"
+            >> addExn exo
           )
           true
       )
@@ -296,15 +301,14 @@ module OwinApp =
 
   let textWriter (suaveLogger : Logger) : IO.TextWriter =
     { new IO.TextWriter(CultureInfo.InvariantCulture) with
-        member x.Encoding = Encoding.UTF8
+        member x.Encoding =
+          Encoding.UTF8
+
         override x.WriteLine (str : string) =
-          suaveLogger.Log LogLevel.Info (fun () ->
-            LogLine.mk "Suave.Owin" LogLevel.Info TraceHeader.empty None str
-          )
+          suaveLogger.info (eventX str >> setSingleName "Suave.Owin")
+
         override x.Write (c : char) =
-          suaveLogger.Log LogLevel.Info (fun () ->
-            LogLine.mk "Suave.Owin" LogLevel.Info TraceHeader.empty None (c.ToString())
-          )
+          ()
     }
 
   module internal SirLensALot =
@@ -710,8 +714,8 @@ module OwinApp =
   let runOwin requestPathBase (owin : OwinApp) cont = 
     fun (ctx : HttpContext) ->
 
-      let verbose f =
-        ctx.runtime.logger.Log LogLevel.Verbose (f >> LogLine.mk "Suave.Owin" LogLevel.Verbose ctx.request.trace None)
+      let verbose message =
+        ctx.runtime.logger.verbose (eventX message >> setSingleName "Suave.Owin")
 
       async {
         let owinRequestUri = UriBuilder ctx.request.url
@@ -731,9 +735,9 @@ module OwinApp =
         let wrapper =
           new OwinContext(requestPathBase, initialState)
 
-        verbose (fun _ -> "yielding to OWIN middleware")
+        verbose "Yielding to OWIN middleware"
         do! owin wrapper.Interface
-        verbose (fun _ -> "suave back in control")
+        verbose "Suave back in control"
 
         let ctx = wrapper.finalise()
 
