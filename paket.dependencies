@@ -21,7 +21,7 @@ group Tests
   nuget FsCheck = 2.1.0
   nuget Fuchu.FsCheck
   nuget Fuchu.PerfUtil
-  nuget Http.fs-prerelease
+  nuget Http.fs
   nuget FSharp.Charting
   nuget DotLiquid
 

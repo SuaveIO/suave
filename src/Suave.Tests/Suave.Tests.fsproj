@@ -293,7 +293,7 @@
     <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
       <ItemGroup>
         <Reference Include="HttpFs">
-          <HintPath>..\..\packages\tests\Http.fs-prerelease\lib\net40\HttpFs.dll</HintPath>
+          <HintPath>..\..\packages\tests\Http.fs\lib\net40\HttpFs.dll</HintPath>
           <Private>True</Private>
           <Paket>True</Paket>
         </Reference>

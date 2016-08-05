@@ -23,7 +23,7 @@ suave_description = 'Suave is a simple web development F# library providing a li
 Configuration = ENV['CONFIGURATION'] || 'Release'
 Platform = ENV['MSBUILD_PLATFORM'] || 'Any CPU'
 
-task :yolo do
+task :paket_files do
   system %{ruby -pi.bak -e "gsub(/module internal YoLo/, 'module internal Suave.Utils.YoLo')" paket-files/haf/YoLo/YoLo.fs} unless Albacore.windows?
   system %{ruby -pi.bak -e "gsub(/module internal YoLo/, 'module internal Suave.Utils.YoLo')" paket-files/examples/haf/YoLo/YoLo.fs} unless Albacore.windows?
   system %{ruby -pi.bak -e "gsub(/namespace Logary.Facade/, 'namespace Suave.Logging')" paket-files/logary/logary/src/Logary.Facade/Facade.fs} unless Albacore.windows?
@@ -35,11 +35,13 @@ task :restore_paket do
     File.exists? 'tools/paket.exe'
 end
 
-desc "Restore all packages"
-task :restore => [:restore_paket, :yolo] do
+task :paket_restore do
   system 'tools/paket.exe', 'restore', clr_command: true
   system 'tools/paket.exe', %w|restore group Build|, clr_command: true
 end
+
+desc 'Restore all packages'
+task :restore => [:restore_paket, :paket_restore, :paket_files]
 
 desc 'create assembly infos'
 asmver_files :asmver => :versioning do |a|
@@ -92,7 +94,7 @@ namespace :dotnetcli do
   directory 'tools/coreclr'
 
   dotnet_exe_path = "dotnet" #from PATH
-  
+
   def get_installed_dotnet_version
     begin
       installed_dotnet_version = `dotnet --version`
@@ -116,7 +118,7 @@ namespace :dotnetcli do
     else
       puts "Found .NET Core SDK #{dotnet_installed_version} but require #{dotnet_version}. Downloading and installing in ./tools/coreclr"
     end
-    
+
     case RUBY_PLATFORM
     when /darwin/
       filename = "dotnet-dev-osx-x64.#{dotnet_version}.tar.gz"
@@ -145,7 +147,7 @@ namespace :dotnetcli do
       system 'powershell',
         %W|-ExecutionPolicy Unrestricted ./dotnet_cli_install.ps1 -InstallDir "tools/coreclr" -Channel "beta" -version "#{dotnet_version}"|
     end
-    
+
     dotnet_exe_path = "#{Dir.pwd}/tools/coreclr/dotnet"
   end
 
