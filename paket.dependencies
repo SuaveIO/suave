@@ -22,6 +22,7 @@ group Tests
   nuget Fuchu.FsCheck
   nuget Fuchu.PerfUtil
   nuget Http.fs
+  nuget Hopac < 0.3.2
   nuget FSharp.Charting
   nuget DotLiquid
 

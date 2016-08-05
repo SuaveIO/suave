@@ -11,7 +11,7 @@ GITHUB
   remote: haf/YoLo
     YoLo.fs (f122eebb2ab82e06ac31ce51f3b4632fb26fd130)
   remote: logary/logary
-    src/Logary.Facade/Facade.fs (f69088683010087e09a142900cbf916ee4fc2fee)
+    src/Logary.Facade/Facade.fs (4987c421849464d23b61ea4b64f8e48a6df21f12)
 GROUP Build
 NUGET
   remote: https://www.nuget.org/api/v2
@@ -22,7 +22,7 @@ FRAMEWORK: NET45
 NUGET
   remote: https://www.nuget.org/api/v2
     Argu (3.2)
-    FSharp.Core (4.0.0.1)
+    FSharp.Core (4.0.0.1) - redirects: force
     FsLibTool (0.1.1)
       FSharp.Core (>= 4.0.0.1)
       PPrint (>= 1.4.3)
@@ -162,7 +162,7 @@ NUGET
       FSharp.Core (>= 3.1.2.1)
       Fuchu (>= 1.0.3)
       PerfUtil (>= 0.1.8)
-    Hopac (0.3.3)
+    Hopac (0.3.1)
       FSharp.Core (>= 3.1.2.5)
     Http.fs (3.0.6)
       FSharp.Core (>= 3.1.2.5)
