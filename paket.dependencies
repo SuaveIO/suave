@@ -28,8 +28,9 @@ group Tests
 group Examples
   framework: NET45
   source https://nuget.org/api/v2
-  nuget FSharp.Core ~> 4
+  nuget FSharp.Core ~> 4 redirects: force
   nuget Topshelf.FSharp
+  nuget Topshelf ~> 3
   nuget Nancy.Owin
   nuget Freya ~> 3.0.0-b
   nuget Microsoft.Owin.Hosting 
@@ -41,6 +42,6 @@ group Examples
 group Docs
   framework: NET45
   source https://nuget.org/api/v2
-  nuget FSharp.Core ~> 4
+  nuget FSharp.Core ~> 4 redirects: force
   nuget FsLibTool
   nuget Argu
