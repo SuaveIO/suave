@@ -5,6 +5,7 @@ nuget FSharp.Core ~> 3.1.2
 nuget openssl.redist
 nuget DotLiquid
 nuget RazorEngine
+nuget Fuchu
 
 github haf/YoLo YoLo.fs
 github logary/logary src/Logary.Facade/Facade.fs
@@ -16,13 +17,12 @@ group Build
 group Tests
   framework: NET45
   source https://nuget.org/api/v2
-  nuget FSharp.Core ~> 3.1.2
+  nuget FSharp.Core ~> 4
   nuget WebSocketSharp
   nuget FsCheck = 2.1.0
   nuget Fuchu.FsCheck
   nuget Fuchu.PerfUtil
   nuget Http.fs
-  nuget Hopac < 0.3.2
   nuget FSharp.Charting
   nuget DotLiquid
 

@@ -106,7 +106,7 @@
     <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
       <ItemGroup>
         <Reference Include="Fuchu">
-          <HintPath>..\..\packages\tests\Fuchu\lib\Fuchu.dll</HintPath>
+          <HintPath>..\..\packages\Fuchu\lib\Fuchu.dll</HintPath>
           <Private>True</Private>
           <Paket>True</Paket>
         </Reference>
