@@ -209,26 +209,30 @@ let bindSocket server bindCallback=
     failwith ("Listen error: " + (new string(uv_strerror(r))))
 
 open Suave.Logging
+open Suave.Logging.Message
 open Suave.Http
 open Suave.Tcp
 open Suave
 
 type LibUvSocket(pool : ConcurrentPool<OperationPair>,
-                  logger, 
-                  serveClient, 
-                  ip, 
-                  loop, 
-                  bufferManager,
-                  startData,
-                  acceptingConnections: AsyncResultCell<StartedData>,
-                  synchronizationContext) =
+                 logger : Logger,
+                 serveClient,
+                 ip,
+                 loop,
+                 bufferManager,
+                 startData,
+                 acceptingConnections: AsyncResultCell<StartedData>,
+                 synchronizationContext) =
 
   [<DefaultValue>] val mutable uv_connection_cb : uv_connection_cb
 
   member this.onNewConnection (server : IntPtr) (status: int) =
 
     if status < 0 then
-          "New connection error: " +  (new string (uv_strerror(status))) |> Log.intern logger "Suave.LibUv.Tcp.LibUvSocket.on_new_connection"
+      logger.verbose (
+        eventX "New connection {error}"
+        >> setSingleName "Suave.LibUv.Tcp.LibUvSocket.onNewConnection"
+        >> setFieldValue "error" (new string (uv_strerror(status))))
     else
 
       let client = createHandle <| uv_handle_size(uv_handle_type.UV_TCP)
@@ -238,7 +242,7 @@ type LibUvSocket(pool : ConcurrentPool<OperationPair>,
       if (uv_accept(server, client) = 0) then
         let transport = new LibUvTransport(pool,loop,client,synchronizationContext,logger)
         transport.initialize()
-        Async.Start (job logger serveClient ip transport bufferManager)
+        Async.Start (job serveClient ip transport bufferManager)
       else
         destroyHandle client
 
@@ -246,34 +250,35 @@ type LibUvSocket(pool : ConcurrentPool<OperationPair>,
     this.uv_connection_cb <- uv_connection_cb(this.onNewConnection)
 
   member this.run(server) =
+    let event message =
+      eventX message >> setSingleName "Suave.LibUv.Tcp.LibUvSocket.run"
 
-    aFewTimes(fun () -> bindSocket server this.uv_connection_cb)
+    aFewTimes (fun () -> bindSocket server this.uv_connection_cb)
 
     let startData = { startData with socketBoundUtc = Some (Globals.utcNow()) }
     acceptingConnections.complete startData |> ignore
     
-    logger.Log LogLevel.Info <| fun _ ->
-        { path          = "Suave.LibUv.Tcp.LibUvSocket.run"
-          trace         = TraceHeader.empty
-          message       = "listener started in " + (startData.ToString())
-          level         = LogLevel.Info
-          ``exception`` = None
-          tsUTCTicks    = Globals.utcNow().Ticks }
+    logger.info (
+      event "Listener started in {startData}"
+      >> setFieldValue "startData" startData)
 
     uv_run(loop, UV_RUN_DEFAULT) |> checkStatus
     let x = uv_loop_close(loop)
-    Log.intern logger "Suave.LibUv.Tcp.LibUvSocket.run" ("uv_loop_close returned: " + x.ToString())
+    logger.verbose (event "uv_loop_close returned {returnValue}"
+                    >> setFieldValue "returnValue" x)
     assert(x = 0)
-    Log.intern logger "Suave.LibUv.Tcp.LibUvSocket.run" "<--"
+    logger.info (event "<--")
 
   member this.exit() =
     this.uv_connection_cb <- null
 
-type LibUvServer(maxConcurrentOps, bufferManager, logger : Logger,
+type LibUvServer(maxConcurrentOps, bufferManager,
                  binding,
                  startData, serveClient,
                  acceptingConnections: AsyncResultCell<StartedData>,
                  event : ManualResetEvent) =
+
+  static let logger = Log.create "Suave.LibUv.Tcp.LibUvServer"
 
   [<DefaultValue>] val mutable thread : Thread
   [<DefaultValue>] val mutable synchronizationContext : SingleThreadSynchronizationContext
@@ -319,11 +324,17 @@ type LibUvServer(maxConcurrentOps, bufferManager, logger : Logger,
       s.run(server)
       s.exit()
     with ex ->
-      Log.infoe logger "Suave.LibUv.Tcp.LibUvServer.run" TraceHeader.empty ex "could not start LibUvSocket"
+      logger.info (
+        eventX "Could not start LibUvSocket"
+        >> addExn ex
+        >> setSingleName "Suave.LibUv.Tcp.LibUvServer.run")
+
     closeEvent.WaitOne() |> ignore
     destroyHandle loop
     event.Set() |> ignore
-    Log.info logger "Suave.LibUv.Tcp.LibUvServer.run" TraceHeader.empty "exiting server."
+    logger.info (
+      eventX "Exiting server"
+      >> setSingleName "Suave.LibUv.Tcp.LibUvServer.run")
 
   member this.closeHandlerCallback (handle : IntPtr) =
     Marshal.FreeCoTaskMem handle
@@ -332,9 +343,9 @@ type LibUvServer(maxConcurrentOps, bufferManager, logger : Logger,
     uv_close(handle,this.uv_close_cb_handler)
 
   member this.stopLoopCallback (_ : IntPtr) =
-    Log.info logger "Suave.LibUv.Tcp.LibUvServer.uv_stop_loop" TraceHeader.empty "-->"
+    logger.info (eventX "-->" >> setSingleName "Suave.LibUv.Tcp.LibUvServer.uv_stop_loop")
     uv_close(stopLoopCallbackHandle, this.uv_close_cb_loop)
-    Log.info logger "Suave.LibUv.Tcp.LibUvServer.uv_stop_loop" TraceHeader.empty "<--"
+    logger.info (eventX "<--" >> setSingleName "Suave.LibUv.Tcp.LibUvServer.uv_stop_loop")
 
   member this.init() = 
     this.thread <- new Thread(this.run)
@@ -356,39 +367,39 @@ type LibUvServer(maxConcurrentOps, bufferManager, logger : Logger,
     this.thread.Start()
 
   member this.stopLoop() =
-    Log.info logger "Suave.LibUv.Tcp.LibUvServer.stopLoop" TraceHeader.empty "-->"
+    logger.info (eventX "-->" >> setSingleName "Suave.LibUv.Tcp.LibUvServer.stopLoop")
     uv_async_send stopLoopCallbackHandle |> checkStatus
     closeEvent.WaitOne() |> ignore
-    Log.info logger "Suave.LibUv.Tcp.LibUvServer.stopLoop" TraceHeader.empty "<--"
+    logger.info (eventX "<--" >> setSingleName "Suave.LibUv.Tcp.LibUvServer.stopLoop")
 
   member private this.destroyServerCallback _ =
-    Log.info logger "Suave.LibUv.Tcp.LibUvServer.destroyServerCallback" TraceHeader.empty "-->"
+    logger.info (eventX "-->" >> setSingleName "Suave.LibUv.Tcp.LibUvServer.destroyServerCallback")
     uv_walk(loop, this.uv_walk_cb, IntPtr.Zero)
     destroyHandle server
-    Log.info logger "Suave.LibUv.Tcp.LibUvServer.destroy" TraceHeader.empty "<--"
+    logger.info (eventX "<--" >> setSingleName "Suave.LibUv.Tcp.LibUvServer.destroyServerCallback")
     closeEvent.Set() |> ignore
 
   member private this.destroyRunOnThisThreadCallback _ =
-    Log.info logger "Suave.LibUv.Tcp.LibUvServer.destroyRunOnThisThreadCallback" TraceHeader.empty "-->"
+    logger.info (eventX "-->" >> setSingleName "Suave.LibUv.Tcp.LibUvServer.destroyRunOnThisThreadCallback")
     destroyHandle synchronizationContextCallback
     uv_close(server, this.uv_close_cb_destroy)
-    Log.info logger "Suave.LibUv.Tcp.LibUvServer.destroyRunOnThisThreadCallback" TraceHeader.empty "<--"
+    logger.info (eventX "<--" >> setSingleName "Suave.LibUv.Tcp.LibUvServer.destroyRunOnThisThreadCallback")
 
   member private this.destroyLoopCallback _ =
-    Log.info logger "Suave.LibUv.Tcp.LibUvServer.destroyLoopCallback" TraceHeader.empty "-->"
+    logger.info (eventX "-->" >> setSingleName "Suave.LibUv.Tcp.LibUvServer.destroyLoopCallback")
     destroyHandle stopLoopCallbackHandle
     this.synchronizationContext.running <- false
     uv_close(synchronizationContextCallback, this.uv_close_cb_thread)
-    Log.info logger "Suave.LibUv.Tcp.LibUvServer.destroyLoopCallback" TraceHeader.empty "<--"
+    logger.info (eventX "<--" >> setSingleName "Suave.LibUv.Tcp.LibUvServer.destroyLoopCallback")
 
-let runServerLibUv logger maxConcurrentOps bufferSize autoGrow (binding: SocketBinding) startData (acceptingConnections: AsyncResultCell<StartedData>) serveClient =
-  let bufferManager = new BufferManager(bufferSize * (maxConcurrentOps + 1), bufferSize, logger, autoGrow)
+let runServerLibUv maxConcurrentOps bufferSize autoGrow (binding: SocketBinding) startData (acceptingConnections: AsyncResultCell<StartedData>) serveClient =
+  let bufferManager = new BufferManager(bufferSize * (maxConcurrentOps + 1), bufferSize, autoGrow)
   bufferManager.Init()
 
   let exitEvent = new ManualResetEvent(false)
 
   let libUvServer = new LibUvServer(maxConcurrentOps, bufferManager,
-                          logger, binding, startData, serveClient, acceptingConnections, exitEvent)
+                                    binding, startData, serveClient, acceptingConnections, exitEvent)
 
   libUvServer.init()
   async {

@@ -32,6 +32,8 @@ open System.Net.Http.Headers
 open Fuchu
 
 open Suave
+open Suave.Logging
+open Suave.Logging.Message
 open Suave.Http
 
 [<AutoOpen>]
@@ -78,7 +80,7 @@ open Utilities
 /// cancel the token and dispose the server's runtime artifacts
 /// (like the listening socket etc).
 type SuaveTestCtx =
-  { cts          : CancellationTokenSource
+  { cts         : CancellationTokenSource
     suaveConfig : SuaveConfig }
 
 /// Cancels the cancellation token source and disposes the server's
@@ -141,8 +143,11 @@ let mkClient handler =
 
 /// Send the request with the client - returning the result of the request
 let send (client : HttpClient) (timeout : TimeSpan) (ctx : SuaveTestCtx) (request : HttpRequestMessage) =
-  Log.intern ctx.suaveConfig.logger "Suave.Tests"
-             (sprintf "%s %O"  request.Method.Method request.RequestUri)
+  ctx.suaveConfig.logger.log Verbose (
+    eventX "Send"
+    >> setFieldValue "method" request.Method.Method
+    >> setFieldValue "uri" request.RequestUri)
+
   let send = client.SendAsync(request, HttpCompletionOption.ResponseContentRead, ctx.cts.Token)
 
   let completed = send.Wait (int timeout.TotalMilliseconds, ctx.cts.Token)

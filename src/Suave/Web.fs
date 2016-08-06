@@ -8,14 +8,16 @@ module Web =
   open System.Net
   open Suave.Utils
   open Suave.Logging
+  open Suave.Logging.Message
 
   /// The default error handler returns a 500 Internal Error in response to
   /// thrown exceptions.
   let defaultErrorHandler (ex : Exception) msg (ctx : HttpContext) =
-    ctx.runtime.logger.Log LogLevel.Error (fun _ ->
-      LogLine.mk "Suave.Web.defaultErrorHandler" LogLevel.Error
-                 ctx.request.trace (Some ex)
-                 msg)
+    ctx.runtime.logger.error (
+      eventX msg
+      >> setSingleName "Suave.Web.defaultErrorHandler"
+      >> addExn ex)
+
     if ctx.isLocal then
       Response.response HTTP_500 (UTF8.bytes (sprintf "<h1>%s</h1><br/>%A" ex.Message ex)) ctx
     else 
@@ -41,11 +43,15 @@ module Web =
     let toRuntime = SuaveConfig.toRuntime config homeFolder compressionFolder true
 
     let startWebWorkerAsync runtime =
-      ParsingAndControl.startWebWorkerAsync 
-        (config.bufferSize, config.maxOps) 
-        webpart
-        runtime 
-        (config.tcpServerFactory.create(config.logger, config.maxOps, config.bufferSize,config.autoGrow,runtime.matchedBinding.socketBinding))
+      let tcpServer =
+        config.tcpServerFactory.create(
+          config.maxOps, config.bufferSize, config.autoGrow,
+          runtime.matchedBinding.socketBinding)
+
+      ParsingAndControl.startWebWorkerAsync (config.bufferSize, config.maxOps) 
+                                            webpart
+                                            runtime 
+                                            tcpServer
 
     let servers = 
        List.map (toRuntime >> startWebWorkerAsync) config.bindings
@@ -74,7 +80,7 @@ module Web =
       mimeTypesMap          = Writers.defaultMimeTypesMap
       homeFolder            = None
       compressedFilesFolder = None
-      logger                = Loggers.saneDefaultsFor LogLevel.Info
+      logger                = Targets.create Info
       tcpServerFactory      = new DefaultTcpServerFactory()
       #if NETSTANDARD1_5
       cookieSerialiser      = new JsonFormatterSerialiser()

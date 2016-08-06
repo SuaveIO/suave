@@ -1,6 +1,6 @@
 ﻿module Server
 
-open Nessos.Argu
+open Argu
 open Suave
 open Suave.Http
 open Suave.ServerErrors
