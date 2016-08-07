@@ -20,7 +20,7 @@ module Web =
 
     if ctx.isLocal then
       Response.response HTTP_500 (UTF8.bytes (sprintf "<h1>%s</h1><br/>%A" ex.Message ex)) ctx
-    else 
+    else
       Response.response HTTP_500 (UTF8.bytes HTTP_500.message) ctx
 
   /// Starts the web server asynchronously.
@@ -42,20 +42,25 @@ module Web =
     // spawn tcp listeners/web workers
     let toRuntime = SuaveConfig.toRuntime config homeFolder compressionFolder true
 
+    if config.initialiseLogger then
+      Global.initialise { Global.DefaultConfig with getLogger = fun _ -> config.logger }
+    else
+      ()
+
     let startWebWorkerAsync runtime =
       let tcpServer =
         config.tcpServerFactory.create(
           config.maxOps, config.bufferSize, config.autoGrow,
           runtime.matchedBinding.socketBinding)
 
-      ParsingAndControl.startWebWorkerAsync (config.bufferSize, config.maxOps) 
+      ParsingAndControl.startWebWorkerAsync (config.bufferSize, config.maxOps)
                                             webpart
-                                            runtime 
+                                            runtime
                                             tcpServer
 
-    let servers = 
+    let servers =
        List.map (toRuntime >> startWebWorkerAsync) config.bindings
-              
+
     let listening = servers |> Seq.map fst |> Async.Parallel
     let server    = servers |> Seq.map snd |> Async.Parallel |> Async.Ignore
     listening, server
@@ -68,7 +73,7 @@ module Web =
   /// The default configuration binds on IPv4, 127.0.0.1:8083 with a regular 500 Internal Error handler,
   /// with a timeout of one minute for computations to run. Waiting for 2 seconds for the socket bind
   /// to succeed.
-  let defaultConfig = 
+  let defaultConfig =
     { bindings              = [ HttpBinding.defaults ]
       serverKey             = Crypto.generateKey HttpRuntime.ServerKeyLength
       errorHandler          = defaultErrorHandler
@@ -81,6 +86,7 @@ module Web =
       homeFolder            = None
       compressedFilesFolder = None
       logger                = Targets.create Info
+      initialiseLogger      = true
       tcpServerFactory      = new DefaultTcpServerFactory()
       #if NETSTANDARD1_5
       cookieSerialiser      = new JsonFormatterSerialiser()

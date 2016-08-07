@@ -236,6 +236,7 @@ let main argv =
       homeFolder            = None
       compressedFilesFolder = None
       logger                = logger
+      initialiseLogger      = true
       tcpServerFactory      = new DefaultTcpServerFactory()
 #if NETSTANDARD1_5
       cookieSerialiser      = new JsonFormatterSerialiser()
