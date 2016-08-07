@@ -10,7 +10,7 @@ Example:
   open Fuchu
 
   let runWithConfig = runWith defaultConfig
-  
+
   testCase "parsing a large multipart form" <| fun _ ->
 
     let res =
@@ -54,7 +54,7 @@ module ResponseData =
     response.Content.ReadAsByteArrayAsync().Result
 
 module Utilities =
-    
+
   /// Utility function for mapping from Suave.Types.HttpMethod to
   /// System.Net.Http.HttpMethod.
   let toHttpMethod = function
@@ -121,7 +121,7 @@ let withContext f ctx =
   finally disposeContext ctx
 
 /// Create a new HttpRequestMessage towards the endpoint
-let mkRequest methd resource query data (endpoint : Uri) =
+let createRequest methd resource query data (endpoint : Uri) =
   let uriBuilder   = UriBuilder endpoint
   uriBuilder.Path  <- resource
   uriBuilder.Query <- query
@@ -132,13 +132,13 @@ let mkRequest methd resource query data (endpoint : Uri) =
   request
 
 /// Create a new disposable HttpClientHandler
-let mkHandler decomp_method cookies =
+let createHandler decomp_method cookies =
   let handler = new Net.Http.HttpClientHandler(AllowAutoRedirect = false)
   handler.AutomaticDecompression <- decomp_method
   cookies |> Option.iter (fun cookies -> handler.CookieContainer <- cookies)
   handler
 
-let mkClient handler =
+let createClient handler =
   new HttpClient(handler)
 
 /// Send the request with the client - returning the result of the request
@@ -187,9 +187,9 @@ let reqResp
   let defaultTimeout = TimeSpan.FromSeconds 10.
 
   withContext <| fun ctx ->
-    use handler = mkHandler decompMethod cookies
-    use client = mkClient handler
-    use request = mkRequest methd resource query data (endpointUri ctx.suaveConfig) |> fRequest
+    use handler = createHandler decompMethod cookies
+    use client = createClient handler
+    use request = createRequest methd resource query data (endpointUri ctx.suaveConfig) |> fRequest
     use result = request |> send client defaultTimeout ctx
     fResult result
 

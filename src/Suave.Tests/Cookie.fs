@@ -46,8 +46,8 @@ let parseResultCookie (_:SuaveConfig) =
 
     testCase "set cookie (same name) twice keeps last" <| fun _ ->
       let force = Async.RunSynchronously >> Option.get
-      let c1 = HttpCookie.mkKV "a" "aa"
-      let c2 = HttpCookie.mkKV "a" "bb"
+      let c1 = HttpCookie.createKV "a" "aa"
+      let c2 = HttpCookie.createKV "a" "bb"
       let subject =
         HttpContext.empty
         |> Cookie.setCookie c1 |> force
@@ -64,9 +64,9 @@ let parseRequestCookies (_ : SuaveConfig) =
       testCase "parse valid cookies" <| fun _ ->
         let sample = "session=2b14f6a69199243f570031bf94865bb6;abc=123;alphaplusvalues=!#$%&'()*+-./:<=>?@[]^_`{|}~"
         let result = Cookie.parseCookies sample
-        let expected = [HttpCookie.mkKV "session" "2b14f6a69199243f570031bf94865bb6"
-                        HttpCookie.mkKV "abc" "123"
-                        HttpCookie.mkKV "alphaplusvalues" "!#$%&'()*+-./:<=>?@[]^_`{|}~"]
+        let expected = [HttpCookie.createKV "session" "2b14f6a69199243f570031bf94865bb6"
+                        HttpCookie.createKV "abc" "123"
+                        HttpCookie.createKV "alphaplusvalues" "!#$%&'()*+-./:<=>?@[]^_`{|}~"]
         Assert.Equal("cookies should eq", expected, result)
 
       testCase "ignore malformed cookies" <| fun _ ->
@@ -76,7 +76,7 @@ let parseRequestCookies (_ : SuaveConfig) =
     ]
 
 [<Tests>]
-let setCookie (_ : SuaveConfig) = 
+let setCookie (_ : SuaveConfig) =
   testList "set cookie" [
     testCase "set cookie - no warning when < 4k" <| fun _ ->
       let log = InspectableLog()

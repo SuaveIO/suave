@@ -34,7 +34,7 @@ let main argv =
 
   let config =
     { defaultConfig with
-        bindings = [ HttpBinding.mkSimple HTTP host port ]
+        bindings = [ HttpBinding.createSimple HTTP host port ]
         homeFolder = Some home }
 
   startWebServer config app

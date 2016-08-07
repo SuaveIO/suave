@@ -23,13 +23,13 @@ type ScanResult = NeedMore | Found of int
 module internal Aux =
 
   let inline skipBuffers (pairs : LinkedList<BufferSegment>) (number : int)  =
-    let rec loop acc = 
+    let rec loop acc =
       if pairs.Count > 0 then
         let x = pairs.First.Value
         pairs.RemoveFirst()
-      
-        if x.length + acc >= number then 
-          let segment = BufferSegment.mk x.buffer (x.offset  + (number - acc)) (x.length - number + acc)
+
+        if x.length + acc >= number then
+          let segment = BufferSegment.create x.buffer (x.offset  + (number - acc)) (x.length - number + acc)
           pairs.AddFirst segment |> ignore
         else loop (acc + x.length)
     loop 0
@@ -58,10 +58,10 @@ type ConnectionFacade(ctx) =
   let multiPartFields = List<string*string>()
   let mutable _rawForm : byte array = [||]
 
-  /// Splits the segment list in two lits of ArraySegment; the first one containing a total of index bytes 
+  /// Splits the segment list in two lits of ArraySegment; the first one containing a total of index bytes
   let split index select markerLength : Async<int> =
     let rec loop acc count =  async {
-      if segments.Count = 0 then 
+      if segments.Count = 0 then
        return count
       else
         let pair = segments.First.Value
@@ -79,10 +79,11 @@ type ConnectionFacade(ctx) =
             return count + bytesRead
           else
             if remaining - markerLength >= 0 then
-              let segment = BufferSegment.mk pair.buffer
-                                             (pair.offset  + bytesRead  + markerLength)
-                                             (remaining - markerLength)
-              segments.AddFirst( segment) |> ignore
+              let segment =
+                BufferSegment.create pair.buffer
+                                     (pair.offset  + bytesRead  + markerLength)
+                                     (remaining - markerLength)
+              segments.AddFirst(segment) |> ignore
               return count + bytesRead
             else
               Aux.skipBuffers segments (markerLength - remaining)
@@ -106,13 +107,13 @@ type ConnectionFacade(ctx) =
     }
 
 
-  /// Iterates over a BufferSegment list looking for a marker, data before the marker 
+  /// Iterates over a BufferSegment list looking for a marker, data before the marker
   /// is sent to the function select and the corresponding buffers are released
   /// Returns the number of bytes read.
   let scanMarker (marker: byte[]) select = socket {
 
     match kmpW marker segments with
-    | Some x -> 
+    | Some x ->
       let! res = SocketOp.ofAsync <| split x select marker.Length
       return Found res
     | None   ->
@@ -304,7 +305,7 @@ type ConnectionFacade(ctx) =
               })
           let byts = mem.ToArray()
           multiPartFields.Add (fieldName, ASCII.toStringAtOffset byts 0 byts.Length)
-          return! loop 
+          return! loop
       }
     loop
 
@@ -323,7 +324,7 @@ type ConnectionFacade(ctx) =
         let! _ =
           (headerParams.TryLookup "form-data" |> Choice.map (String.trimc '"'))
           @|! "Key 'form-data' was not present in 'content-disposition'"
-        
+
         let! fieldName =
           (headerParams.TryLookup "name" |> Choice.map (String.trimc '"'))
           @|! "Key 'name' was not present in 'content-disposition'"
@@ -358,7 +359,7 @@ type ConnectionFacade(ctx) =
             })
           let byts = mem.ToArray()
           multiPartFields.Add(fieldName, ASCII.toStringAtOffset byts 0 byts.Length)
-          return () 
+          return ()
       }
 
     socket {
@@ -379,7 +380,7 @@ type ConnectionFacade(ctx) =
           return ()
         else
           failwith "Invalid multipart format"
-    } 
+    }
 
   /// Reads raw POST data
   let getRawPostData contentLength =
@@ -394,7 +395,7 @@ type ConnectionFacade(ctx) =
     }
 
   let parsePostData (contentLengthHeader : Choice<string,_>) contentTypeHeader = socket {
-    match contentLengthHeader with 
+    match contentLengthHeader with
     | Choice1Of2 contentLengthString ->
       let contentLength = Convert.ToInt32 contentLengthString
       logger.verbose (eventX "Expecting {contentLength}" >> setFieldValue "contentLength" contentLength)
@@ -456,7 +457,7 @@ type ConnectionFacade(ctx) =
       { httpVersion      = httpVersion
         url              = matchedBinding.uri path rawQuery
         host             = host
-        ``method``       = meth  
+        ``method``       = meth
         headers          = headers
         rawForm          = _rawForm
         rawQuery         = rawQuery

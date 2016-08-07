@@ -31,7 +31,7 @@ module Cookie =
         | idx when idx > 1 ->
           let name = String.trim (cookie.Substring(0, idx))
           let value = String.trim (cookie.Substring(idx + 1))
-          Some (HttpCookie.mkKV name value)
+          Some (HttpCookie.createKV name value)
 
         | _ ->
           None)
@@ -82,7 +82,7 @@ module Cookie =
 
   let private clientCookieFrom (httpCookie : HttpCookie) =
     let ccn = String.Concat [ httpCookie.name; "-client" ]
-    { HttpCookie.mkKV ccn httpCookie.name
+    { HttpCookie.createKV ccn httpCookie.name
         with httpOnly = false
              secure    = httpCookie.secure
              expires   = httpCookie.expires }
@@ -127,7 +127,7 @@ module Cookie =
 
   let unsetCookie (cookieName : string) =
     let startEpoch = DateTimeOffset(1970, 1, 1, 0, 0, 1, TimeSpan.Zero) |> Some
-    let stringValue = HttpCookie.toHeader { HttpCookie.mkKV cookieName "x" with expires = startEpoch }
+    let stringValue = HttpCookie.toHeader { HttpCookie.createKV cookieName "x" with expires = startEpoch }
     Writers.addHeader "Set-Cookie" stringValue
 
   let setPair (httpCookie : HttpCookie) (clientCookie : HttpCookie) : WebPart =
@@ -155,7 +155,7 @@ module Cookie =
   [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
   module CookiesState =
 
-    let mk serverKey cookieName userStateKey relativeExpiry secure =
+    let create serverKey cookieName userStateKey relativeExpiry secure =
       { serverKey      = serverKey
         cookieName     = cookieName
         userStateKey   = userStateKey
@@ -168,7 +168,7 @@ module Cookie =
     match Crypto.secretbox serverKey plainData with
     | Choice1Of2 cookieData ->
       let encodedData = enc cookieData
-      { HttpCookie.mkKV cookieName encodedData
+      { HttpCookie.createKV cookieName encodedData
           with httpOnly = true
                secure   = secure }
       |> slidingExpiry relativeExpiry

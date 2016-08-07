@@ -58,12 +58,11 @@ module Cookie =
   [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
   module CookiesState =
 
-    val mk : serverKey:ServerKey ->
-             cookieName:string ->
-             userStateKey:string ->
-             relativeExpiry:CookieLife ->
-             secure:bool -> CookiesState
-
+    val create : serverKey:ServerKey
+               -> cookieName:string
+               -> userStateKey:string
+               -> relativeExpiry:CookieLife
+               -> secure:bool -> CookiesState
 
   /// Generate one server-side cookie, and another client-side cookie with
   /// name "${server-side-name}-client"
@@ -88,7 +87,7 @@ module Cookie =
 
   val updateCookies :  csctx:CookiesState ->
                        fPlainText : (byte [] option -> byte []) -> WebPart
-  
+
   val cookieState : csctx:CookiesState
                   -> noCookie:(unit -> Choice<byte [], WebPart>)
                   -> decryptionFailure:(Crypto.SecretboxDecryptionError -> Choice<byte [], WebPart>)

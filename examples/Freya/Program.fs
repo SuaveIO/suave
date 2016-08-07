@@ -62,7 +62,7 @@ module SelfHostedServer =
 
     let config =
       { defaultConfig with
-          bindings = [ HttpBinding.mkSimple HTTP "127.0.0.1" 7000 ]
+          bindings = [ HttpBinding.createSimple HTTP "127.0.0.1" 7000 ]
           logger = Targets.create Verbose }
 
     printfn "Listening on port 7000"

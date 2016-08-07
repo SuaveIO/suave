@@ -62,7 +62,7 @@ module Http =
         | "OPTIONS" -> HttpMethod.OPTIONS
         | s         -> HttpMethod.OTHER s
 
-  type HttpStatus = 
+  type HttpStatus =
     { code   : int
       reason : string
     }
@@ -78,8 +78,8 @@ module Http =
     | HTTP_422 | HTTP_428 | HTTP_429 | HTTP_414 | HTTP_415 | HTTP_416 | HTTP_417
     | HTTP_451 | HTTP_500 | HTTP_501 | HTTP_502 | HTTP_503 | HTTP_504 | HTTP_505
 
-    member x.code = 
-      match x with 
+    member x.code =
+      match x with
       | HTTP_100 -> 100 | HTTP_101 -> 101 | HTTP_200 -> 200 | HTTP_201 -> 201
       | HTTP_202 -> 202 | HTTP_203 -> 203 | HTTP_204 -> 204 | HTTP_205 -> 205
       | HTTP_206 -> 206 | HTTP_300 -> 300 | HTTP_301 -> 301 | HTTP_302 -> 302
@@ -92,7 +92,7 @@ module Http =
       | HTTP_429 -> 429 | HTTP_451 -> 451 | HTTP_500 -> 500 | HTTP_501 -> 501
       | HTTP_502 -> 502 | HTTP_503 -> 503 | HTTP_504 -> 504 | HTTP_505 -> 505
 
-    member x.reason = 
+    member x.reason =
       match x with
       | HTTP_100 -> "Continue"
       | HTTP_101 -> "Switching Protocols"
@@ -139,8 +139,8 @@ module Http =
       | HTTP_504 -> "Gateway Timeout"
       | HTTP_505 -> "HTTP Version Not Supported"
 
-    member x.message = 
-      match x with 
+    member x.message =
+      match x with
       | HTTP_100 -> "Request received, please continue"
       | HTTP_101 -> "Switching to new protocol; obey Upgrade header"
       | HTTP_200 -> "Request fulfilled, document follows"
@@ -230,7 +230,7 @@ module Http =
   [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
   module HttpCookie =
 
-    let mk name value expires path domain secure httpOnly =
+    let create name value expires path domain secure httpOnly =
       { name      = name
         value     = value
         expires   = expires
@@ -240,7 +240,7 @@ module Http =
         httpOnly = httpOnly }
 
 
-    let mkKV name value =
+    let createKV name value =
       { name      = name
         value     = value
         expires   = None
@@ -249,7 +249,7 @@ module Http =
         secure    = false
         httpOnly = true }
 
-    let empty = mkKV "" ""
+    let empty = createKV "" ""
 
     let toHeader (x : HttpCookie) =
       let app (sb : StringBuilder) (value : string) = sb.Append value |> ignore
@@ -287,16 +287,16 @@ module Http =
   type TlsProvider =
     abstract member wrap : Connection * obj -> SocketOp<Connection>
 
-  type Protocol = 
+  type Protocol =
     | HTTP
     | HTTPS of obj
 
-    member x.secure = 
+    member x.secure =
       match x with
       | HTTP    -> false
       | HTTPS _ -> true
 
-    override x.ToString() = 
+    override x.ToString() =
       match x with
       | HTTP    -> "http"
       | HTTPS _ -> "https"
@@ -354,7 +354,7 @@ module Http =
 
         let params' =
           (tryGetChoice1 this.queryParam)
-            >>= (tryGetChoice1 this.formData) 
+            >>= (tryGetChoice1 this.formData)
             >>= (tryGetChoice1 <| getFirst this.multiPartFields)
 
         params' x
@@ -418,15 +418,15 @@ module Http =
 
     let defaults =
       { scheme        = HTTP
-        socketBinding = SocketBinding.mk IPAddress.Loopback DefaultBindingPort }
+        socketBinding = SocketBinding.create IPAddress.Loopback DefaultBindingPort }
 
-    let mk scheme (ip : IPAddress) (port : Port) = 
+    let create scheme (ip : IPAddress) (port : Port) =
       { scheme        = scheme
-        socketBinding = SocketBinding.mk ip port }
+        socketBinding = SocketBinding.create ip port }
 
-    let mkSimple scheme ip (port : int) = 
+    let createSimple scheme ip (port : int) =
       { scheme        = scheme
-        socketBinding = SocketBinding.mk (IPAddress.Parse ip) (uint16 port) } 
+        socketBinding = SocketBinding.create (IPAddress.Parse ip) (uint16 port) }
 
   type HttpContent =
     | NullContent
@@ -582,7 +582,7 @@ module Http =
         content       = HttpContent.NullContent
         writePreamble = true }
 
-  /// a module that gives you the `empty` (beware) and `mk` functions for creating
+  /// a module that gives you the `empty` (beware) and `create` functions for creating
   /// a HttpRuntime
   [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
   module HttpRuntime =
@@ -606,7 +606,7 @@ module Http =
         tlsProvider       = null
         hideHeader        = false }
 
-    let mk serverKey errorHandler mimeTypes homeDirectory compressionFolder
+    let create serverKey errorHandler mimeTypes homeDirectory compressionFolder
            logger parsePostData cookieSerialiser tlsProvider hideHeader binding =
       { serverKey         = serverKey
         errorHandler      = errorHandler
@@ -629,7 +629,7 @@ module Http =
         connection = Connection.empty
         response   = HttpResult.empty }
 
-    let mk request runtime connection writePreamble =
+    let create request runtime connection writePreamble =
       { request    = request
         userState  = Map.empty
         runtime    = runtime

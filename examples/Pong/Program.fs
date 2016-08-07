@@ -13,7 +13,7 @@ let app = OK "PONG"
 let port = 3000us
 let config =
   { defaultConfig with
-     bindings = [ HttpBinding.mk HTTP IPAddress.Loopback port ]
+     bindings = [ HttpBinding.create HTTP IPAddress.Loopback port ]
      bufferSize = 8192
      maxOps = 10000
   }

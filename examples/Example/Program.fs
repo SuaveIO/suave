@@ -68,7 +68,7 @@ let sleep milliseconds message: WebPart =
 // Adds a new mime type to the default map
 let mimeTypes =
   Writers.defaultMimeTypesMap
-    @@ (function | ".avi" -> Writers.mkMimeType "video/avi" false | _ -> None)
+    @@ (function | ".avi" -> Writers.createMimeType "video/avi" false | _ -> None)
 
 module OwinSample =
   open System.Collections.Generic
@@ -93,9 +93,9 @@ module OwinSample =
 
 let unzipBody : WebPart =
   fun ctx -> WebPart.asyncOption {
-    if ctx.request.header "content-encoding" = Choice1Of2 "gzip" then 
-      return { ctx with request = { ctx.request with rawForm = Utils.Compression.gzipDecode ctx.request.rawForm} } 
-    else 
+    if ctx.request.header "content-encoding" = Choice1Of2 "gzip" then
+      return { ctx with request = { ctx.request with rawForm = Utils.Compression.gzipDecode ctx.request.rawForm} }
+    else
       return ctx }
 
 open System.IO
@@ -184,7 +184,7 @@ let app =
         PUT >=> path "/upload2"
           >=> request (fun x ->
              let files =
-               x.files 
+               x.files
                |> Seq.map (fun y -> sprintf "(%s, %s, %s)" y.fileName y.mimeType y.tempFilePath)
                |> String.concat "<br/>"
              OK (sprintf "Upload successful.<br>POST data: %A<br>Uploaded files (%d): %s" x.multiPartFields (List.length x.files) files))
@@ -222,8 +222,8 @@ let main argv =
   let cert = X509Certificate2("suave.p12","easy")
 
   startWebServer
-    { bindings              = [ HttpBinding.mkSimple HTTP "127.0.0.1" 8082
-                                HttpBinding.mkSimple (HTTPS cert) "127.0.0.1" 8443
+    { bindings              = [ HttpBinding.createSimple HTTP "127.0.0.1" 8082
+                                HttpBinding.createSimple (HTTPS cert) "127.0.0.1" 8443
                               ]
       serverKey             = Utils.Crypto.generateKey HttpRuntime.ServerKeyLength
       errorHandler          = defaultErrorHandler

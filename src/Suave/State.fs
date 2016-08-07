@@ -18,7 +18,7 @@ module CookieStateStore =
   open System.IO
   open System.Collections.Generic
 
-  /// The user state key for the state store. Always "Suave.State.CookieStateStore". 
+  /// The user state key for the state store. Always "Suave.State.CookieStateStore".
   [<Literal>]
   let StateStoreType = "Suave.State.CookieStateStore"
 
@@ -90,7 +90,7 @@ module CookieStateStore =
 
   module HttpContext =
 
-    let private mkStateStore (serialiser : CookieSerialiser) (userState : Map<string, obj>) (ss : obj) =
+    let private createStateStore (serialiser : CookieSerialiser) (userState : Map<string, obj>) (ss : obj) =
       { new StateStore with
           member x.get key =
             serialiser.deserialise (ss :?> byte []) |> Map.tryFind key
@@ -104,7 +104,7 @@ module CookieStateStore =
     let state (ctx : HttpContext) =
       ctx.userState
       |> Map.tryFind StateStoreType
-      |> Option.map (mkStateStore ctx.runtime.cookieSerialiser ctx.userState)
+      |> Option.map (createStateStore ctx.runtime.cookieSerialiser ctx.userState)
 
 #if SYSTEM_RUNTIME_CACHING
 /// This module contains the implementation for the memory-cache backed session

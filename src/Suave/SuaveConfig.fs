@@ -100,16 +100,16 @@ module SuaveConfig =
   /// You will normally not have to use this function as a consumer from the
   /// library, but it may be useful for unit testing with the HttpRuntime record.
   let toRuntime config contentFolder compressionFolder parsePostData =
-    HttpRuntime.mk config.serverKey
-                   config.errorHandler
-                   config.mimeTypesMap
-                   contentFolder
-                   compressionFolder
-                   config.logger
-                   parsePostData
-                   config.cookieSerialiser
-                   config.tlsProvider
-                   config.hideHeader
+    HttpRuntime.create config.serverKey
+                       config.errorHandler
+                       config.mimeTypesMap
+                       contentFolder
+                       compressionFolder
+                       config.logger
+                       parsePostData
+                       config.cookieSerialiser
+                       config.tlsProvider
+                       config.hideHeader
 
   /// Finds an endpoint that is configured from the given configuration. Throws
   /// an exception if the configuration has no bindings. Useful if you make

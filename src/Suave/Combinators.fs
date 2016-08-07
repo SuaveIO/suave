@@ -10,7 +10,7 @@ module Response =
 
   let response (statusCode : HttpCode) (cnt : byte []) =
     fun (ctx : HttpContext) ->
-      let response = 
+      let response =
         { ctx.response with status = statusCode.status; content = Bytes cnt }
       { ctx with response = response } |> succeed
 
@@ -21,17 +21,17 @@ module Writers =
   open System
   open Suave.Utils
 
-  let setStatus (s : HttpCode) : WebPart = 
+  let setStatus (s : HttpCode) : WebPart =
     fun ctx ->
       { ctx with response = { ctx.response with status = s.status }}
       |> succeed
 
-  let setStatusCode (code : int) : WebPart = 
+  let setStatusCode (code : int) : WebPart =
     fun ctx ->
       { ctx with response = { ctx.response with status = { ctx.response.status with code = code }}}
       |> succeed
 
-  let setStatusReason (reason : string) : WebPart = 
+  let setStatusReason (reason : string) : WebPart =
     fun ctx ->
       { ctx with response = { ctx.response with status = { ctx.response.status with reason = reason }}}
       |> succeed
@@ -84,32 +84,32 @@ module Writers =
     |> succeed
 
   // TODO: I'm not sure about having MIME types in the Writers module
-  let mkMimeType name compression =
+  let createMimeType name compression =
     { name=name; compression=compression } |> Some
 
   let defaultMimeTypesMap = function
-    | ".bmp" -> mkMimeType "image/bmp" false
-    | ".css" -> mkMimeType "text/css" true
-    | ".gif" -> mkMimeType "image/gif" false
-    | ".png" -> mkMimeType "image/png" false
-    | ".svg" -> mkMimeType "image/svg+xml" true
-    | ".ico" -> mkMimeType "image/x-icon" false
-    | ".xml" -> mkMimeType "application/xml" true
-    | ".js"  -> mkMimeType "application/javascript" true
-    | ".json" -> mkMimeType "application/json" true
-    | ".map"  -> mkMimeType "application/json" true
+    | ".bmp" -> createMimeType "image/bmp" false
+    | ".css" -> createMimeType "text/css" true
+    | ".gif" -> createMimeType "image/gif" false
+    | ".png" -> createMimeType "image/png" false
+    | ".svg" -> createMimeType "image/svg+xml" true
+    | ".ico" -> createMimeType "image/x-icon" false
+    | ".xml" -> createMimeType "application/xml" true
+    | ".js"  -> createMimeType "application/javascript" true
+    | ".json" -> createMimeType "application/json" true
+    | ".map"  -> createMimeType "application/json" true
     | ".htm"
-    | ".html" -> mkMimeType "text/html" true
+    | ".html" -> createMimeType "text/html" true
     | ".jpe"
     | ".jpeg"
-    | ".jpg" -> mkMimeType "image/jpeg" false
-    | ".exe" -> mkMimeType "application/exe" false
-    | ".txt" -> mkMimeType "text/plain" true
-    | ".ttf" -> mkMimeType "application/x-font-ttf" true
-    | ".otf" -> mkMimeType "application/font-sfnt" true
-    | ".woff" -> mkMimeType "application/font-woff" false
-    | ".woff2" -> mkMimeType "application/font-woff2" false
-    | ".eot" -> mkMimeType "application/vnd.ms-fontobject" false
+    | ".jpg" -> createMimeType "image/jpeg" false
+    | ".exe" -> createMimeType "application/exe" false
+    | ".txt" -> createMimeType "text/plain" true
+    | ".ttf" -> createMimeType "application/x-font-ttf" true
+    | ".otf" -> createMimeType "application/font-sfnt" true
+    | ".woff" -> createMimeType "application/font-woff" false
+    | ".woff2" -> createMimeType "application/font-woff2" false
+    | ".eot" -> createMimeType "application/vnd.ms-fontobject" false
     | _      -> None
 
   let setMimeType t = setHeader "Content-Type" t
@@ -128,11 +128,11 @@ module Intermediate =
 
 // 2xx
 module Successful =
-    
+
   open Suave.Utils
   open Response
-    
-  let ok s : WebPart = 
+
+  let ok s : WebPart =
     fun ctx -> { ctx with response = { ctx.response with status = HTTP_200.status; content = Bytes s }} |> succeed
 
   let OK a = ok (UTF8.bytes a)
@@ -252,7 +252,7 @@ module RequestErrors =
   let TOO_MANY_REQUESTS s = too_many_requests (UTF8.bytes s)
 
 module ServerErrors =
-  
+
   open Suave.Utils
   open Response
 
@@ -366,9 +366,9 @@ module Filters =
   open ServerErrors
 
   let pathScan (pf : PrintfFormat<_,_,_,_,'t>) (h : 't ->  WebPart) : WebPart =
-      
+
     let scan url =
-      try 
+      try
         let r = sscanf pf url
         Some r
       with _ -> None
@@ -377,13 +377,13 @@ module Filters =
       match scan r.request.path with
       | Some p ->
         let part = h p
-        part r 
-      | None -> 
+        part r
+      | None ->
         fail
     F
 
   let urlScan s x = pathScan s x
-          
+
   let timeoutWebPart (timeSpan : TimeSpan) (webPart : WebPart) : WebPart =
     fun (ctx : HttpContext) -> async {
       try
@@ -516,7 +516,7 @@ module Files =
   let browseFileHome fileName =
     fun ({request = r; runtime = q} as h) ->
       browseFile q.homeDirectory fileName h
-    
+
   let browse rootPath : WebPart =
     warbler (fun ctx ->
       ctx.runtime.logger.verbose (
@@ -558,7 +558,7 @@ module Files =
     dir ctx.runtime.homeDirectory ctx
 
 module Embedded =
-    
+
   open System
   open System.IO
   open System.Reflection
@@ -568,7 +568,7 @@ module Embedded =
 
   open Response
   open ServeResource
-  
+
   #if !NETSTANDARD1_5
   let defaultSourceAssembly =
     if Assembly.GetEntryAssembly() = null
@@ -581,7 +581,7 @@ module Embedded =
 
   let lastModified (assembly : Assembly) =
     FileInfo(assembly.Location).CreationTime
-    
+
   let sendResource (assembly : Assembly)
                     resourceName
                     (compression : bool)
@@ -627,7 +627,7 @@ module Embedded =
       (fun _ -> lastModified assembly)
       (Path.GetExtension)
       (sendResource assembly)
-  
+
   #if !NETSTANDARD1_5
   let resourceFromDefaultAssembly name =
     resource defaultSourceAssembly name
@@ -687,11 +687,12 @@ module EventSource =
       /// The event's type. If this is specified, an event will be dispatched on the browser to the listener for the specified event name; the web site source code should use addEventListener() to listen for named events. The onmessage handler is called if no event name is specified for a message.
       ``type`` : string option }
 
-  let mkMessage id data =
-    { id = id; data = data; ``type`` = None }
+    /// Create a new EventSource Message
+    static member create id data =
+      { id = id; data = data; ``type`` = None }
 
-  let mkMessageType id data typ =
-    { id = id; data = data; ``type`` = Some typ }
+    static member createType id data typ =
+      { id = id; data = data; ``type`` = Some typ }
 
   let send (out : Connection) (msg : Message) =
     socket {
@@ -749,7 +750,7 @@ module Control =
     |> succeed
 
 module CORS =
-  
+
   open System
   open Successful
   open Utils
@@ -791,23 +792,23 @@ module CORS =
 
       /// The list of allowed HttpMethods for the request.
       allowedMethods          : InclusiveOption<HttpMethod list>
-      
+
       /// Allow cookies? This is sent in the AccessControlAllowCredentials header.
       allowCookies            : bool
 
-      /// Should response headers be exposed to the client? This is sent in AccessControlExposeHeaders header. 
+      /// Should response headers be exposed to the client? This is sent in AccessControlExposeHeaders header.
       exposeHeaders           : bool
-      
+
       /// Max age in seconds the user agent is allowed to cache the result of the request.
       maxAge                  : int option }
-    
+
     static member allowedUris_           = Property<CORSConfig,_> (fun x -> x.allowedUris)           (fun v x -> { x with allowedUris = v })
     static member allowedMethods_        = Property<CORSConfig,_> (fun x -> x.allowedMethods)        (fun v x -> { x with allowedMethods = v })
     static member allowCookies_          = Property<CORSConfig,_> (fun x -> x.allowCookies)          (fun v x -> { x with allowCookies = v })
     static member exposeHeaders_         = Property<CORSConfig,_> (fun x -> x.exposeHeaders)         (fun v x -> { x with exposeHeaders = v })
     static member maxAge_                = Property<CORSConfig,_> (fun x -> x.maxAge)                (fun v x -> { x with maxAge = v })
 
-  let private isAllowedOrigin config (value : string) = 
+  let private isAllowedOrigin config (value : string) =
     match config.allowedUris with
     | InclusiveOption.All ->
       true
@@ -827,7 +828,7 @@ module CORS =
     | Some age ->
       Writers.setHeader AccessControlMaxAge (age.ToString())
 
-  let private setAllowCredentialsHeader config = 
+  let private setAllowCredentialsHeader config =
     Writers.setHeader AccessControlAllowCredentials (config.allowCookies.ToString())
 
   let private setAllowMethodsHeader config value =
@@ -838,7 +839,7 @@ module CORS =
     | InclusiveOption.All ->
       Writers.setHeader AccessControlAllowMethods "*"
 
-    | InclusiveOption.Some (m :: ms) -> 
+    | InclusiveOption.Some (m :: ms) ->
       let exists = m.ToString() = value || List.exists (fun m -> m.ToString() = value) ms
       if exists then
         let header = sprintf "%s,%s" (m.ToString()) (ms |> Seq.map (fun i -> i.ToString()) |> String.concat( ", "))
@@ -849,7 +850,7 @@ module CORS =
     | InclusiveOption.Some ([]) ->
       succeed
 
-  let private setAllowOriginHeader value = 
+  let private setAllowOriginHeader value =
     Writers.setHeader AccessControlAllowOrigin value
 
   let private setExposeHeadersHeader config =

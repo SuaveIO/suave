@@ -51,9 +51,9 @@ let reqResp
 
   let defaultTimeout = TimeSpan.FromSeconds 5.
 
-  use handler = mkHandler DecompressionMethods.None cookies
-  use client = mkClient handler
-  use request = mkRequest methd resource "" None (endpointUri ctx.suaveConfig) |> fRequest
+  use handler = createHandler DecompressionMethods.None cookies
+  use client = createClient handler
+  use request = createRequest methd resource "" None (endpointUri ctx.suaveConfig) |> fRequest
 
   for h in request.Headers do
     logger.debug (event "{headerName}: {headerValue}"

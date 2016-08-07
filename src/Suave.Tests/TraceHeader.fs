@@ -11,25 +11,25 @@ open FsCheck
 open Tests.TestUtilities
 
 [<Tests>]
-let mk (_ : SuaveConfig) =
-  testList "mk" [
-    testCase "mk works with both ids given" <| fun _ ->
-      let hdr = TraceHeader.mk (Some 82UL) (Some 44UL)
+let create (_ : SuaveConfig) =
+  testList "create" [
+    testCase "create works with both ids given" <| fun _ ->
+      let hdr = TraceHeader.create (Some 82UL) (Some 44UL)
       Assert.Equal("traceId should have been 82", 82UL, hdr.traceId)
       Assert.Equal("reqId should not be 0", true, 0UL <> hdr.reqId)
       Assert.Equal("reqParentId should have been 44", Some 44UL, hdr.reqParentId)
-    testCase "mk works with trace id missing" <| fun _ ->
-      let hdr = TraceHeader.mk None (Some 86UL)
+    testCase "create works with trace id missing" <| fun _ ->
+      let hdr = TraceHeader.create None (Some 86UL)
       Assert.Equal("traceId should not be 0", true, 0UL <> hdr.traceId)
       Assert.Equal("traceId should have defaulted to reqId", hdr.reqId, hdr.traceId)
       Assert.Equal("reqParentId should have been 86", Some 86UL, hdr.reqParentId)
-    testCase "mk works with parent id missing" <| fun _ ->
-      let hdr = TraceHeader.mk (Some 14UL) None
+    testCase "create works with parent id missing" <| fun _ ->
+      let hdr = TraceHeader.create (Some 14UL) None
       Assert.Equal("traceId should have been 14", 14UL, hdr.traceId)
       Assert.Equal("reqId should not be 0", true, 0UL <> hdr.reqId)
       Assert.Equal("reqParentId should have been None", None, hdr.reqParentId)
-    testCase "mk works with both ids missing" <| fun _ ->
-      let hdr = TraceHeader.mk None None
+    testCase "create works with both ids missing" <| fun _ ->
+      let hdr = TraceHeader.create None None
       Assert.Equal("traceId should not be 0", true, 0UL <> hdr.traceId)
       Assert.Equal("traceId should have defaulted to reqId", hdr.reqId, hdr.traceId)
       Assert.Equal("reqParentId should have been None", None, hdr.reqParentId)

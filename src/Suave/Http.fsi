@@ -30,7 +30,7 @@ module Http =
     val parse : string -> HttpMethod
 
   /// A HTTP status code and reason message
-  type HttpStatus = 
+  type HttpStatus =
     { code   : int
       reason : string
     }
@@ -84,10 +84,10 @@ module Http =
   module HttpCookie =
 
     /// Create a new HttpCookie with all the given values.
-    val mk : name:string -> value:string -> expires:DateTimeOffset option
-             -> path:string option -> domain:string option -> secure:bool
-             -> httpOnly:bool
-             -> HttpCookie
+    val create : name:string -> value:string -> expires:DateTimeOffset option
+               -> path:string option -> domain:string option -> secure:bool
+               -> httpOnly:bool
+               -> HttpCookie
 
     /// Create a new cookie with the given name, value, and defaults:
     ///
@@ -104,7 +104,7 @@ module Http =
     /// - http://www.nczonline.net/blog/2009/05/05/http-cookies-explained/
     /// - https://developer.mozilla.org/en-US/docs/Web/API/document.cookie
     ///
-    val mkKV : name:string -> value:string -> HttpCookie
+    val createKV : name:string -> value:string -> HttpCookie
 
     /// An empty cookie value
     val empty : HttpCookie
@@ -140,7 +140,7 @@ module Http =
     abstract wrap : Connection * obj -> SocketOp<Connection>
 
   /// Gets the supported protocols, HTTP and HTTPS with a certificate
-  type Protocol = 
+  type Protocol =
     /// The HTTP protocol is the core protocol
     | HTTP
     /// The HTTP protocol tunneled in a TLS tunnel
@@ -214,7 +214,7 @@ module Http =
     member fieldData : key:string -> Choice<string, string>
 
     /// Syntactic Sugar to retrieve query string, form or multi-field values
-    /// from HttpRequest 
+    /// from HttpRequest
     member Item : key:string -> string option with get
 
     /// Get the client's view of what host is being called. If you trust your
@@ -259,11 +259,11 @@ module Http =
 
     /// Create a HttpBinding for the given protocol, an IP address to bind to and
     /// a port to listen on – this is the strongly typed overload.
-    val mk : scheme:Protocol -> ip:IPAddress -> port:Port -> HttpBinding
+    val create : scheme:Protocol -> ip:IPAddress -> port:Port -> HttpBinding
 
     /// Create a HttpBinding for the given protocol, an IP address to bind to and
     /// a port to listen on – this is the "stringly typed" overload.
-    val mkSimple : scheme:Protocol -> ip:string -> port:int -> HttpBinding
+    val createSimple : scheme:Protocol -> ip:string -> port:int -> HttpBinding
 
   type HttpContent =
     /// This is the default HttpContent. If you place this is a HttpResult the web
@@ -415,7 +415,7 @@ module Http =
     static member clientProto_ : Property<HttpContext, string>
 
   /// A WebPart is an asynchronous function that transforms the HttpContext.  An asynchronous return
-  /// value of None indicates 'did not handle'. 
+  /// value of None indicates 'did not handle'.
 
   /// An error handler takes the exception, a programmer-provided message, a
   /// request (that failed) and returns an asynchronous workflow for the handling
@@ -424,7 +424,7 @@ module Http =
 
   type WebPart = WebPart<HttpContext>
 
-  /// a module that gives you the `empty` (beware) and `mk` functions for creating
+  /// a module that gives you the `empty` (beware) and `create` functions for creating
   /// a HttpRuntime
   [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
   module HttpRuntime =
@@ -439,12 +439,12 @@ module Http =
     val empty : HttpRuntime
 
     /// make a new HttpRuntime from the given parameters
-    val mk : serverKey:ServerKey -> errorHandler:ErrorHandler
-          -> mimeTypes:MimeTypesMap -> homeDirectory:string
-          -> compressionFolder:string -> logger:Logger
-          -> parsePostData:bool -> cookieSerialiser:CookieSerialiser
-          -> tlsProvider:TlsProvider -> hideHeader:bool -> binding:HttpBinding
-          -> HttpRuntime
+    val create : serverKey:ServerKey -> errorHandler:ErrorHandler
+               -> mimeTypes:MimeTypesMap -> homeDirectory:string
+               -> compressionFolder:string -> logger:Logger
+               -> parsePostData:bool -> cookieSerialiser:CookieSerialiser
+               -> tlsProvider:TlsProvider -> hideHeader:bool -> binding:HttpBinding
+               -> HttpRuntime
 
   /// A module that provides functions to create a new HttpContext.
   [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
@@ -454,9 +454,9 @@ module Http =
     /// in unit tests.
     val empty : HttpContext
 
-    val mk : request:HttpRequest -> runtime:HttpRuntime -> connection:Connection
-          -> writePreamble:bool
-          -> HttpContext
+    val create : request:HttpRequest -> runtime:HttpRuntime -> connection:Connection
+               -> writePreamble:bool
+               -> HttpContext
 
   val request : apply:(HttpRequest -> HttpContext -> 'a) -> context:HttpContext -> 'a
   val context : apply:(HttpContext -> HttpContext -> 'a) -> context:HttpContext -> 'a
