@@ -24,7 +24,6 @@
                 "../../paket-files/logary/logary/src/Logary.Facade/Facade.fs",
                 "Globals.fs",
                 "CookieSerialiser.fs",
-                "Utils/Facade.fs",
                 "Sockets/SocketBinding.fs",
                 "Sockets/BufferManager.fs",
                 "Sockets/ConcurrentPool.fs",
