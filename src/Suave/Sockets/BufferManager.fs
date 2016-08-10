@@ -32,7 +32,7 @@ type BufferManager(totalBytes, bufferSize, autoGrow) =
   /// Initialise a segment of memory
   member x.createBuffer() =
     lock creatingSegment (fun _ ->
-      if segments.Count < chunksPerSegment / 2 then 
+      if segments.Count < chunksPerSegment / 2 then
         let buffer = Array.zeroCreate totalBytes
         let mutable runningOffset = 0
         while runningOffset < totalBytes - bufferSize do
@@ -79,7 +79,7 @@ type BufferManager(totalBytes, bufferSize, autoGrow) =
     //if segments. args then failwithf "double free buffer %d" args.Offset
     segments.Add args
     logger.log Verbose (
-      Message.eventX "Freeing buffer at {offset} from {caller}. Free segments {segmentCount}. [%s]"
+      Message.eventX "Freeing buffer at {offset} from {caller}. Free segments {segmentCount}."
       >> Message.setFieldValue "offset" args.Offset
       >> Message.setFieldValue "caller" (defaultArg caller "no-caller-specified")
       >> Message.setFieldValue "segmentCount" segments.Count)
