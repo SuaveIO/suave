@@ -427,13 +427,17 @@ module Regex =
   let replaceWithFunction pattern (replaceFunc : RegexMatch -> string) input =
     Regex.Replace(input, pattern, replaceFunc)
 
+  /// Match the `input` against the regex `pattern`. You can do a 
+  /// `Seq.cast<Group>` on the result to get it as a sequence
+  /// and also index with `.["name"]` into the result if you have
+  /// named capture groups.
   let ``match`` pattern input =
     match Regex.Matches(input, pattern) with
     | x when x.Count > 0 ->
       x
       |> Seq.cast<Match>
       |> Seq.head
-      |> fun x -> Seq.cast<Group> x.Groups
+      |> fun x -> x.Groups
       |> Some
     | _ -> None
 
@@ -630,12 +634,7 @@ module App =
             .InformationalVersion
 
   /// Get the assembly resource
-  let resource name =
-#if DNXCORE50
-    let assembly = typeof<Random>.GetTypeInfo().Assembly
-#else
-    let assembly = Assembly.GetExecutingAssembly ()
-#endif
+  let resourceIn (assembly : Assembly) name =
     use stream = assembly.GetManifestResourceStream name
     if stream = null then
       assembly.GetManifestResourceNames()
@@ -646,3 +645,12 @@ module App =
       use reader = new StreamReader(stream)
       reader.ReadToEnd ()
       |> Choice1Of2
+
+  /// Get the current assembly resource
+  let resource =
+#if DNXCORE50
+    let assembly = typeof<Random>.GetTypeInfo().Assembly
+#else
+    let assembly = Assembly.GetExecutingAssembly ()
+#endif
+    resourceIn assembly

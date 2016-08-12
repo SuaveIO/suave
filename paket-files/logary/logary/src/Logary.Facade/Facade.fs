@@ -227,24 +227,61 @@ type LoggingConfig =
     getLogger : string[] -> Logger }
 
 module internal Formatting =
+  open System.Text
+  open System.Text.RegularExpressions
 
   [<Literal>]
   let FieldExnKey = "exn"
 
+  let fieldRegex =
+    // https://msdn.microsoft.com/en-us/library/bs2twtah.aspx#balancing_group_definition
+    Regex(@"( (?<B>\{) [\s\w]+ (?<-B>\}) )", RegexOptions.IgnorePatternWhitespace ||| RegexOptions.Compiled)
+
+  let extractMatches fields (template : string) =
+    fieldRegex.Matches template
+    |> Seq.cast<Match>
+    |> Seq.toList
+    |> List.choose (fun m ->
+      let name = m.Value.Trim([| '{'; '}'; ' '|])
+      if fields |> Map.containsKey name then
+        Some (name, fields |> Map.find name, m)
+      else
+        None)
+
   /// let the ISO8601 love flow
-  let internal defaultFormatter (message : Message) =
+  let defaultFormatter (message : Message) =
+    let app (x : obj) (sb : StringBuilder) =
+      sb.Append x |> ignore
 
     let formatLevel (level : LogLevel) =
       "[" + Char.ToUpperInvariant(level.ToString().[0]).ToString() + "] "
 
     let formatInstant (utcTicks : int64) =
-      (DateTime(utcTicks, DateTimeKind.Utc).ToString("o")) + ": "
+      (DateTimeOffset(utcTicks, TimeSpan.Zero).ToString("o")) + ": "
 
-    let formatValue = function
+    let formatValue fields = function
       | Event template ->
-        template
+        let matches = extractMatches fields template
+
+        let folder (length, index, chPos, builder) (_, value : obj, m : Match) =
+          //printfn "index: %i, chPos: %i, builder: %O, m.Index: %i, m.Value: %s" index chPos builder m.Index m.Value
+          builder |> app (template.Substring(chPos, m.Index - chPos))
+          builder |> app (sprintf "%O" value)
+          let chPos = chPos + (m.Index - chPos) + m.Value.Length
+
+          if length - 1 = index then
+            builder |> app (template.Substring(chPos, template.Length - chPos))
+
+          length, index + 1, chPos, builder
+
+        let _, _, _, builder =
+          matches |> Seq.fold folder (matches.Length, 0, 0, StringBuilder())
+
+        matches |> List.map (fun (name, _, _) -> name) |> Set.ofList,
+        if builder.Length = 0 then template else builder.ToString()
 
       | Gauge (value, units) ->
+        Set.empty,
         sprintf "%i %s" value units
 
     let formatName (name : string[]) =
@@ -258,12 +295,25 @@ module internal Formatting =
       | Some ex ->
         " exn:\n" + ex.ToString()
 
+    let formatFields (ignored : Set<string>) (fields : Map<string, obj>) =
+      if not (Map.isEmpty fields) then
+        fields
+        |> Seq.filter (fun (KeyValue (k, _)) -> not (ignored |> Set.contains k))
+        |> Seq.map (fun (KeyValue (k, v)) -> sprintf "\n - %s: %O" k v)
+        |> String.concat ""
+      else
+        ""
+
+    let matchedFields, valueString =
+      formatValue message.fields message.value
+
     // [I] 2014-04-05T12:34:56Z: Hello World! [my.sample.app]
     formatLevel message.level +
     formatInstant message.utcTicks +
-    formatValue message.value +
+    valueString +
     formatName message.name +
-    formatExn message.fields
+    formatExn message.fields +
+    formatFields matchedFields message.fields
 
 /// Log a line with the given format, printing the current time in UTC ISO-8601 format
 /// and then the string, like such:
@@ -391,15 +441,18 @@ module Global =
 
       action logger
 
+    let ensureName (m : Message) =
+      if Array.isEmpty m.name then { m with name = name } else m
+
     interface Logger with
       member x.log level msgFactory =
-        withLogger (fun logger -> logger.log level msgFactory)
+        withLogger (fun logger -> logger.log level (msgFactory >> ensureName))
 
       member x.logWithAck level msgFactory =
-        withLogger (fun logger -> logger.logWithAck level msgFactory)
+        withLogger (fun logger -> logger.logWithAck level (msgFactory >> ensureName))
 
       member x.logSimple message =
-        withLogger (fun logger -> logger.logSimple message)
+        withLogger (fun logger -> logger.logSimple (ensureName message))
 
   let internal getStaticLogger (name : string []) =
     Flyweight name
