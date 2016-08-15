@@ -220,6 +220,9 @@ let reqHeaders methd resource data =
 let reqContentHeaders methd resource data =
   reqResp methd resource "" data None DecompressionMethods.None id contentHeaders
 
+let reqStatusCode methd resource data =
+  reqResp methd resource "" data None DecompressionMethods.None id statusCode
+
 /// Test a request by looking at the cookies alone.
 let reqCookies methd resource data ctx =
   let cookies = new CookieContainer()
