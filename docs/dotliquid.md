@@ -5,9 +5,18 @@ layout: default
 Suave.DotLiquid
 ===============
 
-How to use liquid from Suave.
+Installing DotLiquid
+--------------------
 
-{% highlight liquid %}
+{% highlight %}
+paket add nuget DotLiquid
+paket add nuget Suave.DotLiquid
+{% endhighlight %}
+
+How to use liquid from Suave.
+-----------------------------
+
+{% highlight fsharp %}
 open Suave
 open Suave.DotLiquid
 open DotLiquid
@@ -15,9 +24,14 @@ open DotLiquid
 type Model =
   { title : string }
 
+setTemplatesDirectory "./templates"
+
+let o = { title = "Hello World" }
+
 let app =
-  let o = { title = "Hello World" }
-  page "my_page.liquid" o
+  choose
+    [ GET >=> choose
+        [ path "/" >=> page "my_page.liquid" o ]]
 
 {% endhighlight %}
 
