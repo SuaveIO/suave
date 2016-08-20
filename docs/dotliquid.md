@@ -8,7 +8,7 @@ Suave.DotLiquid
 Installing DotLiquid
 --------------------
 
-{% highlight %}
+{% highlight text %}
 paket add nuget DotLiquid
 paket add nuget Suave.DotLiquid
 {% endhighlight %}
