@@ -6,6 +6,7 @@
         "compile": {
             "includeFiles": [
                 "../../paket-files/haf/YoLo/YoLo.fs",
+                "../../paket-files/logary/logary/src/Logary.Facade/Facade.fs",
                 "Utils/Aether.fs",
                 "Utils/AsyncExtensions.fs",
                 "Utils/AsyncResultCell.fs",
