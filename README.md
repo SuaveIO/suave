@@ -21,7 +21,7 @@ Sponsored by
 | Platform | Status         |
 | -------- | -------------- |
 | Windows  | [![Build status](https://ci.appveyor.com/api/projects/status/g0lum9qndwb018sy/branch/master?svg=true)](https://ci.appveyor.com/project/AdemarGonzalez/suave/branch/master) |
-| Mono/OSX     | [![Build status](https://travis-ci.org/SuaveIO/suave.svg?branch=master)](https://travis-ci.org/SuaveIO/suave) |
+| Mono/Linux     | [![Build status](https://travis-ci.org/SuaveIO/suave.svg?branch=master)](https://travis-ci.org/SuaveIO/suave) |
 
 What follows is a tutorial on how to create applications. Scroll past the
 tutorial to see detailed function documentation.
@@ -83,7 +83,7 @@ We're using a cross-platform build suite called [albacore](https://github.com/Al
 * [Bundler](http://bundler.io/)
 * [Libuv](https://github.com/libuv/libuv)
 
-On linux and os x you should have ruby out of the box (you might need to install bundler though). 
+On Linux and OS X/macOS you should have ruby out of the box (you might need to install bundler though). 
 On Windows, you have to [install it](https://github.com/albacore/albacore/#installing-ruby-on-windows).
 
 To execute the build script, invoke following commands:
