@@ -524,15 +524,7 @@ module Message =
 
   /// Sets the value of the field on the log message.
   let setField (key : string) (value : obj) (x : Message) =
-    let put k v m =
-      match m |> Map.tryFind k with
-      | None ->
-        m |> Map.add k v
-
-      | Some _ ->
-        m |> Map.remove k |> Map.add k v
-
-    { x with fields = x.fields |> put key value }
+    { x with fields = x.fields |> Map.add key value }
 
   /// Alias to `setField`
   let setFieldValue = setField
@@ -554,6 +546,6 @@ module Message =
       
       | Some errors ->
         let arr : obj list = unbox errors
-        x.fields |> Map.remove "errors" |> Map.add "errors" (box (box ex :: arr))
+        x.fields |> Map.add "errors" (box (box ex :: arr))
 
     { x with fields = fields' }

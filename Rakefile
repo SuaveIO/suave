@@ -1,7 +1,5 @@
 # Encoding: utf-8
-
 require 'bundler/setup'
-
 require 'albacore'
 require 'albacore/nuget_model'
 require 'albacore/project'
@@ -10,7 +8,6 @@ require 'albacore/tasks/versionizer'
 require 'albacore/tasks/release'
 require 'albacore/task_types/nugets_pack'
 require 'albacore/task_types/asmver'
-require 'albacore/ext/teamcity'
 require './tools/paket_pack'
 require 'semver'
 

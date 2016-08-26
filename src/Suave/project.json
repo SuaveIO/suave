@@ -6,7 +6,6 @@
         "compile": {
             "includeFiles": [
                 "../../paket-files/haf/YoLo/YoLo.fs",
-                "../../paket-files/logary/logary/src/Logary.Facade/Facade.fs",
                 "Utils/Aether.fs",
                 "Utils/AsyncExtensions.fs",
                 "Utils/AsyncResultCell.fs",
@@ -23,6 +22,7 @@
                 "Utils/Parse.fs",
                 "Utils/CultureInfoCache.fs",
                 "../../paket-files/logary/logary/src/Logary.Facade/Facade.fs",
+                "Utils/TraceHeader.fs",
                 "Globals.fs",
                 "CookieSerialiser.fs",
                 "Sockets/SocketBinding.fs",
@@ -60,7 +60,7 @@
                 "ConnectionFacade.fs",
                 "ParsingAndControl.fs",
                 "Web.fs",
-                "WebSocket.fs",        
+                "WebSocket.fs",
                 "Owin.fs",
                 "Json.fs"
             ]
@@ -76,7 +76,7 @@
     },
 
     "frameworks": {
-        "netstandard1.6": { 
+        "netstandard1.6": {
             "buildOptions": {
                 "define": [
                     "DNXCORE50",
@@ -95,7 +95,7 @@
                 "System.Runtime.Serialization.Json": "4.0.2"
             }
         },
-        "net46" : { 
+        "net46" : {
             "dependencies": {
                 "FSharp.Core": "4.0.0.1"
             },

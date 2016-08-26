@@ -192,6 +192,7 @@ module Option =
 type Base64String = string
 
 module String =
+  open System.Globalization // needed when using DNXCORE50
   open System.IO
   open System.Security.Cryptography
 
@@ -204,7 +205,7 @@ module String =
 #endif
 
   /// Also, invariant culture
-  let equalsCaseInsensitve (a : string) (b : string) =
+  let equalsCaseInsensitive (a : string) (b : string) =
 #if DNXCORE50
     (CultureInfo.InvariantCulture.CompareInfo.GetStringComparer(CompareOptions.IgnoreCase)).Equals(a, b)
 #else

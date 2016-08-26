@@ -1,7 +1,7 @@
 FRAMEWORK: NET45
 NUGET
   remote: https://www.nuget.org/api/v2
-    DotLiquid (2.0.24)
+    DotLiquid (2.0.26)
     FSharp.Core (3.1.2.5)
     Fuchu (1.0.3)
       FSharp.Core (>= 3.1.2.1)
@@ -11,9 +11,9 @@ NUGET
       Microsoft.AspNet.Razor (>= 3.0)
 GITHUB
   remote: haf/YoLo
-    YoLo.fs (c8cab523cd9cc30d3a5a450249de561e5069dc6d)
+    YoLo.fs (11023b9fcd2c1d28a7a0c0de5609647e3e1b03ce)
   remote: logary/logary
-    src/Logary.Facade/Facade.fs (52aee916805b69d9ab1c671bd3924455b813c2ba)
+    src/Logary.Facade/Facade.fs (6bbcf69be1712464e629499093921cf3293a6f70)
 GROUP Build
 NUGET
   remote: https://www.nuget.org/api/v2
@@ -127,7 +127,7 @@ NUGET
     FSharp.Core (4.0.0.1) - redirects: force
     Hekate (3.2)
       Aether (>= 8.0.2 < 9.0)
-    IdentityServer3 (2.5.1)
+    IdentityServer3 (2.5.2)
       Owin (>= 1.0)
     Microsoft.Owin (3.0.1)
       Owin (>= 1.0)
@@ -144,12 +144,12 @@ NUGET
       Topshelf (>= 3.2)
 GITHUB
   remote: haf/YoLo
-    YoLo.fs (c8cab523cd9cc30d3a5a450249de561e5069dc6d)
+    YoLo.fs (11023b9fcd2c1d28a7a0c0de5609647e3e1b03ce)
 GROUP Tests
 FRAMEWORK: NET45
 NUGET
   remote: https://www.nuget.org/api/v2
-    DotLiquid (2.0.24)
+    DotLiquid (2.0.26)
     FsCheck (2.1)
       FSharp.Core (>= 3.1.2.5)
     FSharp.Charting (0.90.14)
@@ -164,10 +164,10 @@ NUGET
       FSharp.Core (>= 3.1.2.1)
       Fuchu (>= 1.0.3)
       PerfUtil (>= 0.1.8)
-    Hopac (0.3.7)
+    Hopac (0.3.13)
       FSharp.Core (>= 3.1.2.5)
-    Http.fs (3.0.7)
+    Http.fs (4.0.2)
       FSharp.Core (>= 3.1.2.5)
-      Hopac (>= 0.3.4)
+      Hopac (>= 0.3.13)
     PerfUtil (0.1.8)
     WebSocketSharp (1.0.3-rc11)

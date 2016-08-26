@@ -39,7 +39,7 @@ module Writers =
   let setHeader key value (ctx : HttpContext) =
     let headers' =
       (key, value)
-      :: (ctx.response.headers |> List.filter (fst >> String.equalsCaseInsensitve key >> not))
+      :: (ctx.response.headers |> List.filter (fst >> String.equalsCaseInsensitive key >> not))
 
     { ctx with response = { ctx.response with headers = headers' } }
     |> succeed
@@ -51,7 +51,7 @@ module Writers =
           [key, value]
 
         | (existingKey, existingValue) :: hs
-          when String.equalsCaseInsensitve key existingKey ->
+          when String.equalsCaseInsensitive key existingKey ->
           // Deliberately side-stepping lowercase-uppercase and just doing a F# (=)
           // compare.
           // This can be changed via PR/discussion.
@@ -818,7 +818,7 @@ module CORS =
 
     | InclusiveOption.Some uris ->
       uris
-      |> List.exists (String.equalsCaseInsensitve value)
+      |> List.exists (String.equalsCaseInsensitive value)
 
   let private setMaxAgeHeader config =
     match config.maxAge with

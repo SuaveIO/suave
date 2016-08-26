@@ -333,7 +333,7 @@ module Http =
 
     member x.header key =
       // Field names are case-insensitive (RFC 2616 section 4.2)
-      getFirstCaseInsensitve x.headers key
+      getFirstCaseInsensitive x.headers key
 
     member x.form =
       Parsing.parseData (ASCII.toString x.rawForm)
