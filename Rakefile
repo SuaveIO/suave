@@ -250,7 +250,7 @@ desc 'create suave nuget with .NET Core'
 task :nugets_with_netcore => [:nugets, 'dotnetcli:do_netcorepackage', 'dotnetcli:merge']
 
 desc 'compile, gen versions, test and create nuget'
-task :appveyor => [:compile, :'tests:unit'] # disable .Net Core-exitcode-1, :nugets_with_netcore]
+task :appveyor => [:compile, :'tests:unit', :nugets_with_netcore]
 
 desc 'compile, gen versions, test'
 task :default => [:compile, :'tests:unit', :'docs:build']
