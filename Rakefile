@@ -28,7 +28,7 @@ end
 
 desc "Restore paket.exe"
 task :restore_paket do
-  system 'tools/paket.bootstrapper.exe', clr_command: true unless
+  system 'tools/paket.bootstrapper.exe', 'prerelease', clr_command: true unless
     File.exists? 'tools/paket.exe'
 end
 
