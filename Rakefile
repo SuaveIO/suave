@@ -33,6 +33,7 @@ task :restore_paket do
 end
 
 task :paket_restore do
+  system 'tools/paket.exe', 'update', clr_command: true
   system 'tools/paket.exe', 'restore', clr_command: true
   system 'tools/paket.exe', %w|restore group Build|, clr_command: true
 end
