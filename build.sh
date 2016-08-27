@@ -23,6 +23,9 @@ then
 fi
 
 echo 'Restoring nugets'
+run tools/paket.exe update 
+
+echo 'Restoring nugets'
 run tools/paket.exe restore
 
 echo 'Building'
