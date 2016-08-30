@@ -349,6 +349,20 @@ module Filters =
       | Bytes bs -> bs.Length
       | _ -> 0)
 
+  let logFormatStructured (ctx : HttpContext) =
+    let fieldList : (string*obj) list = [
+      "clientIp", box ctx.clientIpTrustProxy
+      "processId", box (System.Diagnostics.Process.GetCurrentProcess().Id.ToString())
+      "userName", box (match Map.tryFind "userName" ctx.userState with Some x -> x :?> string | None -> "-")
+      "utcNow", box DateTime.UtcNow
+      "requestMethod", box (ctx.request.``method``)
+      "requestUrlPath", box (ctx.request.url.AbsolutePath)
+      "httpVersion", box ctx.request.httpVersion
+      "httpStatusCode", box ctx.response.status.code
+      "responseContentLength", box (match ctx.response.content with | Bytes bs -> bs.Length | _ -> 0)
+    ]
+    "{clientIp} {processId} {userName} [{utcNow:dd/MMM/yyyy:hh:mm:ss %K}] \"{requestMethod} {requestUrlPath} {httpVersion}\" {httpStatusCode} {responseContentLength}", fieldList |> Map
+
   let logWithLevel (level : LogLevel) (logger : Logger) (formatter : HttpContext -> string) (ctx : HttpContext) =
     logger.log level <| fun _ ->
       { value         = Event (formatter ctx)
@@ -358,6 +372,20 @@ module Filters =
         timestamp     = Suave.Logging.Global.timestamp() }
 
     succeed ctx
+
+  let logWithLevelStructured (level : LogLevel) (logger : Logger) (templateAndFieldsCreator : HttpContext -> (string * Map<string,obj>)) (ctx : HttpContext) =
+    logger.log level <| fun _ ->
+      let template, fields = templateAndFieldsCreator ctx
+      { value         = Event template
+        level         = level
+        name          = [| "Suave"; "Http"; "requests" |]
+        fields        = fields
+        timestamp     = Suave.Logging.Global.timestamp() }
+
+    succeed ctx
+
+  let logStructured (logger : Logger) (structuredFormatter : HttpContext -> (string * Map<string,obj>)) =
+    logWithLevelStructured LogLevel.Debug logger structuredFormatter
 
   let log (logger : Logger) (formatter : HttpContext -> string) =
     logWithLevel LogLevel.Debug logger formatter
