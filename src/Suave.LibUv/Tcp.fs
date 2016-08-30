@@ -31,7 +31,7 @@ type SingleThreadSynchronizationContext(loop, runOnThisThreadHandler) =
 
   [<DefaultValue>] val mutable running : bool
   [<DefaultValue>] val mutable uv_handle_cb : uv_handle_cb
- 
+
   member this.Post(d : SendOrPostCallback, state : obj) =
     if (d = null) then
       raise( ArgumentNullException("d"))
@@ -104,7 +104,7 @@ type WriteOp() =
 
   member this.writeEnd (request : IntPtr) (status : int) =
     Marshal.FreeCoTaskMem request
-    if (status < 0) then 
+    if (status < 0) then
       let err = new string(uv_strerror(status))
       fork(fun _ -> this.ok (Choice2Of2 <| ConnectionError err))
     else
@@ -131,7 +131,7 @@ open Suave.Logging
 
 type LibUvTransport(pool : ConcurrentPool<OperationPair>,
                     loop : IntPtr,
-                    client : Handle, 
+                    client : Handle,
                     synchronizationContext : SingleThreadSynchronizationContext,
                     logger : Logger) =
 
@@ -140,7 +140,7 @@ type LibUvTransport(pool : ConcurrentPool<OperationPair>,
   [<DefaultValue>] val mutable pin : GCHandle
 
   let (readOp,writeOp) = pool.Pop()
- 
+
   member this.closeCallback _ =
     destroyHandle client
     pool.Push (readOp,writeOp)
@@ -174,7 +174,7 @@ type LibUvTransport(pool : ConcurrentPool<OperationPair>,
       do! this.shutdown()
       do this.pin.Free()
       }
-      
+
 
 let createLibUvOpsPool maxOps =
 
@@ -257,10 +257,12 @@ type LibUvSocket(pool : ConcurrentPool<OperationPair>,
 
     let startData = { startData with socketBoundUtc = Some (Globals.utcNow()) }
     acceptingConnections.complete startData |> ignore
-    
+
     logger.info (
-      event "Listener started in {startData}"
-      >> setFieldValue "startData" startData)
+      event "Listener started in {startedListeningMilliseconds:#.###} with binding {ipAddress}:{port}"
+      >> setFieldValue "startedListeningMilliseconds" (startData.GetStartedListeningElapsedMilliseconds())
+      >> setFieldValue "ipAddress" startData.binding.ip
+      >> setFieldValue "port" startData.binding.port)
 
     uv_run(loop, UV_RUN_DEFAULT) |> checkStatus
     let x = uv_loop_close(loop)
@@ -347,7 +349,7 @@ type LibUvServer(maxConcurrentOps, bufferManager,
     uv_close(stopLoopCallbackHandle, this.uv_close_cb_loop)
     logger.info (eventX "<--" >> setSingleName "Suave.LibUv.Tcp.LibUvServer.uv_stop_loop")
 
-  member this.init() = 
+  member this.init() =
     this.thread <- new Thread(this.run)
     this.thread.Name <- "LibUvLoop"
     this.uv_close_cb_destroy <- uv_close_cb(this.destroyServerCallback)
@@ -363,7 +365,7 @@ type LibUvServer(maxConcurrentOps, bufferManager,
     this.synchronizationContext <- new SingleThreadSynchronizationContext(loop, synchronizationContextCallback)
     this.synchronizationContext.init()
 
-  member this.start() = 
+  member this.start() =
     this.thread.Start()
 
   member this.stopLoop() =

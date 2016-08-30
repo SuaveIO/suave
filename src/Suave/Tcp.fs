@@ -21,9 +21,11 @@ type StartedData =
     socketBoundUtc : DateTimeOffset option
     binding        : SocketBinding }
 
+  member x.GetStartedListeningElapsedMilliseconds() =
+    ((x.socketBoundUtc |> Option.fold (fun _ t -> t) x.startCalledUtc) - x.startCalledUtc).TotalMilliseconds
   override x.ToString() =
     sprintf "%.3f ms with binding %O:%d"
-      ((x.socketBoundUtc |> Option.fold (fun _ t -> t) x.startCalledUtc) - x.startCalledUtc).TotalMilliseconds
+      (x.GetStartedListeningElapsedMilliseconds())
       x.binding.ip x.binding.port
 
 /// Stop the TCP listener server
@@ -115,7 +117,7 @@ let job (serveClient : TcpWorker<unit>)
       Async.RunSynchronously (transport.shutdown()))
 
     do! serveClient connection
-  with 
+  with
     | :? System.IO.EndOfStreamException ->
       logger.debug (eventX "Disconnected client (end of stream)")
 
@@ -155,8 +157,10 @@ let runServer maxConcurrentOps bufferSize autoGrow (binding: SocketBinding) star
     acceptingConnections.complete startData |> ignore
 
     logger.info (
-      eventX (sprintf "Listener started in %O" startData)
-      >> setFieldValue "startData" startData
+      eventX "Listener started in {startedListeningMilliseconds:#.###} with binding {ipAddress}:{port}"
+      >> setFieldValue "startedListeningMilliseconds" (startData.GetStartedListeningElapsedMilliseconds())
+      >> setFieldValue "ipAddress" startData.binding.ip
+      >> setFieldValue "port" startData.binding.port
       >> setSingleName "Suave.Tcp.runServer")
 
     let! token = Async.CancellationToken
