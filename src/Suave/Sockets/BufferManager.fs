@@ -19,7 +19,7 @@ type BufferManager(totalBytes, bufferSize, autoGrow) =
 
   do logger.log Debug (
        Message.eventX "Initialising BufferManager with {totalBytes}"
-       >> Message.setFieldValue "size" totalBytes)
+       >> Message.setFieldValue "totalBytes" totalBytes)
 
   /// underlying list of byte arrays maintained by the Buffer Manager
   let segments = new ConcurrentBag<ArraySegment<byte>>()
