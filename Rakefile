@@ -306,6 +306,6 @@ task :docs => :'docs:build'
 
 Albacore::Tasks::Release.new :release,
                              pkg_dir: 'build/pkg',
-                             depend_on: [:compile, :nugets, :'docs:deploy'],
+                             depend_on: [:compile, :nugets_with_netcore, :'docs:deploy'],
                              nuget_exe: 'packages/build/NuGet.CommandLine/tools/NuGet.exe',
                              api_key: ENV['NUGET_KEY']
