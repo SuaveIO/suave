@@ -311,7 +311,7 @@ module internal ParsingAndControl =
           let! ctx = parseMultipartMixed fieldName subboundary { ctx with connection = connection }
           return! loop ctx
 
-        | Choice1Of2 contentType ->
+        | Choice1Of2 contentType when headerParams.ContainsKey "filename" ->
           verbosef (fun f -> f "parsing content type %s -> readFilePart" contentType)
           let! res = readFilePart boundary { ctx with connection = connection } headerParams fieldName contentType
           verbosef (fun f -> f "parsing content type %s <- readFilePart" contentType)
@@ -323,7 +323,7 @@ module internal ParsingAndControl =
           | connection, None ->
             return! loop { ctx with connection = connection }
 
-        | Choice2Of2 _ ->
+        | Choice1Of2 _ | Choice2Of2 _ ->
           use mem = new MemoryStream()
           let! a, connection =
             readUntil (ASCII.bytes(eol + boundary)) (fun x y -> async {
