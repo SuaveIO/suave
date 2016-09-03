@@ -17,6 +17,18 @@ type WebPart = HttpContext -> Async<HttpContext option>
 
 This function has a single parameter of type `HttpContext`. This is an F# record type that includes the HTTP request, the HTTP response, and a few other things. This should be pretty familiar to anyone who has done any web programming before.
 
+Here are a few examples of actions written this way.
+
+{% highlight fsharp %}
+
+let MyNoInputAction : WebPart =
+  OK "some string content"
+
+let MyInputAction (var1 : string, var2 int) -> WebPart =
+  OK (sprintf "var1=%s var2=%i" var1 var2)
+
+{% endhighlight %}
+
 A WebPart function returns an asynchronous workflow which itself ultimately returns an `HttpContext option`. Asynchronous workflows are hopefully already somewhat familiar. The `HttpContext option` returned by the asynchronous workflow is either `Some HttpContext` record or `None`, and it is the option that is used to determine routing. Here is a web server with some simple routing logic. You can ignore the `>=>` operator and the exact workings of `choose` for now (both are explained in more detail later), just focus on the tree-like structure of the code:
 
 {% highlight fsharp %}        
@@ -39,7 +51,54 @@ startWebServer defaultConfig app
 
 By using `choose` we execute different logic depending on whether the request was a GET or a POST, and depending on whether the url was /hello or /goodbye. If a request matches a given path in the decision tree, `choose` will return `Some HttpContext`, if it doesn't, `choose` will return `None`. The end result is that when someone makes a request the server will walk down this tree looking for the first part that returns `Some HttpContext`, and then return it to the client. If no part of the tree returns `Some HttpContext` then the result is an exception. You can can also add a default route which returns a 404 page.
 
-The server won't evalute the entire data structure for every request, only the actual decisions, so there is no need to be concerned about performance.
+The server won't evaluate the entire data structure for every request, only the actual decisions, so there is no need to be concerned about performance.
+
+## Handling Route Inputs
+
+Here is how you can extract a route input
+
+{% highlight fsharp %}        
+open Suave
+open Suave.Filters
+open Suave.Operators
+open Suave.Successful
+
+let sayHello (name : string) : WebPart =
+  OK (sprintf "Hello %s" name)
+
+let app =
+  choose
+    [ GET >=> choose
+        [ pathScan "/hello/%s" sayHello]]
+
+startWebServer defaultConfig app
+{% endhighlight %}
+
+## Handling Form Post data
+
+Here's how you can access form post data
+
+{% highlight fsharp %}        
+open Suave
+open Suave.Filters
+open Suave.Operators
+open Suave.Successful
+
+let sayHello : WebPart = request (fun req ->
+  let name = match (req.formData "name") with
+              | Choice1Of2 t -> t
+              | Choice2Of2 t -> "World"
+  OK (sprintf "Hello %s" name)
+  )
+
+
+let app =
+  choose
+    [ POST >=> choose
+        [ path "/hello" >=> sayHello]]
+
+startWebServer defaultConfig app
+{% endhighlight %}
 
 ## Handling Errors
 
