@@ -49,6 +49,9 @@ the function call, until you cancel the `Async.DefaultCancellationToken`. If you
 want to handle disposal of the async yourself, have a look at
 `startWebServerAsync`.
 
+To test the above yourself, paste that code in `Hello.fsx` and then invoke it
+with `fsharpi Hello.fsx` (or `fsi Hello.fsx` on Windows).
+
 In suave, we have opted to write a lot of documentation inside the code; so just
 hover the function in your IDE or use an assembly browser to bring out the XML
 docs. You can also browse [our API reference](/Suave.html).
