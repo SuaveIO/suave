@@ -1060,6 +1060,10 @@ module Filters =
   /// Match on the protocol being HTTPS
   val isSecure : WebPart
 
+  /// Ensure the query-string parameter exists (it exists even if it does
+  /// not have a value associated with it.)
+  val hasFlag : flag:string -> WebPart
+
   /// Applies the regex to the path and matches on the result
   val pathRegex : pathAfterDomainRegex:string -> WebPart
 
