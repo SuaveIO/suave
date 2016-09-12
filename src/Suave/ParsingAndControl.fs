@@ -239,6 +239,15 @@ module internal ParsingAndControl =
       return connection, None
     }
 
+  let parseEncoding partHeaders =
+    partHeaders %% "content-type"
+    |> Choice.map Parsing.headerParams
+    |> Choice.bind (fun x -> x.TryLookup "charset")
+    |> Choice.bind (function
+        | "utf-8" -> Choice1Of2 (UTF8.bytes, UTF8.toStringAtOffset)
+        | x -> Choice2Of2 x)
+    |> Choice.orDefault (ASCII.bytes, ASCII.toStringAtOffset)
+
   let parseMultipartMixed fieldName boundary (context : HttpContext) : SocketOp<HttpContext> =
     let verbose = Log.verbose context.runtime.logger "Suave.Web.parseMultipartMixed" context.request.trace
     let verbosef = Log.verbosef context.runtime.logger "Suave.Web.parseMultipartMixed" context.request.trace
@@ -268,12 +277,13 @@ module internal ParsingAndControl =
 
         | Choice2Of2 _ ->
           use mem = new MemoryStream()
+          let bytes, toStringAtOffset = parseEncoding partHeaders
           let! a, connection =
-            readUntil (ASCII.bytes(eol + boundary)) (fun x y -> async {
+            readUntil (bytes(eol + boundary)) (fun x y -> async {
                 do! mem.AsyncWrite(x.Array, x.Offset, y)
               }) connection
           let byts = mem.ToArray()
-          return! loop { ctx with request = { ctx.request with multiPartFields = (fieldName, ASCII.toStringAtOffset byts 0 byts.Length)::(ctx.request.multiPartFields) }; connection = connection}
+          return! loop { ctx with request = { ctx.request with multiPartFields = (fieldName, toStringAtOffset byts 0 byts.Length)::(ctx.request.multiPartFields) }; connection = connection}
       else
         return { ctx with connection = connection }
       }
@@ -325,12 +335,13 @@ module internal ParsingAndControl =
 
         | Choice1Of2 _ | Choice2Of2 _ ->
           use mem = new MemoryStream()
+          let bytes, toStringAtOffset = parseEncoding partHeaders
           let! a, connection =
-            readUntil (ASCII.bytes(eol + boundary)) (fun x y -> async {
+            readUntil (bytes(eol + boundary)) (fun x y -> async {
                 do! mem.AsyncWrite(x.Array, x.Offset, y)
               }) connection
           let byts = mem.ToArray()
-          let fields = (fieldName, ASCII.toStringAtOffset byts 0 byts.Length) :: ctx.request.multiPartFields
+          let fields = (fieldName, toStringAtOffset byts 0 byts.Length) :: ctx.request.multiPartFields
           return! loop { ctx with request = { ctx.request with multiPartFields = fields }
                                   connection = connection }
       }
