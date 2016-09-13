@@ -264,6 +264,15 @@ type ConnectionFacade(ctx) =
       return None
     }
 
+  let parseMultipartEncoding partHeaders =
+    partHeaders %% "content-type"
+    |> Choice.map Parsing.headerParams
+    |> Choice.bind (fun x -> x.TryLookup "charset")
+    |> Choice.bind (function
+        | "utf-8" -> Choice1Of2 (UTF8.bytes, UTF8.toStringAtOffset)
+        | x -> Choice2Of2 x)
+    |> Choice.orDefault (ASCII.bytes, ASCII.toStringAtOffset)
+
   let parseMultipartMixed fieldName boundary : SocketOp<unit> =
     let rec loop = socket {
       let! firstLine = readLine
@@ -299,12 +308,13 @@ type ConnectionFacade(ctx) =
 
         | Choice2Of2 _ ->
           use mem = new MemoryStream()
+          let bytes, toStringAtOffset = parseMultipartEncoding partHeaders
           let! a =
-            readUntil (ASCII.bytes(eol + boundary)) (fun x y -> async {
+            readUntil (bytes(eol + boundary)) (fun x y -> async {
                 do! mem.AsyncWrite(x.Array, x.Offset, y)
               })
           let byts = mem.ToArray()
-          multiPartFields.Add (fieldName, ASCII.toStringAtOffset byts 0 byts.Length)
+          multiPartFields.Add (fieldName, toStringAtOffset byts 0 byts.Length)
           return! loop
       }
     loop
@@ -353,12 +363,13 @@ type ConnectionFacade(ctx) =
 
         | Choice1Of2 _ | Choice2Of2 _ ->
           use mem = new MemoryStream()
+          let bytes, toStringAtOffset = parseMultipartEncoding partHeaders
           let! a =
-            readUntil (ASCII.bytes (eol + boundary)) (fun x y -> async {
+            readUntil (bytes (eol + boundary)) (fun x y -> async {
               do! mem.AsyncWrite(x.Array, x.Offset, y)
             })
           let byts = mem.ToArray()
-          multiPartFields.Add(fieldName, ASCII.toStringAtOffset byts 0 byts.Length)
+          multiPartFields.Add(fieldName, toStringAtOffset byts 0 byts.Length)
           return ()
       }
 
