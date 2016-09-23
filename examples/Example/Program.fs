@@ -89,7 +89,7 @@ module OwinSample =
       responseStream.Write(hello, 0, hello.Length)
       async.Return ()
 
-    OwinApp.ofApp "/" owinApp
+    (OwinApp.ofApp "/" owinApp =>= RequestErrors.NOT_FOUND "File not found")
 
 let unzipBody : WebPart =
   fun ctx -> WebPart.asyncOption {
