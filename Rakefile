@@ -103,7 +103,7 @@ namespace :dotnetcli do
   end
 
   task :coreclr_binaries => 'tools/coreclr' do
-    dotnet_version = '1.0.0-preview2-003121'
+    dotnet_version = '1.0.0-preview2-003131'
     dotnet_installed_version = get_installed_dotnet_version
     # check if required version of .net core sdk is already installed, otherwise download and install it
     if dotnet_installed_version == dotnet_version then
