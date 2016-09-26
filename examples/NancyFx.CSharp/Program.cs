@@ -1,6 +1,8 @@
-﻿using Suave;
-using Nancy;
+﻿using Nancy;
 using Nancy.Owin;
+using System;
+using Microsoft.FSharp.Core;
+using Microsoft.FSharp.Control;
 
 namespace Suave.NancyFx
 {
@@ -17,7 +19,7 @@ namespace Suave.NancyFx
         public static int Main(string[] args)
         {
             var opts = new NancyOptions();
-            var app = Suave.Owin.OwinAppModule.OfMidFunc("/", NancyMiddleware.UseNancy(opts));
+            var app = Owin.OwinAppModule.OfMidFunc("/", NancyMiddleware.UseNancy(opts));
             Web.startWebServer(Web.defaultConfig, app);
             return 0;
         }

@@ -317,7 +317,6 @@ module OwinApp =
       (fun x ->
         box x),
       (fun x ->
-        //failwithf "converting %s to %s" (x.GetType().Name) (typeof<'t>.Name)
         unbox x)
 
     let boundAddresses : Property<HttpContext, IList<IDictionary<string, obj>>> =
@@ -649,7 +648,7 @@ module OwinApp =
 
     interface IDictionary<string, obj> with
       member x.Remove k =
-        invalidOp "Remove not supported"
+        owinRW.Remove k || (if (!state).userState.ContainsKey k then state := { !state with userState = (!state).userState.Remove k}; true else false)
 
       member x.Item
         with get key =
@@ -709,9 +708,7 @@ module OwinApp =
         |> Seq.map (fun key -> KeyValuePair(key, (x :> IDictionary<_, _>).[key]))
         |> fun seq -> (seq :> IEnumerable).GetEnumerator()
 
-  let FALLBACK_KEY = "__suave.fallback"
-
-  let runOwin requestPathBase (owin : OwinApp) cont = 
+  let runOwin requestPathBase (owin : OwinApp) (cont : WebPart) = 
     fun (ctx : HttpContext) ->
 
       let verbose message =
@@ -741,41 +738,35 @@ module OwinApp =
 
         let ctx = wrapper.finalise()
 
-        return! cont wrapper { ctx with request = { ctx.request with url = originalUrl }}
-      }
-  
-  // Simple logic for now. If headers were sent lets asume the middleware did handle the request.
-  let simpleLogic (wrapper: OwinContext)= 
-    fun ctx ->
-    async {
-      if wrapper.HeadersSent then
-        let request = 
-          if wrapper.CloseConnection then
-            { ctx.request with headers = [ "connection", "close" ] } 
-          else
-            ctx.request
-        let response = { ctx.response with content = NullContent; writePreamble = false }
-        return Some { ctx with response = response; request = request  }
-      else
-        return None
-    }
+        let ctx = { ctx with request = { ctx.request with url = originalUrl }}
 
-  let identity (wrapper: OwinContext)= 
-    fun ctx ->
-    async {
-      return Some ctx
-    }
+        //return! cont wrapper ctx
+
+        if wrapper.HeadersSent then
+          let request = 
+            if wrapper.CloseConnection then
+              { ctx.request with headers = [ "connection", "close" ] } 
+            else
+              ctx.request
+          let response = { ctx.response with content = NullContent; writePreamble = false }
+          return Some { ctx with response = response; request = request  }
+        else
+          if ctx.response.status.code <> HttpCode.HTTP_404.code then
+            return Some ctx
+          else
+            return! cont ctx
+      }
 
   [<CompiledName "OfAppWithContinuation">]
-  let ofAppWithContinuation (requestPathBase : string) (owin : OwinApp) cont : WebPart =
-    Filters.pathStarts requestPathBase >=> runOwin requestPathBase owin cont
+  let ofAppWithContinuation (requestPathBase : string) (owin : OwinApp) cont =
+    runOwin requestPathBase owin cont
 
   [<CompiledName "OfApp">]
   let ofApp (requestPathBase : string) (owin : OwinApp) : WebPart =
-    ofAppWithContinuation requestPathBase owin simpleLogic
+    ofAppWithContinuation requestPathBase owin (RequestErrors.NOT_FOUND "File not found")
 
   [<CompiledName "OfAppFunc">]
-  let ofAppFunc requestPathBase (owin : OwinAppFunc) =
+  let ofAppFunc requestPathBase (owin : OwinAppFunc) : WebPart =
     ofApp requestPathBase (fun env -> Async.AwaitTask (owin.Invoke env))
 
   [<CompiledName "OfMidFuncWithNext">]
@@ -785,7 +776,7 @@ module OwinApp =
   [<CompiledName "OfMidFunc">]
   let ofMidFunc requestPathBase (owin : OwinMidFunc) =
     let appFunc = owin.Invoke(fun env -> Task.FromResult(false) :> Task)
-    ofAppWithContinuation requestPathBase (fun env -> async{ do! appFunc.Invoke env}) identity
+    ofAppWithContinuation requestPathBase (fun env -> async{ do! appFunc.Invoke env}) (RequestErrors.NOT_FOUND "File not found")
 
 open Suave.Web
 

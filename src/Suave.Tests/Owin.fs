@@ -267,8 +267,7 @@ let owinEndToEnd cfg =
   let composedApp =
     path "/owin"
       >=> setHeader "X-Custom-Before" "Before OWIN"
-      >=> OwinApp.ofApp "/" owinHelloWorld
-      >=> setHeader "X-Custom-After" "After OWIN"
+      >=> (OwinApp.ofApp "/" owinHelloWorld >=> setHeader "X-Custom-After" "After OWIN")
 
   testList "e2e" [
     testCase "Hello, OWIN!" <| fun _ ->
@@ -428,7 +427,7 @@ let owinEndToEnd cfg =
         async.Return (Some ctx)
 
       let composedApp =
-        pathRegex "/owin(/.+)*" >=> OwinApp.ofAppWithContinuation "/owin" ok OwinApp.identity >=> postCondition
+        pathRegex "/owin(/.+)*" >=> (OwinApp.ofAppWithContinuation "/owin" ok (fun ctx -> async { return Some ctx }) >=> postCondition)
 
       let asserts (result : HttpResponseMessage) =
         eq "Http Status Code" HttpStatusCode.OK result.StatusCode
@@ -450,13 +449,13 @@ let owinEndToEnd cfg =
         async.Return ()
 
       let composedApp =
-        pathScan "/owin/%s" (fun path -> OwinApp.ofApp "/" (fun env -> async {
+        pathScan "/owin/%s" (fun path -> (OwinApp.ofApp "/" (fun env -> async {
           env.[OwinConstants.requestPathBase] <- box "/owin"
           env.[OwinConstants.requestPath] <- box ("/" + path)
           do! ok env
           env.[OwinConstants.requestPathBase] <- box ""
           env.[OwinConstants.requestPath] <- box ("/owin/" + path)
-          })
+          }))
         )
 
       let asserts (result : HttpResponseMessage) =

@@ -38,7 +38,7 @@ module HttpOutput =
     do! writeContentType r.headers
     }
 
-  let inline writeContent context = function
+  let inline writeContent writePreamble context = function
     | Bytes b -> socket {
       let connection = context.connection
       let! (encoding, content : byte []) = Compression.transform b context connection
@@ -68,7 +68,15 @@ module HttpOutput =
     | SocketTask f -> socket {
         return! f (context.connection, context.response)
       }
-    | NullContent -> socket { return context.connection }
+    | NullContent -> socket {
+        if writePreamble then
+          let! (_, connection) = asyncWriteLn (String.Concat [| "Content-Length: 0"; Bytes.eol |]) context.connection
+          let! connection = flush connection
+          return connection
+        else
+          let! connection = flush context.connection
+          return connection
+           }
 
   let inline executeTask ctx r errorHandler = async {
     try
@@ -87,10 +95,10 @@ module HttpOutput =
       | Some newCtx ->
         if newCtx.response.writePreamble then
           let! (_, connection) = writePreamble ["server";"date";"content-length"] newCtx newCtx.connection
-          let! connection = writeContent { newCtx with connection = connection } newCtx.response.content
+          let! connection = writeContent true { newCtx with connection = connection } newCtx.response.content
           return Some { newCtx with connection = connection }
         else
-          let! connection =  writeContent newCtx newCtx.response.content
+          let! connection =  writeContent false newCtx newCtx.response.content
           return Some { newCtx with connection = connection }
 
       | None ->
