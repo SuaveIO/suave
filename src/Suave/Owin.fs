@@ -726,8 +726,6 @@ module OwinApp =
         |> Seq.map (fun key -> KeyValuePair(key, (x :> IDictionary<_, _>).[key]))
         |> fun seq -> (seq :> IEnumerable).GetEnumerator()
 
-  let FALLBACK_KEY = "__suave.fallback"
-
   let runOwin requestPathBase (owin : OwinApp) (cont : OwinContext -> OwinPart) = 
     fun (ctx : HttpContext) ->
 
