@@ -25,7 +25,7 @@ module Suave.Tests.OwinContentLength
     responseStream.Write(hello, 0, hello.Length)
     async.Return ()
 
-  let app = OwinApp.ofApp "/" owinHelloWorld  =>= RequestErrors.NOT_FOUND "File not found"
+  let app = OwinApp.ofApp "/" owinHelloWorld
 
   [<Tests>]
   let tests (cfg : SuaveConfig) =

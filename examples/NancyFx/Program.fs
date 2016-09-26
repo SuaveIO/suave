@@ -22,6 +22,6 @@ module Program =
   [<EntryPoint>]
   let main argv =
     let opts = new NancyOptions()
-    let app = OwinApp.ofMidFunc "/" (NancyMiddleware.UseNancy(opts))  =>= RequestErrors.NOT_FOUND "File not found"
+    let app = OwinApp.ofMidFunc "/" (NancyMiddleware.UseNancy(opts))
     startWebServer defaultConfig app
     0

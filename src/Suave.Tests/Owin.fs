@@ -224,7 +224,7 @@ let owinUnit cfg =
           stream.WriteAsync(content, 0, content.Length) |> Async.AwaitTask
 
         let composedApp =
-          path "/owin" >=> (OwinApp.ofApp "/" misbehaving =>= RequestErrors.NOT_FOUND "File not found")
+          path "/owin" >=> OwinApp.ofApp "/" misbehaving
 
         let asserts (result : HttpResponseMessage) =
           eq "Http Status Code" HttpStatusCode.OK result.StatusCode
@@ -267,7 +267,7 @@ let owinEndToEnd cfg =
   let composedApp =
     path "/owin"
       >=> setHeader "X-Custom-Before" "Before OWIN"
-      >=> (OwinApp.ofApp "/" owinHelloWorld =>= setHeader "X-Custom-After" "After OWIN")
+      >=> (OwinApp.ofApp "/" owinHelloWorld >=> setHeader "X-Custom-After" "After OWIN")
 
   testList "e2e" [
     testCase "Hello, OWIN!" <| fun _ ->
@@ -302,7 +302,7 @@ let owinEndToEnd cfg =
         async.Return ()
 
       let composedApp =
-        OwinApp.ofApp "/" noContent =>= RequestErrors.NOT_FOUND "File not found"
+        OwinApp.ofApp "/" noContent
 
       let asserts (result : HttpResponseMessage) =
         eq "Http Status Code" HttpStatusCode.NoContent result.StatusCode
@@ -321,7 +321,7 @@ let owinEndToEnd cfg =
         async.Return ()
 
       let composedApp =
-        OwinApp.ofApp "/" noContent  =>= RequestErrors.NOT_FOUND "File not found"
+        OwinApp.ofApp "/" noContent
 
       let asserts (result : HttpResponseMessage) =
         eq "Http Status Code" HttpStatusCode.NoContent result.StatusCode
@@ -339,7 +339,7 @@ let owinEndToEnd cfg =
         async.Return ()
 
       let composedApp =
-        OwinApp.ofApp "/" noContent  =>= RequestErrors.NOT_FOUND "File not found"
+        OwinApp.ofApp "/" noContent
 
       let asserts (result : HttpResponseMessage) =
         eq "Http Status Code" HttpStatusCode.NoContent result.StatusCode
@@ -358,7 +358,7 @@ let owinEndToEnd cfg =
         ))
 
       let composedApp =
-        OwinApp.ofMidFunc "/" noContent  =>= RequestErrors.NOT_FOUND "File not found"
+        OwinApp.ofMidFunc "/" noContent
 
       let asserts (result : HttpResponseMessage) =
         eq "Http Status Code" HttpStatusCode.NoContent result.StatusCode
@@ -396,7 +396,7 @@ let owinEndToEnd cfg =
         ))
 
       let composedApp =
-        OwinApp.ofAppFunc "/" (basicAuthMidFunc.Invoke(noContent))  =>= RequestErrors.NOT_FOUND "File not found"
+        OwinApp.ofAppFunc "/" (basicAuthMidFunc.Invoke(noContent))
 
       let asserts (result : HttpResponseMessage) =
         eq "Http Status Code" HttpStatusCode.NoContent result.StatusCode
@@ -427,7 +427,7 @@ let owinEndToEnd cfg =
         async.Return (Some ctx)
 
       let composedApp =
-        pathRegex "/owin(/.+)*" >=> (OwinApp.ofAppWithContinuation "/owin" ok OwinApp.identity =>= postCondition)
+        pathRegex "/owin(/.+)*" >=> (OwinApp.ofAppWithContinuation "/owin" ok (fun ctx -> async { return Some ctx }) >=> postCondition)
 
       let asserts (result : HttpResponseMessage) =
         eq "Http Status Code" HttpStatusCode.OK result.StatusCode
@@ -455,7 +455,7 @@ let owinEndToEnd cfg =
           do! ok env
           env.[OwinConstants.requestPathBase] <- box ""
           env.[OwinConstants.requestPath] <- box ("/owin/" + path)
-          })  =>= RequestErrors.NOT_FOUND "File not found" )
+          }))
         )
 
       let asserts (result : HttpResponseMessage) =

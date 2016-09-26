@@ -58,7 +58,7 @@ module SelfHostedServer =
     printfn "w00t"
 
     let app =
-      OwinApp.ofAppFunc "/" (OwinAppFunc.ofFreya routes)  =>= RequestErrors.NOT_FOUND "File not found"
+      OwinApp.ofAppFunc "/" (OwinAppFunc.ofFreya routes)
 
     let config =
       { defaultConfig with

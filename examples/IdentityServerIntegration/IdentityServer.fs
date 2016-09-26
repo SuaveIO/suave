@@ -65,7 +65,7 @@ module IdentityServer =
   let webApp =
     choose [
       path "/hello" >=> OK "Hello!"
-      securityMiddleware =>= RequestErrors.NOT_FOUND "File not found."
+      securityMiddleware
     ]
 
   [<EntryPoint>]
