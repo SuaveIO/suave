@@ -72,25 +72,27 @@ module Http =
   type HttpCode =
     | HTTP_100 | HTTP_101
     | HTTP_200 | HTTP_201 | HTTP_202 | HTTP_203 | HTTP_204 | HTTP_205 | HTTP_206
-    | HTTP_300 | HTTP_301 | HTTP_302 | HTTP_303 | HTTP_304 | HTTP_305 | HTTP_307
-    | HTTP_400 | HTTP_401 | HTTP_402 | HTTP_403 | HTTP_404 | HTTP_405 | HTTP_406
-    | HTTP_407 | HTTP_408 | HTTP_409 | HTTP_410 | HTTP_411 | HTTP_412 | HTTP_413
-    | HTTP_422 | HTTP_428 | HTTP_429 | HTTP_414 | HTTP_415 | HTTP_416 | HTTP_417
-    | HTTP_451 | HTTP_500 | HTTP_501 | HTTP_502 | HTTP_503 | HTTP_504 | HTTP_505
+    | HTTP_300 | HTTP_301 | HTTP_302 | HTTP_303 | HTTP_304 | HTTP_305 | HTTP_306
+    | HTTP_307 | HTTP_400 | HTTP_401 | HTTP_402 | HTTP_403 | HTTP_404 | HTTP_405 
+    | HTTP_406 | HTTP_407 | HTTP_408 | HTTP_409 | HTTP_410 | HTTP_411 | HTTP_412 
+    | HTTP_413 | HTTP_422 | HTTP_426 | HTTP_428 | HTTP_429 | HTTP_414 | HTTP_415 
+    | HTTP_416 | HTTP_417 | HTTP_451 | HTTP_500 | HTTP_501 | HTTP_502 | HTTP_503 
+    | HTTP_504 | HTTP_505
 
     member x.code =
       match x with
       | HTTP_100 -> 100 | HTTP_101 -> 101 | HTTP_200 -> 200 | HTTP_201 -> 201
       | HTTP_202 -> 202 | HTTP_203 -> 203 | HTTP_204 -> 204 | HTTP_205 -> 205
       | HTTP_206 -> 206 | HTTP_300 -> 300 | HTTP_301 -> 301 | HTTP_302 -> 302
-      | HTTP_303 -> 303 | HTTP_304 -> 304 | HTTP_305 -> 305 | HTTP_307 -> 307
-      | HTTP_400 -> 400 | HTTP_401 -> 401 | HTTP_402 -> 402 | HTTP_403 -> 403
-      | HTTP_404 -> 404 | HTTP_405 -> 405 | HTTP_406 -> 406 | HTTP_407 -> 407
-      | HTTP_408 -> 408 | HTTP_409 -> 409 | HTTP_410 -> 410 | HTTP_411 -> 411
-      | HTTP_412 -> 412 | HTTP_413 -> 413 | HTTP_414 -> 414 | HTTP_415 -> 415
-      | HTTP_416 -> 416 | HTTP_417 -> 417 | HTTP_422 -> 422 | HTTP_428 -> 428
-      | HTTP_429 -> 429 | HTTP_451 -> 451 | HTTP_500 -> 500 | HTTP_501 -> 501
-      | HTTP_502 -> 502 | HTTP_503 -> 503 | HTTP_504 -> 504 | HTTP_505 -> 505
+      | HTTP_303 -> 303 | HTTP_304 -> 304 | HTTP_305 -> 305 | HTTP_306 -> 306 
+      | HTTP_307 -> 307 | HTTP_400 -> 400 | HTTP_401 -> 401 | HTTP_402 -> 402 
+      | HTTP_403 -> 403 | HTTP_404 -> 404 | HTTP_405 -> 405 | HTTP_406 -> 406 
+      | HTTP_407 -> 407 | HTTP_408 -> 408 | HTTP_409 -> 409 | HTTP_410 -> 410 
+      | HTTP_411 -> 411 | HTTP_412 -> 412 | HTTP_413 -> 413 | HTTP_414 -> 414 
+      | HTTP_415 -> 415 | HTTP_416 -> 416 | HTTP_417 -> 417 | HTTP_422 -> 422 
+      | HTTP_426 -> 426 | HTTP_428 -> 428 | HTTP_429 -> 429 | HTTP_451 -> 451 
+      | HTTP_500 -> 500 | HTTP_501 -> 501 | HTTP_502 -> 502 | HTTP_503 -> 503 
+      | HTTP_504 -> 504 | HTTP_505 -> 505
 
     member x.reason =
       match x with
@@ -109,6 +111,7 @@ module Http =
       | HTTP_303 -> "See Other"
       | HTTP_304 -> "Not Modified"
       | HTTP_305 -> "Use Proxy"
+      | HTTP_306 -> "Unused"
       | HTTP_307 -> "Temporary Redirect"
       | HTTP_400 -> "Bad Request"
       | HTTP_401 -> "Unauthorized"
@@ -129,6 +132,7 @@ module Http =
       | HTTP_416 -> "Requested Range Not Satisfiable"
       | HTTP_417 -> "Expectation Failed"
       | HTTP_422 -> "Unprocessable Entity"
+      | HTTP_426 -> "Upgrade Required"
       | HTTP_428 -> "Precondition Required"
       | HTTP_429 -> "Too Many Requests"
       | HTTP_451 -> "Unavailable For Legal Reasons"
@@ -156,6 +160,7 @@ module Http =
       | HTTP_303 -> "Object moved -- see Method and URL list"
       | HTTP_304 -> "Document has not changed since given time"
       | HTTP_305 -> "You must use proxy specified in Location to access this resource."
+      | HTTP_306 -> "Unused is a proposed extension to the HTTP/1.1 specification that is not fully specified."
       | HTTP_307 -> "Object moved temporarily -- see URI list"
       | HTTP_400 -> "Bad request syntax or unsupported method"
       | HTTP_401 -> "No permission -- see authorization schemes"
@@ -176,6 +181,7 @@ module Http =
       | HTTP_416 -> "Cannot satisfy request range."
       | HTTP_417 -> "Expect condition could not be satisfied."
       | HTTP_422 -> "The entity sent to the server was invalid."
+      | HTTP_426 -> "Upgrade Required indicates that the client should switch to a different protocol such as TLS/1.0."
       | HTTP_428 -> "You should verify the server accepts the request before sending it."
       | HTTP_429 -> "Request rate too high, chill out please."
       | HTTP_451 -> "The server is subject to legal restrictions which prevent it servicing the request"
