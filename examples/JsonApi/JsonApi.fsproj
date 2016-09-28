@@ -43,7 +43,7 @@
       <Paket>True</Paket>
       <Link>paket-files/YoLo.fs</Link>
     </Compile>
-    <Compile Include="AssemblyVersionInfo.fs" />
+    <Compile Include="AssemblyVersionInfo.fs" Condition="Exists('AssemblyVersionInfo.fs')"/>
     <Compile Include="Program.fs" />
   </ItemGroup>
   <Choose>
