@@ -635,13 +635,13 @@ module OwinApp =
         HttpContext.response_ >--> HttpResult.headers_
 
       let handleResponse  (rhs : Dictionary<string, string[]>) = 
-        let handleKey key =
-          if key = "Set-Cookie" then 
-            rhs.[key] |> Seq.map(fun v -> key,v) |> Seq.toList
-          else
+        let handleKey = function
+          | "Set-Cookie" as key -> 
+            rhs.[key] |> Seq.map (fun v -> key,v) |> Seq.toList
+          | _ as key -> 
             [key, String.concat ", " rhs.[key]]
 
-        (Seq.collect handleKey rhs.Keys |> Seq.toList)
+        Seq.collect handleKey rhs.Keys |> Seq.toList
 
       let setResponseHeaders (rhs : Dictionary<string, string[]>) =
         Lens.set respHeaders_ (handleResponse rhs)
