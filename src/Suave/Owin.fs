@@ -636,7 +636,7 @@ module OwinApp =
 
       let handleResponse  (rhs : Dictionary<string, string[]>) = 
         let handleKey = function
-          | "Set-Cookie" as key -> 
+          | Headers.Fields.Response.setCookie as key -> 
             rhs.[key] |> Seq.map (fun v -> key,v) |> Seq.toList
           | _ as key -> 
             [key, String.concat ", " rhs.[key]]

@@ -73,7 +73,7 @@ module Cookie =
 
     member x.cookies =
       x.headers
-      |> List.filter (fst >> (String.equalsOrdinalCI "Set-Cookie"))
+      |> List.filter (fst >> (String.equalsOrdinalCI Headers.Fields.Response.setCookie))
       |> List.map (snd >> String.trim)
       |> List.map parseResultCookie
       |> List.fold (fun cookies cookie ->
@@ -101,7 +101,7 @@ module Cookie =
 
   let setCookie (cookie : HttpCookie) (ctx : HttpContext) =
     let notSetCookie : string * string -> bool =
-      fst >> (String.equalsOrdinalCI "Set-Cookie" >> not)
+      fst >> (String.equalsOrdinalCI Headers.Fields.Response.setCookie >> not)
 
     let cookieHeaders =
       ctx.response.cookies
@@ -113,7 +113,7 @@ module Cookie =
     let headers' =
       cookieHeaders
       |> List.fold (fun headers header ->
-          ("Set-Cookie", header) :: headers)
+          (Headers.Fields.Response.setCookie, header) :: headers)
           (ctx.response.headers |> List.filter notSetCookie)
 
     if cookie.value.Length > 4096 then
@@ -128,7 +128,7 @@ module Cookie =
   let unsetCookie (cookieName : string) =
     let startEpoch = DateTimeOffset(1970, 1, 1, 0, 0, 1, TimeSpan.Zero) |> Some
     let stringValue = HttpCookie.toHeader { HttpCookie.createKV cookieName "x" with expires = startEpoch }
-    Writers.addHeader "Set-Cookie" stringValue
+    Writers.addHeader Headers.Fields.Response.setCookie stringValue
 
   let setPair (httpCookie : HttpCookie) (clientCookie : HttpCookie) : WebPart =
     context (fun ctx ->
