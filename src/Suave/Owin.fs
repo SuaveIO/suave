@@ -634,8 +634,17 @@ module OwinApp =
         HttpContext.request_ >--> HttpRequest.headers_,
         HttpContext.response_ >--> HttpResult.headers_
 
+      let handleResponse  (rhs : Dictionary<string, string[]>) = 
+        let handleKey = function
+          | Headers.Fields.Response.setCookie as key -> 
+            rhs.[key] |> Seq.map (fun v -> key,v) |> Seq.toList
+          | _ as key -> 
+            [key, String.concat ", " rhs.[key]]
+
+        Seq.collect handleKey rhs.Keys |> Seq.toList
+
       let setResponseHeaders (rhs : Dictionary<string, string[]>) =
-        Lens.set respHeaders_ (Seq.map (fun k -> k, String.concat ", " rhs.[k]) rhs.Keys |> Seq.toList)
+        Lens.set respHeaders_ (handleResponse rhs)
 
       let setRequestHeaders (rhs : Dictionary<string, string[]>) =
         Lens.set reqHeaders_ (Seq.map (fun k -> k, String.concat ", " rhs.[k]) rhs.Keys |> Seq.toList)

@@ -2,6 +2,11 @@
 
 /// Inspired by https://github.com/NancyFx/Nancy/blob/45860c82e4df8e2d380997ddf1d19d61400fb145/src/Nancy/RequestHeaders.cs
 module Headers =
+  module Fields =
+    module Response =
+      [<CompiledName ("SetCookie")>]
+      let [<Literal>] setCookie = "Set-Cookie"
+
   let private toLower (s:string) = s.ToLowerInvariant()
 
   /// Parse a DateTime as given in the 'Date' Header field.
