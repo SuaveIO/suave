@@ -20,74 +20,44 @@ type Node =
 let tag tag attr (contents : Node list) = Element ((tag, Array.ofList attr), contents)
 let voidTag tag attr = VoidElement (tag, Array.ofList attr)
 let text s = [Text s]
-let empty:Node list = []
 
 let emptyText = text ""
-
-let htmlAttr = tag "html"
-let html nodes = htmlAttr [ ] nodes
-
-let headAttr = tag "head"
-let head nodes = headAttr [ ] nodes
-
-let titleAttr attr s = tag "title" attr [(Text s)]
-let title = titleAttr [ ]
-
-let scriptAttr = tag "script"
-let script = scriptAttr [ ]
-
-let bodyAttr = tag "body"
-let body = bodyAttr [ ]
-
-let divAttr = tag "div"
-let div = divAttr [ ]
-
-let pAttr = tag "p"
-let p = pAttr [ ]
-
-let aAttr href attr = tag "a" (("href",href)::attr)
-let a href = aAttr href [ ]
-
-let spanAttr = tag "span"
-let span  = spanAttr [ ]
-
-let imgAttr attr = tag "img" attr empty
-let img  = imgAttr [ ]
-
-let inputAttr attr = tag "input" attr empty
-let input = inputAttr [ ]
+let html = tag "html"
+let head = tag "head"
+let title attr s = tag "title" attr [Text s]
+let script = tag "script"
+let body = tag "body"
+let div = tag "div"
+let p = tag "p"
+let a href attr = tag "a" (("href",href)::attr)
+let span = tag "span"
+let img attr = tag "img" attr []
+let input attr = tag "input" attr []
 
 // Void tags
-let linkAttr attr = voidTag "link" attr
-let link = linkAttr [ ]
-
-let metaAttr attr = voidTag "meta" attr
-let meta = metaAttr [ ]
-
-let hrAttr attr = voidTag "hr" attr
-let hr = hrAttr [ ]
-
-let brAttr attr = voidTag "br" attr
-let br = brAttr [ ]
+let link attr = voidTag "link" attr
+let meta attr = voidTag "meta" attr
+let hr attr = voidTag "hr" attr
+let br attr = voidTag "br" attr
 
 /// Example
 
 let samplePage =
-  html [
-    head [
-      title "Little HTML DSL"
-      linkAttr [ "rel", "https://instabt.com/instaBT.ico" ]
-      scriptAttr [ "type", "text/javascript"; "src", "js/jquery-2.1.0.min.js" ] []
-      scriptAttr [ "type", "text/javascript" ] (text "$().ready(function () { setup(); });" )
+  html [] [
+    head [] [
+      title [] "Little HTML DSL"
+      link [ "rel", "https://instabt.com/instaBT.ico" ]
+      script [ "type", "text/javascript"; "src", "js/jquery-2.1.0.min.js" ] []
+      script [ "type", "text/javascript" ] (text "$().ready(function () { setup(); });" )
     ]
-    body [
-      divAttr ["id","content"] [
-        p (text "Hello world.")
-        br
-        imgAttr [ "src", "http://fsharp.org/img/logo/fsharp256.png"]
+    body [] [
+      div ["id","content"] [
+        p [] (text "Hello world.")
+        br []
+        img [ "src", "http://fsharp.org/img/logo/fsharp256.png"]
       ]
     ]
- ]
+  ]
 
 /// Rendering
 
