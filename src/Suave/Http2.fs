@@ -200,9 +200,11 @@ module Http2 =
     | GoAway of uint32 * ErrorCode * byte[]
     | WindowUpdate of uint32
     | Continuation of byte[]
-    | Unknown of byte * byte[]
+//    | Unknown of byte * byte[]
 
   type PayloadDecoder = FrameHeader -> byte [] -> FramePayload
+
+  type Frame = FrameHeader * FramePayload
 
   let isPriority bs = bs &&& 0x20uy = 0x20uy
 
@@ -322,3 +324,36 @@ module Http2 =
     let payload = payloadDecoders.[int header.``type``] header payload
     return header, payload
     }
+
+  type Http2Connection =
+    member x.read() : SocketOp<Frame> = 
+      let header = { length = 1u;
+        ``type`` = 1uy;
+        flags = 1uy;
+        streamIdentifier = 1u }
+      SocketOp.mreturn (header, Continuation [||])
+
+  let http2loop (cn : Http2Connection) (consumer : WebPart) =
+    fun cx -> socket {
+      let loop = ref true
+      while !loop do
+          let! (header,payload) = cn.read()
+          match payload with
+          | Data (data, isEndStream) -> ()
+          | Headers (option, data) -> ()
+          | Priority option -> ()
+          | RstStream errorCode -> ()
+          | Settings  (ack, settings) -> ()
+          | PushPromise (streamIdentifier, headerBlockFragment) ->
+            // reserves an idle stream by associating the stream with an open stream that was initiated by the remote peer.
+            // Streams initiated by a client MUST use odd-numbered stream identifiers
+            assert (streamIdentifier % 2u = 1u)
+            ()
+          | Ping (ack, payload) -> ()
+          | GoAway (streamIdentifier, errorCode , payload) -> ()
+          | WindowUpdate windowSizeIncrement -> ()
+          | Continuation payload ->
+            // CONTINUATION frames do not result in state transitions;
+            // they are effectively part of the HEADERS or PUSH_PROMISE that they follow.
+            ()
+      }
