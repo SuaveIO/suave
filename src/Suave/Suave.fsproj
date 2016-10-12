@@ -135,14 +135,14 @@
     <Compile Include="SuaveConfig.fs" />
     <Compile Include="HttpOutput.fs" />
     <Compile Include="ConnectionFacade.fs" />
-    <Compile Include="ParsingAndControl.fs" />
-    <Compile Include="Web.fs" />
     <Compile Include="WebSocket.fs" />
     <Compile Include="Huffman\Bits.fs" />
     <Compile Include="Huffman\Table.fs" />
     <Compile Include="Huffman\Huffman.fs" />
     <Compile Include="Hpack.fs" />
     <Compile Include="Http2.fs" />
+    <Compile Include="ParsingAndControl.fs" />
+    <Compile Include="Web.fs" />
     <Compile Include="Owin.fs" />
     <Compile Include="Json.fs" />
     <Compile Include="AssemblyVersionInfo.fs" Condition="Exists('AssemblyVersionInfo.fs')" />
