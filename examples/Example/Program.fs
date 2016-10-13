@@ -45,7 +45,7 @@ let myApp =
 // typed routes
 let testApp =
   choose [
-    log logger logFormat >=> never
+    logStructured logger logFormatStructured >=> never
     pathScan "/add/%d/%d"   (fun (a,b) -> OK((a + b).ToString()))
     pathScan "/minus/%d/%d" (fun (a,b) -> OK((a - b).ToString()))
     pathScan "/divide/%d/%d" (fun (a,b) -> OK((a / b).ToString()))
@@ -195,7 +195,7 @@ let app =
           >=> OK "Doooooge"
         RequestErrors.NOT_FOUND "Found no handlers"
       ]
-    ] >=> log logger logFormat
+    ] >=> logStructured logger logFormatStructured
 
 (*
 // using Suave.OpenSSL
