@@ -13,7 +13,7 @@ GITHUB
   remote: haf/YoLo
     YoLo.fs (11023b9fcd2c1d28a7a0c0de5609647e3e1b03ce)
   remote: logary/logary
-    src/Logary.Facade/Facade.fs (6bbcf69be1712464e629499093921cf3293a6f70)
+    src/Logary.Facade/Facade.fs (a131dce06cd491e75db74b7c2467d84814d81200)
 GROUP Build
 NUGET
   remote: https://www.nuget.org/api/v2
