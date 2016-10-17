@@ -74,21 +74,23 @@ module Hpack =
 
   open Suave.Huffman
 
-  type ReadBuffer = Stream
+  type ReadBuffer = IO.MemoryStream
 
-  type HuffmanDecoding = ReadBuffer -> int -> string
+  type HuffmanDecoding = IO.MemoryStream -> int -> string
 
   type CodeInfo =
-    | EncodeInfo of RevIndex
-    | DecodeInfo of HuffmanDecoding * int
+    | EncodeInfo of (RevIndex * (int option))
+    | DecodeInfo of (HuffmanDecoding * int)
 
-  type DynamicTable (size,maxDynamicTableSize, codeInfo: CodeInfo) =
+  type Table = Entry array
+
+  type DynamicTable (codeInfo: CodeInfo, circularTable: Table,offset, numOfEntries, maxNumOfEntries, dynamicTableSize, maxDynamicTableSize) =
     member val codeInfo = codeInfo
-    member val circularTable =  Array.zeroCreate size
-    member val offset = 0 with get,set
-    member val numOfEntries  = 0 with get,set
-    member val maxNumOfEntries  = 0
-    member val dynamicTableSize = 0 with get,set
+    member val circularTable = circularTable
+    member val offset = offset with get,set
+    member val numOfEntries  = numOfEntries with get,set
+    member val maxNumOfEntries  = maxNumOfEntries with get,set
+    member val dynamicTableSize = dynamicTableSize with get,set
 
   let staticHeaderList : HeaderList = [
     (":authority", "")
@@ -226,6 +228,7 @@ module Hpack =
 
   let maxStaticTokenIndex = 51
   let maxTokenIndex = 54
+  let minTokenIx = 0
 
   let isStaticToken (token:Token) = token.index <= maxStaticTokenIndex
 
@@ -534,7 +537,7 @@ if I < 2^N - 1, encode I on N bits
     newName wbuf huff set0000 k v
 
   let getRevIndex (dynbtl : DynamicTable) : RevIndex =
-    let (EncodeInfo rev) = dynbtl.codeInfo
+    let (EncodeInfo (rev,_)) = dynbtl.codeInfo
     rev
 
   let encodeTokenHeader (wbuf : MemoryStream) size (strategy: EncodeStrategy) (first: bool) (dyntbl:DynamicTable) (hl:TokenHeaderList) =
@@ -563,3 +566,60 @@ if I < 2^N - 1, encode I on N bits
   // produce HPACK format
   let encodeHeader (strategy : EncodeStrategy) (size : int) (dyntbl : DynamicTable) (hl : HeaderList) : byte array =
     encodeHeader' strategy size dyntbl (List.map (fun (a,b) -> let c = toToken a in (c,b)) hl)
+
+  let isTableSizeUpdate (w: byte) = w &&& (byte 0xe0) = (byte 0x20)
+
+  let mask4 w = w &&& 15
+  let mask5 w = w &&& 31
+  let mask6 w = w &&& 63
+
+  let isset (x:byte) i = x &&& (1uy <<< i) <> 0uy
+
+  let decode (n:int) (w:byte) (rbuf:  MemoryStream) =
+    let rec decode' m j =
+      let b = rbuf.ReadByte()
+      let j' = j + (b &&& 0x7f)*(int (Math.Pow(float 2,float m)))
+      let m' = m + 7
+      if isset (byte b) 7 then 
+        decode' m' j' 
+      else j'
+    let p = powerArray.[n - 1]
+    if w < p then int w
+    else decode' 0 (int w)
+
+  let isSuitableSize size (dyntbl : DynamicTable) =
+    let (DecodeInfo(_,limiref)) = dyntbl.codeInfo
+    size < limiref
+
+  let renewDynamicTable size dyntbl =
+    dyntbl
+
+  let tableSizeUpdate (dyntbl : DynamicTable) (w: Byte) (rbuf:  MemoryStream) =
+    let w' = byte(mask5 (int w))
+    let size = decode 5 w' rbuf
+    if isSuitableSize size dyntbl then
+      renewDynamicTable size dyntbl
+    else
+      failwith "TooLargeTableSize"
+
+  let rec chkChange (dyntbl : DynamicTable) (rbuf : MemoryStream)(dec : DynamicTable -> MemoryStream -> HeaderList) : HeaderList =
+    let edn = rbuf.GetBuffer().Length
+    if rbuf.Position = int64 edn then
+      let w = byte (rbuf.ReadByte())
+      if isTableSizeUpdate w then
+        let dyntbl = tableSizeUpdate dyntbl w rbuf
+        chkChange dyntbl rbuf dec
+      else
+        //rewindOneByte rbuf
+        dec dyntbl rbuf
+    else
+      failwith ""
+
+  let decodeHPACK (dyntbl : DynamicTable) (inp: byte array) (dec : DynamicTable -> MemoryStream -> HeaderList) : HeaderList =
+    chkChange dyntbl (new MemoryStream(inp)) dec
+
+  let decodeSimple (dyntbl : DynamicTable) (rbuf : MemoryStream) : HeaderList = 
+    []
+
+  let decodeHeader (dyntbl : DynamicTable) (inp: byte array) : HeaderList =
+    decodeHPACK dyntbl inp decodeSimple

@@ -57,7 +57,7 @@ module HuffmanDecoding =
     | Leaf(mx, _ ) -> mx
     | Node(mx, _, _, _ ) -> mx
 
-  type Chara = None | One of byte | Two of (byte*byte)
+  type Chara = Nothing | One of byte | Two of (byte*byte)
 
   let rec step root t char bss =
     match t, char, bss with
@@ -101,3 +101,8 @@ module HuffmanDecoding =
         go (n-1) way
 
     go len (way256.[0])
+
+  let decode buf size rbuf len =
+    dec buf rbuf len
+    let reader = new StreamReader(buf)
+    reader.ReadToEnd()
