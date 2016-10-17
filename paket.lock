@@ -1,28 +1,24 @@
 FRAMEWORK: NET45
 NUGET
-  remote: https://nuget.org/api/v2
-  specs:
-    DotLiquid (1.8.0)
+  remote: https://www.nuget.org/api/v2
+    DotLiquid (1.8)
     FSharp.Core (3.1.2.5)
     Microsoft.AspNet.Razor (3.2.3)
     openssl.redist (1.0.1.25)
     RazorEngine (3.7.5)
-      Microsoft.AspNet.Razor (>= 3.0.0)
+      Microsoft.AspNet.Razor (>= 3.0)
 GITHUB
   remote: haf/YoLo
-  specs:
     YoLo.fs (0d120146e4c558b1b7cb1763161dcf33e31de22b)
 GROUP Build
 NUGET
-  remote: https://nuget.org/api/v2
-  specs:
-    NuGet.CommandLine (3.3.0)
+  remote: https://www.nuget.org/api/v2
+    NuGet.CommandLine (3.3)
 
 GROUP Docs
 FRAMEWORK: NET45
 NUGET
-  remote: https://nuget.org/api/v2
-  specs:
+  remote: https://www.nuget.org/api/v2
     Argu (1.1.3)
     FSharp.Core (4.0.0.1)
     FsLibTool (0.1.1)
@@ -34,31 +30,30 @@ NUGET
 GROUP Examples
 FRAMEWORK: NET45
 NUGET
-  remote: https://nuget.org/api/v2
-  specs:
+  remote: https://www.nuget.org/api/v2
     Aether (8.0.2)
     Arachne.Core (3.0.0-b078)
-      FParsec (>= 1.0.0 < 2.0.0)
+      FParsec (>= 1.0 < 2.0)
     Arachne.Http (3.0.0-b078)
       Arachne.Core (>= 3.0.0-b078)
       Arachne.Language (>= 3.0.0-b078)
       Arachne.Uri (>= 3.0.0-b078)
-      FParsec (>= 1.0.0 < 2.0.0)
+      FParsec (>= 1.0 < 2.0)
     Arachne.Http.Cors (3.0.0-b078)
       Arachne.Core (>= 3.0.0-b078)
       Arachne.Http (>= 3.0.0-b078)
       Arachne.Uri (>= 3.0.0-b078)
-      FParsec (>= 1.0.0 < 2.0.0)
+      FParsec (>= 1.0 < 2.0)
     Arachne.Language (3.0.0-b078)
       Arachne.Core (>= 3.0.0-b078)
-      FParsec (>= 1.0.0 < 2.0.0)
+      FParsec (>= 1.0 < 2.0)
     Arachne.Uri (3.0.0-b078)
       Arachne.Core (>= 3.0.0-b078)
-      FParsec (>= 1.0.0 < 2.0.0)
+      FParsec (>= 1.0 < 2.0)
     Arachne.Uri.Template (3.0.0-b078)
       Arachne.Core (>= 3.0.0-b078)
       Arachne.Uri (>= 3.0.0-b078)
-      FParsec (>= 1.0.0 < 2.0.0)
+      FParsec (>= 1.0 < 2.0)
     FParsec (1.0.2)
     Freya (3.0.0-b264)
       Freya.Core (>= 3.0.0-b264)
@@ -71,29 +66,29 @@ NUGET
       Freya.Recorder (>= 3.0.0-b264)
       Freya.Router (>= 3.0.0-b264)
     Freya.Core (3.0.0-b264)
-      Aether (>= 8.0.2 < 9.0.0)
+      Aether (>= 8.0.2 < 9.0)
     Freya.Lenses.Http (3.0.0-b264)
-      Aether (>= 8.0.2 < 9.0.0)
+      Aether (>= 8.0.2 < 9.0)
       Arachne.Http (>= 3.0.0-b078)
       Freya.Core (>= 3.0.0-b264)
     Freya.Lenses.Http.Cors (3.0.0-b264)
-      Aether (>= 8.0.2 < 9.0.0)
+      Aether (>= 8.0.2 < 9.0)
       Arachne.Http.Cors (>= 3.0.0-b078)
       Freya.Core (>= 3.0.0-b264)
       Freya.Lenses.Http (>= 3.0.0-b264)
     Freya.Machine (3.0.0-b264)
-      Aether (>= 8.0.2 < 9.0.0)
+      Aether (>= 8.0.2 < 9.0)
       Freya.Core (>= 3.0.0-b264)
       Freya.Recorder (>= 3.0.0-b264)
-      Hekate (>= 2.0.1 < 3.0.0)
+      Hekate (>= 2.0.1 < 3.0)
     Freya.Machine.Extensions.Http (3.0.0-b264)
-      Aether (>= 8.0.2 < 9.0.0)
+      Aether (>= 8.0.2 < 9.0)
       Arachne.Http (>= 3.0.0-b078)
       Freya.Core (>= 3.0.0-b264)
       Freya.Lenses.Http (>= 3.0.0-b264)
       Freya.Machine (>= 3.0.0-b264)
     Freya.Machine.Extensions.Http.Cors (3.0.0-b264)
-      Aether (>= 8.0.2 < 9.0.0)
+      Aether (>= 8.0.2 < 9.0)
       Arachne.Http.Cors (>= 3.0.0-b078)
       Freya.Core (>= 3.0.0-b264)
       Freya.Lenses.Http (>= 3.0.0-b264)
@@ -106,19 +101,19 @@ NUGET
       Freya.Core (>= 3.0.0-b264)
       Freya.Router (>= 3.0.0-b264)
     Freya.Recorder (3.0.0-b264)
-      Aether (>= 8.0.2 < 9.0.0)
+      Aether (>= 8.0.2 < 9.0)
       Freya.Core (>= 3.0.0-b264)
     Freya.Router (3.0.0-b264)
-      Aether (>= 8.0.2 < 9.0.0)
+      Aether (>= 8.0.2 < 9.0)
       Arachne.Http (>= 3.0.0-b078)
       Arachne.Uri.Template (>= 3.0.0-b078)
       Freya.Core (>= 3.0.0-b264)
       Freya.Lenses.Http (>= 3.0.0-b264)
       Freya.Recorder (>= 3.0.0-b264)
-      Hekate (>= 2.0.1 < 3.0.0)
+      Hekate (>= 2.0.1 < 3.0)
     FSharp.Core (4.0.0.1)
     Hekate (2.0.1)
-      Aether (>= 8.0.2 < 9.0.0)
+      Aether (>= 8.0.2 < 9.0)
     Microsoft.Owin (3.0.1)
       Owin (>= 1.0)
     Microsoft.Owin.Hosting (3.0.1)
@@ -130,32 +125,31 @@ NUGET
       Owin (>= 1.0)
     Owin (1.0)
     Topshelf (3.3.1)
-    Topshelf.FSharp (2.1.0)
-      Topshelf (>= 3.2.0)
+    Topshelf.FSharp (2.1)
+      Topshelf (>= 3.2)
 GITHUB
   remote: haf/YoLo
-  specs:
     YoLo.fs (0d120146e4c558b1b7cb1763161dcf33e31de22b)
 GROUP Tests
 FRAMEWORK: NET45
 NUGET
-  remote: https://nuget.org/api/v2
-  specs:
-    FsCheck (2.1.0)
+  remote: https://www.nuget.org/api/v2
+    FsCheck (2.1)
       FSharp.Core (>= 3.1.2.5)
     FSharp.Charting (0.90.13)
     FSharp.Core (3.1.2.5)
     Fuchu (1.0.2)
       FSharp.Core (>= 3.1.2.1)
     Fuchu.FsCheck (1.0.1)
-      FsCheck (>= 2.1.0)
+      FsCheck (>= 2.1)
       FSharp.Core (>= 3.1.2.5)
-      Fuchu (>= 1.0.1.0)
+      Fuchu (>= 1.0.1)
     Fuchu.PerfUtil (1.0.2)
       FSharp.Core (>= 3.1.2.1)
-      Fuchu (>= 1.0.2.0)
+      Fuchu (>= 1.0.2)
       PerfUtil (>= 0.1.8)
-    Http.fs-prerelease (2.4.0)
+    Http.fs-prerelease (2.4)
       FSharp.Core (>= 3.1.2.1)
+    HttpTwo (0.0.1.19)
     PerfUtil (0.1.8)
     WebSocketSharp (1.0.3-rc9)
