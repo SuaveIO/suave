@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
@@ -244,6 +244,22 @@
       <ItemGroup>
         <Reference Include="HttpFs">
           <HintPath>..\..\packages\tests\Http.fs-prerelease\lib\net40\HttpFs.dll</HintPath>
+          <Private>True</Private>
+          <Paket>True</Paket>
+        </Reference>
+      </ItemGroup>
+    </When>
+  </Choose>
+  <Choose>
+    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
+      <ItemGroup>
+        <Reference Include="HttpTwo.HPack">
+          <HintPath>..\..\packages\tests\HttpTwo\lib\net45\HttpTwo.HPack.dll</HintPath>
+          <Private>True</Private>
+          <Paket>True</Paket>
+        </Reference>
+        <Reference Include="HttpTwo">
+          <HintPath>..\..\packages\tests\HttpTwo\lib\net45\HttpTwo.dll</HintPath>
           <Private>True</Private>
           <Paket>True</Paket>
         </Reference>
