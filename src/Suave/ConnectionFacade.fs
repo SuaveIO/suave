@@ -172,7 +172,7 @@ type ConnectionFacade(ctx) =
     readUntilPattern (scanMarker marker select)
 
   /// Read a line from the stream, calling ASCII.toString on the bytes before the EOL marker
-  let readLine = socket {
+  member this.readLine = socket {
     let offset = ref 0
     let! count =
       readUntilEOL (fun a count -> async {
@@ -183,7 +183,7 @@ type ConnectionFacade(ctx) =
     return result
   }
 
-  let skipLine = socket {
+  member this.skipLine = socket {
     let offset = ref 0
     let! _ =
       readUntilEOL (fun a count -> async {
@@ -193,7 +193,7 @@ type ConnectionFacade(ctx) =
   }
 
   /// Read all headers from the stream, returning a dictionary of the headers found
-  let readHeaders =
+  member this.readHeaders =
     let rec loop headers = socket {
       let offset = ref 0
       let buf = lineBuffer
@@ -212,7 +212,7 @@ type ConnectionFacade(ctx) =
     loop []
 
   /// Read the post data from the stream, given the number of bytes that makes up the post data.
-  let readPostData  (bytes : int) select  : SocketOp<unit> =
+  member this.readPostData  (bytes : int) select  : SocketOp<unit> =
 
     let rec loop n : SocketOp<unit> =
       socket {
@@ -236,7 +236,7 @@ type ConnectionFacade(ctx) =
       }
     loop bytes
 
-  let readFilePart boundary (headerParams : Dictionary<string,string>) fieldName contentType = socket {
+  member this.readFilePart boundary (headerParams : Dictionary<string,string>) fieldName contentType = socket {
     let tempFilePath = Path.GetTempFileName()
     use tempFile = new FileStream(tempFilePath, FileMode.Truncate)
     let! a =
@@ -263,19 +263,19 @@ type ConnectionFacade(ctx) =
       return None
     }
 
-  let parseMultipartMixed fieldName boundary : SocketOp<unit> =
+  member this.parseMultipartMixed fieldName boundary : SocketOp<unit> =
     let verbose = Log.verbose logger "Suave.Web.parseMultipartMixed" trace
     let verbosef = Log.verbosef logger "Suave.Web.parseMultipartMixed" trace
 
     let rec loop = socket {
 
-      let! firstLine = readLine
+      let! firstLine = this.readLine
 
       if firstLine.Equals("--") then
         return ()
       else
 
-        let! partHeaders = readHeaders
+        let! partHeaders = this.readHeaders
 
         let! (contentDisposition : string) =
           (partHeaders %% "content-disposition")
@@ -285,7 +285,7 @@ type ConnectionFacade(ctx) =
         | Choice1Of2 contentType ->
           let headerParams = headerParams contentDisposition
           verbosef (fun f -> f "parsing content type %s -> readFilePart" contentType)
-          let! res = readFilePart boundary headerParams fieldName contentType
+          let! res = this.readFilePart boundary headerParams fieldName contentType
           verbosef (fun f -> f "parsing content type %s -> readFilePart" contentType)
 
           match res with
@@ -308,12 +308,12 @@ type ConnectionFacade(ctx) =
     loop
 
   /// Parses multipart data from the stream, feeding it into the HttpRequest's property Files.
-  let parseMultipart (boundary:string) : SocketOp<unit> =
+  member this.parseMultipart (boundary:string) : SocketOp<unit> =
     let verbosef = Log.verbosef logger "Suave.Web.parseMultipart" trace
 
     let  parsePart  = socket {
 
-        let! partHeaders = readHeaders
+        let! partHeaders = this.readHeaders
 
         let! (contentDisposition : string) =
           (partHeaders %% "content-disposition")
@@ -332,13 +332,13 @@ type ConnectionFacade(ctx) =
         match partHeaders %% "content-type" with
         | Choice1Of2 x when String.startsWith "multipart/mixed" x ->
           let subboundary = "--" + (x.Substring(x.IndexOf('=') + 1) |> String.trimStart |> String.trimc '"')
-          do! parseMultipartMixed fieldName subboundary
+          do! this.parseMultipartMixed fieldName subboundary
           let! a = skip (boundary.Length)
           return () 
 
         | Choice1Of2 contentType ->
           verbosef (fun f -> f "parsing content type %s -> readFilePart" contentType)
-          let! res = readFilePart boundary  headerParams fieldName contentType
+          let! res = this.readFilePart boundary  headerParams fieldName contentType
           verbosef (fun f -> f "parsing content type %s <- readFilePart" contentType)
 
           match res with
@@ -361,7 +361,7 @@ type ConnectionFacade(ctx) =
 
     socket {
       let mutable parsing = true
-      let! firstLine = readLine
+      let! firstLine = this.readLine
 
       assert(firstLine=boundary)
       while parsing do
@@ -380,18 +380,18 @@ type ConnectionFacade(ctx) =
     } 
 
   /// Reads raw POST data
-  let getRawPostData contentLength =
+  member this.getRawPostData contentLength =
     socket {
       let offset = ref 0
       let rawForm = Array.zeroCreate contentLength
-      do! readPostData contentLength (fun a count -> async {
+      do! this.readPostData contentLength (fun a count -> async {
           Array.blit a.Array a.Offset rawForm !offset count;
           offset := !offset + count
         })
       return rawForm
     }
 
-  let parsePostData (contentLengthHeader:Choice<string,_>) contentTypeHeader = socket {
+  member this.parsePostData (contentLengthHeader:Choice<string,_>) contentTypeHeader = socket {
 
     let verbosef = Log.verbosef logger "Suave.Web.parsePostData" trace
     let verbose = Log.verbose logger "Suave.Web.parsePostData" trace
@@ -403,7 +403,7 @@ type ConnectionFacade(ctx) =
 
       match contentTypeHeader with
       | Choice1Of2 ce when String.startsWith "application/x-www-form-urlencoded" ce ->
-        let! rawForm = getRawPostData contentLength
+        let! rawForm = this.getRawPostData contentLength
         _rawForm <- rawForm
         return Some ()
 
@@ -411,11 +411,11 @@ type ConnectionFacade(ctx) =
         let boundary = "--" + (ce |> String.substring (ce.IndexOf('=') + 1) |> String.trimStart |> String.trimc '"')
 
         verbose "parsing multipart"
-        do! parseMultipart boundary
+        do! this.parseMultipart boundary
         return Some ()
 
       | Choice1Of2 _ | Choice2Of2 _ ->
-        let! rawForm = getRawPostData contentLength
+        let! rawForm = this.getRawPostData contentLength
         _rawForm <- rawForm
         return Some ()
     | Choice2Of2 _ -> return Some ()
@@ -423,17 +423,14 @@ type ConnectionFacade(ctx) =
 
   /// Process the request, reading as it goes from the incoming 'stream', yielding a HttpRequest
   /// when done
-  member this.processRequest = socket {
+  member this.processRequest firstLine = socket {
     let verbose = Log.verbose logger "Suave.Web.processRequest" trace
-
-    verbose "reading first line of request"
-    let! firstLine = readLine
 
     let rawMethod, path, rawQuery, httpVersion = parseUrl firstLine
     let meth = HttpMethod.parse rawMethod
 
     verbose "reading headers"
-    let! headers = readHeaders
+    let! headers = this.readHeaders
 
     // Respond with 400 Bad Request as
     // per http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html
@@ -444,14 +441,13 @@ type ConnectionFacade(ctx) =
         | s -> s))
       @|! "Missing 'Host' header"
 
-
     if headers %% "expect" = Choice1Of2 "100-continue" then
       let! _ = HttpOutput.run Intermediate.CONTINUE ctx
       verbose "sent 100-continue response"
 
     if ctx.runtime.parsePostData then
       verbose "parsing post data"
-      let! a = parsePostData (headers %% "content-length") (headers %% "content-type")
+      let! _ = this.parsePostData (headers %% "content-length") (headers %% "content-type")
       ()
 
     let request =
