@@ -349,7 +349,7 @@ module Http2 =
   let maxNumbers size = size / headerSizeMagicNumber
 
   let newDynamicTable maxsize (info:CodeInfo) =
-    let maxN = 0
+    let maxN = maxNumbers maxsize
     let edn = maxN - 1
     let table = Array.create edn {size = 0; token=tokenMax; headerValue="dummyValue"}
     new DynamicTable(info,table,edn,0,maxN,0,maxsize)
