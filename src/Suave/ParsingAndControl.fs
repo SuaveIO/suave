@@ -25,8 +25,6 @@ module internal ParsingAndControl =
   open Suave.Utils.Parsing
   open Suave.Logging
 
-  let BadRequestPrefix = "__suave_BAD_REQUEST"
-
   /// Free up a list of buffers
   let inline free context connection =
     List.iter (fun (x: BufferSegment) -> connection.bufferManager.FreeBuffer (x.buffer, context)) connection.segments
@@ -47,6 +45,84 @@ module internal ParsingAndControl =
   let inline cleanResponse (ctx : HttpContext) =
     { ctx with response = HttpResult.empty }
 
+  open Http2
+  open Hpack
+
+  let http2readRequest (matchedBinding: HttpBinding) (cn2 : Http2Connection) : SocketOp<HttpRequest> = 
+    socket {
+
+      // Read headers till you get an end header
+      let loop = ref true
+      let payloads = List<byte[]>()
+      while !loop do
+        let! (header,Headers (priorityOption, bytes)) = cn2.read ()
+        payloads.Add bytes
+        loop := testEndHeader header.flags
+      // Concatenate payloads
+      let payload = Array.concat payloads
+      // A receiving endpoint reassembles the header block by concatenating its fragments and then 
+      // decompresses the block to reconstruct the header list.
+      let headerList = decodeHeader (cn2.decodeDynamicTable) (payload)
+
+      let (Choice1Of2 _method) = headerList %% ":method"
+      let (Choice1Of2 _scheme) = headerList %% ":scheme"
+      let (Choice1Of2 _path  ) = headerList %% ":path"
+      let (Choice1Of2 _host  ) = headerList %% ":authority"
+
+      let path' = if _path.StartsWith "/" then _path else "/" + _path
+
+      let url =
+        String.Concat [
+          matchedBinding.scheme.ToString(); "://"; matchedBinding.socketBinding.ToString()
+          path' ] |> Uri
+
+      let r = 
+        { httpVersion     = "HTTP/2.0"
+          url             = url
+          host            = _host
+          ``method``      = HttpMethod.parse  _method
+          headers         = []
+          rawForm         = Array.empty
+          rawQuery        = ""
+          files           = []
+          multiPartFields = []
+          trace           = TraceHeader.empty }
+
+      return r
+      }
+
+
+
+  let procQueue = new BlockingQueueAgent<HttpRequest>()
+
+  let http2queue (r:HttpRequest) =
+    Async.Start (procQueue.AsyncAdd r)
+
+  let http2writeLoop = 
+     socket {
+       while true do
+         let! a = SocketOp.ofAsync <| procQueue.AsyncGet()
+         // apply the web part .. get a response back.
+         // transform the response to http2 frames.
+         // send the frames
+         do ()
+       }
+
+  let http2Loop (ctxOuter : HttpContext) (consumer : WebPart) = 
+    let cn2 = new Http2Connection(ctxOuter.connection.transport)
+    socket {
+      // start reading frames
+      // use a different dispatcher; regular http 1.x uses a serial dispatcher (per connection)
+      // the client will send the http2 client connection preface
+      // and the server will send a potentially empty SETTINGS frame as its first frame.
+      let! (header,Settings (flag,settings)) = cn2.read ()
+      // figure out what to do with those headers
+      while true do
+        let! request = http2readRequest ctxOuter.runtime.matchedBinding cn2
+        // queue for processing
+        do http2queue request // will queue the request for processing
+      }
+
   let httpLoop (ctxOuter : HttpContext) (consumer : WebPart) =
 
     let runtime = ctxOuter.runtime
@@ -59,13 +135,59 @@ module internal ParsingAndControl =
       let verbosef = Log.verbosef runtime.logger "Suave.Web.httpLoop.loop" TraceHeader.empty
 
       verbose "-> processor"
-      let! result' = facade.processRequest
+
+      verbose "reading first line of request"
+      let! (Choice1Of2 firstLine) = facade.readLine 
+
+      if firstLine.Equals("PRI * HTTP/2.0") then
+        printfn "we have http2"
+        // read the remaining octects "\r\nSM\r\n\r\n"
+        let! a = facade.skipLine
+        let! a = facade.skipLine
+        let! a = facade.skipLine
+        //inititate http2 looop
+        let! a = http2Loop ctxOuter consumer
+        return ()
+      
+      // else regular http loop
+      let! result' = facade.processRequest firstLine
+
       verbose "<- processor"
+
       match result' with
       | Choice1Of2 result ->
         match result with
         | None -> verbose "'result = None', exiting"
         | Some ctx ->
+          // Check for Upgrade header.
+          (*
+          A server that supports HTTP/2 accepts the upgrade with a 101 (Switching Protocols) response. After the empty line 
+          that terminates the 101 response, the server can begin sending HTTP/2 frames. These frames MUST include a response
+          to the request that initiated the upgrade.
+          *)
+
+          match ctx.request.headers %% "upgrade" with
+          | Choice1Of2 "h2c" -> 
+            let! _ = HttpOutput.run Intermediate.CONTINUE ctx
+            verbose "sent 100-continue response"
+            let! a = http2Loop ctx consumer
+            return ()
+          | Choice1Of2 "h2" ->
+             // implies TLS
+            if ctx.runtime.matchedBinding.scheme <> Http.Protocol.HTTP then
+              let! _ = HttpOutput.run Intermediate.CONTINUE ctx
+              verbose "sent 100-continue response"
+              let! a = http2Loop ctx consumer
+              return ()
+             else
+               failwith "TLS required"
+          | Choice1Of2 _ -> 
+            failwith "Invalid identifier"
+          | Choice2Of2 _ -> 
+            ignore ()
+
+          // the difference is that in http2 we would queue the response (even the re-solution of the response)
+          // and will continue reading (duplex) - we need a loop reading and a loop writing parallel
           let! result'' = HttpOutput.addKeepAliveHeader ctx |> HttpOutput.run consumer
           match result'' with
           | Choice1Of2 result -> 

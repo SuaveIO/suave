@@ -55,6 +55,21 @@ module Http2 =
     | 0xd -> HTTP11Required
     | w   -> UnknownErrorCode w
 
+  let isset (x:byte) i = x &&& (1uy <<< i) <> 0uy
+  let set   (x:byte) i = x ||| (1uy <<< i)
+
+  let testEndStream x = isset x 0
+  let testAck x = isset x  0
+  let testEndHeader x = isset x  2
+  let testPadded x = isset x 3
+  let testPriority x = isset x 5
+
+  let setEndStream x = set x 0
+  let setAck x = set x 0
+  let setEndHeader x = set x 2
+  let setPadded x = set x 3
+  let setPriority x = set x 5
+
   type FrameHeader = { 
     // the length field allows payloads of up to 224224 bytes (~16MB) per frame
     length : uint32;
@@ -325,35 +340,44 @@ module Http2 =
     return header, payload
     }
 
-  type Http2Connection =
-    member x.read() : SocketOp<Frame> = 
-      let header = { length = 1u;
-        ``type`` = 1uy;
-        flags = 1uy;
-        streamIdentifier = 1u }
-      SocketOp.mreturn (header, Continuation [||])
+  open System.Collections.Concurrent
+  open System.IO
+  open Hpack
+  open Huffman.HuffmanDecoding
 
-  let http2loop (cn : Http2Connection) (consumer : WebPart) =
-    fun cx -> socket {
-      let loop = ref true
-      while !loop do
-          let! (header,payload) = cn.read()
-          match payload with
-          | Data (data, isEndStream) -> ()
-          | Headers (option, data) -> ()
-          | Priority option -> ()
-          | RstStream errorCode -> ()
-          | Settings  (ack, settings) -> ()
-          | PushPromise (streamIdentifier, headerBlockFragment) ->
-            // reserves an idle stream by associating the stream with an open stream that was initiated by the remote peer.
-            // Streams initiated by a client MUST use odd-numbered stream identifiers
-            assert (streamIdentifier % 2u = 1u)
-            ()
-          | Ping (ack, payload) -> ()
-          | GoAway (streamIdentifier, errorCode , payload) -> ()
-          | WindowUpdate windowSizeIncrement -> ()
-          | Continuation payload ->
-            // CONTINUATION frames do not result in state transitions;
-            // they are effectively part of the HEADERS or PUSH_PROMISE that they follow.
-            ()
-      }
+  // How many entries can be stored in a dynamic table?
+  let maxNumbers size = size / headerSizeMagicNumber
+
+  let newDynamicTable maxsize (info:CodeInfo) =
+    let maxN = 0
+    let edn = maxN - 1
+    let table = Array.create edn {size = 0; token=tokenMax; headerValue="dummyValue"}
+    new DynamicTable(info,table,edn,0,maxN,0,maxsize)
+
+  let newDynamicRevIndex = 
+    Array.map (fun _ -> Map.empty<HeaderValue, HIndex>) [| minTokenIx .. maxStaticTokenIndex |]
+
+  let newOtherRevIndex = Map.empty
+
+  let newrevIndex = RevIndex (newDynamicRevIndex, newOtherRevIndex)
+
+  let newDynamicTableForEncoding (maxSize:int) =
+    let kk = newrevIndex
+    let info = EncodeInfo(kk, None)
+    newDynamicTable maxSize info
+
+  let newDynamicTableForDecoding maxsiz huftmpsiz =
+    let buf = Array.zeroCreate huftmpsiz
+    let decoder = decode (new MemoryStream(buf)) huftmpsiz
+    newDynamicTable maxsiz (DecodeInfo(decoder,maxsiz))
+
+
+  type Http2Connection(transport: ITransport) =
+
+    let writeQueue = new ConcurrentQueue<Frame>()
+
+    member val encodeDynamicTable = newDynamicTableForEncoding defaultDynamicTableSize
+    member val decodeDynamicTable = newDynamicTableForDecoding defaultDynamicTableSize 4096
+
+    member x.read() : SocketOp<Frame> = 
+      readFrame transport
