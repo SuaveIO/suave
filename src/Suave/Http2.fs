@@ -55,12 +55,11 @@ module Http2 =
     | 0xd -> HTTP11Required
     | w   -> UnknownErrorCode w
 
-  let isset (x:byte) i = x &&& (1uy <<< i) <> 0uy
-  let set   (x:byte) i = x ||| (1uy <<< i)
+  open Utils.BitOperations
 
   let testEndStream x = isset x 0
-  let testAck x = isset x  0
-  let testEndHeader x = isset x  2
+  let testAck x = isset x 0
+  let testEndHeader x = isset x 2
   let testPadded x = isset x 3
   let testPriority x = isset x 5
 
@@ -278,18 +277,21 @@ module Http2 =
     // than 0 MUST be treated as a connection error
     let ack = header.flags &&& 0x1uy = 0x1uy
     let settings = ref defaultSetting
-    for i in 0 .. 6 .. payload.Length do
-      let settingIdentifier = BitConverter.ToUInt16 (payload, i)
-      let value = (BitConverter.ToUInt32 (payload, i + 2))
-      settings :=
-        match settingIdentifier with
-        | 1us -> setHeaderTableSize !settings value
-        | 2us -> setEnablePush !settings (value=1u)
-        | 3us -> setMaxConcurrentStreams !settings (Some value)
-        | 4us -> setInitialWindowSize !settings value
-        | 5us -> setMaxFrameSize !settings value
-        | 6us -> setMaxHeaderBlockSize !settings (Some value)
-        | _ -> failwith "invalid setting identifier"
+    Console.WriteLine payload.Length
+    if payload.Length > 0 then
+      for i in 0 .. 6 .. payload.Length do
+        Console.WriteLine i
+        let settingIdentifier = BitConverter.ToUInt16 (payload, i)
+        let value = (BitConverter.ToUInt32 (payload, i + 2))
+        settings :=
+          match settingIdentifier with
+          | 1us -> setHeaderTableSize !settings value
+          | 2us -> setEnablePush !settings (value=1u)
+          | 3us -> setMaxConcurrentStreams !settings (Some value)
+          | 4us -> setInitialWindowSize !settings value
+          | 5us -> setMaxFrameSize !settings value
+          | 6us -> setMaxHeaderBlockSize !settings (Some value)
+          | _ -> failwith "invalid setting identifier"
 
     Settings (ack, !settings)
 
@@ -343,16 +345,15 @@ module Http2 =
   open System.Collections.Concurrent
   open System.IO
   open Hpack
-  open Huffman.HuffmanDecoding
+  open Huffman.Decoding
 
   // How many entries can be stored in a dynamic table?
   let maxNumbers size = size / headerSizeMagicNumber
 
   let newDynamicTable maxsize (info:CodeInfo) =
     let maxN = maxNumbers maxsize
-    let edn = maxN - 1
-    let table = Array.create edn {size = 0; token=tokenMax; headerValue="dummyValue"}
-    new DynamicTable(info,table,edn,0,maxN,0,maxsize)
+    let table = Array.create maxN {size = 0; token=tokenMax; headerValue="dummyValue"}
+    new DynamicTable(info,table,maxN - 1,0,maxN,0,maxsize)
 
   let newDynamicRevIndex = 
     Array.map (fun _ -> Map.empty<HeaderValue, HIndex>) [| minTokenIx .. maxStaticTokenIndex |]
@@ -362,13 +363,12 @@ module Http2 =
   let newrevIndex = RevIndex (newDynamicRevIndex, newOtherRevIndex)
 
   let newDynamicTableForEncoding (maxSize:int) =
-    let kk = newrevIndex
-    let info = EncodeInfo(kk, None)
+    let info = EncodeInfo(newrevIndex, None)
     newDynamicTable maxSize info
 
   let newDynamicTableForDecoding maxsiz huftmpsiz =
     let buf = Array.zeroCreate huftmpsiz
-    let decoder = decode (new MemoryStream(buf)) huftmpsiz
+    let decoder = decode buf huftmpsiz
     newDynamicTable maxsiz (DecodeInfo(decoder,maxsiz))
 
 

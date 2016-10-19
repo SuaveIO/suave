@@ -1,3 +1,4 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
@@ -98,6 +99,7 @@
     <Compile Include="Utils\Parse.fs" />
     <Compile Include="Utils\CultureInfoCache.fs" />
     <Compile Include="Utils\BlockingQueueAgent.fs" />
+    <Compile Include="Utils\BitOperations.fs" />
     <Compile Include="Globals.fs" />
     <Compile Include="CookieSerialiser.fs" />
     <Compile Include="Logging\LogLevel.fs" />
@@ -142,6 +144,8 @@
     <Compile Include="Huffman\Bits.fs" />
     <Compile Include="Huffman\Table.fs" />
     <Compile Include="Huffman\Huffman.fs" />
+    <Compile Include="Huffman\Decoding.fs" />
+    <Compile Include="Huffman\Encoding.fs" />
     <Compile Include="Hpack.fs" />
     <Compile Include="Http2.fs" />
     <Compile Include="ParsingAndControl.fs" />

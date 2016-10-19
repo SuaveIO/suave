@@ -163,9 +163,18 @@ module Hpack =
   type StaticTable() =
     static member get index = staticHeaderArray.[index]
 
+  let toStaticEntry (idx:int) = StaticTable.get idx
+
+  let adj maxN x =
+    if maxN = 0 then failwith "Too small table size."
+    else
+      let ret = (x + maxN) / maxN
+      ret
+
+  let headerSize (kv : Header) = (fst kv).Length + (snd kv).Length + headerSizeMagicNumber
+
   let mkToken index shouldIndex isPseudo tokenKey =
     { index = index; shouldIndex = shouldIndex; isPseudo = isPseudo; tokenKey = tokenKey }
-
 
   let tokenAuthority                = mkToken 0  true  true ":authority"
   let tokenMethod                   = mkToken 1  true  true ":method"
@@ -360,6 +369,20 @@ module Hpack =
 
   type TokenHeaderList = TokenHeader list
 
+  let toEntry (kv:Header) : Entry =
+    {size = headerSize kv;token = toToken (fst kv); headerValue = (snd kv)}
+
+  let toDynamicEntry (dyntbl:DynamicTable) (idx:int) =
+    let maxN = dyntbl.maxNumOfEntries
+    let off = dyntbl.offset
+    let dix = adj maxN (idx + off - staticTableSize)
+    dyntbl.circularTable.[dix]
+
+  let toIndexedEntry (dyntbl:DynamicTable) (idx:int) =
+    if idx < 0 then failwith "Index overrun."
+    elif idx <= staticTableSize then toStaticEntry idx |> toEntry
+    else toDynamicEntry dyntbl idx
+
   /// encode index
 
 (*
@@ -501,11 +524,11 @@ if I < 2^N - 1, encode I on N bits
     newName wbuf huff id k v
  
   let useHuffman  = true
-
+  (*
   let adj max x =
     if max = 0 then failwith "dynamic table size is zero"
     else
-      (x + max) % max
+      (x + max) % max*)
 
   let fromHIndexToIndex (dyntbl : DynamicTable) = function
     | SIndex index -> index
@@ -569,16 +592,16 @@ if I < 2^N - 1, encode I on N bits
 
   let isTableSizeUpdate (w: byte) = w &&& (byte 0xe0) = (byte 0x20)
 
-  let mask4 w = w &&& 15
-  let mask5 w = w &&& 31
-  let mask6 w = w &&& 63
+  let mask4 w = w &&& 15uy
+  let mask5 w = w &&& 31uy
+  let mask6 w = w &&& 63uy
 
   let isset (x:byte) i = x &&& (1uy <<< i) <> 0uy
 
   let decode (n:int) (w:byte) (rbuf:  MemoryStream) =
     let rec decode' m j =
       let b = rbuf.ReadByte()
-      let j' = j + (b &&& 0x7f)*(int (Math.Pow(float 2,float m)))
+      let j' = j + (b &&& 0x7f)*(pown 2 m)
       let m' = m + 7
       if isset (byte b) 7 then 
         decode' m' j' 
@@ -595,7 +618,7 @@ if I < 2^N - 1, encode I on N bits
     dyntbl
 
   let tableSizeUpdate (dyntbl : DynamicTable) (w: Byte) (rbuf:  MemoryStream) =
-    let w' = byte(mask5 (int w))
+    let w' = mask5 w
     let size = decode 5 w' rbuf
     if isSuitableSize size dyntbl then
       renewDynamicTable size dyntbl
@@ -603,23 +626,113 @@ if I < 2^N - 1, encode I on N bits
       failwith "TooLargeTableSize"
 
   let rec chkChange (dyntbl : DynamicTable) (rbuf : MemoryStream)(dec : DynamicTable -> MemoryStream -> HeaderList) : HeaderList =
-    let edn = rbuf.GetBuffer().Length
-    if rbuf.Position = int64 edn then
+    let edn = rbuf.Length
+    if rbuf.Position <> int64 edn then
       let w = byte (rbuf.ReadByte())
       if isTableSizeUpdate w then
         let dyntbl = tableSizeUpdate dyntbl w rbuf
         chkChange dyntbl rbuf dec
       else
-        //rewindOneByte rbuf
+        rbuf.Position <- rbuf.Position - 1L
         dec dyntbl rbuf
     else
-      failwith ""
+      failwith "Header block truncated."
 
   let decodeHPACK (dyntbl : DynamicTable) (inp: byte array) (dec : DynamicTable -> MemoryStream -> HeaderList) : HeaderList =
     chkChange dyntbl (new MemoryStream(inp)) dec
 
+  let entryTokenHeader (e:Entry) : TokenHeader =
+    e.token,e.headerValue
+
+  open Utils.BitOperations
+
+  let indexed (dyntbl : DynamicTable) (w: byte) rbuf : TokenHeader =
+    let w' = unset w 7
+    // The index value of 0 is not used. It MUST be treated as a decoding error if found in an indexed header field representation.
+    assert (w <> 0uy)
+    let idx = decode 7 w' rbuf
+    toIndexedEntry dyntbl idx |> entryTokenHeader
+
+  let isIndexedName1 w = mask6 w <> 0uy
+  let isIndexedName2 w = mask4 w <> 0uy
+
+  let entryToken (e:Entry) = e.token
+
+  let dropHuffman w = unset w 7
+  let isHuffman w   = isset w 7
+
+  let extractByteString (rbuf:MemoryStream) (len:int) =
+    let sr = new StreamReader(rbuf)
+    let text = sr.ReadToEnd()
+    let result = text.Substring(0,len)
+    // rewind 
+    rbuf.Position <- rbuf.Position - (rbuf.Length - int64 len)
+    result
+
+  let decodeString (huff:bool) (decoder: HuffmanDecoding)  (rbuf:MemoryStream) (len:int) =
+    if rbuf.Length <> rbuf.Position then
+      if huff then
+        decoder rbuf len
+      else
+        extractByteString rbuf len
+    else
+      failwith "Header block truncated"
+
+  let huffmanDecoder (dyntbl : DynamicTable) = 
+    let (DecodeInfo(dec,_)) = dyntbl.codeInfo
+    dec
+
+  let headerStuff (dyntbl : DynamicTable) (rbuf:MemoryStream) =
+    let w = byte(rbuf.ReadByte())
+    let p = dropHuffman w
+    let huff = isHuffman w
+    let len = decode 7 p rbuf
+    decodeString huff (huffmanDecoder dyntbl) rbuf len
+
+  let inserIndexedName (dyntbl : DynamicTable) (w: byte) rbuf n mask =
+    let p = mask w
+    let idx = decode n p rbuf
+    let t = entryToken(toIndexedEntry dyntbl idx)
+    let v = headerStuff dyntbl rbuf
+    (t,v)
+
+  let insertNewName (dyntbl : DynamicTable) (rbuf:MemoryStream) =
+    let t = toToken (headerStuff dyntbl rbuf)
+    let v = headerStuff dyntbl rbuf
+    (t,v)
+
+  let incrementalIndexing (dyntbl : DynamicTable) (w: byte) rbuf : TokenHeader =
+    let tv =
+      if isIndexedName1 w then
+        inserIndexedName dyntbl w rbuf 6 mask6
+      else
+        insertNewName dyntbl rbuf
+    let e = toEntryToken (fst tv) (snd tv)
+    insertEntry e dyntbl
+    tv
+
+  let neverIndexing (dyntbl : DynamicTable) (w: byte) rbuf : TokenHeader =
+    failwith "neverIndexing: not implemented"
+
+  let withoutIndexing (dyntbl : DynamicTable) (w: byte) rbuf : TokenHeader =
+    failwith "withoutIndexing: not implemented"
+
+  let toTokenHeader (dyntbl : DynamicTable) (w: byte) rbuf =
+    if   isset w 7  then indexed dyntbl w rbuf
+    elif isset w 6  then incrementalIndexing dyntbl w rbuf
+    elif isset w 5  then failwith "Illegal table size update"
+    elif isset w 4  then neverIndexing dyntbl w rbuf
+    else withoutIndexing dyntbl w rbuf
+
+  open System.Collections.Generic
+
   let decodeSimple (dyntbl : DynamicTable) (rbuf : MemoryStream) : HeaderList = 
-    []
+    let list = new List<Header>()
+    while rbuf.Position <> rbuf.Length do
+      let w = byte(rbuf.ReadByte())
+      let (token,headerValue) = toTokenHeader dyntbl w rbuf
+      list.Add (token.tokenKey,headerValue)
+    Seq.toList list
 
   let decodeHeader (dyntbl : DynamicTable) (inp: byte array) : HeaderList =
     decodeHPACK dyntbl inp decodeSimple
