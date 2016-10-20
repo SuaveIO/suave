@@ -2,6 +2,7 @@
 
 module Decoding =
 
+  open System
   open System.IO
   open Bits
 
@@ -9,7 +10,7 @@ module Decoding =
 
   let rec mark i bs t =
     match i, bs, t with
-    | i, [], Leaf (None, v) -> Leaf (Some i, v)
+    | i, []     , Leaf (None, v)       -> Leaf (Some i, v)
     | i, F::tail, Node (None, n, l, r) -> Node (Some i, n, mark (i + 1) tail l,r )
     | i, T::tail, Node (None, n, l, r) -> Node (Some i, n, l, mark (i + 1) tail r )
     | _, _, _ -> failwith "error: mark"
@@ -60,9 +61,16 @@ module Decoding =
     | Node (_,_,l,_), mx, F::tail   -> step root l mx tail
     | Node (_,_,_,r), mx, T::tail   -> step root r mx tail
 
+  let rec flatten (decoder : HTree) : HTree list =
+    match decoder with
+    | Leaf (_, _) ->
+      []
+    | Node (_, _, l, r) as t ->
+      t:: (flatten l @ flatten r)
+
   let construct (decoder : HTree) : Way256 =
     let to16ways x = WayStep ((eosInfo x), (List.map (step decoder x Nothing) bits8s) |> List.toArray)
-    Array.create 256 (to16ways decoder)
+    List.map to16ways (flatten decoder) |> List.toArray
 
   let way256 : Way256 = construct (toHTree Table.huffmanTable)
 
@@ -85,7 +93,7 @@ module Decoding =
         | WayStep (Some i, _) ->
           if i <= 8 then ()
           else failwith "too long eos"
-        | WayStep (_,_) -> failwith "illegal eos"
+        | WayStep (None,_) -> failwith "illegal eos"
       else
         let w = rbuf.ReadByte()
         let way = doit way0 w
@@ -96,6 +104,5 @@ module Decoding =
   let decode (buf : byte array) size rbuf len =
     let wbuf = new MemoryStream(buf)
     dec wbuf rbuf len
-    let reader = new StreamReader(wbuf)
-    reader.ReadToEnd()
+    Array.sub buf 0 (int wbuf.Position)
 

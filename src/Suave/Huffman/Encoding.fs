@@ -18,40 +18,39 @@ module Encoding =
   let idxEos = 256
 
   let enc (wbuf: MemoryStream) (rbuf: MemoryStream) =
+    let write p (w:uint64) =
+      if int64 p >= wbuf.Length then
+        failwith "Buffer overrun"
+      let w8 = byte(w >>> shiftForWrite)
+      wbuf.WriteByte w8
+      p + 1
     let rec copy p (w,o) =
       if o > shiftForWrite then
         (p,w,o)
       else
-        wbuf.WriteByte w
+        let p' = write p w
         let w' = w <<< 8
         let o' = o + 8
-        copy (p + 1) (w',o')
+        copy p' (w',o')
     let bond i encoded off =
-      let len  = huffmanLength.[i]
-      let code = huffmanCode.[i]
+      let len  = huffmanLength.[i] // 7
+      let code = huffmanCode.[i]  // 0x6e = 110
       let scode = code <<< (off - len)
       let encoded' = encoded ||| scode
       let off' = off - len
-      (byte encoded', off')
-    let write p w =
-      if int64 p >= wbuf.Length then
-        failwith "Buffer overrun"
-      let w8 = w >>> shiftForWrite
-      wbuf.WriteByte w8
-      p + 1
-    let rec go (dst,encoded, off) : int =
+      (encoded', off')
+    let rec go (dst,encoded : uint64, off) : int =
       let i = rbuf.ReadByte()
       if i >= 0 then
-        let a,encoded', off' = copy dst (bond i encoded off)
-        go ((dst + 1), int encoded', off')
+        let dst',encoded', off' = copy dst (bond i encoded off)
+        go (dst', encoded', off')
       elif off = initialOffset then dst
       else
         let (encoded1,_) = bond idxEos encoded off
-        write dst encoded1 |> int
-    go (0,0,initialOffset)
+        write dst encoded1 
+    go (0,0UL,initialOffset)
 
   let encode (buf : byte array) rbuf =
     let wbuf = new MemoryStream(buf)
     let r = enc wbuf rbuf
-    let reader = new StreamReader(wbuf)
-    reader.ReadToEnd()
+    Array.sub buf 0 r

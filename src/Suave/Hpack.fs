@@ -76,7 +76,7 @@ module Hpack =
 
   type ReadBuffer = IO.MemoryStream
 
-  type HuffmanDecoding = IO.MemoryStream -> int -> string
+  type HuffmanDecoding = IO.MemoryStream -> int -> byte []
 
   type CodeInfo =
     | EncodeInfo of (RevIndex * (int option))
@@ -469,8 +469,6 @@ if I < 2^N - 1, encode I on N bits
     let lst = List.map2 (fun (k,v) i -> (k,(v,i))) staticHeaderList (List.map SIndex [1 .. staticHeaderArray.Length])
     let groups = groupBy (fun x y -> fst x = fst y) lst
     let zs = List.map extract groups
-    //Array.create (maxStaticTokenIndex + 1)
-    //[|0 .. maxStaticTokenIndex |]
     List.map toEnt zs
 
   let lookupStaticRevIndex (ix:int) (v:HeaderValue) fa' fbd = ()
@@ -662,12 +660,7 @@ if I < 2^N - 1, encode I on N bits
   let isHuffman w   = isset w 7
 
   let extractByteString (rbuf:MemoryStream) (len:int) =
-    let sr = new StreamReader(rbuf)
-    let text = sr.ReadToEnd()
-    let result = text.Substring(0,len)
-    // rewind 
-    rbuf.Position <- rbuf.Position - (rbuf.Length - int64 len)
-    result
+    Array.sub (rbuf.GetBuffer()) 0 len
 
   let decodeString (huff:bool) (decoder: HuffmanDecoding)  (rbuf:MemoryStream) (len:int) =
     if rbuf.Length <> rbuf.Position then
@@ -693,12 +686,12 @@ if I < 2^N - 1, encode I on N bits
     let p = mask w
     let idx = decode n p rbuf
     let t = entryToken(toIndexedEntry dyntbl idx)
-    let v = headerStuff dyntbl rbuf
+    let v = Text.Encoding.UTF8.GetString(headerStuff dyntbl rbuf)
     (t,v)
 
   let insertNewName (dyntbl : DynamicTable) (rbuf:MemoryStream) =
-    let t = toToken (headerStuff dyntbl rbuf)
-    let v = headerStuff dyntbl rbuf
+    let t = toToken (Text.Encoding.UTF8.GetString(headerStuff dyntbl rbuf))
+    let v = Text.Encoding.UTF8.GetString(headerStuff dyntbl rbuf)
     (t,v)
 
   let incrementalIndexing (dyntbl : DynamicTable) (w: byte) rbuf : TokenHeader =
