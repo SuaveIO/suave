@@ -16,6 +16,7 @@ open Suave.Operators
 open Suave.Sockets
 open Suave.Sockets.Control
 open Suave.Http2
+open Suave.Huffman
 open Suave.Utils
 open Suave.Tests.TestUtilities
 open Suave.Testing
@@ -31,6 +32,24 @@ let frameHeaders (_ : SuaveConfig) =
        let encoded = encodeFrameHeader originalHeader
        let header = parseFrameHeader encoded
        Assert.Equal("encode >> decode == id", originalHeader, header)
+  ]
+
+[<Tests>]
+let huffmanTest (_ : SuaveConfig) =
+  let buf1 = Array.zeroCreate<byte> 4096
+  let buf2 = Array.zeroCreate<byte> 4096
+  testList "Huffman" [
+    testPropertyWithConfig fsCheckConfig "encode/decode" 
+    <| fun (testText:string) ->
+
+       let decoder = Decoding.decode buf1 4096
+       let encoder = Encoding.encode buf2
+       
+       let arr = System.Text.ASCIIEncoding.UTF8.GetBytes testText
+       let encoded = encoder (new MemoryStream(arr,false))
+       let b = decoder (new MemoryStream(encoded,false)) encoded.Length
+
+       Assert.Equal("failed", testText, System.Text.ASCIIEncoding.UTF8.GetString b)
   ]
 
 [<Tests>]
