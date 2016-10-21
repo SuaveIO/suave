@@ -55,14 +55,19 @@ module internal ParsingAndControl =
       let loop = ref true
       let payloads = List<byte[]>()
       while !loop do
-        let! (header,Headers (priorityOption, bytes)) = cn2.read ()
-        payloads.Add bytes
-        loop := testEndHeader header.flags
+        let! frame = cn2.read ()
+        match frame with
+        | (header,Headers (priorityOption, bytes)) ->
+          payloads.Add bytes
+          loop := not(testEndHeader header.flags)
+        | (header,f) ->
+          printfn "Got frame: %A" f
+          printfn "Spkiping"
       // Concatenate payloads
       let payload = Array.concat payloads
       // A receiving endpoint reassembles the header block by concatenating its fragments and then 
       // decompresses the block to reconstruct the header list.
-      let headerList = decodeHeader (cn2.decodeDynamicTable) (payload)
+      let headerList = decodeHeader cn2.decodeDynamicTable payload
 
       let (Choice1Of2 _method) = headerList %% ":method"
       let (Choice1Of2 _scheme) = headerList %% ":scheme"
@@ -81,7 +86,7 @@ module internal ParsingAndControl =
           url             = url
           host            = _host
           ``method``      = HttpMethod.parse  _method
-          headers         = []
+          headers         = List.filter (fun (x,y) -> x <> ":method" || x <> ":scheme" || x <> ":path" || x <> ":authority") headerList
           rawForm         = Array.empty
           rawQuery        = ""
           files           = []
@@ -91,23 +96,6 @@ module internal ParsingAndControl =
       return r
       }
 
-
-
-  let procQueue = new BlockingQueueAgent<HttpRequest>()
-
-  let http2queue (r:HttpRequest) =
-    Async.Start (procQueue.AsyncAdd r)
-
-  let http2writeLoop = 
-     socket {
-       while true do
-         let! a = SocketOp.ofAsync <| procQueue.AsyncGet()
-         // apply the web part .. get a response back.
-         // transform the response to http2 frames.
-         // send the frames
-         do ()
-       }
-
   let http2Loop (ctxOuter : HttpContext) (consumer : WebPart) = 
     let cn2 = new Http2Connection(ctxOuter.connection.transport)
     socket {
@@ -116,11 +104,17 @@ module internal ParsingAndControl =
       // the client will send the http2 client connection preface
       // and the server will send a potentially empty SETTINGS frame as its first frame.
       let! (header,Settings (flag,settings)) = cn2.read ()
-      // figure out what to do with those headers
-      while true do
-        let! request = http2readRequest ctxOuter.runtime.matchedBinding cn2
-        // queue for processing
-        do http2queue request // will queue the request for processing
+      Async.Start (cn2.writeLoop ctxOuter consumer)
+      // The SETTINGS frames received from a peer as part of the connection preface MUST be acknowledged 
+      // (see Section 6.5.3) after sending the connection preface.
+      //while true do
+      let! request = http2readRequest ctxOuter.runtime.matchedBinding cn2
+      // queue for processing
+      do cn2.send request
+      //send a close to the mailbox
+      //let! a = procQueue.AsyncAdd(Stop)
+      do cn2.stop()
+      free "Suave.ParsingAndControl.http2Loop" ctxOuter.connection
       }
 
   let httpLoop (ctxOuter : HttpContext) (consumer : WebPart) =
@@ -140,12 +134,12 @@ module internal ParsingAndControl =
       let! (Choice1Of2 firstLine) = facade.readLine 
 
       if firstLine.Equals("PRI * HTTP/2.0") then
-        printfn "we have http2"
+        verbose "HTTP/2 preamble detected."
         // read the remaining octects "\r\nSM\r\n\r\n"
         let! a = facade.skipLine
         let! a = facade.skipLine
         let! a = facade.skipLine
-        //inititate http2 looop
+        // inititate http2 looop
         let! a = http2Loop ctxOuter consumer
         return ()
       
@@ -170,6 +164,7 @@ module internal ParsingAndControl =
           | Choice1Of2 "h2c" -> 
             let! _ = HttpOutput.run Intermediate.CONTINUE ctx
             verbose "sent 100-continue response"
+            verbose "Connection upgraded to HTTP/2"
             let! a = http2Loop ctx consumer
             return ()
           | Choice1Of2 "h2" ->
@@ -177,6 +172,7 @@ module internal ParsingAndControl =
             if ctx.runtime.matchedBinding.scheme <> Http.Protocol.HTTP then
               let! _ = HttpOutput.run Intermediate.CONTINUE ctx
               verbose "sent 100-continue response"
+              verbose "Connection upgraded to HTTP/2"
               let! a = http2Loop ctx consumer
               return ()
              else

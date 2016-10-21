@@ -363,18 +363,31 @@ module Http2 =
     arr.[4] <- priority.weight - 1uy
     arr
 
-  let encodeFramePayload = function
-    | Data (bytes, flag) -> [ bytes ]
-    | Headers(None, bytes) -> [ bytes ]
+  type EncodeInfo = { flags : byte; streamIdentifier: uint32; padding : byte [] option}
+
+  let encodeFramePayload (encodeInfo: EncodeInfo)= function
+    | Data (bytes, flag) ->
+      { length = uint32 bytes.Length; ``type`` = 0uy ; flags = encodeInfo.flags; streamIdentifier = 0u} ,
+      [ bytes ]
+    | Headers(None, bytes) -> 
+      { length = uint32 bytes.Length; ``type`` = 1uy ; flags = encodeInfo.flags; streamIdentifier = 0u} ,
+      [ bytes ]
     | Headers(Some priority, bytes) -> 
+      { length = uint32 bytes.Length + 5u; ``type`` = 1uy ; flags = encodeInfo.flags; streamIdentifier = 0u} ,
       [ encodePriority priority ; bytes ]
-    | Priority None -> [[||]]
-    | Priority (Some priority) -> [encodePriority priority]
+    | Priority None -> 
+      { length = 0u; ``type`` = 2uy ; flags = encodeInfo.flags; streamIdentifier = 0u} ,
+      [[||]]
+    | Priority (Some priority) -> 
+       { length = 5u; ``type`` = 2uy ; flags = encodeInfo.flags; streamIdentifier = 0u} ,
+       [encodePriority priority]
     | RstStream errorCode ->
       let b4 = Array.zeroCreate 4
       poke32 b4 0 (uint32 (fromErrorCode errorCode))
+      { length = 4u; ``type`` = 3uy ; flags = encodeInfo.flags; streamIdentifier = encodeInfo.streamIdentifier } ,
       [ b4 ]
     | Settings (flag,settings) ->
+      { length = 36u; ``type`` = 4uy ; flags = encodeInfo.flags; streamIdentifier = encodeInfo.streamIdentifier } ,
       [ 
         for settingIdentifier in [ 1 .. 6 ] do
           let arr = Array.zeroCreate<byte> 6
@@ -408,22 +421,30 @@ module Http2 =
     | PushPromise (i,bytes) -> 
       let b4 = Array.zeroCreate 4
       poke32 b4 0 i
+      { length = uint32 bytes.Length + 4u; ``type`` = 5uy ; flags = encodeInfo.flags; streamIdentifier = encodeInfo.streamIdentifier } ,
       [ b4 ; bytes ]
-    | Ping (flag,bytes) -> [ bytes] 
+    | Ping (flag,bytes) ->
+      { length = uint32 bytes.Length; ``type`` = 6uy ; flags = encodeInfo.flags; streamIdentifier = encodeInfo.streamIdentifier } ,
+      [ bytes] 
     | GoAway (i,errorCode,bytes) -> 
       let b8 = Array.zeroCreate 8
       poke32 b8 0 i
       poke32 b8 4 (uint32 (fromErrorCode errorCode))
+      { length = uint32 bytes.Length + 8u; ``type`` = 7uy ; flags = encodeInfo.flags; streamIdentifier = encodeInfo.streamIdentifier } ,
       [ b8; bytes]
     | WindowUpdate w -> 
       let b4 = Array.zeroCreate 4
       poke32 b4 0 w
+      { length = 4u; ``type`` = 8uy ; flags = encodeInfo.flags; streamIdentifier = encodeInfo.streamIdentifier } ,
       [ b4 ]
-    | Continuation bytes -> [bytes]
+    | Continuation bytes -> 
+      { length = uint32 bytes.Length; ``type`` = 9uy ; flags = encodeInfo.flags; streamIdentifier = encodeInfo.streamIdentifier } ,
+      [ bytes ]
 
-  let writeFrame (header,payload:FramePayload) (t:ITransport) = socket {
+  let writeFrame encInfo (payload:FramePayload) (t:ITransport) = socket {
+    let header,chunks = encodeFramePayload encInfo payload
     do! writeFrameHeader header t
-    for bytes in encodeFramePayload payload do
+    for bytes in chunks do
       do! t.write(ByteSegment(bytes,0,bytes.Length))
     }
 
@@ -455,11 +476,16 @@ module Http2 =
     let buf = Array.zeroCreate huftmpsiz
     let decoder = decode buf huftmpsiz
     newDynamicTable maxsiz (DecodeInfo(decoder,maxsiz))
-
+  
+  open Suave.Utils
+  type Message<'a> = Request of 'a | Stop
 
   type Http2Connection(transport: ITransport) =
 
+    let alive = ref true
     let writeQueue = new ConcurrentQueue<Frame>()
+
+    let procQueue = new BlockingQueueAgent<Message<HttpRequest>>()
 
     member val encodeDynamicTable = newDynamicTableForEncoding defaultDynamicTableSize
     member val decodeDynamicTable = newDynamicTableForDecoding defaultDynamicTableSize 4096
@@ -467,5 +493,45 @@ module Http2 =
     member x.read() : SocketOp<Frame> = 
       readFrame transport
 
-    member x.write(f:Frame) : SocketOp<unit> = 
-      writeFrame f transport
+    member x.write(encInfo,p:FramePayload) : SocketOp<unit> = 
+      writeFrame encInfo p transport
+
+    member x.writeResponseToFrame (response: HttpResult) = async {
+        let headersFrame = encodeHeader { algorithm = CompressionAlgorithm.Naive; useHuffman = true} 4096 x.encodeDynamicTable  ((":status",response.status.ToString())::response.headers)
+        let encInfo = { flags = BitOperations.set 0uy 2; streamIdentifier = 0u;  padding = None}
+        let! a = x.write (encInfo, Headers(None, headersFrame))
+        Console.WriteLine "Send HEADERS"
+        match response.content with
+        | Bytes bs ->
+          let encInfo = { flags = BitOperations.set 0uy 0; streamIdentifier = 0u;  padding = None}
+          let! a = x.write (encInfo, Data(bs,true))
+          Console.WriteLine "Send DATA"
+        return ()
+        }
+
+    member x.send (r:HttpRequest) =
+      Async.Start (procQueue.AsyncAdd <| Request r)
+
+    member x.stop() = Async.Start (procQueue.AsyncAdd <| Stop)
+
+    member x.get() =
+      procQueue.AsyncGet()
+
+    member x.writeLoop (ctxOuter : HttpContext) (webPart: WebPart) = 
+     async {
+       // send an empty SETTINGS frame
+       let encInfo = { flags = 1uy (*ack*); streamIdentifier = 0u;  padding = None}
+       let! a = x.write (encInfo,Settings(true,defaultSetting))
+       Console.WriteLine "Send SETTINGS"
+       while !alive do
+         let! a = x.get ()
+         match a with
+         | Request req ->
+             let! r = webPart { ctxOuter with request = req}
+             match r with
+             | Some ctx ->
+               do! x.writeResponseToFrame ctx.response
+             | None ->
+               return ()
+         | Stop -> alive := false
+       }
