@@ -45,6 +45,9 @@ module Hpack =
     tokenKey : string  // case-insensitive header key 
     }
 
+  let tokenFoldedKey (token : Token) =
+    token.tokenKey.ToLowerInvariant()
+
   type Entry =  {
     size : int
     token : Token
@@ -163,7 +166,7 @@ module Hpack =
   type StaticTable() =
     static member get index = staticHeaderArray.[index]
 
-  let toStaticEntry (idx:int) = StaticTable.get idx
+  let toStaticEntry (idx:int) = StaticTable.get (idx - 1)
 
   let adj maxN x =
     if maxN = 0 then failwith "Too small table size."
@@ -719,13 +722,31 @@ if I < 2^N - 1, encode I on N bits
 
   open System.Collections.Generic
 
+  type Builder<'a> = Builder of ('a list -> 'a list)
+
+  let prepend b = fun y -> b::y
+
+  let ( << ) (Builder a) b  = Builder(fun x -> a (prepend b x))
+
+  let empty = Builder id
+
+  let run (Builder b) = b []
+
+  let singleton x = Builder (prepend x)
+
   let decodeSimple (dyntbl : DynamicTable) (rbuf : MemoryStream) : HeaderList = 
     let list = new List<Header>()
-    while rbuf.Position <> rbuf.Length do
-      let w = byte(rbuf.ReadByte())
-      let (token,headerValue) = toTokenHeader dyntbl w rbuf
-      list.Add (token.tokenKey,headerValue)
-    Seq.toList list
+    let rec go builder =
+      if rbuf.Position <> rbuf.Length then
+        let w = byte(rbuf.ReadByte())
+        let (token,headerValue) as tv = toTokenHeader dyntbl w rbuf
+        let builder' = builder << tv
+        go builder'
+      else
+        let tvs = run builder
+        let kvs = List.map ( fun (t,v) -> let k = tokenFoldedKey t in (k,v)) tvs
+        kvs
+    go empty
 
   let decodeHeader (dyntbl : DynamicTable) (inp: byte array) : HeaderList =
     decodeHPACK dyntbl inp decodeSimple
