@@ -342,6 +342,91 @@ module Http2 =
     return header, payload
     }
 
+  let writeFrameHeader (h: FrameHeader) (t:ITransport) = socket {
+    let bytes = encodeFrameHeader h
+    do! t.write(ByteSegment(bytes,0,bytes.Length))
+    }
+
+  let poke16 (arr : byte array) i w =
+    arr.[i]     <- byte w
+    arr.[i + 1] <- byte w >>> 8
+
+  let poke32 (arr : byte array) i w =
+    arr.[i]     <- byte w
+    arr.[i + 1] <- byte w >>> 8
+    arr.[i + 2] <- byte w >>> 0x10
+    arr.[i + 3] <- byte w >>> 0x18
+
+  let encodePriority priority =
+    let arr = Array.zeroCreate<byte> 5
+    poke32 arr 0 priority.streamIdentifier
+    arr.[4] <- priority.weight - 1uy
+    arr
+
+  let encodeFramePayload = function
+    | Data (bytes, flag) -> [ bytes ]
+    | Headers(None, bytes) -> [ bytes ]
+    | Headers(Some priority, bytes) -> 
+      [ encodePriority priority ; bytes ]
+    | Priority None -> [[||]]
+    | Priority (Some priority) -> [encodePriority priority]
+    | RstStream errorCode ->
+      let b4 = Array.zeroCreate 4
+      poke32 b4 0 (uint32 (fromErrorCode errorCode))
+      [ b4 ]
+    | Settings (flag,settings) ->
+      [ 
+        for settingIdentifier in [ 1 .. 6 ] do
+          let arr = Array.zeroCreate<byte> 6
+          poke16 arr 0 settingIdentifier
+          match settingIdentifier  with
+          | 1 ->
+            poke32 arr 2 settings.headerTableSize
+          | 2 ->
+            if settings.enablePush then
+              poke32 arr 2 1u
+          | 3 ->
+            match settings.maxConcurrentStreams with
+            | Some v ->
+              poke32 arr 2 v
+            | None ->
+              ()
+          | 4 ->
+            poke32 arr 2 settings.initialWindowSize
+          | 5 ->
+            poke32 arr 2 settings.maxFrameSize
+          | 6 ->
+            match settings.maxHeaderBlockSize with
+            | Some v ->
+              poke32 arr 2 v
+            | None ->
+              ()
+          | _ ->
+            failwith "invalid setting identifier"
+          yield arr
+      ]
+    | PushPromise (i,bytes) -> 
+      let b4 = Array.zeroCreate 4
+      poke32 b4 0 i
+      [ b4 ; bytes ]
+    | Ping (flag,bytes) -> [ bytes] 
+    | GoAway (i,errorCode,bytes) -> 
+      let b8 = Array.zeroCreate 8
+      poke32 b8 0 i
+      poke32 b8 4 (uint32 (fromErrorCode errorCode))
+      [ b8; bytes]
+    | WindowUpdate w -> 
+      let b4 = Array.zeroCreate 4
+      poke32 b4 0 w
+      [ b4 ]
+    | Continuation bytes -> [bytes]
+
+  let writeFrame (header,payload:FramePayload) (t:ITransport) = socket {
+    do! writeFrameHeader header t
+    for bytes in encodeFramePayload payload do
+      do! t.write(ByteSegment(bytes,0,bytes.Length))
+    }
+
   open System.Collections.Concurrent
   open System.IO
   open Hpack
@@ -381,3 +466,6 @@ module Http2 =
 
     member x.read() : SocketOp<Frame> = 
       readFrame transport
+
+    member x.write(f:Frame) : SocketOp<unit> = 
+      writeFrame f transport
