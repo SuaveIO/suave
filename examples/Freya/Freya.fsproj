@@ -163,7 +163,7 @@
     <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
       <ItemGroup>
         <Reference Include="Freya.Core">
-          <HintPath>..\..\packages\examples\Freya.Core\lib\net45\Freya.Core.dll</HintPath>
+          <HintPath>..\..\packages\examples\Freya.Core\lib\net452\Freya.Core.dll</HintPath>
           <Private>True</Private>
           <Paket>True</Paket>
         </Reference>
