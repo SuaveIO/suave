@@ -66,7 +66,7 @@ let http2connect (cfg: SuaveConfig) =
   testList "test basic http2" [
     testCase "basic request/response" 
     <| fun _ ->
-         let ctx = runWith {cfg with logger = Loggers.saneDefaultsFor LogLevel.Verbose} (Successful.OK "Hello HTTP/2")
+         let ctx = runWith {cfg with logger = Targets.create Verbose } (Successful.OK "Hello HTTP/2")
          withContext (fun _ ->
            // open http connection
            let uri = Uri(sprintf "http://%s:%i/websocket" ip port)

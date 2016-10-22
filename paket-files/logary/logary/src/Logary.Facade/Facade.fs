@@ -2,7 +2,7 @@
 /// library. See https://github.com/logary/logary for details. This module is
 /// completely stand-alone in that it has no external references and its adapter
 /// in Logary has been well tested.
-namespace Logary.Facade
+namespace Suave.Logging
 
 open System
 open System.Runtime.CompilerServices
