@@ -142,84 +142,84 @@ module internal ParsingAndControl =
         // inititate http2 looop
         let! a = http2Loop ctxOuter consumer
         return ()
-      
+      else
       // else regular http loop
-      let! result' = facade.processRequest firstLine
+          let! result' = facade.processRequest firstLine
 
-      verbose "<- processor"
+          verbose "<- processor"
 
-      match result' with
-      | Choice1Of2 result ->
-        match result with
-        | None -> verbose "'result = None', exiting"
-        | Some ctx ->
-          // Check for Upgrade header.
-          (*
-          A server that supports HTTP/2 accepts the upgrade with a 101 (Switching Protocols) response. After the empty line 
-          that terminates the 101 response, the server can begin sending HTTP/2 frames. These frames MUST include a response
-          to the request that initiated the upgrade.
-          *)
-
-          match ctx.request.headers %% "upgrade" with
-          | Choice1Of2 "h2c" -> 
-            let! _ = HttpOutput.run Intermediate.CONTINUE ctx
-            verbose "sent 100-continue response"
-            verbose "Connection upgraded to HTTP/2"
-            let! a = http2Loop ctx consumer
-            return ()
-          | Choice1Of2 "h2" ->
-             // implies TLS
-            if ctx.runtime.matchedBinding.scheme <> Http.Protocol.HTTP then
-              let! _ = HttpOutput.run Intermediate.CONTINUE ctx
-              verbose "sent 100-continue response"
-              verbose "Connection upgraded to HTTP/2"
-              let! a = http2Loop ctx consumer
-              return ()
-             else
-               failwith "TLS required"
-          | Choice1Of2 _ -> 
-            failwith "Invalid identifier"
-          | Choice2Of2 _ -> 
-            ignore ()
-
-          // the difference is that in http2 we would queue the response (even the re-solution of the response)
-          // and will continue reading (duplex) - we need a loop reading and a loop writing parallel
-          let! result'' = HttpOutput.addKeepAliveHeader ctx |> HttpOutput.run consumer
-          match result'' with
-          | Choice1Of2 result -> 
+          match result' with
+          | Choice1Of2 result ->
             match result with
-            | None -> ()
+            | None -> verbose "'result = None', exiting"
             | Some ctx ->
-              match ctx.request.header "connection" with
-              | Choice1Of2 conn when String.equalsOrdinalCI conn "keep-alive" ->
-                verbose "'Connection: keep-alive' recurse"
-                return! loop (cleanResponse ctx)
-              | Choice1Of2 _ ->
-                free "Suave.Web.httpLoop.loop (case Choice1Of2 _)" ctx.connection
-                verbose "Connection: close"
-              | Choice2Of2 _ ->
-                if ctx.request.httpVersion.Equals("HTTP/1.1") then
-                  verbose "'Connection: keep-alive' recurse (!)"
-                  return! loop (cleanResponse ctx)
-                else
-                  free "Suave.Web.httpLoop.loop (case Choice2Of2, else branch)" ctx.connection
-                  verbose "Connection: close"
-                  return ()
-          | Choice2Of2 err ->
-            verbose (sprintf "Socket error while running webpart, exiting: %A" err)
-      | Choice2Of2 err ->
-        match err with
-        | InputDataError msg ->
-          verbose (sprintf "Error parsing http request: %s" msg)
-          let! result''' = HttpOutput.run (RequestErrors.BAD_REQUEST msg) ctxOuter
-          match result''' with
-          | Choice1Of2 _ ->
-            verbose "Exiting http loop"
-          | Choice2Of2 err ->
-            verbose (sprintf "Socket error while sending BAD_REQUEST, exiting: %A" err)
+              // Check for Upgrade header.
+              (*
+              A server that supports HTTP/2 accepts the upgrade with a 101 (Switching Protocols) response. After the empty line 
+              that terminates the 101 response, the server can begin sending HTTP/2 frames. These frames MUST include a response
+              to the request that initiated the upgrade.
+              *)
 
-        | err ->
-          verbose (sprintf "Socket error while processing request, exiting: %A" err)
+              match ctx.request.headers %% "upgrade" with
+              | Choice1Of2 "h2c" -> 
+                let! _ = HttpOutput.run Intermediate.CONTINUE ctx
+                verbose "sent 100-continue response"
+                verbose "Connection upgraded to HTTP/2"
+                let! a = http2Loop ctx consumer
+                return ()
+              | Choice1Of2 "h2" ->
+                 // implies TLS
+                if ctx.runtime.matchedBinding.scheme <> Http.Protocol.HTTP then
+                  let! _ = HttpOutput.run Intermediate.CONTINUE ctx
+                  verbose "sent 100-continue response"
+                  verbose "Connection upgraded to HTTP/2"
+                  let! a = http2Loop ctx consumer
+                  return ()
+                 else
+                   failwith "TLS required"
+              | Choice1Of2 _ -> 
+                failwith "Invalid identifier"
+              | Choice2Of2 _ -> 
+                ignore ()
+
+              // the difference is that in http2 we would queue the response (even the re-solution of the response)
+              // and will continue reading (duplex) - we need a loop reading and a loop writing parallel
+              let! result'' = HttpOutput.addKeepAliveHeader ctx |> HttpOutput.run consumer
+              match result'' with
+              | Choice1Of2 result -> 
+                match result with
+                | None -> ()
+                | Some ctx ->
+                  match ctx.request.header "connection" with
+                  | Choice1Of2 conn when String.equalsOrdinalCI conn "keep-alive" ->
+                    verbose "'Connection: keep-alive' recurse"
+                    return! loop (cleanResponse ctx)
+                  | Choice1Of2 _ ->
+                    free "Suave.Web.httpLoop.loop (case Choice1Of2 _)" ctx.connection
+                    verbose "Connection: close"
+                  | Choice2Of2 _ ->
+                    if ctx.request.httpVersion.Equals("HTTP/1.1") then
+                      verbose "'Connection: keep-alive' recurse (!)"
+                      return! loop (cleanResponse ctx)
+                    else
+                      free "Suave.Web.httpLoop.loop (case Choice2Of2, else branch)" ctx.connection
+                      verbose "Connection: close"
+                      return ()
+              | Choice2Of2 err ->
+                verbose (sprintf "Socket error while running webpart, exiting: %A" err)
+          | Choice2Of2 err ->
+            match err with
+            | InputDataError msg ->
+              verbose (sprintf "Error parsing http request: %s" msg)
+              let! result''' = HttpOutput.run (RequestErrors.BAD_REQUEST msg) ctxOuter
+              match result''' with
+              | Choice1Of2 _ ->
+                verbose "Exiting http loop"
+              | Choice2Of2 err ->
+                verbose (sprintf "Socket error while sending BAD_REQUEST, exiting: %A" err)
+
+            | err ->
+              verbose (sprintf "Socket error while processing request, exiting: %A" err)
     }
     loop ctxOuter
 
