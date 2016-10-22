@@ -30,12 +30,12 @@ To gain access to the underlying `HttpRequest` and read query and http form data
 
 {% highlight fsharp %}
 let greetings q =
-  defaultArg (Option.ofChoice(q ^^ "name")) "World" |> sprintf "Hello %s"
+  defaultArg (Option.ofChoice (q ^^ "name")) "World" |> sprintf "Hello %s"
 
 let sample : WebPart = 
     path "/hello" >=> choose [
-      GET  >=> request(fun r -> OK <| greetings r.query)
-      POST >=> request(fun r -> OK <| greetings r.form)
+      GET  >=> request (fun r -> OK (greetings r.query))
+      POST >=> request (fun r -> OK (greetings r.form))
       RequestErrors.NOT_FOUND "Found no handlers" ]
 {% endhighlight %}
 
@@ -47,12 +47,14 @@ To protect a route with HTTP Basic Authentication the combinator `authenticateBa
 let requiresAuthentication _ =
     choose
         [ GET >=> path "/public" >=> OK "Default GET"
-          // access to handlers after this one will require authentication
-          Authentication.authenticateBasic ((=) ("foo", "bar")) <|
-            choose [
+          // Access to handlers after this one will require authentication
+          Authentication.authenticateBasic 
+            (fun (user,pwd) -> user = "foo" && pwd = "bar") 
+            (choose [
                 GET >=> path "/whereami" >=> OK (sprintf "Hello authenticated person ")
                 GET >=> path "/" >=> dirHome
-                GET >=> browseHome //serves file if exists ]]
+                GET >=> browseHome // Serves file if exists 
+             ])]
 {% endhighlight %}
 
 Your web parts are "values" in the sense that they evaluate

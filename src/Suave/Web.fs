@@ -8,24 +8,26 @@ module Web =
   open System.Net
   open Suave.Utils
   open Suave.Logging
+  open Suave.Logging.Message
 
   /// The default error handler returns a 500 Internal Error in response to
   /// thrown exceptions.
   let defaultErrorHandler (ex : Exception) msg (ctx : HttpContext) =
-    ctx.runtime.logger.Log LogLevel.Error (fun _ ->
-      LogLine.mk "Suave.Web.defaultErrorHandler" LogLevel.Error
-                 ctx.request.trace (Some ex)
-                 msg)
+    ctx.runtime.logger.error (
+      eventX msg
+      >> setSingleName "Suave.Web.defaultErrorHandler"
+      >> addExn ex)
+
     if ctx.isLocal then
       Response.response HTTP_500 (UTF8.bytes (sprintf "<h1>%s</h1><br/>%A" ex.Message ex)) ctx
-    else 
+    else
       Response.response HTTP_500 (UTF8.bytes HTTP_500.message) ctx
 
   /// Starts the web server asynchronously.
   ///
-  /// Returns the webserver as a tuple of 1) an async computation the yields unit when
-  /// the web server is ready to serve quests, and 2) an async computation that yields
-  /// when the web server is being shut down and is being terminated. The async values
+  /// Returns the webserver as a tuple of 1) an async computation that yields startup
+  /// metrics DTOs when the web server is ready to serve requests, and 2) an async computation
+  /// that yields when the web server is being shut down and is being terminated. The async values
   /// returned are not 'hot' in the sense that they have started running, so you must manually
   /// start the 'server' (second item in tuple), as this starts the TcpListener.
   /// Have a look at the example and the unit tests for more documentation.
@@ -40,16 +42,25 @@ module Web =
     // spawn tcp listeners/web workers
     let toRuntime = SuaveConfig.toRuntime config homeFolder compressionFolder true
 
-    let startWebWorkerAsync runtime =
-      ParsingAndControl.startWebWorkerAsync 
-        (config.bufferSize, config.maxOps) 
-        webpart
-        runtime 
-        (config.tcpServerFactory.create(config.logger, config.maxOps, config.bufferSize,config.autoGrow,runtime.matchedBinding.socketBinding))
+    if config.initialiseLogger then
+      Global.initialise { Global.DefaultConfig with getLogger = fun _ -> config.logger }
+    else
+      ()
 
-    let servers = 
+    let startWebWorkerAsync runtime =
+      let tcpServer =
+        config.tcpServerFactory.create(
+          config.maxOps, config.bufferSize, config.autoGrow,
+          runtime.matchedBinding.socketBinding)
+
+      ParsingAndControl.startWebWorkerAsync (config.bufferSize, config.maxOps)
+                                            webpart
+                                            runtime
+                                            tcpServer
+
+    let servers =
        List.map (toRuntime >> startWebWorkerAsync) config.bindings
-              
+
     let listening = servers |> Seq.map fst |> Async.Parallel
     let server    = servers |> Seq.map snd |> Async.Parallel |> Async.Ignore
     listening, server
@@ -62,7 +73,7 @@ module Web =
   /// The default configuration binds on IPv4, 127.0.0.1:8083 with a regular 500 Internal Error handler,
   /// with a timeout of one minute for computations to run. Waiting for 2 seconds for the socket bind
   /// to succeed.
-  let defaultConfig = 
+  let defaultConfig =
     { bindings              = [ HttpBinding.defaults ]
       serverKey             = Crypto.generateKey HttpRuntime.ServerKeyLength
       errorHandler          = defaultErrorHandler
@@ -74,7 +85,8 @@ module Web =
       mimeTypesMap          = Writers.defaultMimeTypesMap
       homeFolder            = None
       compressedFilesFolder = None
-      logger                = Loggers.saneDefaultsFor LogLevel.Info
+      logger                = Targets.create Info
+      initialiseLogger      = true
       tcpServerFactory      = new DefaultTcpServerFactory()
       #if NETSTANDARD1_5
       cookieSerialiser      = new JsonFormatterSerialiser()

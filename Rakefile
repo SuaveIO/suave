@@ -1,7 +1,5 @@
 # Encoding: utf-8
-
 require 'bundler/setup'
-
 require 'albacore'
 require 'albacore/nuget_model'
 require 'albacore/project'
@@ -10,7 +8,6 @@ require 'albacore/tasks/versionizer'
 require 'albacore/tasks/release'
 require 'albacore/task_types/nugets_pack'
 require 'albacore/task_types/asmver'
-require 'albacore/ext/teamcity'
 require './tools/paket_pack'
 require 'semver'
 
@@ -23,9 +20,10 @@ suave_description = 'Suave is a simple web development F# library providing a li
 Configuration = ENV['CONFIGURATION'] || 'Release'
 Platform = ENV['MSBUILD_PLATFORM'] || 'Any CPU'
 
-task :yolo do
-  system %{ruby -pi.bak -e "gsub(/module internal YoLo/, 'module internal Suave.Utils.YoLo')" paket-files/haf/YoLo/YoLo.fs} unless Albacore.windows?
-  system %{ruby -pi.bak -e "gsub(/module internal YoLo/, 'module internal Suave.Utils.YoLo')" paket-files/examples/haf/YoLo/YoLo.fs} unless Albacore.windows?
+task :paket_files do
+  sh %{ruby -pi.bak -e "gsub(/module internal YoLo/, 'module internal Suave.Utils.YoLo')" paket-files/haf/YoLo/YoLo.fs}
+  sh %{ruby -pi.bak -e "gsub(/module internal YoLo/, 'module internal Suave.Utils.YoLo')" paket-files/examples/haf/YoLo/YoLo.fs}
+  sh %{ruby -pi.bak -e "gsub(/namespace Logary.Facade/, 'namespace Suave.Logging')" paket-files/logary/logary/src/Logary.Facade/Facade.fs}
 end
 
 desc "Restore paket.exe"
@@ -34,11 +32,13 @@ task :restore_paket do
     File.exists? 'tools/paket.exe'
 end
 
-desc "Restore all packages"
-task :restore => [:restore_paket, :yolo] do
+task :paket_restore do
   system 'tools/paket.exe', 'restore', clr_command: true
   system 'tools/paket.exe', %w|restore group Build|, clr_command: true
 end
+
+desc 'Restore all packages'
+task :restore => [:restore_paket, :paket_restore, :paket_files]
 
 desc 'create assembly infos'
 asmver_files :asmver => :versioning do |a|
@@ -64,27 +64,7 @@ task :libs do
     system "pkg-config --cflags libuv" do |ok, res|
       if !ok
         raise %{
-  You seem to be missing `libuv`, which needs to be installed.
-
-  On OS X:
-    brew install libuv --universal
-    and then `export LD_LIBRARY_PATH=/usr/local/lib:/usr/lib:/lib`
-
-  On Windows:
-    @powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-FileDownload 'https://github.com/libuv/libuv/archive/v1.7.5.zip'"
-    7z x v1.7.5.zip & cd libuv-1.7.5 & vcbuild.bat x86 shared debug
-    mkdir src\\Suave.Tests\\bin\\Release\\ & cp libuv-1.7.5\\Debug\\libuv.dll src\\Suave.Tests\\bin\\Release\\libuv.dll
-
-  On Linux Ubuntu/Debian:
-    sudo apt-get install automake libtool
-    curl -sSL https://github.com/libuv/libuv/archive/v1.7.5.tar.gz | sudo tar zxfv - -C /usr/local/src
-    cd /usr/local/src/libuv-1.7.5
-    sudo sh autogen.sh
-    sudo ./configure
-    sudo make
-    sudo make install
-    sudo rm -rf /usr/local/src/libuv-1.7.5 && cd ~/
-    sudo ldconfig
+  You seem to be missing `libuv`, which needs to be installed. See https://github.com/SuaveIO/suave#libuv-installation
   }
       end
     end
@@ -110,24 +90,48 @@ end
 namespace :dotnetcli do
   directory 'tools/coreclr'
 
-  task :coreclr_binaries => 'tools/coreclr'do
-    dotnet_version = '1.0.0-beta-002071'
+  dotnet_exe_path = "dotnet" #from PATH
+
+  def get_installed_dotnet_version
+    begin
+      installed_dotnet_version = `dotnet --version`
+      return "" unless $?.success?
+      if installed_dotnet_version.nil? then "" else installed_dotnet_version.strip end
+    rescue
+      ""
+    end
+  end
+
+  task :coreclr_binaries => 'tools/coreclr' do
+    dotnet_version = '1.0.0-preview2-003131'
+    dotnet_installed_version = get_installed_dotnet_version
+    # check if required version of .net core sdk is already installed, otherwise download and install it
+    if dotnet_installed_version == dotnet_version then
+      puts ".NET Core SDK #{dotnet_version} already installed. Skip install"
+      dotnet_exe_path = "dotnet"
+      next
+    elsif dotnet_installed_version == "" then
+      puts ".NET Core SDK #{dotnet_version} not found. Downloading and installing in ./tools/coreclr"
+    else
+      puts "Found .NET Core SDK #{dotnet_installed_version} but require #{dotnet_version}. Downloading and installing in ./tools/coreclr"
+    end
+
     case RUBY_PLATFORM
     when /darwin/
       filename = "dotnet-dev-osx-x64.#{dotnet_version}.tar.gz"
       system 'curl',
         %W|-o tools/#{filename}
-           -L https://dotnetcli.blob.core.windows.net/dotnet/beta/Binaries/#{dotnet_version}/#{filename}| \
+           -L https://dotnetcli.blob.core.windows.net/dotnet/preview/Binaries/#{dotnet_version}/#{filename}| \
         unless File.exists? "tools/#{filename}"
 
       system 'tar',
         %W|xf tools/#{filename}
            --directory tools/coreclr|
     when /linux/
-      filename = "dotnet-dev-ubuntu-x64.#{dotnet_version}.tar.gz"
+      filename = "dotnet-dev-ubuntu.14.04-x64.#{dotnet_version}.tar.gz"
       system 'curl',
         %W|-o tools/#{filename}
-           -L https://dotnetcli.blob.core.windows.net/dotnet/beta/Binaries/#{dotnet_version}/#{filename}| \
+           -L https://dotnetcli.blob.core.windows.net/dotnet/preview/Binaries/#{dotnet_version}/#{filename}| \
         unless File.exists? "tools/#{filename}"
 
       system 'tar',
@@ -136,44 +140,48 @@ namespace :dotnetcli do
     end
     if Gem.win_platform?
       system 'powershell',
-        %W|Invoke-WebRequest "https://raw.githubusercontent.com/dotnet/cli/rel/1.0.0/scripts/obtain/install.ps1" -OutFile "dotnet_cli_install.ps1"|
+        %W|Invoke-WebRequest "https://raw.githubusercontent.com/dotnet/cli/rel/1.0.0-preview2/scripts/obtain/dotnet-install.ps1" -OutFile "dotnet_cli_install.ps1"|
       system 'powershell',
         %W|-ExecutionPolicy Unrestricted ./dotnet_cli_install.ps1 -InstallDir "tools/coreclr" -Channel "beta" -version "#{dotnet_version}"|
-      ENV['PATH'] = %{#{Dir.pwd}/tools/coreclr/sdk/#{dotnet_version};#{ENV['PATH']}}
     end
+
+    dotnet_exe_path = "#{Dir.pwd}/tools/coreclr/dotnet"
   end
 
   desc 'Restore the CoreCLR binaries'
   task :restore => :coreclr_binaries do
-    system "tools/coreclr/dotnet restore"
-  end
-
-  desc 'Build Suave and test project'
-  task :build do
-    Dir.chdir("src/Suave.DotnetCLI.Tests") do
-      system "../../tools/coreclr/dotnet --verbose build"
+    Dir.chdir "src" do
+      system dotnet_exe_path, "restore"
     end
   end
 
+  task :build_lib => :coreclr_binaries do
+    Dir.chdir "src/Suave" do
+      system dotnet_exe_path, %W|--verbose build --configuration #{Configuration} -f netstandard1.6|
+    end
+  end
+
+  desc 'Build Suave and test project'
+  task :build => [:build_lib]
+
   desc 'Create Suave nugets packages'
-  task :pack do
-    Dir.chdir("src/Suave") do
-      system "../../tools/coreclr/dotnet --verbose pack --configuration #{Configuration}"
+  task :pack => :coreclr_binaries do
+    Dir.chdir "src/Suave"  do
+      system dotnet_exe_path, %W|--verbose pack --configuration #{Configuration} --no-build|
     end
   end
 
   task :do_netcorepackage => [ :restore, :build, :pack ]
 
-  # merge standard and dotnetcli nupkgs
-  task :merge do
+  desc 'Merge standard and dotnetcli nupkgs; note the need to run :nugets before'
+  task :merge => :coreclr_binaries do
     Dir.chdir("src/Suave") do
       version = SemVer.find.format("%M.%m.%p%s")
       sourcenupkg = "../../build/pkg/Suave.#{version}.nupkg"
       clinupkg = "bin/#{Configuration}/Suave.#{version}-dotnetcli.nupkg"
-      system %Q[../../tools/coreclr/dotnet mergenupkg --source "#{sourcenupkg}" --other "#{clinupkg}" --framework netstandard1.5]
+      system dotnet_exe_path, %W|mergenupkg --source "#{sourcenupkg}" --other "#{clinupkg}" --framework netstandard1.6|
     end
   end
-
 end
 
 namespace :tests do
@@ -220,7 +228,7 @@ iconUrl https://raw.githubusercontent.com/SuaveIO/resources/master/images/head_t
 files
   #{p.proj_path_base}/bin/#{Configuration}/#{p.id}.* ==\> lib/net40
 releaseNotes
-  #{n.metadata.release_notes}
+  #{n.metadata.release_notes.each_line.reject{|x| x.strip == ""}.join}
 dependencies
   #{d}
 }
@@ -238,8 +246,11 @@ end
 desc 'create suave nuget'
 task :nugets => ['build/pkg', :versioning, :compile, :create_nuget_quick]
 
+desc 'create suave nuget with .NET Core'
+task :nugets_with_netcore => [:nugets, 'dotnetcli:do_netcorepackage', 'dotnetcli:merge']
+
 desc 'compile, gen versions, test and create nuget'
-task :appveyor => [:compile, :'tests:unit', :nugets]
+task :appveyor => [:compile, :'tests:unit', :nugets_with_netcore]
 
 desc 'compile, gen versions, test'
 task :default => [:compile, :'tests:unit', :'docs:build']
@@ -266,6 +277,7 @@ namespace :docs do
 
   task :reference => :restore_paket do
     system 'packages/docs/FsLibTool/tools/FsLibTool.exe', %W|src docs/_site|, clr_command: true
+    puts "Reference docs generated successfully."
   end
 
   task :jekyll do
@@ -294,6 +306,6 @@ task :docs => :'docs:build'
 
 Albacore::Tasks::Release.new :release,
                              pkg_dir: 'build/pkg',
-                             depend_on: [:compile, :nugets, :'docs:deploy'],
+                             depend_on: [:compile, :nugets_with_netcore, :'docs:deploy'],
                              nuget_exe: 'packages/build/NuGet.CommandLine/tools/NuGet.exe',
                              api_key: ENV['NUGET_KEY']

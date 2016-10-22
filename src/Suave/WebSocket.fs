@@ -7,8 +7,10 @@ module WebSocket =
   open Suave.Operators
   open Suave.Utils
   open Suave.Logging
+  open Suave.Logging.Message
 
   open System
+  open System.Collections.Concurrent
   open System.Security.Cryptography
   open System.Text
 
@@ -79,6 +81,12 @@ module WebSocket =
       hasMask : bool
       length  : int }
 
+  type Frame = {
+    OpcodeByte: byte
+    EncodedLength: byte[]
+    Data: ByteSegment
+    }
+
   let internal exctractHeader (arr: byte []) =
     let bytes x = arr.[x]
     let firstByte = bytes 0
@@ -95,31 +103,29 @@ module WebSocket =
       }
     header
 
-  let internal frame (opcode : Opcode) (data : byte[])  (fin : bool) =
+  let writeFrame (connection: Connection) (f: Frame) = socket {
+      do! connection.transport.write (ArraySegment([| f.OpcodeByte |], 0, 1))
+      do! connection.transport.write (ArraySegment(f.EncodedLength, 0, f.EncodedLength.Length))
+      do! connection.transport.write f.Data
+      }
+
+  let internal frame (opcode : Opcode) (data : ByteSegment)  (fin : bool) =
 
     let firstByte = fromOpcode opcode
 
     let firstByte = if fin then firstByte ||| 128uy else firstByte
 
-    let maxHeaderLength = 10
-    let strLen = data.Length
-    use ms = new IO.MemoryStream(maxHeaderLength + strLen)
-
-    ms.WriteByte(firstByte)
-
-    match strLen with
-    | l when l >= 65536 ->
-      let lengthBytes = BitConverter.GetBytes(uint64 data.Length) |> Array.rev
-      ms.WriteByte(127uy)
-      ms.Write(lengthBytes, 0, lengthBytes.Length)
-    | l when l >= 126 ->
-      let lengthBytes = BitConverter.GetBytes(uint16 data.Length) |> Array.rev
-      ms.WriteByte(126uy)
-      ms.Write(lengthBytes, 0, lengthBytes.Length)
-    | _ -> ms.WriteByte(byte strLen)
-
-    ms.Write(data,0,data.Length)
-    ms.ToArray()
+    let encodedLength = 
+        match data.Count with
+        | l when l >= 65536 ->
+          [| yield 127uy
+             yield! BitConverter.GetBytes(uint64 data.Count) |> Array.rev |]
+        | l when l >= 126 ->
+          [| yield 126uy
+             yield! BitConverter.GetBytes(uint16 data.Count) |> Array.rev |]
+        | _ -> [| byte (data.Count) |]
+    
+    { Frame.OpcodeByte = firstByte; EncodedLength = encodedLength; Data = data }
 
   let readBytes (transport : ITransport) (n : int) =
     let arr = Array.zeroCreate n
@@ -132,8 +138,17 @@ module WebSocket =
       }
     loop 0
 
+  type internal Cont<'t> = 't -> unit
+
+  open System.Threading
+
+  let fork f = ThreadPool.QueueUserWorkItem(WaitCallback(f)) |> ignore
+
   /// This class represents a WebSocket connection, it provides an interface to read and write to a WebSocket.
   type WebSocket(connection : Connection) =
+    
+    let mutable writing = false
+    let mutable reading = false
 
     let readExtendedLength header = socket {
       if header.length = 126 then
@@ -153,11 +168,31 @@ module WebSocket =
           return uint64(header.length)
       }
 
-    let sendFrame opcode bs fin = socket {
-      let frame = frame opcode bs fin
-      let! _ = connection.transport.write <| ArraySegment (frame,0,frame.Length)
-      return ()
+    let writeQueue = new ConcurrentQueue<Frame*Cont<Choice<unit,Error>>>()
+    let readQueue  = new ConcurrentQueue<Cont<Choice<Opcode*byte[]*bool,Error>>>()
+
+    let rec writeloop _ =
+      async{
+        try
+          match writeQueue.TryDequeue() with
+          | true, (frame, ok) ->
+            let! res = writeFrame connection frame 
+            fork (fun _ -> ok res)
+            do! writeloop ()
+          | false, _ ->
+            lock writeQueue (fun _ -> writing <- false)
+        with ex ->
+          lock writeQueue (fun _ -> writing <- false)
       }
+
+    let sendFrame opcode bs fin =
+      let frame = frame opcode bs fin
+      Async.FromContinuations <| fun (ok,ex,cn) ->
+        writeQueue.Enqueue (frame,ok)
+        lock(writeQueue) (fun _ -> 
+          if not writing then
+            writing <- true
+            Async.Start <| writeloop ())
 
     let readFrame () = socket {
       assert (List.length connection.segments = 0)
@@ -173,7 +208,7 @@ module WebSocket =
         let data =
           [| yield! BitConverter.GetBytes (CloseCode.CLOSE_TOO_LARGE.code)
              yield! UTF8.bytes reason |]
-        do! sendFrame Close data true
+        do! sendFrame Close (ArraySegment(data)) true
         return! SocketOp.abort (InputDataError reason)
       else
         let! frame = readBytes connection.transport (int extendedLength)
@@ -182,8 +217,29 @@ module WebSocket =
         return (header.opcode, data, header.fin)
       }
 
-    member this.read () = readFrame ()
-    member this.send opcode bs fin = sendFrame  opcode bs fin
+    let rec readloop _ =
+      async{
+        try
+          match readQueue.TryDequeue() with
+          | true, ok ->
+            let! res = readFrame ()
+            fork (fun _ -> ok res)
+            do! readloop ()
+          | false, _ ->
+            lock readQueue (fun _ -> reading <- false)
+        with ex ->
+          lock readQueue (fun _ -> reading <- false)
+      }
+
+    member this.read () =
+       Async.FromContinuations <| fun (ok,ex,cn) ->
+        readQueue.Enqueue (ok)
+        lock(readQueue) (fun _ -> 
+          if not reading then
+            reading <- true
+            Async.Start <| readloop ())
+
+    member this.send opcode bs fin = sendFrame opcode bs fin
 
   let internal handShakeAux webSocketKey continuation (ctx : HttpContext) =
     socket {
@@ -212,8 +268,13 @@ module WebSocket =
           match a with
           | Choice1Of2 _ ->
             do ()
+
           | Choice2Of2 err ->
-            Log.log ctx.runtime.logger "Suave.Websocket.handShake" LogLevel.Info (sprintf "websocket disconnected: %A" err)
+            ctx.runtime.logger.info (
+              eventX "WebSocket disconnected"
+              >> setSingleName "Suave.Websocket.handShake"
+              >> setFieldValue "error" err)
+
           return! Control.CLOSE ctx
         | _ ->
           return! RequestErrors.BAD_REQUEST "Missing 'sec-websocket-key' header" ctx

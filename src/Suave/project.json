@@ -1,99 +1,101 @@
 {
-    "version": "2.0.0-alpha-dotnetcli",
+    "version": "2.0.0-alpha7-dotnetcli",
 
-    "compilerName": "fsc",
-    "compileFiles": [
-        "../../paket-files/haf/YoLo/YoLo.fs",
-        "Utils/Aether.fs",
-        "Utils/AsyncExtensions.fs",
-        "Utils/AsyncResultCell.fs",
-        "Utils/Collections.fs",
-        "Utils/ASCII.fs",
-        "Utils/Choice.fs",
-        "Utils/ThreadSafeRandom.fs",
-        "Utils/Bytes.fs",
-        "Utils/Compression.fs",
-        "Utils/Crypto.fs",
-        "Utils/Parsing.fs",
-        "Utils/OpenMemoryStream.fs",
-        "Utils/Property.fs",
-        "Utils/Parse.fs",
-        "Utils/CultureInfoCache.fs",
-        "Globals.fs",
-        "CookieSerialiser.fs",
-        "Logging/LogLevel.fs",
-        "Logging/TraceHeader.fs",
-        "Logging/LogLine.fs",
-        "Logging/Logger.fs",
-        "Log.fs",
-        "Sockets/SocketBinding.fs",
-        "Sockets/BufferManager.fs",
-        "Sockets/ConcurrentPool.fs",
-        "Sockets/AsyncUserToken.fs",
-        "Sockets/SocketOp.fs",
-        "Sockets/ITransport.fs",
-        "Sockets/TcpTransport.fs",
-        "Sockets/Connection.fs",
-        "Sockets/SocketMonad.fs",
-        "Sockets/AsyncSocket.fs",
-        "Sockets/TransportStream.fs",
-        "Tcp.fs",
-        "TcpServerFactory.fs",
-        "Sscanf.fs",
-        "WebPart.fsi",
-        "WebPart.fs",
-        "Operators.fs",
-        "Http.fsi",
-        "Http.fs",
-        "Headers.fs",
-        "DefaultTlsProvider.fs",
-        "Compression.fs",
-        "Combinators.fsi",
-        "Combinators.fs",
-        "Cookie.fsi",
-        "Cookie.fs",
-        "Model.fs",
-        "State.fs",
-        "Authentication.fsi",
-        "Authentication.fs",
-        "SuaveConfig.fs",
-        "HttpOutput.fs",
-        "ParsingAndControl.fs",
-        "Web.fs",
-        "WebSocket.fs",        
-        "Owin.fs",
-        "Json.fs"
-    ],
+    "buildOptions": {
+        "compilerName": "fsc",
+        "compile": {
+            "includeFiles": [
+                "../../paket-files/haf/YoLo/YoLo.fs",
+                "Utils/Aether.fs",
+                "Utils/AsyncExtensions.fs",
+                "Utils/AsyncResultCell.fs",
+                "Utils/Collections.fs",
+                "Utils/ASCII.fs",
+                "Utils/Choice.fs",
+                "Utils/ThreadSafeRandom.fs",
+                "Utils/Bytes.fs",
+                "Utils/Compression.fs",
+                "Utils/Crypto.fs",
+                "Utils/Parsing.fs",
+                "Utils/OpenMemoryStream.fs",
+                "Utils/Property.fs",
+                "Utils/Parse.fs",
+                "Utils/CultureInfoCache.fs",
+                "../../paket-files/logary/logary/src/Logary.Facade/Facade.fs",
+                "Utils/TraceHeader.fs",
+                "Globals.fs",
+                "CookieSerialiser.fs",
+                "Sockets/SocketBinding.fs",
+                "Sockets/BufferManager.fs",
+                "Sockets/ConcurrentPool.fs",
+                "Sockets/AsyncUserToken.fs",
+                "Sockets/SocketOp.fs",
+                "Sockets/ITransport.fs",
+                "Sockets/TcpTransport.fs",
+                "Sockets/Connection.fs",
+                "Sockets/SocketMonad.fs",
+                "Sockets/AsyncSocket.fs",
+                "Sockets/TransportStream.fs",
+                "Tcp.fs",
+                "TcpServerFactory.fs",
+                "Sscanf.fs",
+                "WebPart.fsi",
+                "WebPart.fs",
+                "Operators.fs",
+                "Http.fsi",
+                "Http.fs",
+                "Headers.fs",
+                "DefaultTlsProvider.fs",
+                "Compression.fs",
+                "Combinators.fsi",
+                "Combinators.fs",
+                "Cookie.fsi",
+                "Cookie.fs",
+                "Model.fs",
+                "State.fs",
+                "Authentication.fsi",
+                "Authentication.fs",
+                "SuaveConfig.fs",
+                "HttpOutput.fs",
+                "ConnectionFacade.fs",
+                "ParsingAndControl.fs",
+                "Web.fs",
+                "WebSocket.fs",
+                "Owin.fs",
+                "Json.fs"
+            ]
+        }
+    },
 
     "tools": {
-        "dotnet-mergenupkg": { "target": "package", "version": "0.9.*" }	
+        "dotnet-compile-fsc": {
+            "version": "1.0.0-preview2-*",
+            "imports": "dnxcore50"
+        },
+        "dotnet-mergenupkg": { "version": "1.0.*" }
     },
 
     "frameworks": {
-        "netstandard1.5": { 
-            "compilationOptions": {
+        "netstandard1.6": {
+            "buildOptions": {
                 "define": [
-                    "DNXCORE50"
+                    "DNXCORE50",
+                    "NETSTANDARD1_5"
                 ]
             },
             "dependencies": {
-                "System.Data.Common": "4.0.1-rc2-23911",
-                "System.Diagnostics.Process": "4.1.0-rc2-23925",
-                "System.Security.Cryptography.Primitives": "4.0.0-rc2-23911",
-                "System.IO.Compression": "4.1.0-rc2-23911",
-                "System.Net.Security": "4.0.0-rc2-23911",
-                "System.Globalization.Extensions": "4.0.1-rc2-23911",
-                "Microsoft.FSharp.Core.netcore": "1.0.0-alpha-160316",
-                "NETStandard.Library": "1.5.0-rc2-23911",
-                "System.Security.Claims": "4.0.1-*",
-                "System.Runtime.Serialization.Json": "4.0.2-rc2-23911"
-            },
-            "imports": [
-                "dnxcore50",
-                "portable-net45+win81"
-            ]
+                "System.Data.Common": "4.1.0",
+                "System.Diagnostics.Process": "4.1.0",
+                "System.Security.Cryptography.Primitives": "4.0.0",
+                "System.Net.Security": "4.0.0",
+                "System.Globalization.Extensions": "4.0.1",
+                "Microsoft.FSharp.Core.netcore": "1.0.0-alpha-*",
+                "NETStandard.Library": "1.6.0",
+                "System.Security.Claims": "4.0.1",
+                "System.Runtime.Serialization.Json": "4.0.2"
+            }
         },
-        "net46" : { 
+        "net46" : {
             "dependencies": {
                 "FSharp.Core": "4.0.0.1"
             },

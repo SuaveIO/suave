@@ -42,20 +42,20 @@ let websocketTests cfg =
           let str = UTF8.toString data
           match str with
           | "BinaryRequest7bit" ->  
-            let message = Array.create (int PayloadSize.Bit7) 0uy
+            let message = ArraySegment(Array.create (int PayloadSize.Bit7) 0uy)
             do! webSocket.send Binary message true
           | "BinaryRequest16bit" ->  
-            let message = Array.create (int PayloadSize.Bit16) 0uy
+            let message = ArraySegment(Array.create (int PayloadSize.Bit16) 0uy)
             do! webSocket.send Binary message true
           | "BinaryRequest32bit" ->  
-            let message = Array.create (int PayloadSize.Bit32) 0uy
+            let message = ArraySegment(Array.create (int PayloadSize.Bit32) 0uy)
             do! webSocket.send Binary message true
           | _ -> 
-            do! webSocket.send Text data true
+            do! webSocket.send Text (ArraySegment data) true
         | (Ping, _, _) ->
-          do! webSocket.send Pong [||] true
+          do! webSocket.send Pong (ArraySegment([||])) true
         | (Close, _, _) ->
-          do! webSocket.send Close [||] true
+          do! webSocket.send Close (ArraySegment([||])) true
           loop := false
         | _ -> ()
       }

@@ -17,7 +17,7 @@ open Suave.State.CookieStateStore
 let basicAuth =
   Authentication.authenticateBasic ((=) ("foo", "bar"))
 
-let logger = Loggers.ConsoleWindowLogger LogLevel.Verbose
+let logger = Targets.create Verbose
 
 ///  With this workflow you can write WebParts like this
 let task : WebPart =
@@ -45,14 +45,17 @@ let myApp =
 // typed routes
 let testApp =
   choose [
-    log logger logFormat >=> never
+    logStructured logger logFormatStructured >=> never
     pathScan "/add/%d/%d"   (fun (a,b) -> OK((a + b).ToString()))
     pathScan "/minus/%d/%d" (fun (a,b) -> OK((a - b).ToString()))
     pathScan "/divide/%d/%d" (fun (a,b) -> OK((a / b).ToString()))
     RequestErrors.NOT_FOUND "Found no handlers"
   ]
 
+#if NETSTANDARD1_5
+#else
 System.Net.ServicePointManager.DefaultConnectionLimit <- Int32.MaxValue
+#endif
 
 // How to write a new primitive WebPart
 let sleep milliseconds message: WebPart =
@@ -65,7 +68,7 @@ let sleep milliseconds message: WebPart =
 // Adds a new mime type to the default map
 let mimeTypes =
   Writers.defaultMimeTypesMap
-    @@ (function | ".avi" -> Writers.mkMimeType "video/avi" false | _ -> None)
+    @@ (function | ".avi" -> Writers.createMimeType "video/avi" false | _ -> None)
 
 module OwinSample =
   open System.Collections.Generic
@@ -88,6 +91,17 @@ module OwinSample =
 
     OwinApp.ofApp "/" owinApp
 
+let unzipBody : WebPart =
+  fun ctx -> WebPart.asyncOption {
+    if ctx.request.header "content-encoding" = Choice1Of2 "gzip" then
+      return { ctx with request = { ctx.request with rawForm = Utils.Compression.gzipDecode ctx.request.rawForm} }
+    else
+      return ctx }
+
+open System.IO
+open Suave.Sockets
+open Suave.Sockets.Control
+
 let app =
   choose [
     GET >=> path "/hello" >=> never
@@ -95,6 +109,26 @@ let app =
     path "/neverme" >=> never >=> OK (Guid.NewGuid().ToString())
     path "/guid" >=> OK (Guid.NewGuid().ToString())
     path "/hello" >=> OK "Hello World"
+    path "/byte-stream" >=> (fun ctx ->
+
+      let write (conn, _) = socket {
+        use ms = new MemoryStream()
+        ms.Write([| 1uy; 2uy; 3uy |], 0, 3)
+        ms.Seek(0L, SeekOrigin.Begin) |> ignore
+        // do things here
+        let! (_,conn) = asyncWriteLn (sprintf "Content-Length: %d\r\n" ms.Length) conn
+        let! conn = flush conn
+        do! transferStream conn ms
+        return conn
+      }
+
+      { ctx with
+          response =
+            { ctx.response with
+                status = HTTP_200.status
+                content = SocketTask write } }
+      |> succeed
+    )
     (path "/apple" <|> path "/orange") >=> OK "Hello Fruit"
     GET >=> path "/query" >=> request( fun x -> cond (x.queryParam "name") (fun y -> OK ("Hello " + y)) never)
     GET >=> path "/query" >=> OK "Hello beautiful"
@@ -150,7 +184,7 @@ let app =
         PUT >=> path "/upload2"
           >=> request (fun x ->
              let files =
-               x.files 
+               x.files
                |> Seq.map (fun y -> sprintf "(%s, %s, %s)" y.fileName y.mimeType y.tempFilePath)
                |> String.concat "<br/>"
              OK (sprintf "Upload successful.<br>POST data: %A<br>Uploaded files (%d): %s" x.multiPartFields (List.length x.files) files))
@@ -161,7 +195,7 @@ let app =
           >=> OK "Doooooge"
         RequestErrors.NOT_FOUND "Found no handlers"
       ]
-    ] >=> log logger logFormat
+    ] >=> logStructured logger logFormatStructured
 
 (*
 // using Suave.OpenSSL
@@ -188,8 +222,8 @@ let main argv =
   let cert = X509Certificate2("suave.p12","easy")
 
   startWebServer
-    { bindings              = [ HttpBinding.mkSimple HTTP "127.0.0.1" 8082
-                                HttpBinding.mkSimple (HTTPS cert) "127.0.0.1" 8443
+    { bindings              = [ HttpBinding.createSimple HTTP "127.0.0.1" 8082
+                                HttpBinding.createSimple (HTTPS cert) "127.0.0.1" 8443
                               ]
       serverKey             = Utils.Crypto.generateKey HttpRuntime.ServerKeyLength
       errorHandler          = defaultErrorHandler
@@ -202,8 +236,13 @@ let main argv =
       homeFolder            = None
       compressedFilesFolder = None
       logger                = logger
+      initialiseLogger      = true
       tcpServerFactory      = new DefaultTcpServerFactory()
+#if NETSTANDARD1_5
+      cookieSerialiser      = new JsonFormatterSerialiser()
+#else
       cookieSerialiser      = new BinaryFormatterSerialiser()
+#endif
       tlsProvider           = new DefaultTlsProvider()
       hideHeader            = false }
     app

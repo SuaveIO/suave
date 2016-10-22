@@ -5,6 +5,7 @@ open System.Text
 open Suave.RequestErrors
 open Suave.Utils
 open Suave.Logging
+open Suave.Logging.Message
 open Suave.Cookie
 open Suave.State.CookieStateStore
 open Suave.Operators
@@ -74,18 +75,20 @@ let authenticate relativeExpiry secure
                  (decryptionFailure : Crypto.SecretboxDecryptionError -> Choice<byte [], WebPart>)
                  (fSuccess : WebPart)
                  : WebPart =
-  context (fun ctx ->
-    Log.log ctx.runtime.logger "Suave.Auth.authenticate" LogLevel.Debug "authenticating"
 
-    cookieState
+  context (fun ctx ->
+    ctx.runtime.logger.debug (
+      eventX "Authenticating"
+      >> setSingleName "Suave.Auth.authenticate")
+
+    let state =
       { serverKey      = ctx.runtime.serverKey
         cookieName     = SessionAuthCookie
         userStateKey   = StateStoreType
         relativeExpiry = relativeExpiry
         secure         = secure }
-      missingCookie
-      decryptionFailure
-      fSuccess)
+
+    cookieState state missingCookie decryptionFailure fSuccess)
 
 let authenticateWithLogin relativeExpiry loginPage fSuccess : WebPart =
   authenticate relativeExpiry false

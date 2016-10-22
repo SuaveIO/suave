@@ -89,7 +89,6 @@ module Compression =
     if not (Directory.Exists compressionFolder) then Directory.CreateDirectory compressionFolder |> ignore
     let newPath = Path.Combine(compressionFolder,tempFileName)
     do! compress n newPath stream
-    stream.Dispose()
     return newPath
   }
 
@@ -101,16 +100,19 @@ module Compression =
         let enconding = parseEncoder ctx.request
         match enconding with
         | Some n ->
-          if Globals.compressedFilesMap.ContainsKey key then
-            let lastModified = getLast key
-            let cmprInfo = new FileInfo(Globals.compressedFilesMap.[key])
-            if lastModified > cmprInfo.CreationTime then
-              let! newPath = compressFile n stream compressionFolder
-              Globals.compressedFilesMap.[key] <- newPath
-          else
-            let! newPath =  compressFile n stream compressionFolder
-            Globals.compressedFilesMap.TryAdd(key,newPath) |> ignore
-          return Some n, new FileStream(Globals.compressedFilesMap.[key], FileMode.Open, FileAccess.Read, FileShare.Read) :> Stream
+          try
+            if Globals.compressedFilesMap.ContainsKey key then
+              let lastModified = getLast key
+              let cmprInfo = new FileInfo(Globals.compressedFilesMap.[key])
+              if lastModified > cmprInfo.CreationTime then
+                let! newPath = compressFile n stream compressionFolder
+                Globals.compressedFilesMap.[key] <- newPath
+            else
+              let! newPath =  compressFile n stream compressionFolder
+              Globals.compressedFilesMap.TryAdd(key,newPath) |> ignore
+            return Some n, new FileStream(Globals.compressedFilesMap.[key], FileMode.Open, FileAccess.Read, FileShare.Read) :> Stream
+          finally
+            stream.Dispose()
         | None ->
           return None, stream
       else

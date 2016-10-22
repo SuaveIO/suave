@@ -20,8 +20,8 @@ let main args =
 
   let testConfig =
     { defaultConfig with
-        bindings = [ HttpBinding.mkSimple HTTP "127.0.0.1" 9001 ]
-        logger   = Loggers.saneDefaultsFor LogLevel.Warn }
+        bindings = [ HttpBinding.createSimple HTTP "127.0.0.1" 9001 ]
+        logger   = Targets.create Warn }
 
   Console.WriteLine "Running tests with default TCP engine."
   let firstRun = defaultMainThisAssemblyWithParam testConfig args

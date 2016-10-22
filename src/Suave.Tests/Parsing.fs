@@ -19,6 +19,15 @@ open Suave.Tests.TestUtilities
 open Suave.Testing
 
 [<Tests>]
+let parseQuery =
+  testCase "can parse with =" <| fun _ ->
+    let parsed =
+      Parsing.parseData "bewit=c&d=Q%3D%3D&r=https%3A%2F%2Fqvitoo.dev%3A8080%2F"
+    Assert.Equal("", 3, parsed.Length)
+    Assert.Equal("", "Q==", parsed.[1] |> snd |> Option.get)
+
+
+[<Tests>]
 let parsingMultipart cfg =
   let runWithConfig = runWith cfg
 
@@ -42,28 +51,28 @@ let parsingMultipart cfg =
   byteArrayContent.Headers.TryAddWithoutValidation("Content-Type","multipart/form-data; boundary=99233d57-854a-4b17-905b-ae37970e8a39") |> ignore
 
   testList "http parser tests" [
-      testCase "parsing a large multipart form" <| fun _ ->
-        Assert.Equal("", "Bob <bob@wishfulcoding.mailgun.org>", runWithConfig testMultipartForm |> req HttpMethod.POST "/" (Some byteArrayContent))
+    testCase "parsing a large multipart form" <| fun _ ->
+      Assert.Equal("", "Bob <bob@wishfulcoding.mailgun.org>", runWithConfig testMultipartForm |> req HttpMethod.POST "/" (Some byteArrayContent))
 
-      testCase "parsing a large urlencoded form data" <| fun _ ->
-        Assert.Equal("", "hallo wereld", 
-          runWithConfig (testUrlEncodedForm "stripped-text") |> reqGZip HttpMethod.POST "/" (Some <| new StringContent(postData2, Encoding.UTF8, "application/x-www-form-urlencoded")))
+    testCase "parsing a large urlencoded form data" <| fun _ ->
+      Assert.Equal("", "hallo wereld", 
+        runWithConfig (testUrlEncodedForm "stripped-text") |> reqGZip HttpMethod.POST "/" (Some <| new StringContent(postData2, Encoding.UTF8, "application/x-www-form-urlencoded")))
 
-      testCase "parsing a large urlencoded form data" <| fun _ ->
-        Assert.Equal("", "Pepijn de Vos <pepijndevos@gmail.com>", 
-          runWithConfig (testUrlEncodedForm "from") |> reqGZip HttpMethod.POST "/" (Some <| new StringContent(postData3, Encoding.UTF8, "application/x-www-form-urlencoded")))
+    testCase "parsing a large urlencoded form data" <| fun _ ->
+      Assert.Equal("", "Pepijn de Vos <pepijndevos@gmail.com>", 
+        runWithConfig (testUrlEncodedForm "from") |> reqGZip HttpMethod.POST "/" (Some <| new StringContent(postData3, Encoding.UTF8, "application/x-www-form-urlencoded")))
 
-      testCase "parsing a large urlencoded form data" <| fun _ ->
-        Assert.Equal("", "no attachment 2",
-          runWithConfig (testUrlEncodedForm "subject") |> reqGZip HttpMethod.POST "/" (Some <| new StringContent(postData3, Encoding.UTF8, "application/x-www-form-urlencoded")))
+    testCase "parsing a large urlencoded form data" <| fun _ ->
+      Assert.Equal("", "no attachment 2",
+        runWithConfig (testUrlEncodedForm "subject") |> reqGZip HttpMethod.POST "/" (Some <| new StringContent(postData3, Encoding.UTF8, "application/x-www-form-urlencoded")))
 
-      testCase "parsing a large urlencoded form data" <| fun _ ->
-        Assert.Equal("", "identifier 123abc", 
-          runWithConfig (testUrlEncodedForm "body-plain") |> reqGZip HttpMethod.POST "/" (Some <| new StringContent(postData3, Encoding.UTF8, "application/x-www-form-urlencoded")))
+    testCase "parsing a large urlencoded form data" <| fun _ ->
+      Assert.Equal("", "identifier 123abc", 
+        runWithConfig (testUrlEncodedForm "body-plain") |> reqGZip HttpMethod.POST "/" (Some <| new StringContent(postData3, Encoding.UTF8, "application/x-www-form-urlencoded")))
 
-      testCase "parsing a large urlencoded form data" <| fun _ ->
-        Assert.Equal("", "field-does-not-exists", 
-          runWithConfig (testUrlEncodedForm "body-html") |> reqGZip HttpMethod.POST "/" (Some <| new StringContent(postData3, Encoding.UTF8, "application/x-www-form-urlencoded")))
+    testCase "parsing a large urlencoded form data" <| fun _ ->
+      Assert.Equal("", "field-does-not-exists", 
+        runWithConfig (testUrlEncodedForm "body-html") |> reqGZip HttpMethod.POST "/" (Some <| new StringContent(postData3, Encoding.UTF8, "application/x-www-form-urlencoded")))
   ]
 
 open System.Net

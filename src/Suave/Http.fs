@@ -16,7 +16,6 @@ module Http =
   open Suave.Sockets
   open Suave.Tcp
   open Suave.Utils
-  open Suave.Log
   open Suave.Logging
 
   open Microsoft.FSharp.Reflection
@@ -63,7 +62,7 @@ module Http =
         | "OPTIONS" -> HttpMethod.OPTIONS
         | s         -> HttpMethod.OTHER s
 
-  type HttpStatus = 
+  type HttpStatus =
     { code   : int
       reason : string
     }
@@ -73,27 +72,29 @@ module Http =
   type HttpCode =
     | HTTP_100 | HTTP_101
     | HTTP_200 | HTTP_201 | HTTP_202 | HTTP_203 | HTTP_204 | HTTP_205 | HTTP_206
-    | HTTP_300 | HTTP_301 | HTTP_302 | HTTP_303 | HTTP_304 | HTTP_305 | HTTP_307
-    | HTTP_400 | HTTP_401 | HTTP_402 | HTTP_403 | HTTP_404 | HTTP_405 | HTTP_406
-    | HTTP_407 | HTTP_408 | HTTP_409 | HTTP_410 | HTTP_411 | HTTP_412 | HTTP_413
-    | HTTP_422 | HTTP_428 | HTTP_429 | HTTP_414 | HTTP_415 | HTTP_416 | HTTP_417
-    | HTTP_451 | HTTP_500 | HTTP_501 | HTTP_502 | HTTP_503 | HTTP_504 | HTTP_505
+    | HTTP_300 | HTTP_301 | HTTP_302 | HTTP_303 | HTTP_304 | HTTP_305 | HTTP_306
+    | HTTP_307 | HTTP_400 | HTTP_401 | HTTP_402 | HTTP_403 | HTTP_404 | HTTP_405 
+    | HTTP_406 | HTTP_407 | HTTP_408 | HTTP_409 | HTTP_410 | HTTP_411 | HTTP_412 
+    | HTTP_413 | HTTP_422 | HTTP_426 | HTTP_428 | HTTP_429 | HTTP_414 | HTTP_415 
+    | HTTP_416 | HTTP_417 | HTTP_451 | HTTP_500 | HTTP_501 | HTTP_502 | HTTP_503 
+    | HTTP_504 | HTTP_505
 
-    member x.code = 
-      match x with 
+    member x.code =
+      match x with
       | HTTP_100 -> 100 | HTTP_101 -> 101 | HTTP_200 -> 200 | HTTP_201 -> 201
       | HTTP_202 -> 202 | HTTP_203 -> 203 | HTTP_204 -> 204 | HTTP_205 -> 205
       | HTTP_206 -> 206 | HTTP_300 -> 300 | HTTP_301 -> 301 | HTTP_302 -> 302
-      | HTTP_303 -> 303 | HTTP_304 -> 304 | HTTP_305 -> 305 | HTTP_307 -> 307
-      | HTTP_400 -> 400 | HTTP_401 -> 401 | HTTP_402 -> 402 | HTTP_403 -> 403
-      | HTTP_404 -> 404 | HTTP_405 -> 405 | HTTP_406 -> 406 | HTTP_407 -> 407
-      | HTTP_408 -> 408 | HTTP_409 -> 409 | HTTP_410 -> 410 | HTTP_411 -> 411
-      | HTTP_412 -> 412 | HTTP_413 -> 413 | HTTP_414 -> 414 | HTTP_415 -> 415
-      | HTTP_416 -> 416 | HTTP_417 -> 417 | HTTP_422 -> 422 | HTTP_428 -> 428
-      | HTTP_429 -> 429 | HTTP_451 -> 451 | HTTP_500 -> 500 | HTTP_501 -> 501
-      | HTTP_502 -> 502 | HTTP_503 -> 503 | HTTP_504 -> 504 | HTTP_505 -> 505
+      | HTTP_303 -> 303 | HTTP_304 -> 304 | HTTP_305 -> 305 | HTTP_306 -> 306 
+      | HTTP_307 -> 307 | HTTP_400 -> 400 | HTTP_401 -> 401 | HTTP_402 -> 402 
+      | HTTP_403 -> 403 | HTTP_404 -> 404 | HTTP_405 -> 405 | HTTP_406 -> 406 
+      | HTTP_407 -> 407 | HTTP_408 -> 408 | HTTP_409 -> 409 | HTTP_410 -> 410 
+      | HTTP_411 -> 411 | HTTP_412 -> 412 | HTTP_413 -> 413 | HTTP_414 -> 414 
+      | HTTP_415 -> 415 | HTTP_416 -> 416 | HTTP_417 -> 417 | HTTP_422 -> 422 
+      | HTTP_426 -> 426 | HTTP_428 -> 428 | HTTP_429 -> 429 | HTTP_451 -> 451 
+      | HTTP_500 -> 500 | HTTP_501 -> 501 | HTTP_502 -> 502 | HTTP_503 -> 503 
+      | HTTP_504 -> 504 | HTTP_505 -> 505
 
-    member x.reason = 
+    member x.reason =
       match x with
       | HTTP_100 -> "Continue"
       | HTTP_101 -> "Switching Protocols"
@@ -110,6 +111,7 @@ module Http =
       | HTTP_303 -> "See Other"
       | HTTP_304 -> "Not Modified"
       | HTTP_305 -> "Use Proxy"
+      | HTTP_306 -> "Unused"
       | HTTP_307 -> "Temporary Redirect"
       | HTTP_400 -> "Bad Request"
       | HTTP_401 -> "Unauthorized"
@@ -130,6 +132,7 @@ module Http =
       | HTTP_416 -> "Requested Range Not Satisfiable"
       | HTTP_417 -> "Expectation Failed"
       | HTTP_422 -> "Unprocessable Entity"
+      | HTTP_426 -> "Upgrade Required"
       | HTTP_428 -> "Precondition Required"
       | HTTP_429 -> "Too Many Requests"
       | HTTP_451 -> "Unavailable For Legal Reasons"
@@ -140,8 +143,8 @@ module Http =
       | HTTP_504 -> "Gateway Timeout"
       | HTTP_505 -> "HTTP Version Not Supported"
 
-    member x.message = 
-      match x with 
+    member x.message =
+      match x with
       | HTTP_100 -> "Request received, please continue"
       | HTTP_101 -> "Switching to new protocol; obey Upgrade header"
       | HTTP_200 -> "Request fulfilled, document follows"
@@ -157,6 +160,7 @@ module Http =
       | HTTP_303 -> "Object moved -- see Method and URL list"
       | HTTP_304 -> "Document has not changed since given time"
       | HTTP_305 -> "You must use proxy specified in Location to access this resource."
+      | HTTP_306 -> "Unused is a proposed extension to the HTTP/1.1 specification that is not fully specified."
       | HTTP_307 -> "Object moved temporarily -- see URI list"
       | HTTP_400 -> "Bad request syntax or unsupported method"
       | HTTP_401 -> "No permission -- see authorization schemes"
@@ -177,6 +181,7 @@ module Http =
       | HTTP_416 -> "Cannot satisfy request range."
       | HTTP_417 -> "Expect condition could not be satisfied."
       | HTTP_422 -> "The entity sent to the server was invalid."
+      | HTTP_426 -> "Upgrade Required indicates that the client should switch to a different protocol such as TLS/1.0."
       | HTTP_428 -> "You should verify the server accepts the request before sending it."
       | HTTP_429 -> "Request rate too high, chill out please."
       | HTTP_451 -> "The server is subject to legal restrictions which prevent it servicing the request"
@@ -220,8 +225,8 @@ module Http =
       secure   : bool
       httpOnly : bool }
 
-    static member name_     = (fun x -> x.name),    fun v x -> { x with name = v }
-    static member value_    = (fun x -> x.value), fun v x -> { x with value = v }
+    static member name_     = (fun x -> x.name),    fun v (x : HttpCookie) -> { x with name = v }
+    static member value_    = (fun x -> x.value), fun v (x : HttpCookie) -> { x with value = v }
     static member expires_  = (fun x -> x.expires), fun v x -> { x with expires = v }
     static member path_     = (fun x -> x.path), fun v (x : HttpCookie) -> { x with path = v }
     static member domain_   = (fun x -> x.domain), fun v x -> { x with domain = v }
@@ -231,7 +236,7 @@ module Http =
   [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
   module HttpCookie =
 
-    let mk name value expires path domain secure httpOnly =
+    let create name value expires path domain secure httpOnly =
       { name      = name
         value     = value
         expires   = expires
@@ -241,7 +246,7 @@ module Http =
         httpOnly = httpOnly }
 
 
-    let mkKV name value =
+    let createKV name value =
       { name      = name
         value     = value
         expires   = None
@@ -250,7 +255,7 @@ module Http =
         secure    = false
         httpOnly = true }
 
-    let empty = mkKV "" ""
+    let empty = createKV "" ""
 
     let toHeader (x : HttpCookie) =
       let app (sb : StringBuilder) (value : string) = sb.Append value |> ignore
@@ -288,16 +293,16 @@ module Http =
   type TlsProvider =
     abstract member wrap : Connection * obj -> SocketOp<Connection>
 
-  type Protocol = 
+  type Protocol =
     | HTTP
     | HTTPS of obj
 
-    member x.secure = 
+    member x.secure =
       match x with
       | HTTP    -> false
       | HTTPS _ -> true
 
-    override x.ToString() = 
+    override x.ToString() =
       match x with
       | HTTP    -> "http"
       | HTTPS _ -> "https"
@@ -334,7 +339,7 @@ module Http =
 
     member x.header key =
       // Field names are case-insensitive (RFC 2616 section 4.2)
-      getFirstCaseInsensitve x.headers key
+      getFirstCaseInsensitive x.headers key
 
     member x.form =
       Parsing.parseData (ASCII.toString x.rawForm)
@@ -355,7 +360,7 @@ module Http =
 
         let params' =
           (tryGetChoice1 this.queryParam)
-            >>= (tryGetChoice1 this.formData) 
+            >>= (tryGetChoice1 this.formData)
             >>= (tryGetChoice1 <| getFirst this.multiPartFields)
 
         params' x
@@ -419,15 +424,15 @@ module Http =
 
     let defaults =
       { scheme        = HTTP
-        socketBinding = SocketBinding.mk IPAddress.Loopback DefaultBindingPort }
+        socketBinding = SocketBinding.create IPAddress.Loopback DefaultBindingPort }
 
-    let mk scheme (ip : IPAddress) (port : Port) = 
+    let create scheme (ip : IPAddress) (port : Port) =
       { scheme        = scheme
-        socketBinding = SocketBinding.mk ip port }
+        socketBinding = SocketBinding.create ip port }
 
-    let mkSimple scheme ip (port : int) = 
+    let createSimple scheme ip (port : int) =
       { scheme        = scheme
-        socketBinding = SocketBinding.mk (IPAddress.Parse ip) (uint16 port) } 
+        socketBinding = SocketBinding.create (IPAddress.Parse ip) (uint16 port) }
 
   type HttpContent =
     | NullContent
@@ -583,7 +588,7 @@ module Http =
         content       = HttpContent.NullContent
         writePreamble = true }
 
-  /// a module that gives you the `empty` (beware) and `mk` functions for creating
+  /// a module that gives you the `empty` (beware) and `create` functions for creating
   /// a HttpRuntime
   [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
   module HttpRuntime =
@@ -596,7 +601,7 @@ module Http =
         mimeTypesMap      = fun _ -> None
         homeDirectory     = "."
         compressionFolder = "."
-        logger            = Loggers.saneDefaultsFor LogLevel.Debug
+        logger            = Targets.create Debug
         matchedBinding    = HttpBinding.defaults
         parsePostData     = false
         #if NETSTANDARD1_5
@@ -607,7 +612,7 @@ module Http =
         tlsProvider       = null
         hideHeader        = false }
 
-    let mk serverKey errorHandler mimeTypes homeDirectory compressionFolder
+    let create serverKey errorHandler mimeTypes homeDirectory compressionFolder
            logger parsePostData cookieSerialiser tlsProvider hideHeader binding =
       { serverKey         = serverKey
         errorHandler      = errorHandler
@@ -630,7 +635,7 @@ module Http =
         connection = Connection.empty
         response   = HttpResult.empty }
 
-    let mk request runtime connection writePreamble =
+    let create request runtime connection writePreamble =
       { request    = request
         userState  = Map.empty
         runtime    = runtime

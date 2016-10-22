@@ -32,3 +32,4 @@ project.lock.json
 *.project.lock.json
 dotnet-dev-*
 tools/coreclr/
+dotnet_cli_install.ps1

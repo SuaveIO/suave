@@ -14,14 +14,14 @@ open Suave.State.CookieStateStore
 open Suave.Utils
 open Suave.Operators
 
-let logger = Loggers.ConsoleWindowLogger LogLevel.Verbose
+let logger = Targets.create Verbose
 
 let corsConfig = { defaultCORSConfig with allowedUris = InclusiveOption.Some [ "http://localhost:8085" ] }
 
 let app =
-    choose [ 
+    choose [
         GET >=> path "/hello" >=> cors corsConfig >=> OK "CORS request accepted."
-    ] >=> log logger logFormat
+    ] >=> logStructured logger logFormatStructured
 
 [<EntryPoint>]
 let main argv =

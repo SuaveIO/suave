@@ -4,11 +4,10 @@
 open System
 open System.Net
 open System.Net.Http
-
 open Fuchu
-
 open Suave
 open Suave.Logging
+open Suave.Logging.Message
 open Suave.Cookie
 open Suave.State.CookieStateStore
 open Suave.Operators
@@ -16,7 +15,6 @@ open Suave.Successful
 open Suave.Filters
 open Suave.RequestErrors
 open Suave.Authentication
-
 open Suave.Testing
 
 type Assert with
@@ -38,19 +36,29 @@ let reqResp
   (cookies : CookieContainer option)
   (fRequest : HttpRequestMessage -> HttpRequestMessage)
   fResult
-  ctx =
+  (ctx : SuaveTestCtx) =
 
-  let log = Suave.Log.info ctx.suaveConfig.logger "Suave.Tests" TraceHeader.empty
-  log (sprintf "%A %s" methd resource)
+  let event message =
+    eventX message >> setSingleName "Suave.Tests"
+
+  let logger =
+    ctx.suaveConfig.logger
+
+  logger.debug (
+    event "{method} {resource}"
+    >> setFieldValue "method" methd
+    >> setFieldValue "resource" resource)
 
   let defaultTimeout = TimeSpan.FromSeconds 5.
 
-  use handler = mkHandler DecompressionMethods.None cookies
-  use client = mkClient handler
-  use request = mkRequest methd resource "" None (endpointUri ctx.suaveConfig) |> fRequest
+  use handler = createHandler DecompressionMethods.None cookies
+  use client = createClient handler
+  use request = createRequest methd resource "" None (endpointUri ctx.suaveConfig) |> fRequest
 
   for h in request.Headers do
-    log (sprintf "%s: %s" h.Key (String.Join(", ", h.Value)))
+    logger.debug (event "{headerName}: {headerValue}"
+                  >> setFieldValue "headerName" h.Key
+                  >> setFieldValue "headerValue" (String.Join(", ", h.Value)))
 
   // use -> let!!!
   let result = request |> send client defaultTimeout ctx
@@ -87,7 +95,7 @@ let sessionState f =
 
 [<Tests>]
 let authTests cfg =
-  let runWithConfig = runWith { cfg with logger = Loggers.saneDefaultsFor LogLevel.Warn }
+  let runWithConfig = runWith { cfg with logger = Targets.create Warn }
   testList "auth tests" [
     testCase "baseline, no auth cookie" <| fun _ ->
       let ctx = runWithConfig (OK "ACK")

@@ -79,6 +79,8 @@
     <Compile Include="TestUtilities.fs" />
     <Content Include="regressions\Bug105-StopsResponding.fsx" />
     <Compile Include="regressions\Bug256-FormDataParsing.fs" />
+    <Content Include="regressions\Bug435.fsx" />
+    <Compile Include="regressions\Bug435-OwinContentLength.fs" />
     <Content Include="regressions\pix.gif">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
@@ -102,11 +104,15 @@
     <Compile Include="Json.fs" />
     <Compile Include="Owin.fs" />
     <Compile Include="Auth.fs" />
+    <Compile Include="LogLevel.fs" />
+    <Compile Include="TraceHeader.fs" />
+    <Compile Include="Logger.fs" />
     <Compile Include="Cookie.fs" />
     <Compile Include="Types.fs" />
     <Compile Include="WebSocket.fs" />
     <Compile Include="Http2.fs" />
     <Compile Include="Razor.fs" />
+    <Compile Include="DotLiquid.fs" />
     <Compile Include="FuchuExtensions.fs" />
     <Compile Include="Program.fs" />
     <None Include="paket.references" />
@@ -148,6 +154,15 @@
     <Content Include="fallback.cshtml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <None Include="liquid\hello.liquid">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="liquid\parent.liquid">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="liquid\child.liquid">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Reference Include="mscorlib" />
@@ -171,6 +186,10 @@
     <ProjectReference Include="..\Suave.LibUv\Suave.LibUv.fsproj">
       <Project>{7C787110-A146-4021-8163-40137E325DB4}</Project>
       <Name>Suave.LibUv</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\Suave.DotLiquid\Suave.DotLiquid.fsproj">
+      <Project>{4E3FE86D-FDB7-4DAA-8D58-13F06F75D240}</Project>
+      <Name>Suave.DotLiquid</Name>
     </ProjectReference>
   </ItemGroup>
   <Choose>
@@ -242,8 +261,29 @@
   <Choose>
     <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
       <ItemGroup>
+        <Reference Include="Hopac.Core">
+          <HintPath>..\..\packages\tests\Hopac\lib\net45\Hopac.Core.dll</HintPath>
+          <Private>True</Private>
+          <Paket>True</Paket>
+        </Reference>
+        <Reference Include="Hopac.Platform">
+          <HintPath>..\..\packages\tests\Hopac\lib\net45\Hopac.Platform.dll</HintPath>
+          <Private>True</Private>
+          <Paket>True</Paket>
+        </Reference>
+        <Reference Include="Hopac">
+          <HintPath>..\..\packages\tests\Hopac\lib\net45\Hopac.dll</HintPath>
+          <Private>True</Private>
+          <Paket>True</Paket>
+        </Reference>
+      </ItemGroup>
+    </When>
+  </Choose>
+  <Choose>
+    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
+      <ItemGroup>
         <Reference Include="HttpFs">
-          <HintPath>..\..\packages\tests\Http.fs-prerelease\lib\net40\HttpFs.dll</HintPath>
+          <HintPath>..\..\packages\tests\Http.fs\lib\net40\HttpFs.dll</HintPath>
           <Private>True</Private>
           <Paket>True</Paket>
         </Reference>

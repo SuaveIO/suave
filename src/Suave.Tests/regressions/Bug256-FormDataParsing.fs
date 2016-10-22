@@ -6,7 +6,7 @@ open Fuchu
 open System
 open System.IO
 open System.Reflection
-
+open Hopac
 open Suave
 open Suave.Utils
 open Suave.Logging
@@ -41,20 +41,20 @@ let tests (cfg : SuaveConfig) =
   let uriFor (res : string) =
     SuaveConfig.firstBindingUri cfg res ""
 
-  let postTo res = createRequest Post (uriFor res) |> withKeepAlive false
+  let postTo res = Request.create Post (uriFor res) |> Request.keepAlive false
 
   testCase "can send/receive" <| fun _ ->
     let ctx = runWithConfig app
     try
       use fs = File.OpenRead (pathOf "regressions/pix.gif")
-      let file = "pix.gif", ContentType.Create("image", "gif"), StreamData fs
+      let file = "pix.gif", ContentType.create("image", "gif"), StreamData fs
 
       //printfn "--- get response"
       let data =
         postTo "gifs/echo"
-        |> withBody (BodyForm [ FormFile ("img", file) ])
+        |> Request.body (BodyForm [ FormFile ("img", file) ])
         |> Request.responseAsBytes
-        |> Async.RunSynchronously
+        |> run
 
       fs.Seek(0L, SeekOrigin.Begin) |> ignore
 

@@ -20,6 +20,6 @@ let poolTests (config: SuaveConfig) =
 
     testCase "BufferManager" <| fun _ ->
       // 5 buffers
-      let bufferManager = new BufferManager(2560, 512, config.logger, true)
+      let bufferManager = new BufferManager(2560, 512, true)
       for i = 0 to 10 do bufferManager.PopBuffer() |> ignore
       Assert.Equal("test ran to completion", true, true)]

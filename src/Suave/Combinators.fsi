@@ -76,7 +76,7 @@ module Writers =
   /// <summary>
   /// Creates a MIME type record
   /// </summary>
-  val mkMimeType : name:string -> compression:bool -> MimeType option
+  val createMimeType : name:string -> compression:bool -> MimeType option
 
   /// <summary><para>
   /// Map a file ending to a mime-type
@@ -421,7 +421,7 @@ module Redirection =
   ///    kind of reaction is expected of the client.
   /// </remarks>
   val FOUND : location:string -> WebPart
-  
+
   /// <summary><para>
   /// Composite:
   /// </para><para>
@@ -656,7 +656,7 @@ module RequestErrors =
   /// response is applicable.
   /// </para></summary>
   val not_found : bytes:byte [] -> WebPart
-  
+
   /// <summary><para>
   /// 404
   /// </para><para>
@@ -724,7 +724,7 @@ module RequestErrors =
   /// <remarks>
   /// </remarks>
   val not_acceptable : bytes:byte[] -> WebPart
-  
+
   /// <summary><para>
   /// 406
   /// </para><para>
@@ -787,7 +787,7 @@ module RequestErrors =
   /// Content-Type.
   /// </para></summary>
   val conflict : bytes:byte[] -> WebPart
-  
+
   /// <summary><para>
   /// 409
   /// </para><para>
@@ -833,7 +833,7 @@ module RequestErrors =
   /// discretion of the server owner.
   /// </para></summary>
   val gone : bytes:byte [] -> WebPart
-  
+
   /// <summary><para>
   /// 410
   /// </para><para>
@@ -978,7 +978,7 @@ module RequestErrors =
   /// https://tools.ietf.org/html/rfc6585
   /// </remarks>
   val too_many_requests : bytes:byte [] -> WebPart
-  
+
   /// <summary><para>
   /// 429
   /// </para><para>
@@ -1060,6 +1060,10 @@ module Filters =
   /// Match on the protocol being HTTPS
   val isSecure : WebPart
 
+  /// Ensure the query-string parameter exists (it exists even if it does
+  /// not have a value associated with it.)
+  val hasFlag : flag:string -> WebPart
+
   /// Applies the regex to the path and matches on the result
   val pathRegex : pathAfterDomainRegex:string -> WebPart
 
@@ -1087,6 +1091,35 @@ module Filters =
   val clientHost : hostname:string -> WebPart
 
   /// <summary><para>
+  /// The structured version of default log format for <see cref="log" />.  NCSA Common log format
+  ///
+  /// 127.0.0.1 user-identifier frank [10/Oct/2000:13:55:36 -0700] "GET /apache_pb.gif HTTP/1.0" 200 2326
+  ///
+  /// A "-" in a field indicates missing data.
+  ///
+  /// 127.0.0.1 is the IP address of the client (remote host) which made the request to the server.
+  /// user-identifier is the RFC 1413 identity of the client.
+  /// frank is the userid of the person requesting the document.
+  /// [10/Oct/2000:13:55:36 -0700] is the date, time, and time zone when the server finished processing the request, by default in strftime format %d/%b/%Y:%H:%M:%S %z.
+  /// "GET /apache_pb.gif HTTP/1.0" is the request line from the client. The method GET, /apache_pb.gif the resource requested, and HTTP/1.0 the HTTP protocol.
+  /// 200 is the HTTP status code returned to the client. 2xx is a successful response, 3xx a redirection, 4xx a client error, and 5xx a server error.
+  /// 2326 is the size of the object returned to the client, measured in bytes.
+  /// </para></summary>
+  val logFormatStructured : ctx:HttpContext -> string * Map<string,obj>
+
+  /// <summary><para>
+  /// Log the HttpRequest to the given logger, given the Suave Logger, a LogLevel and a
+  /// message formatter that can inspect the context and produce a message to
+  /// send to the logger, along with the structured fields as a name*obj map.
+  /// </para></summary>
+  val logWithLevelStructured :  level:LogLevel -> logger:Logger -> messageFun:(HttpContext -> string * Map<string,obj>) -> WebPart
+
+  /// <summary><para>
+  /// The function log is equivalent to `logWithLevel LogLevel.Debug`.
+  /// </para></summary>
+  val logStructured : logger:Logger -> messageFun:(HttpContext -> string * Map<string,obj>) -> WebPart
+
+  /// <summary><para>
   /// The default log format for <see cref="log" />.  NCSA Common log format
   ///
   /// 127.0.0.1 user-identifier frank [10/Oct/2000:13:55:36 -0700] "GET /apache_pb.gif HTTP/1.0" 200 2326
@@ -1104,9 +1137,14 @@ module Filters =
   val logFormat : ctx:HttpContext -> string
 
   /// <summary><para>
-  /// Log the HttpRequest to the given logger, given the Suave Logger and a
+  /// Log the HttpRequest to the given logger, given the Suave Logger, a LogLevel and a
   /// message formatter that can inspect the context and produce a message to
   /// send to the logger.
+  /// </para></summary>
+  val logWithLevel :  level:LogLevel -> logger:Logger -> messageFun:(HttpContext -> string) -> WebPart
+
+  /// <summary><para>
+  /// The function log is equivalent to `logWithLevel LogLevel.Debug`.
   /// </para></summary>
   val log : logger:Logger -> messageFun:(HttpContext -> string) -> WebPart
 
@@ -1492,11 +1530,11 @@ module EventSource =
 
   /// Same as `async_write`; convenience function.
   val (<<.) : out:Connection -> data:string -> SocketOp<unit>
-    
+
   /// "If the line is empty (a blank line) - dispatch the event."
   /// Dispatches the event properly to the browser.
   val dispatch : out:Connection -> SocketOp<unit>
-    
+
   /// "If the line starts with a U+003A COLON character (:) - Ignore the line."
   /// Writes a comment to the stream
   val comment : out:Connection -> cmt:string -> SocketOp<unit>
@@ -1518,18 +1556,18 @@ module EventSource =
   /// Sets the option for the EventSource instance, of how long to wait in ms
   /// until a new connection is spawned as a retry.
   val retry : out:Connection -> retry:uint32 -> SocketOp<unit>
-    
+
   /// A container data type for the output events
   type Message =
     { id       : string
       data     : string
       ``type`` : string option }
 
-  /// Create a new message to send over SSE
-  val mkMessage : id:string -> data:string -> Message
+    /// Create a new message to send over SSE
+    static member create : id:string -> data:string -> Message
 
-  /// Create a new message with a given type to send over SSE
-  val mkMessageType : id:string -> data:string -> typ:string -> Message
+    /// Create a new message with a given type to send over SSE
+    static member createType : id:string -> data:string -> typ:string -> Message
 
   /// send a message containing data to the output stream
   val send : out:Connection -> msg:Message -> SocketOp<unit>
@@ -1567,16 +1605,16 @@ module CORS =
 
       /// The list of allowed HttpMethods for the request.
       allowedMethods          : InclusiveOption<HttpMethod list>
-      
+
       /// Allow cookies? This is sent in the AccessControlAllowCredentials header.
       allowCookies            : bool
 
-      /// Should response headers be exposed to the client? This is sent in AccessControlExposeHeaders header. 
+      /// Should response headers be exposed to the client? This is sent in AccessControlExposeHeaders header.
       exposeHeaders           : bool
-      
+
       /// Max age in seconds the user agent is allowed to cache the result of the request.
       maxAge                  : int option }
-    
+
     static member allowedUris_           : Property<CORSConfig, InclusiveOption<string list>>
     static member allowedMethods_        : Property<CORSConfig, InclusiveOption<HttpMethod list>>
     static member allowCookies_          : Property<CORSConfig, bool>

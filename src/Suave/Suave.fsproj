@@ -100,13 +100,13 @@
     <Compile Include="Utils\CultureInfoCache.fs" />
     <Compile Include="Utils\BlockingQueueAgent.fs" />
     <Compile Include="Utils\BitOperations.fs" />
+    <Compile Include="..\..\paket-files\logary\logary\src\Logary.Facade\Facade.fs">
+      <Paket>True</Paket>
+      <Link>Utils/Facade.fs</Link>
+    </Compile>
+    <Compile Include="Utils\TraceHeader.fs" />
     <Compile Include="Globals.fs" />
     <Compile Include="CookieSerialiser.fs" />
-    <Compile Include="Logging\LogLevel.fs" />
-    <Compile Include="Logging\TraceHeader.fs" />
-    <Compile Include="Logging\LogLine.fs" />
-    <Compile Include="Logging\Logger.fs" />
-    <Compile Include="Log.fs" />
     <Compile Include="Sockets\SocketBinding.fs" />
     <Compile Include="Sockets\BufferManager.fs" />
     <Compile Include="Sockets\ConcurrentPool.fs" />

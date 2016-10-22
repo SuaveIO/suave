@@ -1,4 +1,4 @@
-﻿/// A module for composing the applicatives.
+/// A module for composing the applicatives.
 [<AutoOpen>]
 module Suave.Utils.Collections
 
@@ -11,7 +11,7 @@ type NameValueList = (string * string) list
 type NameOptionValueList = (string * string option) list
 
 type IDictionary<'b,'a> with
-  member dict.TryLookup key = 
+  member dict.TryLookup key =
     match dict.TryGetValue key with
     | true, v  -> Choice1Of2 v
     | false, _ -> Choice2Of2 (sprintf "Key %A was not present" key)
@@ -21,10 +21,14 @@ let getFirst (target : NameValueList) (key : string) =
   | Some b -> Choice1Of2 b
   | None   -> Choice2Of2 (sprintf "Couldn't find key '%s' in NameValueList" key)
 
-let getFirstCaseInsensitve (target : NameValueList) (key : string) =
-  match target |> List.tryPick (fun (a, b) -> if String.equalsCaseInsensitve a key then Some b else None) with
+let getFirstCaseInsensitive (target : NameValueList) (key : string) =
+  match target |> List.tryPick (fun (a, b) -> if String.equalsCaseInsensitive a key then Some b else None) with
   | Some b -> Choice1Of2 b
   | None   -> Choice2Of2 (sprintf "Couldn't find key '%s' in NameValueList" key)
+
+[<System.Obsolete("Use getFirstCaseInsensitive with an i")>]
+let getFirstCaseInsensitve (target : NameValueList) (key : string) =
+  getFirstCaseInsensitive target key
 
 let getFirstOpt (target : NameOptionValueList) (key : string) =
   match target |> List.tryPick (fun (a,b) -> if a.Equals key then b else None) with
@@ -32,7 +36,7 @@ let getFirstOpt (target : NameOptionValueList) (key : string) =
   | None -> Choice2Of2 (sprintf "Couldn't find key '%s' in NameOptionValueList" key)
 
 let tryGetChoice1 f x =
-  match f x with 
+  match f x with
   | Choice1Of2 str -> Some str
   | Choice2Of2 _ -> None
 

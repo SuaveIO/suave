@@ -70,3 +70,24 @@ type Microsoft.FSharp.Control.AsyncBuilder with
   /// An extension method that overloads the standard 'Bind' of the 'async' builder. The new overload awaits on
   /// a standard .NET task which does not commpute a value
   member x.Bind(t : Task, f : unit -> Async<'R>) : Async<'R> = async.Bind(Async.AwaitTask t, f)
+
+type System.Threading.Tasks.Task<'T> with
+  /// From Task-based asynchronous model to Begin/End pattern
+  static member ToIAsyncResult<'T>(task: Task<'T>,callback: AsyncCallback,state:obj) : IAsyncResult =
+
+    let tcs = new TaskCompletionSource<'T>(state)
+
+    let routine (t:Task<'T>) = 
+       let x = 
+         if (t.IsFaulted) then
+           tcs.TrySetException(t.Exception.InnerExceptions)
+         else if (t.IsCanceled) then 
+           tcs.TrySetCanceled()
+         else 
+           tcs.TrySetResult(t.Result)
+
+       if (callback <> null) then
+          callback.Invoke(tcs.Task)
+
+    let t = task.ContinueWith( routine, TaskScheduler.Default)
+    tcs.Task :> IAsyncResult

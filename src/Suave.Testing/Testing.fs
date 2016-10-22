@@ -10,7 +10,7 @@ Example:
   open Fuchu
 
   let runWithConfig = runWith defaultConfig
-  
+
   testCase "parsing a large multipart form" <| fun _ ->
 
     let res =
@@ -32,6 +32,8 @@ open System.Net.Http.Headers
 open Fuchu
 
 open Suave
+open Suave.Logging
+open Suave.Logging.Message
 open Suave.Http
 
 [<AutoOpen>]
@@ -52,7 +54,7 @@ module ResponseData =
     response.Content.ReadAsByteArrayAsync().Result
 
 module Utilities =
-    
+
   /// Utility function for mapping from Suave.Types.HttpMethod to
   /// System.Net.Http.HttpMethod.
   let toHttpMethod = function
@@ -78,7 +80,7 @@ open Utilities
 /// cancel the token and dispose the server's runtime artifacts
 /// (like the listening socket etc).
 type SuaveTestCtx =
-  { cts          : CancellationTokenSource
+  { cts         : CancellationTokenSource
     suaveConfig : SuaveConfig }
 
 /// Cancels the cancellation token source and disposes the server's
@@ -119,7 +121,7 @@ let withContext f ctx =
   finally disposeContext ctx
 
 /// Create a new HttpRequestMessage towards the endpoint
-let mkRequest methd resource query data (endpoint : Uri) =
+let createRequest methd resource query data (endpoint : Uri) =
   let uriBuilder   = UriBuilder endpoint
   uriBuilder.Path  <- resource
   uriBuilder.Query <- query
@@ -130,19 +132,22 @@ let mkRequest methd resource query data (endpoint : Uri) =
   request
 
 /// Create a new disposable HttpClientHandler
-let mkHandler decomp_method cookies =
+let createHandler decomp_method cookies =
   let handler = new Net.Http.HttpClientHandler(AllowAutoRedirect = false)
   handler.AutomaticDecompression <- decomp_method
   cookies |> Option.iter (fun cookies -> handler.CookieContainer <- cookies)
   handler
 
-let mkClient handler =
+let createClient handler =
   new HttpClient(handler)
 
 /// Send the request with the client - returning the result of the request
 let send (client : HttpClient) (timeout : TimeSpan) (ctx : SuaveTestCtx) (request : HttpRequestMessage) =
-  Log.intern ctx.suaveConfig.logger "Suave.Tests"
-             (sprintf "%s %O"  request.Method.Method request.RequestUri)
+  ctx.suaveConfig.logger.log Verbose (
+    eventX "Send"
+    >> setFieldValue "method" request.Method.Method
+    >> setFieldValue "uri" request.RequestUri)
+
   let send = client.SendAsync(request, HttpCompletionOption.ResponseContentRead, ctx.cts.Token)
 
   let completed = send.Wait (int timeout.TotalMilliseconds, ctx.cts.Token)
@@ -182,9 +187,9 @@ let reqResp
   let defaultTimeout = TimeSpan.FromSeconds 10.
 
   withContext <| fun ctx ->
-    use handler = mkHandler decompMethod cookies
-    use client = mkClient handler
-    use request = mkRequest methd resource query data (endpointUri ctx.suaveConfig) |> fRequest
+    use handler = createHandler decompMethod cookies
+    use client = createClient handler
+    use request = createRequest methd resource query data (endpointUri ctx.suaveConfig) |> fRequest
     use result = request |> send client defaultTimeout ctx
     fResult result
 
@@ -214,6 +219,9 @@ let reqHeaders methd resource data =
 
 let reqContentHeaders methd resource data =
   reqResp methd resource "" data None DecompressionMethods.None id contentHeaders
+
+let reqStatusCode methd resource data =
+  reqResp methd resource "" data None DecompressionMethods.None id statusCode
 
 /// Test a request by looking at the cookies alone.
 let reqCookies methd resource data ctx =

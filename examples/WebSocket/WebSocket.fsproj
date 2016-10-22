@@ -42,7 +42,7 @@
   <ItemGroup>
     <Compile Include="..\..\paket-files\examples\haf\YoLo\YoLo.fs">
       <Paket>True</Paket>
-      <Link>paket-files\YoLo.fs</Link>
+      <Link>paket-files/YoLo.fs</Link>
     </Compile>
     <Compile Include="Program.fs" />
     <None Include="App.config" />

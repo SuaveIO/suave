@@ -25,7 +25,7 @@ type Connection =
 module Connection =
 
   let empty : Connection =
-    { socketBinding = SocketBinding.mk IPAddress.IPv6Loopback 8083us
+    { socketBinding = SocketBinding.create IPAddress.IPv6Loopback 8083us
       transport     = null
       bufferManager = null
       lineBuffer    = ArraySegment<byte>()
@@ -34,7 +34,7 @@ module Connection =
 
   let inline receive (cn : Connection) (buf : ByteSegment) =
     cn.transport.read buf
-  
+
   let inline send (cn :Connection) (buf : ByteSegment) =
     cn.transport.write buf
 

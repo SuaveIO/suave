@@ -7,7 +7,7 @@ open System.Net
 
 /// Inspired by https://news.ycombinator.com/item?id=3067403
 
-let fib n = 
+let fib n =
   let rec loop a b i = async {
     if i > n then
       return b
@@ -26,9 +26,9 @@ let app =
 
 let config =
   { defaultConfig with
-     bindings = [ HttpBinding.mk HTTP IPAddress.Loopback 3000us ] }
+     bindings = [ HttpBinding.create HTTP IPAddress.Loopback 3000us ] }
 
 [<EntryPoint>]
 let main _ =
   startWebServer config app
-  0    
+  0

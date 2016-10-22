@@ -1,5 +1,5 @@
 [<AutoOpen>]
-module internal Suave.Utils.YoLo
+module YoLo
 
 #nowarn "64"
 
@@ -35,7 +35,12 @@ module Choice =
     match v with
     | Choice1Of2 x -> Choice1Of2 x
     | Choice2Of2 x -> f x
-
+    
+  let fold f g =
+    function
+    | Choice1Of2 x -> f x
+    | Choice2Of2 y -> g y
+    
   let apply f v =
     bind (fun f' ->
       bind (fun v' ->
@@ -64,11 +69,11 @@ module Choice =
 
   let inject f = function
     | Choice1Of2 x -> f x; Choice1Of2 x
-    | Choice2Of2 x -> Choice1Of2 x
+    | Choice2Of2 x -> Choice2Of2 x
 
   let injectSnd f = function
     | Choice1Of2 x -> Choice1Of2 x
-    | Choice2Of2 x -> f x; Choice1Of2 x
+    | Choice2Of2 x -> f x; Choice2Of2 x
 
   module Operators =
 
@@ -187,16 +192,25 @@ module Option =
 type Base64String = string
 
 module String =
+  open System.Globalization // needed when using DNXCORE50
   open System.IO
   open System.Security.Cryptography
 
   /// Also, invariant culture
   let equals (a : string) (b : string) =
+#if DNXCORE50
+    (CultureInfo.InvariantCulture.CompareInfo.GetStringComparer(CompareOptions.None)).Equals(a, b)
+#else
     a.Equals(b, StringComparison.InvariantCulture)
+#endif
 
   /// Also, invariant culture
-  let equalsCaseInsensitve (a : string) (b : string) =
+  let equalsCaseInsensitive (a : string) (b : string) =
+#if DNXCORE50
+    (CultureInfo.InvariantCulture.CompareInfo.GetStringComparer(CompareOptions.IgnoreCase)).Equals(a, b)
+#else
     a.Equals(b, StringComparison.InvariantCultureIgnoreCase)
+#endif
     
   /// Compare ordinally with ignore case.
   let equalsOrdinalCI (str1 : string) (str2 : string) =
@@ -250,28 +264,40 @@ module Bytes =
   open System.Linq
   open System.Security.Cryptography
 
-  let hash (algo : HashAlgorithm) (bs : byte[]) =
+  let hash (algo : unit -> #HashAlgorithm) (bs : byte[]) =
     use ms = new MemoryStream()
     ms.Write(bs, 0, bs.Length)
     ms.Seek(0L, SeekOrigin.Begin) |> ignore
-    use sha = algo
+    use sha = algo ()
     sha.ComputeHash ms
 
   let sha1 =
-    hash (new SHA1Managed())
+#if DNXCORE50
+    hash (fun () -> SHA1.Create())
+#else
+    hash (fun () -> new SHA1Managed())
+#endif
 
   let sha256 =
-    hash (new SHA256Managed())
+#if DNXCORE50
+    hash (fun () -> SHA256.Create())
+#else
+    hash (fun () -> new SHA256Managed())
+#endif
 
   let sha512 =
-    hash (new SHA512Managed())
+#if DNXCORE50
+    hash (fun () -> SHA512.Create())
+#else
+    hash (fun () -> new SHA512Managed())
+#endif
 
   let toHex (bs : byte[]) =
     BitConverter.ToString bs
     |> String.replace "-" ""
     |> String.toLowerInvariant
 
-  let fromHex (digestString : string) =
+  let ofHex (digestString : string) =
     Enumerable.Range(0, digestString.Length)
               .Where(fun x -> x % 2 = 0)
               .Select(fun x -> Convert.ToByte(digestString.Substring(x, 2), 16))
@@ -387,6 +413,8 @@ module Array =
 module Regex =
   open System.Text.RegularExpressions
 
+  type RegexMatch = Match
+
   let escape input =
     Regex.Escape input
 
@@ -397,6 +425,13 @@ module Regex =
   let replace pattern replacement input =
     Regex.Replace(input, pattern, (replacement : string))
 
+  let replaceWithFunction pattern (replaceFunc : RegexMatch -> string) input =
+    Regex.Replace(input, pattern, replaceFunc)
+
+  /// Match the `input` against the regex `pattern`. You can do a 
+  /// `Seq.cast<Group>` on the result to get it as a sequence
+  /// and also index with `.["name"]` into the result if you have
+  /// named capture groups.
   let ``match`` pattern input =
     match Regex.Matches(input, pattern) with
     | x when x.Count > 0 ->
@@ -591,13 +626,16 @@ module App =
 
   /// Gets the calling assembly's informational version number as a string
   let getVersion () =
+#if DNXCORE50
+    (typeof<Random>.GetTypeInfo().Assembly)
+#else
     Assembly.GetCallingAssembly()
+#endif
             .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
             .InformationalVersion
 
   /// Get the assembly resource
-  let resource name =
-    let assembly = Assembly.GetExecutingAssembly ()
+  let resourceIn (assembly : Assembly) name =
     use stream = assembly.GetManifestResourceStream name
     if stream = null then
       assembly.GetManifestResourceNames()
@@ -608,3 +646,12 @@ module App =
       use reader = new StreamReader(stream)
       reader.ReadToEnd ()
       |> Choice1Of2
+
+  /// Get the current assembly resource
+  let resource =
+#if DNXCORE50
+    let assembly = typeof<Random>.GetTypeInfo().Assembly
+#else
+    let assembly = Assembly.GetExecutingAssembly ()
+#endif
+    resourceIn assembly
