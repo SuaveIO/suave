@@ -183,7 +183,7 @@ module internal ParsingAndControl =
                else
                  failwith "TLS required"
             | Choice1Of2 _ -> 
-              failwith "Invalid identifier"
+              ignore ()
             | Choice2Of2 _ -> 
               ignore ()
 
