@@ -80,8 +80,8 @@
   <Choose>
     <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
       <ItemGroup>
-        <Reference Include="Arachne.Core">
-          <HintPath>..\..\packages\examples\Arachne.Core\lib\net40\Arachne.Core.dll</HintPath>
+        <Reference Include="Anat">
+          <HintPath>..\..\packages\examples\Anat\lib\net35\Anat.dll</HintPath>
           <Private>True</Private>
           <Paket>True</Paket>
         </Reference>
@@ -91,52 +91,8 @@
   <Choose>
     <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
       <ItemGroup>
-        <Reference Include="Arachne.Http">
-          <HintPath>..\..\packages\examples\Arachne.Http\lib\net40\Arachne.Http.dll</HintPath>
-          <Private>True</Private>
-          <Paket>True</Paket>
-        </Reference>
-      </ItemGroup>
-    </When>
-  </Choose>
-  <Choose>
-    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
-      <ItemGroup>
-        <Reference Include="Arachne.Http.Cors">
-          <HintPath>..\..\packages\examples\Arachne.Http.Cors\lib\net40\Arachne.Http.Cors.dll</HintPath>
-          <Private>True</Private>
-          <Paket>True</Paket>
-        </Reference>
-      </ItemGroup>
-    </When>
-  </Choose>
-  <Choose>
-    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
-      <ItemGroup>
-        <Reference Include="Arachne.Language">
-          <HintPath>..\..\packages\examples\Arachne.Language\lib\net40\Arachne.Language.dll</HintPath>
-          <Private>True</Private>
-          <Paket>True</Paket>
-        </Reference>
-      </ItemGroup>
-    </When>
-  </Choose>
-  <Choose>
-    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
-      <ItemGroup>
-        <Reference Include="Arachne.Uri">
-          <HintPath>..\..\packages\examples\Arachne.Uri\lib\net40\Arachne.Uri.dll</HintPath>
-          <Private>True</Private>
-          <Paket>True</Paket>
-        </Reference>
-      </ItemGroup>
-    </When>
-  </Choose>
-  <Choose>
-    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
-      <ItemGroup>
-        <Reference Include="Arachne.Uri.Template">
-          <HintPath>..\..\packages\examples\Arachne.Uri.Template\lib\net40\Arachne.Uri.Template.dll</HintPath>
+        <Reference Include="Hephaestus">
+          <HintPath>..\..\packages\examples\Hephaestus\lib\net452\Hephaestus.dll</HintPath>
           <Private>True</Private>
           <Paket>True</Paket>
         </Reference>
@@ -159,7 +115,7 @@
       </ItemGroup>
     </When>
   </Choose>
-   <Choose>
+  <Choose>
     <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
       <ItemGroup>
         <Reference Include="Freya.Core">
@@ -173,8 +129,8 @@
   <Choose>
     <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
       <ItemGroup>
-        <Reference Include="Freya.Lenses.Http">
-          <HintPath>..\..\packages\examples\Freya.Lenses.Http\lib\net45\Freya.Lenses.Http.dll</HintPath>
+        <Reference Include="Freya.Machines">
+          <HintPath>..\..\packages\examples\Freya.Machines\lib\net452\Freya.Machines.dll</HintPath>
           <Private>True</Private>
           <Paket>True</Paket>
         </Reference>
@@ -184,80 +140,110 @@
   <Choose>
     <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
       <ItemGroup>
-        <Reference Include="Freya.Lenses.Http.Cors">
-          <HintPath>..\..\packages\examples\Freya.Lenses.Http.Cors\lib\net45\Freya.Lenses.Http.Cors.dll</HintPath>
+        <Reference Include="Freya.Machines.Http">
+          <HintPath>..\..\packages\examples\Freya.Machines.Http\lib\net452\Freya.Machines.Http.dll</HintPath>
           <Private>True</Private>
           <Paket>True</Paket>
         </Reference>
       </ItemGroup>
     </When>
   </Choose>
+   <Choose>
+    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
+      <ItemGroup>
+        <Reference Include="Freya.Routers">
+          <HintPath>..\..\packages\examples\Freya.Routers\lib\net452\Freya.Routers.dll</HintPath>
+          <Private>True</Private>
+          <Paket>True</Paket>
+        </Reference>
+      </ItemGroup>
+    </When>
+  </Choose>
+
   <Choose>
     <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
       <ItemGroup>
-        <Reference Include="Freya.Machine">
-          <HintPath>..\..\packages\examples\Freya.Machine\lib\net45\Freya.Machine.dll</HintPath>
+        <Reference Include="Freya.Types.Routers.Template">
+          <HintPath>..\..\packages\examples\Freya.Routers.Uri.Template\lib\net452\Freya.Routers.Uri.Template.dll</HintPath>
           <Private>True</Private>
           <Paket>True</Paket>
         </Reference>
       </ItemGroup>
     </When>
   </Choose>
+
   <Choose>
     <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
       <ItemGroup>
-        <Reference Include="Freya.Machine.Extensions.Http">
-          <HintPath>..\..\packages\examples\Freya.Machine.Extensions.Http\lib\net45\Freya.Machine.Extensions.Http.dll</HintPath>
+        <Reference Include="Freya.Optics.Http">
+          <HintPath>..\..\packages\examples\Freya.Optics.Http\lib\net452\Freya.Optics.Http.dll</HintPath>
           <Private>True</Private>
           <Paket>True</Paket>
         </Reference>
       </ItemGroup>
     </When>
   </Choose>
-  <Choose>
+
+   <Choose>
     <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
       <ItemGroup>
-        <Reference Include="Freya.Machine.Extensions.Http.Cors">
-          <HintPath>..\..\packages\examples\Freya.Machine.Extensions.Http.Cors\lib\net45\Freya.Machine.Extensions.Http.Cors.dll</HintPath>
+        <Reference Include="Freya.Polyfills">
+          <HintPath>..\..\packages\examples\Freya.Polyfills\lib\net452\Freya.Polyfills.dll</HintPath>
           <Private>True</Private>
           <Paket>True</Paket>
         </Reference>
       </ItemGroup>
     </When>
   </Choose>
-  <Choose>
+
+   <Choose>
     <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
       <ItemGroup>
-        <Reference Include="Freya.Machine.Router">
-          <HintPath>..\..\packages\examples\Freya.Machine.Router\lib\net45\Freya.Machine.Router.dll</HintPath>
+        <Reference Include="Freya.Types.Http">
+          <HintPath>..\..\packages\examples\Freya.Types.Http\lib\net452\Freya.Types.Http.dll</HintPath>
           <Private>True</Private>
           <Paket>True</Paket>
         </Reference>
       </ItemGroup>
     </When>
   </Choose>
-  <Choose>
+
+     <Choose>
     <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
       <ItemGroup>
-        <Reference Include="Freya.Recorder">
-          <HintPath>..\..\packages\examples\Freya.Recorder\lib\net45\Freya.Recorder.dll</HintPath>
+        <Reference Include="Freya.Types.Language">
+          <HintPath>..\..\packages\examples\Freya.Types.Language\lib\net452\Freya.Types.Language.dll</HintPath>
           <Private>True</Private>
           <Paket>True</Paket>
         </Reference>
       </ItemGroup>
     </When>
   </Choose>
-  <Choose>
+
+     <Choose>
     <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
       <ItemGroup>
-        <Reference Include="Freya.Router">
-          <HintPath>..\..\packages\examples\Freya.Router\lib\net45\Freya.Router.dll</HintPath>
+        <Reference Include="Freya.Types.Uri">
+          <HintPath>..\..\packages\examples\Freya.Types.Uri\lib\net452\Freya.Types.Uri.dll</HintPath>
           <Private>True</Private>
           <Paket>True</Paket>
         </Reference>
       </ItemGroup>
     </When>
   </Choose>
+
+       <Choose>
+    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
+      <ItemGroup>
+        <Reference Include="Freya.Types.Uri.Template">
+          <HintPath>..\..\packages\examples\Freya.Types.Uri.Template\lib\net452\Freya.Types.Uri.Template.dll</HintPath>
+          <Private>True</Private>
+          <Paket>True</Paket>
+        </Reference>
+      </ItemGroup>
+    </When>
+  </Choose>
+
   <Choose>
     <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
       <ItemGroup>

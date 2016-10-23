@@ -34,7 +34,7 @@ group Examples
   nuget Topshelf.FSharp
   nuget Topshelf ~> 3
   nuget Nancy.Owin
-  nuget Freya ~> 3.0.0-b
+  nuget Freya ~> 3.0.0-rc01 
   nuget Microsoft.Owin.Hosting 
   nuget Owin
   nuget Chiron
