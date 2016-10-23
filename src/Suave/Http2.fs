@@ -518,7 +518,7 @@ module Http2 =
 
     member x.stop() = 
       Async.Start (procQueue.AsyncAdd <| Stop)
-      closeEvent.WaitOne()
+      closeEvent.WaitOne() |> ignore
 
     member x.get() =
       procQueue.AsyncGet()

@@ -102,22 +102,19 @@ module internal ParsingAndControl =
   let http2Loop (ctxOuter : HttpContext) (consumer : WebPart) = 
     let cn2 = new Http2Connection(ctxOuter.connection.transport)
     socket {
-      // start reading frames
-      // use a different dispatcher; regular http 1.x uses a serial dispatcher (per connection)
-      // the client will send the http2 client connection preface
-      // and the server will send a potentially empty SETTINGS frame as its first frame.
-      let! (header,Settings (flag,settings)) = cn2.read ()
-      Async.Start (cn2.writeLoop ctxOuter consumer)
-      // The SETTINGS frames received from a peer as part of the connection preface MUST be acknowledged 
-      // (see Section 6.5.3) after sending the connection preface.
-      //while true do
-      let! request = http2readRequest ctxOuter.runtime.matchedBinding cn2
-      // queue for processing
-      do cn2.send request
-      //send a close to the mailbox
-      //let! a = procQueue.AsyncAdd(Stop)
-      do cn2.stop()
-      free "Suave.ParsingAndControl.http2Loop" ctxOuter.connection
+      let! q = cn2.read ()
+      match q with
+      | header,Settings (flag,settings) ->
+        Async.Start (cn2.writeLoop ctxOuter consumer)
+        // The SETTINGS frames received from a peer as part of the connection preface MUST be acknowledged 
+        // (see Section 6.5.3) after sending the connection preface.
+        let! request = http2readRequest ctxOuter.runtime.matchedBinding cn2
+        // queue for processing
+        do cn2.send request
+        do cn2.stop()
+        free "Suave.ParsingAndControl.http2Loop" ctxOuter.connection
+      | _, r ->
+        failwithf "Expecting SETTINGS frame, got: %A" r
       }
 
   let httpLoop (ctxOuter : HttpContext) (consumer : WebPart) =
