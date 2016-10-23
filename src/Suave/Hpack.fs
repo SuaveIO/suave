@@ -663,7 +663,13 @@ if I < 2^N - 1, encode I on N bits
   let isHuffman w   = isset w 7
 
   let extractByteString (rbuf:MemoryStream) (len:int) =
-    Array.sub (rbuf.GetBuffer()) 0 len
+    #if NETSTANDARD1_5
+    let (_, arrSegment) = rbuf.TryGetBuffer()
+    let buff = arrSegment.Array
+    #else
+    let buff = rbuf.GetBuffer()
+    #endif
+    Array.sub buff 0 len
 
   let decodeString (huff:bool) (decoder: HuffmanDecoding)  (rbuf:MemoryStream) (len:int) =
     if rbuf.Length <> rbuf.Position then
