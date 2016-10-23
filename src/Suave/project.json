@@ -61,7 +61,7 @@
                 "HttpOutput.fs",
                 "ConnectionFacade.fs",
                 "WebSocket.fs",
-                "Huffman\Bits.fs.fs",
+                "Huffman\Bits.fs",
                 "Huffman\Table.fs",
                 "Huffman\Huffman.fs",
                 "Huffman\Decoding.fs",
