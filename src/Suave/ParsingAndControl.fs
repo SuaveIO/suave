@@ -99,22 +99,23 @@ module internal ParsingAndControl =
       return r
       }
 
-  let http2Loop (ctxOuter : HttpContext) (consumer : WebPart) = 
-    let cn2 = new Http2Connection(ctxOuter.connection.transport)
+  let http2Loop (facade : ConnectionFacade) (consumer : WebPart) = 
+
     socket {
+      let cn2 = new Http2Connection(facade)
       let! q = cn2.read ()
       match q with
       | header,Settings (flag,settings) ->
-        Async.Start (cn2.writeLoop ctxOuter consumer)
+        Async.Start (cn2.writeLoop (facade.GetCurrentContext()) consumer)
         // The SETTINGS frames received from a peer as part of the connection preface MUST be acknowledged 
         // (see Section 6.5.3) after sending the connection preface.
-        let! request = http2readRequest ctxOuter.runtime.matchedBinding cn2
+        let! request = http2readRequest (facade.GetCurrentContext().runtime.matchedBinding) cn2
         // queue for processing
         do cn2.send request
         do cn2.stop()
-        free "Suave.ParsingAndControl.http2Loop" ctxOuter.connection
+        free "Suave.ParsingAndControl.http2Loop" (facade.GetCurrentContext().connection)
       | _, r ->
-        failwithf "Expecting SETTINGS frame, got: %A" r
+        printfn "Expecting SETTINGS frame, got: %A" r
       }
 
   let httpLoop (ctxOuter : HttpContext) (consumer : WebPart) =
@@ -139,7 +140,7 @@ module internal ParsingAndControl =
          let! _ = HttpOutput.run Intermediate.CONTINUE ctx
          logger.verbose (event "sent 100-continue response")
          logger.verbose (event "Connection upgraded to HTTP/2")
-         let! a = http2Loop ctx consumer
+         let! a = http2Loop facade consumer
          return ()
        | Choice1Of2 "h2" ->
           // implies TLS
@@ -147,7 +148,7 @@ module internal ParsingAndControl =
            let! _ = HttpOutput.run Intermediate.CONTINUE ctx
            logger.verbose (event "sent 100-continue response")
            logger.verbose (event "Connection upgraded to HTTP/2")
-           let! a = http2Loop ctx consumer
+           let! a = http2Loop facade consumer
            return ()
           else
             failwith "TLS required"
@@ -201,7 +202,7 @@ module internal ParsingAndControl =
           let! a = facade.skipLine
           let! a = facade.skipLine
           // inititate http2 looop
-          let! a = http2Loop ctxOuter consumer
+          let! a = http2Loop facade consumer
           return ()
         else
           // else regular http loop

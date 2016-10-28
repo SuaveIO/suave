@@ -116,17 +116,6 @@ module Http2 =
   open Suave.Sockets
   open Suave.Sockets.Control.SocketMonad
 
-  let readBytes (transport : ITransport) (n : int) =
-    let arr = Array.zeroCreate n
-    let rec loop i = socket {
-      if i = n then
-        return arr
-      else
-        let! read = transport.read <| ArraySegment(arr,i,n - i)
-        return! loop (i+read)
-      }
-    loop 0
-
   let checkEndianness (b : byte []) =
     if (BitConverter.IsLittleEndian) then
       Array.Reverse b
@@ -145,13 +134,8 @@ module Http2 =
 
   let parseFrameHeader (bytes : byte[]) =
     assert(bytes.Length = 9)
-    let flen = Array.zeroCreate<byte> 4
-    flen.[0] <- 0uy
-    flen.[1] <- bytes.[0]
-    flen.[2] <- bytes.[1]
-    flen.[3] <- bytes.[2]
 
-    let frameLength = BitConverter.ToInt32 (checkEndianness flen, 0)
+    let frameLength = ((int bytes.[0]) <<< 16) ||| ((int bytes.[1]) <<< 8) ||| (int bytes.[2])
 
     let frameType  = bytes.[3]; // 4th byte in frame header is TYPE
     let frameFlags = bytes.[4]; // 5th byte is FLAGS
@@ -192,8 +176,8 @@ module Http2 =
 
     bytes
 
-  let readFrameHeader transport = socket{
-    let! bytes = readBytes transport 9
+  let readFrameHeader (facade:ConnectionFacade) = socket{
+    let! bytes = facade.readBytesToArray 9
     return parseFrameHeader bytes
     }
 
@@ -335,9 +319,9 @@ module Http2 =
     [| parseData; parseHeaders; parsePriority; parseRstStream; parseSettings; parsePushPromise; parsePing;
        parseGoAway; parseWindowUpdate; parseContinuation |]
 
-  let readFrame transport = socket {
-    let! header = readFrameHeader transport
-    let! payload = readBytes transport (int header.length)
+  let readFrame (facade:ConnectionFacade) = socket {
+    let! header = readFrameHeader facade
+    let! payload = facade.readBytesToArray (int header.length)
     let payload = payloadDecoders.[int header.``type``] header payload
     return header, payload
     }
@@ -483,7 +467,7 @@ module Http2 =
 
   type Message<'a> = Request of 'a | Stop
 
-  type Http2Connection(transport: ITransport) =
+  type Http2Connection(facade: ConnectionFacade) =
 
     let alive = ref true
     let closeEvent = new ManualResetEvent(false)
@@ -495,10 +479,10 @@ module Http2 =
     member val decodeDynamicTable = newDynamicTableForDecoding defaultDynamicTableSize 4096
 
     member x.read() : SocketOp<Frame> = 
-      readFrame transport
+      readFrame facade
 
     member x.write(encInfo,p:FramePayload) : SocketOp<unit> = 
-      writeFrame encInfo p transport
+      writeFrame encInfo p (facade.GetCurrentContext().connection.transport)
 
     member x.writeResponseToFrame (response: HttpResult) = async {
         let headersFrame = encodeHeader { algorithm = CompressionAlgorithm.Naive; useHuffman = true} 4096 x.encodeDynamicTable  ((":status",response.status.code.ToString())::response.headers)

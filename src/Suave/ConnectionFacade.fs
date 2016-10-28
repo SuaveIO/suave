@@ -161,7 +161,7 @@ type ConnectionFacade(ctx) =
     loop
 
   let skip n = socket {
-    return! SocketOp.ofAsync <| split n (fun a b -> async { return () }  ) 0
+    return! SocketOp.ofAsync <| split n (fun a b -> async.Return() ) 0
     }
 
   /// returns the number of bytes read and the connection
@@ -222,15 +222,15 @@ type ConnectionFacade(ctx) =
     }
     loop []
 
-  /// Read the post data from the stream, given the number of bytes that makes up the post data.
-  member this.readPostData  (bytes : int) select  : SocketOp<unit> =
+  /// Read bytes from the stream passing each ArraySegment to the function `select`
+  member this.readBytes  (numberOfBytes : int) select  : SocketOp<unit> =
     let rec loop n : SocketOp<unit> =
       socket {
         if segments.Count > 0  then
           let segment = segments.First.Value
           segments.RemoveFirst() |> ignore
           if segment.length > n then
-            do! SocketOp.ofAsync <| select (BufferSegment.toArraySegment(BufferSegment(segment.buffer,n,segment.length))) n
+            do! SocketOp.ofAsync <| select (BufferSegment.toArraySegment(BufferSegment(segment.buffer,segment.offset,n))) n
             segments.AddFirst (BufferSegment(segment.buffer, segment.offset + n, segment.length - n)) |> ignore
             return ()
           else
@@ -244,7 +244,7 @@ type ConnectionFacade(ctx) =
             do! readMoreData
             return! loop n
       }
-    loop bytes
+    loop numberOfBytes
 
   member this.readFilePart boundary (headerParams : Dictionary<string,string>) fieldName contentType = socket {
     let tempFilePath = Path.GetTempFileName()
@@ -397,12 +397,12 @@ type ConnectionFacade(ctx) =
           failwith "Invalid multipart format"
     }
 
-  /// Reads raw POST data
-  member this.getRawPostData contentLength =
+  /// Reads contentLength bytes to a new array
+  member this.readBytesToArray contentLength =
     socket {
       let offset = ref 0
       let rawForm = Array.zeroCreate contentLength
-      do! this.readPostData contentLength (fun a count -> async {
+      do! this.readBytes contentLength (fun a count -> async {
           Array.blit a.Array a.Offset rawForm !offset count;
           offset := !offset + count
         })
@@ -418,7 +418,7 @@ type ConnectionFacade(ctx) =
 
       match contentTypeHeader with
       | Choice1Of2 ce when String.startsWith "application/x-www-form-urlencoded" ce ->
-        let! rawForm = this.getRawPostData contentLength
+        let! rawForm = this.readBytesToArray contentLength
         _rawForm <- rawForm
         return Some ()
 
@@ -432,7 +432,7 @@ type ConnectionFacade(ctx) =
         return Some ()
 
       | Choice1Of2 _ | Choice2Of2 _ ->
-        let! rawForm = this.getRawPostData contentLength
+        let! rawForm = this.readBytesToArray contentLength
         _rawForm <- rawForm
         return Some ()
     | Choice2Of2 _ -> return Some ()
@@ -482,3 +482,6 @@ type ConnectionFacade(ctx) =
 
     return Some { ctx with request = request; connection = { ctx.connection with segments = Seq.toList segments } }
   }
+
+  member this.GetCurrentContext() =
+    { ctx with connection = { ctx.connection with segments = Seq.toList segments } }
