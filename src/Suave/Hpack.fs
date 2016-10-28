@@ -640,7 +640,7 @@ if I < 2^N - 1, encode I on N bits
       failwith "Header block truncated."
 
   let decodeHPACK (dyntbl : DynamicTable) (inp: byte array) (dec : DynamicTable -> MemoryStream -> HeaderList) : HeaderList =
-    chkChange dyntbl (new MemoryStream(inp)) dec
+    chkChange dyntbl (new MemoryStream(inp, 0, inp.Length, true, true)) dec
 
   let entryTokenHeader (e:Entry) : TokenHeader =
     e.token,e.headerValue
