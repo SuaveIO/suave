@@ -29,10 +29,17 @@ let frameHeaders (_ : SuaveConfig) =
   testList "frame headers" [
     testCase "encode/decode" 
     <| fun _ ->
-       let originalHeader = { length = 500; ``type`` = 2uy; flags = 1uy; streamIdentifier = 16777215 }
+       let originalHeader = { length = 1234; ``type`` = 3uy; flags = 5uy; streamIdentifier = 16777215 }
        let encoded = encodeFrameHeader originalHeader
        let header = parseFrameHeader encoded
        Assert.Equal("encode >> decode == id", originalHeader, header)
+
+    testCase "integer encoding" 
+    <| fun _ ->
+
+       Assert.Equal("decode 8 42uy (new MemoryStream([||])) == 42", Hpack.decode 8 42uy (new MemoryStream([||])), 42)
+       Assert.Equal("decode 5 31uy (new MemoryStream([|154uy; 10uy|])) == 1337", Hpack.decode 5 31uy (new MemoryStream([|154uy; 10uy|])), 1337)
+       Assert.Equal("decode 5 10uy (new MemoryStream(0)) == 10", Hpack.decode 5 10uy (new MemoryStream(0)), 10)
   ]
 
 [<Tests>]
@@ -53,7 +60,7 @@ let huffmanTest (_ : SuaveConfig) =
        Assert.Equal("failed", testText, System.Text.ASCIIEncoding.UTF8.GetString b)
   ]
 
-//[<Tests()>] 
+[<Tests()>] 
 // Disabled atm HttpTwo does not close the connection
 // and ignores GOAWAY frame
 let http2connect (cfg: SuaveConfig) =
@@ -69,7 +76,7 @@ let http2connect (cfg: SuaveConfig) =
          let ctx = runWith {cfg with logger = Targets.create Verbose } (Successful.OK "Hello HTTP/2")
          withContext (fun _ ->
            // open http connection
-           let uri = Uri(sprintf "http://%s:%i/websocket" ip port)
+           let uri = Uri(sprintf "http://%s:%i/whatever" ip port)
            let http2MsgHandler = new Http2MessageHandler ()
            let http2 = new HttpClient (http2MsgHandler)
            let body = Async.RunSynchronously <| Async.AwaitTask (http2.GetStringAsync(uri))
