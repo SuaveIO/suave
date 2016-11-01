@@ -156,4 +156,33 @@ let websocketTests cfg =
         clientWebSocket.Close()
         Assert.Equal("should be equal", testByteArray (int PayloadSize.Bit32) echo.Value , true)
         ) ctx
+    testCase "echo large number of messages to client" <| fun _ ->
+      let ctx = runWithConfig webPart
+
+      withContext (fun _ ->
+        let mre = new ManualResetEvent(false)
+        let amountOfMessages = 1000
+        let echo = ref []
+        let count = ref 0
+
+        use clientWebSocket = new WebSocketSharp.WebSocket(sprintf "ws://%s:%i/websocket" ip port)
+
+        clientWebSocket.OnMessage.Add(fun e ->
+          echo:= e.Data :: !echo
+          count := !count + 1
+          if !count = amountOfMessages then mre.Set() |> ignore
+        )
+        clientWebSocket.Connect()
+
+        for i = 1 to amountOfMessages do
+          clientWebSocket.Send(i.ToString())
+
+        mre.WaitOne() |> ignore
+        clientWebSocket.Close()
+
+        let expectedMessages = [ for i in amountOfMessages .. -1 .. 1 -> i.ToString() ] 
+
+        Assert.Equal("should be equal", (expectedMessages = echo.Value), true)
+        Assert.Equal("received message count on websocket", amountOfMessages, !count)
+        ) ctx
   ]
