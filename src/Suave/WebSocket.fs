@@ -13,6 +13,7 @@ module WebSocket =
   open System.Collections.Concurrent
   open System.Security.Cryptography
   open System.Text
+  open System.Threading
 
   let magicGUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
@@ -146,9 +147,6 @@ module WebSocket =
 
   /// This class represents a WebSocket connection, it provides an interface to read and write to a WebSocket.
   type WebSocket(connection : Connection) =
-    
-    let mutable writing = false
-    let mutable reading = false
 
     let readExtendedLength header = socket {
       if header.length = 126 then
@@ -168,31 +166,20 @@ module WebSocket =
           return uint64(header.length)
       }
 
-    let writeQueue = new ConcurrentQueue<Frame*Cont<Choice<unit,Error>>>()
-    let readQueue  = new ConcurrentQueue<Cont<Choice<Opcode*byte[]*bool,Error>>>()
+    let writeSemaphore = new SemaphoreSlim(1, 1)
+    let readSemaphore  = new SemaphoreSlim(1, 1)
 
-    let rec writeloop _ =
-      async{
-        try
-          match writeQueue.TryDequeue() with
-          | true, (frame, ok) ->
-            let! res = writeFrame connection frame 
-            fork (fun _ -> ok res)
-            do! writeloop ()
-          | false, _ ->
-            lock writeQueue (fun _ -> writing <- false)
-        with ex ->
-          lock writeQueue (fun _ -> writing <- false)
+    let releaseSemaphoreDisposable (semaphore: SemaphoreSlim) = { new IDisposable with member __.Dispose() = semaphore.Release() |> ignore }
+
+    let runAsyncWithSemaphore semaphore asyncAction = async {
+      use releaseSemaphoreDisposable = releaseSemaphoreDisposable semaphore
+      do! semaphore.WaitAsync() |> Async.AwaitTask
+      return! asyncAction
       }
 
-    let sendFrame opcode bs fin =
+    let sendFrame opcode bs fin = 
       let frame = frame opcode bs fin
-      Async.FromContinuations <| fun (ok,ex,cn) ->
-        writeQueue.Enqueue (frame,ok)
-        lock(writeQueue) (fun _ -> 
-          if not writing then
-            writing <- true
-            Async.Start <| writeloop ())
+      runAsyncWithSemaphore writeSemaphore (writeFrame connection frame)
 
     let readFrame () = socket {
       assert (List.length connection.segments = 0)
@@ -217,27 +204,7 @@ module WebSocket =
         return (header.opcode, data, header.fin)
       }
 
-    let rec readloop _ =
-      async{
-        try
-          match readQueue.TryDequeue() with
-          | true, ok ->
-            let! res = readFrame ()
-            fork (fun _ -> ok res)
-            do! readloop ()
-          | false, _ ->
-            lock readQueue (fun _ -> reading <- false)
-        with ex ->
-          lock readQueue (fun _ -> reading <- false)
-      }
-
-    member this.read () =
-       Async.FromContinuations <| fun (ok,ex,cn) ->
-        readQueue.Enqueue (ok)
-        lock(readQueue) (fun _ -> 
-          if not reading then
-            reading <- true
-            Async.Start <| readloop ())
+    member this.read () = runAsyncWithSemaphore readSemaphore (readFrame())
 
     member this.send opcode bs fin = sendFrame opcode bs fin
 
