@@ -90,29 +90,29 @@ let samplePage =
 
 /// Rendering
 
+let internal joinSpaces (strings:#seq<string>) =
+  String.Join (" ", strings)
+
+let internal attributesToString attributes =
+  attributes
+  |> Array.map (fun (a, b) -> sprintf "%s=\"%s\"" a b) 
+  |> joinSpaces
+
 let internal leafElementToString = function
  | Text text -> text
  | WhiteSpace text -> text
- | Element (e,id, attributes) ->
-   if Array.length attributes = 0 then
-     sprintf "<%s/>" e
-   else
-     let ats =
-       Array.map (fun (a,b) -> sprintf "%s=\"%s\"" a b) attributes
-       |> String.Concat
-     sprintf "<%s %s/>" e ats
+ | Element (e, id, attributes) ->
+   match attributes with
+   | [||] -> sprintf "<%s/>" e
+   | _ -> sprintf "<%s %s/>" e (attributes |> attributesToString)
 
 let internal beginElementToString = function
  | Text text -> failwith "invalid option"
  | WhiteSpace text -> failwith "invalid option"
- | Element (e,id, attributes) ->
-   if Array.length attributes = 0 then
-     sprintf "<%s>" e
-   else
-     let ats =
-       Array.map (fun (a,b) -> sprintf "%s=\"%s\"" a b) attributes
-       |> String.Concat
-     sprintf "<%s %s>" e ats
+ | Element (e, id, attributes) ->
+   match attributes with
+   | [||] -> sprintf "<%s>" e
+   | _ -> sprintf "<%s %s>" e (attributes |> attributesToString)
 
 let internal endElementToString = function
  | Text text -> failwith "invalid option"
