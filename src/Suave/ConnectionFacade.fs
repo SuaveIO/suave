@@ -221,7 +221,7 @@ type ConnectionFacade(ctx) =
           let segment = segments.First.Value
           segments.RemoveFirst() |> ignore
           if segment.length > n then
-            do! SocketOp.ofAsync <| select (BufferSegment.toArraySegment(BufferSegment(segment.buffer,n,segment.length))) n
+            do! SocketOp.ofAsync <| select (BufferSegment.toArraySegment(BufferSegment(segment.buffer,segment.offset, n))) n
             segments.AddFirst (BufferSegment(segment.buffer, segment.offset + n, segment.length - n)) |> ignore
             return ()
           else
