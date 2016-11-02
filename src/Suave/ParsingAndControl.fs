@@ -26,8 +26,6 @@ module internal ParsingAndControl =
   open Suave.Logging
   open Suave.Logging.Message
 
-  let BadRequestPrefix = "__suave_BAD_REQUEST"
-
   /// Free up a list of buffers
   let inline free context connection =
     connection.segments
@@ -50,72 +48,186 @@ module internal ParsingAndControl =
   let inline cleanResponse (ctx : HttpContext) =
     { ctx with response = HttpResult.empty }
 
+  open Http2
+  open Hpack
+
+  let http2readRequest (matchedBinding: HttpBinding) (cn2 : Http2Connection) : SocketOp<HttpRequest> = 
+    socket {
+
+      // Read headers till you get an end header
+      let loop = ref true
+      let payloads = List<byte[]>()
+      while !loop do
+        let! frame = cn2.read ()
+        match frame with
+        | (header,Headers (priorityOption, bytes)) ->
+          payloads.Add bytes
+          loop := not(testEndHeader header.flags)
+        | (header,f) ->
+          printfn "Got frame: %A" f
+          printfn "Spkiping"
+      // Concatenate payloads
+      let payload = Array.concat payloads
+      // A receiving endpoint reassembles the header block by concatenating its fragments and then 
+      // decompresses the block to reconstruct the header list.
+      let headerList = decodeHeader cn2.decodeDynamicTable payload
+
+      let (Choice1Of2 _method) = headerList %% ":method"
+      let (Choice1Of2 _scheme) = headerList %% ":scheme"
+      let (Choice1Of2 _path  ) = headerList %% ":path"
+      let (Choice1Of2 _host  ) = headerList %% ":authority"
+
+      let path' = if _path.StartsWith "/" then _path else "/" + _path
+
+      let url =
+        String.Concat [
+          matchedBinding.scheme.ToString(); "://"; matchedBinding.socketBinding.ToString()
+          path' ] |> Uri
+
+      let r = 
+        { httpVersion     = "HTTP/2.0"
+          url             = url
+          host            = _host
+          ``method``      = HttpMethod.parse  _method
+          headers         = List.filter (fun (x,y) -> x <> ":method" || x <> ":scheme" || x <> ":path" || x <> ":authority") headerList
+          rawForm         = Array.empty
+          rawQuery        = ""
+          files           = []
+          multiPartFields = []
+          trace           = TraceHeader.empty }
+
+      return r
+      }
+
+  let http2Loop (facade : ConnectionFacade) (consumer : WebPart) = 
+
+    socket {
+      let cn2 = new Http2Connection(facade)
+      let! q = cn2.read ()
+      match q with
+      | header,Settings (flag,settings) ->
+        Async.Start (cn2.writeLoop (facade.GetCurrentContext()) consumer)
+        // The SETTINGS frames received from a peer as part of the connection preface MUST be acknowledged 
+        // (see Section 6.5.3) after sending the connection preface.
+        let! request = http2readRequest (facade.GetCurrentContext().runtime.matchedBinding) cn2
+        // queue for processing
+        do cn2.send request
+        do cn2.stop()
+        free "Suave.ParsingAndControl.http2Loop" (facade.GetCurrentContext().connection)
+      | _, r ->
+        printfn "Expecting SETTINGS frame, got: %A" r
+      }
+
   let httpLoop (ctxOuter : HttpContext) (consumer : WebPart) =
 
     let logger = ctxOuter.runtime.logger
+    let event message =
+      eventX message 
+      >> setSingleName "Suave.ParsingAndControl.httpLoop.loop"
 
     let facade = new ConnectionFacade(ctxOuter)
 
-    let rec loop (_ : HttpContext) = async {
-      let event message =
-       eventX message 
-       >> setSingleName "Suave.ParsingAndControl.httpLoop.loop"
+    let rec processRequest ctx = async {
+       // Check for Upgrade header.
+       (*
+       A server that supports HTTP/2 accepts the upgrade with a 101 (Switching Protocols) response. After the empty line 
+       that terminates the 101 response, the server can begin sending HTTP/2 frames. These frames MUST include a response
+       to the request that initiated the upgrade.
+       *)
 
-      logger.verbose (event "Processing request... -> processor")
-      let! result' = facade.processRequest
-      logger.verbose (event "Processed request. <- processor")
-      match result' with
-      | Choice1Of2 result ->
-        match result with
-        | None ->
-          logger.verbose (event "'result = None', exiting")
+       match ctx.request.headers %% "upgrade" with
+       | Choice1Of2 "h2c" -> 
+         let! _ = HttpOutput.run Intermediate.CONTINUE ctx
+         logger.verbose (event "sent 100-continue response")
+         logger.verbose (event "Connection upgraded to HTTP/2")
+         let! a = http2Loop facade consumer
+         return ()
+       | Choice1Of2 "h2" ->
+          // implies TLS
+         if ctx.runtime.matchedBinding.scheme <> Http.Protocol.HTTP then
+           let! _ = HttpOutput.run Intermediate.CONTINUE ctx
+           logger.verbose (event "sent 100-continue response")
+           logger.verbose (event "Connection upgraded to HTTP/2")
+           let! a = http2Loop facade consumer
+           return ()
+          else
+            failwith "TLS required"
+       | Choice1Of2 _ -> 
+         ignore ()
+       | Choice2Of2 _ -> 
+         ignore ()
 
-        | Some ctx ->
-          let! result'' = HttpOutput.addKeepAliveHeader ctx |> HttpOutput.run consumer
-          match result'' with
-          | Choice1Of2 result -> 
-            match result with
-            | None -> ()
-            | Some ctx ->
-              match ctx.request.header "connection" with
-              | Choice1Of2 conn when String.equalsOrdinalCI conn "keep-alive" ->
-                logger.verbose (event "'Connection: keep-alive' recurse")
-                return! loop (cleanResponse ctx)
-              | Choice1Of2 _ ->
-                free "Suave.Web.httpLoop.loop (case Choice1Of2 _)" ctx.connection
-                logger.verbose (event "Connection: close")
-              | Choice2Of2 _ ->
-                if ctx.request.httpVersion.Equals("HTTP/1.1") then
-                  logger.verbose (event "'Connection: keep-alive' recurse (!)")
-                  return! loop (cleanResponse ctx)
-                else
-                  free "Suave.Web.httpLoop.loop (case Choice2Of2, else branch)" ctx.connection
-                  logger.verbose (event "Connection: close")
-                  return ()
+       // the difference is that in http2 we would queue the response (even the re-solution of the response)
+       // and will continue reading (duplex) - we need a loop reading and a loop writing parallel
+       let! result'' = HttpOutput.addKeepAliveHeader ctx |> HttpOutput.run consumer
+       match result'' with
+       | Choice1Of2 result -> 
+         match result with
+         | None -> ()
+         | Some ctx ->
+           match ctx.request.header "connection" with
+           | Choice1Of2 conn when String.equalsOrdinalCI conn "keep-alive" ->
+             logger.verbose (event "'Connection: keep-alive' recurse")
+             return! loop (cleanResponse ctx)
+           | Choice1Of2 _ ->
+             free "Suave.Web.httpLoop.loop (case Choice1Of2 _)" ctx.connection
+             logger.verbose (event "Connection: close")
+           | Choice2Of2 _ ->
+             if ctx.request.httpVersion.Equals("HTTP/1.1") then
+               logger.verbose (event "'Connection: keep-alive' recurse (!)")
+               return! loop (cleanResponse ctx)
+             else
+               free "Suave.Web.httpLoop.loop (case Choice2Of2, else branch)" ctx.connection
+               logger.verbose (event "Connection: close")
+               return ()
 
-          | Choice2Of2 err ->
-            logger.info (
-              event "Socket error while running webpart, exiting"
-              >> addExn err)
+       | Choice2Of2 err ->
+           logger.info (
+             event "Socket error while running webpart, exiting"
+             >> addExn err)
+      }
+    and loop (_ : HttpContext) = async {
 
+      logger.verbose (event "-> processor")
+      logger.verbose (event "reading first line of request")
+      let! q = facade.readLine
+      match q with
       | Choice2Of2 err ->
-        match err with
-        | InputDataError msg ->
-          logger.info (event "Error parsing HTTP request with {message}"
-                       >> setFieldValue "message" msg)
-
-          let! result''' = HttpOutput.run (RequestErrors.BAD_REQUEST msg) ctxOuter
-          match result''' with
-          | Choice1Of2 _ ->
-            logger.verbose (event "Exiting http loop")
-
+          logger.verbose (event ("Exiting: " + err.ToString()))
+      | Choice1Of2 firstLine ->
+        if firstLine.Equals("PRI * HTTP/2.0") then
+          logger.verbose (event "HTTP/2 preamble detected.")
+          // read the remaining octects "\r\nSM\r\n\r\n"
+          let! a = facade.skipLine
+          let! a = facade.skipLine
+          let! a = facade.skipLine
+          // inititate http2 looop
+          let! a = http2Loop facade consumer
+          return ()
+        else
+          // else regular http loop
+          logger.verbose (event "Processing request... -> processor")
+          let! result' = facade.processRequest firstLine
+          logger.verbose (event "Processed request. <- processor")
+          match result' with
+          | Choice1Of2 result ->
+            match result with
+            | None ->
+              logger.verbose (event "'result = None', exiting")
+            | Some ctx ->
+              return! processRequest ctx
           | Choice2Of2 err ->
-            logger.verbose (event "Socket error while sending BAD_REQUEST, exiting"
-                            >> setFieldValue "error" err)
-            
-        | err ->
-          logger.verbose (event "Socket error while processing request, exiting"
-                          >> setFieldValue "error" err)
+            match err with
+            | InputDataError msg ->
+              logger.info (event "Error parsing HTTP request with {message}" >> setFieldValue "message" msg)
+              let! result''' = HttpOutput.run (RequestErrors.BAD_REQUEST msg) ctxOuter
+              match result''' with
+              | Choice1Of2 _ ->
+                logger.verbose (event "Exiting http loop")
+              | Choice2Of2 err ->
+                logger.verbose (event "Socket error while sending BAD_REQUEST, exiting" >> setFieldValue "error" err)
+            | err ->
+              logger.verbose (event "Socket error while processing request, exiting" >> setFieldValue "error" err)
     }
     loop ctxOuter
 

@@ -7,7 +7,7 @@
     <OutputType>Exe</OutputType>
     <RootNamespace>Suave.Tests</RootNamespace>
     <AssemblyName>Suave.Tests</AssemblyName>
-    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.5.1</TargetFrameworkVersion>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -110,6 +110,7 @@
     <Compile Include="Cookie.fs" />
     <Compile Include="Types.fs" />
     <Compile Include="WebSocket.fs" />
+    <Compile Include="Http2.fs" />
     <Compile Include="Razor.fs" />
     <Compile Include="DotLiquid.fs" />
     <Compile Include="FuchuExtensions.fs" />
@@ -192,18 +193,7 @@
     </ProjectReference>
   </ItemGroup>
   <Choose>
-    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
-      <ItemGroup>
-        <Reference Include="DotLiquid">
-          <HintPath>..\..\packages\tests\DotLiquid\lib\NET45\DotLiquid.dll</HintPath>
-          <Private>True</Private>
-          <Paket>True</Paket>
-        </Reference>
-      </ItemGroup>
-    </When>
-  </Choose>
-  <Choose>
-    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
+    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5.1'">
       <ItemGroup>
         <Reference Include="FsCheck">
           <HintPath>..\..\packages\tests\FsCheck\lib\net45\FsCheck.dll</HintPath>
@@ -214,7 +204,7 @@
     </When>
   </Choose>
   <Choose>
-    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
+    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5.1'">
       <ItemGroup>
         <Reference Include="FSharp.Charting">
           <HintPath>..\..\packages\tests\FSharp.Charting\lib\net40\FSharp.Charting.dll</HintPath>
@@ -225,7 +215,7 @@
     </When>
   </Choose>
   <Choose>
-    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
+    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5.1'">
       <ItemGroup>
         <Reference Include="FSharp.Core">
           <HintPath>..\..\packages\tests\FSharp.Core\lib\net40\FSharp.Core.dll</HintPath>
@@ -236,7 +226,7 @@
     </When>
   </Choose>
   <Choose>
-    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
+    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5.1'">
       <ItemGroup>
         <Reference Include="Fuchu">
           <HintPath>..\..\packages\tests\Fuchu\lib\Fuchu.dll</HintPath>
@@ -247,7 +237,7 @@
     </When>
   </Choose>
   <Choose>
-    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
+    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5.1'">
       <ItemGroup>
         <Reference Include="Fuchu.FsCheck">
           <HintPath>..\..\packages\tests\Fuchu.FsCheck\lib\Fuchu.FsCheck.dll</HintPath>
@@ -258,7 +248,7 @@
     </When>
   </Choose>
   <Choose>
-    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
+    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5.1'">
       <ItemGroup>
         <Reference Include="Fuchu.PerfUtil">
           <HintPath>..\..\packages\tests\Fuchu.PerfUtil\lib\Fuchu.PerfUtil.dll</HintPath>
@@ -269,7 +259,7 @@
     </When>
   </Choose>
   <Choose>
-    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
+    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5.1'">
       <ItemGroup>
         <Reference Include="Hopac.Core">
           <HintPath>..\..\packages\tests\Hopac\lib\net45\Hopac.Core.dll</HintPath>
@@ -290,7 +280,7 @@
     </When>
   </Choose>
   <Choose>
-    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
+    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5.1'">
       <ItemGroup>
         <Reference Include="HttpFs">
           <HintPath>..\..\packages\tests\Http.fs\lib\net40\HttpFs.dll</HintPath>
@@ -301,7 +291,23 @@
     </When>
   </Choose>
   <Choose>
-    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
+    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5.1'">
+      <ItemGroup>
+        <Reference Include="HttpTwo.HPack">
+          <HintPath>..\..\packages\tests\HttpTwo\lib\net45\HttpTwo.HPack.dll</HintPath>
+          <Private>True</Private>
+          <Paket>True</Paket>
+        </Reference>
+        <Reference Include="HttpTwo">
+          <HintPath>..\..\packages\tests\HttpTwo\lib\net45\HttpTwo.dll</HintPath>
+          <Private>True</Private>
+          <Paket>True</Paket>
+        </Reference>
+      </ItemGroup>
+    </When>
+  </Choose>
+  <Choose>
+    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5.1'">
       <ItemGroup>
         <Reference Include="PerfUtil">
           <HintPath>..\..\packages\tests\PerfUtil\lib\net40\PerfUtil.dll</HintPath>
@@ -312,7 +318,7 @@
     </When>
   </Choose>
   <Choose>
-    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
+    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5.1'">
       <ItemGroup>
         <Reference Include="websocket-sharp">
           <HintPath>..\..\packages\tests\WebSocketSharp\lib\websocket-sharp.dll</HintPath>

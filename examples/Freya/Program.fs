@@ -2,48 +2,31 @@
 
 module SampleApp =
     open System.Text
-    open Arachne.Language
-    open Arachne.Http
     open Freya.Core
-    open Freya.Core.Operators
-    open Freya.Lenses.Http
-    open Freya.Machine
-    open Freya.Machine.Extensions.Http
-    open Freya.Machine.Router
-    open Freya.Router
-    open Arachne.Uri.Template
+    open Freya.Machines.Http
+    open Freya.Routers.Uri.Template
 
-    let en = LanguageTag.parse "en"
+    let name =
+        freya {
+            let! name = Freya.Optic.get (Route.atom_ "name")
 
-    let inline represent (x : string) =
-        { Description =
-            { Charset = Some Charset.Utf8
-              Encodings = None
-              MediaType = Some MediaType.Text
-              Languages = Some [ en ] }
-          Data = Encoding.UTF8.GetBytes x }
+            match name with
+            | Some name -> return name
+            | _ -> return "World" }
 
-    let ok =
-            Freya.Optic.set Response.reasonPhrase_ (Some "Hey Folks!")
-         *> Freya.init (represent "Hey, folks!")
+    let hello =
+        freya {
+            let! name = name
 
-    let common =
+            return Represent.text (sprintf "Hello %s!" name) }
+
+    let machine =
         freyaMachine {
-            using http
-            charsetsSupported Charset.Utf8
-            languagesSupported en
-            mediaTypesSupported MediaType.Text }
+            handleOk hello }
 
-    let home =
-        freyaMachine {
-            using http
-            including common
-            methodsSupported GET
-            handleOk ok }
-
-    let routes =
+    let router =
         freyaRouter {
-            resource "/" home }
+            resource "/hello{/name}" machine }
 
 module SelfHostedServer =
   open Freya.Core
@@ -58,7 +41,7 @@ module SelfHostedServer =
     printfn "w00t"
 
     let app =
-      OwinApp.ofAppFunc "/" (OwinAppFunc.ofFreya routes)
+      OwinApp.ofAppFunc "/" (OwinAppFunc.ofFreya router)
 
     let config =
       { defaultConfig with
