@@ -4,7 +4,7 @@ open System
 open System.Net
 open System.Net.Http
 
-open Fuchu
+open Expecto
 
 open Suave
 open Suave.Successful
@@ -26,5 +26,5 @@ let connectionTests cfg =
                  setConnectionKeepAlive
                  contentString
                  context
-      Assert.Equal("should ACK", "ACK", res)
+      Expect.equal res "ACK" "should ACK"
     ]

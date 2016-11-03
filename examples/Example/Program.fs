@@ -219,7 +219,7 @@ open System.Security.Cryptography.X509Certificates
 [<EntryPoint>]
 let main argv =
 
-  let cert = X509Certificate2("suave.p12","easy")
+  let cert = new X509Certificate2("suave.p12","easy")
 
   startWebServer
     { bindings              = [ HttpBinding.createSimple HTTP "127.0.0.1" 8082

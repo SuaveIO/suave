@@ -3,149 +3,147 @@
 open Suave
 open Suave.Logging
 open Suave.Testing
-
-open Fuchu
-
+open Expecto
 open FsCheck
-
-open Tests.TestUtilities
 
 [<Tests>]
 let toString (_ : SuaveConfig) =
   testList "ToString" [
     testCase "verbose ToString" <| fun _ ->
-      Assert.Equal("LogLevel.Verbose ToString incorrect", "verbose", string LogLevel.Verbose)
+      Expect.equal (string LogLevel.Verbose) "verbose" "LogLevel.Verbose ToString incorrect"
     testCase "debug ToString"   <| fun _ ->
-      Assert.Equal("LogLevel.Debug ToString incorrect",   "debug",   string LogLevel.Debug)
+      Expect.equal (string LogLevel.Debug) "debug" "LogLevel.Debug ToString incorrect"
     testCase "info ToString"    <| fun _ ->
-      Assert.Equal("LogLevel.Info ToString incorrect",    "info",    string LogLevel.Info)
+      Expect.equal (string LogLevel.Info) "info" "LogLevel.Info ToString incorrect"
     testCase "warn ToString"    <| fun _ ->
-      Assert.Equal("LogLevel.Warn ToString incorrect",    "warn",    string LogLevel.Warn)
+      Expect.equal (string LogLevel.Warn) "warn" "LogLevel.Warn ToString incorrect"
     testCase "error ToString"   <| fun _ ->
-      Assert.Equal("LogLevel.Error ToString incorrect",   "error",   string LogLevel.Error)
+      Expect.equal (string LogLevel.Error) "error" "LogLevel.Error ToString incorrect"
     testCase "fatal ToString"   <| fun _ ->
-      Assert.Equal("LogLevel.Fatal ToString incorrect",   "fatal",   string LogLevel.Fatal)
+      Expect.equal (string LogLevel.Fatal) "fatal" "LogLevel.Fatal ToString incorrect"
   ]
 
 [<Tests>]
 let fromString (_ : SuaveConfig) =
   testList "FromString" [
     testCase "verbose FromString" <| fun _ ->
-      Assert.Equal("LogLevel.Verbose FromString failed", LogLevel.Verbose, LogLevel.ofString "verbose")
+      Expect.equal (LogLevel.ofString "verbose") LogLevel.Verbose "LogLevel.Verbose FromString failed"
     testCase "debug FromString"   <| fun _ ->
-      Assert.Equal("LogLevel.Debug FromString failed",   LogLevel.Debug,   LogLevel.ofString "debug")
+      Expect.equal (LogLevel.ofString "debug") LogLevel.Debug "LogLevel.Debug FromString failed"
     testCase "info FromString"    <| fun _ ->
-      Assert.Equal("LogLevel.Info FromString failed",    LogLevel.Info,    LogLevel.ofString "info")
+      Expect.equal (LogLevel.ofString "info") LogLevel.Info "LogLevel.Info FromString failed"
     testCase "warn FromString"    <| fun _ ->
-      Assert.Equal("LogLevel.Warn FromString failed",    LogLevel.Warn,    LogLevel.ofString "warn")
+      Expect.equal (LogLevel.ofString "warn") LogLevel.Warn "LogLevel.Warn FromString failed"
     testCase "error FromString"   <| fun _ ->
-      Assert.Equal("LogLevel.Error FromString failed",   LogLevel.Error,   LogLevel.ofString "error")
+      Expect.equal (LogLevel.ofString "error") LogLevel.Error "LogLevel.Error FromString failed"
     testCase "fatal FromString"   <| fun _ ->
-      Assert.Equal("LogLevel.Fatal FromString failed",   LogLevel.Fatal,   LogLevel.ofString "fatal")
+      Expect.equal (LogLevel.ofString "fatal") LogLevel.Fatal "LogLevel.Fatal FromString failed"
     testCase "unrecognized string defaults to info" <| fun _ ->
-      Assert.Equal("LogLevel.FromString should default to Info", LogLevel.Info, LogLevel.ofString "garbage")
+      Expect.equal (LogLevel.ofString "garbage") LogLevel.Info "LogLevel.FromString should default to Info"
   ]
 
 [<Tests>]
 let toInt (_ : SuaveConfig) =
   testList "ToInt" [
     testCase "verbose ToInt" <| fun _ ->
-      Assert.Equal("LogLevel.Verbose ToInt incorrect", 1, LogLevel.Verbose.toInt())
+      Expect.equal (LogLevel.Verbose.toInt()) 1 "LogLevel.Verbose ToInt incorrect"
     testCase "debug ToInt"   <| fun _ ->
-      Assert.Equal("LogLevel.Debug ToInt incorrect",   2, LogLevel.Debug.toInt())
+      Expect.equal (LogLevel.Debug.toInt()) 2 "LogLevel.Debug ToInt incorrect"
     testCase "info ToInt"    <| fun _ ->
-      Assert.Equal("LogLevel.Info ToInt incorrect",    3, LogLevel.Info.toInt())
+      Expect.equal (LogLevel.Info.toInt()) 3 "LogLevel.Info ToInt incorrect"
     testCase "warn ToInt"    <| fun _ ->
-      Assert.Equal("LogLevel.Warn ToInt incorrect",    4, LogLevel.Warn.toInt())
+      Expect.equal (LogLevel.Warn.toInt()) 4 "LogLevel.Warn ToInt incorrect"
     testCase "error ToInt"   <| fun _ ->
-      Assert.Equal("LogLevel.Error ToInt incorrect",   5, LogLevel.Error.toInt())
+      Expect.equal (LogLevel.Error.toInt()) 5 "LogLevel.Error ToInt incorrect"
     testCase "fatal ToInt"   <| fun _ ->
-      Assert.Equal("LogLevel.Fatal ToInt incorrect",   6, LogLevel.Fatal.toInt())
+      Expect.equal (LogLevel.Fatal.toInt()) 6 "LogLevel.Fatal ToInt incorrect"
   ]
 
 [<Tests>]
 let fromInt (_ : SuaveConfig) =
   testList "FromInt" [
     testCase "verbose FromInt" <| fun _ ->
-      Assert.Equal("verbose FromInt failed", LogLevel.Verbose, LogLevel.ofInt 1)
+      Expect.equal (LogLevel.ofInt 1) LogLevel.Verbose "verbose FromInt failed"
     testCase "debug FromInt"   <| fun _ ->
-      Assert.Equal("verbose FromInt failed", LogLevel.Debug,   LogLevel.ofInt 2)
+      Expect.equal (LogLevel.ofInt 2) LogLevel.Debug "verbose FromInt failed"
     testCase "info FromInt"    <| fun _ ->
-      Assert.Equal("verbose FromInt failed", LogLevel.Info,    LogLevel.ofInt 3)
+      Expect.equal (LogLevel.ofInt 3) LogLevel.Info "verbose FromInt failed"
     testCase "warn FromInt"    <| fun _ ->
-      Assert.Equal("verbose FromInt failed", LogLevel.Warn,    LogLevel.ofInt 4)
+      Expect.equal (LogLevel.ofInt 4) LogLevel.Warn "verbose FromInt failed"
     testCase "error FromInt"   <| fun _ ->
-      Assert.Equal("verbose FromInt failed", LogLevel.Error,   LogLevel.ofInt 5)
+      Expect.equal (LogLevel.ofInt 5) LogLevel.Error "verbose FromInt failed"
     testCase "fatal FromInt"   <| fun _ ->
-      Assert.Equal("verbose FromInt failed", LogLevel.Fatal,   LogLevel.ofInt 6)
+      Expect.equal (LogLevel.ofInt 6) LogLevel.Fatal "verbose FromInt failed"
     testCase "FromInt fails with unknown int" <| fun _ ->
       try
         ignore <| LogLevel.ofInt 0
-        Assert.Equal("FromInt should have raised for unknown integer", true, false)
+        Expect.equal false true "FromInt should have raised for unknown integer"
       with exn as ex ->
-        Assert.Equal("Should have returned an exception message", false, System.String.IsNullOrEmpty ex.Message)
+        Expect.equal (System.String.IsNullOrEmpty ex.Message) false "Should have returned an exception message"
   ]
 
 [<Tests>]
 let greaterThan (_ : SuaveConfig) =
   testList "greaterThan" [
     testCase "debug > verbose" <| fun _ ->
-      Assert.Equal("debug should be > verbose", true, LogLevel.Debug > LogLevel.Verbose)
+      Expect.isTrue (LogLevel.Debug > LogLevel.Verbose) "debug should be > verbose"
     testCase "info > debug"    <| fun _ ->
-      Assert.Equal("info should be > debug",    true, LogLevel.Info  > LogLevel.Debug)
+      Expect.isTrue (LogLevel.Info  > LogLevel.Debug)  "info should be > debug"
     testCase "warn > info"     <| fun _ ->
-      Assert.Equal("warn should be > info",     true, LogLevel.Warn  > LogLevel.Info)
+      Expect.isTrue (LogLevel.Warn  > LogLevel.Info) "warn should be > info"
     testCase "error > warn"    <| fun _ ->
-      Assert.Equal("error should be > warn",    true, LogLevel.Error > LogLevel.Warn)
+      Expect.isTrue (LogLevel.Error > LogLevel.Warn) "error should be > warn"
     testCase "fatal > error"   <| fun _ ->
-      Assert.Equal("fatal should be > error",   true, LogLevel.Fatal > LogLevel.Error)
+      Expect.isTrue (LogLevel.Fatal > LogLevel.Error) "fatal should be > error"
   ]
 
 [<Tests>]
 let lessThan (_ : SuaveConfig) =
   testList "lessThan" [
     testCase "verbose < debug" <| fun _ ->
-      Assert.Equal("verbose should be < debug", true, LogLevel.Verbose < LogLevel.Debug)
+      Expect.isTrue (LogLevel.Verbose < LogLevel.Debug) "verbose should be < debug"
     testCase "debug < info"    <| fun _ ->
-      Assert.Equal("debug should be < info",    true, LogLevel.Debug   < LogLevel.Info)
+      Expect.isTrue (LogLevel.Debug   < LogLevel.Info) "debug should be < info"
     testCase "info < warn"     <| fun _ ->
-      Assert.Equal("info should be < warn",     true, LogLevel.Info    < LogLevel.Warn)
+      Expect.isTrue (LogLevel.Info    < LogLevel.Warn) "info should be < warn"
     testCase "warn < error"    <| fun _ ->
-      Assert.Equal("warn should be < error",    true, LogLevel.Warn    < LogLevel.Error)
+      Expect.isTrue (LogLevel.Warn    < LogLevel.Error) "warn should be < error"
     testCase "error < fatal"   <| fun _ ->
-      Assert.Equal("error should be < fatal",   true, LogLevel.Error   < LogLevel.Fatal)
+      Expect.isTrue (LogLevel.Error   < LogLevel.Fatal) "error should be < fatal"
   ]
 
 [<Tests>]
 let equals (_ : SuaveConfig) =
   testList "equals" [
     testCase "verbose = verbose" <| fun _ ->
-      Assert.Equal("verbose should be = verbose", true, LogLevel.Verbose.Equals(LogLevel.Verbose))
+      Expect.isTrue (LogLevel.Verbose.Equals(LogLevel.Verbose)) "verbose should be = verbose"
     testCase "verbose != debug" <| fun _ ->
-      Assert.Equal("verbose should not be = debug", false, LogLevel.Verbose.Equals(LogLevel.Debug))
+      Expect.isFalse (LogLevel.Verbose.Equals(LogLevel.Debug)) "verbose should not be = debug"
     testCase "verbose != some other object" <| fun _ ->
       try
-        Assert.Equal("verbose should not be = a string", false, LogLevel.Verbose.Equals("tutti fruity"))
-        Assert.Equal("verbose should not have been equal to a string", false, true)
+        Expect.isFalse (LogLevel.Verbose.Equals("tutti fruity"))
+                       "Verbose should not be = a string"
+        Tests.failtest "Verbose should not have been equal to a string"
       with exn as ex ->
-        Assert.Equal("error message should have been generated", false, System.String.IsNullOrEmpty(ex.Message))
+        Expect.isFalse (System.String.IsNullOrEmpty(ex.Message))
+                       "Error message should have been generated"
   ]
 
 [<Tests>]
 let getHashCode (_ : SuaveConfig) =
   testList "getHashCode" [
     testCase "verbose hash code should use ToInt" <| fun _ ->
-      Assert.Equal("verbose hash code != ToInt", LogLevel.Verbose.GetHashCode(), LogLevel.Verbose.toInt())
+      Expect.equal (LogLevel.Verbose.toInt()) (LogLevel.Verbose.GetHashCode()) "verbose hash code != toInt"
     testCase "debug hash code should use ToInt"   <| fun _ ->
-      Assert.Equal("debug hash code != ToInt",   LogLevel.Debug.GetHashCode(),   LogLevel.Debug.toInt())
+      Expect.equal (LogLevel.Debug.toInt()) (LogLevel.Debug.GetHashCode()) "debug hash code != toInt"
     testCase "info hash code should use ToInt"    <| fun _ ->
-      Assert.Equal("info hash code != ToInt",    LogLevel.Info.GetHashCode(),    LogLevel.Info.toInt())
+      Expect.equal (LogLevel.Info.toInt()) (LogLevel.Info.GetHashCode()) "info hash code != toInt"
     testCase "warn hash code should use ToInt"    <| fun _ ->
-      Assert.Equal("warn hash code != ToInt",    LogLevel.Warn.GetHashCode(),    LogLevel.Warn.toInt())
+      Expect.equal (LogLevel.Warn.toInt()) (LogLevel.Warn.GetHashCode()) "warn hash code != toInt"
     testCase "error hash code should use ToInt"    <| fun _ ->
-      Assert.Equal("error hash code != ToInt",   LogLevel.Error.GetHashCode(),   LogLevel.Error.toInt())
+      Expect.equal (LogLevel.Error.toInt()) (LogLevel.Error.GetHashCode()) "error hash code != toInt"
     testCase "fatal hash code should use ToInt"    <| fun _ ->
-      Assert.Equal("fatal hash code != ToInt",   LogLevel.Fatal.GetHashCode(),   LogLevel.Fatal.toInt())
+      Expect.equal (LogLevel.Fatal.toInt()) (LogLevel.Fatal.GetHashCode()) "fatal hash code != toInt"
   ]
 
 // IComparable, <=, and => are exercised indirectly by the above functions

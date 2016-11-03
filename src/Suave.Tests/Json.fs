@@ -1,6 +1,6 @@
 ﻿module Suave.Tests.Json
 
-open Fuchu
+open Expecto
 
 open System
 open System.IO

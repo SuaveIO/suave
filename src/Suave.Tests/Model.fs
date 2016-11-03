@@ -5,7 +5,7 @@ open System.Text
 open System.Net.Http
 open System.Net.Http.Headers
 
-open Fuchu
+open Expecto
 
 open Suave
 open Suave.Model
