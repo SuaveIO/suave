@@ -446,15 +446,17 @@ module Http2 =
     let table = Array.create maxN {size = 0; token=tokenMax; headerValue="dummyValue"}
     new DynamicTable(info,table,maxN - 1,0,maxN,0,maxsize)
 
-  let newDynamicRevIndex = 
-    Array.map (fun _ -> Map.empty<HeaderValue, HIndex>) [| minTokenIx .. maxStaticTokenIndex |]
+  open System.Collections.Generic
 
-  let newOtherRevIndex = Map.empty
+  let newDynamicRevIndex _ = 
+    Array.map (fun _ -> new Dictionary<HeaderValue,HIndex>()) [| minTokenIx .. maxStaticTokenIndex |]
 
-  let newrevIndex = RevIndex (newDynamicRevIndex, newOtherRevIndex)
+  let newOtherRevIndex _ = new Dictionary<KeyValue,HIndex>()
+
+  let newrevIndex _ = RevIndex (newDynamicRevIndex (), newOtherRevIndex())
 
   let newDynamicTableForEncoding (maxSize:int) =
-    let info = EncodeInfo(newrevIndex, None)
+    let info = EncodeInfo(newrevIndex (), None)
     newDynamicTable maxSize info
 
   let newDynamicTableForDecoding maxsiz huftmpsiz =

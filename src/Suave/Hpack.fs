@@ -4,6 +4,7 @@
 module Hpack =
 
   open System
+  open System.Collections.Generic
 
   let defaultDynamicTableSize = 4096
 
@@ -65,15 +66,15 @@ module Hpack =
 
   type HIndex = SIndex of int | DIndex of int
 
-  type ValueMap = Map<HeaderValue, HIndex>
+  type ValueMap = Dictionary<HeaderValue, HIndex>
 
   type KeyValue = KeyValue of HeaderName * HeaderValue
 
-  type OtherRevIdex = Map<KeyValue, HIndex>
+  type OtherRevIndex = Dictionary<KeyValue, HIndex>
 
   type DynamicRevIndex = ValueMap array
 
-  type RevIndex = RevIndex of DynamicRevIndex * OtherRevIdex
+  type RevIndex = RevIndex of DynamicRevIndex * OtherRevIndex
 
   open Suave.Huffman
 
@@ -255,6 +256,8 @@ module Hpack =
   let toToken (str: HeaderValue) : Token =
     let lc = str.ToLowerInvariant()
     let len = lc.Length
+    if len <= 0 then
+      failwith "Empty header value"
     let last = Convert.ToByte (lc.[ len - 1])
     match len with
     | 2 ->
@@ -430,14 +433,12 @@ if I < 2^N - 1, encode I on N bits
 
   let naiveAlgorithm fe (t:Token) v = fe (t.tokenKey.ToLower()) v
 
-  let staticAlgorithm fa fd fe (t:Token) v = ()
-
   type StaticEntry = StaticEntry of HIndex * ValueMap option
 
-  let lookupOtherRevIndex (k,v) (ref: OtherRevIdex) fa' fc' =
-    match Map.tryFind (KeyValue (k,v)) ref with
-    | Some i -> fa' i
-    | None   -> fc'
+  let lookupOtherRevIndex (k,v) (ref: OtherRevIndex) fa' fc' =
+    match ref.TryGetValue (KeyValue (k,v)) with
+    | true, i    -> fa' i
+    | false, _   -> fc'
 
   let toEnt (k : HeaderValue, xs) = 
     let token = (toToken k)
@@ -446,7 +447,8 @@ if I < 2^N - 1, encode I on N bits
       | [] -> failwith "staticRevIndex"
       | ["",i] -> StaticEntry (i, None)
       | (_,i):: _ ->
-        let map = Map.ofList xs
+        let map = new Dictionary<_,_>()
+        List.iter (fun (x,y) -> map.Add(x,y)) xs
         StaticEntry (i,Some map)
     token.index , m
 
@@ -478,9 +480,9 @@ if I < 2^N - 1, encode I on N bits
 
   let lookupDynamicStaticRevIndex (ix:int) (v:HeaderValue) (drev:DynamicRevIndex) fa' fbd' =
     let map = drev.[ix]
-    match Map.tryFind v map with
-    | Some i -> fa' i
-    | None   -> lookupStaticRevIndex ix v fa' fbd'
+    match map.TryGetValue v  with
+    | true , i -> fa' i
+    | false, _   -> lookupStaticRevIndex ix v fa' fbd'
 
   let lookupRevIndex (t:Token) v fa fb fc fd (RevIndex( dyn, oth)) =
     let ent = toEntryToken t v
@@ -494,13 +496,13 @@ if I < 2^N - 1, encode I on N bits
   let linearAlgorithm rev fa fb fc fd t v =
     lookupRevIndex t v fa fb fc fd rev
 
-  let encodeString (useHuffman : bool) (str: string) (wbuf : MemoryStream) =
-    if useHuffman then
-      ()
+  let lookupRevIndex' (t:Token) v fa fd fe =
+    if isStaticToken t then
+      lookupStaticRevIndex t.index v fa (fd v)
     else
-      let len = str.Length
-      encodeInteger wbuf id 7 len
-      copyByteString wbuf str
+      fe (t.tokenKey.ToLowerInvariant()) v
+
+  let staticAlgorithm fa fd fe (t:Token) v = lookupRevIndex' t v fa fd fe
 
   let set1    x = x ||| (1uy <<< 7)
   let set01   x = x ||| (1uy <<< 6)
@@ -508,6 +510,68 @@ if I < 2^N - 1, encode I on N bits
   let set0001 x = x ||| (1uy <<< 4) // unused
   let set0000   = id
   let setH      = set1
+
+  let integerLength n =
+    if n <= 126 then 1
+    elif n <= 254 then 2
+    else 3
+
+  let shiftLastN (wbuf : MemoryStream) gap len =
+
+    let rec shiftLeft dst src n =
+      if n > 0L then
+        wbuf.Position <- src
+        let b = byte(wbuf.ReadByte())
+        wbuf.Position <- dst
+        wbuf.WriteByte(b)
+        shiftLeft (dst + 1L) (src + 1L) (n - 1L)
+
+    let rec shiftRight dst src n =
+      if n > 0L then
+        wbuf.Position <- src
+        let b = byte(wbuf.ReadByte())
+        wbuf.Position <- dst
+        wbuf.WriteByte(b)
+        shiftLeft (dst - 1L) (src - 1L) (n - 1L)
+
+    if gap <> 0 then
+      if wbuf.Position + int64 gap > int64 wbuf.Capacity then
+        failwith "BufferOverrun"
+      let ptr = wbuf.Position + int64 gap
+      let ptr' = ptr + 1L
+      if gap < 0 then
+        let src = ptr - len
+        let dst = src + int64 gap
+        shiftLeft dst src len
+      else
+        let src = ptr  - 1L
+        let dst = ptr' - 1L
+        shiftRight dst src len
+
+
+  let encodeString (useHuffman : bool) (str: string) (wbuf : MemoryStream) =
+    if useHuffman then
+      let origLen = str.Length
+      let expectedLen = origLen / 10 * 8
+      let expectedLenInt = integerLength expectedLen
+      wbuf.Position <- wbuf.Position + int64 expectedLenInt
+      let len = Encoding.enc wbuf (new MemoryStream (UnicodeEncoding.UTF8.GetBytes str))
+      if origLen < len then
+        wbuf.Position <- wbuf.Position - int64(expectedLenInt + len)
+        encodeInteger wbuf id 7 origLen
+        copyByteString wbuf str
+      elif len = expectedLenInt then
+        wbuf.Position <- wbuf.Position - int64 (expectedLenInt + len)
+        encodeInteger wbuf setH 7 origLen
+        wbuf.Position <- wbuf.Position + int64 len
+      else
+        let gap = len - expectedLenInt
+        shiftLastN wbuf gap (int64 len)
+        wbuf.Position <- wbuf.Position - int64(expectedLenInt + len)
+    else
+      let len = str.Length
+      encodeInteger wbuf id 7 len
+      copyByteString wbuf str
 
   let newName (wbuf : MemoryStream) huff (set : Setter) k v = do
     wbuf.WriteByte (set 0uy)
@@ -538,19 +602,64 @@ if I < 2^N - 1, encode I on N bits
   let indexedHeaderField dyntbl wbuf _ hidx =
     fromHIndexToIndex dyntbl hidx |> index wbuf
 
+  let deleteDynamicRevIndex (t:Token) (v:HeaderValue) (drev:DynamicRevIndex) =
+    drev.[t.index].Remove v |> ignore
+
+  let deleteOtherRevIndex (t:Token) (v:HeaderValue) (drev:OtherRevIndex) =
+    drev.Remove(KeyValue (t.tokenKey,v)) |> ignore
+
+  let deleteRevIndex (rev:RevIndex) (e:Entry) =
+    let (RevIndex (dyn,other)) = rev
+    if isStaticToken e.token then
+      deleteDynamicRevIndex e.token e.headerValue dyn
+    else
+      deleteOtherRevIndex e.token e.headerValue other
+
+  let deleteRevIndexList (es: Entry list) (rev:RevIndex) =
+    List.iter (deleteRevIndex rev) es
+
+  let removeEnd (dyntbl:DynamicTable) : Entry =
+    let maxN = dyntbl.maxNumOfEntries
+    let off = dyntbl.offset
+    let n = dyntbl.numOfEntries
+    let i = adj maxN (off + n)
+    let table = dyntbl.circularTable
+    let e = table.[i]
+    table.[i] <- {size = 0; token= tokenMax; headerValue = ""}
+    let dsize = dyntbl.dynamicTableSize
+    let dsize' = dsize - e.size
+    dyntbl.numOfEntries <- n - 1
+    dyntbl.dynamicTableSize <- dsize'
+    e
+
+  let adjustTableSize (dyntbl:DynamicTable) : Entry list =
+    let rec adjust es =
+      let dsize = dyntbl.dynamicTableSize
+      let maxsize = dyntbl.maxNumOfEntries
+      if dsize <= maxsize then
+        es
+      else 
+        let e = removeEnd dyntbl
+        adjust (e::es)
+    adjust []
+
   let insertEntry (ent : Entry) (dynbtl : DynamicTable) =
     let i = dynbtl.offset
     dynbtl.offset <- adj dynbtl.maxNumOfEntries (dynbtl.offset - 1)
     dynbtl.circularTable.[i] <- ent
     dynbtl.numOfEntries <- dynbtl.numOfEntries + 1
     dynbtl.dynamicTableSize <- dynbtl.dynamicTableSize + ent.size
-    // TODO: something is missing here
+    match dynbtl.codeInfo with
+    | EncodeInfo (rev, _) ->
+      let es = adjustTableSize dynbtl
+      deleteRevIndexList es rev
+    | _ -> ()
 
-  let literalHeaderFieldWithIncrementalIndexingIndexedName dyntbl wbuf huff v ent hidx = do
+  let literalHeaderFieldWithIncrementalIndexingIndexedName dyntbl wbuf huff v ent hidx =
     fromHIndexToIndex dyntbl hidx |> indexedName wbuf huff 6 set01 v
     insertEntry ent dyntbl
 
-  let literalHeaderFieldWithIncrementalIndexingNewName dyntbl wbuf huff k v ent = do
+  let literalHeaderFieldWithIncrementalIndexingNewName dyntbl wbuf huff k v ent =
     newName wbuf huff set01 k v
     insertEntry ent dyntbl
 
@@ -579,7 +688,17 @@ if I < 2^N - 1, encode I on N bits
         staticAlgorithm fa fd fe
       | Linear ->
         linearAlgorithm rev fa fb fc fd
-    [],1
+    let ref1 = ref wbuf.Position
+    let ref2 = ref hl
+    let rec loop = function
+      | [] -> ()
+      | (t,v)::tail ->
+        algorithm t v
+        ref1 := wbuf.Position
+        ref2 := tail
+        loop tail
+    loop hl 
+    !ref2,int !ref1
 
   let encodeHeader' (strategy : EncodeStrategy) (size : int) (dyntbl : DynamicTable) (hl : TokenHeaderList) : byte array =
     let buf = Array.zeroCreate<byte> size
@@ -587,9 +706,11 @@ if I < 2^N - 1, encode I on N bits
     if hl' = [] then Array.sub buf 0 len
     else failwith "buffer overflow"
 
+  let toTokenHeaderList hl = List.map (fun (a,b) -> let c = toToken a in (c,b)) hl
+
   // produce HPACK format
   let encodeHeader (strategy : EncodeStrategy) (size : int) (dyntbl : DynamicTable) (hl : HeaderList) : byte array =
-    encodeHeader' strategy size dyntbl (List.map (fun (a,b) -> let c = toToken a in (c,b)) hl)
+    encodeHeader' strategy size dyntbl (toTokenHeaderList hl)
 
   let isTableSizeUpdate (w: byte) = w &&& (byte 0xe0) = (byte 0x20)
 
@@ -699,7 +820,8 @@ if I < 2^N - 1, encode I on N bits
     (t,v)
 
   let insertNewName (dyntbl : DynamicTable) (rbuf:MemoryStream) =
-    let t = toToken (Text.Encoding.UTF8.GetString(headerStuff dyntbl rbuf))
+    let headerValue = Text.Encoding.UTF8.GetString(headerStuff dyntbl rbuf)
+    let t = toToken headerValue
     let v = Text.Encoding.UTF8.GetString(headerStuff dyntbl rbuf)
     (t,v)
 
