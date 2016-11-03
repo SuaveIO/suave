@@ -1,11 +1,11 @@
-framework: NET45
+framework: NET451
 source https://nuget.org/api/v2
 
 nuget FSharp.Core ~> 3.1.2
 nuget openssl.redist
 nuget DotLiquid
 nuget RazorEngine
-nuget Fuchu
+nuget Expecto
 
 github haf/YoLo YoLo.fs
 github logary/logary src/Logary.Facade/Facade.fs
@@ -15,33 +15,34 @@ group Build
   nuget NuGet.CommandLine
 
 group Tests
-  framework: NET45
+  framework: NET451
   source https://nuget.org/api/v2
   nuget FSharp.Core ~> 4 redirects: force
   nuget WebSocketSharp
-  nuget FsCheck = 2.1.0
-  nuget Fuchu.FsCheck
-  nuget Fuchu.PerfUtil
+  nuget FsCheck
+  nuget Expecto.FsCheck
+  nuget Expecto.BenchmarkDotNet
   nuget Http.fs
   nuget FSharp.Charting
   nuget DotLiquid
 
 group Examples
-  framework: NET45
+  framework: NET451
   source https://nuget.org/api/v2
   nuget FSharp.Core ~> 4 redirects: force
   nuget Topshelf.FSharp
   nuget Topshelf ~> 3
   nuget Nancy.Owin
-  nuget Freya ~> 3.0.0-b
-  nuget Microsoft.Owin.Hosting 
+  nuget Freya 3.0.0-b300
+  nuget Freya.Core 3.0.0-b300
+  nuget Microsoft.Owin.Hosting
   nuget Owin
   nuget Chiron
   nuget identityserver3
   github haf/YoLo YoLo.fs
 
 group Docs
-  framework: NET45
+  framework: NET451
   source https://nuget.org/api/v2
   nuget FSharp.Core ~> 4 redirects: force
   nuget FsLibTool
