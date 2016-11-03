@@ -4,7 +4,7 @@ open Suave.Http
 open Suave.Web
 open Suave.Logging
 open Suave.LibUv
-open FuchuExtensions
+open ExpectoExtensions
 
 open System
 

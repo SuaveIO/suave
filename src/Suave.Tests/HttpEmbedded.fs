@@ -1,11 +1,9 @@
 ﻿module HttpEmbedded
 
-open Fuchu
-
+open Expecto
 open Suave
 open Suave.Successful
 open Suave.Embedded
-
 open Suave.Tests.TestUtilities
 open Suave.Testing
 
@@ -15,5 +13,6 @@ let embedded_resources cfg =
 
   testList "test Embedded.browse" [
       testCase "200 OK returns embedded file" <| fun _ ->
-        Assert.Equal("expecting 'Hello World!'", "Hello World!", runWithConfig browseDefaultAsssembly |> req HttpMethod.GET "/embedded-resource.txt" None)
+        let actual = runWithConfig browseDefaultAsssembly |> req HttpMethod.GET "/embedded-resource.txt" None
+        Expect.equal actual "Hello World!" "expecting 'Hello World!'"
     ]

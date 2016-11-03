@@ -1,6 +1,6 @@
 ﻿module Suave.Tests.DotLiquid
 
-open Fuchu
+open Expecto
 open Suave
 open System.IO
 
@@ -17,18 +17,18 @@ let tests =
       let subject =
         DotLiquid.renderPageFile (combine "liquid/hello.liquid") { M1.name = "haf" }
         |> Async.RunSynchronously
-      Assert.Equal("should render properly", "Hi haf", subject)
+      Expect.equal subject "Hi haf" "should render properly"
 
     yield testCase "can render a page & master" <| fun () ->
       let subject =
         DotLiquid.renderPageFile (combine "liquid/child.liquid") { M1.name = "haf2" }
         |> Async.RunSynchronously
-      Assert.Equal("should render parent and child", "Parent: Hi haf2" , subject)
+      Expect.equal subject "Parent: Hi haf2"  "should render parent and child"
 
     yield testCase "can render from string" <| fun () ->
       let subject =
         DotLiquid.renderPageString "Hi {{ model.name }}" { M1.name = "haf3" }
         |> Async.RunSynchronously
 
-      Assert.Equal("should render Hello", "Hi haf3", subject)
+      Expect.equal subject "Hi haf3" "should render Hello"
     ]

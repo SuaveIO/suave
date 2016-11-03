@@ -1,5 +1,5 @@
 {
-    "version": "2.0.0-alpha7-dotnetcli",
+    "version": "2.0.0-rc1-dotnetcli",
 
     "buildOptions": {
         "compilerName": "fsc",
@@ -95,20 +95,16 @@
                 "System.Runtime.Serialization.Json": "4.0.2"
             }
         },
-        "net46" : {
-            "dependencies": {
-                "FSharp.Core": "4.0.0.1"
-            },
-            "frameworkAssemblies": {
-                "System": "",
-                "System.Core": "",
-                "System.Data": "",
-                "System.Data.Linq": "",
-                "System.Numerics": "",
-                "System.Runtime.Caching": "",
-                "System.Runtime.Serialization": "",
-                "System.Xml": ""
-            }
+        "netstandard1.6": {
+          "buildOptions": {
+              "define": [
+                  "DNXCORE50"  
+              ]
+          },
+          "imports": [
+            "portable-net45+win8",
+            "dnxcore50"
+          ]
         }
     }
 }
