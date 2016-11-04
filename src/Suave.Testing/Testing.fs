@@ -28,7 +28,9 @@ open System.Threading
 open System.Net
 open System.Net.Http
 open System.Net.Http.Headers
-open Expecto
+
+open Fuchu
+
 open Suave
 open Suave.Logging
 open Suave.Logging.Message
@@ -149,10 +151,8 @@ let send (client : HttpClient) (timeout : TimeSpan) (ctx : SuaveTestCtx) (reques
   let send = client.SendAsync(request, HttpCompletionOption.ResponseContentRead, ctx.cts.Token)
 
   let completed = send.Wait (int timeout.TotalMilliseconds, ctx.cts.Token)
-  if not completed && Debugger.IsAttached then
-    Debugger.Break()
-  else
-    Expect.isTrue completed (sprintf "should finish request in %fms" timeout.TotalMilliseconds)
+  if not completed && Debugger.IsAttached then Debugger.Break()
+  else Assert.Equal(sprintf "should finish request in %fms" timeout.TotalMilliseconds, true, completed)
 
   send.Result
 
