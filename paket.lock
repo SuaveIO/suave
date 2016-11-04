@@ -3,7 +3,7 @@ NUGET
   remote: https://www.nuget.org/api/v2
     Argu (3.3)
     DotLiquid (2.0.55)
-    Expecto (1.1)
+    Expecto (1.1.2)
       Argu (>= 3.2)
       FSharp.Core (>= 3.1.2.5)
     FSharp.Core (3.1.2.5)
@@ -15,7 +15,7 @@ GITHUB
   remote: haf/YoLo
     YoLo.fs (11023b9fcd2c1d28a7a0c0de5609647e3e1b03ce)
   remote: logary/logary
-    src/Logary.Facade/Facade.fs (89b51091038edf74951cfce10ae022d41177bd3f)
+    src/Logary.Facade/Facade.fs (dcc261ca9ef26a3c5f15f6be7995eea4119df920)
 GROUP Build
 NUGET
   remote: https://www.nuget.org/api/v2
@@ -161,15 +161,15 @@ NUGET
       Microsoft.CodeAnalysis.CSharp (>= 1.3.2)
       System.Threading.Tasks (>= 4.0)
     DotLiquid (2.0.55)
-    Expecto (1.1)
+    Expecto (1.1.2)
       Argu (>= 3.2)
       FSharp.Core (>= 3.1.2.5)
-    Expecto.BenchmarkDotNet (1.1)
+    Expecto.BenchmarkDotNet (1.1.2)
       BenchmarkDotNet (>= 0.9.9)
-      Expecto (>= 1.1)
+      Expecto (>= 1.1.2)
       FSharp.Core (>= 3.1.2.5)
-    Expecto.FsCheck (1.1)
-      Expecto (>= 1.1)
+    Expecto.FsCheck (1.1.2)
+      Expecto (>= 1.1.2)
       FsCheck (>= 2.6.2)
       FSharp.Core (>= 3.1.2.5)
     FsCheck (2.6.2)

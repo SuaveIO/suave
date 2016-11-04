@@ -689,11 +689,10 @@ type CombiningTarget(otherLoggers : Logger list) =
       |> Async.Start
 
 module Global =
-
   /// This is the global semaphore for colourising the console output. Ensure
   /// that the same semaphore is used across libraries by using the Logary
   /// Facade Adapter in the final composing app/service.
-  let internal consoleSemaphore = obj ()
+  let private consoleSemaphore = obj ()
 
   /// The global default configuration, which logs to Console at Info level.
   let DefaultConfig =
@@ -701,32 +700,25 @@ module Global =
       getLogger        = fun _ -> LiterateConsoleTarget(Info) :> Logger
       consoleSemaphore = consoleSemaphore }
 
-  let private config = ref DefaultConfig
-  let private configSemaphore = obj ()
+  let private config =
+    ref (DefaultConfig, (* logical clock *) 1u)
 
   /// The flyweight just references the current configuration. If you want
   /// multiple per-process logging setups, then don't use the static methods,
   /// but instead pass a Logger instance around, setting the name field of the
   /// Message value you pass into the logger.
   type internal Flyweight(name : string[]) =
-    let initialLogger = (!config).getLogger name
-    let mutable actualLogger : Logger option = None
-
-    let withLogger action =
-      let logger =
-        if Object.ReferenceEquals(!config, DefaultConfig) then
-          initialLogger
-        elif actualLogger = None then
-          lock configSemaphore <| fun _ ->
-            if actualLogger = None then
-              let logger' = (!config).getLogger name
-              actualLogger <- Some logger'
-              logger'
-            else
-              actualLogger |> Option.get
-        else
-          actualLogger |> Option.get
-
+    let updating = obj()
+    let mutable fwClock : uint32 = snd !config
+    let mutable logger : Logger = (fst !config).getLogger name
+    let rec withLogger action =
+      let cfg, cfgClock = !config // copy to local
+      let fwCurr = fwClock // copy to local
+      if cfgClock <> fwCurr then
+        lock updating <| fun _ ->
+          logger <- cfg.getLogger name
+          let c = fwCurr + 1u
+          fwClock <- c
       action logger
 
     let ensureName (m : Message) =
@@ -746,12 +738,23 @@ module Global =
     Flyweight name
 
   let timestamp () : EpochNanoSeconds =
-    (!config).timestamp ()
+    (fst !config).timestamp ()
+
+  /// Returns the synchronisation object to use when printing to the console.
+  let internal semaphore () =
+    (fst !config).consoleSemaphore
+
+  /// Run the passed function under the console semaphore lock.
+  let internal lockSem fn =
+    lock (semaphore ()) fn
 
   /// Call from the initialisation of your library. Initialises the
   /// Logary.Facade globally/per process.
   let initialise cfg =
-    config := cfg
+    config := (cfg, snd !config + 1u)
+
+  let initialiseIfDefault cfg =
+    if snd !config = 1u then initialise cfg
 
 /// "Shortcut" for creating targets; useful at the top-level configuration point of
 /// your library.
@@ -763,10 +766,10 @@ module Targets =
   /// in your IDE if you specify a level below Info.
   let create level =
     if level >= LogLevel.Info then
-      LiterateConsoleTarget(level, consoleSemaphore = Global.consoleSemaphore) :> Logger
+      LiterateConsoleTarget(level, consoleSemaphore = Global.semaphore()) :> Logger
     else
       CombiningTarget(
-        [ LiterateConsoleTarget(level, consoleSemaphore = Global.consoleSemaphore)
+        [ LiterateConsoleTarget(level, consoleSemaphore = Global.semaphore())
           OutputWindowTarget(level) ])
       :> Logger
 
