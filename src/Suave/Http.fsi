@@ -198,7 +198,7 @@ module Http =
 
     /// Try to find the query parameter named `key`. Returns None if none was
     /// found, otherwise Some _
-    member queryParamOpt : key:string -> string option
+    member queryParamOpt : key:string -> (string * string option) option
 
     /// Check the query string for a `flag`:
     ///

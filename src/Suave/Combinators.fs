@@ -305,7 +305,7 @@ module Filters =
   let isSecure (x : HttpContext) =
     async.Return (Option.iff x.runtime.matchedBinding.scheme.secure x)
 
-  let hasFlag flag (x : HttpContext) =
+  let hasFlag flag (ctx : HttpContext) =
     if ctx.request.queryFlag flag then succeed ctx else fail
 
   let pathRegex regex (x : HttpContext) =
