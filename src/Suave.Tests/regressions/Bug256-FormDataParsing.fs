@@ -1,8 +1,8 @@
-﻿module Suave.Tests.FormDataParsing 
+﻿module Suave.Tests.FormDataParsing
 
 open HttpFs
 open HttpFs.Client
-open Fuchu
+open Expecto
 open System
 open System.IO
 open System.Reflection
@@ -14,7 +14,7 @@ open Suave.Operators
 open Suave.Filters
 open Suave.RequestErrors
 open Suave.Testing
-open Suave.Tests.TestUtilities  
+open Suave.Tests.TestUtilities
 
 let app =
   choose
@@ -61,7 +61,7 @@ let tests (cfg : SuaveConfig) =
       use ms = new MemoryStream()
       ms.Write(data, 0, data.Length)
       ms.Seek(0L, SeekOrigin.Begin) |> ignore
-      Assert.StreamsEqual("the input should eq the echoed data", ms, fs)
+      Expect.streamsEqual ms fs "the input should eq the echoed data"
     finally
       disposeContext ctx
       ()

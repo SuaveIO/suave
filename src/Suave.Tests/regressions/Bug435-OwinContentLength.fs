@@ -8,7 +8,7 @@ module Suave.Tests.OwinContentLength
   open Suave.Owin
   open Suave.Testing
 
-  open Fuchu
+  open Expecto
   
   let hello = "Hello, OWIN!"B
   let contentLengthHeader = "Content-Length"
@@ -38,7 +38,7 @@ module Suave.Tests.OwinContentLength
         let uri = (uriFor "/")
         let webClient = new WebClient()
         webClient.DownloadString uri |> ignore
-        Assert.Equal( "Content Length Header", (string hello.Length), webClient.ResponseHeaders.[contentLengthHeader])
+        Expect.equal webClient.ResponseHeaders.[contentLengthHeader] (string hello.Length) "Content Length Header"
 
       finally
         disposeContext ctx

@@ -14,7 +14,7 @@ open Suave.ServerErrors
 open Suave.Tests.TestUtilities
 open Suave.Testing
 
-open Fuchu
+open Expecto
 
 [<Tests>]
 let authTests cfg =
@@ -41,11 +41,11 @@ let authTests cfg =
       let req path reqMod = reqResp HttpMethod.GET path "" None None DecompressionMethods.None reqMod (fun res -> res.Content.ReadAsStringAsync().Result)
 
       let res = runWithConfig app |> req "/protected" (fun reqmsg -> reqmsg.Headers.Authorization <- AuthenticationHeaderValue("Basic", basicCredentials); reqmsg)
-      Assert.Equal("should be username", "hello foo", res)
+      Expect.equal res "hello foo" "should be username"
 
       let res = runWithConfig app |> req "/non-protected1" id
-      Assert.Equal("should be no username", "no user", res)
+      Expect.equal res "no user" "should be no username"
 
       let res = runWithConfig app |> req "/non-protected2" id
-      Assert.Equal("should be no username", "no user", res)
+      Expect.equal res "no user" "should be no username"
     ]

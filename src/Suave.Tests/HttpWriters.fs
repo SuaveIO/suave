@@ -1,6 +1,6 @@
 module Suave.Tests.HttpWriters
 
-open Fuchu
+open Expecto
 
 open System
 open System.IO

@@ -1,4 +1,4 @@
-﻿(** For testing suave applications easily
+(** For testing suave applications easily
 
 Example:
 
@@ -7,7 +7,7 @@ Example:
   open Suave.Types
   open Suave.Testing
 
-  open Fuchu
+  open Expecto
 
   let runWithConfig = runWith defaultConfig
 
@@ -17,7 +17,7 @@ Example:
       runWithConfig testMultipartForm
       |> req HttpMethod.POST "/" (Some byteArrayContent)
 
-    Assert.Equal("", "Bob <bob@wishfulcoding.mailgun.org>", )
+    Expect.equal  "Bob <bob@wishfulcoding.mailgun.org>" ""
 
 *)
 module Suave.Testing
@@ -28,9 +28,7 @@ open System.Threading
 open System.Net
 open System.Net.Http
 open System.Net.Http.Headers
-
-open Fuchu
-
+open Expecto
 open Suave
 open Suave.Logging
 open Suave.Logging.Message
@@ -152,7 +150,7 @@ let send (client : HttpClient) (timeout : TimeSpan) (ctx : SuaveTestCtx) (reques
 
   let completed = send.Wait (int timeout.TotalMilliseconds, ctx.cts.Token)
   if not completed && Debugger.IsAttached then Debugger.Break()
-  else Assert.Equal(sprintf "should finish request in %fms" timeout.TotalMilliseconds, true, completed)
+  else Expect.isTrue completed (sprintf "should finish request in %fms" timeout.TotalMilliseconds)
 
   send.Result
 

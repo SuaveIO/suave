@@ -193,7 +193,7 @@ namespace :tests do
   task :stress => [:compile, :stress_quick]
 
   task :unit_quick do
-    system "src/Suave.Tests/bin/#{Configuration}/Suave.Tests.exe", clr_command: true
+    system "src/Suave.Tests/bin/#{Configuration}/Suave.Tests.exe", %w|sequenced|, clr_command: true
   end
 
   desc 'run unit tests'
