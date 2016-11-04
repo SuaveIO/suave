@@ -58,8 +58,7 @@ You can now use it:
 ``` fsharp
 open Suave
 open Suave.Testing
-
-open Fuchu
+open Expecto
 
 testCase "parsing a large multipart form" <| fun _ ->
 
@@ -67,14 +66,27 @@ testCase "parsing a large multipart form" <| fun _ ->
     runWithConfig (OK "hi")
     |> req HttpMethod.POST "/" (Some byteArrayContent)
 
-  Assert.Equal("should get the correct result", "hi", res)
+  Expect.equal res "hi" "Should get the correct result"
 ```
 
 All of our tests use this assembly; you can do too.
 
 # How to Build
 
-We're using a cross-platform build suite called [albacore](https://github.com/Albacore/albacore)/[rake](https://github.com/ruby/rake). 
+We're using a cross-platform build suite called
+[albacore](https://github.com/Albacore/albacore)/[rake](https://github.com/ruby/rake).
+
+Or build using:
+
+```bash
+./build.sh
+```
+
+Or
+
+```cmd
+build.cmd
+```
 
 ## Build prerequisites
 
