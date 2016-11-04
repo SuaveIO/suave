@@ -179,6 +179,7 @@ type LibUvTransport(pool : ConcurrentPool<OperationPair>,
 let createLibUvOpsPool maxOps =
 
   let opsPool = new ConcurrentPool<OperationPair>()
+  opsPool.ObjectGenerator <- fun _ -> (ReadOp(),WriteOp())
 
   for x = 0 to maxOps - 1 do
 
