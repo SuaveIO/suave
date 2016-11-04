@@ -1,5 +1,6 @@
 framework: NET461
 source https://nuget.org/api/v2
+redirects auto
 
 nuget FSharp.Core ~> 3.1.2
 nuget openssl.redist
