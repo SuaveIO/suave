@@ -175,19 +175,20 @@ type LibUvTransport(pool : ConcurrentPool<OperationPair>,
       do this.pin.Free()
       }
 
+let createPair _ =
+  let readOp = new ReadOp()
+  let writeOp = new WriteOp()
+  readOp.initialize()
+  writeOp.initialize()
+  (readOp,writeOp)
 
 let createLibUvOpsPool maxOps =
 
   let opsPool = new ConcurrentPool<OperationPair>()
-  opsPool.ObjectGenerator <- fun _ -> (ReadOp(),WriteOp())
+  opsPool.ObjectGenerator <- fun _ -> createPair()
 
   for x = 0 to maxOps - 1 do
-
-    let readOp = new ReadOp()
-    let writeOp = new WriteOp()
-    readOp.initialize()
-    writeOp.initialize()
-    opsPool.Push (readOp,writeOp)
+    opsPool.Push (createPair())
 
   opsPool
 
