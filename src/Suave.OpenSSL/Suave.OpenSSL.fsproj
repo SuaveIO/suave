@@ -8,6 +8,7 @@
     <RootNamespace>Suave.OpenSSL</RootNamespace>
     <AssemblyName>Suave.OpenSSL</AssemblyName>
     <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
+    <ResolveNuGetPackages>false</ResolveNuGetPackages>
     <Name>Suave.OpenSSL</Name>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">

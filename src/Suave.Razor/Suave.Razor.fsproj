@@ -8,6 +8,7 @@
     <RootNamespace>Suave.Razor</RootNamespace>
     <AssemblyName>Suave.Razor</AssemblyName>
     <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
+    <ResolveNuGetPackages>false</ResolveNuGetPackages>
     <Name>Suave.Razor</Name>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">

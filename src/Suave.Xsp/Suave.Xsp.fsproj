@@ -8,6 +8,7 @@
     <RootNamespace>Suave.Xsp</RootNamespace>
     <AssemblyName>Suave.Xsp</AssemblyName>
     <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
+    <ResolveNuGetPackages>false</ResolveNuGetPackages>
     <Name>Suave.Xsp</Name>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">

@@ -9,7 +9,7 @@
     <RootNamespace>Pong</RootNamespace>
     <AssemblyName>Pong</AssemblyName>
     <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
-    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <ResolveNuGetPackages>false</ResolveNuGetPackages>
     <Name>Pong</Name>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">

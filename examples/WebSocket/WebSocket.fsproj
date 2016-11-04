@@ -8,6 +8,7 @@
     <RootNamespace>WebSocket</RootNamespace>
     <AssemblyName>WebSocket</AssemblyName>
     <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
+    <ResolveNuGetPackages>false</ResolveNuGetPackages>
     <Name>WebSocket</Name>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">

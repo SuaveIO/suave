@@ -12,6 +12,7 @@
     <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
     <TargetFSharpCoreVersion>4.4.0.0</TargetFSharpCoreVersion>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <ResolveNuGetPackages>false</ResolveNuGetPackages>
     <Name>IndentityServerIntegration</Name>
     <TargetFrameworkProfile />
   </PropertyGroup>

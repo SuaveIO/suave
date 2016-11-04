@@ -8,6 +8,7 @@
     <RootNamespace>Asp.NET</RootNamespace>
     <AssemblyName>Asp.NET</AssemblyName>
     <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
+    <ResolveNuGetPackages>false</ResolveNuGetPackages>
     <Name>Asp.NET</Name>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
   </PropertyGroup>

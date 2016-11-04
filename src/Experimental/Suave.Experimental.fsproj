@@ -10,6 +10,7 @@
     <AssemblyName>Suave.Experimental</AssemblyName>
     <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
     <TargetFSharpCoreVersion>4.3.0.0</TargetFSharpCoreVersion>
+    <ResolveNuGetPackages>false</ResolveNuGetPackages>
     <Name>Suave.Experimental</Name>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
