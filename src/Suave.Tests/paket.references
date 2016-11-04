@@ -3,7 +3,7 @@ FSharp.Core
 FSharp.Charting
 Expecto
 Expecto.FsCheck
-Expecto.PerfUtil
+Expecto.BenchmarkDotNet
 WebSocketSharp
 Http.fs
 DotLiquid
