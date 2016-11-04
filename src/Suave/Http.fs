@@ -336,7 +336,7 @@ module Http =
 
     member x.queryParam (key : string) =
       getFirstOpt x.query key
-.
+
     member x.queryParamOpt (key : string) =
       x.query |> List.tryFind (fst >> (=) key)
 
