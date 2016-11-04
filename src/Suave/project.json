@@ -93,18 +93,11 @@
                 "NETStandard.Library": "1.6.0",
                 "System.Security.Claims": "4.0.1",
                 "System.Runtime.Serialization.Json": "4.0.2"
-            }
-        },
-        "netstandard1.6": {
-          "buildOptions": {
-              "define": [
-                  "DNXCORE50"  
-              ]
-          },
-          "imports": [
-            "portable-net45+win8",
-            "dnxcore50"
-          ]
+            },
+            "imports": [
+                "portable-net45+win8",
+                "dnxcore50"
+            ]
         }
     }
 }
