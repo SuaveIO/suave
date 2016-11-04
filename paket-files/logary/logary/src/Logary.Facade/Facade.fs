@@ -689,6 +689,7 @@ type CombiningTarget(otherLoggers : Logger list) =
       |> Async.Start
 
 module Global =
+
   /// This is the global semaphore for colourising the console output. Ensure
   /// that the same semaphore is used across libraries by using the Logary
   /// Facade Adapter in the final composing app/service.
@@ -700,25 +701,32 @@ module Global =
       getLogger        = fun _ -> LiterateConsoleTarget(Info) :> Logger
       consoleSemaphore = consoleSemaphore }
 
-  let private config =
-    ref (DefaultConfig, (* logical clock *) 1u)
+  let private config = ref DefaultConfig
+  let private configSemaphore = obj ()
 
   /// The flyweight just references the current configuration. If you want
   /// multiple per-process logging setups, then don't use the static methods,
   /// but instead pass a Logger instance around, setting the name field of the
   /// Message value you pass into the logger.
   type internal Flyweight(name : string[]) =
-    let updating = obj()
-    let mutable fwClock : uint32 = snd !config
-    let mutable logger : Logger = (fst !config).getLogger name
-    let rec withLogger action =
-      let cfg, cfgClock = !config // copy to local
-      let fwCurr = fwClock // copy to local
-      if cfgClock <> fwCurr then
-        lock updating <| fun _ ->
-          logger <- cfg.getLogger name
-          let c = fwCurr + 1u
-          fwClock <- c
+    let initialLogger = (!config).getLogger name
+    let mutable actualLogger : Logger option = None
+
+    let withLogger action =
+      let logger =
+        if Object.ReferenceEquals(!config, DefaultConfig) then
+          initialLogger
+        elif actualLogger = None then
+          lock configSemaphore <| fun _ ->
+            if actualLogger = None then
+              let logger' = (!config).getLogger name
+              actualLogger <- Some logger'
+              logger'
+            else
+              actualLogger |> Option.get
+        else
+          actualLogger |> Option.get
+
       action logger
 
     let ensureName (m : Message) =
@@ -738,15 +746,12 @@ module Global =
     Flyweight name
 
   let timestamp () : EpochNanoSeconds =
-    (fst !config).timestamp ()
+    (!config).timestamp ()
 
   /// Call from the initialisation of your library. Initialises the
   /// Logary.Facade globally/per process.
   let initialise cfg =
-    config := (cfg, snd !config + 1u)
-
-  let initialiseIfDefault cfg =
-    if snd !config = 1u then initialise cfg
+    config := cfg
 
 /// "Shortcut" for creating targets; useful at the top-level configuration point of
 /// your library.

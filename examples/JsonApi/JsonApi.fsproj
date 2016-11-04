@@ -7,7 +7,7 @@
     <OutputType>Exe</OutputType>
     <RootNamespace>JsonApi</RootNamespace>
     <AssemblyName>JsonApi</AssemblyName>
-    <TargetFrameworkVersion>v4.5.1</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -43,7 +43,7 @@
       <Paket>True</Paket>
       <Link>paket-files/YoLo.fs</Link>
     </Compile>
-    <Compile Include="AssemblyVersionInfo.fs" Condition="Exists('AssemblyVersionInfo.fs')" />
+    <Compile Include="AssemblyVersionInfo.fs" Condition="Exists('AssemblyVersionInfo.fs')"/>
     <Compile Include="Program.fs" />
   </ItemGroup>
   <Choose>
@@ -69,7 +69,7 @@
     <None Include="paket.references" />
   </ItemGroup>
   <Choose>
-    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5.1'">
+    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
       <ItemGroup>
         <Reference Include="Aether">
           <HintPath>..\..\packages\examples\Aether\lib\net35\Aether.dll</HintPath>
@@ -80,7 +80,7 @@
     </When>
   </Choose>
   <Choose>
-    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5.1'">
+    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
       <ItemGroup>
         <Reference Include="Chiron">
           <HintPath>..\..\packages\examples\Chiron\lib\net40\Chiron.dll</HintPath>
@@ -91,7 +91,7 @@
     </When>
   </Choose>
   <Choose>
-    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5.1'">
+    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
       <ItemGroup>
         <Reference Include="FParsec">
           <HintPath>..\..\packages\examples\FParsec\lib\net40-client\FParsec.dll</HintPath>

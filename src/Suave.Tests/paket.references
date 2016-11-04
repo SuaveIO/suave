@@ -1,9 +1,9 @@
 group Tests
 FSharp.Core
 FSharp.Charting
-Expecto
-Expecto.FsCheck
-Expecto.BenchmarkDotNet
+Fuchu
+Fuchu.FsCheck
+Fuchu.PerfUtil
 WebSocketSharp
 Http.fs
 DotLiquid
