@@ -138,7 +138,7 @@ namespace :dotnetcli do
         %W|xf tools/#{filename}
            --directory tools/coreclr|
     end
-    if Gem.win_platform?
+    if Albacore.windows?
       system 'powershell',
         %W|Invoke-WebRequest "https://raw.githubusercontent.com/dotnet/cli/rel/1.0.0-preview2/scripts/obtain/dotnet-install.ps1" -OutFile "dotnet_cli_install.ps1"|
       system 'powershell',
