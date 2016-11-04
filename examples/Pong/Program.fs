@@ -1,23 +1,20 @@
-﻿#if INTERACTIVE
-#r "Suave.dll"
-#r "Suave.LibUv.dll"
-#endif
-open Suave
+﻿open Suave
 open Suave.Http
 open Suave.Successful
 open System
 open System.Net
 open System.Threading
 open System.Diagnostics
+
 // NOTE: this test is only available on Linux
 
 let app = OK "PONG"
+
 let port = 3000us
 let config =
   { defaultConfig with
      bindings = [ HttpBinding.create HTTP IPAddress.Loopback port ]
      bufferSize = 8192
-     tcpServerFactory = new LibUv.LibUvServerFactory()
      maxOps = 10000
   }
 
