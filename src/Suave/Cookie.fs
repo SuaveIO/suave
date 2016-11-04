@@ -61,6 +61,7 @@ module Cookie =
 
   type HttpRequest with
 
+    /// Get yourself a dictionary of cookie-name to Cookie.
     member x.cookies =
       x.headers
       |> List.filter (fun (name, _) -> name.Equals "cookie")

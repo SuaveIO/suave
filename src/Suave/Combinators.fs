@@ -306,10 +306,7 @@ module Filters =
     async.Return (Option.iff x.runtime.matchedBinding.scheme.secure x)
 
   let hasFlag flag (x : HttpContext) =
-    x.request.query
-    |> List.tryFind (fst >> (=) flag)
-    |> Option.map (fun _ -> x)
-    |> async.Return
+    if ctx.request.queryFlag flag then succeed ctx else fail
 
   let pathRegex regex (x : HttpContext) =
     async.Return (Option.iff (Regex.IsMatch(x.request.path, regex)) x)
