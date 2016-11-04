@@ -234,17 +234,24 @@ type LibUvSocket(pool : ConcurrentPool<OperationPair>,
         >> setSingleName "Suave.LibUv.Tcp.LibUvSocket.onNewConnection"
         >> setFieldValue "error" (new string (uv_strerror(status))))
     else
+      try
+        let client = createHandle <| uv_handle_size(uv_handle_type.UV_TCP)
 
-      let client = createHandle <| uv_handle_size(uv_handle_type.UV_TCP)
+        uv_tcp_init(loop, client) |> checkStatus
 
-      uv_tcp_init(loop, client) |> checkStatus
 
-      if (uv_accept(server, client) = 0) then
-        let transport = new LibUvTransport(pool,loop,client,synchronizationContext,logger)
-        transport.initialize()
-        Async.Start (job serveClient ip transport bufferManager)
-      else
-        destroyHandle client
+
+        if (uv_accept(server, client) = 0) then
+          let transport = new LibUvTransport(pool,loop,client,synchronizationContext,logger)
+          transport.initialize()
+          Async.Start (job serveClient ip transport bufferManager)
+        else
+          destroyHandle client
+      with ex ->
+        logger.info (
+          eventX "onNewConnection failed with:"
+          >> addExn ex
+          >> setSingleName "Suave.LibUv.Tcp.LibUvSocket.onNewConnection")
 
   member this.initialize() =
     this.uv_connection_cb <- uv_connection_cb(this.onNewConnection)
