@@ -33,6 +33,9 @@ type BufferManager(totalBytes, bufferSize, autoGrow) =
   member x.createBuffer() =
     lock creatingSegment (fun _ ->
       if segments.Count < chunksPerSegment / 2 then
+        logger.log Verbose (
+          Message.eventX "Creating buffer bank, total {totalBytes} bytes" 
+          >> Message.setFieldValue "totalBytes" totalBytes)
         let buffer = Array.zeroCreate totalBytes
         let mutable runningOffset = 0
         while runningOffset < totalBytes - bufferSize do
@@ -64,6 +67,7 @@ type BufferManager(totalBytes, bufferSize, autoGrow) =
           segment
 
         | false, _ ->
+          logger.log Verbose (Message.eventX "Ran out of buffers")
           if autoGrow then x.createBuffer ()
           loop (tries - 1)
 
