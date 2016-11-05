@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 14
-VisualStudioVersion = 14.0.25123.0
+# Visual Studio 15
+VisualStudioVersion = 15.0.25807.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".paket", ".paket", "{F0556ECB-F98B-4072-8A79-F02C3862138D}"
 	ProjectSection(SolutionItems) = preProject
@@ -15,6 +15,7 @@ Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Suave.Tests", "Suave.Tests\
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "docs", "docs", "{C7760769-4E33-4A06-BB7C-39B477B4FF1B}"
 	ProjectSection(SolutionItems) = preProject
+		..\.editorconfig = ..\.editorconfig
 		..\README.md = ..\README.md
 	EndProjectSection
 EndProject
