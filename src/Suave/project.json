@@ -76,7 +76,8 @@
     },
 
     "frameworks": {
-        "netstandard1.6": {
+        "net45": {},
+		"netstandard1.6": {
             "buildOptions": {
                 "define": [
                     "DNXCORE50",
