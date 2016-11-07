@@ -15,6 +15,9 @@ let setConnectionKeepAlive (r : HttpRequestMessage) =
   r.Headers.ConnectionClose <- Nullable false
   r
 
+// several times the size of a buffer
+let veryLargeContent = String.replicate (defaultConfig.bufferSize * 1000) "A"
+
 [<Tests>]
 let connectionTests cfg =
   testList "connecting" [
@@ -27,4 +30,10 @@ let connectionTests cfg =
                  contentString
                  context
       Expect.equal res "ACK" "should ACK"
+
+    testCase "test large response" <| fun _ ->
+      let context = runWith cfg (OK veryLargeContent)
+      let res =
+        req HttpMethod.GET "/" None context
+      Expect.equal res.Length veryLargeContent.Length "should match"
     ]
