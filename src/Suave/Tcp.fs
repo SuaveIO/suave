@@ -157,7 +157,7 @@ let runServer maxConcurrentOps bufferSize autoGrow (binding: SocketBinding) star
     acceptingConnections.complete startData |> ignore
 
     logger.info (
-      eventX "Listener started in {startedListeningMilliseconds:#.###} with binding {ipAddress}:{port}"
+      eventX "Smooth! Suave listener started in {startedListeningMilliseconds:#.###} with binding {ipAddress}:{port}"
       >> setFieldValue "startedListeningMilliseconds" (startData.GetStartedListeningElapsedMilliseconds())
       >> setFieldValue "ipAddress" startData.binding.ip
       >> setFieldValue "port" startData.binding.port
