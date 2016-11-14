@@ -7,8 +7,8 @@ Deploying Suave to Azure App Service
 
 Suave Web Sites in Azure App Service can be deployed either as an F# script with a suitable host e.g. FAKE, or as a standalone executable. This tutorial will focus on: -
 
-* Deploying and building your Suave application from source control directly in the Azure App Service  
 * Hosting a Suave console application in Azure App Service
+* Deploying and building your Suave application from source control directly in the Azure App Service  
 * Instructing the Azure App Service IIS host to redirect all traffic to Suave
 
 ### 1. Create a ``web.config`` file.
@@ -32,6 +32,8 @@ This file instructs IIS to act as a passthrough and to redirect all traffic thro
 * This file does *not* replace your ``app.config`` file, which should remain.
 
 ### 2. Create a ``.deployment`` file.
+At this point, you can elect to manually FTP your Suave application into the Azure App Service into ``site\wwwroot`` - it should just work. However, if you want an automated deployment process from source control, continue with the following steps.
+
 This file tells Azure App Service what to do after downloading your application code i.e. your build script e.g.
 
 {% highlight ini %}

@@ -12,9 +12,12 @@ open Suave
 open Suave.DotLiquid
 open DotLiquid
 
+type Model =
+  { title : string }
+
 let app =
   let o = { title = "Hello World" }
-  page<> "my_page.liquid" o
+  page "my_page.liquid" o
 
 {% endhighlight %}
 

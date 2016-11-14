@@ -67,6 +67,7 @@
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
     <None Include="paket.references" />
+    <None Include="Example.project.json" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="mscorlib" />
