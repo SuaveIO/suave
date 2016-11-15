@@ -366,7 +366,7 @@ module OwinApp =
         |> Map.tryFind "principal" // TODO: add support for ClaimsPrincipal in Core
         |> function
         | Some x -> unbox x
-        | None -> raise (KeyNotFoundException()) // spec doesn't say
+        | None -> null // not a required environment item; will not be present if no user is signed in
       ),
       (fun v x -> x |> Map.put "principal" (box v))
 
