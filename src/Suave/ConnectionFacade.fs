@@ -413,20 +413,20 @@ type ConnectionFacade(ctx) =
       | Choice1Of2 ce when String.startsWith "application/x-www-form-urlencoded" ce ->
         let! rawForm = getRawPostData contentLength
         _rawForm <- rawForm
-        return Some ()
+        return ()
 
       | Choice1Of2 ce when String.startsWith "multipart/form-data" ce ->
         let boundary = "--" + (ce |> String.substring (ce.IndexOf('=') + 1) |> String.trimStart |> String.trimc '"')
 
         logger.verbose (eventX "Parsing multipart")
         do! parseMultipart boundary
-        return Some ()
+        return ()
 
       | Choice1Of2 _ | Choice2Of2 _ ->
         let! rawForm = getRawPostData contentLength
         _rawForm <- rawForm
-        return Some ()
-    | Choice2Of2 _ -> return Some ()
+        return ()
+    | Choice2Of2 _ -> return ()
     }
 
   /// Process the request, reading as it goes from the incoming 'stream', yielding a HttpRequest
@@ -452,15 +452,13 @@ type ConnectionFacade(ctx) =
         | s -> s))
       @|! "Missing 'Host' header"
 
-
     if headers %% "expect" = Choice1Of2 "100-continue" then
       let! _ = HttpOutput.run Intermediate.CONTINUE ctx
       verbose "sent 100-continue response"
 
     if ctx.runtime.parsePostData then
       verbose "parsing post data"
-      let! a = parsePostData (headers %% "content-length") (headers %% "content-type")
-      ()
+      do! parsePostData (headers %% "content-length") (headers %% "content-type")
 
     let request =
       { httpVersion      = httpVersion
