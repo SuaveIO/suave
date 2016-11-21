@@ -108,14 +108,13 @@ module SuaveConfig =
   /// Convert the Suave configuration to a runtime that the web server understands.
   /// You will normally not have to use this function as a consumer from the
   /// library, but it may be useful for unit testing with the HttpRuntime record.
-  let toRuntime config contentFolder compressionFolder parsePostData =
+  let toRuntime config contentFolder compressionFolder =
     HttpRuntime.create config.serverKey
                        config.errorHandler
                        config.mimeTypesMap
                        contentFolder
                        compressionFolder
                        config.logger
-                       parsePostData
                        config.cookieSerialiser
                        config.tlsProvider
                        config.hideHeader

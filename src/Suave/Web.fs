@@ -40,7 +40,7 @@ module Web =
       Path.Combine(ParsingAndControl.resolveDirectory config.compressedFilesFolder, "_temporary_compressed_files")
 
     // spawn tcp listeners/web workers
-    let toRuntime = SuaveConfig.toRuntime config homeFolder compressionFolder true
+    let toRuntime = SuaveConfig.toRuntime config homeFolder compressionFolder
 
     if config.initialiseLogger then
       Global.initialise { Global.DefaultConfig with getLogger = fun _ -> config.logger }

@@ -456,9 +456,8 @@ type ConnectionFacade(ctx) =
       let! _ = HttpOutput.run Intermediate.CONTINUE ctx
       verbose "sent 100-continue response"
 
-    if ctx.runtime.parsePostData then
-      verbose "parsing post data"
-      do! parsePostData (headers %% "content-length") (headers %% "content-type")
+    verbose "parsing post data"
+    do! parsePostData (headers %% "content-length") (headers %% "content-type")
 
     let request =
       { httpVersion      = httpVersion

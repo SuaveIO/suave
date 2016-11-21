@@ -502,7 +502,6 @@ module Http =
       compressionFolder : string
       logger            : Logger
       matchedBinding    : HttpBinding
-      parsePostData     : bool
       cookieSerialiser  : CookieSerialiser
       tlsProvider       : TlsProvider
       hideHeader        : bool }
@@ -514,7 +513,6 @@ module Http =
     static member compressionFolder_ = Property (fun x -> x.compressionFolder) (fun v x -> { x with compressionFolder = v })
     static member logger_ = Property (fun x -> x.logger) (fun v x -> { x with logger = v })
     static member matchedBinding_ = Property (fun x -> x.matchedBinding) (fun v x -> { x with matchedBinding = v })
-    static member parsePostData_ = Property (fun x -> x.parsePostData) (fun v x -> { x with parsePostData = v })
     static member cookieSerialiser_ = Property (fun x -> x.cookieSerialiser) (fun v x -> { x with cookieSerialiser = v })
     static member tlsProvider_ = Property (fun x -> x.tlsProvider) (fun v x -> { x with tlsProvider = v })
     static member hideHeader_ = Property (fun x -> x.hideHeader) (fun v x -> { x with hideHeader = v })
@@ -615,7 +613,6 @@ module Http =
         compressionFolder = "."
         logger            = Targets.create Debug
         matchedBinding    = HttpBinding.defaults
-        parsePostData     = false
         #if NETSTANDARD1_5
         cookieSerialiser  = new JsonFormatterSerialiser()
         #else
@@ -625,7 +622,7 @@ module Http =
         hideHeader        = false }
 
     let create serverKey errorHandler mimeTypes homeDirectory compressionFolder
-           logger parsePostData cookieSerialiser tlsProvider hideHeader binding =
+           logger cookieSerialiser tlsProvider hideHeader binding =
       { serverKey         = serverKey
         errorHandler      = errorHandler
         mimeTypesMap      = mimeTypes
@@ -633,7 +630,6 @@ module Http =
         compressionFolder = compressionFolder
         logger            = logger
         matchedBinding    = binding
-        parsePostData     = parsePostData
         cookieSerialiser  = cookieSerialiser
         tlsProvider       = tlsProvider
         hideHeader        = hideHeader }
