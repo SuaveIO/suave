@@ -26,8 +26,6 @@ module internal ParsingAndControl =
   open Suave.Logging
   open Suave.Logging.Message
 
-  let BadRequestPrefix = "__suave_BAD_REQUEST"
-
   /// Free up a list of buffers
   let inline free context connection =
     connection.segments

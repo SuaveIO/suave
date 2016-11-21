@@ -44,8 +44,6 @@ module internal Aux =
 
 type ConnectionFacade(ctx) =
 
-  let BadRequestPrefix = "__suave_BAD_REQUEST"
-
   let transport = ctx.connection.transport
   let bufferManager = ctx.connection.bufferManager
   let lineBuffer = ctx.connection.lineBuffer
