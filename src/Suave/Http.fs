@@ -504,7 +504,8 @@ module Http =
       matchedBinding    : HttpBinding
       cookieSerialiser  : CookieSerialiser
       tlsProvider       : TlsProvider
-      hideHeader        : bool }
+      hideHeader        : bool
+      maxContentLength  : int }
 
     static member serverKey_ = Property (fun x -> x.serverKey) (fun v x -> { x with serverKey = v })
     static member errorHandler_ = Property (fun x -> x.errorHandler) (fun v x -> { x with errorHandler = v })
@@ -516,6 +517,7 @@ module Http =
     static member cookieSerialiser_ = Property (fun x -> x.cookieSerialiser) (fun v x -> { x with cookieSerialiser = v })
     static member tlsProvider_ = Property (fun x -> x.tlsProvider) (fun v x -> { x with tlsProvider = v })
     static member hideHeader_ = Property (fun x -> x.hideHeader) (fun v x -> { x with hideHeader = v })
+    static member maxContentLength_ = Property (fun x -> x.maxContentLength) (fun v x -> { x with maxContentLength = v })
 
   and HttpContext =
     { request    : HttpRequest
@@ -619,10 +621,11 @@ module Http =
         cookieSerialiser  = new BinaryFormatterSerialiser()
         #endif
         tlsProvider       = null
-        hideHeader        = false }
+        hideHeader        = false
+        maxContentLength  = 1024 }
 
     let create serverKey errorHandler mimeTypes homeDirectory compressionFolder
-           logger cookieSerialiser tlsProvider hideHeader binding =
+           logger cookieSerialiser tlsProvider hideHeader maxContentLength binding =
       { serverKey         = serverKey
         errorHandler      = errorHandler
         mimeTypesMap      = mimeTypes
@@ -632,7 +635,8 @@ module Http =
         matchedBinding    = binding
         cookieSerialiser  = cookieSerialiser
         tlsProvider       = tlsProvider
-        hideHeader        = hideHeader }
+        hideHeader        = hideHeader
+        maxContentLength  = maxContentLength }
 
   [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
   module HttpContext =

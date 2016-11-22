@@ -248,7 +248,7 @@ type ConnectionFacade(ctx) =
     if fileLength > 0L then
       let! filename =
         (headerParams.TryLookup "filename" |> Choice.map (String.trimc '"'))
-        @|! "Key 'filename' was not present in 'content-disposition'"
+        @|! (None, "Key 'filename' was not present in 'content-disposition'")
 
       let upload =
         { fieldName    = fieldName
@@ -282,7 +282,7 @@ type ConnectionFacade(ctx) =
 
         let! (contentDisposition : string) =
           (partHeaders %% "content-disposition")
-          @|! "Missing 'content-disposition'"
+          @|! (None, "Missing 'content-disposition'")
 
         match partHeaders %% "content-type" with
         | Choice1Of2 contentType ->
@@ -325,17 +325,17 @@ type ConnectionFacade(ctx) =
 
         let! (contentDisposition : string) =
           (partHeaders %% "content-disposition")
-          @|! "Missing 'content-disposition'"
+          @|! (None, "Missing 'content-disposition'")
 
         let headerParams = headerParams contentDisposition
 
         let! _ =
           (headerParams.TryLookup "form-data" |> Choice.map (String.trimc '"'))
-          @|! "Key 'form-data' was not present in 'content-disposition'"
+          @|! (None, "Key 'form-data' was not present in 'content-disposition'")
 
         let! fieldName =
           (headerParams.TryLookup "name" |> Choice.map (String.trimc '"'))
-          @|! "Key 'name' was not present in 'content-disposition'"
+          @|! (None, "Key 'name' was not present in 'content-disposition'")
 
         match partHeaders %% "content-type" with
         | Choice1Of2 x when String.startsWith "multipart/mixed" x ->
@@ -403,30 +403,34 @@ type ConnectionFacade(ctx) =
       return rawForm
     }
 
-  let parsePostData (contentLengthHeader : Choice<string,_>) contentTypeHeader = socket {
+  let parsePostData maxContentLength (contentLengthHeader : Choice<string,_>) contentTypeHeader = socket {
     match contentLengthHeader with
     | Choice1Of2 contentLengthString ->
       let contentLength = Convert.ToInt32 contentLengthString
-      logger.verbose (eventX "Expecting {contentLength}" >> setFieldValue "contentLength" contentLength)
 
-      match contentTypeHeader with
-      | Choice1Of2 ce when String.startsWith "application/x-www-form-urlencoded" ce ->
-        let! rawForm = getRawPostData contentLength
-        _rawForm <- rawForm
-        return ()
+      if contentLength > maxContentLength then
+        return! async.Return (Choice2Of2 (InputDataError (Some 413, "Payload too large")))
+      else
+        logger.verbose (eventX "Expecting {contentLength}" >> setFieldValue "contentLength" contentLength)
 
-      | Choice1Of2 ce when String.startsWith "multipart/form-data" ce ->
-        let boundary = "--" + (ce |> String.substring (ce.IndexOf('=') + 1) |> String.trimStart |> String.trimc '"')
+        match contentTypeHeader with
+        | Choice1Of2 ce when String.startsWith "application/x-www-form-urlencoded" ce ->
+          let! rawForm = getRawPostData contentLength
+          _rawForm <- rawForm
+          return ()
 
-        logger.verbose (eventX "Parsing multipart")
-        do! parseMultipart boundary
-        return ()
+        | Choice1Of2 ce when String.startsWith "multipart/form-data" ce ->
+          let boundary = "--" + (ce |> String.substring (ce.IndexOf('=') + 1) |> String.trimStart |> String.trimc '"')
 
-      | Choice1Of2 _ | Choice2Of2 _ ->
-        let! rawForm = getRawPostData contentLength
-        _rawForm <- rawForm
-        return ()
-    | Choice2Of2 _ -> return ()
+          logger.verbose (eventX "Parsing multipart")
+          do! parseMultipart boundary
+          return ()
+
+        | Choice1Of2 _ | Choice2Of2 _ ->
+          let! rawForm = getRawPostData contentLength
+          _rawForm <- rawForm
+          return ()
+      | Choice2Of2 _ -> return ()
     }
 
   /// Process the request, reading as it goes from the incoming 'stream', yielding a HttpRequest
@@ -450,14 +454,14 @@ type ConnectionFacade(ctx) =
         | s when System.Text.RegularExpressions.Regex.IsMatch(s, ":\d+$") ->
           s.Substring(0, s.LastIndexOf(':'))
         | s -> s))
-      @|! "Missing 'Host' header"
+      @|! (None, "Missing 'Host' header")
 
     if headers %% "expect" = Choice1Of2 "100-continue" then
       let! _ = HttpOutput.run Intermediate.CONTINUE ctx
       verbose "sent 100-continue response"
 
     verbose "parsing post data"
-    do! parsePostData (headers %% "content-length") (headers %% "content-type")
+    do! parsePostData ctx.runtime.maxContentLength (headers %% "content-length") (headers %% "content-type")
 
     let request =
       { httpVersion      = httpVersion

@@ -38,6 +38,8 @@ let gets cfg =
                    headers.Contains("Content-Length"))
     ]
 
+let longData = String.replicate 1815 "A"
+
 [<Tests>]
 let posts cfg =
   let runWithConfig = runWith cfg
@@ -82,8 +84,6 @@ let posts cfg =
                   "bXMubG9jYWw6NzU3NSJ9.xbMyR2R7N9ZeLzqLWYw5hisaomZrtJlNdMvVdx0"+
                   "EaXxMkY7ocCpcpA"
 
-  let longData = String.replicate 1815 "A"
-
   let unicodeString =  "Testing «ταБЬℓσ»: 1<2 & 4+1>3, now 20% off!;"
 
   testList "posting basic data" [
@@ -112,3 +112,16 @@ let posts cfg =
       let actual = runWithConfig (getFormValue "name") |> req HttpMethod.POST "/" (Some data)
       Expect.equal actual unicodeString "expecting form data to be returned"
   ]
+
+[<Tests>]
+let testMaxContentLength cfg =
+  let runWithConfig = runWith { cfg with maxContentLength = 100 }
+
+  testList "test maxContentLength" [
+
+    testCase "POST larger than maxContentLength" <| fun _ ->
+      use data = new StringContent(longData)
+      let actual = runWithConfig (OK "response") |> req HttpMethod.POST "/" (Some data)
+      Expect.equal actual "Payload too large" "expecting data to be returned"
+
+    ]

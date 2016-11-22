@@ -348,7 +348,8 @@ module Http =
       matchedBinding    : HttpBinding
       cookieSerialiser  : CookieSerialiser
       tlsProvider       : TlsProvider
-      hideHeader        : bool }
+      hideHeader        : bool
+      maxContentLength  : int }
 
     static member serverKey_ : Property<HttpRuntime, ServerKey>
     static member errorHandler_ : Property<HttpRuntime, ErrorHandler>
@@ -360,6 +361,7 @@ module Http =
     static member cookieSerialiser_ : Property<HttpRuntime, CookieSerialiser>
     static member tlsProvider_ : Property<HttpRuntime, TlsProvider>
     static member hideHeader_ : Property<HttpRuntime, bool>
+    static member maxContentLength_ : Property<HttpRuntime, int>
 
   /// The HttpContext is the container of the request, runtime, user-state and
   /// response.
@@ -455,7 +457,8 @@ module Http =
                -> mimeTypes:MimeTypesMap -> homeDirectory:string
                -> compressionFolder:string -> logger:Logger
                -> cookieSerialiser:CookieSerialiser
-               -> tlsProvider:TlsProvider -> hideHeader:bool -> binding:HttpBinding
+               -> tlsProvider:TlsProvider -> hideHeader:bool -> maxContentLength:int 
+               -> binding:HttpBinding
                -> HttpRuntime
 
   /// A module that provides functions to create a new HttpContext.

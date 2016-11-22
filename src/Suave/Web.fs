@@ -94,4 +94,6 @@ module Web =
       cookieSerialiser      = new BinaryFormatterSerialiser()
       #endif
       tlsProvider           = new DefaultTlsProvider()
-      hideHeader            = false }
+      hideHeader            = false
+      maxContentLength      = 10000000 // 10 megabytes
+      }
