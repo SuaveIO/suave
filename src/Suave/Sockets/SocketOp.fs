@@ -13,8 +13,9 @@ type Error =
   /// specification (TCP/HTTP/1.1/SSE/WebSocket etc).
   ///
   /// For a HTTP socket user this means a response of '400 Bad Request', or for
-  /// example WebSockets would abort the connection.
-  | InputDataError of string
+  /// example WebSockets would abort the connection. 
+  /// You can specify `Some statusCode` as response status code. If `None` status code 400 will be used.
+  | InputDataError of (int option*string)
   /// Represents an IO/network error; to be used when we do not have a SocketError
   /// but just an error message; like in libuv calls.
   | ConnectionError of string

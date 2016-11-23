@@ -98,7 +98,7 @@ module internal ParsingAndControl =
 
       | Choice2Of2 err ->
         match err with
-        | InputDataError msg ->
+        | InputDataError (None, msg) ->
           logger.info (event "Error parsing HTTP request with {message}"
                        >> setFieldValue "message" msg)
 
@@ -110,7 +110,30 @@ module internal ParsingAndControl =
           | Choice2Of2 err ->
             logger.verbose (event "Socket error while sending BAD_REQUEST, exiting"
                             >> setFieldValue "error" err)
-            
+
+        | InputDataError (Some status,msg) ->
+          logger.info (event "Error parsing HTTP request with {message}"
+                       >> setFieldValue "message" msg)
+          match Http.HttpCode.tryParse status with 
+          | (Choice1Of2 statusCode) ->
+            let! result''' = HttpOutput.run (Response.response statusCode (UTF8.bytes msg)) ctxOuter
+            match result''' with
+            | Choice1Of2 _ ->
+              logger.verbose (event "Exiting http loop")
+
+            | Choice2Of2 err ->
+              logger.verbose (event "Socket error while sending BAD_REQUEST, exiting"
+                              >> setFieldValue "error" err)
+          | (Choice2Of2 err) ->
+            logger.warn (event "Invalid HTTP status code {statusCode}" >> setFieldValue "statusCode" status)
+            let! result''' = HttpOutput.run (RequestErrors.BAD_REQUEST msg) ctxOuter
+            match result''' with
+            | Choice1Of2 _ ->
+              logger.verbose (event "Exiting http loop")
+
+            | Choice2Of2 err ->
+              logger.verbose (event "Socket error while sending BAD_REQUEST, exiting"
+                              >> setFieldValue "error" err)
         | err ->
           logger.verbose (event "Socket error while processing request, exiting"
                           >> setFieldValue "error" err)

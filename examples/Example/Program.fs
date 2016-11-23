@@ -244,6 +244,7 @@ let main argv =
       cookieSerialiser      = new BinaryFormatterSerialiser()
 #endif
       tlsProvider           = new DefaultTlsProvider()
-      hideHeader            = false }
+      hideHeader            = false
+      maxContentLength      = 1000000 }
     app
   0

@@ -70,7 +70,10 @@ type SuaveConfig =
 
     /// Make this true, if you want Suave not to display its server header in
     /// every response. Defaults to false.
-    hideHeader            : bool }
+    hideHeader            : bool
+
+    /// Maximun upload size in bytes
+    maxContentLength      : int }
 
   static member bindings_              = Property<SuaveConfig,_> (fun x -> x.bindings)              (fun v x -> { x with bindings = v })
   static member serverKey_             = Property<SuaveConfig,_> (fun x -> x.serverKey)             (fun v x -> { x with serverKey = v })
@@ -86,6 +89,7 @@ type SuaveConfig =
   static member initialiseLogger_      = Property<SuaveConfig,_> (fun x -> x.initialiseLogger)      (fun v x -> { x with initialiseLogger = v })
   static member tcpServerFactory_      = Property<SuaveConfig,_> (fun x -> x.tcpServerFactory)      (fun v x -> { x with tcpServerFactory = v })
   static member hideHeader_            = Property<SuaveConfig,_> (fun x -> x.hideHeader)            (fun v x -> { x with hideHeader = v })
+  static member maxContentLength_      = Property<SuaveConfig,_> (fun x -> x.maxContentLength)      (fun v x -> { x with maxContentLength = v })
 
   member x.withBindings(v)              = { x with bindings = v }
   member x.withServerKey(v)             = { x with serverKey = v }
@@ -100,7 +104,9 @@ type SuaveConfig =
   member x.withLogger(v)                = { x with logger = v }
   member x.withLoggerInitialisation(v)  = { x with initialiseLogger = v }
   member x.withTcpServerFactory(v)      = { x with tcpServerFactory = v }
-  member x.withHiddenHeader()           = { x with hideHeader = true }
+  member x.withHiddenHeader(v)          = { x with hideHeader = v }
+  member x.withMaxContentLength(v)      = { x with maxContentLength = v }
+
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module SuaveConfig =
@@ -108,17 +114,17 @@ module SuaveConfig =
   /// Convert the Suave configuration to a runtime that the web server understands.
   /// You will normally not have to use this function as a consumer from the
   /// library, but it may be useful for unit testing with the HttpRuntime record.
-  let toRuntime config contentFolder compressionFolder parsePostData =
+  let toRuntime config contentFolder compressionFolder =
     HttpRuntime.create config.serverKey
                        config.errorHandler
                        config.mimeTypesMap
                        contentFolder
                        compressionFolder
                        config.logger
-                       parsePostData
                        config.cookieSerialiser
                        config.tlsProvider
                        config.hideHeader
+                       config.maxContentLength
 
   /// Finds an endpoint that is configured from the given configuration. Throws
   /// an exception if the configuration has no bindings. Useful if you make
