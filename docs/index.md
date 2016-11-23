@@ -56,7 +56,22 @@ with `fsharpi Hello.fsx` (or `fsi Hello.fsx` on Windows). Completely new? Here
 are installation instructions on [OS X/macOS](http://fsharp.org/use/mac/),
 [Windows](http://fsharp.org/use/windows/) and
 [Linux](http://fsharp.org/use/linux/). If you have Visual Studio installed you
-should be able to find the "F# Interactive" in your menues.
+should be able to find the "F# Interactive" in your menus.
+
+If you are running in an IDE, and not starting Suave via `Hello.fsx`, you'll
+want to provide a way of stopping the server without having to restart the IDE;
+the code below will run the server until a key is pressed in the console window,
+then shuts down the server.
+
+{% highlight fsharp %}
+let cts = new CancellationTokenSource()
+let conf = { defaultConfig with cancellationToken = cts.Token }
+let listening, server = startWebServerAsync conf (OK "Hello World")
+Async.Start(server, cts.Token)
+printfn "Make requests now"
+Console.ReadKey true |> ignore
+cts.Cancel()
+{% endhighlight %}
 
 In suave, we have opted to write a lot of documentation inside the code; so just
 hover the function in your IDE or use an assembly browser to bring out the XML
