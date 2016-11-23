@@ -14,17 +14,13 @@ open System.Runtime.Serialization
 
 [<DataContract>]
 type Foo =
-  { 
-  [<field: DataMember(Name = "foo")>]
-  foo : string;
-  }
+  { [<field: DataMember(Name = "foo")>]
+    foo : string }
 
 [<DataContract>]
 type Bar =
-  { 
-  [<field: DataMember(Name = "bar")>]
-  bar : string;
-  }
+  { [<field: DataMember(Name = "bar")>]
+    bar : string }
 
 startWebServer defaultConfig (mapJson (fun (a:Foo) -> { bar = a.foo }))
 {% endhighlight %}
@@ -38,8 +34,8 @@ ademar@nascio:~$ curl -X POST -d '{"foo":"xyz"}' http://localhost:8083/ -w "\n"
 Or you can bring your own JSON serializer like Chiron:https://github.com/xyncro/chiron
 
 {% highlight fsharp %}
-type A = { a : int }
-with
+type A = 
+  { a : int }
   static member ToJson (x : A) =
     Json.writer "a" x.a
 {% endhighlight %}

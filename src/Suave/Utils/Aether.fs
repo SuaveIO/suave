@@ -1,4 +1,6 @@
-﻿module internal Suave.Utils.Aether
+module internal Suave.Utils.Aether
+
+#nowarn "44"
 
 (* Types
 
@@ -30,15 +32,15 @@ type PIso<'a,'b> = ('a -> 'b option) * ('b -> 'a)
 module Lens =
 
     /// Get a value using a total lens
-    let get ((g, _): Lens<'a,'b>) = 
+    let get ((g, _): Lens<'a,'b>) =
         fun a -> g a
 
     /// Get a value option using a partial lens
-    let getPartial ((g, _): PLens<'a,'b>) = 
+    let getPartial ((g, _): PLens<'a,'b>) =
         fun a -> g a
 
     /// Get a value or a default using a partial lens
-    let getPartialOrElse ((g, _): PLens<'a,'b>) = 
+    let getPartialOrElse ((g, _): PLens<'a,'b>) =
         fun b a -> g a |> function | Some b -> b | _ -> b
 
     /// Set a value using a total lens
@@ -50,11 +52,11 @@ module Lens =
         fun b a -> s b a
 
     /// Modify a value using a total lens
-    let map ((g, s): Lens<'a,'b>) = 
+    let map ((g, s): Lens<'a,'b>) =
         fun f a -> s (f (g a)) a
 
     /// Modify a value using a partial lens
-    let mapPartial ((g, s): PLens<'a,'b>) = 
+    let mapPartial ((g, s): PLens<'a,'b>) =
         fun f a -> Option.map f (g a) |> function | Some b -> s b a | _ -> a
 
 (* Compositions
@@ -117,12 +119,12 @@ module Compose =
 
 /// Identity lens returning the original item regardless of modifiction
 let idLens : Lens<'a,'a> =
-    (fun x -> x), (fun x _ -> x) 
+    (fun x -> x), (fun x _ -> x)
 
 /// First item of a tuple giving a total lens
 let fstLens : Lens<('a * 'b),'a> =
     fst, (fun a t -> a, snd t)
-        
+
 /// Second item of a tuple giving a total lens
 let sndLens : Lens<('a * 'b),'b> =
     snd, (fun b t -> fst t, b)
@@ -134,7 +136,7 @@ let headPLens : PLens<'v list, 'v> =
 
 /// Position of a list giving a partial lens
 let listPLens (i: int) : PLens<'v list, 'v> =
-    (function | l when List.length l > i -> Some (List.nth l i) | _ -> None), 
+    (function | l when List.length l > i -> Some (List.nth l i) | _ -> None),
     (fun v l -> List.mapi (fun i' x -> if i = i' then v else x) l)
 
 /// Tail of a list giving a partial lens
@@ -194,8 +196,8 @@ module Operators =
     (* Function Operators
 
        Operators as infix alternatives to some of the standard get, set,
-       modify functions (getL, setL, etc.) Should likely be used rather 
-       sparingly and in specific controlled areas unless you're aiming for 
+       modify functions (getL, setL, etc.) Should likely be used rather
+       sparingly and in specific controlled areas unless you're aiming for
        symbol soup. *)
 
     /// Get a value using a total lens

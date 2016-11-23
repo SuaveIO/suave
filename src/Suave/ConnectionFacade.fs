@@ -11,6 +11,7 @@ open Suave
 open Suave.Utils
 open Suave.Utils.Parsing
 open Suave.Logging
+open Suave.Logging.Message
 open Suave.Sockets
 open Suave.Sockets.Connection
 open Suave.Sockets.Control
@@ -22,13 +23,13 @@ type ScanResult = NeedMore | Found of int
 module internal Aux =
 
   let inline skipBuffers (pairs : LinkedList<BufferSegment>) (number : int)  =
-    let rec loop acc = 
+    let rec loop acc =
       if pairs.Count > 0 then
         let x = pairs.First.Value
         pairs.RemoveFirst()
-      
-        if x.length + acc >= number then 
-          let segment = BufferSegment.mk x.buffer (x.offset  + (number - acc)) (x.length - number + acc)
+
+        if x.length + acc >= number then
+          let segment = BufferSegment.create x.buffer (x.offset  + (number - acc)) (x.length - number + acc)
           pairs.AddFirst segment |> ignore
         else loop (acc + x.length)
     loop 0
@@ -57,31 +58,32 @@ type ConnectionFacade(ctx) =
   let multiPartFields = List<string*string>()
   let mutable _rawForm : byte array = [||]
 
-  /// Splits the segment list in two lits of ArraySegment; the first one containing a total of index bytes 
+  /// Splits the segment list in two lits of ArraySegment; the first one containing a total of index bytes
   let split index select markerLength : Async<int> =
     let rec loop acc count =  async {
-      if segments.Count = 0 then 
+      if segments.Count = 0 then
        return count
       else
         let pair = segments.First.Value
         segments.RemoveFirst()
         if acc + pair.length < index then
           do! select (ArraySegment(pair.buffer.Array, pair.offset, pair.length)) pair.length
-          bufferManager.FreeBuffer( pair.buffer, "Suave.Web.split")
+          bufferManager.FreeBuffer(pair.buffer, "Suave.Web.split")
           return! loop (acc + pair.length) (count + acc + pair.length)
         elif acc + pair.length >= index then
           let bytesRead = index - acc
           do! select (ArraySegment(pair.buffer.Array, pair.offset, bytesRead)) bytesRead
           let remaining = pair.length - bytesRead
           if remaining = markerLength then
-            bufferManager.FreeBuffer( pair.buffer, "Suave.Web.split")
+            bufferManager.FreeBuffer(pair.buffer, "Suave.Web.split")
             return count + bytesRead
           else
             if remaining - markerLength >= 0 then
-              let segment = BufferSegment.mk pair.buffer
-                                             (pair.offset  + bytesRead  + markerLength)
-                                             (remaining - markerLength)
-              segments.AddFirst( segment) |> ignore
+              let segment =
+                BufferSegment.create pair.buffer
+                                     (pair.offset  + bytesRead  + markerLength)
+                                     (remaining - markerLength)
+              segments.AddFirst(segment) |> ignore
               return count + bytesRead
             else
               Aux.skipBuffers segments (markerLength - remaining)
@@ -98,20 +100,20 @@ type ConnectionFacade(ctx) =
         if n > 0 && n + b.length >= index then
           //procees, free and remove
           do! SocketOp.ofAsync <| select (ArraySegment(b.buffer.Array, b.offset, b.length)) b.length
-          do bufferManager.FreeBuffer( b.buffer,"Suave.Web.scanMarker" )
+          do bufferManager.FreeBuffer(b.buffer, "Suave.Web.scanMarker")
           segments.Remove currentnode
         n <- n + b.length
         currentnode <- currentnode.Previous
     }
 
 
-  /// Iterates over a BufferSegment list looking for a marker, data before the marker 
+  /// Iterates over a BufferSegment list looking for a marker, data before the marker
   /// is sent to the function select and the corresponding buffers are released
   /// Returns the number of bytes read.
   let scanMarker (marker: byte[]) select = socket {
 
     match kmpW marker segments with
-    | Some x -> 
+    | Some x ->
       let! res = SocketOp.ofAsync <| split x select marker.Length
       return Found res
     | None   ->
@@ -213,14 +215,13 @@ type ConnectionFacade(ctx) =
 
   /// Read the post data from the stream, given the number of bytes that makes up the post data.
   let readPostData  (bytes : int) select  : SocketOp<unit> =
-
     let rec loop n : SocketOp<unit> =
       socket {
         if segments.Count > 0  then
           let segment = segments.First.Value
           segments.RemoveFirst() |> ignore
           if segment.length > n then
-            do! SocketOp.ofAsync <| select (BufferSegment.toArraySegment(BufferSegment(segment.buffer,n,segment.length))) n
+            do! SocketOp.ofAsync <| select (BufferSegment.toArraySegment(BufferSegment(segment.buffer,segment.offset, n))) n
             segments.AddFirst (BufferSegment(segment.buffer, segment.offset + n, segment.length - n)) |> ignore
             return ()
           else
@@ -263,18 +264,22 @@ type ConnectionFacade(ctx) =
       return None
     }
 
+  let parseMultipartEncoding partHeaders =
+    partHeaders %% "content-type"
+    |> Choice.map Parsing.headerParams
+    |> Choice.bind (fun x -> x.TryLookup "charset")
+    |> Choice.bind (function
+        | "utf-8" -> Choice1Of2 (UTF8.bytes, UTF8.toStringAtOffset)
+        | x -> Choice2Of2 x)
+    |> Choice.orDefault (ASCII.bytes, ASCII.toStringAtOffset)
+
   let parseMultipartMixed fieldName boundary : SocketOp<unit> =
-    let verbose = Log.verbose logger "Suave.Web.parseMultipartMixed" trace
-    let verbosef = Log.verbosef logger "Suave.Web.parseMultipartMixed" trace
-
     let rec loop = socket {
-
       let! firstLine = readLine
 
       if firstLine.Equals("--") then
         return ()
       else
-
         let! partHeaders = readHeaders
 
         let! (contentDisposition : string) =
@@ -284,9 +289,15 @@ type ConnectionFacade(ctx) =
         match partHeaders %% "content-type" with
         | Choice1Of2 contentType ->
           let headerParams = headerParams contentDisposition
-          verbosef (fun f -> f "parsing content type %s -> readFilePart" contentType)
+          logger.verbose (
+            eventX "Parsing {contentType}... -> readFilePart"
+            >> setFieldValue "contentType" contentType)
+
           let! res = readFilePart boundary headerParams fieldName contentType
-          verbosef (fun f -> f "parsing content type %s -> readFilePart" contentType)
+
+          logger.verbose (
+            eventX "Parsed {contentType} <- readFilePart"
+            >> setFieldValue "contentType" contentType)
 
           match res with
           | Some upload ->
@@ -297,21 +308,20 @@ type ConnectionFacade(ctx) =
 
         | Choice2Of2 _ ->
           use mem = new MemoryStream()
+          let bytes, toStringAtOffset = parseMultipartEncoding partHeaders
           let! a =
-            readUntil (ASCII.bytes(eol + boundary)) (fun x y -> async {
+            readUntil (bytes(eol + boundary)) (fun x y -> async {
                 do! mem.AsyncWrite(x.Array, x.Offset, y)
               })
           let byts = mem.ToArray()
-          multiPartFields.Add (fieldName, ASCII.toStringAtOffset byts 0 byts.Length)
-          return! loop 
+          multiPartFields.Add (fieldName, toStringAtOffset byts 0 byts.Length)
+          return! loop
       }
     loop
 
   /// Parses multipart data from the stream, feeding it into the HttpRequest's property Files.
   let parseMultipart (boundary:string) : SocketOp<unit> =
-    let verbosef = Log.verbosef logger "Suave.Web.parseMultipart" trace
-
-    let  parsePart  = socket {
+    let parsePart = socket {
 
         let! partHeaders = readHeaders
 
@@ -324,7 +334,7 @@ type ConnectionFacade(ctx) =
         let! _ =
           (headerParams.TryLookup "form-data" |> Choice.map (String.trimc '"'))
           @|! "Key 'form-data' was not present in 'content-disposition'"
-        
+
         let! fieldName =
           (headerParams.TryLookup "name" |> Choice.map (String.trimc '"'))
           @|! "Key 'name' was not present in 'content-disposition'"
@@ -334,29 +344,33 @@ type ConnectionFacade(ctx) =
           let subboundary = "--" + (x.Substring(x.IndexOf('=') + 1) |> String.trimStart |> String.trimc '"')
           do! parseMultipartMixed fieldName subboundary
           let! a = skip (boundary.Length)
-          return () 
+          return ()
 
-        | Choice1Of2 contentType ->
-          verbosef (fun f -> f "parsing content type %s -> readFilePart" contentType)
-          let! res = readFilePart boundary  headerParams fieldName contentType
-          verbosef (fun f -> f "parsing content type %s <- readFilePart" contentType)
+        | Choice1Of2 contentType when headerParams.ContainsKey "filename" ->
+          logger.verbose (
+            eventX "Parsing {contentType}... -> readFilePart"
+            >> setFieldValue "contentType" contentType
+            >> setSingleName "Suave.Web.parseMultipart")
 
-          match res with
-          | Some upload ->
-            files.Add(upload)
-            return () 
-          | None ->
-            return () 
+          let! res = readFilePart boundary headerParams fieldName contentType
 
-        | Choice2Of2 _ ->
+          logger.verbose (
+            eventX "Parsed {contentType} <- readFilePart"
+            >> setFieldValue "contentType" contentType
+            >> setSingleName "Suave.Web.parseMultipart")
+
+          res |> Option.iter files.Add
+
+        | Choice1Of2 _ | Choice2Of2 _ ->
           use mem = new MemoryStream()
+          let bytes, toStringAtOffset = parseMultipartEncoding partHeaders
           let! a =
-            readUntil (ASCII.bytes(eol + boundary)) (fun x y -> async {
-                do! mem.AsyncWrite(x.Array, x.Offset, y)
-              })
+            readUntil (bytes (eol + boundary)) (fun x y -> async {
+              do! mem.AsyncWrite(x.Array, x.Offset, y)
+            })
           let byts = mem.ToArray()
-          multiPartFields.Add(fieldName, ASCII.toStringAtOffset byts 0 byts.Length)
-          return () 
+          multiPartFields.Add(fieldName, toStringAtOffset byts 0 byts.Length)
+          return ()
       }
 
     socket {
@@ -376,8 +390,8 @@ type ConnectionFacade(ctx) =
           let! a = skip 2
           return ()
         else
-          failwith "invalid multipart format"
-    } 
+          failwith "Invalid multipart format"
+    }
 
   /// Reads raw POST data
   let getRawPostData contentLength =
@@ -391,15 +405,11 @@ type ConnectionFacade(ctx) =
       return rawForm
     }
 
-  let parsePostData (contentLengthHeader:Choice<string,_>) contentTypeHeader = socket {
-
-    let verbosef = Log.verbosef logger "Suave.Web.parsePostData" trace
-    let verbose = Log.verbose logger "Suave.Web.parsePostData" trace
-
-    match contentLengthHeader with 
+  let parsePostData (contentLengthHeader : Choice<string,_>) contentTypeHeader = socket {
+    match contentLengthHeader with
     | Choice1Of2 contentLengthString ->
       let contentLength = Convert.ToInt32 contentLengthString
-      verbosef (fun f -> f "expecting content length %d" contentLength)
+      logger.verbose (eventX "Expecting {contentLength}" >> setFieldValue "contentLength" contentLength)
 
       match contentTypeHeader with
       | Choice1Of2 ce when String.startsWith "application/x-www-form-urlencoded" ce ->
@@ -410,7 +420,7 @@ type ConnectionFacade(ctx) =
       | Choice1Of2 ce when String.startsWith "multipart/form-data" ce ->
         let boundary = "--" + (ce |> String.substring (ce.IndexOf('=') + 1) |> String.trimStart |> String.trimc '"')
 
-        verbose "parsing multipart"
+        logger.verbose (eventX "Parsing multipart")
         do! parseMultipart boundary
         return Some ()
 
@@ -424,7 +434,7 @@ type ConnectionFacade(ctx) =
   /// Process the request, reading as it goes from the incoming 'stream', yielding a HttpRequest
   /// when done
   member this.processRequest = socket {
-    let verbose = Log.verbose logger "Suave.Web.processRequest" trace
+    let verbose message = logger.verbose (eventX message)
 
     verbose "reading first line of request"
     let! firstLine = readLine
@@ -458,7 +468,7 @@ type ConnectionFacade(ctx) =
       { httpVersion      = httpVersion
         url              = matchedBinding.uri path rawQuery
         host             = host
-        ``method``       = meth  
+        ``method``       = meth
         headers          = headers
         rawForm          = _rawForm
         rawQuery         = rawQuery

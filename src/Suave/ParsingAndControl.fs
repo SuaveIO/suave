@@ -24,12 +24,15 @@ module internal ParsingAndControl =
   open Suave.Utils.Bytes
   open Suave.Utils.Parsing
   open Suave.Logging
+  open Suave.Logging.Message
 
   let BadRequestPrefix = "__suave_BAD_REQUEST"
 
   /// Free up a list of buffers
   let inline free context connection =
-    List.iter (fun (x: BufferSegment) -> connection.bufferManager.FreeBuffer (x.buffer, context)) connection.segments
+    connection.segments
+    |> List.iter (fun (x : BufferSegment) ->
+      connection.bufferManager.FreeBuffer (x.buffer, context)) 
 
   /// Load a readable plain-text stream, based on the protocol in use. If plain HTTP
   /// is being used, the stream is returned as it, otherwise a new SslStream is created
@@ -49,22 +52,24 @@ module internal ParsingAndControl =
 
   let httpLoop (ctxOuter : HttpContext) (consumer : WebPart) =
 
-    let runtime = ctxOuter.runtime
+    let logger = ctxOuter.runtime.logger
 
     let facade = new ConnectionFacade(ctxOuter)
 
     let rec loop (_ : HttpContext) = async {
+      let event message =
+       eventX message 
+       >> setSingleName "Suave.ParsingAndControl.httpLoop.loop"
 
-      let verbose  = Log.verbose runtime.logger "Suave.Web.httpLoop.loop" TraceHeader.empty
-      let verbosef = Log.verbosef runtime.logger "Suave.Web.httpLoop.loop" TraceHeader.empty
-
-      verbose "-> processor"
+      logger.verbose (event "Processing request... -> processor")
       let! result' = facade.processRequest
-      verbose "<- processor"
+      logger.verbose (event "Processed request. <- processor")
       match result' with
       | Choice1Of2 result ->
         match result with
-        | None -> verbose "'result = None', exiting"
+        | None ->
+          logger.verbose (event "'result = None', exiting")
+
         | Some ctx ->
           let! result'' = HttpOutput.addKeepAliveHeader ctx |> HttpOutput.run consumer
           match result'' with
@@ -74,34 +79,43 @@ module internal ParsingAndControl =
             | Some ctx ->
               match ctx.request.header "connection" with
               | Choice1Of2 conn when String.equalsOrdinalCI conn "keep-alive" ->
-                verbose "'Connection: keep-alive' recurse"
+                logger.verbose (event "'Connection: keep-alive' recurse")
                 return! loop (cleanResponse ctx)
               | Choice1Of2 _ ->
                 free "Suave.Web.httpLoop.loop (case Choice1Of2 _)" ctx.connection
-                verbose "Connection: close"
+                logger.verbose (event "Connection: close")
               | Choice2Of2 _ ->
                 if ctx.request.httpVersion.Equals("HTTP/1.1") then
-                  verbose "'Connection: keep-alive' recurse (!)"
+                  logger.verbose (event "'Connection: keep-alive' recurse (!)")
                   return! loop (cleanResponse ctx)
                 else
                   free "Suave.Web.httpLoop.loop (case Choice2Of2, else branch)" ctx.connection
-                  verbose "Connection: close"
+                  logger.verbose (event "Connection: close")
                   return ()
+
           | Choice2Of2 err ->
-            verbose (sprintf "Socket error while running webpart, exiting: %A" err)
+            logger.info (
+              event "Socket error while running webpart, exiting"
+              >> addExn err)
+
       | Choice2Of2 err ->
         match err with
         | InputDataError msg ->
-          verbose (sprintf "Error parsing http request: %s" msg)
+          logger.info (event "Error parsing HTTP request with {message}"
+                       >> setFieldValue "message" msg)
+
           let! result''' = HttpOutput.run (RequestErrors.BAD_REQUEST msg) ctxOuter
           match result''' with
           | Choice1Of2 _ ->
-            verbose "Exiting http loop"
-          | Choice2Of2 err ->
-            verbose (sprintf "Socket error while sending BAD_REQUEST, exiting: %A" err)
+            logger.verbose (event "Exiting http loop")
 
+          | Choice2Of2 err ->
+            logger.verbose (event "Socket error while sending BAD_REQUEST, exiting"
+                            >> setFieldValue "error" err)
+            
         | err ->
-          verbose (sprintf "Socket error while processing request, exiting: %A" err)
+          logger.verbose (event "Socket error while processing request, exiting"
+                          >> setFieldValue "error" err)
     }
     loop ctxOuter
 
@@ -113,14 +127,13 @@ module internal ParsingAndControl =
     (runtime    : HttpRuntime)
     (consumer   : WebPart)
     (connection : Connection) =
-    let verbose  = Log.verbose runtime.logger "Suave.Web.httpLoop.loop" TraceHeader.empty
     async {
       let! result = loadConnection runtime connection
       match result with
       | Choice1Of2 connection' ->
         do! httpLoop { HttpContext.empty with runtime = runtime; connection = connection' } consumer
       | Choice2Of2 err ->
-        verbose (sprintf "Socket error while loading the connection, exiting.")
+        runtime.logger.info (eventX "Socket error while loading the connection, exiting")
       return ()
     }
 
@@ -141,6 +154,3 @@ module internal ParsingAndControl =
     | None   -> Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location)
 #endif
     | Some s -> s
-
-////////////////////////////////////////////////////
-

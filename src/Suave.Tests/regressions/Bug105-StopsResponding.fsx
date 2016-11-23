@@ -10,7 +10,7 @@ module XD =
   open System.Xml
   open System.Xml.Linq
 
-  let mkXDoc raw_bytes =
+  let createXDoc raw_bytes =
     use xml_stream = new MemoryStream(raw_bytes : byte [])
     use rdr = new XmlTextReader(xml_stream)
     XDocument.Load rdr

@@ -30,10 +30,20 @@ type TcpTransport(acceptArgs     : SocketAsyncEventArgs,
 
   interface ITransport with
     member this.read (buf : ByteSegment) =
-      asyncDo acceptArgs.AcceptSocket.ReceiveAsync (setBuffer buf) (fun a -> a.BytesTransferred) readArgs
+      async{
+       if acceptArgs.AcceptSocket = null then
+         return Choice2Of2 (ConnectionError "read error: acceptArgs.AcceptSocket = null") 
+       else
+         return! asyncDo acceptArgs.AcceptSocket.ReceiveAsync (setBuffer buf) (fun a -> a.BytesTransferred) readArgs
+       }
 
     member this.write (buf : ByteSegment) =
-      asyncDo acceptArgs.AcceptSocket.SendAsync (setBuffer buf) ignore writeArgs
+      async{
+        if acceptArgs.AcceptSocket = null then
+         return Choice2Of2 (ConnectionError "write error: acceptArgs.AcceptSocket = null") 
+       else
+         return! asyncDo acceptArgs.AcceptSocket.SendAsync (setBuffer buf) ignore writeArgs
+      }
 
     member this.shutdown() = async {
       shutdownSocket ()

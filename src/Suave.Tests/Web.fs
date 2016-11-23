@@ -1,6 +1,6 @@
 ﻿module Suave.Tests.Web
 
-open Fuchu
+open Expecto
 
 open Suave
 open Suave.ParsingAndControl
@@ -30,9 +30,9 @@ let parsing_tests (_: SuaveConfig) =
 
       // the server generates a new one with the client's as the parent?
       // is the semantics that client sends its SpanId and that
-      let expected = TraceHeader.mk (Some 7654321UL) (Some 1234567UL)
-      Assert.Equal("should parse trace id", expected.traceId, (TraceHeader.parseTraceHeaders headers).traceId)
-      Assert.Equal("should parse span id to parent span id", expected.reqParentId, (TraceHeader.parseTraceHeaders headers).reqParentId)
+      let expected = TraceHeader.create (Some 7654321UL) (Some 1234567UL)
+      Expect.equal (TraceHeader.parseTraceHeaders headers).traceId expected.traceId "should parse trace id"
+      Expect.equal (TraceHeader.parseTraceHeaders headers).reqParentId expected.reqParentId "should parse span id to parent span id"
     ]
 
 [<Tests>]
@@ -50,7 +50,7 @@ let keepAliveTests =
         else
           "should not modify the response headers", reqContext
       let actual = HttpOutput.addKeepAliveHeader reqContext
-      Assert.Equal(message, expected.response.headers, actual.response.headers)
+      Expect.equal actual.response.headers expected.response.headers message
 
   testList "when processing keep-alive directives" [
     genKeepAliveTest "HTTP/1.0" None false

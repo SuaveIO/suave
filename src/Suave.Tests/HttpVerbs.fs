@@ -3,22 +3,20 @@
 open System
 open System.Text
 open System.Net.Http
-
 open Suave
 open Suave.Successful
 open Suave.Utils
-
 open Suave.Tests.TestUtilities
 open Suave.Testing
-
-open Fuchu
+open Expecto
 
 [<Tests>]
 let gets cfg =
   let runWithConfig = runWith cfg
   testList "getting basic responses" [
     testCase "200 OK returns 'a'" <| fun _ ->
-      Assert.Equal("expecting non-empty response", "a", runWithConfig (OK "a") |> req HttpMethod.GET "/" None)
+      let actual = runWithConfig (OK "a") |> req HttpMethod.GET "/" None
+      Expect.equal actual "a" "expecting non-empty response"
 
     testCase "200 OK returning url" <| fun _ ->
       Assert.Equal("expecting correct url from binding",
@@ -91,21 +89,26 @@ let posts cfg =
   testList "posting basic data" [
     testCase "POST data round trips with no content-type" <| fun _ ->
       use data = new StringContent("bob")
-      Assert.Equal("expecting data to be returned", "bob", runWithConfig webId |> req HttpMethod.POST "/" (Some data))
+      let actual = runWithConfig webId |> req HttpMethod.POST "/" (Some data)
+      Expect.equal actual "bob" "expecting data to be returned"
 
     testCase "POST form data makes round trip" <| fun _ ->
       use data = new FormUrlEncodedContent(dict [ "name", "bob"])
-      Assert.Equal("expecting form data to be returned", "bob", runWithConfig (getFormValue "name") |> req HttpMethod.POST "/" (Some data))
+      let actual = runWithConfig (getFormValue "name") |> req HttpMethod.POST "/" (Some data)
+      Expect.equal actual "bob" "expecting form data to be returned"
 
     testCase "POST long data" <| fun _ ->
       use data = new FormUrlEncodedContent(dict [ "long", longData])
-      Assert.Equal("expecting form data to be returned", longData, runWithConfig (getFormValue "long") |> req HttpMethod.POST "/" (Some data))
+      let actual = runWithConfig (getFormValue "long") |> req HttpMethod.POST "/" (Some data)
+      Expect.equal actual longData "expecting form data to be returned"
 
     testCase "POST persona assertion" <| fun _ ->
       use data = new FormUrlEncodedContent(dict [ "assertion", assertion])
-      Assert.Equal("expecting form data to be returned", assertion, runWithConfig (getFormValue "assertion") |> req HttpMethod.POST "/" (Some data))
+      let actual = runWithConfig (getFormValue "assertion") |> req HttpMethod.POST "/" (Some data)
+      Expect.equal actual assertion "expecting form data to be returned"
 
     testCase "POST unicode data" <| fun _ ->
       use data = new FormUrlEncodedContent(dict [ "name", unicodeString ])
-      Assert.Equal("expecting form data to be returned", unicodeString, runWithConfig (getFormValue "name") |> req HttpMethod.POST "/" (Some data))
+      let actual = runWithConfig (getFormValue "name") |> req HttpMethod.POST "/" (Some data)
+      Expect.equal actual unicodeString "expecting form data to be returned"
   ]

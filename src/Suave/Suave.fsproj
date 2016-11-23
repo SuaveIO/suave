@@ -8,7 +8,8 @@
     <OutputType>Library</OutputType>
     <RootNamespace>Suave</RootNamespace>
     <AssemblyName>Suave</AssemblyName>
-    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
+    <ResolveNuGetPackages>false</ResolveNuGetPackages>
     <Name>Suave</Name>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
@@ -98,13 +99,13 @@
     <Compile Include="Utils\Property.fs" />
     <Compile Include="Utils\Parse.fs" />
     <Compile Include="Utils\CultureInfoCache.fs" />
+    <Compile Include="..\..\paket-files\logary\logary\src\Logary.Facade\Facade.fs">
+      <Paket>True</Paket>
+      <Link>Utils/Facade.fs</Link>
+    </Compile>
+    <Compile Include="Utils\TraceHeader.fs" />
     <Compile Include="Globals.fs" />
     <Compile Include="CookieSerialiser.fs" />
-    <Compile Include="Logging\LogLevel.fs" />
-    <Compile Include="Logging\TraceHeader.fs" />
-    <Compile Include="Logging\LogLine.fs" />
-    <Compile Include="Logging\Logger.fs" />
-    <Compile Include="Log.fs" />
     <Compile Include="Sockets\SocketBinding.fs" />
     <Compile Include="Sockets\BufferManager.fs" />
     <Compile Include="Sockets\ConcurrentPool.fs" />
@@ -146,6 +147,7 @@
     <Compile Include="AssemblyVersionInfo.fs" Condition="Exists('AssemblyVersionInfo.fs')" />
     <None Include="paket.references" />
     <Content Include="App.config" />
+    <None Include="project.json" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="mscorlib" />
@@ -159,7 +161,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <Choose>
-    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
+    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.6.1'">
       <ItemGroup>
         <Reference Include="FSharp.Core">
           <HintPath>..\..\packages\FSharp.Core\lib\net40\FSharp.Core.dll</HintPath>

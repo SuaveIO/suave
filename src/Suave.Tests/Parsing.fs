@@ -1,22 +1,30 @@
 ﻿module Suave.Tests.Parsing
 
-open Fuchu
-
+open Expecto
 open System
 open System.IO
 open System.Net.Http
 open System.Net.Http.Headers
 open System.Text
-
 open Suave
 open Suave.Operators
 open Suave.Filters
 open Suave.RequestErrors
 open Suave.Successful
 open Suave.Utils
-
 open Suave.Tests.TestUtilities
 open Suave.Testing
+
+[<Tests>]
+let parseQuery =
+  testCase "can parse query with =" <| fun _ ->
+    let subject =
+      Parsing.parseData "bewit=c&d=Q%3D%3D&r=https%3A%2F%2Fqvitoo.dev%3A8080%2F"
+    Expect.equal subject.Length 3 "Should have three values"
+
+    let actual = subject.[1] |> snd |> Option.get
+    Expect.equal actual "Q==" "Should contain Q=="
+
 
 [<Tests>]
 let parsingMultipart cfg =
@@ -42,28 +50,29 @@ let parsingMultipart cfg =
   byteArrayContent.Headers.TryAddWithoutValidation("Content-Type","multipart/form-data; boundary=99233d57-854a-4b17-905b-ae37970e8a39") |> ignore
 
   testList "http parser tests" [
-      testCase "parsing a large multipart form" <| fun _ ->
-        Assert.Equal("", "Bob <bob@wishfulcoding.mailgun.org>", runWithConfig testMultipartForm |> req HttpMethod.POST "/" (Some byteArrayContent))
+    testCase "parsing a large multipart form" <| fun _ ->
+      let actual = runWithConfig testMultipartForm |> req HttpMethod.POST "/" (Some byteArrayContent)
+      Expect.equal actual "Bob <bob@wishfulcoding.mailgun.org>" "Should return correct value"
 
-      testCase "parsing a large urlencoded form data" <| fun _ ->
-        Assert.Equal("", "hallo wereld", 
-          runWithConfig (testUrlEncodedForm "stripped-text") |> reqGZip HttpMethod.POST "/" (Some <| new StringContent(postData2, Encoding.UTF8, "application/x-www-form-urlencoded")))
+    testCase "parsing a large urlencoded form data" <| fun _ ->
+      Assert.Equal("", "hallo wereld",
+        runWithConfig (testUrlEncodedForm "stripped-text") |> reqGZip HttpMethod.POST "/" (Some <| new StringContent(postData2, Encoding.UTF8, "application/x-www-form-urlencoded")))
 
-      testCase "parsing a large urlencoded form data" <| fun _ ->
-        Assert.Equal("", "Pepijn de Vos <pepijndevos@gmail.com>", 
-          runWithConfig (testUrlEncodedForm "from") |> reqGZip HttpMethod.POST "/" (Some <| new StringContent(postData3, Encoding.UTF8, "application/x-www-form-urlencoded")))
+    testCase "parsing a large urlencoded form data" <| fun _ ->
+      Assert.Equal("", "Pepijn de Vos <pepijndevos@gmail.com>",
+        runWithConfig (testUrlEncodedForm "from") |> reqGZip HttpMethod.POST "/" (Some <| new StringContent(postData3, Encoding.UTF8, "application/x-www-form-urlencoded")))
 
-      testCase "parsing a large urlencoded form data" <| fun _ ->
-        Assert.Equal("", "no attachment 2",
-          runWithConfig (testUrlEncodedForm "subject") |> reqGZip HttpMethod.POST "/" (Some <| new StringContent(postData3, Encoding.UTF8, "application/x-www-form-urlencoded")))
+    testCase "parsing a large urlencoded form data" <| fun _ ->
+      Assert.Equal("", "no attachment 2",
+        runWithConfig (testUrlEncodedForm "subject") |> reqGZip HttpMethod.POST "/" (Some <| new StringContent(postData3, Encoding.UTF8, "application/x-www-form-urlencoded")))
 
-      testCase "parsing a large urlencoded form data" <| fun _ ->
-        Assert.Equal("", "identifier 123abc", 
-          runWithConfig (testUrlEncodedForm "body-plain") |> reqGZip HttpMethod.POST "/" (Some <| new StringContent(postData3, Encoding.UTF8, "application/x-www-form-urlencoded")))
+    testCase "parsing a large urlencoded form data" <| fun _ ->
+      Assert.Equal("", "identifier 123abc",
+        runWithConfig (testUrlEncodedForm "body-plain") |> reqGZip HttpMethod.POST "/" (Some <| new StringContent(postData3, Encoding.UTF8, "application/x-www-form-urlencoded")))
 
-      testCase "parsing a large urlencoded form data" <| fun _ ->
-        Assert.Equal("", "field-does-not-exists", 
-          runWithConfig (testUrlEncodedForm "body-html") |> reqGZip HttpMethod.POST "/" (Some <| new StringContent(postData3, Encoding.UTF8, "application/x-www-form-urlencoded")))
+    testCase "parsing a large urlencoded form data" <| fun _ ->
+      Assert.Equal("", "field-does-not-exists",
+        runWithConfig (testUrlEncodedForm "body-html") |> reqGZip HttpMethod.POST "/" (Some <| new StringContent(postData3, Encoding.UTF8, "application/x-www-form-urlencoded")))
   ]
 
 open System.Net
@@ -113,7 +122,7 @@ let parsingMultipart2 cfg =
     use sender = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp)
     sender.Connect (new IPEndPoint(ip, port))
     let written = sender.Send data
-    Assert.Equal("same written as given", data.Length, written)
+    Expect.equal written data.Length "same written as given"
 
     let respBuf = Array.zeroCreate<byte> 0x100
     let resp = sender.Receive respBuf
@@ -133,11 +142,8 @@ let parsingMultipart2 cfg =
       try
         let data = readBytes "request-multipartmixed-twofiles.txt"
         let subject = sendRecv data
-        Assert.StringContains("Expecting 200 OK", "HTTP/1.1 200 OK", subject)
-        Assert.StringContains(
-          "Expecting response to contain file name",
-          "file1.txt",
-          subject)
+        Expect.stringContains subject "HTTP/1.1 200 OK" "Expecting 200 OK"
+        Expect.stringContains subject "file1.txt" "Expecting response to contain file name"
       finally
         disposeContext ctx
 
@@ -146,8 +152,8 @@ let parsingMultipart2 cfg =
       try
         let data = readBytes "request-binary-n-formdata.txt"
         let subject = sendRecv data
-        Assert.StringContains("Expecting 200 OK", "HTTP/1.1 200 OK", subject)
-        Assert.StringContains("Expecting response to contain messageid", "online sha1 hash of all files", subject)
+        Expect.stringContains subject "HTTP/1.1 200 OK" "Expecting 200 OK"
+        Expect.stringContains subject "online sha1 hash of all files" "Expecting response to contain messageid"
       finally
         disposeContext ctx
 
@@ -156,7 +162,7 @@ let parsingMultipart2 cfg =
       try
         let data = readBytes "request-no-host-header.txt"
         let subject = sendRecvRaw data
-        Assert.StringContains("Expecting 400 Bad Request", "HTTP/1.1 400 Bad Request", subject)
+        Expect.stringContains subject "HTTP/1.1 400 Bad Request" "Expecting 400 Bad Request"
       finally
         disposeContext ctx
 
@@ -165,7 +171,7 @@ let parsingMultipart2 cfg =
       try
         let data = readBytes "request-hangs.txt"
         let subject = sendRecvRaw data
-        Assert.StringContains("Expecting 404 Not Found", "HTTP/1.1 404 Not Found", subject)
+        Expect.stringContains subject "HTTP/1.1 404 Not Found" "Expecting 404 Not Found"
       finally
         disposeContext ctx
     ]

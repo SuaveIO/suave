@@ -1,18 +1,27 @@
-language: objective-c
+---
+language: csharp
 
-notifications:
-  email: false
+mono:
+ - 4.2.3
+ - 4.4.1
+ - latest # => "stable release"
+ - weekly # => "latest commits"
 
-env:
- matrix:
-  - MONO_VERSION="4.2.1"
-
-before_install:
- - wget "http://download.mono-project.com/archive/${MONO_VERSION}/macos-10-x86/MonoFramework-MDK-${MONO_VERSION}.macos10.xamarin.x86.pkg"
- - sudo installer -pkg "MonoFramework-MDK-${MONO_VERSION}.macos10.xamarin.x86.pkg" -target /
- - brew update
- - brew install libuv --universal
+install:
+ - rvm install 2.2.3
+ - gem install bundler
+ - sudo apt-get update -y
+ - sudo apt-get install -y gnupg automake libtool
+ - curl -sSL https://github.com/libuv/libuv/archive/v1.9.1.tar.gz | tar zxf - -C /tmp
+ - (cd /tmp/libuv-1.9.1/ && ./autogen.sh && ./configure && make && sudo make install)
+ - sudo ldconfig
+ # for apache bench (ab)
+ - sudo apt-get install -qq apache2-utils
 
 script:
- - bundle install
- - bundle exec rake
+ - bundle && bundle exec rake
+
+matrix:
+  allow_failures:
+    - mono: latest
+    - mono: weekly

@@ -32,6 +32,7 @@ let SuaveVersion = Assembly.GetExecutingAssembly().GetName().Version.ToString()
 /// This is the server header
 let ServerHeader = String.Concat [| "Server: Suave (https://suave.io)" |]
 
+[<assembly:System.Runtime.CompilerServices.InternalsVisibleToAttribute("Suave.LibUv")>]
 [<assembly:System.Runtime.CompilerServices.InternalsVisibleToAttribute("Suave.Experimental")>]
 [<assembly:System.Runtime.CompilerServices.InternalsVisibleToAttribute("Suave.DotLiquid")>]
 [<assembly:System.Runtime.CompilerServices.InternalsVisibleToAttribute("Suave.Razor")>]

@@ -12,4 +12,4 @@ if errorlevel 1 (
 )
 
 msbuild src\Suave.sln /p:Configuration=Release
-src\Suave.Tests\bin\Release\Suave.Tests.exe
+src\Suave.Tests\bin\Release\Suave.Tests.exe --sequenced

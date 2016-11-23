@@ -13,7 +13,7 @@ let app = OK "PONG"
 let port = 3000us
 let config =
   { defaultConfig with
-     bindings = [ HttpBinding.mk HTTP IPAddress.Loopback port ]
+     bindings = [ HttpBinding.create HTTP IPAddress.Loopback port ]
      bufferSize = 8192
      maxOps = 10000
   }
@@ -45,7 +45,7 @@ let main _ =
   // wait for the server to start listening
   listening |> Async.RunSynchronously |> printfn "start stats: %A"
 
-  // launch httpref
+  // launch httperf
   let output = execute "httperf" (sprintf "--hog --server=localhost --port=%d --uri=/ --rate=1000 --num-conns=1000 --num-calls=1000 --burst-length=20" port)
 
   Console.WriteLine output

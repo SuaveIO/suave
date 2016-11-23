@@ -1,22 +1,22 @@
-﻿module internal Suave.Utils.Compression
+﻿module Suave.Utils.Compression
 
 open System.IO
 open System.IO.Compression
 
-let private encode (mkStream : Stream * CompressionMode -> Stream) (bytes: byte[]) =
+let private encode (createStream : Stream * CompressionMode -> Stream) (bytes: byte[]) =
   if bytes.Length > 0 then
     use memory =  new MemoryStream()
-    let compressStream = mkStream(memory, CompressionMode.Compress)
+    let compressStream = createStream(memory, CompressionMode.Compress)
     do compressStream.Write(bytes, 0, bytes.Length)
     compressStream.Dispose()
     memory.ToArray()
   else
     [||]
 
-let private decode (mkStream : Stream * CompressionMode -> Stream) (bytes: byte[]) =
+let private decode (createStream : Stream * CompressionMode -> Stream) (bytes: byte[]) =
   if bytes.Length > 0 then
     use compressed =  new MemoryStream(bytes)
-    use decompressStream = mkStream(compressed, CompressionMode.Decompress)
+    use decompressStream = createStream(compressed, CompressionMode.Decompress)
     use result = new MemoryStream()
     decompressStream.CopyTo(result)
     result.ToArray()

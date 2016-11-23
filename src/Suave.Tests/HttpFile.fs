@@ -1,6 +1,6 @@
 module Suave.Tests.HttpFile
 
-open Fuchu
+open Expecto
 
 open System
 open System.IO
@@ -18,11 +18,10 @@ open Suave.Testing
 let ``canonicalization attacks`` (_: SuaveConfig) =
   testList "canonicalization attacks" [
     testCase "should throw" <| fun _ ->
-      Assert.Raise("'../../passwd' is not a valid path",
-        typeof<Exception>,
-        fun _ -> Files.resolvePath currentPath "../../passwd" |> ignore)
+      Expect.throwsT<Exception> (fun _ -> Files.resolvePath currentPath "../../passwd" |> ignore)
+        "'../../passwd' is not a valid path"
     testCase "can use dot" <| fun _ ->
-      Assert.Equal("expect currentPath", currentPath, Files.resolvePath currentPath ".")
+      Expect.equal (Files.resolvePath currentPath ".") currentPath "expect currentPath"
   ]
 
 [<Tests>]
@@ -33,15 +32,18 @@ let compression cfg =
 
   testList "getting basic gzip/deflate responses" [
       testCase "200 OK returns 'Havana' with gzip " <| fun _ ->
-        Assert.Equal("expecting 'Havana'", "Havana", runWithConfig (OK "Havana") |> reqGZip HttpMethod.GET "/" None)
+        let actual = runWithConfig (OK "Havana") |> reqGZip HttpMethod.GET "/" None
+        let expected = "Havana"
+        Expect.equal actual expected "expecting 'Havana'"
 
       testCase "200 OK returns 'Havana' with deflate " <| fun _ ->
-        Assert.Equal("expecting 'Havana'", "Havana", runWithConfig (OK "Havana") |> reqDeflate HttpMethod.GET "/" None)
+        let actual = runWithConfig (OK "Havana") |> reqDeflate HttpMethod.GET "/" None
+        Expect.equal actual "Havana" "expecting 'Havana'"
 
       testCase "verifiying we get the same size uncompressed" <| fun _ ->
         Assert.Equal("length should match"
-        , testFileSize
-        , (runWithConfig (Files.browseFileHome "test-text-file.txt") |> reqBytes HttpMethod.GET "/" None).Length |> int64)
+          , testFileSize
+          , (runWithConfig (Files.browseFileHome "test-text-file.txt") |> reqBytes HttpMethod.GET "/" None).Length |> int64)
 
       testCase "gzip static file" <| fun _ ->
         Assert.Equal("length should match"
@@ -78,5 +80,5 @@ let ``http HEAD method`` cfg =
           else loop ()
         loop ()
 
-        Assert.Equal("Stream should be at the end.", true, streamReader.EndOfStream)) ctx
+        Expect.equal streamReader.EndOfStream true "Stream should be at the end.") ctx
   ]

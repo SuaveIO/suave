@@ -3,8 +3,8 @@
 open System
 open System.Collections.Generic
 open System.Collections.Concurrent
-
 open Suave
+open Suave.Logging
 
 /// This class creates a single large buffer which can be divided up
 /// and assigned to SocketAsyncEventArgs objects for use with each
@@ -14,10 +14,12 @@ open Suave
 ///
 /// The operations exposed on the BufferManager class are not thread safe.
 [<AllowNullLiteral>]
-type BufferManager(totalBytes, bufferSize, logger, autoGrow) =
+type BufferManager(totalBytes, bufferSize, autoGrow) =
+  static let logger = Log.create "Suave.Sockets.BufferManager"
 
-  do Log.internf logger "Suave.Socket.BufferManager" (fun fmt ->
-    fmt "initialising BufferManager with %d bytes" totalBytes)
+  do logger.log Debug (
+       Message.eventX "Initialising BufferManager with {totalBytes}"
+       >> Message.setFieldValue "totalBytes" totalBytes)
 
   /// underlying list of byte arrays maintained by the Buffer Manager
   let segments = new ConcurrentBag<ArraySegment<byte>>()
@@ -25,12 +27,15 @@ type BufferManager(totalBytes, bufferSize, logger, autoGrow) =
   /// something to lock on when creating a new buffer
   let creatingSegment = obj()
 
-  let chunksPerSegment = totalBytes/bufferSize
+  let chunksPerSegment = totalBytes / bufferSize
 
   /// Initialise a segment of memory
   member x.createBuffer() =
     lock creatingSegment (fun _ ->
-      if segments.Count < chunksPerSegment/2 then 
+      if segments.Count < chunksPerSegment / 2 then
+        logger.log Verbose (
+          Message.eventX "Creating buffer bank, total {totalBytes} bytes" 
+          >> Message.setFieldValue "totalBytes" totalBytes)
         let buffer = Array.zeroCreate totalBytes
         let mutable runningOffset = 0
         while runningOffset < totalBytes - bufferSize do
@@ -38,28 +43,47 @@ type BufferManager(totalBytes, bufferSize, logger, autoGrow) =
           runningOffset <- runningOffset + bufferSize)
 
   /// Pops a buffer from the buffer pool
-  member x.PopBuffer(?context : string) : ArraySegment<byte> =
+  member x.PopBuffer(?caller : string) : ArraySegment<byte> =
+    let caller = defaultArg caller "no-caller-specified"
+
     let rec loop tries =
       if tries = 0 then
-        raise (Exception "Could not adquire a buffer, too many tries.")
+        let msg = "Could not adquire a buffer, too many retries."
+        logger.logWithAck Error (
+          Message.eventX msg
+          >> Message.setFieldValue "segmentCount" segments.Count
+        )
+        // wait for logging infrastructure to Ack this
+        |> Async.RunSynchronously
+        raise (Exception msg)
       else
         match segments.TryTake() with
-        | true, s ->
-          Log.internf logger "Suave.Socket.BufferManager" (fun fmt ->
-            fmt "reserving buffer: %d, free count: %d [%s]" s.Offset segments.Count (defaultArg context "no-ctx"))
-          s
+        | true, segment ->
+          logger.log Verbose (
+            Message.eventX "Reserving buffer at {offset}, with {freeCount} segments from call from {caller}"
+            >> Message.setFieldValue "offset" segment.Offset
+            >> Message.setFieldValue "freeCount" segments.Count
+            >> Message.setFieldValue "caller" caller)
+          segment
+
         | false, _ ->
+          logger.log Verbose (Message.eventX "Ran out of buffers")
           if autoGrow then x.createBuffer ()
           loop (tries - 1)
+
     loop 100
 
-  /// Initialise the memory required to use this BufferManager
-  member x.Init() = x.createBuffer()
+  /// Initialise the memory required to use this BufferManager.
+  member x.Init() =
+    x.createBuffer()
 
-  /// Frees the buffer back to the buffer pool
-  member x.FreeBuffer(args : ArraySegment<_>, ?context : string) =
+  /// Frees the buffer back to the buffer pool.
+  member x.FreeBuffer(args : ArraySegment<_>, ?caller : string) =
     // Not trivial to check for double frees now
     //if segments. args then failwithf "double free buffer %d" args.Offset
     segments.Add args
-    Log.internf logger "Suave.Socket.BufferManager" (fun fmt ->
-      fmt "freeing buffer: %d, free count: %d [%s]" args.Offset segments.Count (defaultArg context "no-ctx"))
+    logger.log Verbose (
+      Message.eventX "Freeing buffer at {offset} from {caller}. Free segments {segmentCount}."
+      >> Message.setFieldValue "offset" args.Offset
+      >> Message.setFieldValue "caller" (defaultArg caller "no-caller-specified")
+      >> Message.setFieldValue "segmentCount" segments.Count)

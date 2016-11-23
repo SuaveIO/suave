@@ -18,10 +18,10 @@ end
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module BufferSegment =
-  
-  let inline mk buffer offset length =
+
+  let inline create buffer offset length =
     #if DEBUG
-    if length < 0 then failwith (sprintf "BufferSegment.mk: length = %d < 0" length)
+    if length < 0 then failwithf "BufferSegment.create: length = %d < 0" length
     #endif
     new BufferSegment(buffer, offset, length)
 
@@ -103,7 +103,7 @@ module internal Bytes =
       if   i < 0 then failwith "invalid args"
       let rec loop k acc =
         let a = aas.[k]
-        if i < acc + a.Count then 
+        if i < acc + a.Count then
           a.Array.[a.Offset + (i - acc)]
         else loop (k + 1) (acc + a.Count)
       loop 0 0
@@ -113,7 +113,7 @@ module internal Bytes =
       if   i < 0 then failwith "invalid args"
       let rec loop k acc =
         let a = aas.[k]
-        if i < acc + a.length then 
+        if i < acc + a.length then
           a.buffer.Array.[a.offset + (i - acc)]
         else loop (k + 1) (acc + a.length)
       loop 0 0

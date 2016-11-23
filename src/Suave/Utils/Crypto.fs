@@ -106,7 +106,7 @@ let secretbox (key : byte []) (msg : byte []) =
     let iv  = generateStdIV ()
     use aes = secretboxInit key iv
 
-    let mkCipherText (msg : byte []) (key : byte []) (iv : byte []) =
+    let createCipherText (msg : byte []) (key : byte []) (iv : byte []) =
       use enc      = aes.CreateEncryptor(key, iv)
       use cipher   = new MemoryStream()
       use crypto   = new CryptoStream(cipher, enc, CryptoStreamMode.Write)
@@ -119,7 +119,7 @@ let secretbox (key : byte []) (msg : byte []) =
 
     let bw  = new BinaryWriter(cipherText)
     bw.Write iv
-    bw.Write (mkCipherText msg key iv)
+    bw.Write (createCipherText msg key iv)
     bw.Flush ()
 
     let hmac = hmacOfBytes key (cipherText.ToArray())

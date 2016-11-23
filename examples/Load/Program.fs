@@ -8,11 +8,11 @@ open Suave.Filters
 open Suave.Files
 open Suave.Logging
 
-let logger = Loggers.saneDefaultsFor LogLevel.Verbose
+let logger = Targets.create Verbose
 
-let config = 
-  { defaultConfig with 
-      bindings   = [ HttpBinding.mkSimple HTTP "127.0.0.1" 8082 ]
+let config =
+  { defaultConfig with
+      bindings   = [ HttpBinding.createSimple HTTP "127.0.0.1" 8082 ]
       bufferSize = 2048
       maxOps     = 10000
       logger     = logger }

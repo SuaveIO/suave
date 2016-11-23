@@ -60,11 +60,13 @@ let asyncWriteBufferedBytes (b : byte[]) (connection : Connection) : SocketOp<un
     if b.Length > 0 then
       let buff = connection.lineBuffer
       let lineBufferCount = connection.lineBufferCount
-      assert (b.Length < buff.Count - lineBufferCount)
       if lineBufferCount + b.Length > buff.Count then
-        do! send connection (new ArraySegment<_>(buff.Array, buff.Offset, lineBufferCount))
-        Array.Copy(b, 0, buff.Array, buff.Offset,b.Length)
-        return (),{ connection with lineBufferCount = b.Length }
+        // flush lineBuffer
+        if lineBufferCount > 0 then 
+          do! send connection (new ArraySegment<_>(buff.Array, buff.Offset, lineBufferCount))
+        // don't waste time buffering here
+        do! send connection (new ArraySegment<_>(b, 0, b.Length))
+        return (), { connection with lineBufferCount = 0 }
       else
         Array.Copy(b, 0, buff.Array, buff.Offset + lineBufferCount, b.Length)
         return (),{ connection with lineBufferCount = lineBufferCount + b.Length }

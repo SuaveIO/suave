@@ -38,17 +38,17 @@ type TraceHeader =
   /// field is defaulted to None, as suave cannot know the "origin span", so to
   /// speak.
 
-  static member mk traceId spanParentId =
+  static member create traceId spanParentId =
     let newId = ThreadSafeRandom.nextUInt64()
     { traceId     = defaultArg traceId newId
       reqId       = newId
       reqParentId = spanParentId }
 
   static member parseTraceHeaders (headers : NameValueList) =
-    let tryParseUint64 x = 
-      match System.UInt64.TryParse x with 
+    let tryParseUint64 x =
+      match System.UInt64.TryParse x with
       | true, value -> Choice1Of2 value
       | false, _    -> Choice2Of2 (sprintf "Couldn't parse '%s' to int64" x)
     let parent = "x-b3-spanid"  |> getFirst headers |> Choice.bind tryParseUint64 |> Option.ofChoice
     let trace  = "x-b3-traceid" |> getFirst headers |> Choice.bind tryParseUint64 |> Option.ofChoice
-    TraceHeader.mk trace parent
+    TraceHeader.create trace parent

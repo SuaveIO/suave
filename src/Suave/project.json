@@ -1,5 +1,5 @@
 {
-    "version": "2.0.0-alpha3-dotnetcli",
+    "version": "2.0.0-rc1-dotnetcli",
 
     "buildOptions": {
         "compilerName": "fsc",
@@ -21,13 +21,10 @@
                 "Utils/Property.fs",
                 "Utils/Parse.fs",
                 "Utils/CultureInfoCache.fs",
+                "../../paket-files/logary/logary/src/Logary.Facade/Facade.fs",
+                "Utils/TraceHeader.fs",
                 "Globals.fs",
                 "CookieSerialiser.fs",
-                "Logging/LogLevel.fs",
-                "Logging/TraceHeader.fs",
-                "Logging/LogLine.fs",
-                "Logging/Logger.fs",
-                "Log.fs",
                 "Sockets/SocketBinding.fs",
                 "Sockets/BufferManager.fs",
                 "Sockets/ConcurrentPool.fs",
@@ -63,7 +60,7 @@
                 "ConnectionFacade.fs",
                 "ParsingAndControl.fs",
                 "Web.fs",
-                "WebSocket.fs",        
+                "WebSocket.fs",
                 "Owin.fs",
                 "Json.fs"
             ]
@@ -72,53 +69,36 @@
 
     "tools": {
         "dotnet-compile-fsc": {
-            "version": "1.0.0-*",
-            "imports": [
-                "dnxcore50",
-                "portable-net45+win81",
-                "netstandard1.3"
-            ]
+            "version": "1.0.0-preview2-*",
+            "imports": "dnxcore50"
         },
-        "dotnet-mergenupkg": { "version": "0.10.*" }
+        "dotnet-mergenupkg": { "version": "1.0.*" }
     },
 
     "frameworks": {
-        "netstandard1.5": { 
+        "net45": {},
+		"netstandard1.6": {
             "buildOptions": {
                 "define": [
-                    "DNXCORE50"
+                    "DNXCORE50",
+                    "NETSTANDARD1_5"
                 ]
             },
             "dependencies": {
-                "System.Data.Common": "4.0.1-rc2-24027",
-                "System.Diagnostics.Process": "4.1.0-rc2-24027",
-                "System.Security.Cryptography.Primitives": "4.0.0-rc2-24027",
-                "System.Net.Security": "4.0.0-rc2-24027",
-                "System.Globalization.Extensions": "4.0.1-rc2-24027",
-                "Microsoft.FSharp.Core.netcore": "1.0.0-alpha-160509",
-                "NETStandard.Library": "1.5.0-rc2-24027",
-                "System.Security.Claims": "4.0.1-rc2-24027",
-                "System.Runtime.Serialization.Json": "4.0.2-rc2-24027"
+                "System.Data.Common": "4.1.0",
+                "System.Diagnostics.Process": "4.1.0",
+                "System.Security.Cryptography.Primitives": "4.0.0",
+                "System.Net.Security": "4.0.0",
+                "System.Globalization.Extensions": "4.0.1",
+                "Microsoft.FSharp.Core.netcore": "1.0.0-alpha-*",
+                "NETStandard.Library": "1.6.0",
+                "System.Security.Claims": "4.0.1",
+                "System.Runtime.Serialization.Json": "4.0.2"
             },
             "imports": [
-                "dnxcore50",
-                "portable-net45+win81"
+                "portable-net45+win8",
+                "dnxcore50"
             ]
-        },
-        "net46" : { 
-            "dependencies": {
-                "FSharp.Core": "4.0.0.1"
-            },
-            "frameworkAssemblies": {
-                "System": "",
-                "System.Core": "",
-                "System.Data": "",
-                "System.Data.Linq": "",
-                "System.Numerics": "",
-                "System.Runtime.Caching": "",
-                "System.Runtime.Serialization": "",
-                "System.Xml": ""
-            }
         }
     }
 }

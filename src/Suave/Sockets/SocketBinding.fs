@@ -8,7 +8,7 @@ open Suave.Utils
 /// A port is an unsigned short (uint16) structure
 type Port = uint16
 
-type SocketBinding = 
+type SocketBinding =
   { ip   : IPAddress
     port : Port }
 
@@ -27,5 +27,5 @@ type SocketBinding =
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module SocketBinding =
 
-  let mk ip port =
+  let create ip port =
     { ip = ip; port = port }

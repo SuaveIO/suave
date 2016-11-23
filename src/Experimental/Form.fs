@@ -202,7 +202,7 @@ let input<'a, 'b> (quotF : 'a -> Expr<'b>) attrs (form : Form<'a>) =
     | Optional(_) -> []
     | _ -> ["required",""]
   let props = getHtmlProps form quotF
-  inputAttr (["name", name; "type", typ]
+  input (["name", name; "type", typ]
         @ required
         @ attrs
         @ props)

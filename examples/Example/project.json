@@ -14,7 +14,7 @@
         
   "dependencies": {
     "Microsoft.FSharp.Core.netcore": "1.0.0-alpha-160509",
-    "Suave": "2.0.0-alpha2",
+    "Suave": "2.0.0-alpha7",
     "Microsoft.NETCore.App": {
       "type": "platform",
       "version": "1.0.0-rc2-3002702"
@@ -23,7 +23,7 @@
 
   "tools": {
     "dotnet-compile-fsc": {
-      "version": "1.0.0-*",
+      "version": "1.0.0-preview1-*",
       "imports": [
         "dnxcore50",
         "portable-net45+win81",
@@ -33,7 +33,7 @@
   },
   
   "frameworks": {
-    "netstandard1.5": {
+    "netstandard1.6": {
       "buildOptions": {
           "define": [
               "DNXCORE50"  

@@ -1,4 +1,4 @@
-FROM fsharp/fsharp
+FROM fsharp
 
 RUN apt-get update && \
     apt-get install -y rake bundler

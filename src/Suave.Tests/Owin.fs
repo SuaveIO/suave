@@ -1,29 +1,26 @@
 ﻿module Suave.Tests.Owin
 
-open Fuchu
-
+open Expecto
 open System
 open System.Collections.Generic
 open System.Net
 open System.Net.Http
 open System.Net.Http.Headers
 open System.Text
-
 open Suave
 open Suave.Utils.AsyncExtensions
 open Suave.Operators
 open Suave.Filters
 open Suave.Writers
 open Suave.Owin
-
 open Suave.Tests.TestUtilities
 open Suave.Testing
 
 let eq msg a b =
-  Assert.Equal(msg, a, b)
+  Expect.equal a b msg
 
 let eqs msg bs aas =
-  Assert.Equal(msg, bs |> List.ofSeq, aas |> List.ofSeq)
+  Expect.sequenceEqual aas bs msg
 
 let throws msg matcher fn =
   try fn () with e when matcher e -> ()
@@ -78,7 +75,7 @@ let owinUnit cfg =
         subject.["b"] <- [| "b-4" |]
         eqs "can change b after remove" ["b-4"] (subject.["b"])
         eq "can remove b after change b after remove" true (subject.Remove("b"))
-        
+
         subject.["c"] <- [| "c-1" |]
         eqs "has a, c"
             ["a"; "c"]
@@ -127,7 +124,7 @@ let owinUnit cfg =
           if headers.ContainsKey("Host") then
             headers.["Host"].[0]
           else "localhost"
-        let queryString : string = 
+        let queryString : string =
           unbox subj.[OwinConstants.requestQueryString]
         let resultUri =
           unbox subj.[OwinConstants.requestScheme] + "://" +
@@ -158,22 +155,22 @@ let owinUnit cfg =
       testCase "test for issue #387" <| fun _ ->
         let subj = createOwin ()
         subj.["someKey"] <- "hello"
-        let hello = 
+        let hello =
           match subj.TryGetValue "someKey" with
           | true, o -> Some(unbox o)
           | _ -> None
-        Assert.Equal("TryGetValue should find custom key", Some "hello", hello)
+        Expect.equal hello (Some "hello") "TryGetValue should find custom key"
 
       testCase "interaction/set and retrieve with case insensitivity" <| fun _ ->
         let subj = createOwin ()
         subj.["testing.MyKey"] <- "oh yeah"
 
-        let upperCased = 
+        let upperCased =
           match subj.TryGetValue "Testing.MyKey" with
           | true, o -> Some(unbox o)
           | _ -> None
 
-        Assert.Equal("TryGetValue should not find upper cased key", None, upperCased)
+        Expect.equal upperCased None "TryGetValue should not find upper cased key"
 
         eq "read back" "oh yeah" (subj.["testing.MyKey"] |> unbox)
 
@@ -267,8 +264,7 @@ let owinEndToEnd cfg =
   let composedApp =
     path "/owin"
       >=> setHeader "X-Custom-Before" "Before OWIN"
-      >=> OwinApp.ofApp "/" owinHelloWorld
-      >=> setHeader "X-Custom-After" "After OWIN"
+      >=> (OwinApp.ofApp "/" owinHelloWorld >=> setHeader "X-Custom-After" "After OWIN")
 
   testList "e2e" [
     testCase "Hello, OWIN!" <| fun _ ->
@@ -375,7 +371,7 @@ let owinEndToEnd cfg =
         responseStream.Write([||],0,0)
         Threading.Tasks.Task.FromResult() :> Threading.Tasks.Task
         )
-      
+
       let basicAuthMidFunc = OwinMidFunc(fun next -> OwinAppFunc(fun env ->
         let requestHeaders : IDictionary<string, string[]> = unbox env.[OwinConstants.requestHeaders]
         // NOTE: currently fails b/c headers are not using StringComparer.OrdinalIgnoreCase.
@@ -428,7 +424,7 @@ let owinEndToEnd cfg =
         async.Return (Some ctx)
 
       let composedApp =
-        pathRegex "/owin(/.+)*" >=> OwinApp.ofAppWithContinuation "/owin" ok OwinApp.identity >=> postCondition
+        pathRegex "/owin(/.+)*" >=> (OwinApp.ofAppWithContinuation "/owin" ok (fun ctx -> async { return Some ctx }) >=> postCondition)
 
       let asserts (result : HttpResponseMessage) =
         eq "Http Status Code" HttpStatusCode.OK result.StatusCode
@@ -450,13 +446,13 @@ let owinEndToEnd cfg =
         async.Return ()
 
       let composedApp =
-        pathScan "/owin/%s" (fun path -> OwinApp.ofApp "/" (fun env -> async {
+        pathScan "/owin/%s" (fun path -> (OwinApp.ofApp "/" (fun env -> async {
           env.[OwinConstants.requestPathBase] <- box "/owin"
           env.[OwinConstants.requestPath] <- box ("/" + path)
           do! ok env
           env.[OwinConstants.requestPathBase] <- box ""
           env.[OwinConstants.requestPath] <- box ("/owin/" + path)
-          })
+          }))
         )
 
       let asserts (result : HttpResponseMessage) =

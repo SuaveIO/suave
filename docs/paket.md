@@ -38,6 +38,7 @@ if not (File.Exists "paket.exe") then
 #r "paket.exe"
  
 Paket.Dependencies.Install """
+frameworks: net46
 source https://nuget.org/api/v2
 nuget Suave
 """;;

@@ -1,10 +1,9 @@
-﻿module Suave.Tests.FuchuExtensions
+﻿module Suave.Tests.ExpectoExtensions
 
-open Fuchu
-open Fuchu.Helpers
-open Fuchu.Tests
-open Fuchu.Impl
-
+open Expecto
+open Expecto.Helpers
+open Expecto.Tests
+open Expecto.Impl
 open System
 open System.Linq
 open System.Reflection
@@ -18,18 +17,18 @@ let testFromMemberWithParam (param : 't) (m: MemberInfo): Test option =
       if m.FieldType = typeof<Test>
         then Some(unbox (m.GetValue(null)))
         else None
-    | :? MethodInfo as m -> 
+    | :? MethodInfo as m ->
       if m.ReturnType = typeof<Test>
         then Some(unbox (m.Invoke(null, [| param :> obj |])))
         else None
-    | :? PropertyInfo as m -> 
+    | :? PropertyInfo as m ->
       if m.PropertyType = typeof<Test>
         then Some(unbox (m.GetValue(null, null)))
         else None
     | _ -> None)
   |> List.tryFind (fun _ -> true)
 
-let listToTestListOption = 
+let listToTestListOption =
   function
   | [] -> None
   | x -> Some (TestList x)
@@ -58,11 +57,13 @@ let testFromAssemblyWithFilterAndParam typeFilter (a: Assembly) param =
 let testFromAssemblyWithParam asm param =
   testFromAssemblyWithFilterAndParam (fun _ -> true) asm param
 
-let defaultMainThisAssemblyWithParam param args = 
+let defaultMainThisAssemblyWithParam param args =
 
   let tests =
       match testFromAssemblyWithParam (Assembly.GetEntryAssembly()) param with
       | Some t -> t
       | None -> TestList []
 
-  defaultMain tests args
+  args
+  |> ExpectoConfig.fillFromArgs defaultConfig
+  |> flip runTests tests

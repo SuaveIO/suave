@@ -11,7 +11,7 @@ open Suave.ServerErrors
 open Suave.Tests.TestUtilities
 open Suave.Testing
 
-open Fuchu
+open Expecto
 
 [<Tests>]
 let applicativeTests cfg =
@@ -26,18 +26,18 @@ let applicativeTests cfg =
     testCase "url with spaces: path" <| fun _ ->
 
       let res = runWithConfig (path "/get by" >=> OK "A") |> req HttpMethod.GET "/get by" None
-      Assert.Equal("should return A", "A", res)
+      Expect.equal res "A" "should return A"
 
     testCase "url with spaces: pathScan" <| fun _ ->
 
       let res = runWithConfig (pathScan "/foo/%s" (fun s -> OK s)) |> req HttpMethod.GET "/foo/get by" None
-      Assert.Equal("should return 'get buy'", "get by", res)
+      Expect.equal res "get by" "should return 'get buy'"
 
     testCase "when not matching on Host" <| fun _ ->
       let app = request (fun r -> OK r.host)
 
       let res = runWithConfig app |> req HttpMethod.GET "/" None
-      Assert.Equal("should be what config says the IP is", ip, res)
+      Expect.equal res ip "should be what config says the IP is"
 
     testCase "when matching on Host but is forwarded" <| fun _ ->
       let app =
@@ -45,5 +45,5 @@ let applicativeTests cfg =
         <|> warbler (fun ctx -> INTERNAL_ERROR (sprintf "host: %s" ctx.request.clientHostTrustProxy))
 
       let res = runWithConfig app |> req HttpMethod.GET "/" None
-      Assert.Equal("should be what the config says the IP is", ip, res)
+      Expect.equal res ip "should be what the config says the IP is"
     ]

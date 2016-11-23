@@ -1,6 +1,6 @@
 module Suave.Tests.HttpWriters
 
-open Fuchu
+open Expecto
 
 open System
 open System.IO
@@ -93,7 +93,7 @@ let headers cfg =
     loop []
 
   let getRespHeaders key =
-    List.filter (fst >> (String.equalsCaseInsensitve key))
+    List.filter (fst >> (String.equalsCaseInsensitive key))
 
   let getRespHeader key =
     getRespHeaders key >> List.head

@@ -6,7 +6,7 @@ open System.Net
 
 let config =
   { defaultConfig with
-     logger = Loggers.ConsoleWindowLogger LogLevel.Verbose }
+     logger = Targets.create Verbose }
 
 [<EntryPoint>]
 let main _ =
