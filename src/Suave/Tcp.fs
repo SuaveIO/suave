@@ -177,7 +177,7 @@ let runServer maxConcurrentOps bufferSize autoGrow (binding: SocketBinding) star
           failwithf "Socket failed to accept client, error: %A" e
 
       with ex ->
-        logger.error (eventX "Socket failed to accept a client" >> addExn exn)
+        logger.error (eventX "Socket failed to accept a client" >> addExn ex)
 
   with ex ->
     logger.fatal (eventX "TCP server failed" >> addExn ex)
