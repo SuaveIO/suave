@@ -117,4 +117,4 @@ module HttpContext =
   let sessionId x =
     x.userState
     |> Map.tryFind StateStoreType
-    |> Option.map (fun x -> x :?> string |> parseData)
+    |> Option.map (fun x -> x :?> byte[] |> UTF8.toString |> parseData)
