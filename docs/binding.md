@@ -11,20 +11,16 @@ combinations. It also supports HTTPS via the interface `ITlsProvider`.
 There is an OpenSSL implementation at [https://github.com/SuaveIO/suave/tree/master/src/Suave.OpenSSL](https://github.com/SuaveIO/suave/tree/master/src/Suave.OpenSSL)
 
 {% highlight fsharp %}
-
-open Suave.OpenSsl.Provider
-
-let sslCert = new X509Certificate("suave.pfx","easy");
 let cfg =
   { defaultConfig with
       bindings =
-        [ HttpBinding.mk HTTP IPAddress.Loopback 80us
-          HttpBinding.mk (HTTPS (openSsl sslCert)) (IPAddress.Parse "0.0.0.0") 443us
-        ]
+        [ HttpBinding.create HTTP IPAddress.Loopback 80us
+          HttpBinding.createSimple HTTP "10.0.1.34" 9000 ]
       listenTimeout = TimeSpan.FromMilliseconds 3000. }
-choose
-  [ path "/hello" >=> OK "Hello World"
-    NOT_FOUND "Found no handlers" ]
+choose [
+  path "/hello" >=> OK "Hello World"
+  NOT_FOUND "Found no handlers"
+]
 |> startWebServer cfg
 {% endhighlight %}
 
