@@ -23,11 +23,3 @@ choose [
 ]
 |> startWebServer cfg
 {% endhighlight %}
-
-The OpenSSL implementation comes with conditional bindings in
-App.config for the three operating systems: linux, OS X and Windows.
-
-**Note** -- currently the compiled versions are "gott och blandat" as we say in
-Swedish. It means some are compiled for x86 (Windows) and some x64 (Linux, OS
-X); check out [issue 42](https://github.com/SuaveIO/suave/issues/42) to see more
-about this issue.
