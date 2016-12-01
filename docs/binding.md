@@ -6,9 +6,9 @@ Multiple bindings and SSL support
 ---------------------------------
 
 Suave supports binding the application to multiple TCP/IP addresses and ports
-combinations. It also supports HTTPS via the interface `ITlsProvider`.
-
-There is an OpenSSL implementation at [https://github.com/SuaveIO/suave/tree/master/src/Suave.OpenSSL](https://github.com/SuaveIO/suave/tree/master/src/Suave.OpenSSL)
+combinations. It also supports HTTPS via the interface `ITlsProvider`, but the current
+recommendation for deploying HTTPS is by letting a reverse proxy manage the HTTPS
+termination.
 
 {% highlight fsharp %}
 let cfg =
