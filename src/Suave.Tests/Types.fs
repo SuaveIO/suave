@@ -57,6 +57,11 @@ let httpBinding (_ : SuaveConfig) =
       let binding = HttpBinding.create HTTP IPAddress.Loopback 80us
       let actual = binding.uri "" "" |> sprintf "%O"
       Expect.equal actual "http://127.0.0.1/" "uri"
+
+    testCase "parsing absolute uri" <| fun _ ->
+      let binding = HttpBinding.create HTTP IPAddress.Any 80us
+      let actual = binding.uri "http://example.com/path/to/resource" "" |> sprintf "%O"
+      Expect.equal actual "http://0.0.0.0/path/to/resource" "absolute uri"
     ]
 
 
