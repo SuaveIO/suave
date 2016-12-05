@@ -417,7 +417,7 @@ module Http =
     member x.uri (path : string) query =
       let path' =
         match Uri.TryCreate(path, UriKind.Absolute) with
-        | true, uri -> uri.AbsolutePath |> Uri.UnescapeDataString
+        | true, uri -> Uri.UnescapeDataString uri.AbsolutePath
         | _ when path.StartsWith "/" -> path
         | _ -> "/" + path
       String.Concat [
