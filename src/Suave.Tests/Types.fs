@@ -62,6 +62,21 @@ let httpBinding (_ : SuaveConfig) =
       let binding = HttpBinding.create HTTP IPAddress.Any 80us
       let actual = binding.uri "http://example.com/path/to/resource" "" |> sprintf "%O"
       Expect.equal actual "http://0.0.0.0/path/to/resource" "absolute uri"
+
+    testCase "uri does not get url-encoded" <| fun _ ->
+      let binding = HttpBinding.create HTTP IPAddress.Any 80us
+      let actual = binding.uri "http://example.com/å b/c" "ö=2" |> string
+      Expect.equal actual "http://0.0.0.0/å b/c?ö=2" "uri"
+
+    testCase "url-encoded uri gets decoded" <| fun _ ->
+      let binding = HttpBinding.create HTTP IPAddress.Any 80us
+      let actual = binding.uri "a%20b" "" |> string
+      Expect.equal actual "http://0.0.0.0/a b" "uri"
+
+    testCase "double-url-encoded uri does not get decoded" <| fun _ ->
+      let binding = HttpBinding.create HTTP IPAddress.Any 80us
+      let actual = binding.uri "a%2520b" "" |> string
+      Expect.equal actual "http://0.0.0.0/a%2520b" "uri"
     ]
 
 
