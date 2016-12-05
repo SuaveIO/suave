@@ -415,7 +415,11 @@ module Http =
       socketBinding : SocketBinding }
 
     member x.uri (path : string) query =
-      let path' = if path.StartsWith "/" then path else "/" + path
+      let path' =
+        match Uri.TryCreate(path, UriKind.Absolute) with
+        | true, uri -> uri.AbsolutePath
+        | _ when path.StartsWith "/" -> path
+        | _ -> "/" + path
       String.Concat [
         x.scheme.ToString(); "://"; x.socketBinding.ToString()
         path'
