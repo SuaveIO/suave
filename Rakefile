@@ -156,7 +156,7 @@ namespace :dotnetcli do
   end
 
   task :build_lib => :coreclr_binaries do
-    [ "src/Suave", "src/Experimental" ].each do |item|
+    [ "src/Suave", "src/Experimental", "src/Suave.DotLiquid" ].each do |item|
       Dir.chdir "#{item}" do
         system dotnet_exe_path, %W|--verbose build --configuration #{Configuration} -f netstandard1.6|
         Dir.chdir "../.."
@@ -169,7 +169,7 @@ namespace :dotnetcli do
 
   desc 'Create Suave nugets packages'
   task :pack => :coreclr_binaries do
-    [ "src/Suave", "src/Experimental" ].each do |item|
+    [ "src/Suave", "src/Experimental", "src/Suave.DotLiquid" ].each do |item|
       Dir.chdir "#{item}" do
         system dotnet_exe_path, %W|--verbose pack --configuration #{Configuration} --no-build|
         Dir.chdir "../.."
@@ -181,7 +181,7 @@ namespace :dotnetcli do
 
   desc 'Merge standard and dotnetcli nupkgs; note the need to run :nugets before'
   task :merge => :coreclr_binaries do
-    [ "Suave", "Experimental" ].each do |item|
+    [ "Suave", "Experimental", "Suave.DotLiquid" ].each do |item|
       Dir.chdir "src/#{item}" do
         version = SemVer.find.format("%M.%m.%p%s")
         if item == "Experimental" then

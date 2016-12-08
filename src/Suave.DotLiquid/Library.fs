@@ -37,6 +37,10 @@ module internal Impl =
     let o = obj()
     fun f -> lock o f
 
+  #if NETSTANDARD1_5
+  open System.Reflection
+  #endif
+
   /// Given a type which is an F# record containing seq<_>, list<_>, array<_>, option and 
   /// other records, register the type with DotLiquid so that its fields are accessible
   let tryRegisterTypeTree =
@@ -47,7 +51,11 @@ module internal Impl =
           let fields = FSharpType.GetRecordFields ty
           Template.RegisterSafeType(ty, [| for f in fields -> f.Name |])
           for f in fields do loop f.PropertyType
+        #if NETSTANDARD1_5
+        elif ty.GetTypeInfo().IsGenericType then
+        #else
         elif ty.IsGenericType then
+        #endif
           let t = ty.GetGenericTypeDefinition()
           if t = typedefof<seq<_>> || t = typedefof<list<_>>  then
             loop (ty.GetGenericArguments().[0])          
