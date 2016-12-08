@@ -20,9 +20,9 @@ let loadObject (str : string) =
   entryAssembly.CreateInstance(str.Replace('.','+'))
 
 /// Invoke the 'action' on the 'object' with 'args'
-let invoke object action args =
-  let typ = object.GetType()
-  let meth = typ.GetMethod(action,[| typeof<Xml>|])
+let invoke (object:obj) action args =
+  let typ : Type = object.GetType()
+  let meth : MethodInfo = typ.GetMethod(action,[| typeof<Xml>|])
   meth.Invoke(object,[| args |])
 
 /// Active Pattern that checks whether 'x' the string contains a pattern
@@ -137,8 +137,17 @@ let rec parser (reader : XmlReader) (Xml(l) as k) =
 /// write the exception as a string to a 500 Internal Error response.
 let processTemplate (data : Map<string,Binder>) ({ request = httpRequest; runtime = runtime } as ctx : HttpContext) =
   try
-    let xmlReader = new XmlTextReader(Files.resolvePath runtime.homeDirectory httpRequest.url.AbsolutePath)
+    let file = Files.resolvePath runtime.homeDirectory httpRequest.url.AbsolutePath
+    #if NETSTANDARD1_5
+    let settings = new XmlReaderSettings()
+    settings.DtdProcessing <- DtdProcessing.Prohibit
+    settings.IgnoreWhitespace <- true
+    settings.IgnoreWhitespace <- false
+    let xmlReader = XmlReader.Create(file, settings)
+    #else
+    let xmlReader = new XmlTextReader(file)
     xmlReader.Namespaces <- false
+    #endif
 
     let transform = parser xmlReader (Xml [])
 
