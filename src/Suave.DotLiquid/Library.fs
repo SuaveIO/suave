@@ -47,7 +47,7 @@ module internal Impl =
           let fields = FSharpType.GetRecordFields ty
           Template.RegisterSafeType(ty, [| for f in fields -> f.Name |])
           for f in fields do loop f.PropertyType
-        elif ty.IsGenericType then
+        elif ty.GetTypeInfo().IsGenericType then
           let t = ty.GetGenericTypeDefinition()
           if t = typedefof<seq<_>> || t = typedefof<list<_>>  then
             loop (ty.GetGenericArguments().[0])          
