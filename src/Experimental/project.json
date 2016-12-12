@@ -1,0 +1,57 @@
+{
+    "version": "2.0.0-rc2-dotnetcli",
+
+    "buildOptions": {
+        "compilerName": "fsc",
+        "compile": {
+            "includeFiles": [
+                "Html.fs",
+                "Xml.fs",
+                "Template.fs",
+                "Data.fs",
+                "Form.fs"
+            ]
+        }
+    },
+
+    "tools": {
+        "dotnet-compile-fsc": {
+            "version": "1.0.0-preview2-*",
+            "imports": "dnxcore50"
+        },
+        "dotnet-mergenupkg": { "version": "1.0.*" }
+    },
+    "dependencies":{
+        "Suave":"2.0.0-rc2-dotnetcli",
+    },
+    "frameworks": {
+        "net45": {},
+		"netstandard1.6": {
+            "buildOptions": {
+                "define": [
+                    "DNXCORE50",
+                    "NETSTANDARD1_5"
+                ]
+            },
+            "dependencies": {
+                "System.Data.Common": "4.1.0",
+				"System.Reflection": "4.3.0",
+				"System.Reflection.TypeExtensions": "4.3.0",
+				"System.Xml.ReaderWriter": "4.3.0",
+                "System.Diagnostics.Process": "4.1.0",
+                "System.Security.Cryptography.Primitives": "4.0.0",
+                "System.Net.Security": "4.0.0",
+                "System.Globalization.Extensions": "4.0.1",
+                "Microsoft.FSharp.Core.netcore": "1.0.0-alpha-*",
+                "NETStandard.Library": "1.6.0",
+                "System.Security.Claims": "4.0.1",
+                "System.Runtime.Serialization.Json": "4.0.2",
+				"System.Net.Mail": "1.0.0-rtm-00002"
+            },
+            "imports": [
+                "portable-net45+win8",
+                "dnxcore50"
+            ]
+        }
+    }
+}

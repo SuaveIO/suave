@@ -156,8 +156,11 @@ namespace :dotnetcli do
   end
 
   task :build_lib => :coreclr_binaries do
-    Dir.chdir "src/Suave" do
-      system dotnet_exe_path, %W|--verbose build --configuration #{Configuration} -f netstandard1.6|
+    [ "src/Suave", "src/Experimental", "src/Suave.DotLiquid" ].each do |item|
+      Dir.chdir "#{item}" do
+        system dotnet_exe_path, %W|--verbose build --configuration #{Configuration} -f netstandard1.6|
+        Dir.chdir "../.."
+      end
     end
   end
 
@@ -166,8 +169,11 @@ namespace :dotnetcli do
 
   desc 'Create Suave nugets packages'
   task :pack => :coreclr_binaries do
-    Dir.chdir "src/Suave"  do
-      system dotnet_exe_path, %W|--verbose pack --configuration #{Configuration} --no-build|
+    [ "src/Suave", "src/Experimental", "src/Suave.DotLiquid" ].each do |item|
+      Dir.chdir "#{item}" do
+        system dotnet_exe_path, %W|--verbose pack --configuration #{Configuration} --no-build|
+        Dir.chdir "../.."
+      end
     end
   end
 
@@ -175,11 +181,19 @@ namespace :dotnetcli do
 
   desc 'Merge standard and dotnetcli nupkgs; note the need to run :nugets before'
   task :merge => :coreclr_binaries do
-    Dir.chdir("src/Suave") do
-      version = SemVer.find.format("%M.%m.%p%s")
-      sourcenupkg = "../../build/pkg/Suave.#{version}.nupkg"
-      clinupkg = "bin/#{Configuration}/Suave.#{version}-dotnetcli.nupkg"
-      system dotnet_exe_path, %W|mergenupkg --source "#{sourcenupkg}" --other "#{clinupkg}" --framework netstandard1.6|
+    [ "Suave", "Experimental", "Suave.DotLiquid" ].each do |item|
+      Dir.chdir "src/#{item}" do
+        version = SemVer.find.format("%M.%m.%p%s")
+        if item == "Experimental" then
+          sourcenupkg = "../../build/pkg/Suave.Experimental.#{version}.nupkg"
+          clinupkg = "bin/#{Configuration}/Experimental.#{version}-dotnetcli.nupkg"
+        else
+          sourcenupkg = "../../build/pkg/#{item}.#{version}.nupkg"
+          clinupkg = "bin/#{Configuration}/#{item}.#{version}-dotnetcli.nupkg"
+        end
+        system dotnet_exe_path, %W|mergenupkg --source "#{sourcenupkg}" --other "#{clinupkg}" --framework netstandard1.6|
+        Dir.chdir "../.."
+      end
     end
   end
 end
