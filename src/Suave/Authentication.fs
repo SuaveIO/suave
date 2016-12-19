@@ -40,7 +40,7 @@ module internal Utils =
   /// random number generator would produce as we only use a small subset alphabet.
   let generateReadableKey (keySize : int) =
     let arr = Array.zeroCreate<byte> keySize |> Crypto.randomize
-    let alpha = "abcdefghijklmnopqrstuvwuxyz0123456789"
+    let alpha = "abcdefghijklmnopqrstuvwxyz0123456789"
     let result = new StringBuilder(keySize)
     arr
     |> Array.iter (fun (b : byte) -> result.Append alpha.[int b % alpha.Length] |> ignore)
