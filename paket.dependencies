@@ -36,10 +36,12 @@ group Examples
   nuget Nancy.Owin
   nuget Freya 3.0.0-b300
   nuget Freya.Core 3.0.0-b300
+  nuget Microsoft.Owin
   nuget Microsoft.Owin.Hosting
   nuget Owin
   nuget Chiron
   nuget identityserver3
+  nuget Microsoft.AspNet.SignalR.Owin
   github haf/YoLo YoLo.fs
 
 group Docs

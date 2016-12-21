@@ -1,0 +1,21 @@
+﻿<!DOCTYPE html>
+<html>
+        <head>
+        
+                <script src="http://ajax.aspnetcdn.com/ajax/jQuery/jquery-3.1.1.js"></script>
+                <script src="http://ajax.aspnetcdn.com/ajax/signalr/jquery.signalr-2.2.1.js"></script>
+                <script src="/signalr/js"></script>
+        </head>
+        <body>
+                hello world
+                <script>
+                        $(function(){
+                                var hub = $.connection.demoHub;
+                                hub.client.sendPing = function (e) {
+                                       console.log(e);
+                                }
+                                $.connection.hub.start();
+                        });
+                </script>
+        </body>
+</html>
