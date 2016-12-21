@@ -727,12 +727,6 @@ module OwinApp =
         let owinRequestUri = UriBuilder ctx.request.url
         let originalUrl = ctx.request.url
 
-        owinRequestUri.Path <-
-          if ctx.request.path.StartsWith requestPathBase then
-            ctx.request.path.Substring requestPathBase.Length
-          else
-            ctx.request.path
-
         let initialState =
           { ctx with
                 request = { ctx.request with url = owinRequestUri.Uri }
@@ -748,8 +742,6 @@ module OwinApp =
         let ctx = wrapper.finalise()
 
         let ctx = { ctx with request = { ctx.request with url = originalUrl }}
-
-        //return! cont wrapper ctx
 
         if wrapper.HeadersSent then
           let request = 
