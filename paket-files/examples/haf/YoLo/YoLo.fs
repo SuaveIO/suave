@@ -12,6 +12,8 @@ let uncurry f (a, b) = f a b
 
 let flip f a b = f b a
 
+let ct x = fun _ -> x
+
 module Choice =
 
   let create v = Choice1Of2 v
@@ -485,6 +487,16 @@ module Async =
     return! f x
   }
 
+  let withTimeout timeoutMillis operation = 
+    async {
+      let! child = Async.StartChild(operation, timeoutMillis)
+      try 
+        let! result = child
+        return Some result
+      with :? TimeoutException ->
+        return None
+    }
+
   let apply fAsync xAsync = async {
     // start the two asyncs in parallel
     let! fChild = Async.StartChild fAsync
@@ -655,3 +667,12 @@ module App =
     let assembly = Assembly.GetExecutingAssembly ()
 #endif
     resourceIn assembly
+
+module Dictionary = 
+  open System.Collections.Generic
+    
+    /// Attempts to retrieve a value as an option from a dictionary using the provided key
+    let tryFind key (dict : Dictionary<_, _>) = 
+      match dict.TryGetValue key with
+      | true, value -> Some value
+      | _ -> None

@@ -224,8 +224,8 @@ let owinUnit cfg =
           path "/owin" >=> OwinApp.ofApp "/" misbehaving
 
         let asserts (result : HttpResponseMessage) =
-          eq "Http Status Code" HttpStatusCode.OK result.StatusCode
-          eq "Reason Phrase set by server" "Afterwards" (result.Content.ReadAsStringAsync().Result)
+          eq "Http Status Code" result.StatusCode HttpStatusCode.OK
+          eq "Reason Phrase set by server" (result.Content.ReadAsStringAsync().Result) "Afterwards"
 
         runWithConfig composedApp
         |> reqResp HttpMethod.GET "/owin" "" None None DecompressionMethods.GZip
@@ -269,10 +269,10 @@ let owinEndToEnd cfg =
   testList "e2e" [
     testCase "Hello, OWIN!" <| fun _ ->
       let asserts (result : HttpResponseMessage) =
-        eq "Content-Type" "text/plain; charset=utf-8" (result.Content.Headers.ContentType.ToString())
-        eq "Http Status Code" HttpStatusCode.Created result.StatusCode
-        eq "Content Length" ("Hello, OWIN!"B.LongLength) (result.Content.Headers.ContentLength.Value)
-        eq "Contents" "Hello, OWIN!" (result.Content.ReadAsStringAsync().Result)
+        eq "Content-Type" (result.Content.Headers.ContentType.ToString()) "text/plain; charset=utf-8"
+        eq "Http Status Code" result.StatusCode HttpStatusCode.Created
+        eq "Content Length" (result.Content.Headers.ContentLength.Value) ("Hello, OWIN!"B.LongLength)
+        eq "Contents" (result.Content.ReadAsStringAsync().Result) "Hello, OWIN!"
 
         match result.Headers.TryGetValues("X-Custom-Before") with
         | true, actual ->
@@ -302,8 +302,8 @@ let owinEndToEnd cfg =
         OwinApp.ofApp "/" noContent
 
       let asserts (result : HttpResponseMessage) =
-        eq "Http Status Code" HttpStatusCode.NoContent result.StatusCode
-        eq "Reason Phrase set by server" "No Content" result.ReasonPhrase
+        eq "Http Status Code" result.StatusCode HttpStatusCode.NoContent
+        eq "Reason Phrase set by server" result.ReasonPhrase "No Content"
 
       runWithConfig composedApp |> reqResp HttpMethod.GET "/" "" None None DecompressionMethods.GZip id asserts
 
@@ -321,9 +321,9 @@ let owinEndToEnd cfg =
         OwinApp.ofApp "/" noContent
 
       let asserts (result : HttpResponseMessage) =
-        eq "Http Status Code" HttpStatusCode.NoContent result.StatusCode
-        eq "Reason Phrase set by server" "No Content" result.ReasonPhrase
-        eq "Content-Type" "text/plain; charset=utf-8" (result.Content.Headers.ContentType.ToString())
+        eq "Http Status Code" result.StatusCode HttpStatusCode.NoContent
+        eq "Reason Phrase set by server" result.ReasonPhrase "No Content"
+        eq "Content-Type" (result.Content.Headers.ContentType.ToString()) "text/plain; charset=utf-8"
 
       runWithConfig composedApp |> reqResp HttpMethod.GET "/" "" None None DecompressionMethods.GZip id asserts
 
@@ -339,8 +339,8 @@ let owinEndToEnd cfg =
         OwinApp.ofApp "/" noContent
 
       let asserts (result : HttpResponseMessage) =
-        eq "Http Status Code" HttpStatusCode.NoContent result.StatusCode
-        eq "Reason Phrase" "Nothing to see here" result.ReasonPhrase
+        eq "Http Status Code" result.StatusCode HttpStatusCode.NoContent
+        eq "Reason Phrase" result.ReasonPhrase "Nothing to see here"
 
       runWithConfig composedApp |> reqResp HttpMethod.GET "/" "" None None DecompressionMethods.GZip id asserts
 
@@ -358,8 +358,8 @@ let owinEndToEnd cfg =
         OwinApp.ofMidFunc "/" noContent
 
       let asserts (result : HttpResponseMessage) =
-        eq "Http Status Code" HttpStatusCode.NoContent result.StatusCode
-        eq "Reason Phrase set by server" "No Content" result.ReasonPhrase
+        eq "Http Status Code" result.StatusCode HttpStatusCode.NoContent
+        eq "Reason Phrase set by server" result.ReasonPhrase "No Content"
 
       runWithConfig composedApp |> reqResp HttpMethod.GET "/" "" None None DecompressionMethods.GZip id asserts
 
@@ -396,8 +396,8 @@ let owinEndToEnd cfg =
         OwinApp.ofAppFunc "/" (basicAuthMidFunc.Invoke(noContent))
 
       let asserts (result : HttpResponseMessage) =
-        eq "Http Status Code" HttpStatusCode.NoContent result.StatusCode
-        eq "Reason Phrase set by server" "No Content" result.ReasonPhrase
+        eq "Http Status Code" result.StatusCode HttpStatusCode.NoContent 
+        eq "Reason Phrase set by server"result.ReasonPhrase "No Content"
 
       let sendAuthHeader (req : HttpRequestMessage) =
         req.Headers.Authorization <- Net.Http.Headers.AuthenticationHeaderValue("Basic", Convert.ToBase64String("foo:bar"B))
@@ -420,18 +420,18 @@ let owinEndToEnd cfg =
         async.Return ()
 
       let postCondition (ctx : HttpContext) =
-        eq "request url contains /owin again" "/owin/app" ctx.request.url.AbsolutePath
+        eq "request url contains /owin again" ctx.request.url.AbsolutePath "/owin/app" 
         async.Return (Some ctx)
 
       let composedApp =
         pathRegex "/owin(/.+)*" >=> (OwinApp.ofAppWithContinuation "/owin" ok (fun ctx -> async { return Some ctx }) >=> postCondition)
 
       let asserts (result : HttpResponseMessage) =
-        eq "Http Status Code" HttpStatusCode.OK result.StatusCode
-        eq "Reason Phrase set by server" "OK" result.ReasonPhrase
+        eq "Http Status Code" result.StatusCode HttpStatusCode.OK
+        eq "Reason Phrase set by server" result.ReasonPhrase "OK"
 
       runWithConfig composedApp |> reqResp HttpMethod.GET "/owin/app" "" None None DecompressionMethods.GZip id asserts
-
+     
     testCase "Manually mount an OWIN app at that path and set requestPathBase" <| fun _ ->
       let ok (env : OwinEnvironment) =
         let requestPathBase : string = unbox env.[OwinConstants.requestPathBase]
@@ -456,8 +456,8 @@ let owinEndToEnd cfg =
         )
 
       let asserts (result : HttpResponseMessage) =
-        eq "Http Status Code" HttpStatusCode.OK result.StatusCode
-        eq "Reason Phrase set by server" "OK" result.ReasonPhrase
+        eq "Http Status Code" result.StatusCode HttpStatusCode.OK
+        eq "Reason Phrase set by server" result.ReasonPhrase "OK"
 
       runWithConfig composedApp |> reqResp HttpMethod.GET "/owin/app" "" None None DecompressionMethods.GZip id asserts
     ]
