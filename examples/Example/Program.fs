@@ -197,33 +197,12 @@ let app =
       ]
     ] >=> logStructured logger logFormatStructured
 
-(*
-// using Suave.OpenSSL
-// also see https://github.com/SuaveIO/suave/issues/291
-// and https://github.com/exira/static-mailer/blob/72fdebf37bafc48ea7277ee4a6b2a758df5c3b3d/src/Program.fs#L28-L31
-
-open Suave.OpenSSL
-open OpenSSL.Core
-open System.Security.Cryptography.X509Certificates
-
-let cert =
-  let bio = BIO.MemoryBuffer()
-  let cert = System.IO.File.ReadAllBytes "example.pem"
-  bio.Write cert
-  OpenSSL.X509.X509Certificate.FromDER bio
-
-*)
-
 open System.Security.Cryptography.X509Certificates
 
 [<EntryPoint>]
 let main argv =
-
-  let cert = new X509Certificate2("suave.p12","easy")
-
   startWebServer
     { bindings              = [ HttpBinding.createSimple HTTP "127.0.0.1" 8082
-                                HttpBinding.createSimple (HTTPS cert) "127.0.0.1" 8443
                               ]
       serverKey             = Utils.Crypto.generateKey HttpRuntime.ServerKeyLength
       errorHandler          = defaultErrorHandler
@@ -247,3 +226,23 @@ let main argv =
       maxContentLength      = 1000000 }
     app
   0
+
+(*
+// using Suave.OpenSSL
+// also see https://github.com/SuaveIO/suave/issues/291
+// and https://github.com/exira/static-mailer/blob/72fdebf37bafc48ea7277ee4a6b2a758df5c3b3d/src/Program.fs#L28-L31
+open Suave.OpenSSL
+open OpenSSL.Core
+open System.Security.Cryptography.X509Certificates
+
+let cert =
+  let bio = BIO.MemoryBuffer()
+  let cert = System.IO.File.ReadAllBytes "example.pem"
+  bio.Write cert
+  OpenSSL.X509.X509Certificate.FromDER bio
+
+Or using the built-in SSL support:
+  let cert = new X509Certificate2("suave.p12","easy")
+  HttpBinding.createSimple (HTTPS cert) "127.0.0.1" 8443
+
+*)
