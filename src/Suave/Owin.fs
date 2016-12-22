@@ -371,9 +371,11 @@ module OwinApp =
       (fun v x -> x |> Map.put "principal" (box v))
 
     let constant x =
-      ((fun _ -> x),
-       (fun v x -> x)
-      ) <--> untyped
+      ((fun _ -> x),(fun v x -> x)) <--> untyped
+
+    let writable x =
+      let r = ref x
+      ((fun _ -> !r),(fun v y -> r:=v;y)) <--> untyped
 
     let mapFindLens key : Property<Map<string, _>, _> =
       (fun x -> x |> Map.pick (fun k v -> if k.Equals(key, StringComparison.Ordinal) then Some v else None)),
@@ -436,7 +438,7 @@ module OwinApp =
       new Action<IDictionary<string, obj>, WebSocketFunc>
         (fun dict runWebSocket -> WebSocket.handShake (continuation runWebSocket) ctx |> ignore)
 
-    let owinMap ct requestPathBase
+    let owinMap ct (requestPathBase:string) (requestPath:string)
                 requestHeadersLens responseHeadersLens
                 responseStreamLens onSendingHeadersLens =
 
@@ -446,9 +448,9 @@ module OwinApp =
         // writeable / value
         OwinConstants.requestMethod,        HttpContext.request_ >--> HttpRequest.method_ >--> methodString <--> untyped
         // writeable / value
-        OwinConstants.requestPathBase,      constant requestPathBase
+        OwinConstants.requestPathBase,      writable requestPathBase
         // writeable / value
-        OwinConstants.requestPath,          HttpContext.request_ >--> HttpRequest.url_ >--> uriAbsolutePath <--> untyped
+        OwinConstants.requestPath,          writable requestPath
         // writeable / value
         OwinConstants.requestQueryString,   HttpContext.request_ >--> HttpRequest.rawQuery_ <--> untyped
         // writeable / value???
@@ -582,7 +584,15 @@ module OwinApp =
         | v'  when Object.ReferenceEquals (v, v') -> x
         | _ -> invalidOp "cannot set onSendingHeadersAction")
 
-    let owinMap = SirLensALot.owinMap cts.Token requestPathBase
+    let uri = initialState.request.url
+
+    let requestPath =
+      if requestPathBase<>"/" && uri.AbsolutePath.StartsWith requestPathBase then
+        uri.AbsolutePath.Substring(requestPathBase.Length) 
+      else
+        uri.AbsolutePath
+    
+    let owinMap = SirLensALot.owinMap cts.Token requestPathBase requestPath
                                       requestHeadersLens responseHeadersLens
                                       responseStreamLens onSendingHeadersLens
 
@@ -724,12 +734,11 @@ module OwinApp =
         ctx.runtime.logger.verbose (eventX message >> setSingleName "Suave.Owin")
 
       async {
-        let owinRequestUri = UriBuilder ctx.request.url
+
         let originalUrl = ctx.request.url
 
         let initialState =
           { ctx with
-                request = { ctx.request with url = owinRequestUri.Uri }
                 response = { ctx.response with status = HTTP_200.status } }
 
         let wrapper =
