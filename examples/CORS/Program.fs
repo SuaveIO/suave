@@ -14,7 +14,7 @@ open Suave.State.CookieStateStore
 open Suave.Utils
 open Suave.Operators
 
-let logger = Targets.create Verbose
+let logger = Targets.create Verbose [||]
 
 let corsConfig = { defaultCORSConfig with allowedUris = InclusiveOption.Some [ "http://localhost:8085" ] }
 

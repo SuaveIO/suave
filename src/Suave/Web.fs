@@ -43,7 +43,7 @@ module Web =
     let toRuntime = SuaveConfig.toRuntime config homeFolder compressionFolder
 
     if config.initialiseLogger then
-      Global.initialise { Global.DefaultConfig with getLogger = fun _ -> config.logger }
+      Global.initialise { Global.defaultConfig with getLogger = fun _ -> config.logger }
     else
       ()
 
@@ -85,7 +85,7 @@ module Web =
       mimeTypesMap          = Writers.defaultMimeTypesMap
       homeFolder            = None
       compressedFilesFolder = None
-      logger                = Targets.create Info
+      logger                = Targets.create Info [||]
       initialiseLogger      = true
       tcpServerFactory      = new DefaultTcpServerFactory()
       #if NETSTANDARD1_5

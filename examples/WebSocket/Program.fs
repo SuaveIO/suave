@@ -42,5 +42,5 @@ let app : WebPart =
 
 [<EntryPoint>]
 let main _ =
-  startWebServer { defaultConfig with logger = Targets.create Verbose } app
+  startWebServer { defaultConfig with logger = Targets.create Verbose [||] } app
   0

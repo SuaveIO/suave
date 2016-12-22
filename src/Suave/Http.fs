@@ -617,7 +617,7 @@ module Http =
         mimeTypesMap      = fun _ -> None
         homeDirectory     = "."
         compressionFolder = "."
-        logger            = Targets.create Debug
+        logger            = Targets.create Debug [||]
         matchedBinding    = HttpBinding.defaults
         #if NETSTANDARD1_5
         cookieSerialiser  = new JsonFormatterSerialiser()

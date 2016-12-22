@@ -39,7 +39,7 @@ let corsWithDefaultConfig = cors defaultCORSConfig
 
 [<Tests>]
 let tests cfg =
-  let runWithConfig = runWith { cfg with logger = Targets.create LogLevel.Warn }
+  let runWithConfig = runWith { cfg with logger = Targets.create LogLevel.Warn [||] }
 
   let origin = "http://someorigin.com"
 

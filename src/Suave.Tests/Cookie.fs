@@ -113,6 +113,7 @@ let setCookie (_ : SuaveConfig) =
           secure    = true
           httpOnly  = false }
       let ctx = Cookie.setCookie cookie { HttpContext.empty with runtime = { HttpRuntime.empty with logger = log }}
+      System.Threading.Thread.Sleep 1000
       Expect.equal (List.length log.logs) 1 "Should be 1 log generated"
       Expect.equal (List.head log.logs).level LogLevel.Warn "should be a warning"
   ]

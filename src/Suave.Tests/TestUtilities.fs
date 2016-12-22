@@ -67,11 +67,12 @@ type InspectableLog() =
   member val logs : InspectableLogEntry list = [] with get, set
 
   interface Logger with
+
+    member x.name = [| |]
+
     member x.log level msgFactory =
       x.logs <- { level = level; value = Factory msgFactory } :: x.logs
-
-    member x.logSimple msg =
-      x.logs <- { level = msg.level; value = Plain msg } :: x.logs
+      async.Return ()
 
     member x.logWithAck level msgFactory : Async<unit> =
       x.logs <- { level = level; value = Factory msgFactory } :: x.logs
