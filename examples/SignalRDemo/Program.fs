@@ -41,7 +41,7 @@ module Main =
         
         let builder = new AppBuilder()
         let builder = builder.MapSignalR()
-        let owin = builder.Build() |> OwinApp.ofAppFunc "/signalr"
+        let owin = builder.Build() |> OwinApp.ofAppFunc ""
         let app = 
             
             choose [
