@@ -42,10 +42,9 @@ module Web =
     // spawn tcp listeners/web workers
     let toRuntime = SuaveConfig.toRuntime config homeFolder compressionFolder
 
-    if config.initialiseLogger then
-      Global.initialise { Global.defaultConfig with getLogger = fun _ -> config.logger }
-    else
-      ()
+    // If noone has already touched the logging configuration, initialise it to
+    // that of Suave's configuration.
+    Global.initialiseIfDefault { Global.defaultConfig with getLogger = fun _ -> config.logger }
 
     let startWebWorkerAsync runtime =
       let tcpServer =
@@ -86,7 +85,6 @@ module Web =
       homeFolder            = None
       compressedFilesFolder = None
       logger                = Targets.create Info [||]
-      initialiseLogger      = true
       tcpServerFactory      = new DefaultTcpServerFactory()
       #if NETSTANDARD1_5
       cookieSerialiser      = new JsonFormatterSerialiser()
