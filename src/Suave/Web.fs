@@ -84,7 +84,7 @@ module Web =
       mimeTypesMap          = Writers.defaultMimeTypesMap
       homeFolder            = None
       compressedFilesFolder = None
-      logger                = Targets.create Info [||]
+      logger                = Targets.create Info [| "Suave" |]
       tcpServerFactory      = new DefaultTcpServerFactory()
       #if NETSTANDARD1_5
       cookieSerialiser      = new JsonFormatterSerialiser()
