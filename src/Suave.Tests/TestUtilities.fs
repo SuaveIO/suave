@@ -68,7 +68,7 @@ type InspectableLog() =
 
   interface Logger with
 
-    member x.name = [| |]
+    member x.name = [| "Suave"; "Tests"; "Inspectable" |]
 
     member x.log level msgFactory =
       x.logs <- { level = level; value = Factory msgFactory } :: x.logs
