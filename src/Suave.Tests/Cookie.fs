@@ -103,7 +103,7 @@ let setCookie (_ : SuaveConfig) =
       let ctx = Cookie.setCookie cookie { HttpContext.empty with runtime = { HttpRuntime.empty with logger = log }}
       Expect.isTrue (List.isEmpty log.logs) "Should be no logs generated"
 
-    ftestCase "set cookie - warning when > 4k" <| fun _ ->
+    testCase "set cookie - warning when > 4k" <| fun _ ->
       let log = InspectableLog()
       let cookie =
         { name      = "test cookie"
