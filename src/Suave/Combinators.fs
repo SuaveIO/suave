@@ -372,9 +372,8 @@ module Filters =
         level         = level
         name          = [| "Suave"; "Http"; "requests" |]
         fields        = Map.empty
-        timestamp     = Suave.Logging.Global.timestamp() }) |> Async.Start
-
-    succeed ctx
+        timestamp     = Suave.Logging.Global.timestamp() })
+    |> Async.map (fun () -> Some ctx)
 
   let logWithLevelStructured (level : LogLevel) (logger : Logger) (templateAndFieldsCreator : HttpContext -> (string * Map<string,obj>)) (ctx : HttpContext) =
     logger.log level (fun _ ->
@@ -383,9 +382,8 @@ module Filters =
         level         = level
         name          = [| "Suave"; "Http"; "requests" |]
         fields        = fields
-        timestamp     = Suave.Logging.Global.timestamp() })|> Async.Start
-
-    succeed ctx
+        timestamp     = Suave.Logging.Global.timestamp() })
+    |> Async.map (fun () -> Some ctx)
 
   let logStructured (logger : Logger) (structuredFormatter : HttpContext -> (string * Map<string,obj>)) =
     logWithLevelStructured LogLevel.Debug logger structuredFormatter
