@@ -28,11 +28,6 @@ let testFromMemberWithParam (param : 't) (m: MemberInfo): Test option =
     | _ -> None)
   |> List.tryFind (fun _ -> true)
 
-let listToTestListOption =
-  function
-  | [] -> None
-  | x -> Some (TestList x)
-
 let testFromTypeWithParam param =
   let asMembers x = Seq.map (fun m -> m :> MemberInfo) x
   let bindingFlags = BindingFlags.Public ||| BindingFlags.Static
@@ -62,8 +57,7 @@ let defaultMainThisAssemblyWithParam param args =
   let tests =
       match testFromAssemblyWithParam (Assembly.GetEntryAssembly()) param with
       | Some t -> t
-      | None -> TestList []
-
-  args
-  |> ExpectoConfig.fillFromArgs defaultConfig
-  |> flip runTests tests
+      | None -> failwith "Found no tests."
+  
+  let (cfg,_) = ExpectoConfig.fillFromArgs defaultConfig args
+  runTests cfg tests

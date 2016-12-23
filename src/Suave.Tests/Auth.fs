@@ -95,7 +95,7 @@ let sessionState f =
 
 [<Tests>]
 let authTests cfg =
-  let runWithConfig = runWith { cfg with logger = Targets.create Warn }
+  let runWithConfig = runWith { cfg with logger = Targets.create Warn [||] }
   testList "auth tests" [
     testCase "baseline, no auth cookie" <| fun _ ->
       let ctx = runWithConfig (OK "ACK")

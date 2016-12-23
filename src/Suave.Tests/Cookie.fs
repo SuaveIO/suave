@@ -102,6 +102,7 @@ let setCookie (_ : SuaveConfig) =
           httpOnly  = false }
       let ctx = Cookie.setCookie cookie { HttpContext.empty with runtime = { HttpRuntime.empty with logger = log }}
       Expect.isTrue (List.isEmpty log.logs) "Should be no logs generated"
+
     testCase "set cookie - warning when > 4k" <| fun _ ->
       let log = InspectableLog()
       let cookie =
@@ -112,7 +113,9 @@ let setCookie (_ : SuaveConfig) =
           domain    = None
           secure    = true
           httpOnly  = false }
-      let ctx = Cookie.setCookie cookie { HttpContext.empty with runtime = { HttpRuntime.empty with logger = log }}
+      let ctx =
+        let input = { HttpContext.empty with runtime = { HttpRuntime.empty with logger = log }}
+        Cookie.setCookie cookie input |> Async.RunSynchronously
       Expect.equal (List.length log.logs) 1 "Should be 1 log generated"
       Expect.equal (List.head log.logs).level LogLevel.Warn "should be a warning"
   ]

@@ -8,7 +8,7 @@ open Suave.Filters
 open Suave.Files
 open Suave.Logging
 
-let logger = Targets.create Verbose
+let logger = Targets.create Verbose [||]
 
 let config =
   { defaultConfig with

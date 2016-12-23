@@ -17,7 +17,7 @@ open Suave.Logging
 type BufferManager(totalBytes, bufferSize, autoGrow) =
   static let logger = Log.create "Suave.Sockets.BufferManager"
 
-  do logger.log Debug (
+  do logger.debug (
        Message.eventX "Initialising BufferManager with {totalBytes}"
        >> Message.setFieldValue "totalBytes" totalBytes)
 
@@ -33,7 +33,7 @@ type BufferManager(totalBytes, bufferSize, autoGrow) =
   member x.createBuffer() =
     lock creatingSegment (fun _ ->
       if segments.Count < chunksPerSegment / 2 then
-        logger.log Verbose (
+        logger.verbose (
           Message.eventX "Creating buffer bank, total {totalBytes} bytes" 
           >> Message.setFieldValue "totalBytes" totalBytes)
         let buffer = Array.zeroCreate totalBytes
@@ -59,7 +59,7 @@ type BufferManager(totalBytes, bufferSize, autoGrow) =
       else
         match segments.TryTake() with
         | true, segment ->
-          logger.log Verbose (
+          logger.verbose (
             Message.eventX "Reserving buffer at {offset}, with {freeCount} segments from call from {caller}"
             >> Message.setFieldValue "offset" segment.Offset
             >> Message.setFieldValue "freeCount" segments.Count
@@ -67,7 +67,7 @@ type BufferManager(totalBytes, bufferSize, autoGrow) =
           segment
 
         | false, _ ->
-          logger.log Verbose (Message.eventX "Ran out of buffers")
+          logger.verbose (Message.eventX "Ran out of buffers")
           if autoGrow then x.createBuffer ()
           loop (tries - 1)
 
@@ -82,7 +82,7 @@ type BufferManager(totalBytes, bufferSize, autoGrow) =
     // Not trivial to check for double frees now
     //if segments. args then failwithf "double free buffer %d" args.Offset
     segments.Add args
-    logger.log Verbose (
+    logger.verbose (
       Message.eventX "Freeing buffer at {offset} from {caller}. Free segments {segmentCount}."
       >> Message.setFieldValue "offset" args.Offset
       >> Message.setFieldValue "caller" (defaultArg caller "no-caller-specified")

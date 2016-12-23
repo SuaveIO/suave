@@ -159,7 +159,8 @@ let runServer maxConcurrentOps bufferSize autoGrow (binding: SocketBinding) star
     logger.info (
       eventX "Smooth! Suave listener started in {startedListeningMilliseconds:#.###} with binding {ipAddress}:{port}"
       >> setFieldValue "startedListeningMilliseconds" (startData.GetStartedListeningElapsedMilliseconds())
-      >> setFieldValue "ipAddress" startData.binding.ip
+      // .Address can throw exceptions, just log its string representation
+      >> setFieldValue "ipAddress" (startData.binding.ip.ToString())
       >> setFieldValue "port" startData.binding.port
       >> setSingleName "Suave.Tcp.runServer")
 
