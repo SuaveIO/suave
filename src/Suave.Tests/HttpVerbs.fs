@@ -58,6 +58,9 @@ let posts cfg =
   let getFileContent _ =
     request (fun x -> let q = List.head x.files in OK (IO.File.ReadAllText q.tempFilePath))
 
+  let getFileName _ =
+    request (fun x -> let q = List.head x.files in OK q.fileName)
+
   let assertion = "eyJhbGciOiJSUzI1NiJ9.eyJwdWJsaWMta2V5Ijp7ImFsZ29yaXRobSI6IkR"+
                   "TIiwieSI6Ijc1MDMyNGRmYzQwNGI0OGQ3ZDg0MDdlOTI0NWMxNGVkZmVlZTY"+
                   "xOWY4ZmUxYWQxM2U5M2Y2ZmVlNjcxM2U5NjYxMjdlZTExNTZiYjIzZTBlMDJ"+
@@ -141,6 +144,16 @@ let posts cfg =
       multipart.Add(data,"attached-file","文档内容.txt")
       let actual = runWithConfig (getFileContent ()) |> req HttpMethod.POST "/" (Some multipart)
       Expect.equal actual fileContent "expecting File to be saved and recovered"
+
+    testCase "POST unicode file-name is parsed correctly" <| fun _ ->
+      let multipart = new MultipartFormDataContent()
+      let fileContent = "there is no cake"
+      let filename = "文档内容.txt"
+      let data = new ByteArrayContent(UTF8.bytes fileContent)
+      data.Headers.ContentType <- Headers.MediaTypeHeaderValue.Parse "text/html"
+      multipart.Add(data,"attached-file",filename)
+      let actual = runWithConfig (getFileName ()) |> req HttpMethod.POST "/" (Some multipart)
+      Expect.equal actual filename "expecting to return correct unicode file name"
   ]
 
 [<Tests>]
