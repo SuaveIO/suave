@@ -84,7 +84,8 @@ let posts cfg =
                   "bXMubG9jYWw6NzU3NSJ9.xbMyR2R7N9ZeLzqLWYw5hisaomZrtJlNdMvVdx0"+
                   "EaXxMkY7ocCpcpA"
 
-  let unicodeString =  "Testing «ταБЬℓσ»: 1<2 & 4+1>3, now 20% off!;"
+  let unicodeString1 =  "Testing «ταБЬℓσ»: 1<2 & 4+1>3, now 20% off!;"
+  let unicodeString2 =  "文档内容"
 
   testList "posting basic data" [
     testCase "POST data round trips with no content-type" <| fun _ ->
@@ -108,9 +109,23 @@ let posts cfg =
       Expect.equal actual assertion "expecting form data to be returned"
 
     testCase "POST unicode data" <| fun _ ->
-      use data = new FormUrlEncodedContent(dict [ "name", unicodeString ])
+      use data = new FormUrlEncodedContent(dict [ "name", unicodeString1 ])
       let actual = runWithConfig (getFormValue "name") |> req HttpMethod.POST "/" (Some data)
-      Expect.equal actual unicodeString "expecting form data to be returned"
+      Expect.equal actual unicodeString1 "expecting form data to be returned"
+
+    testCase "POST unicode multipart" <| fun _ ->
+      use multipart = new MultipartFormDataContent()
+      use data = new FormUrlEncodedContent(dict [ "name", unicodeString1 ])
+      multipart.Add(data)
+      let actual = runWithConfig (getFormValue "name") |> req HttpMethod.POST "/" (Some data)
+      Expect.equal actual unicodeString1 "expecting form data to be returned"
+
+    testCase "POST unicode multipart (Chinese)" <| fun _ ->
+      use multipart = new MultipartFormDataContent()
+      use data = new FormUrlEncodedContent(dict [ "name", unicodeString2 ])
+      multipart.Add(data)
+      let actual = runWithConfig (getFormValue "name") |> req HttpMethod.POST "/" (Some data)
+      Expect.equal actual unicodeString2 "expecting form data to be returned"
   ]
 
 [<Tests>]
