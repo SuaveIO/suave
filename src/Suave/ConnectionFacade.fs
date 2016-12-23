@@ -247,8 +247,21 @@ type ConnectionFacade(ctx) =
 
     if fileLength > 0L then
       let! filename =
-        (headerParams.TryLookup "filename" |> Choice.map (String.trimc '"'))
-        @|! (None, "Key 'filename' was not present in 'content-disposition'")
+        match headerParams.TryLookup "filename*" with
+        | Choice1Of2 _filename ->
+          let ix = _filename.IndexOf "''"
+          if ix > 0 then
+            let enc = _filename.Substring(0,ix).ToLowerInvariant()
+            if enc = "utf-8" then
+              let filename = Net.WebUtility.UrlDecode(_filename.Substring(ix + 2))
+              SocketOp.mreturn (filename)
+            else
+              SocketOp.abort (InputDataError (None, "Unsupported filename encoding: '" + enc + "'"))
+          else
+            SocketOp.abort (InputDataError (None, "Invalid filename encoding"))
+        | Choice2Of2 _ ->
+          (headerParams.TryLookup "filename" |> Choice.map (String.trimc '"'))
+          @|! (None, "Key 'filename' was not present in 'content-disposition'")
 
       let upload =
         { fieldName    = fieldName
