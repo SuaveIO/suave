@@ -52,6 +52,12 @@ let posts cfg =
   let getFormValue name =
     request (fun x -> let q = x.formData name in OK (get q))
 
+  let getMultiPartValue name =
+    request (fun x -> let q = x.fieldData name in OK (get q))
+
+  let getFileContent _ =
+    request (fun x -> let q = List.head x.files in OK (IO.File.ReadAllText q.tempFilePath))
+
   let assertion = "eyJhbGciOiJSUzI1NiJ9.eyJwdWJsaWMta2V5Ijp7ImFsZ29yaXRobSI6IkR"+
                   "TIiwieSI6Ijc1MDMyNGRmYzQwNGI0OGQ3ZDg0MDdlOTI0NWMxNGVkZmVlZTY"+
                   "xOWY4ZmUxYWQxM2U5M2Y2ZmVlNjcxM2U5NjYxMjdlZTExNTZiYjIzZTBlMDJ"+
@@ -114,18 +120,27 @@ let posts cfg =
       Expect.equal actual unicodeString1 "expecting form data to be returned"
 
     testCase "POST unicode multipart" <| fun _ ->
-      use multipart = new MultipartFormDataContent()
-      use data = new FormUrlEncodedContent(dict [ "name", unicodeString1 ])
-      multipart.Add(data)
-      let actual = runWithConfig (getFormValue "name") |> req HttpMethod.POST "/" (Some data)
+      let multipart = new MultipartFormDataContent()
+      let data = new StringContent(unicodeString1)
+      multipart.Add(data, "name")
+      let actual = runWithConfig (getMultiPartValue "name") |> req HttpMethod.POST "/" (Some multipart)
       Expect.equal actual unicodeString1 "expecting form data to be returned"
 
     testCase "POST unicode multipart (Chinese)" <| fun _ ->
-      use multipart = new MultipartFormDataContent()
-      use data = new FormUrlEncodedContent(dict [ "name", unicodeString2 ])
-      multipart.Add(data)
-      let actual = runWithConfig (getFormValue "name") |> req HttpMethod.POST "/" (Some data)
+      let multipart = new MultipartFormDataContent()
+      let data = new StringContent(unicodeString2)
+      multipart.Add(data, "name")
+      let actual = runWithConfig (getMultiPartValue "name") |> req HttpMethod.POST "/" (Some multipart)
       Expect.equal actual unicodeString2 "expecting form data to be returned"
+
+    testCase "POST multipart file with unicode file-name" <| fun _ ->
+      let multipart = new MultipartFormDataContent()
+      let fileContent = "there is no cake"
+      let data = new ByteArrayContent(UTF8.bytes fileContent)
+      data.Headers.ContentType <- Headers.MediaTypeHeaderValue.Parse "text/html"
+      multipart.Add(data,"attached-file","文档内容.txt")
+      let actual = runWithConfig (getFileContent ()) |> req HttpMethod.POST "/" (Some multipart)
+      Expect.equal actual fileContent "expecting File to be saved and recovered"
   ]
 
 [<Tests>]
