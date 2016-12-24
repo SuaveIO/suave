@@ -377,20 +377,18 @@ type ConnectionFacade(ctx) =
       let mutable parsing = true
       let! firstLine = readLine
 
-      assert(firstLine=boundary)
+      if firstLine<>boundary then
+        failwithf "Invalid multipart format: expected boundary '%s' got '%s'" boundary firstLine
+
       while parsing do
         do! parsePart
-        //pick at the next two bytes and decide where to exit the loop
-        let! b = pick
-        if b.buffer.Array.[b.offset] = 45uy && b.buffer.Array.[b.offset+1] = 45uy then
-          let! a = skip 2
+        let! line = readLine
+        if line.StartsWith("--") then
           parsing <- false
-          return ()
-        elif b.buffer.Array.[b.offset] = EOL.[0] && b.buffer.Array.[b.offset+1] = EOL.[1] then
-          let! a = skip 2
-          return ()
-        else
+        else if line <> String.Empty then
           failwith "Invalid multipart format"
+
+      return ()
     }
 
   /// Reads raw POST data
