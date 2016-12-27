@@ -171,7 +171,7 @@ type ConnectionFacade(ctx) =
   let readUntil (marker : byte []) (select : ArraySegment<_> -> int -> Async<unit>) =
     readUntilPattern (scanMarker marker select)
 
-  /// Read a line from the stream, calling ASCII.toString on the bytes before the EOL marker
+  /// Read a line from the stream, calling UTF8.toString on the bytes before the EOL marker
   let readLine = socket {
     let offset = ref 0
     let! count =
@@ -179,7 +179,7 @@ type ConnectionFacade(ctx) =
         Array.blit a.Array a.Offset lineBuffer.Array (lineBuffer.Offset + !offset) count
         offset := !offset + count
       })
-    let result = ASCII.toStringAtOffset lineBuffer.Array lineBuffer.Offset count
+    let result = UTF8.toStringAtOffset lineBuffer.Array lineBuffer.Offset count
     return result
   }
 
@@ -203,7 +203,7 @@ type ConnectionFacade(ctx) =
           offset := !offset + count
         })
       if count <> 0 then
-        let line = ASCII.toStringAtOffset buf.Array buf.Offset count
+        let line = UTF8.toStringAtOffset buf.Array buf.Offset count
         let indexOfColon = line.IndexOf(':')
         let header = (line.Substring(0, indexOfColon).ToLower(), line.Substring(indexOfColon+1).TrimStart())
         return! loop (header :: headers)
