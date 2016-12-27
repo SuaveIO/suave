@@ -474,6 +474,11 @@ type ConnectionFacade(ctx) =
         files            = Seq.toList files
         multiPartFields  = Seq.toList multiPartFields
         trace            = TraceHeader.parseTraceHeaders headers }
+    
+    // clear form data before exit
+    files.Clear()
+    multiPartFields.Clear()
+    _rawForm <- [||]
 
     return Some { ctx with request = request; connection = { ctx.connection with segments = Seq.toList segments } }
   }
