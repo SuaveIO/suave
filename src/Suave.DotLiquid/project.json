@@ -1,5 +1,5 @@
 {
-    "version": "2.0.0-rc6-dotnetcli",
+    "version": "2.0.0-rc7-dotnetcli",
 
     "buildOptions": {
         "compilerName": "fsc",
@@ -18,7 +18,7 @@
         "dotnet-mergenupkg": { "version": "1.0.*" }
     },
     "dependencies":{
-        "Suave":"2.0.0-rc6-dotnetcli",
+        "Suave":"2.0.0-rc7-dotnetcli",
     },
     "frameworks": {
         "net45": {},
