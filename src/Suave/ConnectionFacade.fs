@@ -42,20 +42,7 @@ module internal Aux =
       return! SocketOp.abort (Error.SocketError SocketError.Shutdown)
     }
 
-type ConnectionFacade(ctx) =
-
-  let transport = ctx.connection.transport
-  let bufferManager = ctx.connection.bufferManager
-  let lineBuffer = ctx.connection.lineBuffer
-  let logger = ctx.runtime.logger
-  let trace = ctx.request.trace
-  let matchedBinding = ctx.runtime.matchedBinding
-
-  let segments = new LinkedList<BufferSegment>()
-  let files = List<HttpUpload>()
-  let multiPartFields = List<string*string>()
-  let mutable _rawForm : byte array = [||]
-
+type Reader(segments:LinkedList<BufferSegment>, bufferManager : BufferManager, transport, lineBuffer : ArraySegment<byte>) =
   /// Splits the segment list in two lits of ArraySegment; the first one containing a total of index bytes
   let split index select markerLength : Async<int> =
     let rec loop acc count =  async {
@@ -103,7 +90,6 @@ type ConnectionFacade(ctx) =
         n <- n + b.length
         currentnode <- currentnode.Previous
     }
-
 
   /// Iterates over a BufferSegment list looking for a marker, data before the marker
   /// is sent to the function select and the corresponding buffers are released
@@ -158,21 +144,21 @@ type ConnectionFacade(ctx) =
     }
     loop
 
-  let skip n = socket {
-    return! SocketOp.ofAsync <| split n (fun a b -> async { return () }  ) 0
-    }
-
   /// returns the number of bytes read and the connection
   let readUntilEOL select =
     readUntilPattern (scanMarker EOL select)
 
+  member x.skip n = socket {
+    return! SocketOp.ofAsync <| split n (fun a b -> async { return () }  ) 0
+    }
+
   /// Read the stream until the marker appears and return the number of bytes
   /// read.
-  let readUntil (marker : byte []) (select : ArraySegment<_> -> int -> Async<unit>) =
+  member x.readUntil (marker : byte []) (select : ArraySegment<_> -> int -> Async<unit>) =
     readUntilPattern (scanMarker marker select)
 
   /// Read a line from the stream, calling UTF8.toString on the bytes before the EOL marker
-  let readLine = socket {
+  member x.readLine = socket {
     let offset = ref 0
     let! count =
       readUntilEOL (fun a count -> async {
@@ -183,7 +169,7 @@ type ConnectionFacade(ctx) =
     return result
   }
 
-  let skipLine = socket {
+  member x.skipLine = socket {
     let offset = ref 0
     let! _ =
       readUntilEOL (fun a count -> async {
@@ -193,7 +179,7 @@ type ConnectionFacade(ctx) =
   }
 
   /// Read all headers from the stream, returning a dictionary of the headers found
-  let readHeaders =
+  member x.readHeaders =
     let rec loop headers = socket {
       let offset = ref 0
       let buf = lineBuffer
@@ -212,7 +198,7 @@ type ConnectionFacade(ctx) =
     loop []
 
   /// Read the post data from the stream, given the number of bytes that makes up the post data.
-  let readPostData  (bytes : int) select  : SocketOp<unit> =
+  member x.readPostData  (bytes : int) select  : SocketOp<unit> =
     let rec loop n : SocketOp<unit> =
       socket {
         if segments.Count > 0  then
@@ -235,11 +221,17 @@ type ConnectionFacade(ctx) =
       }
     loop bytes
 
-  let readFilePart boundary (headerParams : Dictionary<string,string>) fieldName contentType = socket {
+type ConnectionFacade(logger:Logger,matchedBinding: HttpBinding) =
+
+  let files = List<HttpUpload>()
+  let multiPartFields = List<string*string>()
+  let mutable _rawForm : byte array = [||]
+
+  let readFilePart (reader:Reader) boundary (headerParams : Dictionary<string,string>) fieldName contentType = socket {
     let tempFilePath = Path.GetTempFileName()
     use tempFile = new FileStream(tempFilePath, FileMode.Truncate)
     let! a =
-      readUntil (ASCII.bytes (eol + boundary)) (fun x y -> async {
+      reader.readUntil (ASCII.bytes (eol + boundary)) (fun x y -> async {
           do! tempFile.AsyncWrite(x.Array, x.Offset, y)
           })
     let fileLength = tempFile.Length
@@ -275,14 +267,14 @@ type ConnectionFacade(ctx) =
       return None
     }
 
-  let parseMultipartMixed fieldName boundary : SocketOp<unit> =
+  let parseMultipartMixed (reader:Reader) fieldName boundary : SocketOp<unit> =
     let rec loop = socket {
-      let! firstLine = readLine
+      let! firstLine = reader.readLine
 
       if firstLine.Equals("--") then
         return ()
       else
-        let! partHeaders = readHeaders
+        let! partHeaders = reader.readHeaders
 
         let! (contentDisposition : string) =
           (partHeaders %% "content-disposition")
@@ -295,7 +287,7 @@ type ConnectionFacade(ctx) =
             eventX "Parsing {contentType}... -> readFilePart"
             >> setFieldValue "contentType" contentType)
 
-          let! res = readFilePart boundary headerParams fieldName contentType
+          let! res = readFilePart reader boundary headerParams fieldName contentType
 
           logger.verbose (
             eventX "Parsed {contentType} <- readFilePart"
@@ -311,7 +303,7 @@ type ConnectionFacade(ctx) =
         | Choice2Of2 _ ->
           use mem = new MemoryStream()
           let! a =
-            readUntil (ASCII.bytes(eol + boundary)) (fun x y -> async {
+            reader.readUntil (ASCII.bytes(eol + boundary)) (fun x y -> async {
                 do! mem.AsyncWrite(x.Array, x.Offset, y)
               })
           let byts = mem.ToArray()
@@ -321,10 +313,10 @@ type ConnectionFacade(ctx) =
     loop
 
   /// Parses multipart data from the stream, feeding it into the HttpRequest's property Files.
-  let parseMultipart (boundary:string) : SocketOp<unit> =
+  let parseMultipart (reader:Reader) (boundary:string) : SocketOp<unit> =
     let parsePart = socket {
 
-        let! partHeaders = readHeaders
+        let! partHeaders = reader.readHeaders
 
         let! (contentDisposition : string) =
           (partHeaders %% "content-disposition")
@@ -343,8 +335,8 @@ type ConnectionFacade(ctx) =
         match partHeaders %% "content-type" with
         | Choice1Of2 x when String.startsWith "multipart/mixed" x ->
           let subboundary = "--" + (x.Substring(x.IndexOf('=') + 1) |> String.trimStart |> String.trimc '"')
-          do! parseMultipartMixed fieldName subboundary
-          let! a = skip (boundary.Length)
+          do! parseMultipartMixed reader fieldName subboundary
+          let! a = reader.skip (boundary.Length)
           return ()
 
         | Choice1Of2 contentType when headerParams.ContainsKey "filename" ->
@@ -353,7 +345,7 @@ type ConnectionFacade(ctx) =
             >> setFieldValue "contentType" contentType
             >> setSingleName "Suave.Web.parseMultipart")
 
-          let! res = readFilePart boundary headerParams fieldName contentType
+          let! res = readFilePart reader boundary headerParams fieldName contentType
 
           logger.verbose (
             eventX "Parsed {contentType} <- readFilePart"
@@ -365,7 +357,7 @@ type ConnectionFacade(ctx) =
         | Choice1Of2 _ | Choice2Of2 _ ->
           use mem = new MemoryStream()
           let! a =
-            readUntil (ASCII.bytes (eol + boundary)) (fun x y -> async {
+            reader.readUntil (ASCII.bytes (eol + boundary)) (fun x y -> async {
               do! mem.AsyncWrite(x.Array, x.Offset, y)
             })
           let byts = mem.ToArray()
@@ -375,14 +367,14 @@ type ConnectionFacade(ctx) =
 
     socket {
       let mutable parsing = true
-      let! firstLine = readLine
+      let! firstLine = reader.readLine
 
       if firstLine<>boundary then
         failwithf "Invalid multipart format: expected boundary '%s' got '%s'" boundary firstLine
 
       while parsing do
         do! parsePart
-        let! line = readLine
+        let! line = reader.readLine
         if line.StartsWith("--") then
           parsing <- false
         else if line <> String.Empty then
@@ -392,18 +384,18 @@ type ConnectionFacade(ctx) =
     }
 
   /// Reads raw POST data
-  let getRawPostData contentLength =
+  let getRawPostData (reader:Reader) contentLength =
     socket {
       let offset = ref 0
       let rawForm = Array.zeroCreate contentLength
-      do! readPostData contentLength (fun a count -> async {
+      do! reader.readPostData contentLength (fun a count -> async {
           Array.blit a.Array a.Offset rawForm !offset count;
           offset := !offset + count
         })
       return rawForm
     }
 
-  let parsePostData maxContentLength (contentLengthHeader : Choice<string,_>) contentTypeHeader = socket {
+  let parsePostData (reader:Reader)  maxContentLength (contentLengthHeader : Choice<string,_>) contentTypeHeader = socket {
     match contentLengthHeader with
     | Choice1Of2 contentLengthString ->
       let contentLength = Convert.ToInt32 contentLengthString
@@ -415,7 +407,7 @@ type ConnectionFacade(ctx) =
 
         match contentTypeHeader with
         | Choice1Of2 ce when String.startsWith "application/x-www-form-urlencoded" ce ->
-          let! rawForm = getRawPostData contentLength
+          let! rawForm = getRawPostData reader contentLength
           _rawForm <- rawForm
           return ()
 
@@ -423,11 +415,11 @@ type ConnectionFacade(ctx) =
           let boundary = "--" + (ce |> String.substring (ce.IndexOf('=') + 1) |> String.trimStart |> String.trimc '"')
 
           logger.verbose (eventX "Parsing multipart")
-          do! parseMultipart boundary
+          do! parseMultipart reader boundary
           return ()
 
         | Choice1Of2 _ | Choice2Of2 _ ->
-          let! rawForm = getRawPostData contentLength
+          let! rawForm = getRawPostData reader contentLength
           _rawForm <- rawForm
           return ()
       | Choice2Of2 _ -> return ()
@@ -435,17 +427,20 @@ type ConnectionFacade(ctx) =
 
   /// Process the request, reading as it goes from the incoming 'stream', yielding a HttpRequest
   /// when done
-  member this.processRequest = socket {
+  member this.processRequest (ctx:HttpContext) = socket {
     let verbose message = logger.verbose (eventX message)
 
+    let segments = new LinkedList<_>(ctx.connection.segments)
+    let reader = new Reader(segments,ctx.connection.bufferManager,ctx.connection.transport,ctx.connection.lineBuffer)
+
     verbose "reading first line of request"
-    let! firstLine = readLine
+    let! firstLine = reader.readLine
 
     let rawMethod, path, rawQuery, httpVersion = parseUrl firstLine
     let meth = HttpMethod.parse rawMethod
 
     verbose "reading headers"
-    let! headers = readHeaders
+    let! headers = reader.readHeaders
 
     // Respond with 400 Bad Request as
     // per http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html
@@ -461,7 +456,7 @@ type ConnectionFacade(ctx) =
       verbose "sent 100-continue response"
 
     verbose "parsing post data"
-    do! parsePostData ctx.runtime.maxContentLength (headers %% "content-length") (headers %% "content-type")
+    do! parsePostData reader ctx.runtime.maxContentLength (headers %% "content-length") (headers %% "content-type")
 
     let request =
       { httpVersion      = httpVersion

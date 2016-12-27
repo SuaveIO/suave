@@ -52,15 +52,15 @@ module internal ParsingAndControl =
 
     let logger = ctxOuter.runtime.logger
 
-    let facade = new ConnectionFacade(ctxOuter)
+    let facade = new ConnectionFacade(logger,ctxOuter.runtime.matchedBinding)
 
-    let rec loop (_ : HttpContext) = async {
+    let rec loop (_ctx : HttpContext) = async {
       let event message =
        eventX message 
        >> setSingleName "Suave.ParsingAndControl.httpLoop.loop"
 
       logger.verbose (event "Processing request... -> processor")
-      let! result' = facade.processRequest
+      let! result' = facade.processRequest _ctx
       logger.verbose (event "Processed request. <- processor")
       match result' with
       | Choice1Of2 result ->
