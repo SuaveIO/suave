@@ -10,7 +10,7 @@ type Node =
   /// A regular html element that can contain a list of other nodes
   | Element of Element * Node list
   /// A void element is one that can't have content, like link, br, hr, meta
-  /// See: https://dev.w3.org/html5/html-author/#void
+  /// See: https://www.w3.org/TR/html5/syntax.html#void-elements
   | VoidElement of Element
   /// A text value for a node
   | Text of string
