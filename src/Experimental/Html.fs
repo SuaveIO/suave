@@ -9,7 +9,7 @@ type Element = string * Attribute[]
 type Node =
   /// A regular html element that can contain a list of other nodes
   | Element of Element * Node list
-  /// A void element is one that can't have content, like link, br, hr, meta
+  /// A void element is one that can't have content
   /// See: https://www.w3.org/TR/html5/syntax.html#void-elements
   | VoidElement of Element
   /// A text value for a node
