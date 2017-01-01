@@ -31,14 +31,14 @@ let div = tag "div"
 let p = tag "p"
 let a href attr = tag "a" (("href",href)::attr)
 let span = tag "span"
-let img attr = tag "img" attr []
-let input attr = tag "input" attr []
 
 // Void tags
 let link attr = voidTag "link" attr
 let meta attr = voidTag "meta" attr
 let hr attr = voidTag "hr" attr
 let br attr = voidTag "br" attr
+let img attr = voidTag "img" attr
+let input attr = voidTag "input" attr
 
 /// Example
 
