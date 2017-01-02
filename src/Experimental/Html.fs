@@ -9,8 +9,8 @@ type Element = string * Attribute[]
 type Node =
   /// A regular html element that can contain a list of other nodes
   | Element of Element * Node list
-  /// A void element is one that can't have content, like link, br, hr, meta
-  /// See: https://dev.w3.org/html5/html-author/#void
+  /// A void element is one that can't have content
+  /// See: https://www.w3.org/TR/html5/syntax.html#void-elements
   | VoidElement of Element
   /// A text value for a node
   | Text of string
@@ -31,14 +31,14 @@ let div = tag "div"
 let p = tag "p"
 let a href attr = tag "a" (("href",href)::attr)
 let span = tag "span"
-let img attr = tag "img" attr []
-let input attr = tag "input" attr []
 
 // Void tags
 let link attr = voidTag "link" attr
 let meta attr = voidTag "meta" attr
 let hr attr = voidTag "hr" attr
 let br attr = voidTag "br" attr
+let img attr = voidTag "img" attr
+let input attr = voidTag "input" attr
 
 /// Example
 
