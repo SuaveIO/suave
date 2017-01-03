@@ -35,6 +35,19 @@ let app =
 
 {% endhighlight %}
 
+Then, for your template:
+
+{% highlight html %}
+<html>
+  <head>
+    <title>{{ model.title }}</title>
+  </head>
+  <body>
+    <p>Hello from {{ model.title }}!</p>
+  </body>
+</html>
+{% endhighlight %}
+
 
 References
 ----------
