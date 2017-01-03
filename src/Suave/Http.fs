@@ -436,7 +436,7 @@ module Http =
   [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
   module HttpBinding =
 
-    let DefaultBindingPort = 8083us
+    let DefaultBindingPort = 8080us
 
     let defaults =
       { scheme        = HTTP
