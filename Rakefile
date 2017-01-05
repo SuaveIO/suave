@@ -192,7 +192,6 @@ namespace :dotnetcli do
           clinupkg = "bin/#{Configuration}/#{item}.#{version}-dotnetcli.nupkg"
         end
         system dotnet_exe_path, %W|mergenupkg --source "#{sourcenupkg}" --other "#{clinupkg}" --framework netstandard1.6|
-        Dir.chdir "../.."
       end
     end
   end
