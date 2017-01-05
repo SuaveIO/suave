@@ -1,6 +1,7 @@
 ﻿module Suave.Tests.HttpApplicatives
 
 open System
+open System.IO
 
 open Suave
 open Suave.Operators
@@ -23,10 +24,14 @@ let applicativeTests cfg =
 
   testList "primitives: Host applicative" [
     testCase "url with spaces: path" <| fun _ ->
+      if File.Exists "/System/Library/CoreServices/SystemVersion.plist" then
+        Tests.skiptest "Broken for OS X mono 4.6.2"
       let res = runWithConfig (path "/get by" >=> OK "A") |> req HttpMethod.GET "/get by" None
       Expect.equal res "A" "Should return A"
 
     testCase "url with spaces: pathScan" <| fun _ ->
+      if File.Exists "/System/Library/CoreServices/SystemVersion.plist" then
+        Tests.skiptest "Broken for OS X mono 4.6.2"
       let res = runWithConfig (pathScan "/foo/%s" (fun s -> OK s)) |> req HttpMethod.GET "/foo/get by" None
       Expect.equal res "get by" "Should return 'get buy'"
 
