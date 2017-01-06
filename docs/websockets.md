@@ -53,3 +53,5 @@ let app : WebPart =
       GET >=> choose [ path "/" >=> file "index.html"; browseHome ]
       NOT_FOUND "Found no handlers." ]
 {% endhighlight %}
+
+The complete example can be found [here](https://github.com/SuaveIO/suave/tree/master/examples/WebSocket).
