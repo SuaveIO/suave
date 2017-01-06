@@ -10,6 +10,10 @@ It's easy to set up WebSockets with Suave.
 First, define a function that takes `WebSocket` and `HttpContext` typed parameters, and returns a socket computation expression:
 
 {% highlight fsharp %}
+open Suave.Sockets
+open Suave.Sockets.Control
+open Suave.WebSocket
+
 let ws (webSocket : WebSocket) (context: HttpContext) =
     socket {
       ...
