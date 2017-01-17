@@ -22,7 +22,7 @@
         "dotnet-mergenupkg": { "version": "1.0.*" }
     },
     "dependencies":{
-        "Suave":"2.0.0-dotnetcli",
+        "Suave":"2.0.1-dotnetcli",
     },
     "frameworks": {
         "net45": {},
