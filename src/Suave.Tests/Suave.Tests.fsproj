@@ -7,8 +7,9 @@
     <OutputType>Exe</OutputType>
     <RootNamespace>Suave.Tests</RootNamespace>
     <AssemblyName>Suave.Tests</AssemblyName>
-    <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.6</TargetFrameworkVersion>
     <ResolveNuGetPackages>false</ResolveNuGetPackages>
+    <TargetFrameworkProfile />
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
