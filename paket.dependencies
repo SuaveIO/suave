@@ -1,4 +1,4 @@
-framework: NET461
+framework: NET46
 source https://nuget.org/api/v2
 redirects auto
 
@@ -16,7 +16,7 @@ group Build
   nuget NuGet.CommandLine
 
 group Tests
-  framework: NET461
+  framework: NET46
   source https://nuget.org/api/v2
   nuget FSharp.Core ~> 4 redirects: force
   nuget WebSocketSharp
@@ -28,7 +28,7 @@ group Tests
   nuget DotLiquid
 
 group Examples
-  framework: NET461
+  framework: NET46
   source https://nuget.org/api/v2
   nuget FSharp.Core ~> 4 redirects: force
   nuget Topshelf.FSharp
@@ -45,7 +45,7 @@ group Examples
   github haf/YoLo YoLo.fs
 
 group Docs
-  framework: NET461
+  framework: NET46
   source https://nuget.org/api/v2
   nuget FSharp.Core ~> 4 redirects: force
   nuget FsLibTool
