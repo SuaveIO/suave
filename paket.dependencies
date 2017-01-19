@@ -20,8 +20,8 @@ group Tests
   nuget FSharp.Core ~> 4 redirects: force
   nuget System.Reflection.Metadata 1.4.1
   nuget WebSocketSharp
-  nuget FsCheck 2.6.2
-  nuget Expecto 2.1.1
+  nuget FsCheck
+  nuget Expecto
   nuget Expecto.FsCheck
   nuget Expecto.BenchmarkDotNet
   nuget Http.fs

@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
@@ -275,7 +275,7 @@
     </When>
   </Choose>
   <Choose>
-    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.6.1'">
+    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.6'">
       <ItemGroup>
         <Reference Include="Expecto.FsCheck">
           <HintPath>..\..\packages\tests\Expecto.FsCheck\lib\net40\Expecto.FsCheck.dll</HintPath>
@@ -399,7 +399,7 @@
     </When>
   </Choose>
   <Choose>
-    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.6.1'">
+    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.6'">
       <ItemGroup>
         <Reference Include="System.AppContext">
           <HintPath>..\..\packages\tests\System.AppContext\lib\net46\System.AppContext.dll</HintPath>
@@ -499,8 +499,8 @@
     <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.6'">
       <ItemGroup>
         <Reference Include="System.Security.Cryptography.Algorithms">
-          <HintPath>..\..\packages\tests\System.Security.Cryptography.Algorithms\ref\net46\System.Security.Cryptography.Algorithms.dll</HintPath>
-          <Private>False</Private>
+          <HintPath>..\..\packages\tests\System.Security.Cryptography.Algorithms\lib\net46\System.Security.Cryptography.Algorithms.dll</HintPath>
+          <Private>True</Private>
           <Paket>True</Paket>
         </Reference>
       </ItemGroup>
@@ -532,8 +532,8 @@
     <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.6'">
       <ItemGroup>
         <Reference Include="System.Security.Cryptography.X509Certificates">
-          <HintPath>..\..\packages\tests\System.Security.Cryptography.X509Certificates\ref\net46\System.Security.Cryptography.X509Certificates.dll</HintPath>
-          <Private>False</Private>
+          <HintPath>..\..\packages\tests\System.Security.Cryptography.X509Certificates\lib\net46\System.Security.Cryptography.X509Certificates.dll</HintPath>
+          <Private>True</Private>
           <Paket>True</Paket>
         </Reference>
       </ItemGroup>
