@@ -58,6 +58,6 @@ let defaultMainThisAssemblyWithParam param args =
       match testFromAssemblyWithParam (Assembly.GetEntryAssembly()) param with
       | Some t -> t
       | None -> failwith "Found no tests."
-  
+
   let (cfg,_) = ExpectoConfig.fillFromArgs defaultConfig args
   runTests cfg tests
