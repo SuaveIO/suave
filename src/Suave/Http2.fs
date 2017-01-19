@@ -4,7 +4,7 @@ module Http2 =
 
   let connectionPreface = "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n"
 
-  type ErrorCode = 
+  type ErrorCode =
     | NoError
     | ProtocolError
     | InternalError
@@ -69,14 +69,14 @@ module Http2 =
   let setPadded x = set x 3
   let setPriority x = set x 5
 
-  type FrameHeader = { 
-    // the length field allows payloads of up to 224224 bytes (~16MB) per frame
+  type FrameHeader = {
+    // the length field allows payloads of up to 2^24 bytes (~16MB) per frame
     length : int32;
     ``type`` : byte;
     flags : byte;
     streamIdentifier : int32 }
 
-  type Settings = 
+  type Settings =
     { headerTableSize : int32
     ; enablePush : bool
     ; maxConcurrentStreams : int32 option
@@ -121,9 +121,10 @@ module Http2 =
       Array.Reverse b
     b
 
+  /// Get 31-bit int from 4-byte array (which MUST be in network order)
   let get31Bit (data: byte []) =
-    data.[3] <- data.[3] &&& 128uy
-    BitConverter.ToInt32(data, 0)
+    data.[0] <- data.[0] &&& 127uy
+    BitConverter.ToInt32(checkEndianness data, 0)
 
   let get24BitBytes (value : Int32) =
     let bytes = BitConverter.GetBytes value
@@ -143,8 +144,8 @@ module Http2 =
     let frameStreamIdData = Array.zeroCreate<byte> 4
     Array.Copy (bytes, 5, frameStreamIdData, 0, 4)
 
-    // turn of most significant bit
-    let streamIdentifier = get31Bit (checkEndianness frameStreamIdData)
+    // turn off most significant bit
+    let streamIdentifier = get31Bit frameStreamIdData
 
     { length = frameLength;
       ``type`` = frameType;
@@ -163,11 +164,9 @@ module Http2 =
     bytes.[3] <- header.``type``
     bytes.[4] <- header.flags
 
-    let encodedStreamIdentifier = BitConverter.GetBytes header.streamIdentifier
+    let encodedStreamIdentifier = BitConverter.GetBytes header.streamIdentifier |> checkEndianness
 
-    encodedStreamIdentifier.[3] <- encodedStreamIdentifier.[3] &&& 128uy
-
-    let encodedStreamIdentifier = checkEndianness encodedStreamIdentifier
+    encodedStreamIdentifier.[0] <- encodedStreamIdentifier.[0] &&& 127uy
 
     bytes.[5] <- encodedStreamIdentifier.[0]
     bytes.[6] <- encodedStreamIdentifier.[1]
@@ -181,7 +180,7 @@ module Http2 =
     return parseFrameHeader bytes
     }
 
-  type Priority = 
+  type Priority =
     { exclusive : bool
     ; streamIdentifier : int32
     ; weight: byte
@@ -216,7 +215,7 @@ module Http2 =
 
   let parseData (header: FrameHeader) (payload: byte[]) =
     assert(header.``type`` = 0uy)
-    //  If a DATA frame is received whose stream identifier field is 0x0, 
+    //  If a DATA frame is received whose stream identifier field is 0x0,
     // the recipient MUST respond with a connection error (Section 5.4.1) of type PROTOCOL_ERROR.
     let isEndStream = (header.flags &&& 0x1uy) = 0x1uy
     let data = removePadding header payload
@@ -228,7 +227,7 @@ module Http2 =
     if priority then
       let dependecyData = Array.zeroCreate 4
       Array.Copy(payload, 0, dependecyData, 0, 4)
-      let dependency = get31Bit (checkEndianness dependecyData)
+      let dependency = get31Bit dependecyData
       let weight = payload.[4]
 
       Some ({ exclusive = true; streamIdentifier = dependency;weight = weight})
@@ -284,7 +283,7 @@ module Http2 =
     let data = removePadding header payload
     let frameStreamIdData = Array.zeroCreate<byte> 4
     Array.Copy (data, 0, frameStreamIdData, 0, 4)
-    let streamIdentifier = get31Bit (checkEndianness frameStreamIdData)
+    let streamIdentifier = get31Bit frameStreamIdData
     let headerBlockFragment = Array.zeroCreate (data.Length - 5)
     Array.Copy(data,headerBlockFragment,data.Length - 5)
     PushPromise (streamIdentifier,headerBlockFragment)
@@ -299,7 +298,7 @@ module Http2 =
     assert(header.``type`` = 7uy)
     let idData = Array.zeroCreate<byte> 4
     Array.Copy (payload, 0, idData, 0, 4)
-    let streamIdentifier = get31Bit (checkEndianness idData)
+    let streamIdentifier = get31Bit idData
     Array.Copy (payload, 4, idData, 0, 4)
     let errorCode = BitConverter.ToUInt32 (checkEndianness idData, 0)
     GoAway (streamIdentifier,toErrorCode (int errorCode), Array.sub payload 8 (payload.Length - 8))
@@ -308,14 +307,14 @@ module Http2 =
     assert(header.``type`` = 8uy)
     let idData = Array.zeroCreate<byte> 4
     Array.Copy (payload, 0, idData, 0, 4)
-    let windowSizeIncrement = get31Bit (checkEndianness idData)
+    let windowSizeIncrement = get31Bit idData
     WindowUpdate windowSizeIncrement
 
   let parseContinuation (header: FrameHeader) (payload: byte[]) =
     assert(header.``type`` = 8uy)
     Continuation payload
 
-  let payloadDecoders : PayloadDecoder [] = 
+  let payloadDecoders : PayloadDecoder [] =
     [| parseData; parseHeaders; parsePriority; parseRstStream; parseSettings; parsePushPromise; parsePing;
        parseGoAway; parseWindowUpdate; parseContinuation |]
 
@@ -331,15 +330,17 @@ module Http2 =
     do! t.write(ByteSegment(bytes,0,bytes.Length))
     }
 
+  /// Poke a 16-bit int into a byte array in network byte order (big-endian)
   let poke16 (arr : byte array) i w =
-    arr.[i]     <- byte w
-    arr.[i + 1] <- byte (w >>> 8)
+    arr.[i]     <- byte (w >>> 8)
+    arr.[i+ 1]  <- byte w
 
+  /// Poke a 32-bit int into a byte array in network byte order (big-endian)
   let poke32 (arr : byte array) i w =
-    arr.[i]     <- byte w
-    arr.[i + 1] <- byte (w >>> 8)
-    arr.[i + 2] <- byte (w >>> 0x10)
-    arr.[i + 3] <- byte (w >>> 0x18)
+    arr.[i]     <- byte (w >>> 0x18)
+    arr.[i + 1] <- byte (w >>> 0x10)
+    arr.[i + 2] <- byte (w >>> 8)
+    arr.[i + 3] <- byte w
 
   let encodePriority priority =
     let arr = Array.zeroCreate<byte> 5
@@ -353,16 +354,16 @@ module Http2 =
     | Data (bytes, flag) ->
       { length = bytes.Length; ``type`` = 0uy ; flags = encodeInfo.flags; streamIdentifier = encodeInfo.streamIdentifier} ,
       [ bytes ]
-    | Headers(None, bytes) -> 
+    | Headers(None, bytes) ->
       { length = bytes.Length; ``type`` = 1uy ; flags = encodeInfo.flags; streamIdentifier = encodeInfo.streamIdentifier} ,
       [ bytes ]
-    | Headers(Some priority, bytes) -> 
+    | Headers(Some priority, bytes) ->
       { length = bytes.Length + 5; ``type`` = 1uy ; flags = encodeInfo.flags; streamIdentifier = encodeInfo.streamIdentifier} ,
       [ encodePriority priority ; bytes ]
-    | Priority None -> 
+    | Priority None ->
       { length = 0; ``type`` = 2uy ; flags = encodeInfo.flags; streamIdentifier = encodeInfo.streamIdentifier} ,
       [[||]]
-    | Priority (Some priority) -> 
+    | Priority (Some priority) ->
        { length = 5; ``type`` = 2uy ; flags = encodeInfo.flags; streamIdentifier = encodeInfo.streamIdentifier} ,
        [encodePriority priority]
     | RstStream errorCode ->
@@ -372,7 +373,7 @@ module Http2 =
       [ b4 ]
     | Settings (flag,settings) ->
       { length = 36; ``type`` = 4uy ; flags = encodeInfo.flags; streamIdentifier = encodeInfo.streamIdentifier } ,
-      [ 
+      [
         for settingIdentifier in [ 1 .. 6 ] do
           let arr = Array.zeroCreate<byte> 6
           poke16 arr 0 settingIdentifier
@@ -402,27 +403,27 @@ module Http2 =
             failwith "invalid setting identifier"
           yield arr
       ]
-    | PushPromise (i,bytes) -> 
+    | PushPromise (i,bytes) ->
       let b4 = Array.zeroCreate 4
       poke32 b4 0 i
       { length = bytes.Length + 4; ``type`` = 5uy ; flags = encodeInfo.flags; streamIdentifier = encodeInfo.streamIdentifier } ,
-      [ checkEndianness b4 ; bytes ]
+      [ b4 ; bytes ]
     | Ping (flag,bytes) ->
       { length = bytes.Length; ``type`` = 6uy ; flags = encodeInfo.flags; streamIdentifier = encodeInfo.streamIdentifier } ,
-      [ bytes] 
-    | GoAway (i,errorCode,bytes) -> 
+      [ bytes]
+    | GoAway (i,errorCode,bytes) ->
       let a4 = Array.zeroCreate 4
       let b4 = Array.zeroCreate 4
       poke32 a4 0 i
       poke32 b4 0 (fromErrorCode errorCode)
       { length = bytes.Length + 8; ``type`` = 7uy ; flags = encodeInfo.flags; streamIdentifier = encodeInfo.streamIdentifier } ,
-      [ checkEndianness a4; b4; bytes]
-    | WindowUpdate w -> 
+      [ a4; b4; bytes]
+    | WindowUpdate w ->
       let b4 = Array.zeroCreate 4
       poke32 b4 0 w
       { length = 4; ``type`` = 8uy ; flags = encodeInfo.flags; streamIdentifier = encodeInfo.streamIdentifier } ,
       [ b4 ]
-    | Continuation bytes -> 
+    | Continuation bytes ->
       { length = bytes.Length; ``type`` = 9uy ; flags = encodeInfo.flags; streamIdentifier = encodeInfo.streamIdentifier } ,
       [ bytes ]
 
@@ -448,7 +449,7 @@ module Http2 =
 
   open System.Collections.Generic
 
-  let newDynamicRevIndex _ = 
+  let newDynamicRevIndex _ =
     Array.map (fun _ -> new Dictionary<HeaderValue,HIndex>()) [| minTokenIx .. maxStaticTokenIndex |]
 
   let newOtherRevIndex _ = new Dictionary<KeyValue,HIndex>()
@@ -463,7 +464,7 @@ module Http2 =
     let buf = Array.zeroCreate huftmpsiz
     let decoder = decode buf huftmpsiz
     newDynamicTable maxsiz (DecodeInfo(decoder,maxsiz))
-  
+
   open Suave.Utils
   open System.Threading
 
@@ -480,10 +481,10 @@ module Http2 =
     member val encodeDynamicTable = newDynamicTableForEncoding defaultDynamicTableSize
     member val decodeDynamicTable = newDynamicTableForDecoding defaultDynamicTableSize 4096
 
-    member x.read() : SocketOp<Frame> = 
+    member x.read() : SocketOp<Frame> =
       readFrame facade
 
-    member x.write(encInfo,p:FramePayload) : SocketOp<unit> = 
+    member x.write(encInfo,p:FramePayload) : SocketOp<unit> =
       writeFrame encInfo p (facade.GetCurrentContext().connection.transport)
 
     member x.writeResponseToFrame (response: HttpResult) = async {
@@ -502,14 +503,14 @@ module Http2 =
     member x.send (r:HttpRequest) =
       Async.Start (procQueue.AsyncAdd <| Request r)
 
-    member x.stop() = 
+    member x.stop() =
       Async.Start (procQueue.AsyncAdd <| Stop)
       closeEvent.WaitOne() |> ignore
 
     member x.get() =
       procQueue.AsyncGet()
 
-    member x.writeLoop (ctxOuter : HttpContext) (webPart: WebPart) = 
+    member x.writeLoop (ctxOuter : HttpContext) (webPart: WebPart) =
      async {
        // send an empty SETTINGS frame
        let encInfo = { flags = 1uy (*ack*); streamIdentifier = 0;  padding = None}
