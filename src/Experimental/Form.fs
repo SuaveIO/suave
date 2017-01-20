@@ -144,7 +144,7 @@ let bindForm<'a> (form : Form<'a>) (req : HttpRequest) =
     return record
   }
 
-let bindForm2<'a> = 
+let bindEmptyForm<'a> = 
   let form : Form<'a> = Form([],[])
   bindForm form
 
@@ -278,7 +278,7 @@ type LoginCredentials = {
 
 Handler:
 let handleLogin req = 
-  match bindForm2 req with
+  match bindEmptyForm req with
   | Choice1Of2 loginCredentials -> 
     // ...
   | Choice2Of2 err -> 
