@@ -144,6 +144,10 @@ let bindForm<'a> (form : Form<'a>) (req : HttpRequest) =
     return record
   }
 
+let bindEmptyForm<'a> = 
+  let form : Form<'a> = Form([],[])
+  bindForm form
+
 let maxLength max : Validation<string> =
   (fun s -> s.Length <= max),
   (sprintf "must be at most %d characters" max),
@@ -264,5 +268,21 @@ Binding.bindReq (bindForm register) handler BAD_REQUEST
 
 HTML markup:
 input (fun f -> <@ f.Password @>) [] register
+
+Plain Form binding
+
+type LoginCredentials = {
+  Username: string
+  Password : string
+}
+
+Handler:
+let handleLogin req = 
+  match bindEmptyForm req with
+  | Choice1Of2 loginCredentials -> 
+    // ...
+  | Choice2Of2 err -> 
+    // ...
+path "/login" >=> POST >=> request handleLogin
 
 *)
