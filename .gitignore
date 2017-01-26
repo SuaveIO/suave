@@ -34,3 +34,4 @@ dotnet-dev-*
 tools/coreclr/
 dotnet_cli_install.ps1
 .vs/
+.vscode/
