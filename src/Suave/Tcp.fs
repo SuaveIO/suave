@@ -100,7 +100,7 @@ let job (serveClient : TcpWorker<unit>)
 
   logger.debug (
     eventX "{client} connected. Now has {totalClients} connected"
-    >> setFieldValue "client" binding.ip
+    >> setFieldValue "client" (binding.ip.ToString())
     >> setFieldValue "totalClients" (!Globals.numberOfClients))
 
   let connection =
