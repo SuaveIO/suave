@@ -67,7 +67,7 @@ let tests cfg =
           eq "Content" "" content // Preflight request should not return content
           eq "Access-Control-Allow-Origin header" origin (result.Headers.GetValues("Access-Control-Allow-Origin") |> Seq.head)
           eq "Access-Control-Allow-Methods header" "*" (result.Headers.GetValues("Access-Control-Allow-Methods") |> Seq.head)
-          eq "Access-Control-Allow-Credentials header" "True" (result.Headers.GetValues("Access-Control-Allow-Credentials") |> Seq.head)
+          eq "Access-Control-Allow-Credentials header" "true" (result.Headers.GetValues("Access-Control-Allow-Credentials") |> Seq.head)
 
         runWithConfig (composedApp None) |> reqResp HttpMethod.OPTIONS "/cors" "" None None DecompressionMethods.None setHeaders asserts
 
@@ -86,7 +86,7 @@ let tests cfg =
           eq "Content" "" content // Preflight request should not return content
           eq "Access-Control-Allow-Origin header" origin (result.Headers.GetValues("Access-Control-Allow-Origin") |> Seq.head)
           eq "Access-Control-Allow-Methods header" "*" (result.Headers.GetValues("Access-Control-Allow-Methods") |> Seq.head)
-          eq "Access-Control-Allow-Credentials header" "True" (result.Headers.GetValues("Access-Control-Allow-Credentials") |> Seq.head)
+          eq "Access-Control-Allow-Credentials header" "true" (result.Headers.GetValues("Access-Control-Allow-Credentials") |> Seq.head)
           eq "Access-Control-Allow-Headers header" allowedHeaders (result.Headers.GetValues("Access-Control-Allow-Headers") |> Seq.head)
 
         runWithConfig (composedApp None) |> reqResp HttpMethod.OPTIONS "/cors" "" None None DecompressionMethods.None setHeaders asserts
@@ -105,10 +105,25 @@ let tests cfg =
           eq "Content" "" content // Preflight request should not return content
           eq "Access-Control-Allow-Origin header" origin (result.Headers.GetValues("Access-Control-Allow-Origin") |> Seq.head)
           eq "Access-Control-Allow-Methods header" "*" (result.Headers.GetValues("Access-Control-Allow-Methods") |> Seq.head)
-          eq "Access-Control-Allow-Credentials header" "True" (result.Headers.GetValues("Access-Control-Allow-Credentials") |> Seq.head)
+          eq "Access-Control-Allow-Credentials header" "true" (result.Headers.GetValues("Access-Control-Allow-Credentials") |> Seq.head)
           eq "Access-Control-Max-Age header" "3600" (result.Headers.GetValues("Access-Control-Max-Age") |> Seq.head)
 
-        runWithConfig (composedApp (Some (cors corsConfig))) |> reqResp HttpMethod.OPTIONS "/cors" "" None None DecompressionMethods.None setHeaders asserts ]
+        runWithConfig (composedApp (Some (cors corsConfig))) |> reqResp HttpMethod.OPTIONS "/cors" "" None None DecompressionMethods.None setHeaders asserts
+        
+      testCase "Can make valid preflight CORS request - doesn't contain header when cookies aren't allowed" <| fun _ ->
+        
+        let corsConfig = { defaultCORSConfig with allowCookies = false }
+
+        let setHeaders (request : HttpRequestMessage) =
+          request.Headers.Add("Origin", origin)
+          request
+
+        let asserts (result : HttpResponseMessage) =
+          eq "Access-Control-Allow-Credentials header" false (result.Headers.Contains("Access-Control-Allow-Credentials"))
+
+        runWithConfig (composedApp (Some(cors corsConfig))) |> reqResp HttpMethod.OPTIONS "/cors" "" None None DecompressionMethods.None setHeaders asserts
+      ]
+
     testList "Actual requests tests" [
       testCase "Can make valid CORS request with default CORS config" <| fun _ ->
 
@@ -122,7 +137,7 @@ let tests cfg =
           eq "Content" "Success" content
           eq "Access-Control-Allow-Origin header" origin (result.Headers.GetValues("Access-Control-Allow-Origin") |> Seq.head)
           eq "Access-Control-Allow-Methods header" "*" (result.Headers.GetValues("Access-Control-Allow-Methods") |> Seq.head)
-          eq "Access-Control-Allow-Credentials header" "True" (result.Headers.GetValues("Access-Control-Allow-Credentials") |> Seq.head)
+          eq "Access-Control-Allow-Credentials header" "true" (result.Headers.GetValues("Access-Control-Allow-Credentials") |> Seq.head)
 
         runWithConfig (composedApp None) |> reqResp HttpMethod.GET "/cors" "" None None DecompressionMethods.None setHeaders asserts
 

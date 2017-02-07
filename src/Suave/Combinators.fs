@@ -858,7 +858,10 @@ module CORS =
       Writers.setHeader AccessControlMaxAge (age.ToString())
 
   let private setAllowCredentialsHeader config =
-    Writers.setHeader AccessControlAllowCredentials (config.allowCookies.ToString())
+    if config.allowCookies then
+        Writers.setHeader AccessControlAllowCredentials "true"
+    else
+        succeed
 
   let private setAllowMethodsHeader config value =
     match config.allowedMethods with
