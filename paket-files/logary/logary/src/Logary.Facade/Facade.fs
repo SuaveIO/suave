@@ -1,4 +1,4 @@
-/// The logging namespace, which contains the logging abstraction for this
+﻿/// The logging namespace, which contains the logging abstraction for this
 /// library. See https://github.com/logary/logary for details. This module is
 /// completely stand-alone in that it has no external references and its adapter
 /// in Logary has been well tested.
@@ -600,6 +600,14 @@ module internal Formatting =
 
     exnExceptionParts @ errorsExceptionParts
 
+  let getLogLevelToken = function
+    | Verbose -> LevelVerbose
+    | Debug -> LevelDebug
+    | Info -> LevelInfo
+    | Warn -> LevelWarning
+    | Error -> LevelError
+    | Fatal -> LevelFatal
+
   /// Split a structured message up into theme-able parts (tokens), allowing the
   /// final output to display to a user with colours to enhance readability.
   let literateDefaultTokeniser (options : LiterateOptions) (message : Message) : (string * LiterateToken) list =
@@ -611,14 +619,6 @@ module internal Formatting =
       message.value |> literateFormatValue options message.fields |> snd
 
     let themedExceptionParts = literateColouriseExceptions options message
-
-    let getLogLevelToken = function
-      | Verbose -> LevelVerbose
-      | Debug -> LevelDebug
-      | Info -> LevelInfo
-      | Warn -> LevelWarning
-      | Error -> LevelError
-      | Fatal -> LevelFatal
 
     [ "[", Punctuation
       formatLocalTime message.utcTicks
@@ -684,6 +684,81 @@ module internal Formatting =
     formatExn message.fields +
     formatFields matchedFields message.fields
 
+/// Assists with controlling the output of the `LiterateConsoleTarget`.
+module internal LiterateFormatting =
+  open Literate
+  type TokenisedPart = string * LiterateToken
+  type LiterateTokeniser = LiterateOptions -> Message -> TokenisedPart list
+
+  type internal TemplateToken = TextToken of text:string | PropToken of name : string * format : string
+  let internal parseTemplate template =
+    let tokens = ResizeArray<TemplateToken>()
+    let foundText (text: string) = tokens.Add (TextToken text)
+    let foundProp (prop: FsMtParser.Property) = tokens.Add (PropToken (prop.name, prop.format))
+    FsMtParser.parseParts template foundText foundProp
+    tokens :> seq<TemplateToken>
+  
+  [<AutoOpen>]
+  module OutputTemplateTokenisers =
+
+    let tokeniseTimestamp format (options : LiterateOptions) (message : Message) = 
+      let localDateTimeOffset = DateTimeOffset(message.utcTicks, TimeSpan.Zero).ToLocalTime()
+      let formattedTimestamp = localDateTimeOffset.ToString(format, options.formatProvider)
+      seq { yield formattedTimestamp, Subtext }
+
+    let tokeniseTimestampUtc format (options : LiterateOptions) (message : Message) = 
+      let utcDateTimeOffset = DateTimeOffset(message.utcTicks, TimeSpan.Zero)
+      let formattedTimestamp = utcDateTimeOffset.ToString(format, options.formatProvider)
+      seq { yield formattedTimestamp, Subtext }
+
+    let tokeniseMissingField name format =
+      seq {
+        yield "{", Punctuation
+        yield name, MissingTemplateField
+        if not (String.IsNullOrEmpty format) then
+          yield ":", Punctuation
+          yield format, Subtext
+        yield "}", Punctuation }
+
+    let tokeniseLogLevel (options : LiterateOptions) (message : Message) =
+      seq { yield options.getLogLevelText message.level, Formatting.getLogLevelToken message.level }
+
+    let tokeniseSource (options : LiterateOptions) (message : Message) =
+      seq { yield (String.concat "." message.name), Subtext }
+
+    let tokeniseNewline (options : LiterateOptions) (message : Message) =
+      seq { yield Environment.NewLine, Text }
+
+    let tokeniseTab (options : LiterateOptions) (message : Message) =
+      seq { yield "\t", Text }
+
+  /// Creates a `LiterateTokeniser` function which can be passed to the `LiterateConsoleTarget`
+  /// constructor in order to customise how each log message is rendered. The default template
+  /// would be: `[{timestampLocal:HH:mm:ss} {level}] {message}{newline}{exceptions}`.
+  /// Available template fields are: `timestamp`, `timestampUtc`, `level`, `source`,
+  /// `newline`, `tab`, `message`, `exceptions`. Any misspelled or otheriwese invalid property
+  /// names will be treated as `LiterateToken.MissingTemplateField`. 
+  let tokeniserForOutputTemplate template : LiterateTokeniser =
+    let tokens = parseTemplate template
+    fun options message ->
+      seq {
+        for token in tokens do
+          match token with
+          | TextToken text -> yield text, LiterateToken.Punctuation
+          | PropToken (name, format) ->
+            match name with
+            | "timestamp" ->    yield! tokeniseTimestamp format options message
+            | "timestampUtc" -> yield! tokeniseTimestampUtc format options message
+            | "level" ->        yield! tokeniseLogLevel options message
+            | "source" ->       yield! tokeniseSource options message
+            | "newline" ->      yield! tokeniseNewline options message
+            | "tab" ->          yield! tokeniseTab options message
+            | "message" ->      yield! Formatting.literateFormatValue options message.fields message.value |> snd
+            | "exceptions" ->   yield! Formatting.literateColouriseExceptions options message
+            | _ ->              yield! tokeniseMissingField name format
+      }
+      |> Seq.toList
+
 /// Logs a line in a format that is great for human consumption,
 /// using console colours to enhance readability.
 /// Sample: [10:30:49 INF] User "AdamC" began the "checkout" process with 100 cart items
@@ -697,6 +772,15 @@ type LiterateConsoleTarget(name, minLevel, ?options, ?literateTokeniser, ?output
     (tokenise options message) @ [Environment.NewLine, Literate.Text]
     |> List.map (fun (s, t) ->
       s, options.theme(t))
+
+  /// Creates the target with a custom output template. The default `outputTemplate`
+  /// is `[{timestampLocal:HH:mm:ss} {level}] {message}{exceptions}`.
+  /// Available template fields are: `timestamp`, `timestampUtc`, `level`, `source`,
+  /// `newline`, `tab`, `message`, `exceptions`. Any misspelled or otheriwese invalid property
+  /// names will be treated as `LiterateToken.MissingTemplateField`.
+  new (name, minLevel, outputTemplate, ?options, ?outputWriter, ?consoleSemaphore) =
+    let tokeniser = LiterateFormatting.tokeniserForOutputTemplate outputTemplate
+    LiterateConsoleTarget(name, minLevel, ?options=options, literateTokeniser=tokeniser, ?outputWriter=outputWriter, ?consoleSemaphore=consoleSemaphore)
 
   interface Logger with
     member x.name = name

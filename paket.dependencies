@@ -8,7 +8,7 @@ nuget DotLiquid
 nuget RazorEngine
 
 github haf/YoLo YoLo.fs
-github logary/logary src/Logary.Facade/Facade.fs
+github logary/logary:c70468f60602e1ab954a38e574b946d4ffbda11d src/Logary.Facade/Facade.fs
 
 group Build
   source https://nuget.org/api/v2

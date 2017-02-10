@@ -17,7 +17,19 @@ open Suave.State.CookieStateStore
 let basicAuth =
   Authentication.authenticateBasic ((=) ("foo", "bar"))
 
-let logger = Targets.create Verbose [||]
+// This demonstrates how to customise the console logger output.
+// In most cases you wont need this. Instead you can use the more succinct: 
+// `let logger = Targets.create Verbose [||]`
+let loggingOptions =
+  { Literate.LiterateOptions.create() with
+      getLogLevelText = function Verbose->"V" | Debug->"D" | Info->"I" | Warn->"W" | Error->"E" | Fatal->"F" }
+
+let logger = LiterateConsoleTarget(
+                name = [|"Suave";"Examples";"Example"|],
+                minLevel = Verbose,
+                options = loggingOptions,
+                outputTemplate = "[{level}] {timestampUtc:o} {message} [{source}]{exceptions}"
+              ) :> Logger
 
 ///  With this workflow you can write WebParts like this
 let task : WebPart =
