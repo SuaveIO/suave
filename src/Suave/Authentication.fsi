@@ -21,6 +21,17 @@ val UserNameKey : string
 /// </remarks>
 val authenticateBasic : f:(string * string -> bool) -> protectedPart:WebPart -> WebPart
 
+/// <summary><para>
+/// Perform basic authentication on the request, applying an asynchronous
+/// predicate to check the request for authentication tokens such as 
+/// 'username' and 'password'. Otherwise, if failing, challenge the client again.
+/// </para><para>
+/// </para><para>
+/// </para></summary>
+/// <remarks>
+/// </remarks>
+val authenticateBasicAsync : f:(string * string -> bool Async) -> protectedPart:WebPart -> WebPart
+
 val SessionAuthCookie : string
 
 /// The key used in `context.user_state` to save the session id for downstream
