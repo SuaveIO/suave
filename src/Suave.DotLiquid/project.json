@@ -1,5 +1,5 @@
 {
-    "version": "2.0.3-dotnetcli",
+    "version": "2.0.4-dotnetcli",
 
     "buildOptions": {
         "compilerName": "fsc",
