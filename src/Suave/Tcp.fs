@@ -130,7 +130,7 @@ let job (serveClient : TcpWorker<unit>)
   Interlocked.Decrement(Globals.numberOfClients) |> ignore
   logger.debug (
     eventX "Disconnected {client}. {totalClients} connected."
-    >> setFieldValue "client" binding.ip
+    >> setFieldValue "client" (binding.ip.ToString())
     >> setFieldValue "totalClients" (!Globals.numberOfClients))
   }
 
