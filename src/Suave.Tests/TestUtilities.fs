@@ -16,9 +16,14 @@ open Expecto
 open FsCheck
 
 type Arbs =
-  static member String () = Arb.Default.String () |> Arb.filter (fun str -> str <> null)
+  static member String () =
+    Arb.Default.String ()
+    |> Arb.filter (fun str -> str <> null)
 
-let fsCheckConfig = { Config.Default with Arbitrary = [ typeof<Arbs> ] }
+let fsCheckConfig =
+  { FsCheckConfig.defaultConfig with
+      maxTest = 100
+      arbitrary = [ typeof<Arbs> ] }
 
 let currentPath =
   Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location)
