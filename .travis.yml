@@ -4,6 +4,7 @@ language: csharp
 mono:
  - 4.2.3
  - 4.4.1
+ - 4.8.0
  - latest # => "stable release"
  - weekly # => "latest commits"
 
