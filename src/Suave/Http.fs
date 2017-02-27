@@ -417,7 +417,7 @@ module Http =
     member x.uri (path : string) query =
       let path' =
         match Uri.TryCreate(path, UriKind.Absolute) with
-        | true, uri -> uri.AbsolutePath
+        | true, uri when uri.Scheme = Uri.UriSchemeHttp || uri.Scheme = Uri.UriSchemeHttps -> uri.AbsolutePath
         | _ when path.StartsWith "/" -> path
         | _ -> "/" + path
       String.Concat [
@@ -425,7 +425,7 @@ module Http =
         path'
         (match query with | "" -> "" | qs -> "?" + qs)
       ]
-      |> fun x -> Uri x
+      |> Uri
 
     override x.ToString() =
       String.Concat [ x.scheme.ToString(); "://"; x.socketBinding.ToString() ]
