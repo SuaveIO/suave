@@ -168,3 +168,16 @@ let testMaxContentLength cfg =
       Expect.equal actual "Payload too large" "expecting data to be returned"
 
     ]
+
+[<Tests>]
+let testDELETE cfg =
+  let runWithConfig = runWith cfg
+
+  let webId =
+    request (fun x -> OK (x.rawForm |> Encoding.UTF8.GetString))
+
+  testList "testing DELETE with body" [
+    testCase "body is parsed" <| fun _ ->
+      use data = new StringContent("bob")
+      let actual = runWithConfig webId |> req HttpMethod.DELETE "/" (Some data)
+      Expect.equal actual "bob" "expecting data to be returned" ]
