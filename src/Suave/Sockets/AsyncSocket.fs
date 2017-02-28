@@ -68,7 +68,7 @@ let asyncWriteBufferedBytes (b : byte[]) (connection : Connection) : SocketOp<un
         do! send connection (new ArraySegment<_>(b, 0, b.Length))
         return (), { connection with lineBufferCount = 0 }
       else
-        Array.Copy(b, 0, buff.Array, buff.Offset + lineBufferCount, b.Length)
+        Buffer.BlockCopy(b, 0, buff.Array, buff.Offset + lineBufferCount, b.Length)
         return (),{ connection with lineBufferCount = lineBufferCount + b.Length }
     else return (),connection
   }
