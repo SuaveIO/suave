@@ -58,9 +58,30 @@ let ws (webSocket : WebSocket) (context: HttpContext) =
       | _ -> ()
     }
 
-let app : WebPart =
+/// An example of explictly fetching websocket errors and handling them in your codebase.
+let wsWithErrorHandling (webSocket : WebSocket) (context: HttpContext) = 
+   
+   let exampleDisposableResource = { new IDisposable with member __.Dispose() = printfn "Resource needed by websocket connection disposed" }
+   let websocketWorkflow = ws webSocket context
+   
+   async {
+    let! successOrError = websocketWorkflow
+    match successOrError with
+    // Success case
+    | Choice1Of2() -> ()
+    // Error case
+    | Choice2Of2(error) ->
+        // Example error handling logic here
+        printfn "Error: [%A]" error
+        exampleDisposableResource.Dispose()
+        
+    return successOrError
+   }
+
+let app : WebPart = 
   choose [
     path "/websocket" >=> handShake ws
+    path "/websocketWithError" >=> handShake wsWithErrorHandling
     GET >=> choose [ path "/" >=> file "index.html"; browseHome ]
     NOT_FOUND "Found no handlers." ]
 
