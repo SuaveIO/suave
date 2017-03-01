@@ -11,7 +11,7 @@ open System.Net.Http.Headers
 open System.Reflection
 open Suave
 open Suave.Web
-open Suave.Logging
+open Logary.Facade
 open Expecto
 open FsCheck
 

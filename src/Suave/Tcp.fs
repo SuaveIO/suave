@@ -5,8 +5,8 @@ open System.Collections.Generic
 open System.Threading
 open System.Net
 open System.Net.Sockets
-open Suave.Logging
-open Suave.Logging.Message
+open Logary.Facade
+open Logary.Facade.Message
 open Suave.Sockets
 open Suave.Utils
 

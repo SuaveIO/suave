@@ -4,7 +4,7 @@ open System
 open System.Net
 
 open Suave
-open Suave.Logging
+open Logary.Facade
 open Suave.Filters
 open Suave.Writers
 open Suave.Files

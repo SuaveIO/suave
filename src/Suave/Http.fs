@@ -9,6 +9,7 @@ module Http =
   open System.Net.Sockets
   open System.Net
   open System.Text
+  open Logary.Facade
   open Suave.Utils
   open Suave.Utils.Aether
   open Suave.Utils.Aether.Operators

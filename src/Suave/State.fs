@@ -2,8 +2,8 @@ module Suave.State
 
 open Suave.Utils
 open Suave.Cookie
-open Suave.Logging
-open Suave.Logging.Message
+open Logary.Facade
+open Logary.Facade.Message
 
 /// A session store is a reader and a writer function pair keyed on strings.
 type StateStore =

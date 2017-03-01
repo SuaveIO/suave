@@ -127,7 +127,7 @@ type WriteOp() =
 
 type OperationPair = ReadOp*WriteOp
 
-open Suave.Logging
+open Logary.Facade
 
 type LibUvTransport(pool : ConcurrentPool<OperationPair>,
                     loop : IntPtr,
@@ -210,8 +210,8 @@ let bindSocket server bindCallback=
   if r<>0 then
     failwith ("Listen error: " + (new string(uv_strerror(r))))
 
-open Suave.Logging
-open Suave.Logging.Message
+open Logary.Facade
+open Logary.Facade.Message
 open Suave.Http
 open Suave.Tcp
 open Suave

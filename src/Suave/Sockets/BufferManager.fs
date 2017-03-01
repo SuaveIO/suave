@@ -4,7 +4,7 @@ open System
 open System.Collections.Generic
 open System.Collections.Concurrent
 open Suave
-open Suave.Logging
+open Logary.Facade
 
 /// This class creates a single large buffer which can be divided up
 /// and assigned to SocketAsyncEventArgs objects for use with each

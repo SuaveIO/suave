@@ -48,7 +48,7 @@ module SampleApp =
 module SelfHostedServer =
   open Freya.Core
   open Suave
-  open Suave.Logging
+  open Logary.Facade
   open Suave.Owin
   open SampleApp
 

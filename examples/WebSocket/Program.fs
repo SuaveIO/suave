@@ -6,7 +6,7 @@ open Suave.Filters
 open Suave.Successful
 open Suave.Files
 open Suave.RequestErrors
-open Suave.Logging
+open Logary.Facade
 open Suave.Utils
 
 open System

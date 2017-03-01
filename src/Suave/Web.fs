@@ -7,8 +7,8 @@ module Web =
   open System.IO
   open System.Net
   open Suave.Utils
-  open Suave.Logging
-  open Suave.Logging.Message
+  open Logary.Facade
+  open Logary.Facade.Message
 
   /// The default error handler returns a 500 Internal Error in response to
   /// thrown exceptions.

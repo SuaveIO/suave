@@ -6,8 +6,8 @@ module Cookie =
   open System.Text
   open System.Globalization
   open Suave.Operators
-  open Suave.Logging
-  open Suave.Logging.Message
+  open Logary.Facade
+  open Logary.Facade.Message
   open Suave.Utils
 
   type CookieLife =

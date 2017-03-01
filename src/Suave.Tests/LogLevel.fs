@@ -1,7 +1,7 @@
 ﻿module Suave.Tests.LogLevel
 
 open Suave
-open Suave.Logging
+open Logary.Facade
 open Suave.Testing
 open Expecto
 open FsCheck

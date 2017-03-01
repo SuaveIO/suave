@@ -2,7 +2,7 @@
 
 open Suave
 open Suave.Cookie
-open Suave.Logging
+open Logary.Facade
 open Suave.Testing
 
 open Expecto

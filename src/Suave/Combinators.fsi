@@ -1,6 +1,7 @@
 ﻿namespace Suave
 
 open Suave.Sockets
+open Logary.Facade
 
 /// <summary><para>
 /// The HTTP module has these main sub-modules:
