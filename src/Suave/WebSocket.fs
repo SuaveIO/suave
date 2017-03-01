@@ -147,8 +147,14 @@ module WebSocket =
     loop 0
 
   let readBytesIntoByteSegment retrieveByteSegment (transport : ITransport) (n : int) =
-    let byteSegment: ByteSegment = retrieveByteSegment n
-    if byteSegment.Count < n then raise (ByteSegmentCapacityException(n, byteSegment.Count))
+    let byteSegmentRetrieved: ByteSegment = retrieveByteSegment n
+
+    let byteSegment = 
+        match byteSegmentRetrieved.Count with
+        | count when count = n -> byteSegmentRetrieved
+        | count when count < n -> raise (ByteSegmentCapacityException(n, byteSegmentRetrieved.Count))
+        | _ -> ArraySegment(byteSegmentRetrieved.Array, byteSegmentRetrieved.Offset, n)
+
     let rec loop i = socket {
       if i = n then
         return byteSegment
