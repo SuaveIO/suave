@@ -32,6 +32,9 @@ let websocketTests cfg =
 
   let runWithConfig = runWith cfg
 
+  let reuseableBuffer = Array.zeroCreate 1000
+
+  let websocketAppUrl = "/websocket"
   let websocketApp (webSocket : WebSocket) =
     fun cx -> socket {
       let loop = ref true
@@ -59,8 +62,40 @@ let websocketTests cfg =
           loop := false
         | _ -> ()
       }
+  
+  let websocketAppReusingBuffersUrl = "/websocketAppReusingBuffers"
+  let websocketAppReusingBuffers (webSocket : WebSocket) =
+    fun cx -> socket {
+      let loop = ref true
+      while !loop do
+        let! msg = webSocket.readIntoByteSegment (fun lengthRequired -> ArraySegment(reuseableBuffer, 0, lengthRequired))
+        match msg with
+        | (Text, data, true) ->
+          let str = System.Text.Encoding.UTF8.GetString(data.Array, data.Offset, data.Count)
+          match str with
+          | "BinaryRequest7bit" ->
+            let message = ArraySegment(Array.create (int PayloadSize.Bit7) 0uy)
+            do! webSocket.send Binary message true
+          | "BinaryRequest16bit" ->
+            let message = ArraySegment(Array.create (int PayloadSize.Bit16) 0uy)
+            do! webSocket.send Binary message true
+          | "BinaryRequest32bit" ->
+            let message = ArraySegment(Array.create (int PayloadSize.Bit32) 0uy)
+            do! webSocket.send Binary message true
+          | _ ->
+            do! webSocket.send Text data true
+        | (Ping, _, _) ->
+          do! webSocket.send Pong (ArraySegment([||])) true
+        | (Close, _, _) ->
+          do! webSocket.send Close (ArraySegment([||])) true
+          loop := false
+        | _ -> ()
+      }
 
-  let webPart = Filters.path "/websocket" >=> handShake websocketApp
+  let webPart = 
+    choose 
+      [ Filters.path websocketAppUrl >=> handShake websocketApp
+        Filters.path websocketAppReusingBuffersUrl >=> handShake websocketAppReusingBuffers ]
 
   let testByteArray (sentSize:int) (bArray: byte []) =
     if sentSize = bArray.Length then
@@ -72,93 +107,96 @@ let websocketTests cfg =
     else
       false
 
-  let testCase testName fn =
+  let testCase webSocketUrl testName fn =
     testCase testName <| fun _ ->
       use mre = new ManualResetEvent(false)
-      use clientWebSocket = new WebSocketSharp.WebSocket(sprintf "ws://%s:%i/websocket" ip port)
+      use clientWebSocket = new WebSocketSharp.WebSocket(sprintf "ws://%s:%i%s" ip port webSocketUrl)
       let ctx = runWithConfig webPart
       withContext (fun _ -> fn mre clientWebSocket) ctx
+  
+  let websocketTests websocketUrl = 
+    testList (sprintf "websocket tests for url %s" websocketUrl) [
+      testCase websocketUrl "text echo test" <| fun mre clientWebSocket ->
+        let message = "Hello Websocket World!"
+        let echo : string ref = ref ""
 
-  testList "websocket tests" [
-    testCase "text echo test" <| fun mre clientWebSocket ->
-      let message = "Hello Websocket World!"
-      let echo : string ref = ref ""
+        clientWebSocket.OnMessage.Add(fun e ->
+          echo := e.Data
+          mre.Set() |> ignore
+        )
+        clientWebSocket.Connect()
+        clientWebSocket.Send(message)
 
-      clientWebSocket.OnMessage.Add(fun e ->
-        echo := e.Data
-        mre.Set() |> ignore
-      )
-      clientWebSocket.Connect()
-      clientWebSocket.Send(message)
+        mre.WaitOne() |> ignore
+        clientWebSocket.Close()
+        Expect.equal echo.Value message "Should be echoed"
 
-      mre.WaitOne() |> ignore
-      clientWebSocket.Close()
-      Expect.equal echo.Value message "Should be echoed"
+      testCase websocketUrl "socket binary payload 7bit" <| fun mre clientWebSocket ->
+        let message = "BinaryRequest7bit"
+        let echo : byte array ref = ref [||]
 
-    testCase "socket binary payload 7bit" <| fun mre clientWebSocket ->
-      let message = "BinaryRequest7bit"
-      let echo : byte array ref = ref [||]
+        clientWebSocket.OnMessage.Add(fun e ->
+          echo:= e.RawData
+          mre.Set() |> ignore
+        )
+        clientWebSocket.Connect()
+        clientWebSocket.Send(message)
 
-      clientWebSocket.OnMessage.Add(fun e ->
-        echo:= e.RawData
-        mre.Set() |> ignore
-      )
-      clientWebSocket.Connect()
-      clientWebSocket.Send(message)
+        mre.WaitOne() |> ignore
+        clientWebSocket.Close()
+        Expect.isTrue (testByteArray (int PayloadSize.Bit7) echo.Value) "Should test equal"
 
-      mre.WaitOne() |> ignore
-      clientWebSocket.Close()
-      Expect.isTrue (testByteArray (int PayloadSize.Bit7) echo.Value) "Should test equal"
+      testCase websocketUrl "socket binary payload 16bit" <| fun mre clientWebSocket ->
+        let message = "BinaryRequest16bit"
+        let echo : byte array ref = ref [||]
 
-    testCase "socket binary payload 16bit" <| fun mre clientWebSocket ->
-      let message = "BinaryRequest16bit"
-      let echo : byte array ref = ref [||]
+        clientWebSocket.OnMessage.Add(fun e ->
+          echo:= e.RawData
+          mre.Set() |> ignore
+        )
+        clientWebSocket.Connect()
+        clientWebSocket.Send(message)
 
-      clientWebSocket.OnMessage.Add(fun e ->
-        echo:= e.RawData
-        mre.Set() |> ignore
-      )
-      clientWebSocket.Connect()
-      clientWebSocket.Send(message)
+        mre.WaitOne() |> ignore
+        clientWebSocket.Close()
+        Expect.isTrue (testByteArray (int PayloadSize.Bit16) echo.Value) "Should be echoed"
 
-      mre.WaitOne() |> ignore
-      clientWebSocket.Close()
-      Expect.isTrue (testByteArray (int PayloadSize.Bit16) echo.Value) "Should be echoed"
+      testCase websocketUrl "socket binary payload 32bit" <| fun mre clientWebSocket ->
+        let message = "BinaryRequest32bit"
+        let echo : byte array ref = ref [||]
 
-    testCase "socket binary payload 32bit" <| fun mre clientWebSocket ->
-      let message = "BinaryRequest32bit"
-      let echo : byte array ref = ref [||]
+        clientWebSocket.OnMessage.Add(fun e ->
+          echo:= e.RawData
+          mre.Set() |> ignore)
+        clientWebSocket.Connect()
+        clientWebSocket.Send(message)
 
-      clientWebSocket.OnMessage.Add(fun e ->
-        echo:= e.RawData
-        mre.Set() |> ignore)
-      clientWebSocket.Connect()
-      clientWebSocket.Send(message)
+        mre.WaitOne() |> ignore
+        clientWebSocket.Close()
+        Expect.isTrue (testByteArray (int PayloadSize.Bit32) echo.Value) "Should be echoed"
 
-      mre.WaitOne() |> ignore
-      clientWebSocket.Close()
-      Expect.isTrue (testByteArray (int PayloadSize.Bit32) echo.Value) "Should be echoed"
+      testCase websocketUrl "echo large number of messages to client" <| fun mre clientWebSocket ->
+        let amountOfMessages = 1000
+        let echo = ref []
+        let count = ref 0
 
-    testCase "echo large number of messages to client" <| fun mre clientWebSocket ->
-      let amountOfMessages = 1000
-      let echo = ref []
-      let count = ref 0
+        clientWebSocket.OnMessage.Add(fun e ->
+          echo:= e.Data :: !echo
+          count := !count + 1
+          if !count = amountOfMessages then mre.Set() |> ignore
+        )
+        clientWebSocket.Connect()
 
-      clientWebSocket.OnMessage.Add(fun e ->
-        echo:= e.Data :: !echo
-        count := !count + 1
-        if !count = amountOfMessages then mre.Set() |> ignore
-      )
-      clientWebSocket.Connect()
+        for i = 1 to amountOfMessages do
+          clientWebSocket.Send(i.ToString())
 
-      for i = 1 to amountOfMessages do
-        clientWebSocket.Send(i.ToString())
+        mre.WaitOne() |> ignore
+        clientWebSocket.Close()
 
-      mre.WaitOne() |> ignore
-      clientWebSocket.Close()
+        let expectedMessages = [ for i in amountOfMessages .. -1 .. 1 -> i.ToString() ]
 
-      let expectedMessages = [ for i in amountOfMessages .. -1 .. 1 -> i.ToString() ]
-
-      Expect.equal echo.Value expectedMessages "should be equal"
-      Expect.equal (!count) amountOfMessages "received message count on websocket"
-  ]
+        Expect.equal echo.Value expectedMessages "should be equal"
+        Expect.equal (!count) amountOfMessages "received message count on websocket"
+    ]
+  
+  testList "websocket tests" [ websocketTests websocketAppUrl; websocketTests websocketAppReusingBuffersUrl ]
