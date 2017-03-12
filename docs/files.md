@@ -52,15 +52,16 @@ The default mime types map `defaultMimeTypesMap` looks like this.
 
 {% highlight fsharp %}
 let defaultMimeTypesMap = function
-  | ".css" -> mkMimeType "text/css" true
-  | ".gif" -> mkMimeType "image/gif" false
-  | ".png" -> mkMimeType "image/png" false
+  | ".css" -> createMimeType "text/css" true
+  | ".gif" -> createMimeType "image/gif" false
+  | ".png" -> createMimeType "image/png" false
   | ".htm"
-  | ".html" -> mkMimeType "text/html" true
+  | ".html" -> createMimeType "text/html" true
   | ".jpe"
   | ".jpeg"
-  | ".jpg" -> mkMimeType "image/jpeg" false
-  | ".js"  -> mkMimeType "application/x-javascript" true
+  | ".jpg" -> createMimeType "image/jpeg" false
+  | ".js"  -> createMimeType "application/x-javascript" true
+  // ... some stuff left out
   | _      -> None
 {% endhighlight %}
 
@@ -70,7 +71,7 @@ You can register additional MIME extensions by creating a new mime map in the fo
 // Adds a new mime type to the default map
 let mimeTypes =
   defaultMimeTypesMap
-    @@ (function | ".avi" -> mkMimeType "video/avi" false | _ -> None)
+    @@ (function | ".avi" -> createMimeType "video/avi" false | _ -> None)
 
 let webConfig = { defaultConfig with mimeTypesMap = mimeTypes }
 {% endhighlight %}
