@@ -37,7 +37,7 @@
                 "System.Security.Cryptography.Primitives": "4.0.0",
                 "System.Net.Security": "4.0.0",
                 "System.Globalization.Extensions": "4.0.1",
-                "Microsoft.FSharp.Core.netcore": "1.0.0-alpha-*",
+                "FSharp.Core": "4.1.*",
                 "NETStandard.Library": "1.6.0",
                 "System.Security.Claims": "4.0.1",
                 "DotLiquid": "2.0.55"
