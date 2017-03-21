@@ -154,12 +154,7 @@ namespace :dotnetcli do
   end
 
   task :build_lib => :coreclr_binaries do
-    [ "src/Suave", "src/Experimental", "src/Suave.DotLiquid" ].each do |item|
-      Dir.chdir "#{item}" do
-        system dotnet_exe_path, %W|--verbose build --configuration #{Configuration} -f netstandard1.6|
-        Dir.chdir "../.."
-      end
-    end
+    system dotnet_exe_path, %W|build src/Suave.netcore.sln -c #{Configuration}|
   end
 
   desc 'Build Suave and test project'
