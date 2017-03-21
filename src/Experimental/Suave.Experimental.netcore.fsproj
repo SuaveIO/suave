@@ -4,6 +4,7 @@
     <TargetFramework>netstandard1.6</TargetFramework>
     <AssemblyName>Suave.Experimental</AssemblyName>
     <PackageId>Suave.Experimental</PackageId>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <DefineConstants>$(DefineConstants);DNXCORE50;NETSTANDARD1_5</DefineConstants>
   </PropertyGroup>
 

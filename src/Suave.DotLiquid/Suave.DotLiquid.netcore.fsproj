@@ -4,6 +4,7 @@
     <TargetFramework>netstandard1.6</TargetFramework>
     <AssemblyName>Suave.DotLiquid</AssemblyName>
     <PackageId>Suave.DotLiquid</PackageId>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <DefineConstants>$(DefineConstants);DNXCORE50;NETSTANDARD1_5</DefineConstants>
   </PropertyGroup>
 
