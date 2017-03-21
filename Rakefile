@@ -162,11 +162,8 @@ namespace :dotnetcli do
 
   desc 'Create Suave nugets packages'
   task :pack => :coreclr_binaries do
-    [ "src/Suave", "src/Experimental", "src/Suave.DotLiquid" ].each do |item|
-      Dir.chdir "#{item}" do
-        system dotnet_exe_path, %W|--verbose pack --configuration #{Configuration} --no-build|
-        Dir.chdir "../.."
-      end
+    [ "src/Suave/Suave.netcore.fsproj", "src/Experimental/Suave.Experimental.fsproj", "src/Suave.DotLiquid/Suave.DotLiquid.netcore.fsproj" ].each do |item|
+        system dotnet_exe_path, %W|pack --configuration #{Configuration} --no-build /p:Version=#{ENV['NUGET_VERSION']}|
     end
   end
 
