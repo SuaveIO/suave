@@ -64,7 +64,7 @@ let testApp =
     RequestErrors.NOT_FOUND "Found no handlers"
   ]
 
-#if NETSTANDARD1_5
+#if NETCOREAPP1_1
 #else
 System.Net.ServicePointManager.DefaultConnectionLimit <- Int32.MaxValue
 #endif
@@ -228,7 +228,7 @@ let main argv =
       compressedFilesFolder = None
       logger                = logger
       tcpServerFactory      = new DefaultTcpServerFactory()
-#if NETSTANDARD1_5
+#if NETCOREAPP1_1
       cookieSerialiser      = new JsonFormatterSerialiser()
 #else
       cookieSerialiser      = new BinaryFormatterSerialiser()
