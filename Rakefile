@@ -275,11 +275,6 @@ task :increase_version_number do
   s.save
   version = s.format("%M.%m.%p%s")
   ENV['NUGET_VERSION'] = version
-  projectjson = 'src/Suave/project.json'
-  contents = File.read(projectjson).gsub(/"version": ".*-dotnetcli"/, %{"version": "#{version}-dotnetcli"})
-  File.open(projectjson, 'w') do |out|
-    out << contents
-  end
 end
 
 namespace :docs do
