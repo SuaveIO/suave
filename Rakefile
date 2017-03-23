@@ -45,7 +45,7 @@ asmver_files :asmver => :versioning do |a|
   a.files = FileList[
     'examples/**/*.fsproj',
     'src/{Suave,Suave.*,Experimental}/*proj'
-  ]
+  ].exclude(/.netcore.fsproj/)
   a.attributes assembly_description: suave_description,
                assembly_configuration: Configuration,
                assembly_company: 'Suave.io',
@@ -103,7 +103,7 @@ namespace :dotnetcli do
   end
 
   task :coreclr_binaries => 'tools/coreclr' do
-    dotnet_version = '1.0.0-preview2-003131'
+    dotnet_version = '1.0.1'
     dotnet_installed_version = get_installed_dotnet_version
     # check if required version of .net core sdk is already installed, otherwise download and install it
     if dotnet_installed_version == dotnet_version then
@@ -116,64 +116,58 @@ namespace :dotnetcli do
       puts "Found .NET Core SDK #{dotnet_installed_version} but require #{dotnet_version}. Downloading and installing in ./tools/coreclr"
     end
 
+    coreclr_bin_dir = File.expand_path "tools/coreclr"
+
+    dotnet_exe_path = "dotnet"
+
     case RUBY_PLATFORM
-    when /darwin/
-      filename = "dotnet-dev-osx-x64.#{dotnet_version}.tar.gz"
+    when /darwin/ , /linux/
       system 'curl',
-        %W|-o tools/#{filename}
-           -L https://dotnetcli.blob.core.windows.net/dotnet/preview/Binaries/#{dotnet_version}/#{filename}| \
-        unless File.exists? "tools/#{filename}"
+        %W|-o tools/dotnet-install.sh
+           -L https://dot.net/v1/dotnet-install.sh| \
+        unless File.exists? "tools/dotnet-install.sh"
 
-      system 'tar',
-        %W|xf tools/#{filename}
-           --directory tools/coreclr|
-    when /linux/
-      filename = "dotnet-dev-ubuntu.14.04-x64.#{dotnet_version}.tar.gz"
-      system 'curl',
-        %W|-o tools/#{filename}
-           -L https://dotnetcli.blob.core.windows.net/dotnet/preview/Binaries/#{dotnet_version}/#{filename}| \
-        unless File.exists? "tools/#{filename}"
+      system 'bash',
+        %W|--install-dir "#{coreclr_bin_dir}"
+           --channel "stable"
+           --version "#{dotnet_version}|
 
-      system 'tar',
-        %W|xf tools/#{filename}
-           --directory tools/coreclr|
-    end
-    if Albacore.windows?
+      ENV['PATH'] = "#{coreclr_bin_dir}/dotnet:#{ENV['PATH']}"
+    else
       system 'powershell',
-        %W|Invoke-WebRequest "https://raw.githubusercontent.com/dotnet/cli/rel/1.0.0-preview2/scripts/obtain/dotnet-install.ps1" -OutFile "dotnet_cli_install.ps1"|
+        %W|Invoke-WebRequest "https://dot.net/v1/dotnet-install.ps1" -OutFile "tools/dotnet-install.ps1"| \
+        unless File.exists? "tools/dotnet-install.ps1"
+
       system 'powershell',
-        %W|-ExecutionPolicy Unrestricted ./dotnet_cli_install.ps1 -InstallDir "tools/coreclr" -Channel "preview" -version "#{dotnet_version}"|
+        %W|-ExecutionPolicy Unrestricted ./tools/dotnet-install.ps1
+           -InstallDir "#{coreclr_bin_dir}"
+           -Channel "stable"
+           -Version "#{dotnet_version}"|
+
+      ENV['PATH'] = "#{coreclr_bin_dir};#{ENV['PATH']}"
     end
 
-    dotnet_exe_path = "#{Dir.pwd}/tools/coreclr/dotnet"
   end
 
   desc 'Restore the CoreCLR binaries'
   task :restore => :coreclr_binaries do
-    Dir.chdir "src" do
-      system dotnet_exe_path, "restore"
-    end
+    system dotnet_exe_path, %W|restore src/Suave.netcore.sln -v n|
   end
 
   task :build_lib => :coreclr_binaries do
-    [ "src/Suave", "src/Experimental", "src/Suave.DotLiquid" ].each do |item|
-      Dir.chdir "#{item}" do
-        system dotnet_exe_path, %W|--verbose build --configuration #{Configuration} -f netstandard1.6|
-        Dir.chdir "../.."
-      end
-    end
+    system dotnet_exe_path, %W|build src/Suave.netcore.sln -c #{Configuration} -v n|
   end
 
   desc 'Build Suave and test project'
   task :build => [:build_lib]
 
+  directory 'build/pkg-netcore'
+
   desc 'Create Suave nugets packages'
-  task :pack => :coreclr_binaries do
-    [ "src/Suave", "src/Experimental", "src/Suave.DotLiquid" ].each do |item|
-      Dir.chdir "#{item}" do
-        system dotnet_exe_path, %W|--verbose pack --configuration #{Configuration} --no-build|
-        Dir.chdir "../.."
-      end
+  task :pack  => [:versioning, 'build/pkg-netcore', :coreclr_binaries] do
+    out_dir = File.expand_path "build/pkg-netcore" 
+    [ "src/Suave/Suave.netcore.fsproj", "src/Experimental/Suave.Experimental.netcore.fsproj", "src/Suave.DotLiquid/Suave.DotLiquid.netcore.fsproj" ].each do |item|
+        system dotnet_exe_path, %W|pack #{item} --configuration #{Configuration} --output "#{out_dir}" --no-build -v n /p:Version=#{ENV['NUGET_VERSION']}|
     end
   end
 
@@ -181,17 +175,13 @@ namespace :dotnetcli do
 
   desc 'Merge standard and dotnetcli nupkgs; note the need to run :nugets before'
   task :merge => :coreclr_binaries do
-    [ "Suave", "Experimental", "Suave.DotLiquid" ].each do |item|
-      Dir.chdir "src/#{item}" do
-        version = SemVer.find.format("%M.%m.%p%s")
-        if item == "Experimental" then
-          sourcenupkg = "../../build/pkg/Suave.Experimental.#{version}.nupkg"
-          clinupkg = "bin/#{Configuration}/Experimental.#{version}-dotnetcli.nupkg"
-        else
-          sourcenupkg = "../../build/pkg/#{item}.#{version}.nupkg"
-          clinupkg = "bin/#{Configuration}/#{item}.#{version}-dotnetcli.nupkg"
-        end
-        system dotnet_exe_path, %W|mergenupkg --source "#{sourcenupkg}" --other "#{clinupkg}" --framework netstandard1.6|
+    system dotnet_exe_path, %W|restore tools/tools.proj -v n|
+    Dir.chdir "tools" do
+      [ "Suave", "Suave.Experimental", "Suave.DotLiquid" ].each do |item|
+          version = SemVer.find.format("%M.%m.%p%s")
+          sourcenupkg = "../build/pkg/#{item}.#{version}.nupkg"
+          netcorenupkg = "../build/pkg-netcore/#{item}.#{version}.nupkg"
+          system dotnet_exe_path, %W|mergenupkg --source "#{sourcenupkg}" --other "#{netcorenupkg}" --framework netstandard1.6|
       end
     end
   end
@@ -219,7 +209,7 @@ task :tests => [:'tests:stress', :'tests:unit']
 directory 'build/pkg'
 
 task :create_nuget_quick => [:versioning, 'build/pkg'] do
-  projects = FileList['src/**/*.fsproj'].exclude(/Tests/)
+  projects = FileList['src/**/*.fsproj'].exclude(/.netcore.fsproj/).exclude(/Tests/)
   knowns = Set.new(projects.map { |f| Albacore::Project.new f }.map { |p| p.id })
   authors = "Ademar Gonzalez, Henrik Feldt"
   projects.each do |f|
@@ -275,11 +265,6 @@ task :increase_version_number do
   s.save
   version = s.format("%M.%m.%p%s")
   ENV['NUGET_VERSION'] = version
-  projectjson = 'src/Suave/project.json'
-  contents = File.read(projectjson).gsub(/"version": ".*-dotnetcli"/, %{"version": "#{version}-dotnetcli"})
-  File.open(projectjson, 'w') do |out|
-    out << contents
-  end
 end
 
 namespace :docs do

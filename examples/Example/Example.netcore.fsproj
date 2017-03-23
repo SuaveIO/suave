@@ -1,0 +1,22 @@
+﻿<Project Sdk="FSharp.NET.Sdk;Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netcoreapp1.1</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>Example</AssemblyName>
+    <DefineConstants>$(DefineConstants);DNXCORE50</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="../../paket-files/haf/YoLo/YoLo.fs" />
+    <Compile Include="CounterDemo.fs" />
+    <Compile Include="Program.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FSharp.NET.Sdk" Version="1.0.*" PrivateAssets="All" />
+    <PackageReference Include="FSharp.Core" Version="4.1.*" />
+    <ProjectReference Include="../../src/Suave/Suave.netcore.fsproj" />
+  </ItemGroup>
+
+</Project>
