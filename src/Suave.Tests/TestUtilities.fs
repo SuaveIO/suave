@@ -36,7 +36,8 @@ module Generators =
       bs
 
     gen {
-      let! charSize = Gen.choose (1, 4)
+      // TODO: consider enabling 4-byte chars after more investigation
+      let! charSize = Gen.choose (1, 3)
       match charSize with
       | 1 ->
         let! value = Gen.choose (0x00, 0x7F)
