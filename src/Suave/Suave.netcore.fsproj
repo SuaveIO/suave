@@ -22,6 +22,7 @@
     <Compile Include="Utils/Crypto.fs" />
     <Compile Include="Utils/Parsing.fs" />
     <Compile Include="Utils/OpenMemoryStream.fs" />
+    <Compile Include="Utils/RangedStream.fs" />
     <Compile Include="Utils/Property.fs" />
     <Compile Include="Utils/Parse.fs" />
     <Compile Include="Utils/CultureInfoCache.fs" />
