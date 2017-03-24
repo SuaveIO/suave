@@ -46,7 +46,20 @@ let tests =
     fn conn, writes
 
   testList "AsyncSocket" [
-    ftestPropertyWithConfig (1,1) fsCheckConfig "sum of bytes" <|
+    ftestCase "simple failure" <| fun _ ->
+      let sample =
+        [| // ("���", [|244uy; 179uy; 138uy; 133uy|])
+          ("毠", [|230uy; 175uy; 160uy|])
+          ("Ə", [|198uy; 143uy|])
+          ("j", [|106uy|])
+          // ("����", [|245uy; 147uy; 154uy; 153uy|])
+          ("㟴", [|227uy; 159uy; 180uy|])
+        |]
+      let str = UTF8String(sample, 0us, 0u).concat ()
+      let dotnetBytes = Encoding.UTF8.GetBytes str
+      Expect.equal dotnetBytes.Length 9 "Should output UTF8 bytes"
+
+    testPropertyWithConfig fsCheckConfig "sum of bytes" <|
       fun (UTF8String (str, _, bytesCount) as sample, bufSize) ->
         if str.Length < 6 then true else
         let concatenated = sample.concat ()
