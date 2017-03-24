@@ -1,4 +1,4 @@
-﻿[<AutoOpen>]
+[<AutoOpen>]
 module Suave.Sockets.AsyncSocket
 
 open Suave.Utils
@@ -28,13 +28,39 @@ let flush (connection : Connection) : SocketOp<Connection> =
     return { connection with lineBufferCount = 0 }
   }
 
+let chunkBoundaries maxChunkBytes (s : string) =
+  // if maxChunkBytes < 6 then failwith "Cannot split into chunks of smaller than 6 bytes"
+  // if maxChunkBytes < 6 then Seq.empty else
+  seq {
+    // One UTF-16 char can represent at most 3 UTF-8 bytes, because any 4-byte
+    // UTF-8 sequences are represented by two UTF-16 chars (a surrogate pair).
+    let maxChars = maxChunkBytes / 3
+    let mutable charsLeft = s.Length
+    let mutable charsSoFar = 0
+    while charsLeft > 0 do
+      let charsThisTime = min maxChars charsLeft
+      let lastCharIdx = charsSoFar + charsThisTime - 1
+      // Don't split a surrogate pair; if this segments ends on a
+      let charsThisTime = if Char.IsHighSurrogate s.[lastCharIdx] then charsThisTime - 1 else charsThisTime
+      yield charsSoFar, charsThisTime
+      charsSoFar <- charsSoFar + charsThisTime
+      charsLeft <- charsLeft - charsThisTime
+  }
+
 let asyncWrite (s: string) (connection: Connection) : SocketOp<unit*Connection> =
   socket {
     if s.Length > 0 then
       let buff = connection.lineBuffer
       let lineBufferCount = connection.lineBufferCount
-      assert (s.Length < buff.Count - lineBufferCount)
-      if lineBufferCount + s.Length > buff.Count then
+      let maxByteCount = Encoding.UTF8.GetMaxByteCount(s.Length)
+      if maxByteCount > buff.Count then
+        do! send connection (new ArraySegment<_>(buff.Array, buff.Offset, lineBufferCount))
+        for offset, charCount in chunkBoundaries buff.Count s do
+          let byteCount = Encoding.UTF8.GetBytes(s, offset, charCount, buff.Array, buff.Offset)
+          // don't waste time buffering here
+          do! send connection (new ArraySegment<_>(buff.Array, buff.Offset, byteCount))
+        return (),{ connection with lineBufferCount = 0 }
+      elif lineBufferCount + maxByteCount > buff.Count then
         do! send connection (new ArraySegment<_>(buff.Array, buff.Offset, lineBufferCount))
         // the string, char index, char count, bytes, byte index
         let c = Encoding.UTF8.GetBytes(s, 0, s.Length, buff.Array, buff.Offset)
