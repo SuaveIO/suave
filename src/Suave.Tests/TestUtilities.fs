@@ -16,12 +16,20 @@ open Suave.Logging
 open Expecto
 open FsCheck
 
-type UTF8Char = UTF8Char of ch:string * bytesCount:uint32
-type MultiByteString = MultiByteString of str:string * characters:uint16 * bytesCount:uint32
+type UTF8Char = UTF8Char of ch:byte[]
+type UTF8String =
+  UTF8String of str:(string * byte[])[] * characters:uint16 * bytesCount:uint32
+with
+  /// Returns a .Net string (UTF16) from the chars. Note that the char count in UTF8 doesn't equal
+  /// that of UTF16.
+  member x.concat () =
+    let (UTF8String (chars, ccount, bcount)) = x
+    chars |> Array.map fst |> String.Concat
+
+type UTF8LongString = UTF8LongString of string:UTF8String
 
 module Generators =
   let utf8char: Gen<UTF8Char> =
-    let utf8 = Encoding.UTF8
     let intToBytes (i: int) =
       let bs = BitConverter.GetBytes i
       if BitConverter.IsLittleEndian then Array.Reverse bs
@@ -75,29 +83,35 @@ module Generators =
       | _ ->
         return failwith "outside gen"
     }
-    |> Gen.map (fun bs -> utf8.GetString bs, uint32 bs.Length)
-    |> Gen.map (fun (str, count) ->
-      //if str.Length <> 1 then failwithf "char=%A, bytes=%A: string.Length <> 1!" str (utf8.GetBytes str)
-      str, count)
     |> Gen.map UTF8Char
 
   let utf8String =
     let baseNoChars = 389
-    gen {
-      let! multiple = Gen.choose (1, 10)
-      let! size = Gen.choose (baseNoChars, baseNoChars * multiple)
-      // up to 15.2 KiB of data (if all chars are using 4 byte chars)
-      let! chars = Gen.arrayOfLength size utf8char
-      let str = chars |> Array.map (fun (UTF8Char (c, _)) -> c) |> String.Concat
-      let bytesCount = chars |> Array.sumBy (fun (UTF8Char (_, bytesCount)) -> bytesCount) |> uint32
-      return MultiByteString (str, uint16 (* size, really *) str.Length, bytesCount)
-    }
+    let utf8 = Encoding.UTF8
+    let generator =
+      gen {
+        let! multiple = Gen.choose (1, 10)
+        let! size = Gen.choose (baseNoChars, baseNoChars * multiple)
+        // up to 15.2 KiB of data (if all chars are using 4 byte chars)
+        let! chars = Gen.arrayOfLength size utf8char
+        let combinedString = chars |> Array.map (fun (UTF8Char c) -> utf8.GetString c, c)
+        let bytesCount = chars |> Array.sumBy (fun (UTF8Char c) -> c.Length) |> uint32
+        return UTF8String (combinedString, uint16 size, bytesCount)
+      }
+    let shrinker (UTF8String (chars, charCount, bytesCount)) =
+      if chars.Length <= 1 then Seq.empty else
+      let removedBytes = let _, bs = chars.[0] in bs.Length
+      UTF8String (chars.[1..], charCount - 1us, bytesCount - uint32 removedBytes)
+      |> Seq.singleton
+    generator, shrinker
+    // generator
 
-type MultiByteGlyphs() =
+type UTF8Strings() =
   static member UTF8Char(): Arbitrary<UTF8Char> =
     Arb.fromGen Generators.utf8char
-  static member MultiByteString(): Arbitrary<MultiByteString> =
-    Arb.fromGen Generators.utf8String
+  static member UTF8String(): Arbitrary<UTF8String> =
+    Arb.fromGenShrink Generators.utf8String
+    // Arb.fromGen Generators.utf8String
 
 type Arbs =
   static member String () =
@@ -106,11 +120,11 @@ type Arbs =
 
 let fsCheckConfig =
   { FsCheckConfig.defaultConfig with
-      startSize = 10
-      maxTest = 10000
+      startSize = 1
+      maxTest = 200
       arbitrary =
         [ typeof<Arbs>
-          typeof<MultiByteGlyphs>
+          typeof<UTF8Strings>
         ] }
 
 let currentPath =

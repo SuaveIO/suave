@@ -13,6 +13,8 @@ open Suave.Tests.TestUtilities
 
 [<Tests>]
 let tests =
+  let logger = Log.create "AsyncSocket"
+
   let createStubTransport (writes: ResizeArray<byte[]>) =
     { new ITransport with
         member x.write (buf: ByteSegment) =
@@ -28,11 +30,12 @@ let tests =
           async.Return ()
     }
 
-  let usingConn fn =
+  let usingConn bufSize fn =
     let writes = ResizeArray<_>()
     let tx = createStubTransport writes
     let conn =
-      let bm = BufferManager (32 * 1024 * 1000, (* buffer size *) 128, true)
+      let bufSize = max 6 bufSize
+      let bm = BufferManager (bufSize * 1000, bufSize, true)
       { transport = tx
         bufferManager = bm
         lineBuffer = bm.PopBuffer "First buffer"
@@ -44,10 +47,19 @@ let tests =
 
   testList "AsyncSocket" [
     ftestPropertyWithConfig (1,1) fsCheckConfig "sum of bytes" <|
-      fun (MultiByteString (str, characters, bytesCount)) ->
+      fun (UTF8String (str, _, bytesCount) as sample, bufSize) ->
+        if str.Length < 6 then true else
+        let concatenated = sample.concat ()
+
+        logger.debugWithBP (
+          eventX "'sum of bytes' called with string length {len}"
+          >> setField "sample" sample
+          >> setField "len" concatenated.Length)
+        |> Async.RunSynchronously
+
         let _, writes =
-          usingConn <| fun conn ->
-            let (res: Async<Choice<unit * Connection, Error>>) = AsyncSocket.asyncWrite str conn
+          usingConn bufSize <| fun conn ->
+            let (res: Async<Choice<unit * Connection, Error>>) = AsyncSocket.asyncWrite concatenated conn
             let (res: Choice<unit * Connection, Error>) = Async.RunSynchronously res
             Expect.isChoice1Of2 res "Should write to stub successfully"
 
@@ -55,4 +67,5 @@ let tests =
 
         let bytesWritten = uint32 (writes |> Seq.sumBy (fun bs -> bs.Length))
         Expect.equal bytesWritten bytesCount "The generated # bytes should equal the # bytes written"
+        true
   ]

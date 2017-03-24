@@ -17,6 +17,8 @@ open Suave.Logging
 type BufferManager(totalBytes, bufferSize, autoGrow) =
   static let logger = Log.create "Suave.Sockets.BufferManager"
 
+  do if bufferSize < 6 then failwith "bufferSize must be greater than six bytes"
+
   do logger.debug (
        Message.eventX "Initialising BufferManager with {totalBytes}"
        >> Message.setFieldValue "totalBytes" totalBytes)
@@ -34,7 +36,7 @@ type BufferManager(totalBytes, bufferSize, autoGrow) =
     lock creatingSegment (fun _ ->
       if segments.Count < chunksPerSegment / 2 then
         logger.verbose (
-          Message.eventX "Creating buffer bank, total {totalBytes} bytes" 
+          Message.eventX "Creating buffer bank, total {totalBytes} bytes"
           >> Message.setFieldValue "totalBytes" totalBytes)
         let buffer = Array.zeroCreate totalBytes
         let mutable runningOffset = 0
