@@ -52,7 +52,6 @@ let asyncWrite (s : string) (connection : Connection) : SocketOp<unit*Connection
     if s.Length > 0 then
       let buff = connection.lineBuffer
       let lineBufferCount = connection.lineBufferCount
-      assert (s.Length < buff.Count - lineBufferCount)
       let maxByteCount = Encoding.UTF8.GetMaxByteCount(s.Length)
       if maxByteCount > buff.Count then
         do! send connection (new ArraySegment<_>(buff.Array, buff.Offset, lineBufferCount))
