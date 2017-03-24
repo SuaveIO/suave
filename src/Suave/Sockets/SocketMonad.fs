@@ -59,7 +59,7 @@ type SocketMonad() =
 [<AutoOpen>]
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module SocketMonad =
-  /// The socket monad   
+  /// The socket monad
   let socket = SocketMonad()
 
 
@@ -77,7 +77,7 @@ module SocketMonad =
     member x.Delay(f: unit ->  SocketState<'s,'a>) : SocketState<'s,'a> = fun s -> f () s
     member x.Using(disposable : #System.IDisposable, body : 'a -> SocketState<'s,_>) = fun s -> socket {
       use _ = disposable
-     return! body disposable s
+      return! body disposable s
     }
     member x.While(guard, body : SocketState<'s,_>) : SocketState<'s,_> = fun s -> socket {
       if guard() then

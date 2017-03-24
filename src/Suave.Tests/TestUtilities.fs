@@ -9,11 +9,95 @@ open System.Net
 open System.Net.Http
 open System.Net.Http.Headers
 open System.Reflection
+open System.Text
 open Suave
 open Suave.Web
 open Suave.Logging
 open Expecto
 open FsCheck
+
+type UTF8Char = UTF8Char of ch:string * bytesCount:uint32
+type MultiByteString = MultiByteString of str:string * characters:uint16 * bytesCount:uint32
+
+module Generators =
+  let utf8char: Gen<UTF8Char> =
+    let utf8 = Encoding.UTF8
+    let intToBytes (i: int) =
+      let bs = BitConverter.GetBytes i
+      if BitConverter.IsLittleEndian then Array.Reverse bs
+      bs
+
+    gen {
+      let! charSize = Gen.choose (1, 4)
+      match charSize with
+      | 1 ->
+        let! value = Gen.choose (0x00, 0x7F)
+        let bs = intToBytes value
+        if bs.Length <> 4 then failwith "len(bs) should be 4"
+        return Array.singleton bs.[3]
+
+      | 2 ->
+        let! codepoint = Gen.choose (0x0080, 0x07ff)
+        let bs = intToBytes codepoint
+        return [|
+          // MSB byte 1: 110xxxxx
+          0b1100_0000uy ||| ((0b0000_0111uy &&& bs.[2]) <<< 2) ||| ((0b1100_0000uy &&& bs.[3]) >>> 6)
+          // LSB byte 2: 10xxxxxx
+          0b1000_0000uy ||| (0b0011_1111uy &&& bs.[3])
+        |]
+
+      | 3 ->
+        let! codepoint = Gen.choose (0x0800, 0xFFFF)
+        let bs = intToBytes codepoint
+        return [|
+          // byte 1: 1110 xxxx
+          0b1110_0000uy ||| ((0b1111_0000uy &&& bs.[2]) >>> 4)
+          // byte 2: 10 xxxx xx
+          0b1000_0000uy ||| (((0b0000_1111uy &&& bs.[2]) <<< 2) ||| ((0b1100_0000uy &&& bs.[3]) >>> 6))
+          // byte 3: 10 xx xxxx
+          0b1000_0000uy ||| (0b0011_0000uy &&& bs.[2]) ||| (0b0000_1111uy &&& bs.[3])
+        |]
+
+      | 4 ->
+        let! codepoint = Gen.choose (0x10000, 0x10FFFF)
+        let bs = intToBytes codepoint
+        return [|
+          // byte 1: 11110xxx
+          0b1111_0000uy ||| ((0b0001_1100uy &&& bs.[2]) >>> 2)
+          // byte 2: 10xxxxxx
+          0b1000_0000uy ||| ((0b1111_0000uy &&& bs.[2]) >>> 4) ||| ((0b0000_0011uy &&& bs.[1]) <<< 4)
+          // byte 3: 10xxxxxx
+          0b1000_0000uy ||| ((0b0000_1111uy &&& bs.[2]) <<< 2) ||| ((0b1100_0000uy &&& bs.[3]) >>> 6)
+          // byte 4: 10xxxxxx
+          0b1000_0000uy ||| (0b0011_1111uy &&& bs.[3])
+        |]
+
+      | _ ->
+        return failwith "outside gen"
+    }
+    |> Gen.map (fun bs -> utf8.GetString bs, uint32 bs.Length)
+    |> Gen.map (fun (str, count) ->
+      //if str.Length <> 1 then failwithf "char=%A, bytes=%A: string.Length <> 1!" str (utf8.GetBytes str)
+      str, count)
+    |> Gen.map UTF8Char
+
+  let utf8String =
+    let baseNoChars = 389
+    gen {
+      let! multiple = Gen.choose (1, 10)
+      let! size = Gen.choose (baseNoChars, baseNoChars * multiple)
+      // up to 15.2 KiB of data (if all chars are using 4 byte chars)
+      let! chars = Gen.arrayOfLength size utf8char
+      let str = chars |> Array.map (fun (UTF8Char (c, _)) -> c) |> String.Concat
+      let bytesCount = chars |> Array.sumBy (fun (UTF8Char (_, bytesCount)) -> bytesCount) |> uint32
+      return MultiByteString (str, uint16 (* size, really *) str.Length, bytesCount)
+    }
+
+type MultiByteGlyphs() =
+  static member UTF8Char(): Arbitrary<UTF8Char> =
+    Arb.fromGen Generators.utf8char
+  static member MultiByteString(): Arbitrary<MultiByteString> =
+    Arb.fromGen Generators.utf8String
 
 type Arbs =
   static member String () =
@@ -22,8 +106,12 @@ type Arbs =
 
 let fsCheckConfig =
   { FsCheckConfig.defaultConfig with
-      maxTest = 100
-      arbitrary = [ typeof<Arbs> ] }
+      startSize = 10
+      maxTest = 10000
+      arbitrary =
+        [ typeof<Arbs>
+          typeof<MultiByteGlyphs>
+        ] }
 
 let currentPath =
   Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location)

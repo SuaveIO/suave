@@ -19,7 +19,7 @@ open System.Text
 type TcpWorker<'a> = Connection -> Async<'a>
 
 /// Flush out whatever is in the lineBuffer
-let flush (connection : Connection) : SocketOp<Connection> = 
+let flush (connection : Connection) : SocketOp<Connection> =
   socket {
     let buff = connection.lineBuffer
     let lineBufferCount = connection.lineBufferCount
@@ -28,7 +28,7 @@ let flush (connection : Connection) : SocketOp<Connection> =
     return { connection with lineBufferCount = 0 }
   }
 
-let asyncWrite (s : string) (connection : Connection) : SocketOp<unit*Connection> = 
+let asyncWrite (s: string) (connection: Connection) : SocketOp<unit*Connection> =
   socket {
     if s.Length > 0 then
       let buff = connection.lineBuffer
@@ -36,15 +36,16 @@ let asyncWrite (s : string) (connection : Connection) : SocketOp<unit*Connection
       assert (s.Length < buff.Count - lineBufferCount)
       if lineBufferCount + s.Length > buff.Count then
         do! send connection (new ArraySegment<_>(buff.Array, buff.Offset, lineBufferCount))
+        // the string, char index, char count, bytes, byte index
         let c = Encoding.UTF8.GetBytes(s, 0, s.Length, buff.Array, buff.Offset)
-        return (),{ connection with lineBufferCount = c }
+        return (), { connection with lineBufferCount = c }
       else
         let c = Encoding.UTF8.GetBytes(s, 0, s.Length, buff.Array, buff.Offset + lineBufferCount )
-        return (),{ connection with lineBufferCount = lineBufferCount + c }
-    else return (),connection
+        return (), { connection with lineBufferCount = lineBufferCount + c }
+    else return (), connection
   }
 
-let asyncWriteLn (s : string) (connection : Connection) : SocketOp<unit*Connection> = 
+let asyncWriteLn (s : string) (connection : Connection) : SocketOp<unit*Connection> =
   socket {
     return! asyncWrite (s + Bytes.eol) connection
   }
@@ -55,14 +56,14 @@ let asyncWriteBytes (connection : Connection) (b : byte[]) : SocketOp<unit> = as
   else return Choice1Of2 ()
 }
 
-let asyncWriteBufferedBytes (b : byte[]) (connection : Connection) : SocketOp<unit*Connection> = 
+let asyncWriteBufferedBytes (b : byte[]) (connection : Connection) : SocketOp<unit*Connection> =
   socket {
     if b.Length > 0 then
       let buff = connection.lineBuffer
       let lineBufferCount = connection.lineBufferCount
       if lineBufferCount + b.Length > buff.Count then
         // flush lineBuffer
-        if lineBufferCount > 0 then 
+        if lineBufferCount > 0 then
           do! send connection (new ArraySegment<_>(buff.Array, buff.Offset, lineBufferCount))
         // don't waste time buffering here
         do! send connection (new ArraySegment<_>(b, 0, b.Length))
