@@ -67,7 +67,10 @@ module Generators =
         |]
 
       | 4 ->
-        let! codepoint = Gen.choose (0x10000, 0x10FFFF)
+        // https://en.wikipedia.org/wiki/Plane_(Unicode)#Overview
+        // Let's skip Supplementary Private Use Area planes
+        // let! codepoint = Gen.choose (0x10000, 0x10FFFF)
+        let! codepoint = Gen.choose (0x10000, 0x2FFFF)
         let bs = intToBytes codepoint
         return [|
           // byte 1: 11110xxx

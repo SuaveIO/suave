@@ -45,21 +45,42 @@ let tests =
       }
     fn conn, writes
 
+  let pretty (bytes: byte[]) =
+    bytes
+    |> Array.mapi (fun i b ->
+        [|
+          yield "0x"
+          yield Convert.ToString(b, 16)
+          yield " "
+        |])
+    |> Array.concat
+    |> String.Concat
+
   testList "AsyncSocket" [
-    ftestCase "simple failure" <| fun _ ->
+    testCase "<= 3 byte chars" <| fun _ ->
       let sample =
-        [| // ("���", [|244uy; 179uy; 138uy; 133uy|])
-          ("毠", [|230uy; 175uy; 160uy|])
+        [|("毠", [|230uy; 175uy; 160uy|])
           ("Ə", [|198uy; 143uy|])
           ("j", [|106uy|])
-          // ("����", [|245uy; 147uy; 154uy; 153uy|])
-          ("㟴", [|227uy; 159uy; 180uy|])
-        |]
+          ("㟴", [|227uy; 159uy; 180uy|]) |]
       let str = UTF8String(sample, 0us, 0u).concat ()
       let dotnetBytes = Encoding.UTF8.GetBytes str
-      Expect.equal dotnetBytes.Length 9 "Should output UTF8 bytes"
+      let pretty = pretty dotnetBytes
+      Expect.equal dotnetBytes.Length 9 (sprintf "Should output UTF8 bytes, but got\n%A\n%s" dotnetBytes pretty)
 
-    testPropertyWithConfig fsCheckConfig "sum of bytes" <|
+    testCase "4 byte chars" <| fun _ ->
+      let sample = [| ("���", [|244uy; 179uy; 138uy; 133uy|]) |]
+      let str = UTF8String(sample, 0us, 0u).concat ()
+      let dotnetBytes = Encoding.UTF8.GetBytes str
+      let pretty = pretty dotnetBytes
+      // https://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character
+
+      Expect.equal dotnetBytes.Length 9
+                   "Should output three replacement chars (which are three bytes)"
+      Expect.sequenceEqual (Encoding.UTF8.GetBytes "���") dotnetBytes
+                           "Should output three replacement chars"
+
+    ftestPropertyWithConfig (1, 1) fsCheckConfig "sum of bytes" <|
       fun (UTF8String (str, _, bytesCount) as sample, bufSize) ->
         if str.Length < 6 then true else
         let concatenated = sample.concat ()
