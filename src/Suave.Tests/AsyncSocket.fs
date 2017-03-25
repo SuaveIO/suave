@@ -57,13 +57,7 @@ let tests =
 
   let pretty (bytes: byte[]) =
     bytes
-    |> Array.mapi (fun i b ->
-        [|
-          yield "0x"
-          yield Convert.ToString(b, 16)
-          yield " "
-        |])
-    |> Array.concat
+    |> Array.map (sprintf "0x%02x ")
     |> String.Concat
 
   testList "AsyncSocket" [
@@ -79,16 +73,15 @@ let tests =
       Expect.equal dotnetBytes.Length 9 (sprintf "Should output UTF8 bytes, but got\n%A\n%s" dotnetBytes pretty)
 
     testCase "4 byte chars" <| fun _ ->
-      let sample = [| ("���", [|244uy; 179uy; 138uy; 133uy|]) |]
+      let sample = [| ("\ud835\udda5", [|240uy; 157uy; 150uy; 165uy|]) // Surrogate pair for U+1D5A5 MATHEMATICAL SANS-SERIF CAPITAL F
+                      ("\ud834\udd30", [|240uy; 157uy; 132uy; 176uy|]) // Surrogate pair for U+1D130 MUSICAL SYMBOL SHARP UP
+                      ("𝖥", [|240uy; 157uy; 150uy; 165uy|]) // Actual U+1D5A5 character in source file (still a surrogate pair internally)
+                      ("𝄰", [|240uy; 157uy; 132uy; 176uy|]) // Actual U+1D130 character in source file (still a surrogate pair internally)
+                   |]
       let str = UTF8String(sample, 0us, 0u).concat ()
       let dotnetBytes = Encoding.UTF8.GetBytes str
       let pretty = pretty dotnetBytes
-      // https://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character
-
-      Expect.equal dotnetBytes.Length 9
-                   "Should output three replacement chars (which are three bytes)"
-      Expect.sequenceEqual (Encoding.UTF8.GetBytes "���") dotnetBytes
-                           "Should output three replacement chars"
+      Expect.equal dotnetBytes.Length 16 (sprintf "Should output UTF8 bytes, but got\n%A\n%s" dotnetBytes pretty)
 
     testPropertyWithConfig fsCheckConfig "sum of bytes" <|
       fun (UTF8String (_, _, _) as sample, bufSize) ->

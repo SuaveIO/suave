@@ -56,7 +56,10 @@ module Generators =
         |]
 
       | 3 ->
-        let! codepoint = Gen.choose (0x0800, 0xFFFF)
+        // Don't generate surrogate characters (U+D800 - U+DFFF), which are invalid on their own.
+        // Also don't generate 0xFFFE or 0xFFFF, which are illegal Unicode characters
+        let! codepoint = Gen.frequency [ 0xD800 - 0x0800, Gen.choose (0x0800, 0xD7FF)
+                                         0xFFFE - 0xE000, Gen.choose (0xE000, 0xFFFD) ]
         let bs = intToBytes codepoint
         return [|
           // byte 1: 1110 xxxx
@@ -64,7 +67,7 @@ module Generators =
           // byte 2: 10 xxxx xx
           0b1000_0000uy ||| (((0b0000_1111uy &&& bs.[2]) <<< 2) ||| ((0b1100_0000uy &&& bs.[3]) >>> 6))
           // byte 3: 10 xx xxxx
-          0b1000_0000uy ||| (0b0011_0000uy &&& bs.[2]) ||| (0b0000_1111uy &&& bs.[3])
+          0b1000_0000uy ||| (0b0011_1111uy &&& bs.[3])
         |]
 
       | 4 ->
@@ -75,7 +78,7 @@ module Generators =
         let bs = intToBytes codepoint
         return [|
           // byte 1: 11110xxx
-          0b1111_0000uy ||| ((0b0001_1100uy &&& bs.[2]) >>> 2)
+          0b1111_0000uy ||| ((0b0001_1100uy &&& bs.[1]) >>> 2)
           // byte 2: 10xxxxxx
           0b1000_0000uy ||| ((0b1111_0000uy &&& bs.[2]) >>> 4) ||| ((0b0000_0011uy &&& bs.[1]) <<< 4)
           // byte 3: 10xxxxxx
