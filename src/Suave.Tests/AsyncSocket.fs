@@ -84,12 +84,11 @@ let tests =
       Expect.equal dotnetBytes.Length 16 (sprintf "Should output UTF8 bytes, but got\n%A\n%s" dotnetBytes pretty)
 
     testPropertyWithConfig fsCheckConfig "sum of bytes" <|
-      fun (UTF8String (_, _, _) as sample, bufSize) ->
+      fun (UTF8String (_, _, bytesCount) as sample, bufSize) ->
         if bufSize < 6 then
           true 
         else
           let concatenated = sample.concat ()
-          let bytesCount = uint32((Encoding.UTF8.GetBytes concatenated).Length)
 
           logger.debugWithBP (
             eventX "'sum of bytes' called with string length {len}"
