@@ -1,4 +1,4 @@
-namespace Suave
+﻿namespace Suave
 
 open Suave.Operators
 open Suave.Sockets
@@ -472,6 +472,32 @@ module ServeResource =
       log (sprintf "failed to find resource by key '%s'" key)
       fail
 
+module ContentRange =
+  open System
+  open System.IO
+  open Suave.Utils
+
+  let parseContentRange (input:string) =
+    let contentUnit = input.Split([|' '; '='|], 2)
+    let rangeArray = contentUnit.[1].Split([|'-'|])
+    let start = int64 rangeArray.[0]
+    let finish = if Int64.TryParse (rangeArray.[1], ref 0L) then Some <| int64 rangeArray.[1] else None
+    start, finish
+    
+  let (|ContentRange|_|) (context:HttpContext) =
+    match context.request.header "range" with
+    | Choice1Of2 rangeValue -> Some <| parseContentRange rangeValue
+    | Choice2Of2 _ -> None
+
+  let getFileStream (ctx:HttpContext) =
+    match ctx with
+    | ContentRange (start, finish) ->
+      let length = finish |> Option.bind (fun finish -> Some (finish - start))
+      (fun path ->
+        let fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite)
+        new RangedStream(fs, start, length, true) :> Stream), start
+    | _ -> (fun path -> new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite) :> Stream), 0L
+
 module Files =
 
   open System
@@ -488,15 +514,17 @@ module Files =
   open Successful
   open Redirection
   open ServeResource
+  open ContentRange
 
   let sendFile fileName (compression : bool) (ctx : HttpContext) =
     let writeFile file (conn, _) = socket {
-      let getFs = fun path -> new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite) :> Stream
+      let getFs, start = getFileStream ctx
       let getLm = fun path -> FileInfo(path).LastWriteTime
       let! (encoding,fs) = Compression.transformStream file getFs getLm compression ctx.runtime.compressionFolder ctx
       try
         match encoding with
         | Some n ->
+          let! (_,conn) = asyncWriteLn (sprintf "Content-Range: bytes %d-%d/*" start (start+fs.Length)) conn
           let! (_,conn) = asyncWriteLn (String.Concat [| "Content-Encoding: "; n.ToString() |]) conn
           let! (_,conn) = asyncWriteLn (sprintf "Content-Length: %d\r\n" (fs : Stream).Length) conn
           let! conn = flush conn
@@ -504,6 +532,7 @@ module Files =
             do! transferStream conn fs
           return conn
         | None ->
+          let! (_,conn) = asyncWriteLn (sprintf "Content-Range: bytes %d-%d/*" start (start+fs.Length)) conn
           let! (_,conn) = asyncWriteLn (sprintf "Content-Length: %d\r\n" (fs : Stream).Length) conn
           let! conn = flush conn
           if  ctx.request.``method`` <> HttpMethod.HEAD && fs.Length > 0L then
