@@ -15,6 +15,16 @@ open Suave.Tests.TestUtilities
 let tests =
   let logger = Log.create "AsyncSocket"
 
+  let fsCheckConfig =
+    { FsCheckConfig.defaultConfig with
+        startSize = 1
+        endSize = 20000
+        maxTest = 2000
+        arbitrary =
+          [
+            typeof<UTF8Strings>
+          ] }
+
   let createStubTransport (writes: ResizeArray<byte[]>) =
     { new ITransport with
         member x.write (buf: ByteSegment) =
@@ -80,26 +90,37 @@ let tests =
       Expect.sequenceEqual (Encoding.UTF8.GetBytes "���") dotnetBytes
                            "Should output three replacement chars"
 
-    ftestPropertyWithConfig (1, 1) fsCheckConfig "sum of bytes" <|
-      fun (UTF8String (str, _, bytesCount) as sample, bufSize) ->
-        if str.Length < 6 then true else
-        let concatenated = sample.concat ()
+    testPropertyWithConfig fsCheckConfig "sum of bytes" <|
+      fun (UTF8String (_, _, _) as sample, bufSize) ->
+        if bufSize < 6 then
+          true 
+        else
+          let concatenated = sample.concat ()
+          let bytesCount = uint32((Encoding.UTF8.GetBytes concatenated).Length)
 
-        logger.debugWithBP (
-          eventX "'sum of bytes' called with string length {len}"
-          >> setField "sample" sample
-          >> setField "len" concatenated.Length)
-        |> Async.RunSynchronously
+          logger.debugWithBP (
+            eventX "'sum of bytes' called with string length {len}"
+            >> setField "sample" sample
+            >> setField "len" concatenated.Length)
+          |> Async.RunSynchronously
 
-        let _, writes =
-          usingConn bufSize <| fun conn ->
-            let (res: Async<Choice<unit * Connection, Error>>) = AsyncSocket.asyncWrite concatenated conn
-            let (res: Choice<unit * Connection, Error>) = Async.RunSynchronously res
-            Expect.isChoice1Of2 res "Should write to stub successfully"
+          let mutable bufferedBytes = 0
+          let _, writes =
+            usingConn bufSize <| fun conn ->
+              let (res: Async<Choice<unit * Connection, Error>>) = AsyncSocket.asyncWrite concatenated conn
+              let (res: Choice<unit * Connection, Error>) = Async.RunSynchronously res
+              Expect.isChoice1Of2 res "Should write to stub successfully"
+              match res with
+              | Choice1Of2 (_, cn) ->
+                // Count the bytes that are left in the lineBuffer
+                bufferedBytes <- bufferedBytes + cn.lineBufferCount
+              | _ ->
+                failwith "does not happen"
 
-        Expect.isGreaterThan writes.Count 0 "Should have written at least one buffer"
+          if uint32 bufSize < bytesCount then
+            Expect.isGreaterThan writes.Count 0 "Should have written at least one buffer"
 
-        let bytesWritten = uint32 (writes |> Seq.sumBy (fun bs -> bs.Length))
-        Expect.equal bytesWritten bytesCount "The generated # bytes should equal the # bytes written"
-        true
+          let bytesWritten = uint32 (writes |> Seq.sumBy (fun bs -> bs.Length)) + (uint32 bufferedBytes)
+          Expect.equal bytesWritten bytesCount "The generated # bytes should equal the # bytes written"
+          true
   ]
