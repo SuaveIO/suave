@@ -489,14 +489,13 @@ module ContentRange =
     | Choice1Of2 rangeValue -> Some <| parseContentRange rangeValue
     | Choice2Of2 _ -> None
 
-  let getFileStream (ctx:HttpContext) =
+  let getFileStream (ctx:HttpContext) path =
+    let fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite) :> Stream
     match ctx with
     | ContentRange (start, finish) ->
       let length = finish |> Option.bind (fun finish -> Some (finish - start))
-      (fun path ->
-        let fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite)
-        new RangedStream(fs, start, length, true) :> Stream), start
-    | _ -> (fun path -> new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite) :> Stream), 0L
+      new RangedStream(fs, start, length, true) :> Stream, start, fs.Length, HTTP_206.status
+    | _ -> fs, 0L, fs.Length, HTTP_200.status
 
 module Files =
 
@@ -517,35 +516,38 @@ module Files =
   open ContentRange
 
   let sendFile fileName (compression : bool) (ctx : HttpContext) =
-    let writeFile file (conn, _) = socket {
-      let getFs, start = getFileStream ctx
-      let getLm = fun path -> FileInfo(path).LastWriteTime
-      let! (encoding,fs) = Compression.transformStream file getFs getLm compression ctx.runtime.compressionFolder ctx
-      try
-        match encoding with
-        | Some n ->
-          let! (_,conn) = asyncWriteLn (sprintf "Content-Range: bytes %d-%d/*" start (start+fs.Length)) conn
-          let! (_,conn) = asyncWriteLn (String.Concat [| "Content-Encoding: "; n.ToString() |]) conn
-          let! (_,conn) = asyncWriteLn (sprintf "Content-Length: %d\r\n" (fs : Stream).Length) conn
-          let! conn = flush conn
-          if  ctx.request.``method`` <> HttpMethod.HEAD && fs.Length > 0L then
-            do! transferStream conn fs
-          return conn
-        | None ->
-          let! (_,conn) = asyncWriteLn (sprintf "Content-Range: bytes %d-%d/*" start (start+fs.Length)) conn
-          let! (_,conn) = asyncWriteLn (sprintf "Content-Length: %d\r\n" (fs : Stream).Length) conn
-          let! conn = flush conn
-          if  ctx.request.``method`` <> HttpMethod.HEAD && fs.Length > 0L then
-            do! transferStream conn fs
-          return conn
-      finally
-        fs.Dispose()
-    }
+    let writeFile file =
+      let fs, start, total, status = getFileStream ctx file
+      fun (conn, _) -> socket {
+        let getLm = fun path -> FileInfo(path).LastWriteTime
+        let! (encoding,fs) = Compression.transformStream file fs getLm compression ctx.runtime.compressionFolder ctx
+        let finish = start + fs.Length - 1L
+        try
+          match encoding with
+          | Some n ->
+            let! (_,conn) = asyncWriteLn (sprintf "Content-Range: bytes %d-%d/*" start finish) conn
+            let! (_,conn) = asyncWriteLn (String.Concat [| "Content-Encoding: "; n.ToString() |]) conn
+            let! (_,conn) = asyncWriteLn (sprintf "Content-Length: %d\r\n" (fs : Stream).Length) conn
+            let! conn = flush conn
+            if ctx.request.``method`` <> HttpMethod.HEAD && fs.Length > 0L then
+              do! transferStream conn fs
+            return conn
+          | None ->
+            let! (_,conn) = asyncWriteLn (sprintf "Content-Range: bytes %d-%d/%d" start finish total) conn
+            let! (_,conn) = asyncWriteLn (sprintf "Content-Length: %d\r\n" (fs : Stream).Length) conn
+            let! conn = flush conn
+            if ctx.request.``method`` <> HttpMethod.HEAD && fs.Length > 0L then
+              do! transferStream conn fs
+            return conn
+        finally
+          fs.Dispose()
+      }, status
+    let task, status = writeFile fileName
     { ctx with
         response =
           { ctx.response with
-              status = HTTP_200.status
-              content = SocketTask (writeFile fileName) } }
+              status = status
+              content = SocketTask task } }
     |> succeed
 
   let file fileName : WebPart =
@@ -645,9 +647,9 @@ module Embedded =
                     (compression : bool)
                     (ctx : HttpContext) =
     let writeResource name (conn, _) = socket {
-      let getFs = fun name -> assembly.GetManifestResourceStream(name)
+      let fs = assembly.GetManifestResourceStream(name)
       let getLm = fun _ -> lastModified assembly
-      let! encoding,fs = Compression.transformStream name getFs getLm compression ctx.runtime.compressionFolder ctx
+      let! encoding,fs = Compression.transformStream name fs getLm compression ctx.runtime.compressionFolder ctx
 
       match encoding with
       | Some n ->
