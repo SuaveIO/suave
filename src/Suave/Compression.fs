@@ -92,10 +92,9 @@ module Compression =
     return newPath
   }
 
-  let transformStream (key : string) (getData : string -> Stream) (getLast : string -> DateTime)
+  let transformStream (key : string) (stream : Stream) (getLast : string -> DateTime)
                       compression compressionFolder ctx =
     socket {
-      let stream = getData key
       if compression && stream.Length > int64(MIN_BYTES_TO_COMPRESS) && stream.Length < int64(MAX_BYTES_TO_COMPRESS) then
         let enconding = parseEncoder ctx.request
         match enconding with
