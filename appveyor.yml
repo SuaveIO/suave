@@ -16,14 +16,15 @@ install:
  - cmd: mkdir src\Suave.Tests\bin\Release\ & cp libuv-1.9.1\Debug\libuv.dll src\Suave.Tests\bin\Release\libuv.dll
  
 build_script:
- - cmd: '"C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\Tools\VsDevCmd.bat"'
- - cmd: set GYP_MSVS_VERSION=2015
  - cmd: msbuild /t:Restore src/Suave.sln
  - cmd: msbuild /t:Restore src/Suave.netcore.sln
  - cmd: gem sources -r https://rubygems.org/
  - cmd: gem install bundler --no-ri --no-rdoc --source https://rubygems.org/
  - cmd: bundle install
- - cmd: bundle exec rake appveyor
+ - cmd: |
+        "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\Tools\VsDevCmd.bat"
+        set GYP_MSVS_VERSION=2015
+        bundle exec rake appveyor
  
 artifacts:
  - path: build\pkg\*.nupkg 
