@@ -34,6 +34,7 @@
     <DocumentationFile>bin\Release\Suave.xml</DocumentationFile>
     <DefineConstants>
     </DefineConstants>
+    <DebugType>pdbonly</DebugType>
   </PropertyGroup>
   <PropertyGroup>
     <MinimumVisualStudioVersion Condition="'$(MinimumVisualStudioVersion)' == ''">11</MinimumVisualStudioVersion>
@@ -61,6 +62,7 @@
     <DocumentationFile>bin\Release\Suave.XML</DocumentationFile>
     <DefineConstants>
     </DefineConstants>
+    <DebugType>pdbonly</DebugType>
     <PlatformTarget>x86</PlatformTarget>
   </PropertyGroup>
   <Choose>
