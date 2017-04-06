@@ -127,10 +127,10 @@ module WebSocket =
         match data.Count with
         | l when l >= 65536 ->
           [| yield 127uy
-             yield! BitConverter.GetBytes(uint64 data.Count) |> Array.rev |]
+             yield! BitConverter.GetBytes(uint64 data.Count) |> if BitConverter.IsLittleEndian then Array.rev else id |]
         | l when l >= 126 ->
           [| yield 126uy
-             yield! BitConverter.GetBytes(uint16 data.Count) |> Array.rev |]
+             yield! BitConverter.GetBytes(uint16 data.Count) |> if BitConverter.IsLittleEndian then Array.rev else id |]
         | _ -> [| byte (data.Count) |]
     
     { Frame.OpcodeByte = firstByte; EncodedLength = encodedLength; Data = data }
@@ -218,7 +218,7 @@ module WebSocket =
       if extendedLength > uint64 Int32.MaxValue then
         let reason = sprintf "Frame size of %d bytes exceeds maximum accepted frame size (2 GB)" extendedLength
         let data =
-          [| yield! BitConverter.GetBytes (CloseCode.CLOSE_TOO_LARGE.code)
+          [| yield! BitConverter.GetBytes (CloseCode.CLOSE_TOO_LARGE.code) |> if BitConverter.IsLittleEndian then Array.rev else id
              yield! UTF8.bytes reason |]
         do! sendFrame Close (ArraySegment(data)) true
         return! SocketOp.abort (InputDataError(None, reason))
@@ -241,7 +241,7 @@ module WebSocket =
       if extendedLength > uint64 Int32.MaxValue then
         let reason = sprintf "Frame size of %d bytes exceeds maximum accepted frame size (2 GB)" extendedLength
         let data =
-            [| yield! BitConverter.GetBytes (CloseCode.CLOSE_TOO_LARGE.code)
+            [| yield! BitConverter.GetBytes (CloseCode.CLOSE_TOO_LARGE.code) |> if BitConverter.IsLittleEndian then Array.rev else id
                yield! UTF8.bytes reason |]
         do! sendFrame Close (ArraySegment(data)) true
         return! SocketOp.abort (InputDataError(None, reason))
