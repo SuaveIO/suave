@@ -1,6 +1,7 @@
-module Suave.Html
+﻿module Suave.Html
 
 open System
+open System.Net
 
 type Attribute = string * string
 
@@ -69,14 +70,14 @@ let rec htmlToString node =
     | xs ->
       let attributeString =
         attributes
-        |> Array.map (fun (k,v) -> sprintf " %s=\"%s\"" k v)
+        |> Array.map (fun (k, v) -> sprintf " %s=\"%s\"" k (WebUtility.HtmlEncode v))
         |> String.Concat
       sprintf "<%s%s>" e attributeString
 
   let endElemToString (e, _) = sprintf "</%s>" e
 
   match node with
-  | Text text -> text
+  | Text text -> text |> WebUtility.HtmlEncode
   | WhiteSpace text -> text
   | Element (e, nodes) ->
     let inner = nodes |> List.map htmlToString |> String.Concat
