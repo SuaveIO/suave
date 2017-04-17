@@ -104,6 +104,7 @@ module Writers =
     | ".jpeg"
     | ".jpg" -> createMimeType "image/jpeg" false
     | ".exe" -> createMimeType "application/exe" false
+    | ".pdf" -> createMimeType "application/pdf" false
     | ".txt" -> createMimeType "text/plain" true
     | ".ttf" -> createMimeType "application/x-font-ttf" true
     | ".otf" -> createMimeType "application/font-sfnt" true
