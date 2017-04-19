@@ -22,6 +22,9 @@ then
   mozroots --import --sync --quiet
 fi
 
+echo 'Update nugets'
+run tools/paket.exe update 
+
 echo 'Restoring nugets'
 run tools/paket.exe restore
 

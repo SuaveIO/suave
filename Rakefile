@@ -28,11 +28,12 @@ end
 
 desc "Restore paket.exe"
 task :restore_paket do
-  system 'tools/paket.bootstrapper.exe', clr_command: true unless
+  system 'tools/paket.bootstrapper.exe', 'prerelease', clr_command: true unless
     File.exists? 'tools/paket.exe'
 end
 
 task :paket_restore do
+  system 'tools/paket.exe', 'update', clr_command: true
   system 'tools/paket.exe', 'restore', clr_command: true
   system 'tools/paket.exe', %w|restore group Build|, clr_command: true
 end
