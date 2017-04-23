@@ -63,7 +63,7 @@ module SelfHostedServer =
     let config =
       { defaultConfig with
           bindings = [ HttpBinding.createSimple HTTP "127.0.0.1" 7000 ]
-          logger = Targets.create Verbose }
+          logger = Targets.create Verbose [||] }
 
     printfn "Listening on port 7000"
     startWebServer config app

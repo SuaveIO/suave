@@ -1,12 +1,20 @@
 ﻿module Suave.Tests.ExpectoExtensions
 
 open Expecto
-open Expecto.Helpers
 open Expecto.Tests
 open Expecto.Impl
 open System
 open System.Linq
 open System.Reflection
+
+type MemberInfo with
+  member m.HasAttributePred (pred: Type -> bool) =
+    m.GetCustomAttributes true
+    |> Seq.filter (fun a -> pred(a.GetType()))
+    |> Seq.length |> (<) 0
+
+  member m.HasAttributeType (attr: Type) =
+    m.HasAttributePred ((=) attr)
 
 let testFromMemberWithParam (param : 't) (m: MemberInfo): Test option =
   [m]
@@ -27,11 +35,6 @@ let testFromMemberWithParam (param : 't) (m: MemberInfo): Test option =
         else None
     | _ -> None)
   |> List.tryFind (fun _ -> true)
-
-let listToTestListOption =
-  function
-  | [] -> None
-  | x -> Some (TestList x)
 
 let testFromTypeWithParam param =
   let asMembers x = Seq.map (fun m -> m :> MemberInfo) x
@@ -62,8 +65,8 @@ let defaultMainThisAssemblyWithParam param args =
   let tests =
       match testFromAssemblyWithParam (Assembly.GetEntryAssembly()) param with
       | Some t -> t
-      | None -> TestList []
+      | None -> failwith "Found no tests."
 
-  args
-  |> ExpectoConfig.fillFromArgs defaultConfig
-  |> flip runTests tests
+  match ExpectoConfig.fillFromArgs defaultConfig args with
+  | ArgsRun cfg -> runTests cfg tests
+  | _ -> 1

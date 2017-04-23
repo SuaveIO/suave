@@ -76,18 +76,6 @@ All of our tests use this assembly; you can do too.
 We're using a cross-platform build suite called
 [albacore](https://github.com/Albacore/albacore)/[rake](https://github.com/ruby/rake).
 
-Or build using:
-
-```bash
-./build.sh
-```
-
-Or
-
-```cmd
-build.cmd
-```
-
 ## Build prerequisites
 
 * [Ruby](https://www.ruby-lang.org/en/documentation/installation/)

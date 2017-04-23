@@ -17,7 +17,19 @@ open Suave.State.CookieStateStore
 let basicAuth =
   Authentication.authenticateBasic ((=) ("foo", "bar"))
 
-let logger = Targets.create Verbose
+// This demonstrates how to customise the console logger output.
+// In most cases you wont need this. Instead you can use the more succinct: 
+// `let logger = Targets.create Verbose [||]`
+let loggingOptions =
+  { Literate.LiterateOptions.create() with
+      getLogLevelText = function Verbose->"V" | Debug->"D" | Info->"I" | Warn->"W" | Error->"E" | Fatal->"F" }
+
+let logger = LiterateConsoleTarget(
+                name = [|"Suave";"Examples";"Example"|],
+                minLevel = Verbose,
+                options = loggingOptions,
+                outputTemplate = "[{level}] {timestampUtc:o} {message} [{source}]{exceptions}"
+              ) :> Logger
 
 ///  With this workflow you can write WebParts like this
 let task : WebPart =
@@ -52,7 +64,7 @@ let testApp =
     RequestErrors.NOT_FOUND "Found no handlers"
   ]
 
-#if NETSTANDARD1_5
+#if NETCOREAPP1_1
 #else
 System.Net.ServicePointManager.DefaultConnectionLimit <- Int32.MaxValue
 #endif
@@ -197,33 +209,12 @@ let app =
       ]
     ] >=> logStructured logger logFormatStructured
 
-(*
-// using Suave.OpenSSL
-// also see https://github.com/SuaveIO/suave/issues/291
-// and https://github.com/exira/static-mailer/blob/72fdebf37bafc48ea7277ee4a6b2a758df5c3b3d/src/Program.fs#L28-L31
-
-open Suave.OpenSSL
-open OpenSSL.Core
-open System.Security.Cryptography.X509Certificates
-
-let cert =
-  let bio = BIO.MemoryBuffer()
-  let cert = System.IO.File.ReadAllBytes "example.pem"
-  bio.Write cert
-  OpenSSL.X509.X509Certificate.FromDER bio
-
-*)
-
 open System.Security.Cryptography.X509Certificates
 
 [<EntryPoint>]
 let main argv =
-
-  let cert = new X509Certificate2("suave.p12","easy")
-
   startWebServer
     { bindings              = [ HttpBinding.createSimple HTTP "127.0.0.1" 8082
-                                HttpBinding.createSimple (HTTPS cert) "127.0.0.1" 8443
                               ]
       serverKey             = Utils.Crypto.generateKey HttpRuntime.ServerKeyLength
       errorHandler          = defaultErrorHandler
@@ -236,14 +227,34 @@ let main argv =
       homeFolder            = None
       compressedFilesFolder = None
       logger                = logger
-      initialiseLogger      = true
       tcpServerFactory      = new DefaultTcpServerFactory()
-#if NETSTANDARD1_5
+#if NETCOREAPP1_1
       cookieSerialiser      = new JsonFormatterSerialiser()
 #else
       cookieSerialiser      = new BinaryFormatterSerialiser()
 #endif
       tlsProvider           = new DefaultTlsProvider()
-      hideHeader            = false }
+      hideHeader            = false
+      maxContentLength      = 1000000 }
     app
   0
+
+(*
+// using Suave.OpenSSL
+// also see https://github.com/SuaveIO/suave/issues/291
+// and https://github.com/exira/static-mailer/blob/72fdebf37bafc48ea7277ee4a6b2a758df5c3b3d/src/Program.fs#L28-L31
+open Suave.OpenSSL
+open OpenSSL.Core
+open System.Security.Cryptography.X509Certificates
+
+let cert =
+  let bio = BIO.MemoryBuffer()
+  let cert = System.IO.File.ReadAllBytes "example.pem"
+  bio.Write cert
+  OpenSSL.X509.X509Certificate.FromDER bio
+
+Or using the built-in SSL support:
+  let cert = new X509Certificate2("suave.p12","easy")
+  HttpBinding.createSimple (HTTPS cert) "127.0.0.1" 8443
+
+*)

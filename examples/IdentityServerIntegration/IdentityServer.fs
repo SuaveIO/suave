@@ -70,10 +70,10 @@ module IdentityServer =
 
   [<EntryPoint>]
   let main _ =
-    let logger = Targets.create Verbose
+    let logger = Targets.create Verbose [||]
 
     let loggedWebApp context = async {
-      logger.log Debug (
+      logger.debug (
         eventX "Received request {method} {url}"
         >> setField "method" context.request.``method``
         >> setField "url" context.request.url)

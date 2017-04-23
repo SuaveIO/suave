@@ -1,4 +1,4 @@
-framework: NET461
+framework: NET46
 source https://nuget.org/api/v2
 redirects auto
 
@@ -6,21 +6,22 @@ nuget FSharp.Core ~> 3.1.2
 nuget openssl.redist
 nuget DotLiquid
 nuget RazorEngine
-nuget Expecto
 
 github haf/YoLo YoLo.fs
-github logary/logary src/Logary.Facade/Facade.fs
+github logary/logary:c70468f60602e1ab954a38e574b946d4ffbda11d src/Logary.Facade/Facade.fs
 
 group Build
   source https://nuget.org/api/v2
   nuget NuGet.CommandLine
 
 group Tests
-  framework: NET461
+  framework: NET46
   source https://nuget.org/api/v2
   nuget FSharp.Core ~> 4 redirects: force
+  nuget System.Reflection.Metadata 1.4.1
   nuget WebSocketSharp
   nuget FsCheck
+  nuget Expecto
   nuget Expecto.FsCheck
   nuget Expecto.BenchmarkDotNet
   nuget Http.fs
@@ -28,7 +29,7 @@ group Tests
   nuget DotLiquid
 
 group Examples
-  framework: NET461
+  framework: NET46
   source https://nuget.org/api/v2
   nuget FSharp.Core ~> 4 redirects: force
   nuget Topshelf.FSharp
@@ -36,14 +37,16 @@ group Examples
   nuget Nancy.Owin
   nuget Freya 3.0.0-b300
   nuget Freya.Core 3.0.0-b300
+  nuget Microsoft.Owin
   nuget Microsoft.Owin.Hosting
   nuget Owin
   nuget Chiron
   nuget identityserver3
+  nuget Microsoft.AspNet.SignalR.Owin
   github haf/YoLo YoLo.fs
 
 group Docs
-  framework: NET461
+  framework: NET46
   source https://nuget.org/api/v2
   nuget FSharp.Core ~> 4 redirects: force
   nuget FsLibTool

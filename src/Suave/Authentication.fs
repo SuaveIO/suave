@@ -22,17 +22,25 @@ let internal parseAuthenticationToken (token : string) =
 
 let inline private addUserName username ctx = { ctx with userState = ctx.userState |> Map.add UserNameKey (box username) }
 
-let authenticateBasic f (protectedPart : WebPart) (ctx : HttpContext) =
+let authenticateBasicAsync f protectedPart ctx =
   let p = ctx.request
   match p.header "authorization" with
   | Choice1Of2 header ->
     let (typ, username, password) = parseAuthenticationToken header
-    if (typ.Equals("basic")) && f (username, password) then
-      protectedPart (addUserName username ctx)
-    else
-      challenge (addUserName username ctx)
+    if (typ.Equals("basic")) then
+      async {
+        let! authenticated = f (username, password)
+        if authenticated then
+          return! protectedPart (addUserName username ctx)
+        else
+          return! challenge (addUserName username ctx)
+      }
+    else challenge (addUserName username ctx)
   | Choice2Of2 _ ->
     challenge ctx
+
+let authenticateBasic f protectedPart ctx = 
+  authenticateBasicAsync (f >> async.Return) protectedPart ctx
 
 module internal Utils =
   /// Generates a string key from the available characters with the given key size
@@ -40,7 +48,7 @@ module internal Utils =
   /// random number generator would produce as we only use a small subset alphabet.
   let generateReadableKey (keySize : int) =
     let arr = Array.zeroCreate<byte> keySize |> Crypto.randomize
-    let alpha = "abcdefghijklmnopqrstuvwuxyz0123456789"
+    let alpha = "abcdefghijklmnopqrstuvwxyz0123456789"
     let result = new StringBuilder(keySize)
     arr
     |> Array.iter (fun (b : byte) -> result.Append alpha.[int b % alpha.Length] |> ignore)
@@ -117,4 +125,4 @@ module HttpContext =
   let sessionId x =
     x.userState
     |> Map.tryFind StateStoreType
-    |> Option.map (fun x -> x :?> string |> parseData)
+    |> Option.map (fun x -> x :?> byte[] |> UTF8.toString |> parseData)

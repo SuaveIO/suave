@@ -38,6 +38,8 @@ let gets cfg =
                    headers.Contains("Content-Length"))
     ]
 
+let longData = String.replicate 1815 "A"
+
 [<Tests>]
 let posts cfg =
   let runWithConfig = runWith cfg
@@ -49,6 +51,15 @@ let posts cfg =
 
   let getFormValue name =
     request (fun x -> let q = x.formData name in OK (get q))
+
+  let getMultiPartValue name =
+    request (fun x -> let q = x.fieldData name in OK (get q))
+
+  let getFileContent _ =
+    request (fun x -> let q = List.head x.files in OK (IO.File.ReadAllText q.tempFilePath))
+
+  let getFileName _ =
+    request (fun x -> let q = List.head x.files in OK q.fileName)
 
   let assertion = "eyJhbGciOiJSUzI1NiJ9.eyJwdWJsaWMta2V5Ijp7ImFsZ29yaXRobSI6IkR"+
                   "TIiwieSI6Ijc1MDMyNGRmYzQwNGI0OGQ3ZDg0MDdlOTI0NWMxNGVkZmVlZTY"+
@@ -82,9 +93,8 @@ let posts cfg =
                   "bXMubG9jYWw6NzU3NSJ9.xbMyR2R7N9ZeLzqLWYw5hisaomZrtJlNdMvVdx0"+
                   "EaXxMkY7ocCpcpA"
 
-  let longData = String.replicate 1815 "A"
-
-  let unicodeString =  "Testing «ταБЬℓσ»: 1<2 & 4+1>3, now 20% off!;"
+  let unicodeString1 =  "Testing «ταБЬℓσ»: 1<2 & 4+1>3, now 20% off!;"
+  let unicodeString2 =  "文档内容"
 
   testList "posting basic data" [
     testCase "POST data round trips with no content-type" <| fun _ ->
@@ -108,7 +118,66 @@ let posts cfg =
       Expect.equal actual assertion "expecting form data to be returned"
 
     testCase "POST unicode data" <| fun _ ->
-      use data = new FormUrlEncodedContent(dict [ "name", unicodeString ])
+      use data = new FormUrlEncodedContent(dict [ "name", unicodeString1 ])
       let actual = runWithConfig (getFormValue "name") |> req HttpMethod.POST "/" (Some data)
-      Expect.equal actual unicodeString "expecting form data to be returned"
+      Expect.equal actual unicodeString1 "expecting form data to be returned"
+
+    testCase "POST unicode multipart" <| fun _ ->
+      let multipart = new MultipartFormDataContent()
+      let data = new StringContent(unicodeString1)
+      multipart.Add(data, "name")
+      let actual = runWithConfig (getMultiPartValue "name") |> req HttpMethod.POST "/" (Some multipart)
+      Expect.equal actual unicodeString1 "expecting form data to be returned"
+
+    testCase "POST unicode multipart (Chinese)" <| fun _ ->
+      let multipart = new MultipartFormDataContent()
+      let data = new StringContent(unicodeString2)
+      multipart.Add(data, "name")
+      let actual = runWithConfig (getMultiPartValue "name") |> req HttpMethod.POST "/" (Some multipart)
+      Expect.equal actual unicodeString2 "expecting form data to be returned"
+
+    testCase "POST multipart file with unicode file-name" <| fun _ ->
+      let multipart = new MultipartFormDataContent()
+      let fileContent = "there is no cake"
+      let data = new ByteArrayContent(UTF8.bytes fileContent)
+      data.Headers.ContentType <- Headers.MediaTypeHeaderValue.Parse "text/html"
+      multipart.Add(data,"attached-file","文档内容.txt")
+      let actual = runWithConfig (getFileContent ()) |> req HttpMethod.POST "/" (Some multipart)
+      Expect.equal actual fileContent "expecting File to be saved and recovered"
+
+    testCase "POST unicode file-name is parsed correctly" <| fun _ ->
+      let multipart = new MultipartFormDataContent()
+      let fileContent = "there is no cake"
+      let filename = "文档内容.txt"
+      let data = new ByteArrayContent(UTF8.bytes fileContent)
+      data.Headers.ContentType <- Headers.MediaTypeHeaderValue.Parse "text/html"
+      multipart.Add(data,"attached-file",filename)
+      let actual = runWithConfig (getFileName ()) |> req HttpMethod.POST "/" (Some multipart)
+      Expect.equal actual filename "expecting to return correct unicode file name"
   ]
+
+[<Tests>]
+let testMaxContentLength cfg =
+  let runWithConfig = runWith { cfg with maxContentLength = 100 }
+
+  testList "test maxContentLength" [
+
+    testCase "POST larger than maxContentLength" <| fun _ ->
+      use data = new StringContent(longData)
+      let actual = runWithConfig (OK "response") |> req HttpMethod.POST "/" (Some data)
+      Expect.equal actual "Payload too large" "expecting data to be returned"
+
+    ]
+
+[<Tests>]
+let testDELETE cfg =
+  let runWithConfig = runWith cfg
+
+  let webId =
+    request (fun x -> OK (x.rawForm |> Encoding.UTF8.GetString))
+
+  testList "testing DELETE with body" [
+    testCase "body is parsed" <| fun _ ->
+      use data = new StringContent("bob")
+      let actual = runWithConfig webId |> req HttpMethod.DELETE "/" (Some data)
+      Expect.equal actual "bob" "expecting data to be returned" ]

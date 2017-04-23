@@ -48,4 +48,20 @@ let authTests cfg =
 
       let res = runWithConfig app |> req "/non-protected2" id
       Expect.equal res "no user" "should be no username"
+
+    testCase "add username to userstate for protectedPart (async)" <| fun _ ->
+      let okUser = context <| fun ctx ->
+        match Map.tryFind UserNameKey ctx.userState with
+        | Some username -> sprintf "hello %O" username
+        | None -> "no user"
+        |> OK
+
+      let authenticate credentials = async { return credentials = ("foo", "bar") }
+      let app = GET >=> authenticateBasicAsync authenticate okUser
+
+      let req path reqMod = reqResp HttpMethod.GET path "" None None DecompressionMethods.None reqMod (fun res -> res.Content.ReadAsStringAsync().Result)
+
+      let res = runWithConfig app |> req "/protected" (fun reqmsg -> reqmsg.Headers.Authorization <- AuthenticationHeaderValue("Basic", basicCredentials); reqmsg)
+      Expect.equal res "hello foo" "should be username"
+
     ]

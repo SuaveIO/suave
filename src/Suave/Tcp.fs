@@ -100,7 +100,7 @@ let job (serveClient : TcpWorker<unit>)
 
   logger.debug (
     eventX "{client} connected. Now has {totalClients} connected"
-    >> setFieldValue "client" binding.ip
+    >> setFieldValue "client" (binding.ip.ToString())
     >> setFieldValue "totalClients" (!Globals.numberOfClients))
 
   let connection =
@@ -130,7 +130,7 @@ let job (serveClient : TcpWorker<unit>)
   Interlocked.Decrement(Globals.numberOfClients) |> ignore
   logger.debug (
     eventX "Disconnected {client}. {totalClients} connected."
-    >> setFieldValue "client" binding.ip
+    >> setFieldValue "client" (binding.ip.ToString())
     >> setFieldValue "totalClients" (!Globals.numberOfClients))
   }
 
@@ -159,7 +159,8 @@ let runServer maxConcurrentOps bufferSize autoGrow (binding: SocketBinding) star
     logger.info (
       eventX "Smooth! Suave listener started in {startedListeningMilliseconds:#.###} with binding {ipAddress}:{port}"
       >> setFieldValue "startedListeningMilliseconds" (startData.GetStartedListeningElapsedMilliseconds())
-      >> setFieldValue "ipAddress" startData.binding.ip
+      // .Address can throw exceptions, just log its string representation
+      >> setFieldValue "ipAddress" (startData.binding.ip.ToString())
       >> setFieldValue "port" startData.binding.port
       >> setSingleName "Suave.Tcp.runServer")
 
@@ -177,7 +178,7 @@ let runServer maxConcurrentOps bufferSize autoGrow (binding: SocketBinding) star
           failwithf "Socket failed to accept client, error: %A" e
 
       with ex ->
-        logger.error (eventX "Socket failed to accept a client" >> addExn exn)
+        logger.error (eventX "Socket failed to accept a client" >> addExn ex)
 
   with ex ->
     logger.fatal (eventX "TCP server failed" >> addExn ex)

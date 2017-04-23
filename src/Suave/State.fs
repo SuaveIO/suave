@@ -93,8 +93,11 @@ module CookieStateStore =
     let private createStateStore (serialiser : CookieSerialiser) (userState : Map<string, obj>) (ss : obj) =
       { new StateStore with
           member x.get key =
-            serialiser.deserialise (ss :?> byte []) |> Map.tryFind key
-            |> Option.map (fun x -> Convert.ChangeType(x, typeof<'T>) :?> 'T)
+            ss 
+            :?> byte []
+            |> serialiser.deserialise
+            |> Map.tryFind key
+            |> Option.map unbox
           member x.set key value =
             let expiry = userState |> Map.find (StateStoreType + "-expiry") :?> CookieLife
             write expiry key value

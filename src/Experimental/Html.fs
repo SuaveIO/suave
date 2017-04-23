@@ -1,6 +1,7 @@
-module Suave.Html
+﻿module Suave.Html
 
 open System
+open System.Net
 
 type Attribute = string * string
 
@@ -9,8 +10,8 @@ type Element = string * Attribute[]
 type Node =
   /// A regular html element that can contain a list of other nodes
   | Element of Element * Node list
-  /// A void element is one that can't have content, like link, br, hr, meta
-  /// See: https://dev.w3.org/html5/html-author/#void
+  /// A void element is one that can't have content
+  /// See: https://www.w3.org/TR/html5/syntax.html#void-elements
   | VoidElement of Element
   /// A text value for a node
   | Text of string
@@ -31,14 +32,14 @@ let div = tag "div"
 let p = tag "p"
 let a href attr = tag "a" (("href",href)::attr)
 let span = tag "span"
-let img attr = tag "img" attr []
-let input attr = tag "input" attr []
 
 // Void tags
 let link attr = voidTag "link" attr
 let meta attr = voidTag "meta" attr
 let hr attr = voidTag "hr" attr
 let br attr = voidTag "br" attr
+let img attr = voidTag "img" attr
+let input attr = voidTag "input" attr
 
 /// Example
 
@@ -69,14 +70,14 @@ let rec htmlToString node =
     | xs ->
       let attributeString =
         attributes
-        |> Array.map (fun (k,v) -> sprintf " %s=\"%s\"" k v)
+        |> Array.map (fun (k, v) -> sprintf " %s=\"%s\"" k (WebUtility.HtmlEncode v))
         |> String.Concat
       sprintf "<%s%s>" e attributeString
 
   let endElemToString (e, _) = sprintf "</%s>" e
 
   match node with
-  | Text text -> text
+  | Text text -> text |> WebUtility.HtmlEncode
   | WhiteSpace text -> text
   | Element (e, nodes) ->
     let inner = nodes |> List.map htmlToString |> String.Concat

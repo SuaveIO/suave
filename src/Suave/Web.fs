@@ -40,12 +40,11 @@ module Web =
       Path.Combine(ParsingAndControl.resolveDirectory config.compressedFilesFolder, "_temporary_compressed_files")
 
     // spawn tcp listeners/web workers
-    let toRuntime = SuaveConfig.toRuntime config homeFolder compressionFolder true
+    let toRuntime = SuaveConfig.toRuntime config homeFolder compressionFolder
 
-    if config.initialiseLogger then
-      Global.initialise { Global.DefaultConfig with getLogger = fun _ -> config.logger }
-    else
-      ()
+    // If noone has already touched the logging configuration, initialise it to
+    // that of Suave's configuration.
+    Global.initialiseIfDefault { Global.defaultConfig with getLogger = fun _ -> config.logger }
 
     let startWebWorkerAsync runtime =
       let tcpServer =
@@ -70,7 +69,7 @@ module Web =
   let startWebServer (config : SuaveConfig) (webpart : WebPart) =
     Async.RunSynchronously(startWebServerAsync config webpart |> snd, cancellationToken = config.cancellationToken)
 
-  /// The default configuration binds on IPv4, 127.0.0.1:8083 with a regular 500 Internal Error handler,
+  /// The default configuration binds on IPv4, 127.0.0.1:8080 with a regular 500 Internal Error handler,
   /// with a timeout of one minute for computations to run. Waiting for 2 seconds for the socket bind
   /// to succeed.
   let defaultConfig =
@@ -85,8 +84,7 @@ module Web =
       mimeTypesMap          = Writers.defaultMimeTypesMap
       homeFolder            = None
       compressedFilesFolder = None
-      logger                = Targets.create Info
-      initialiseLogger      = true
+      logger                = Targets.create Info [| "Suave" |]
       tcpServerFactory      = new DefaultTcpServerFactory()
       #if NETSTANDARD1_5
       cookieSerialiser      = new JsonFormatterSerialiser()
@@ -94,4 +92,6 @@ module Web =
       cookieSerialiser      = new BinaryFormatterSerialiser()
       #endif
       tlsProvider           = new DefaultTlsProvider()
-      hideHeader            = false }
+      hideHeader            = false
+      maxContentLength      = 10000000 // 10 megabytes
+      }

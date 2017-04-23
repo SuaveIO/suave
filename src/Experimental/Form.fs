@@ -38,11 +38,22 @@ type Form<'a> = Form of FormProp<'a> list * ServerSideValidation<'a> list
 
 let formatDec (d : Decimal) = d.ToString(Globalization.CultureInfo.InvariantCulture)
 
+#if NETSTANDARD1_5
+open System.Reflection
+#endif
+
 let (|Optional|_|) (typ : Type) =
+  #if NETSTANDARD1_5
+  if typ.GetTypeInfo().IsGenericType
+     && typ.GetGenericTypeDefinition() = typedefof<option<_>> then
+    Some(typ.GetGenericArguments().[0])
+  else None
+  #else
   if typ.IsGenericType
      && typ.GetGenericTypeDefinition() = typedefof<option<_>> then
     Some(typ.GetGenericArguments().[0])
   else None
+  #endif
 
 let private parse = function
 | Optional(t), "" -> Choice1Of2 None |> Choice.map box
@@ -132,6 +143,10 @@ let bindForm<'a> (form : Form<'a>) (req : HttpRequest) =
 
     return record
   }
+
+let bindEmptyForm<'a> = 
+  let form : Form<'a> = Form([],[])
+  bindForm form
 
 let maxLength max : Validation<string> =
   (fun s -> s.Length <= max),
@@ -253,5 +268,21 @@ Binding.bindReq (bindForm register) handler BAD_REQUEST
 
 HTML markup:
 input (fun f -> <@ f.Password @>) [] register
+
+Plain Form binding
+
+type LoginCredentials = {
+  Username: string
+  Password : string
+}
+
+Handler:
+let handleLogin req = 
+  match bindEmptyForm req with
+  | Choice1Of2 loginCredentials -> 
+    // ...
+  | Choice2Of2 err -> 
+    // ...
+path "/login" >=> POST >=> request handleLogin
 
 *)

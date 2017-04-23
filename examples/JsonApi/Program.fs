@@ -30,7 +30,7 @@ let main argv =
   0
 
 (*
-➜  suave git:(master) ✗ curl http://127.0.0.1:8083/monkey --silent | jq .
+➜  suave git:(master) ✗ curl http://127.0.0.1:8080/monkey --silent | jq .
 {
   "height": 1.53,
   "sound": "ooh"

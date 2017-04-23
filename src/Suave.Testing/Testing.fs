@@ -141,7 +141,7 @@ let createClient handler =
 
 /// Send the request with the client - returning the result of the request
 let send (client : HttpClient) (timeout : TimeSpan) (ctx : SuaveTestCtx) (request : HttpRequestMessage) =
-  ctx.suaveConfig.logger.log Verbose (
+  ctx.suaveConfig.logger.verbose (
     eventX "Send"
     >> setFieldValue "method" request.Method.Method
     >> setFieldValue "uri" request.RequestUri)

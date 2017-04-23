@@ -1,4 +1,4 @@
-namespace Suave
+﻿namespace Suave
 
 open Suave.Operators
 open Suave.Sockets
@@ -104,6 +104,7 @@ module Writers =
     | ".jpeg"
     | ".jpg" -> createMimeType "image/jpeg" false
     | ".exe" -> createMimeType "application/exe" false
+    | ".pdf" -> createMimeType "application/pdf" false
     | ".txt" -> createMimeType "text/plain" true
     | ".ttf" -> createMimeType "application/x-font-ttf" true
     | ".otf" -> createMimeType "application/font-sfnt" true
@@ -367,25 +368,23 @@ module Filters =
     "{clientIp} {processId} {userName} [{utcNow:dd/MMM/yyyy:hh:mm:ss %K}] \"{requestMethod} {requestUrlPath} {httpVersion}\" {httpStatusCode} {responseContentLength}", fieldList |> Map
 
   let logWithLevel (level : LogLevel) (logger : Logger) (formatter : HttpContext -> string) (ctx : HttpContext) =
-    logger.log level <| fun _ ->
+    logger.log level (fun _ ->
       { value         = Event (formatter ctx)
         level         = level
         name          = [| "Suave"; "Http"; "requests" |]
         fields        = Map.empty
-        timestamp     = Suave.Logging.Global.timestamp() }
-
-    succeed ctx
+        timestamp     = Suave.Logging.Global.timestamp() })
+    |> Async.map (fun () -> Some ctx)
 
   let logWithLevelStructured (level : LogLevel) (logger : Logger) (templateAndFieldsCreator : HttpContext -> (string * Map<string,obj>)) (ctx : HttpContext) =
-    logger.log level <| fun _ ->
+    logger.log level (fun _ ->
       let template, fields = templateAndFieldsCreator ctx
       { value         = Event template
         level         = level
         name          = [| "Suave"; "Http"; "requests" |]
         fields        = fields
-        timestamp     = Suave.Logging.Global.timestamp() }
-
-    succeed ctx
+        timestamp     = Suave.Logging.Global.timestamp() })
+    |> Async.map (fun () -> Some ctx)
 
   let logStructured (logger : Logger) (structuredFormatter : HttpContext -> (string * Map<string,obj>)) =
     logWithLevelStructured LogLevel.Debug logger structuredFormatter
@@ -474,6 +473,31 @@ module ServeResource =
       log (sprintf "failed to find resource by key '%s'" key)
       fail
 
+module ContentRange =
+  open System
+  open System.IO
+  open Suave.Utils
+
+  let parseContentRange (input:string) =
+    let contentUnit = input.Split([|' '; '='|], 2)
+    let rangeArray = contentUnit.[1].Split([|'-'|])
+    let start = int64 rangeArray.[0]
+    let finish = if Int64.TryParse (rangeArray.[1], ref 0L) then Some <| int64 rangeArray.[1] else None
+    start, finish
+    
+  let (|ContentRange|_|) (context:HttpContext) =
+    match context.request.header "range" with
+    | Choice1Of2 rangeValue -> Some <| parseContentRange rangeValue
+    | Choice2Of2 _ -> None
+
+  let getFileStream (ctx:HttpContext) path =
+    let fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite) :> Stream
+    match ctx with
+    | ContentRange (start, finish) ->
+      let length = finish |> Option.bind (fun finish -> Some (finish - start))
+      new RangedStream(fs, start, length, true) :> Stream, start, fs.Length, HTTP_206.status
+    | _ -> fs, 0L, fs.Length, HTTP_200.status
+
 module Files =
 
   open System
@@ -490,35 +514,41 @@ module Files =
   open Successful
   open Redirection
   open ServeResource
+  open ContentRange
 
   let sendFile fileName (compression : bool) (ctx : HttpContext) =
-    let writeFile file (conn, _) = socket {
-      let getFs = fun path -> new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite) :> Stream
-      let getLm = fun path -> FileInfo(path).LastWriteTime
-      let! (encoding,fs) = Compression.transformStream file getFs getLm compression ctx.runtime.compressionFolder ctx
-      try
-        match encoding with
-        | Some n ->
-          let! (_,conn) = asyncWriteLn (String.Concat [| "Content-Encoding: "; n.ToString() |]) conn
-          let! (_,conn) = asyncWriteLn (sprintf "Content-Length: %d\r\n" (fs : Stream).Length) conn
-          let! conn = flush conn
-          if  ctx.request.``method`` <> HttpMethod.HEAD && fs.Length > 0L then
-            do! transferStream conn fs
-          return conn
-        | None ->
-          let! (_,conn) = asyncWriteLn (sprintf "Content-Length: %d\r\n" (fs : Stream).Length) conn
-          let! conn = flush conn
-          if  ctx.request.``method`` <> HttpMethod.HEAD && fs.Length > 0L then
-            do! transferStream conn fs
-          return conn
-      finally
-        fs.Dispose()
-    }
+    let writeFile file =
+      let fs, start, total, status = getFileStream ctx file
+      fun (conn, _) -> socket {
+        let getLm = fun path -> FileInfo(path).LastWriteTime
+        let! (encoding,fs) = Compression.transformStream file fs getLm compression ctx.runtime.compressionFolder ctx
+        let finish = start + fs.Length - 1L
+        try
+          match encoding with
+          | Some n ->
+            let! (_,conn) = asyncWriteLn (sprintf "Content-Range: bytes %d-%d/*" start finish) conn
+            let! (_,conn) = asyncWriteLn (String.Concat [| "Content-Encoding: "; n.ToString() |]) conn
+            let! (_,conn) = asyncWriteLn (sprintf "Content-Length: %d\r\n" (fs : Stream).Length) conn
+            let! conn = flush conn
+            if ctx.request.``method`` <> HttpMethod.HEAD && fs.Length > 0L then
+              do! transferStream conn fs
+            return conn
+          | None ->
+            let! (_,conn) = asyncWriteLn (sprintf "Content-Range: bytes %d-%d/%d" start finish total) conn
+            let! (_,conn) = asyncWriteLn (sprintf "Content-Length: %d\r\n" (fs : Stream).Length) conn
+            let! conn = flush conn
+            if ctx.request.``method`` <> HttpMethod.HEAD && fs.Length > 0L then
+              do! transferStream conn fs
+            return conn
+        finally
+          fs.Dispose()
+      }, status
+    let task, status = writeFile fileName
     { ctx with
         response =
           { ctx.response with
-              status = HTTP_200.status
-              content = SocketTask (writeFile fileName) } }
+              status = status
+              content = SocketTask task } }
     |> succeed
 
   let file fileName : WebPart =
@@ -618,9 +648,9 @@ module Embedded =
                     (compression : bool)
                     (ctx : HttpContext) =
     let writeResource name (conn, _) = socket {
-      let getFs = fun name -> assembly.GetManifestResourceStream(name)
+      let fs = assembly.GetManifestResourceStream(name)
       let getLm = fun _ -> lastModified assembly
-      let! encoding,fs = Compression.transformStream name getFs getLm compression ctx.runtime.compressionFolder ctx
+      let! encoding,fs = Compression.transformStream name fs getLm compression ctx.runtime.compressionFolder ctx
 
       match encoding with
       | Some n ->
@@ -860,7 +890,10 @@ module CORS =
       Writers.setHeader AccessControlMaxAge (age.ToString())
 
   let private setAllowCredentialsHeader config =
-    Writers.setHeader AccessControlAllowCredentials (config.allowCookies.ToString())
+    if config.allowCookies then
+        Writers.setHeader AccessControlAllowCredentials "true"
+    else
+        succeed
 
   let private setAllowMethodsHeader config value =
     match config.allowedMethods with

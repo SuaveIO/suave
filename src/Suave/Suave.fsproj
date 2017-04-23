@@ -8,7 +8,7 @@
     <OutputType>Library</OutputType>
     <RootNamespace>Suave</RootNamespace>
     <AssemblyName>Suave</AssemblyName>
-    <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.6</TargetFrameworkVersion>
     <ResolveNuGetPackages>false</ResolveNuGetPackages>
     <Name>Suave</Name>
   </PropertyGroup>
@@ -59,7 +59,7 @@
     <ErrorReport>prompt</ErrorReport>
     <ConsolePause>false</ConsolePause>
     <WarningLevel>3</WarningLevel>
-    <DocumentationFile>bin\Release\Suave.xml</DocumentationFile>
+    <DocumentationFile>bin\Release\Suave.XML</DocumentationFile>
     <DefineConstants>
     </DefineConstants>
     <DebugType>pdbonly</DebugType>
@@ -96,6 +96,7 @@
     <Compile Include="Utils\Crypto.fs" />
     <Compile Include="Utils\Parsing.fs" />
     <Compile Include="Utils\OpenMemoryStream.fs" />
+    <Compile Include="Utils\RangedStream.fs" />
     <Compile Include="Utils\Property.fs" />
     <Compile Include="Utils\Parse.fs" />
     <Compile Include="Utils\CultureInfoCache.fs" />
@@ -147,7 +148,6 @@
     <Compile Include="AssemblyVersionInfo.fs" Condition="Exists('AssemblyVersionInfo.fs')" />
     <None Include="paket.references" />
     <Content Include="App.config" />
-    <None Include="project.json" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="mscorlib" />
@@ -161,7 +161,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <Choose>
-    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.6.1'">
+    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.6'">
       <ItemGroup>
         <Reference Include="FSharp.Core">
           <HintPath>..\..\packages\FSharp.Core\lib\net40\FSharp.Core.dll</HintPath>

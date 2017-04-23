@@ -1,4 +1,4 @@
-/// The logging namespace, which contains the logging abstraction for this
+﻿/// The logging namespace, which contains the logging abstraction for this
 /// library. See https://github.com/logary/logary for details. This module is
 /// completely stand-alone in that it has no external references and its adapter
 /// in Logary has been well tested.
@@ -156,7 +156,7 @@ type Message =
     /// The main value for this metric or event. Either a Gauge or an Event. (A
     /// discriminated union type)
     value     : PointValue
-    /// The semantic-logging data.
+    /// The structured-logging data.
     fields    : Map<string, obj>
     /// When? nanoseconds since UNIX epoch.
     timestamp : EpochNanoSeconds
@@ -174,48 +174,114 @@ type Message =
   member x.README =
     ()
 
-/// The logger is the interface for calling code to use for logging.
+/// The logger is the interface for calling code to use for logging. Its
+/// different functions have different semantics - read the docs for each
+/// method to choose the right one for your use-case.
 type Logger =
-  /// Evaluates the callback if the log level is enabled. Returns an async that
-  /// itself completes when the logging infrastructure has finished writing that
-  /// Message. Completes directly if nothing is logged. What the ack means from
-  /// a durability standpoint depends on the logging infrastructure you're using
-  /// behind this facade. Will not block, besides doing the computation inside
-  /// the callback. You should not do blocking operations in the callback.
+  /// Gets the name of the logger instance.
+  abstract member name : string[]
+  /// Logs with the specified log level with backpressure via the logging
+  /// library's buffers *and* ACK/flush to the underlying message targets.
+  ///
+  /// Calls to this function will block the caller only while executing the
+  /// callback (if the level is active).
+  ///
+  /// The returned async value will yield when the message has been flushed to
+  /// the underlying message targets.
+  ///
+  /// You need to start the (cold) async value for the logging to happen.
+  ///
+  /// You should not do blocking/heavy operations in the callback.
   abstract member logWithAck : LogLevel -> (LogLevel -> Message) -> Async<unit>
 
-  /// Evaluates the callback if the log level is enabled. Will not block,
-  /// besides doing the computation inside the callback. You should not do
-  /// blocking operations in the callback.
-  abstract member log : LogLevel -> (LogLevel -> Message) -> unit
-
-  /// Logs the message without awaiting the logging infrastructure's ack of
-  /// having successfully written the log message. What the ack means from a
-  /// durability standpoint depends on the logging infrastructure you're using
-  /// behind this facade.
-  abstract member logSimple : Message -> unit
+  /// Logs with the specified log level with backpressure via the logging
+  /// library's buffers.
+  ///
+  /// Calls to this function will block the caller only while executing the
+  /// callback (if the level is active).
+  ///
+  /// The returned async value will yield when the message has been added to
+  /// the buffers of the logging library.
+  ///
+  /// You need to start the (cold) async value for the logging to happen.
+  ///
+  /// You should not do blocking/heavy operations in the callback.
+  abstract member log : LogLevel -> (LogLevel -> Message) -> Async<unit>
 
 /// Syntactic sugar on top of Logger for F# libraries.
 [<AutoOpen>]
-module internal LoggerEx =
+module LoggerEx =
+  let private logWithTimeout (logger : Logger) level messageFactory =
+    async {
+      let! child = Async.StartChild (logger.log level messageFactory, 5000)
+      try
+        do! child
+      with
+      | :? TimeoutException ->
+        Console.Error.WriteLine(
+          "Logary (facade) message timed out. This means that you have an underperforming target. (Reevaluated) message name '{0}'.",
+          String.concat "." (messageFactory level).name)
+    }
+
   type Logger with
-    member x.verbose (msgFactory : LogLevel -> Message) : unit =
-      x.log Verbose msgFactory
+    member x.verbose (messageFactory : LogLevel -> Message) : unit =
+      logWithTimeout x Verbose messageFactory |> Async.Start
 
-    member x.debug (msgFactory : LogLevel -> Message) : unit =
-      x.log Debug msgFactory
+    /// Log with backpressure
+    member x.verboseWithBP (messageFactory : LogLevel -> Message) : Async<unit> =
+      x.log Verbose messageFactory
+      
+    member x.debug (messageFactory : LogLevel -> Message) : unit =
+      logWithTimeout x Debug messageFactory |> Async.Start
 
-    member x.info msgFactory : unit =
-      x.log Info msgFactory
+    /// Log with backpressure
+    member x.debugWithBP (messageFactory : LogLevel -> Message) : Async<unit> =
+      x.log Debug messageFactory
+      
+    member x.info (messageFactory : LogLevel -> Message) : unit =
+      logWithTimeout x Info messageFactory |> Async.Start
 
-    member x.warn msgFactory : unit =
-      x.log Warn msgFactory
+    /// Log with backpressure
+    member x.infoWithBP (messageFactory : LogLevel -> Message) : Async<unit> =
+      x.log Info messageFactory
+      
+    member x.warn (messageFactory : LogLevel -> Message) : unit =
+      logWithTimeout x Warn messageFactory |> Async.Start
 
-    member x.error msgFactory : unit =
-      x.log Error msgFactory
+    /// Log with backpressure
+    member x.warnWithBP (messageFactory : LogLevel -> Message) : Async<unit> =
+      x.log Warn messageFactory
+      
+    member x.error (messageFactory : LogLevel -> Message) : unit =
+      logWithTimeout x Error messageFactory |> Async.Start
 
-    member x.fatal msgFactory : unit =
-      x.log Fatal msgFactory
+    /// Log with backpressure
+    member x.errorWithBP (messageFactory : LogLevel -> Message) : Async<unit> =
+      x.log Error messageFactory
+      
+    member x.fatal (messageFactory : LogLevel -> Message) : unit =
+      logWithTimeout x Fatal messageFactory |> Async.Start
+
+    /// Log with backpressure
+    member x.fatalWithBP (messageFactory : LogLevel -> Message) : Async<unit> =
+      x.log Fatal messageFactory
+
+    /// Log a message, but don't synchronously wait for the message to be placed
+    /// inside the logging library's buffers. Instead the message will be added
+    /// to the logging library's buffers asynchronously (with respect to the
+    /// caller) with a timeout of 5 seconds, and will then be dropped.
+    ///
+    /// This is the way we avoid the unbounded buffer problem.
+    ///
+    /// If you have dropped messages, they will be logged to STDERR. You should load-
+    /// test your app to ensure that your targets can send at a rate high enough
+    /// without dropping messages.
+    ///
+    /// It's recommended to have alerting on STDERR.
+    member x.logSimple message : unit =
+      logWithTimeout x message.level (fun _ -> message) |> Async.Start
+
+    // TODO: timeXXX functions
 
 type LoggingConfig =
   { /// The `timestamp` function should preferably be monotonic and not 'jumpy'
@@ -282,6 +348,13 @@ module Literate =
 /// Module that contains the 'known' keys of the Maps in the Message type's
 /// fields/runtime data.
 module Literals =
+
+  /// What version of the Facade is this. This is a major version that allows the Facade
+  /// adapter to choose how it handles the API.
+  let FacadeVersion = 2u
+
+  /// What language this Facade has. This controls things like naming standards.
+  let FacadeLanguage = "F#"
 
   [<Literal>]
   let FieldExnKey = "exn"
@@ -527,6 +600,14 @@ module internal Formatting =
 
     exnExceptionParts @ errorsExceptionParts
 
+  let getLogLevelToken = function
+    | Verbose -> LevelVerbose
+    | Debug -> LevelDebug
+    | Info -> LevelInfo
+    | Warn -> LevelWarning
+    | Error -> LevelError
+    | Fatal -> LevelFatal
+
   /// Split a structured message up into theme-able parts (tokens), allowing the
   /// final output to display to a user with colours to enhance readability.
   let literateDefaultTokeniser (options : LiterateOptions) (message : Message) : (string * LiterateToken) list =
@@ -538,14 +619,6 @@ module internal Formatting =
       message.value |> literateFormatValue options message.fields |> snd
 
     let themedExceptionParts = literateColouriseExceptions options message
-
-    let getLogLevelToken = function
-      | Verbose -> LevelVerbose
-      | Debug -> LevelDebug
-      | Info -> LevelInfo
-      | Warn -> LevelWarning
-      | Error -> LevelError
-      | Fatal -> LevelFatal
 
     [ "[", Punctuation
       formatLocalTime message.utcTicks
@@ -611,10 +684,85 @@ module internal Formatting =
     formatExn message.fields +
     formatFields matchedFields message.fields
 
+/// Assists with controlling the output of the `LiterateConsoleTarget`.
+module internal LiterateFormatting =
+  open Literate
+  type TokenisedPart = string * LiterateToken
+  type LiterateTokeniser = LiterateOptions -> Message -> TokenisedPart list
+
+  type internal TemplateToken = TextToken of text:string | PropToken of name : string * format : string
+  let internal parseTemplate template =
+    let tokens = ResizeArray<TemplateToken>()
+    let foundText (text: string) = tokens.Add (TextToken text)
+    let foundProp (prop: FsMtParser.Property) = tokens.Add (PropToken (prop.name, prop.format))
+    FsMtParser.parseParts template foundText foundProp
+    tokens :> seq<TemplateToken>
+  
+  [<AutoOpen>]
+  module OutputTemplateTokenisers =
+
+    let tokeniseTimestamp format (options : LiterateOptions) (message : Message) = 
+      let localDateTimeOffset = DateTimeOffset(message.utcTicks, TimeSpan.Zero).ToLocalTime()
+      let formattedTimestamp = localDateTimeOffset.ToString(format, options.formatProvider)
+      seq { yield formattedTimestamp, Subtext }
+
+    let tokeniseTimestampUtc format (options : LiterateOptions) (message : Message) = 
+      let utcDateTimeOffset = DateTimeOffset(message.utcTicks, TimeSpan.Zero)
+      let formattedTimestamp = utcDateTimeOffset.ToString(format, options.formatProvider)
+      seq { yield formattedTimestamp, Subtext }
+
+    let tokeniseMissingField name format =
+      seq {
+        yield "{", Punctuation
+        yield name, MissingTemplateField
+        if not (String.IsNullOrEmpty format) then
+          yield ":", Punctuation
+          yield format, Subtext
+        yield "}", Punctuation }
+
+    let tokeniseLogLevel (options : LiterateOptions) (message : Message) =
+      seq { yield options.getLogLevelText message.level, Formatting.getLogLevelToken message.level }
+
+    let tokeniseSource (options : LiterateOptions) (message : Message) =
+      seq { yield (String.concat "." message.name), Subtext }
+
+    let tokeniseNewline (options : LiterateOptions) (message : Message) =
+      seq { yield Environment.NewLine, Text }
+
+    let tokeniseTab (options : LiterateOptions) (message : Message) =
+      seq { yield "\t", Text }
+
+  /// Creates a `LiterateTokeniser` function which can be passed to the `LiterateConsoleTarget`
+  /// constructor in order to customise how each log message is rendered. The default template
+  /// would be: `[{timestampLocal:HH:mm:ss} {level}] {message}{newline}{exceptions}`.
+  /// Available template fields are: `timestamp`, `timestampUtc`, `level`, `source`,
+  /// `newline`, `tab`, `message`, `exceptions`. Any misspelled or otheriwese invalid property
+  /// names will be treated as `LiterateToken.MissingTemplateField`. 
+  let tokeniserForOutputTemplate template : LiterateTokeniser =
+    let tokens = parseTemplate template
+    fun options message ->
+      seq {
+        for token in tokens do
+          match token with
+          | TextToken text -> yield text, LiterateToken.Punctuation
+          | PropToken (name, format) ->
+            match name with
+            | "timestamp" ->    yield! tokeniseTimestamp format options message
+            | "timestampUtc" -> yield! tokeniseTimestampUtc format options message
+            | "level" ->        yield! tokeniseLogLevel options message
+            | "source" ->       yield! tokeniseSource options message
+            | "newline" ->      yield! tokeniseNewline options message
+            | "tab" ->          yield! tokeniseTab options message
+            | "message" ->      yield! Formatting.literateFormatValue options message.fields message.value |> snd
+            | "exceptions" ->   yield! Formatting.literateColouriseExceptions options message
+            | _ ->              yield! tokeniseMissingField name format
+      }
+      |> Seq.toList
+
 /// Logs a line in a format that is great for human consumption,
 /// using console colours to enhance readability.
 /// Sample: [10:30:49 INF] User "AdamC" began the "checkout" process with 100 cart items
-type LiterateConsoleTarget(minLevel, ?options, ?literateTokeniser, ?outputWriter, ?consoleSemaphore) =
+type LiterateConsoleTarget(name, minLevel, ?options, ?literateTokeniser, ?outputWriter, ?consoleSemaphore) =
   let sem          = defaultArg consoleSemaphore (obj())
   let options      = defaultArg options (Literate.LiterateOptions.create())
   let tokenise     = defaultArg literateTokeniser Formatting.literateDefaultTokeniser
@@ -625,7 +773,17 @@ type LiterateConsoleTarget(minLevel, ?options, ?literateTokeniser, ?outputWriter
     |> List.map (fun (s, t) ->
       s, options.theme(t))
 
+  /// Creates the target with a custom output template. The default `outputTemplate`
+  /// is `[{timestampLocal:HH:mm:ss} {level}] {message}{exceptions}`.
+  /// Available template fields are: `timestamp`, `timestampUtc`, `level`, `source`,
+  /// `newline`, `tab`, `message`, `exceptions`. Any misspelled or otheriwese invalid property
+  /// names will be treated as `LiterateToken.MissingTemplateField`.
+  new (name, minLevel, outputTemplate, ?options, ?outputWriter, ?consoleSemaphore) =
+    let tokeniser = LiterateFormatting.tokeniserForOutputTemplate outputTemplate
+    LiterateConsoleTarget(name, minLevel, ?options=options, literateTokeniser=tokeniser, ?outputWriter=outputWriter, ?consoleSemaphore=consoleSemaphore)
+
   interface Logger with
+    member x.name = name
     member x.logWithAck level msgFactory =
       if level >= minLevel then
         colourWriter (colouriseThenNewLine (msgFactory level))
@@ -633,60 +791,51 @@ type LiterateConsoleTarget(minLevel, ?options, ?literateTokeniser, ?outputWriter
     member x.log level msgFactory =
       if level >= minLevel then
         colourWriter (colouriseThenNewLine (msgFactory level))
-    member x.logSimple msg =
-      if msg.level >= minLevel then
-        colourWriter (colouriseThenNewLine msg)
+      async.Return ()
 
-type TextWriterTarget(minLevel, writer : System.IO.TextWriter, ?formatter) =
+type TextWriterTarget(name, minLevel, writer : System.IO.TextWriter, ?formatter) =
   let formatter = defaultArg formatter Formatting.defaultFormatter
   let log msg = writer.WriteLine(formatter msg)
 
   interface Logger with
-    member x.log level msgFactory =
-      if level >= minLevel then log (msgFactory level)
-
-    member x.logWithAck level msgFactory =
-      if level >= minLevel then log (msgFactory level)
+    member x.name = name
+    member x.log level messageFactory =
+      if level >= minLevel then log (messageFactory level)
       async.Return ()
 
-    member x.logSimple msg =
-      if msg.level >= minLevel then log msg
+    member x.logWithAck level messageFactory =
+      if level >= minLevel then log (messageFactory level)
+      async.Return ()
 
-type OutputWindowTarget(minLevel, ?formatter) =
+type OutputWindowTarget(name, minLevel, ?formatter) =
   let formatter = defaultArg formatter Formatting.defaultFormatter
   let log msg = System.Diagnostics.Debug.WriteLine(formatter msg)
 
   interface Logger with
-    member x.log level msgFactory =
-      if level >= minLevel then log (msgFactory level)
-
-    member x.logWithAck level msgFactory =
-      if level >= minLevel then log (msgFactory level)
+    member x.name = name
+    member x.log level messageFactory =
+      if level >= minLevel then log (messageFactory level)
       async.Return ()
 
-    member x.logSimple msg =
-      if msg.level >= minLevel then log msg
+    member x.logWithAck level messageFactory =
+      if level >= minLevel then log (messageFactory level)
+      async.Return ()
 
 /// A logger to use for combining a number of other loggers
-type CombiningTarget(otherLoggers : Logger list) =
-  let sendToAll level msgFactory =
-    otherLoggers
-    |> List.map (fun l ->
-      l.logWithAck level msgFactory)
-    |> Async.Parallel
-    |> Async.Ignore // Async<unit>
-
+type CombiningTarget(name, otherLoggers : Logger list) =
   interface Logger with
-    member x.logWithAck level msgFactory =
-      sendToAll level msgFactory
+    member x.name = name
+    member x.logWithAck level messageFactory =
+      otherLoggers
+      |> List.map (fun l -> l.logWithAck level messageFactory)
+      |> Async.Parallel
+      |> Async.Ignore // Async<unit>
 
-    member x.log level msgFactory =
-      for logger in otherLoggers do
-        logger.log level msgFactory
-
-    member x.logSimple msg =
-      sendToAll msg.level (fun _ -> msg)
-      |> Async.Start
+    member x.log level messageFactory =
+      otherLoggers
+      |> List.map (fun l -> l.log level messageFactory)
+      |> Async.Parallel
+      |> Async.Ignore // Async<unit>
 
 module Global =
   /// This is the global semaphore for colourising the console output. Ensure
@@ -695,13 +844,13 @@ module Global =
   let private consoleSemaphore = obj ()
 
   /// The global default configuration, which logs to Console at Info level.
-  let DefaultConfig =
+  let defaultConfig =
     { timestamp        = fun () -> DateTimeOffset.timestamp DateTimeOffset.UtcNow
-      getLogger        = fun _ -> LiterateConsoleTarget(Info) :> Logger
+      getLogger        = fun name -> LiterateConsoleTarget(name, Info) :> Logger
       consoleSemaphore = consoleSemaphore }
 
   let private config =
-    ref (DefaultConfig, (* logical clock *) 1u)
+    ref (defaultConfig, (* logical clock *) 1u)
 
   /// The flyweight just references the current configuration. If you want
   /// multiple per-process logging setups, then don't use the static methods,
@@ -717,22 +866,19 @@ module Global =
       if cfgClock <> fwCurr then
         lock updating <| fun _ ->
           logger <- cfg.getLogger name
-          let c = fwCurr + 1u
-          fwClock <- c
+          fwClock <- fwCurr + 1u
       action logger
 
     let ensureName (m : Message) =
       if Array.isEmpty m.name then { m with name = name } else m
 
     interface Logger with
+      member x.name = name
       member x.log level msgFactory =
         withLogger (fun logger -> logger.log level (msgFactory >> ensureName))
 
       member x.logWithAck level msgFactory =
         withLogger (fun logger -> logger.logWithAck level (msgFactory >> ensureName))
-
-      member x.logSimple message =
-        withLogger (fun logger -> logger.logSimple (ensureName message))
 
   let internal getStaticLogger (name : string []) =
     Flyweight name
@@ -764,13 +910,14 @@ module Targets =
   ///
   /// Will log to console (colourised) by default, and also to the output window
   /// in your IDE if you specify a level below Info.
-  let create level =
+  let create level name =
     if level >= LogLevel.Info then
-      LiterateConsoleTarget(level, consoleSemaphore = Global.semaphore()) :> Logger
+      LiterateConsoleTarget(name, level, consoleSemaphore = Global.semaphore()) :> Logger
     else
       CombiningTarget(
-        [ LiterateConsoleTarget(level, consoleSemaphore = Global.semaphore())
-          OutputWindowTarget(level) ])
+        name,
+        [ LiterateConsoleTarget(name, level, consoleSemaphore = Global.semaphore())
+          OutputWindowTarget(name, level) ])
       :> Logger
 
 /// Module for acquiring static loggers (when you don't want or can't)
@@ -822,6 +969,13 @@ module Message =
   /// Sets the name/path of the log message.
   let setName (name : string[]) (x : Message) =
     { x with name = name }
+
+  /// Sets the final portion o fthe name of the Message.
+  let setNameEnding (ending : string) (x : Message) =
+    if String.IsNullOrWhiteSpace ending then x else
+    let segs = ResizeArray<_>(x.name)
+    segs.Add ending
+    { x with name = segs.ToArray() }
 
   /// Sets the name as a single string; if this string contains dots, the string
   /// will be split on these dots.

@@ -415,13 +415,17 @@ module Http =
       socketBinding : SocketBinding }
 
     member x.uri (path : string) query =
-      let path' = if path.StartsWith "/" then path else "/" + path
+      let path' =
+        match Uri.TryCreate(path, UriKind.Absolute) with
+        | true, uri when uri.Scheme = "http" || uri.Scheme = "https" -> uri.AbsolutePath
+        | _ when path.StartsWith "/" -> path
+        | _ -> "/" + path
       String.Concat [
         x.scheme.ToString(); "://"; x.socketBinding.ToString()
         path'
         (match query with | "" -> "" | qs -> "?" + qs)
       ]
-      |> fun x -> Uri x
+      |> Uri
 
     override x.ToString() =
       String.Concat [ x.scheme.ToString(); "://"; x.socketBinding.ToString() ]
@@ -432,7 +436,7 @@ module Http =
   [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
   module HttpBinding =
 
-    let DefaultBindingPort = 8083us
+    let DefaultBindingPort = 8080us
 
     let defaults =
       { scheme        = HTTP
@@ -502,10 +506,10 @@ module Http =
       compressionFolder : string
       logger            : Logger
       matchedBinding    : HttpBinding
-      parsePostData     : bool
       cookieSerialiser  : CookieSerialiser
       tlsProvider       : TlsProvider
-      hideHeader        : bool }
+      hideHeader        : bool
+      maxContentLength  : int }
 
     static member serverKey_ = Property (fun x -> x.serverKey) (fun v x -> { x with serverKey = v })
     static member errorHandler_ = Property (fun x -> x.errorHandler) (fun v x -> { x with errorHandler = v })
@@ -514,10 +518,10 @@ module Http =
     static member compressionFolder_ = Property (fun x -> x.compressionFolder) (fun v x -> { x with compressionFolder = v })
     static member logger_ = Property (fun x -> x.logger) (fun v x -> { x with logger = v })
     static member matchedBinding_ = Property (fun x -> x.matchedBinding) (fun v x -> { x with matchedBinding = v })
-    static member parsePostData_ = Property (fun x -> x.parsePostData) (fun v x -> { x with parsePostData = v })
     static member cookieSerialiser_ = Property (fun x -> x.cookieSerialiser) (fun v x -> { x with cookieSerialiser = v })
     static member tlsProvider_ = Property (fun x -> x.tlsProvider) (fun v x -> { x with tlsProvider = v })
     static member hideHeader_ = Property (fun x -> x.hideHeader) (fun v x -> { x with hideHeader = v })
+    static member maxContentLength_ = Property (fun x -> x.maxContentLength) (fun v x -> { x with maxContentLength = v })
 
   and HttpContext =
     { request    : HttpRequest
@@ -613,19 +617,19 @@ module Http =
         mimeTypesMap      = fun _ -> None
         homeDirectory     = "."
         compressionFolder = "."
-        logger            = Targets.create Debug
+        logger            = Targets.create Debug [| "Suave" |]
         matchedBinding    = HttpBinding.defaults
-        parsePostData     = false
         #if NETSTANDARD1_5
         cookieSerialiser  = new JsonFormatterSerialiser()
         #else
         cookieSerialiser  = new BinaryFormatterSerialiser()
         #endif
         tlsProvider       = null
-        hideHeader        = false }
+        hideHeader        = false
+        maxContentLength  = 1024 }
 
     let create serverKey errorHandler mimeTypes homeDirectory compressionFolder
-           logger parsePostData cookieSerialiser tlsProvider hideHeader binding =
+           logger cookieSerialiser tlsProvider hideHeader maxContentLength binding =
       { serverKey         = serverKey
         errorHandler      = errorHandler
         mimeTypesMap      = mimeTypes
@@ -633,10 +637,10 @@ module Http =
         compressionFolder = compressionFolder
         logger            = logger
         matchedBinding    = binding
-        parsePostData     = parsePostData
         cookieSerialiser  = cookieSerialiser
         tlsProvider       = tlsProvider
-        hideHeader        = hideHeader }
+        hideHeader        = hideHeader
+        maxContentLength  = maxContentLength }
 
   [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
   module HttpContext =

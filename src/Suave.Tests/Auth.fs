@@ -95,7 +95,7 @@ let sessionState f =
 
 [<Tests>]
 let authTests cfg =
-  let runWithConfig = runWith { cfg with logger = Targets.create Warn }
+  let runWithConfig = runWith { cfg with logger = Targets.create Warn [||] }
   testList "auth tests" [
     testCase "baseline, no auth cookie" <| fun _ ->
       let ctx = runWithConfig (OK "ACK")
@@ -113,6 +113,15 @@ let authTests cfg =
       let ctx = runWithConfig (authenticated maxAge false >=> OK "ACK")
       let cookies = ctx |> reqCookies' HttpMethod.GET "/"  None
       Expect.isNotNull cookies.[SessionAuthCookie] "should have auth cookie"
+
+    testCase "can access session id when authenticate" <| fun _ ->
+      let readSessionId = context (HttpContext.sessionId >> function
+        | None -> OK "no session id"
+        | Some _ -> OK "session id found")
+      let res =
+        runWithConfig (authenticated Session false >=> readSessionId)
+        |> req HttpMethod.GET "/" None
+      Expect.equal res "session id found" "should find session id"
 
     testCase "can access authenticated contents when authenticate, and not after deauthenticate" <| fun _ ->
       // given

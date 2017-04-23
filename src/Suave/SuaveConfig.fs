@@ -47,14 +47,11 @@ type SuaveConfig =
 
     /// Suave's logger. You can override the default instance if you wish to
     /// ship your logs, e.g. using https://www.nuget.org/packages/Logary.Adapters.Suave/
+    /// Also, this logger will be configured by default for Suave unless you
+    /// explicitly use `Suave.Logging.Global.initialise` before starting the
+    /// web server (the first time – the second time, the static will already
+    /// have been initialised).
     logger                : Logger
-
-    /// Whether to initialise the global static Suave logger with the passed one when
-    /// you call 'startWebServer' – this is a side effect, but a mostly harmless such.
-    /// Defaults to true, because if you set the 'logger' field, then you'd expect the
-    /// logging of Suave to adapt, whilst without this flag, it would not until
-    /// you call `Suave.Logging.Global.initialise logger`.
-    initialiseLogger      : bool
 
     /// Pluggable TCP async sockets implementation. You can choose betwee libuv
     /// and CLR's Async Socket Event Args. Currently defaults to the managed-only
@@ -70,7 +67,10 @@ type SuaveConfig =
 
     /// Make this true, if you want Suave not to display its server header in
     /// every response. Defaults to false.
-    hideHeader            : bool }
+    hideHeader            : bool
+
+    /// Maximun upload size in bytes
+    maxContentLength      : int }
 
   static member bindings_              = Property<SuaveConfig,_> (fun x -> x.bindings)              (fun v x -> { x with bindings = v })
   static member serverKey_             = Property<SuaveConfig,_> (fun x -> x.serverKey)             (fun v x -> { x with serverKey = v })
@@ -83,9 +83,9 @@ type SuaveConfig =
   static member homeFolder_            = Property<SuaveConfig,_> (fun x -> x.homeFolder)            (fun v x -> { x with homeFolder = v })
   static member compressedFilesFolder_ = Property<SuaveConfig,_> (fun x -> x.compressedFilesFolder) (fun v x -> { x with compressedFilesFolder = v })
   static member logger_                = Property<SuaveConfig,_> (fun x -> x.logger)                (fun v x -> { x with logger = v })
-  static member initialiseLogger_      = Property<SuaveConfig,_> (fun x -> x.initialiseLogger)      (fun v x -> { x with initialiseLogger = v })
   static member tcpServerFactory_      = Property<SuaveConfig,_> (fun x -> x.tcpServerFactory)      (fun v x -> { x with tcpServerFactory = v })
   static member hideHeader_            = Property<SuaveConfig,_> (fun x -> x.hideHeader)            (fun v x -> { x with hideHeader = v })
+  static member maxContentLength_      = Property<SuaveConfig,_> (fun x -> x.maxContentLength)      (fun v x -> { x with maxContentLength = v })
 
   member x.withBindings(v)              = { x with bindings = v }
   member x.withServerKey(v)             = { x with serverKey = v }
@@ -98,9 +98,10 @@ type SuaveConfig =
   member x.withHomeFolder(v)            = { x with homeFolder = v }
   member x.withCompressedFilesFolder(v) = { x with compressedFilesFolder = v }
   member x.withLogger(v)                = { x with logger = v }
-  member x.withLoggerInitialisation(v)  = { x with initialiseLogger = v }
   member x.withTcpServerFactory(v)      = { x with tcpServerFactory = v }
-  member x.withHiddenHeader()           = { x with hideHeader = true }
+  member x.withHiddenHeader(v)          = { x with hideHeader = v }
+  member x.withMaxContentLength(v)      = { x with maxContentLength = v }
+
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module SuaveConfig =
@@ -108,17 +109,17 @@ module SuaveConfig =
   /// Convert the Suave configuration to a runtime that the web server understands.
   /// You will normally not have to use this function as a consumer from the
   /// library, but it may be useful for unit testing with the HttpRuntime record.
-  let toRuntime config contentFolder compressionFolder parsePostData =
+  let toRuntime config contentFolder compressionFolder =
     HttpRuntime.create config.serverKey
                        config.errorHandler
                        config.mimeTypesMap
                        contentFolder
                        compressionFolder
                        config.logger
-                       parsePostData
                        config.cookieSerialiser
                        config.tlsProvider
                        config.hideHeader
+                       config.maxContentLength
 
   /// Finds an endpoint that is configured from the given configuration. Throws
   /// an exception if the configuration has no bindings. Useful if you make
