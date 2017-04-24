@@ -62,42 +62,68 @@ The first argument to `startWebServer` is a configuration record with the follow
 /// <code>{ defaultConfig with bindings = [ ... ] }</code>
 type SuaveConfig =
   { /// The bindings for the web server to launch with
-    bindings          : HttpBinding list
+    bindings                : HttpBinding list
 
-    /// The server key used for creating cookies
-    serverKey         : byte [] // should be 64 bytes (256 bits)
+    /// A server-key to use for cryptographic operations. When generated it
+    /// should be completely random; you can share this key between load-balanced
+    /// servers if you want to have them cryptographically verify similarly.
+    serverKey              : byte []
 
     /// An error handler to use for handling exceptions that are
     /// are thrown from the web parts
-    errorHandler      : ErrorHandler
+    errorHandler           : ErrorHandler
 
     /// Timeout to wait for the socket bind to finish
-    listenTimeout     : TimeSpan
+    listenTimeout          : TimeSpan
 
     /// A cancellation token for the web server. Signalling this token
     /// means that the web server shuts down
-    cancellationToken : CancellationToken
+    cancellationToken      : Threading.CancellationToken
 
     /// buffer size for socket operations
-    bufferSize        : int
+    bufferSize             : int
+
+    /// Buffer manager auto grow
+    autoGrow               : bool
 
     /// max number of concurrent socket operations
-    maxOps            : int
+    maxOps                 : int
 
     /// MIME types
-    mimeTypesMap      : MimeTypesMap
+    mimeTypesMap          : MimeTypesMap
 
     /// Home or root directory
-    homeFolder        : string option
+    homeFolder             : string option
 
     /// Folder for temporary compressed files
-    compressedFilesFolder : string option
+    compressedFilesFolder  : string option
 
-    /// A logger to log with
-    logger           : Log.Logger
+    /// Suave's logger. You can override the default instance if you wish to
+    /// ship your logs, e.g. using https://www.nuget.org/packages/Logary.Adapters.Suave/
+    /// Also, this logger will be configured by default for Suave unless you
+    /// explicitly use `Suave.Logging.Global.initialise` before starting the
+    /// web server (the first time – the second time, the static will already
+    /// have been initialised).
+    logger                : Logger
 
-    /// A http session provider
-    sessionProvider  : ISessionProvider }
+    /// Pluggable TCP async sockets implementation. You can choose betwee libuv
+    /// and CLR's Async Socket Event Args. Currently defaults to the managed-only
+    /// implementation.
+    tcpServerFactory      : TcpServerFactory
+
+    /// The cookie serialiser to use for converting the data you save in cookies
+    /// from your application into a byte array.
+    cookieSerialiser      : CookieSerialiser
+
+    /// A TLS provider implementation.
+    tlsProvider           : TlsProvider
+
+    /// Make this true, if you want Suave not to display its server header in
+    /// every response. Defaults to false.
+    hideHeader            : bool
+
+    /// Maximun upload size in bytes
+    maxContentLength      : int }
 {% endhighlight %}
 
 With `Protocol` , `HttpBinding` and `MimeType` defined like follows:
