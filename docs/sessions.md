@@ -2,10 +2,10 @@
 layout: default
 ---
 
-Using Sessions in Suave
-=======================
+State and Sessions in Suave
+===========================
 
-While stateless web applications are all the rage, there still may be times where session storage is needed. In these cases, Suave has you covered!
+While stateless web applications are all the rage, there are still times where state needs to be preserved, either across requests in a session, or simply among `WebPart`s as the request/response pipeline is composed.  In these cases, Suave has you covered!  We'll look at three aspects of session cookies first, then how we can construct state among `WebPart`s.
 
 Cookie State Session Storage
 ----------------------------
@@ -70,8 +70,8 @@ let main argv =
   0 
 {% endhighlight %}
 
-Cookie Serialization (of particular interest to .NET Core < netstandard2.0)
----------------------------------------------------------------------------
+Cookie Serialization<br>_(of particular interest to .NET Core < netstandard2.0)_
+--------------------------------------------------------------------------------
 
 Suave uses the .NET Framework type `BinaryFormatter` to serialize the `Map<string, obj>` containing the session state; this is the default. However, the `BinaryFormatter` was removed in the .NET Core API, and the `DataContractJsonSerializer` does not recognize the `Map<string, obj>` type. One option is to utilize JSON.NET to serialize this object. To use that, ensure you've added the `Newtonsoft.Json` NuGet package to your project, then put the following code somewhere before the `suaveCfg` definition in the example above.
 
@@ -79,7 +79,7 @@ Suave uses the .NET Framework type `BinaryFormatter` to serialize the `Map<strin
 /// alias
 let utf8 = System.Text.Encoding.UTF8
 
-type JsonNetCookieSerialiser() =
+type JsonNetCookieSerialiser () =
   interface CookieSerialiser with
     member x.serialise m =
       utf8.GetBytes (JsonConvert.SerializeObject m)
@@ -97,3 +97,31 @@ let suaveCfg =
       cookieSerialiser = new JsonNetCookieSerialiser()
     }
 {% endhighlight %}
+
+State among WebParts
+--------------------
+
+Within the `Writers` module, Suave provides the functions `setUserData` and `unsetUserData` for adding items to the context's `userState` property.  The example below could be used to accrue a list of messags to be displayed to the user.
+
+{% highlight fsharp %}
+/// string -> WebPart
+let addUserMessage message =
+  context (fun ctx ->
+    let existing =
+      match ctx.userState.ContainsKey "messages" with
+      | true -> ctx.userState.["messages"] :?> string list
+      | _ -> []
+    Writers.setUserData "messages" (message :: existing))
+
+/// WebPart
+let app =
+  choose [
+    path "/"
+      >=> addUserMessage "It's a state!"
+      >=> addUserMessage "Another one"
+      >=> context (fun ctx -> Successful.OK (View.page ctx.userState))
+      >=> Writers.unsetUserData "messages"
+    ]
+{% endhighlight %}
+
+In this example, `View.page` is a function that generates the output, using the user state `Map<string, obj>` to display the messages in a nice way.  Additionally, this example shows a few other interesting aspects.  First, the user state may persist across requests; if that is not desirable for your use case, you will want to `unset` the items when they are no longer needed.  Second, you can combine `WebPart`s even after the one that sets the output content.  If you are used to an MVC environment, you can't do much after you `return` your result; these combinators let you modify the context even once the output has been generated.
