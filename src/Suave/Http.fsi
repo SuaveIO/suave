@@ -206,7 +206,7 @@ module Http =
     /// - `?flag=false` => `false`
     /// - `?flag=apa` => `false`
     /// - `?flag=true` => `true`
-    /// - `?` => `false
+    /// - `?` => `false`
     member queryFlag : flag:string -> bool
 
     /// Gets the header for the given key in the HttpRequest

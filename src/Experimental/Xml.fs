@@ -27,7 +27,7 @@ let text s = Xml([Text s, Xml[]])
 let emptyText = text ""
 
 /// HTML elements.
-/// If you need to pass attributes use the version sufixed by ` (funny quote symbol)
+/// If you need to pass attributes use the version sufixed by Attr
 
 /// Flattens an XML list
 let flatten xs = xs |> List.map (fun (Xml y) -> y) |> List.concat |> Xml
