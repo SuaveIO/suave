@@ -274,9 +274,7 @@ namespace :docs do
   end
 
   task :reference => :restore_paket do
-    # Last worked in 0a0851f
-    # 'System.Exception: Failed to escape text properly: []'
-    #system 'packages/docs/FsLibTool/tools/FsLibTool.exe', %W|src docs/_site|, clr_command: true
+    system 'packages/docs/FsLibTool/tools/FsLibTool.exe', %W|src docs/_site|, clr_command: true
     puts "Reference docs generated successfully."
   end
 

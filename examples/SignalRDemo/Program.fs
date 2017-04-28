@@ -51,7 +51,7 @@ module Main =
         
         let cts = new CancellationTokenSource()
         let suaveConfig =  defaultConfig
-        let lisening, server = 
+        let listening, server = 
             startWebServerAsync suaveConfig app
         Async.Start(server, cts.Token)
         startSendingNonsense()
