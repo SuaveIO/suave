@@ -134,8 +134,11 @@ let app =
       >=> addUserMessage "It's a state!"
       >=> addUserMessage "Another one"
       >=> context (fun ctx -> Successful.OK (View.page ctx.userState))
-      >=> Writers.unsetUserData "messages"
     ]
 {% endhighlight %}
 
-In this example, `View.page` is a function that generates the output, using the user state `Map<string, obj>` to display the messages in a nice way.  Additionally, this example shows a few other interesting aspects.  First, user state only persists for the duration of the TCP connection; however, due to HTTP keep-alive headers, it may persist across requests. In our message accrual case, this causes the list of messages to continue to grow; that's the reason for the `unsetUserData` call at the end of the pipeline. If you're just using it to build up enough state to return a response, though, that step is probably unnecessary.  Second, you can combine `WebPart`s even after the one that sets the output content. If you are used to an MVC environment, you can't do much after you `return` your result; these combinators let you modify the context even once the output has been generated.
+In this example, `View.page` is a function that generates the output, using the user state `Map<string, obj>` to display the messages in a nice way.
+
+We've covered two different ways of managing state.  Session state persists throughout the session, while `userData` has a per-request lifetime.
+
+_(NOTE: Currently, Suave is keeping `userData` across requests if those requests are served from the same TCP connection, which is how Suave implements HTTP keep-alive.  There is an [issue to fix this behavior](https://github.com/SuaveIO/suave/issues/616), but if this is causing unintended issues, adding `>=> Writers.unsetUserData "messages"` at the end of the `path "/"` pipeline will ensure that it is cleared out.)_
