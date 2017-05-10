@@ -64,7 +64,7 @@ open Suave.Utils
 open System
 
 let writeKey key = System.IO.File.WriteAllText ("key.txt", key)
-Crypto.generateKey Crypto.KeySize
+Crypto.generateKey Crypto.KeyLength
 |> Convert.ToBase64String
 |> writeKey
 {% endhighlight %}
