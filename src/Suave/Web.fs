@@ -35,6 +35,8 @@ module Web =
   /// The return value from 'listening' (first item in tuple) gives you some metrics on
   /// how quickly suave started.
   let startWebServerAsync (config : SuaveConfig) (webpart : WebPart) =
+    ServerKey.create config.serverKey |> ignore
+
     let homeFolder, compressionFolder =
       ParsingAndControl.resolveDirectory config.homeFolder,
       Path.Combine(ParsingAndControl.resolveDirectory config.compressedFilesFolder, "_temporary_compressed_files")

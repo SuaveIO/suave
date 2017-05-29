@@ -74,7 +74,7 @@ Now, key in hand, we can continue our example from above. _(Note that hard-codin
 {% highlight fsharp %}
 let suaveCfg =
   { defaultConfig with
-      serverKey = Convert.FromBase64String [encoded-key]
+      serverKey = ServerKey.fromBase64 [encoded-key]
     }
 
 [<EntryPoint>]
