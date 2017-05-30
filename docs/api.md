@@ -234,10 +234,10 @@ that helps ensure that the key is the proper length.  The importance of this
 key, how to generate one, and how to plug it into your Suave config can be found
 under the [Server Keys](/sessions.html#server-keys) heading on that page.
 
-While the examples all demonstrate using a UTF-8 string, if you have 256 bits
-already in a byte array that you want to use as a server key, you can
-use `ServerKey.validate` instead of `ServerKey.create`; it will ensure that the
-key is the proper length.
+While the examples all demonstrate using a base64-encoded string, if you have
+256 bits already in a byte array that you want to use as a server key, you can
+use `ServerKey.validate` instead of `ServerKey.fromBase64`; it will ensure that
+the key is the proper length.
 
 #### Changing the error handler
 

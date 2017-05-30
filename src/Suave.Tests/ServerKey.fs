@@ -9,23 +9,23 @@ open Suave.Tests.TestUtilities
 [<Tests>]
 let serverKeyTest (cfg : SuaveConfig) =
   testList "server key" [
-    testList "create" [
+    testList "validate" [
       // No exception = successful test
       testCase "succeeds when the key has the correct number of bytes" <| fun _ ->
         let testKey : byte [] = Array.zeroCreate (int Crypto.KeyLength)
         ThreadSafeRandom.nextBytes testKey
-        let key = ServerKey.create testKey
+        let key = ServerKey.validate testKey
         Assert.Equal ("The two keys should be the same", testKey, key)
       testCase "fails when the key is too short" <| fun _ ->
         try
           int (Crypto.KeyLength - 1us)
-          |> (Array.zeroCreate >> ServerKey.create >> ignore)
+          |> (Array.zeroCreate >> ServerKey.validate >> ignore)
           failtest "A key smaller than the proper key length should have been invalid"
         with _ -> ()
       testCase "fails when the key is too long" <| fun _ ->
         try
           int (Crypto.KeyLength + 1us)
-          |> (Array.zeroCreate >> ServerKey.create >> ignore)
+          |> (Array.zeroCreate >> ServerKey.validate >> ignore)
           failtest "A key larger than the proper key length should have been invalid"
         with _ -> ()
       ]

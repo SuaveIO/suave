@@ -336,7 +336,7 @@ module Http =
   module ServerKey =
     
     /// Ensure that a server key is the proper length
-    val create : byte [] -> ServerKey
+    val validate : ServerKey -> ServerKey
 
     /// Create a key from a base-64 encoded string
     val fromBase64 : (string -> ServerKey)

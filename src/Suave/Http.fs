@@ -495,16 +495,13 @@ module Http =
   [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
   module ServerKey =
     
-    let create (key : byte []) : ServerKey =
+    let validate (key : ServerKey) =
       if key.Length <> int Crypto.KeyLength then
-        raise
-        <| ApplicationException
-            (sprintf "Invalid server key length - should be %i, but was %i"
-              Crypto.KeyLength key.Length)
+        failwithf "Invalid server key length - should be %i, but was %i" Crypto.KeyLength key.Length
       key
     
     let fromBase64 =
-      Convert.FromBase64String >> create
+      Convert.FromBase64String >> validate
     
   type IPAddress with
     static member tryParseC str =
