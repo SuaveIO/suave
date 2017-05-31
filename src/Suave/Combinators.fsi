@@ -1609,8 +1609,8 @@ module CORS =
       /// Allow cookies? This is sent in the AccessControlAllowCredentials header.
       allowCookies            : bool
 
-      /// Should response headers be exposed to the client? This is sent in AccessControlExposeHeaders header.
-      exposeHeaders           : bool
+      /// The list of response headers exposed to client. This is sent in AccessControlExposeHeaders header.
+      exposeHeaders           : InclusiveOption<string list>
 
       /// Max age in seconds the user agent is allowed to cache the result of the request.
       maxAge                  : int option }
@@ -1618,7 +1618,7 @@ module CORS =
     static member allowedUris_           : Property<CORSConfig, InclusiveOption<string list>>
     static member allowedMethods_        : Property<CORSConfig, InclusiveOption<HttpMethod list>>
     static member allowCookies_          : Property<CORSConfig, bool>
-    static member exposeHeaders_         : Property<CORSConfig, bool>
+    static member exposeHeaders_         : Property<CORSConfig, InclusiveOption<string list>>
     static member maxAge_                : Property<CORSConfig, int option>
 
 

@@ -158,5 +158,19 @@ let tests cfg =
           Expect.EmptyHeader("Should not have Access-Control-Allow-Credentials header", "Access-Control-Allow-Credentials", result)
 
         runWithConfig (composedApp (Some (cors corsConfig))) |> reqResp HttpMethod.GET "/cors" "" None None DecompressionMethods.None setHeaders asserts
+
+      testCase "Can respond with predefined Access-Control-Expose-Headers value" <| fun _ ->
+
+        let corsConfig = { defaultCORSConfig with exposeHeaders = InclusiveOption.Some ["Header1"; "Header2"] }
+
+        let setHeaders (request : HttpRequestMessage) =
+          request.Headers.Add("Origin", origin)
+          request
+
+        let asserts (result : HttpResponseMessage) =
+          let content = result.Content.ReadAsStringAsync().Result
+          eq "Access-Control-Expose-Headers header" "Header1, Header2" (result.Headers.GetValues("Access-Control-Expose-Headers") |> Seq.head)
+
+        runWithConfig (composedApp (Some (cors corsConfig))) |> reqResp HttpMethod.GET "/cors" "" None None DecompressionMethods.None setHeaders asserts
     ]
   ]
