@@ -331,6 +331,16 @@ module Http =
   /// A server-key is a 256 bit key with high entropy
   type ServerKey = byte []
 
+  /// Utilities to ensure server keys are well-formed
+  [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+  module ServerKey =
+    
+    /// Ensure that a server key is the proper length
+    val validate : ServerKey -> ServerKey
+
+    /// Create a key from a base-64 encoded string
+    val fromBase64 : (string -> ServerKey)
+
   type IPAddress with
     /// Try parse the IP address from a string, returning a choice.
     static member tryParseC : ip:string -> Choice<IPAddress, unit>
