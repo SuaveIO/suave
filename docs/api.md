@@ -227,7 +227,7 @@ combination of IP addresses and ports.
 
 #### Changing the server's cryptography key
 
-Suave encrypts state stored in (sessions)[sessions.html], and the key used for
+Suave encrypts state stored in [sessions](sessions.html), and the key used for
 that is the `serverKey` configuration setting. This key is required to be a
 specific length (256 bits as of this writing), so there is a `ServerKey` module
 that helps ensure that the key is the proper length.  The importance of this
