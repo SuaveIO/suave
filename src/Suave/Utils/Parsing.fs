@@ -22,6 +22,7 @@ let parseData (s : string) =
     else d.[0],None
   s.Split('&')
   |> Array.toList
+  |> List.filter (not << String.IsNullOrWhiteSpace)
   |> List.map (fun (k : string) -> k.Split('=') |> parseArr)
 
 /// parse the url into its constituents and fill out the passed dictionary with
