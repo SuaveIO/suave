@@ -17,14 +17,20 @@ open Suave.Testing
 
 [<Tests>]
 let parseQuery =
-  testCase "can parse query with =" <| fun _ ->
-    let subject =
-      Parsing.parseData "bewit=c&d=Q%3D%3D&r=https%3A%2F%2Fqvitoo.dev%3A8080%2F"
-    Expect.equal subject.Length 3 "Should have three values"
+  testList "http parser tests" [
+    testCase "can parse query with =" <| fun _ ->
+      let subject =
+        Parsing.parseData "bewit=c&d=Q%3D%3D&r=https%3A%2F%2Fqvitoo.dev%3A8080%2F"
+      Expect.equal subject.Length 3 "Should have three values"
 
-    let actual = subject.[1] |> snd |> Option.get
-    Expect.equal actual "Q==" "Should contain Q=="
+      let actual = subject.[1] |> snd |> Option.get
+      Expect.equal actual "Q==" "Should contain Q=="
 
+    testCase "can parse empty query" <| fun _ ->
+      let subject =
+        Parsing.parseData ""
+      Expect.equal subject.Length 0 "Should be empty list"
+    ]
 
 [<Tests>]
 let parsingMultipart cfg =
