@@ -9,7 +9,7 @@ open Suave
 open Suave.Successful
 open Suave.Operators
 open Suave.Filters
-open Suave.Logging
+open Logary.Facade
 open Suave.Cookie
 open Suave.State.CookieStateStore
 open Suave.CORS

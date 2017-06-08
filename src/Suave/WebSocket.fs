@@ -6,8 +6,8 @@ module WebSocket =
   open Suave.Sockets.Control
   open Suave.Operators
   open Suave.Utils
-  open Suave.Logging
-  open Suave.Logging.Message
+  open Logary.Facade
+  open Logary.Facade.Message
 
   open System
   open System.Collections.Concurrent

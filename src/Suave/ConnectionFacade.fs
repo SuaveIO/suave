@@ -7,11 +7,12 @@ open System.IO
 open System.Collections.Generic
 open System.Net.Sockets
 
+open Logary.Facade
+open Logary.Facade.Message
 open Suave
+open Suave.Logging
 open Suave.Utils
 open Suave.Utils.Parsing
-open Suave.Logging
-open Suave.Logging.Message
 open Suave.Sockets
 open Suave.Sockets.Connection
 open Suave.Sockets.Control

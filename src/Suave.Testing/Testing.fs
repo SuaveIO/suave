@@ -30,8 +30,8 @@ open System.Net.Http
 open System.Net.Http.Headers
 open Expecto
 open Suave
-open Suave.Logging
-open Suave.Logging.Message
+open Logary.Facade
+open Logary.Facade.Message
 open Suave.Http
 
 [<AutoOpen>]

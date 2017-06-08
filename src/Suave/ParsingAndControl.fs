@@ -23,8 +23,8 @@ module internal ParsingAndControl =
   open Suave.Utils
   open Suave.Utils.Bytes
   open Suave.Utils.Parsing
-  open Suave.Logging
-  open Suave.Logging.Message
+  open Logary.Facade
+  open Logary.Facade.Message
 
   /// Free up a list of buffers
   let inline free context connection =

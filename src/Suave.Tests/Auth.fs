@@ -6,8 +6,8 @@ open System.Net
 open System.Net.Http
 open Expecto
 open Suave
-open Suave.Logging
-open Suave.Logging.Message
+open Logary.Facade
+open Logary.Facade.Message
 open Suave.Cookie
 open Suave.State.CookieStateStore
 open Suave.Operators

@@ -7,6 +7,7 @@ module Http =
   open System.Net
   open Suave.Utils
   open Suave.Logging
+  open Logary.Facade
   open Suave.Sockets
 
   /// These are the known HTTP methods. See http://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html

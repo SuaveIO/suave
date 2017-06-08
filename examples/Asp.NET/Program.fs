@@ -1,6 +1,6 @@
 ﻿
 open Suave
-open Suave.Logging
+open Logary.Facade
 open System.IO
 open System.Net
 

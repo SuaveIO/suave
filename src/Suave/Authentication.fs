@@ -5,7 +5,8 @@ open System.Text
 open Suave.RequestErrors
 open Suave.Utils
 open Suave.Logging
-open Suave.Logging.Message
+open Logary.Facade
+open Logary.Facade.Message
 open Suave.Cookie
 open Suave.State.CookieStateStore
 open Suave.Operators

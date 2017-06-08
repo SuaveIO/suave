@@ -2,7 +2,7 @@ module Suave.Tests.Program
 
 open Suave.Http
 open Suave.Web
-open Suave.Logging
+open Logary.Facade
 open Suave.LibUv
 open ExpectoExtensions
 

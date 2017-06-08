@@ -5,7 +5,7 @@ open System.Net
 
 open Suave
 open Suave.Sockets.Control
-open Suave.Logging
+open Logary.Facade
 open Suave.Operators
 open Suave.EventSource
 open Suave.Filters

@@ -284,7 +284,7 @@ module ServerErrors =
 module Filters =
   open Suave.Utils
   open Suave.Utils.AsyncExtensions
-  open Suave.Logging
+  open Logary.Facade
   open System
   open System.Text.RegularExpressions
 
@@ -373,7 +373,7 @@ module Filters =
         level         = level
         name          = [| "Suave"; "Http"; "requests" |]
         fields        = Map.empty
-        timestamp     = Suave.Logging.Global.timestamp() })
+        timestamp     = Logary.Facade.Global.timestamp() })
     |> Async.map (fun () -> Some ctx)
 
   let logWithLevelStructured (level : LogLevel) (logger : Logger) (templateAndFieldsCreator : HttpContext -> (string * Map<string,obj>)) (ctx : HttpContext) =
@@ -383,7 +383,7 @@ module Filters =
         level         = level
         name          = [| "Suave"; "Http"; "requests" |]
         fields        = fields
-        timestamp     = Suave.Logging.Global.timestamp() })
+        timestamp     = Logary.Facade.Global.timestamp() })
     |> Async.map (fun () -> Some ctx)
 
   let logStructured (logger : Logger) (structuredFormatter : HttpContext -> (string * Map<string,obj>)) =
@@ -432,8 +432,8 @@ module ServeResource =
   open Redirection
   open RequestErrors
   open Suave.Utils
-  open Suave.Logging
-  open Suave.Logging.Message
+  open Logary.Facade
+  open Logary.Facade.Message
 
   // If a response includes both an Expires header and a max-age directive,
   // the max-age directive overrides the Expires header, even if the Expires header is more restrictive
@@ -505,8 +505,8 @@ module Files =
   open System.Text
 
   open Suave.Utils
-  open Suave.Logging
-  open Suave.Logging.Message
+  open Logary.Facade
+  open Logary.Facade.Message
   open Suave.Sockets.Control
 
   open Response

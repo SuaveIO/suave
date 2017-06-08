@@ -6,8 +6,8 @@ module IdentityServer =
   open Owin
   open Microsoft.Owin.Builder
   open Suave
-  open Suave.Logging
-  open Suave.Logging.Message
+  open Logary.Facade
+  open Logary.Facade.Message
   open Suave.Owin
   open Suave.Filters
   open Suave.Operators

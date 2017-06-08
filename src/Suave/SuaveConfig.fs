@@ -1,6 +1,6 @@
 ﻿namespace Suave
 
-open Suave.Logging
+open Logary.Facade
 open Suave.Utils
 open System
 
