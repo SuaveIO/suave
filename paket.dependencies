@@ -51,3 +51,4 @@ group Docs
   nuget FSharp.Core ~> 4 redirects: force
   nuget FsLibTool
   nuget Argu
+  nuget Stripe.net
