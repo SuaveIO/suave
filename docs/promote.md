@@ -19,7 +19,7 @@ Or perhaps you **have more money than you have time** to contribute? Here's your
       data-key="pk_live_0zs9hGzMcV8cSFjQnw5HdVpE"
       data-image="images/marketplace.png"
       data-name="Suave.io"
-      data-description="A dev is ~$13000/month."
+      data-description="We appreciate your support."
       data-amount="20000"
       data-label="Support Suave as a business with 200 USD/month">
     </script>
@@ -34,7 +34,7 @@ Or perhaps you **have more money than you have time** to contribute? Here's your
       data-key="pk_live_0zs9hGzMcV8cSFjQnw5HdVpE"
       data-image="images/marketplace.png"
       data-name="Suave.io"
-      data-description="A dev is ~$13000/month."
+      data-description="We appreciate your support."
       data-amount="40000"
       data-label="Support Suave as a business with 400 USD/month">
     </script>
@@ -49,7 +49,7 @@ Or perhaps you **have more money than you have time** to contribute? Here's your
       data-key="pk_live_0zs9hGzMcV8cSFjQnw5HdVpE"
       data-image="images/marketplace.png"
       data-name="Suave.io"
-      data-description="A dev is ~$13000/month."
+      data-description="We appreciate your support."
       data-amount="60000"
       data-label="Support Suave as a business with 600 USD/month">
     </script>
