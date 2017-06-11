@@ -6,13 +6,11 @@ steps:
   name: eu.gcr.io/$PROJECT_ID/suaveio-docs-builder
   entrypoint: docker
   args: ["build", "-t", "eu.gcr.io/$PROJECT_ID/suaveio-docs", "."]
-  waitFor: ["suaveio-docs-builder"]
 - id: suaveio-docs-push
   name: eu.gcr.io/$PROJECT_ID/suaveio-docs-builder
   entrypoint: docker
   args: ["push", "eu.gcr.io/$PROJECT_ID/suaveio-docs"]
-  waitFor: ["suaveio-docs-build"]
-- id: suaveio-docs-push
+- id: suaveio-docs-deploy
   name: eu.gcr.io/$PROJECT_ID/suaveio-docs-builder
   entrypoint: bash
   args:
