@@ -1,6 +1,6 @@
 steps:
 - id: suaveio-docs-builder
-  name: eu.gcr.io/cloud-builders/docker:latest
+  name: gcr.io/cloud-builders/docker:latest
   args: ['build', '--rm=false', '-t', 'eu.gcr.io/$PROJECT_ID/suaveio-docs-builder', '-f', 'Dockerfile.builder', '.']
 - id: suaveio-docs-build
   name: eu.gcr.io/$PROJECT_ID/suaveio-docs-builder
