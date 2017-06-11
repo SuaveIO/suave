@@ -287,8 +287,14 @@ namespace :docs do
     end
   end
 
+  task :server do
+    Dir.chdir 'docs' do
+      system 'xbuild', %w|/p:Configuration=Release server/server.fsproj|
+    end
+  end
+
   desc 'build documentation'
-  task :build => [:clean, :restore_paket, :jekyll, :reference]
+  task :build => [:clean, :restore_paket, :jekyll, :server, :reference]
 
   desc 'deploy the suave.io site'
   task :deploy => :build do
