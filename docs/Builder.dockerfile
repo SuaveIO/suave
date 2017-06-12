@@ -41,8 +41,8 @@ ARG DEBIAN_FRONTEND=noninteractive
 RUN apt-add-repository ppa:brightbox/ruby-ng && \
     apt-get update -y && \
     apt-get install -q -y ruby2.2 ruby2.2-dev ruby-switch g++ build-essential curl git libssl-dev
-RUN ruby-switch --set ruby2.2 && gem install bundler fpm --no-ri --no-rdoc
-RUN gem install albacore fpm --no-rdoc --no-ri
+RUN ruby-switch --set ruby2.2 && gem install bundler fpm rake --no-ri --no-rdoc
+RUN gem install rake albacore fpm --no-rdoc --no-ri
 RUN ruby -v
 
 ENV MONO_THREADS_PER_CPU 50 \

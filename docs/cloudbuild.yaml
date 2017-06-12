@@ -7,8 +7,12 @@ steps:
   args: [gcloud docker -- push eu.gcr.io/$PROJECT_ID/suaveio-docs-builder]
 - id: suaveio-docs-build
   name: eu.gcr.io/$PROJECT_ID/suaveio-docs-builder
-  entrypoint: bundle
-  args: ["exec", "rake", "build:docs"]
+  entrypoint: ["bundle"]
+  args: ["install"]
+- id: suaveio-docs-build
+  name: eu.gcr.io/$PROJECT_ID/suaveio-docs-builder
+  entrypoint: ["bundle", "exec"]
+  args: [rake", "build:docs"]
 - id: suaveio-docs-push
   name: eu.gcr.io/$PROJECT_ID/suaveio-docs-builder
   entrypoint: docker
