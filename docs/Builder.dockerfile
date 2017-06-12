@@ -37,10 +37,16 @@ RUN apt-get -y update && \
     rm -rf /var/lib/apt/lists/* && \
     rm -rf ~/.config/gcloud
 
-# From https://github.com/fsprojects/docker-fsharp/blob/master/4.1.18/mono-jessie/Dockerfile
-ENV MONO_THREADS_PER_CPU 50 \
-    MONO_TLS_PROVIDER btls
+ARG DEBIAN_FRONTEND=noninteractive
+RUN apt-add-repository ppa:brightbox/ruby-ng && \
+    apt-get update -y && \
+    apt-get install -q -y ruby2.2 ruby2.2-dev ruby-switch g++ build-essential curl git libssl-dev
+RUN ruby-switch --set ruby2.2 && gem install bundler fpm --no-ri --no-rdoc
+RUN gem install albacore fpm --no-rdoc --no-ri
+RUN node -v && npm -v && ruby -v
 
-ENV PATH=/builder/google-cloud-sdk/bin/:$PATH
+ENV MONO_THREADS_PER_CPU 50 \
+    MONO_TLS_PROVIDER btls \
+    PATH=/builder/google-cloud-sdk/bin/:$PATH
 
 ENTRYPOINT ["/bin/sh", "-c"]
