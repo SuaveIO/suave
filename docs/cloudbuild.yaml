@@ -2,6 +2,9 @@ steps:
 - id: suaveio-docs-builder
   name: gcr.io/cloud-builders/docker:latest
   args: ['build', '--rm=false', '-t', 'eu.gcr.io/$PROJECT_ID/suaveio-docs-builder', '-f', 'docs/Builder.dockerfile', '.']
+- id: suaveio-docs-builder-push
+  name: eu.gcr.io/$PROJECT_ID/suaveio-docs-builder
+  args: [gcloud docker -- push eu.gcr.io/$PROJECT_ID/suaveio-docs-builder]
 - id: suaveio-docs-build
   name: eu.gcr.io/$PROJECT_ID/suaveio-docs-builder
   entrypoint: bundle
