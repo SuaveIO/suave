@@ -4,6 +4,8 @@ language: csharp
 dist: trusty
 sudo: required
 
+dotnet: 1.0.4
+
 mono:
  - 4.8.0
  - latest # => "stable release"
