@@ -104,6 +104,7 @@ module Writers =
     | ".jpeg"
     | ".jpg" -> createMimeType "image/jpeg" false
     | ".exe" -> createMimeType "application/exe" false
+    | ".pdf" -> createMimeType "application/pdf" false
     | ".txt" -> createMimeType "text/plain" true
     | ".ttf" -> createMimeType "application/x-font-ttf" true
     | ".otf" -> createMimeType "application/font-sfnt" true
@@ -856,8 +857,8 @@ module CORS =
       /// Allow cookies? This is sent in the AccessControlAllowCredentials header.
       allowCookies            : bool
 
-      /// Should response headers be exposed to the client? This is sent in AccessControlExposeHeaders header.
-      exposeHeaders           : bool
+      /// The list of response headers exposed to client. This is sent in AccessControlExposeHeaders header.
+      exposeHeaders           : InclusiveOption<string list>
 
       /// Max age in seconds the user agent is allowed to cache the result of the request.
       maxAge                  : int option }
@@ -917,7 +918,15 @@ module CORS =
     Writers.setHeader AccessControlAllowOrigin value
 
   let private setExposeHeadersHeader config =
-    Writers.setHeader AccessControlExposeHeaders (config.exposeHeaders.ToString())
+    match config.exposeHeaders with
+    | InclusiveOption.None
+    | InclusiveOption.Some [] ->
+      succeed
+    | InclusiveOption.All ->
+      Writers.setHeader AccessControlExposeHeaders "*"
+    | InclusiveOption.Some hs ->
+      let header = hs |> String.concat(", ")
+      Writers.setHeader AccessControlExposeHeaders header
 
   let cors (config : CORSConfig) : WebPart =
     fun (ctx : HttpContext) ->
@@ -971,5 +980,5 @@ module CORS =
     { allowedUris           = InclusiveOption.All
       allowedMethods        = InclusiveOption.All
       allowCookies          = true
-      exposeHeaders         = true
+      exposeHeaders         = InclusiveOption.None
       maxAge                = None }

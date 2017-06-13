@@ -1,6 +1,7 @@
-module Suave.Html
+﻿module Suave.Html
 
 open System
+open System.Net
 
 type Attribute = string * string
 
@@ -12,14 +13,17 @@ type Node =
   /// A void element is one that can't have content
   /// See: https://www.w3.org/TR/html5/syntax.html#void-elements
   | VoidElement of Element
-  /// A text value for a node
+  /// A text value for a node (will be encoded)
   | Text of string
+  // raw content to pass through without html encoding (e.g. for <script> content)
+  | Raw of string
   /// Whitespace for formatting
   | WhiteSpace of string
 
 let tag tag attr (contents : Node list) = Element ((tag, Array.ofList attr), contents)
 let voidTag tag attr = VoidElement (tag, Array.ofList attr)
 let text s = [Text s]
+let rawText s = [Raw s]
 
 let emptyText = text ""
 let html = tag "html"
@@ -48,7 +52,7 @@ let samplePage =
       title [] "Little HTML DSL"
       link [ "rel", "https://instabt.com/instaBT.ico" ]
       script [ "type", "text/javascript"; "src", "js/jquery-2.1.0.min.js" ] []
-      script [ "type", "text/javascript" ] (text "$().ready(function () { setup(); });" )
+      script [ "type", "text/javascript" ] (rawText "$().ready(function () { setup(); });" )
     ]
     body [] [
       div ["id","content"] [
@@ -69,14 +73,15 @@ let rec htmlToString node =
     | xs ->
       let attributeString =
         attributes
-        |> Array.map (fun (k,v) -> sprintf " %s=\"%s\"" k v)
+        |> Array.map (fun (k, v) -> sprintf " %s=\"%s\"" k (WebUtility.HtmlEncode v))
         |> String.Concat
       sprintf "<%s%s>" e attributeString
 
   let endElemToString (e, _) = sprintf "</%s>" e
 
   match node with
-  | Text text -> text
+  | Text text -> text |> WebUtility.HtmlEncode
+  | Raw text -> text
   | WhiteSpace text -> text
   | Element (e, nodes) ->
     let inner = nodes |> List.map htmlToString |> String.Concat

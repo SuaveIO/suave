@@ -206,7 +206,7 @@ module Http =
     /// - `?flag=false` => `false`
     /// - `?flag=apa` => `false`
     /// - `?flag=true` => `true`
-    /// - `?` => `false
+    /// - `?` => `false`
     member queryFlag : flag:string -> bool
 
     /// Gets the header for the given key in the HttpRequest
@@ -330,6 +330,16 @@ module Http =
 
   /// A server-key is a 256 bit key with high entropy
   type ServerKey = byte []
+
+  /// Utilities to ensure server keys are well-formed
+  [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+  module ServerKey =
+    
+    /// Ensure that a server key is the proper length
+    val validate : ServerKey -> ServerKey
+
+    /// Create a key from a base-64 encoded string
+    val fromBase64 : (string -> ServerKey)
 
   type IPAddress with
     /// Try parse the IP address from a string, returning a choice.

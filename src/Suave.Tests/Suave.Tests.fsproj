@@ -113,6 +113,7 @@
     <Compile Include="WebSocket.fs" />
     <Compile Include="Razor.fs" />
     <Compile Include="DotLiquid.fs" />
+    <Compile Include="ServerKey.fs" />
     <Compile Include="ExpectoExtensions.fs" />
     <Compile Include="Program.fs" />
     <None Include="paket.references" />

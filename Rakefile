@@ -274,9 +274,7 @@ namespace :docs do
   end
 
   task :reference => :restore_paket do
-    # Last worked in 0a0851f
-    # 'System.Exception: Failed to escape text properly: []'
-    #system 'packages/docs/FsLibTool/tools/FsLibTool.exe', %W|src docs/_site|, clr_command: true
+    system 'packages/docs/FsLibTool/tools/FsLibTool.exe', %W|src docs/_site|, clr_command: true
     puts "Reference docs generated successfully."
   end
 
@@ -289,8 +287,14 @@ namespace :docs do
     end
   end
 
+  task :server do
+    Dir.chdir 'docs' do
+      system 'xbuild', %w|/p:Configuration=Release server/server.fsproj|
+    end
+  end
+
   desc 'build documentation'
-  task :build => [:clean, :restore_paket, :jekyll, :reference]
+  task :build => [:clean, :restore_paket, :jekyll, :server, :reference]
 
   desc 'deploy the suave.io site'
   task :deploy => :build do

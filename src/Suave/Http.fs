@@ -491,7 +491,18 @@ module Http =
     static member writePreamble_ = Property<HttpResult,_> (fun x -> x.writePreamble) (fun v x -> { x with writePreamble = v })
 
   type ServerKey = byte []
-
+  
+  [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+  module ServerKey =
+    
+    let validate (key : ServerKey) =
+      if key.Length <> int Crypto.KeyLength then
+        failwithf "Invalid server key length - should be %i, but was %i" Crypto.KeyLength key.Length
+      key
+    
+    let fromBase64 =
+      Convert.FromBase64String >> validate
+    
   type IPAddress with
     static member tryParseC str =
       match IPAddress.TryParse str with

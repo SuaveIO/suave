@@ -1,0 +1,27 @@
+steps:
+- id: suaveio-docs-builder
+  name: gcr.io/cloud-builders/docker:latest
+  args: ['build', '--rm=false', '-t', 'eu.gcr.io/$PROJECT_ID/suaveio-docs-builder', '-f', 'docs/Builder.dockerfile', '.']
+- id: suaveio-docs-builder-push
+  name: eu.gcr.io/$PROJECT_ID/suaveio-docs-builder
+  args: [gcloud docker -- push eu.gcr.io/$PROJECT_ID/suaveio-docs-builder]
+- id: suaveio-docs-build
+  name: eu.gcr.io/$PROJECT_ID/suaveio-docs-builder
+  entrypoint: ["bundle"]
+  args: ["install"]
+- id: suaveio-docs-build
+  name: eu.gcr.io/$PROJECT_ID/suaveio-docs-builder
+  entrypoint: ["bundle", "exec"]
+  args: [rake", "build:docs"]
+- id: suaveio-docs-push
+  name: eu.gcr.io/$PROJECT_ID/suaveio-docs-builder
+  entrypoint: docker
+  args: ["push", "eu.gcr.io/$PROJECT_ID/suaveio-docs"]
+- id: suaveio-docs-deploy
+  name: eu.gcr.io/$PROJECT_ID/suaveio-docs-builder
+  entrypoint: bash
+  args:
+  - '-c'
+  - |
+    gcloud container clusters get-credentials $PROJECT_ID --zone europe-west1
+    kubectl set image deployment/suaveio-docs suaveio-docs=eu.gcr.io/$PROJECT_ID/suaveio-docs

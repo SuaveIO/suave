@@ -90,9 +90,9 @@ module WebSocket =
 
   type ByteSegmentCapacityException(requiredCapacity: int, actualCapacity: int) =
     inherit Exception(
-      sprintf 
-        "Byte segment provided to read websocket message does not have enough capacity [Required Capacity: %i, Actual Capacity: %i]" 
-        requiredCapacity 
+      sprintf
+        "Byte segment provided to read websocket message does not have enough capacity [Required Capacity: %i, Actual Capacity: %i]"
+        requiredCapacity
         actualCapacity)
 
   let internal exctractHeader (arr: byte []) =
@@ -111,6 +111,9 @@ module WebSocket =
       }
     header
 
+  let internal bytesToNetworkOrder (bytes : byte[]) =
+    if BitConverter.IsLittleEndian then bytes |> Array.rev else bytes
+
   let writeFrame (connection: Connection) (f: Frame) = socket {
       do! connection.transport.write (ArraySegment([| f.OpcodeByte |], 0, 1))
       do! connection.transport.write (ArraySegment(f.EncodedLength, 0, f.EncodedLength.Length))
@@ -123,16 +126,16 @@ module WebSocket =
 
     let firstByte = if fin then firstByte ||| 128uy else firstByte
 
-    let encodedLength = 
+    let encodedLength =
         match data.Count with
         | l when l >= 65536 ->
           [| yield 127uy
-             yield! BitConverter.GetBytes(uint64 data.Count) |> Array.rev |]
+             yield! BitConverter.GetBytes(uint64 data.Count) |> bytesToNetworkOrder |]
         | l when l >= 126 ->
           [| yield 126uy
-             yield! BitConverter.GetBytes(uint16 data.Count) |> Array.rev |]
+             yield! BitConverter.GetBytes(uint16 data.Count) |> bytesToNetworkOrder |]
         | _ -> [| byte (data.Count) |]
-    
+
     { Frame.OpcodeByte = firstByte; EncodedLength = encodedLength; Data = data }
 
   let readBytes (transport : ITransport) (n : int) =
@@ -149,7 +152,7 @@ module WebSocket =
   let readBytesIntoByteSegment retrieveByteSegment (transport : ITransport) (n : int) =
     let byteSegmentRetrieved: ByteSegment = retrieveByteSegment n
 
-    let byteSegment = 
+    let byteSegment =
         match byteSegmentRetrieved.Count with
         | count when count = n -> byteSegmentRetrieved
         | count when count < n -> raise (ByteSegmentCapacityException(n, byteSegmentRetrieved.Count))
@@ -202,7 +205,7 @@ module WebSocket =
       return! asyncAction
       }
 
-    let sendFrame opcode bs fin = 
+    let sendFrame opcode bs fin =
       let frame = frame opcode bs fin
       runAsyncWithSemaphore writeSemaphore (writeFrame connection frame)
 
@@ -218,7 +221,7 @@ module WebSocket =
       if extendedLength > uint64 Int32.MaxValue then
         let reason = sprintf "Frame size of %d bytes exceeds maximum accepted frame size (2 GB)" extendedLength
         let data =
-          [| yield! BitConverter.GetBytes (CloseCode.CLOSE_TOO_LARGE.code)
+          [| yield! BitConverter.GetBytes (CloseCode.CLOSE_TOO_LARGE.code) |> bytesToNetworkOrder
              yield! UTF8.bytes reason |]
         do! sendFrame Close (ArraySegment(data)) true
         return! SocketOp.abort (InputDataError(None, reason))
@@ -241,15 +244,15 @@ module WebSocket =
       if extendedLength > uint64 Int32.MaxValue then
         let reason = sprintf "Frame size of %d bytes exceeds maximum accepted frame size (2 GB)" extendedLength
         let data =
-            [| yield! BitConverter.GetBytes (CloseCode.CLOSE_TOO_LARGE.code)
+            [| yield! BitConverter.GetBytes (CloseCode.CLOSE_TOO_LARGE.code) |> bytesToNetworkOrder
                yield! UTF8.bytes reason |]
         do! sendFrame Close (ArraySegment(data)) true
         return! SocketOp.abort (InputDataError(None, reason))
       else
         let! frame = readBytesIntoByteSegment byteSegmentForLengthFunc connection.transport (int extendedLength)
-        
+
         // Messages from the client MUST be masked
-        if header.hasMask 
+        if header.hasMask
         then
           for i = 0 to (int extendedLength) - 1 do
             let pos = frame.Offset + i
@@ -257,15 +260,15 @@ module WebSocket =
 
         return (header.opcode, frame, header.fin)
       }
-    
+
     member this.read () = async {
       let! result = runAsyncWithSemaphore readSemaphore (readFrameIntoSegment (Array.zeroCreate >> ArraySegment))
       return
-        match result with 
+        match result with
         | Choice1Of2(opcode, frame, header) -> Choice1Of2(opcode, frame.Array, header)
         | Choice2Of2(error) -> Choice2Of2(error)
         }
-    
+
     /// Reads from the websocket and puts the data into a ByteSegment selected by the byteSegmentForLengthFunc parameter
     /// <param name="byteSegmentForLengthFunc">A function that takes in the message length in bytes required to hold the next websocket message and returns an appropriately sized ArraySegment of bytes</param>
     member this.readIntoByteSegment byteSegmentForLengthFunc = runAsyncWithSemaphore readSemaphore (readFrameIntoSegment byteSegmentForLengthFunc)

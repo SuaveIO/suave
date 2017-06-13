@@ -1,9 +1,6 @@
-FROM fsharp:latest
+FROM eu.gcr.io/$PROJECT_ID/suaveio-docs-builder:latest
 
-RUN apt-get update && \
-    apt-get install -y rake bundler
-
-ADD . /suave-build
-WORKDIR /suave-build
+ADD . /workspace
+WORKDIR /workspace
 RUN bundle
-RUN bundle exec rake dotnetcli:restore dotnetcli:build compile
+RUN bundle exec rake build:docs

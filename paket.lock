@@ -26,8 +26,11 @@ NUGET
     FsLibTool (0.1.1)
       FSharp.Core (>= 4.0.0.1)
       PPrint (>= 1.4.3)
+    Newtonsoft.Json (10.0.2)
     PPrint (2.0)
       FSharp.Core (>= 3.1.2.5)
+    Stripe.net (10.0)
+      Newtonsoft.Json (>= 9.0.1)
 
 GROUP Examples
 FRAMEWORK: NET46

@@ -64,13 +64,23 @@ the code below will run the server until a key is pressed in the console window,
 then shuts down the server.
 
 {% highlight fsharp %}
-let cts = new CancellationTokenSource()
-let conf = { defaultConfig with cancellationToken = cts.Token }
-let listening, server = startWebServerAsync conf (OK "Hello World")
-Async.Start(server, cts.Token)
-printfn "Make requests now"
-Console.ReadKey true |> ignore
-cts.Cancel()
+open System
+open System.Threading
+open Suave
+
+[<EntryPoint>]
+let main argv = 
+  let cts = new CancellationTokenSource()
+  let conf = { defaultConfig with cancellationToken = cts.Token }
+  let listening, server = startWebServerAsync conf (Successful.OK "Hello World")
+    
+  Async.Start(server, cts.Token)
+  printfn "Make requests now"
+  Console.ReadKey true |> ignore
+    
+  cts.Cancel()
+
+  0 // return an integer exit code
 {% endhighlight %}
 
 In suave, we have opted to write a lot of documentation inside the code; so just

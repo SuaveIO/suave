@@ -5,6 +5,12 @@ layout: default
 Getting Hold of Suave's Logs
 ----------------------------
 
+Current documentation for configuring Suave is either
+[in this sample](https://github.com/fable-compiler/fable-suave-scaffold/blob/master/src/Server/Server.fs#L24-L28)
+or [in the Logary readme](https://github.com/logary/logary#using-logary-in-a-library).
+
+The below details how to configure Suave v1.x with Logary v3.x:
+
 When you are using suave you will probably want to funnel all logs from the
 output to your own log sink. We provide the interface `Logger` to do that; just
 set the propery `logger` in the configuration to an instance of your thread-safe
