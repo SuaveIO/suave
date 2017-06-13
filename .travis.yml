@@ -1,6 +1,9 @@
 ---
 language: csharp
 
+dist: trusty
+sudo: required
+
 mono:
  - 4.8.0
  - latest # => "stable release"
