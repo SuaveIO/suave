@@ -128,11 +128,12 @@ namespace :dotnetcli do
         unless File.exists? "tools/dotnet-install.sh"
 
       system 'bash',
-        %W|--install-dir "#{coreclr_bin_dir}"
-           --channel "stable"
-           --version "#{dotnet_version}|
+        %W|tools/dotnet-install.sh
+           --install-dir tools/coreclr
+           --channel stable
+           --version #{dotnet_version}|
 
-      ENV['PATH'] = "#{coreclr_bin_dir}/dotnet:#{ENV['PATH']}"
+      ENV['PATH'] = "#{coreclr_bin_dir}:#{ENV['PATH']}"
     else
       system 'powershell',
         %W|Invoke-WebRequest "https://dot.net/v1/dotnet-install.ps1" -OutFile "tools/dotnet-install.ps1"| \
@@ -146,6 +147,9 @@ namespace :dotnetcli do
 
       ENV['PATH'] = "#{coreclr_bin_dir};#{ENV['PATH']}"
     end
+
+    system 'dotnet',
+      %W|--info|
 
   end
 
@@ -253,7 +257,7 @@ desc 'create suave nuget with .NET Core'
 task :nugets_with_netcore => [:nugets, 'dotnetcli:do_netcorepackage', 'dotnetcli:merge']
 
 desc 'compile, gen versions, test and create nuget'
-task :appveyor => [:compile, :'tests:unit', :nugets_with_netcore]
+task :ci => [:compile, :'tests:unit', :nugets_with_netcore]
 
 desc 'compile, gen versions, test'
 task :default => [:compile, :'tests:unit', :'docs:build']

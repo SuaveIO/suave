@@ -1,6 +1,11 @@
 ---
 language: csharp
 
+dist: trusty
+sudo: required
+
+dotnet: 1.0.4
+
 mono:
  - 4.8.0
  - latest # => "stable release"
@@ -18,7 +23,7 @@ install:
  - sudo apt-get install -qq apache2-utils
 
 script:
- - bundle && bundle exec rake
+ - bundle && bundle exec rake ci
 
 matrix:
   allow_failures:
