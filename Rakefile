@@ -129,7 +129,7 @@ namespace :dotnetcli do
 
       system 'bash',
         %W|tools/dotnet-install.sh
-           --install-dir "#{coreclr_bin_dir}"
+           --install-dir tools/coreclr
            --channel stable
            --version #{dotnet_version}|
 
