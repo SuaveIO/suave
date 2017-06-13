@@ -133,7 +133,7 @@ namespace :dotnetcli do
            --channel stable
            --version #{dotnet_version}|
 
-      ENV['PATH'] = "#{coreclr_bin_dir}/dotnet:#{ENV['PATH']}"
+      ENV['PATH'] = "#{coreclr_bin_dir}:#{ENV['PATH']}"
     else
       system 'powershell',
         %W|Invoke-WebRequest "https://dot.net/v1/dotnet-install.ps1" -OutFile "tools/dotnet-install.ps1"| \
