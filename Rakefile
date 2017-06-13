@@ -128,7 +128,8 @@ namespace :dotnetcli do
         unless File.exists? "tools/dotnet-install.sh"
 
       system 'bash',
-        %W|--install-dir "#{coreclr_bin_dir}"
+        %W|tools/dotnet-install.sh
+           --install-dir "#{coreclr_bin_dir}"
            --channel "stable"
            --version "#{dotnet_version}|
 
