@@ -14,6 +14,7 @@ install:
  - ps: Start-FileDownload 'https://github.com/libuv/libuv/archive/v1.12.0.zip'
  - cmd: |
         "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\Tools\VsDevCmd.bat"
+        set GYP_MSVS_VERSION=2015
         7z x v1.12.0.zip & cd libuv-1.12.0 & vcbuild.bat %arch% shared debug
  - cmd: mkdir src\Suave.Tests\bin\Release\ & cp libuv-1.12.0\Debug\libuv.dll src\Suave.Tests\bin\Release\libuv.dll
  - set PATH=C:\Ruby22\bin;%PATH% # use Ruby 2.2.6
