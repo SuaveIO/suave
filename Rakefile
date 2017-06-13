@@ -148,6 +148,9 @@ namespace :dotnetcli do
       ENV['PATH'] = "#{coreclr_bin_dir};#{ENV['PATH']}"
     end
 
+    system 'dotnet',
+      %W|--info|
+
   end
 
   desc 'Restore the CoreCLR binaries'
