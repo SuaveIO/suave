@@ -23,7 +23,7 @@ install:
  - sudo apt-get install -qq apache2-utils
 
 script:
- - bundle && bundle exec rake travis
+ - bundle && bundle exec rake ci
 
 matrix:
   allow_failures:
