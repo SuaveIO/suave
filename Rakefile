@@ -130,8 +130,8 @@ namespace :dotnetcli do
       system 'bash',
         %W|tools/dotnet-install.sh
            --install-dir "#{coreclr_bin_dir}"
-           --channel "stable"
-           --version "#{dotnet_version}|
+           --channel stable
+           --version #{dotnet_version}|
 
       ENV['PATH'] = "#{coreclr_bin_dir}/dotnet:#{ENV['PATH']}"
     else
