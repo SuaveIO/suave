@@ -20,7 +20,7 @@ PLATFORMS
   x86-mingw32
 
 DEPENDENCIES
-  albacore (~> 2.3)
+  albacore
 
 BUNDLED WITH
    1.15.0
