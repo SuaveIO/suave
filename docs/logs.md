@@ -6,8 +6,35 @@ Getting Hold of Suave's Logs
 ----------------------------
 
 Current documentation for configuring Suave is either
-[in this sample](https://github.com/fable-compiler/fable-suave-scaffold/blob/master/src/Server/Server.fs#L24-L28)
+[in this sample](https://github.com/fable-compiler/fable-suave-scaffold/blob/master/src/Server/WebServer.fs#L17-#L22)
 or [in the Logary readme](https://github.com/logary/logary#using-logary-in-a-library).
+
+Here is an example of using Logary via Facade adapter 4.0 + with Suave ver. 2.0+
+
+{% highlight fsharp %}
+open Logary
+open Logary.Configuration
+open Logary.Targets
+open Logary.Adapters.Facade
+
+//init logger
+let logary = 
+        withLogaryManager "ExampleLogger" (
+            withTargets [
+                LiterateConsole.create LiterateConsole.empty "console"
+            ]
+            >> withRules [ Rule.createForTarget "console"]
+            )
+        |> Hopac.Hopac.run
+        
+//get logger for API
+let logger = Logging.getLoggerByName("Suave.API")
+
+let webConfig =
+  { defaultConfig with
+      logger   = LoggerAdapter.createGeneric logger)
+  }
+{% endhighlight %}
 
 The below details how to configure Suave v1.x with Logary v3.x:
 
