@@ -20,7 +20,7 @@ type LogLevel =
   /// some important business event occurred.
   | Info
   /// The log message is a warning; e.g. there was an unhandled exception or
-  /// an even occurred which was unexpected. Sometimes human corrective action
+  /// an event occurred which was unexpected. Sometimes human corrective action
   /// is needed.
   | Warn
   /// The log message is at an error level, meaning an unhandled exception
