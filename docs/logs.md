@@ -40,7 +40,7 @@ The below details how to configure Suave v1.x with Logary v3.x:
 
 When you are using suave you will probably want to funnel all logs from the
 output to your own log sink. We provide the interface `Logger` to do that; just
-set the propery `logger` in the configuration to an instance of your thread-safe
+set the property `logger` in the configuration to an instance of your thread-safe
 logger. An example:
 
 {% highlight fsharp %}
