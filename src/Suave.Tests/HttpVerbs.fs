@@ -31,6 +31,12 @@ let gets cfg =
       Assert.Equal("empty string should always be returned by 204 No Content",
                    "", (runWithConfig NO_CONTENT |> req HttpMethod.GET "/" None))
 
+    testCase "204 No Content must not sends content-length header" <| fun _ ->
+      let headers = reqContentHeaders HttpMethod.GET "/" None (runWithConfig NO_CONTENT)
+      Assert.Equal("204 No Content must not sends content-length header",
+                   false,
+                   headers.Contains("Content-Length"))
+
     testCase "302 FOUND sends content-length header" <| fun _ ->
       let headers = reqContentHeaders HttpMethod.GET "/" None (runWithConfig (Redirection.FOUND "/url"))
       Assert.Equal("302 FOUND sends content-length header",
