@@ -27,7 +27,8 @@ let cookies cfg =
       domain   = None
       path     = Some "/"
       httpOnly = false
-      secure   = false }
+      secure   = false
+      sameSite = None }
 
   let ip, port =
     let binding = SuaveConfig.firstBinding cfg

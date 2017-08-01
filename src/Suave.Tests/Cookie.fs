@@ -24,7 +24,36 @@ let parseResultCookie (_:SuaveConfig) =
           path      = Some "/"
           domain    = None
           secure    = false
-          httpOnly = true }
+          httpOnly  = true
+          sameSite  = None }
+      Expect.equal subject expected "cookie should eq"
+
+    testCase "parse SameSite=Strict" <| fun _ ->
+      let sample = @"st=oFqpYxbMObHvpEW!QLzedHwSZ1gZnotBs$; Path=/; HttpOnly; SameSite=Strict"
+      let subject = Cookie.parseResultCookie sample
+      let expected =
+        { name      = "st"
+          value     = "oFqpYxbMObHvpEW!QLzedHwSZ1gZnotBs$"
+          expires   = None
+          path      = Some "/"
+          domain    = None
+          secure    = false
+          httpOnly  = true
+          sameSite  = Some Strict }
+      Expect.equal subject expected "cookie should eq"
+
+    testCase "parse SameSite=Lax" <| fun _ ->
+      let sample = @"st=oFqpYxbMObHvpEW!QLzedHwSZ1gZnotBs$; Path=/; HttpOnly; SameSite=Lax"
+      let subject = Cookie.parseResultCookie sample
+      let expected =
+        { name      = "st"
+          value     = "oFqpYxbMObHvpEW!QLzedHwSZ1gZnotBs$"
+          expires   = None
+          path      = Some "/"
+          domain    = None
+          secure    = false
+          httpOnly  = true
+          sameSite  = Some Lax }
       Expect.equal subject expected "cookie should eq"
 
     testCase "parse secure" <| fun _ ->
@@ -35,7 +64,8 @@ let parseResultCookie (_:SuaveConfig) =
           path      = Some "/"
           domain    = None
           secure    = true
-          httpOnly = false }
+          httpOnly  = false
+          sameSite  = None }
       let parsed = Cookie.parseResultCookie (HttpCookie.toHeader cookie)
       Expect.equal parsed cookie "eq"
 
@@ -87,7 +117,8 @@ let setCookie (_ : SuaveConfig) =
           path      = Some "/"
           domain    = None
           secure    = true
-          httpOnly  = false }
+          httpOnly  = false
+          sameSite  = None }
       let ctx = Cookie.setCookie cookie { HttpContext.empty with runtime = { HttpRuntime.empty with logger = log }}
       Expect.isTrue (List.isEmpty log.logs) "Should be no logs generated"
     testCase "set cookie - no warning when = 4k" <| fun _ ->
@@ -99,7 +130,8 @@ let setCookie (_ : SuaveConfig) =
           path      = Some "/"
           domain    = None
           secure    = true
-          httpOnly  = false }
+          httpOnly  = false
+          sameSite  = None }
       let ctx = Cookie.setCookie cookie { HttpContext.empty with runtime = { HttpRuntime.empty with logger = log }}
       Expect.isTrue (List.isEmpty log.logs) "Should be no logs generated"
 
@@ -112,7 +144,8 @@ let setCookie (_ : SuaveConfig) =
           path      = Some "/"
           domain    = None
           secure    = true
-          httpOnly  = false }
+          httpOnly  = false
+          sameSite  = None }
       let ctx =
         let input = { HttpContext.empty with runtime = { HttpRuntime.empty with logger = log }}
         Cookie.setCookie cookie input |> Async.RunSynchronously
