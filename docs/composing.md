@@ -26,7 +26,7 @@ The `choose` combinator is implemented such that it will execute each webpart in
 
 `OK` is a combinator of the second type. It always succeeds and writes its argument to the underlying response stream. It has type `string -> WebPart`.
 
-To gain access to the underlying `HttpRequest` and read query and http form data we can use the `request` combinator (the `^^` custom operator is shorthand for searching a list of key-value option pairs and returning the value (or None if not found)):
+To gain access to the underlying `HttpRequest` and read query and http form data we can use the `request` combinator (the `^^` custom operator, you have to add `open Suave.Utils.Collections`, is shorthand for searching a list of key-value option pairs and returning the value (or None if not found)):
 
 {% highlight fsharp %}
 let greetings q =
