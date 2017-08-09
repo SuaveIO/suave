@@ -72,7 +72,6 @@
     </Otherwise>
   </Choose>
   <Import Project="$(FSharpTargetsPath)" />
-  <Import Project="..\..\tools\paket.targets" />
   <ItemGroup>
     <Content Include="large_xml.xml" />
     <Content Include="PerfLab.fsx" />

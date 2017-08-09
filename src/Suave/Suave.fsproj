@@ -78,7 +78,6 @@
     </Otherwise>
   </Choose>
   <Import Project="$(FSharpTargetsPath)" Condition="Exists('$(FSharpTargetsPath)')" />
-  <Import Project="..\..\tools\paket.targets" />
   <ItemGroup>
     <Compile Include="..\..\paket-files\haf\YoLo\YoLo.fs">
       <Paket>True</Paket>

@@ -95,7 +95,6 @@
       <HintPath>..\..\libs\ManagedOpenSsl.dll</HintPath>
     </Reference>
   </ItemGroup>
-  <Import Project="..\..\tools\paket.targets" />
   <Choose>
     <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.6'">
       <ItemGroup>

@@ -1,5 +1,4 @@
-﻿<Project Sdk="FSharp.NET.Sdk;Microsoft.NET.Sdk">
-
+<Project Sdk="FSharp.NET.Sdk;Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>netstandard1.6</TargetFramework>
     <AssemblyName>Suave</AssemblyName>
@@ -7,8 +6,15 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <DefineConstants>$(DefineConstants);DNXCORE50;NETSTANDARD1_5</DefineConstants>
   </PropertyGroup>
-
   <ItemGroup>
+    <Compile Include="..\..\paket-files\haf\YoLo\YoLo.fs">
+      <Paket>True</Paket>
+      <Link>Utils/YoLo.fs</Link>
+    </Compile>
+    <Compile Include="..\..\paket-files\logary\logary\src\Logary.Facade\Facade.fs">
+      <Paket>True</Paket>
+      <Link>Utils/Facade.fs</Link>
+    </Compile>
     <Compile Include="../../paket-files/haf/YoLo/YoLo.fs" />
     <Compile Include="Utils/Aether.fs" />
     <Compile Include="Utils/AsyncExtensions.fs" />
@@ -69,7 +75,6 @@
     <Compile Include="Owin.fs" />
     <Compile Include="Json.fs" />
   </ItemGroup>
-
   <ItemGroup>
     <PackageReference Include="FSharp.NET.Sdk" Version="1.0.*" PrivateAssets="All" />
     <PackageReference Include="FSharp.Core" Version="4.1.*" />
@@ -81,5 +86,4 @@
     <PackageReference Include="System.Security.Claims" Version="4.0.1" />
     <PackageReference Include="System.Runtime.Serialization.Json" Version="4.0.2" />
   </ItemGroup>
-
 </Project>

@@ -92,7 +92,6 @@
       <Project>{3DC9193E-BD0C-4486-9C58-56B630C36623}</Project>
     </ProjectReference>
   </ItemGroup>
-  <Import Project="..\..\tools\paket.targets" />
   <Choose>
     <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.6'">
       <ItemGroup>
