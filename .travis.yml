@@ -28,6 +28,5 @@ script:
 
 matrix:
   allow_failures:
-    - mono: 5.0.0
     - mono: latest
     - mono: weekly
