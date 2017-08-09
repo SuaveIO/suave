@@ -8,6 +8,7 @@ dotnet: 1.0.4
 
 mono:
  - 4.8.0
+ - 5.0.0
  - latest # => "stable release"
  - weekly # => "latest commits"
 
@@ -27,5 +28,6 @@ script:
 
 matrix:
   allow_failures:
+    - mono: 5.0.0
     - mono: latest
     - mono: weekly
