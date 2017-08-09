@@ -192,7 +192,7 @@ NUGET
     FSharp.Core (4.0.0.1) - redirects: force
     Hopac (0.3.23)
       FSharp.Core (>= 3.1.2.5)
-    Http.fs (4.1)
+    Http.fs (4.1.2)
       FSharp.Core (>= 3.1.2.5)
       Hopac (>= 0.3.21)
     Microsoft.CodeAnalysis.Analyzers (1.1)
