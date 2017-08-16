@@ -74,6 +74,7 @@
     <Compile Include="WebSocket.fs" />
     <Compile Include="Owin.fs" />
     <Compile Include="Json.fs" />
+    <Compile Include="AssemblyVersionInfo.fs" Condition="Exists('AssemblyVersionInfo.fs')" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="FSharp.NET.Sdk" Version="1.0.*" PrivateAssets="All" />
