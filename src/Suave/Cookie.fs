@@ -112,7 +112,7 @@ module Cookie =
 
     let cookieHeaders =
       ctx.response.cookies
-      |> Map.put cookie.name cookie // possibly overwrite
+      |> Map.add cookie.name cookie // possibly overwrite
       |> Map.toList
       |> List.map snd // get HttpCookie-s
       |> List.map HttpCookie.toHeader
