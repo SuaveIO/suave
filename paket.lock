@@ -1,7 +1,7 @@
 RESTRICTION: == net46
 NUGET
   remote: https://www.nuget.org/api/v2
-    DotLiquid (2.0.64)
+    DotLiquid (2.0.158)
     FSharp.Core (3.1.2.5)
     Microsoft.AspNet.Razor (3.2.3)
     openssl.redist (1.0.1.25)
