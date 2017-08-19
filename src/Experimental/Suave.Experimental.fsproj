@@ -73,6 +73,7 @@
   <Import Project="$(FSharpTargetsPath)" Condition="Exists('$(FSharpTargetsPath)')" />
   <ItemGroup>
     <Compile Include="AssemblyVersionInfo.fs" Condition="Exists('AssemblyVersionInfo.fs')" />
+    <Compile Include="ViewEngine.fs" />
     <Compile Include="Html.fs" />
     <Compile Include="Xml.fs" />
     <Compile Include="Template.fs" />
