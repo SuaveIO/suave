@@ -46,7 +46,7 @@ module internal ParsingAndControl =
   open System.Net.Sockets
 
   let inline cleanResponse (ctx : HttpContext) =
-    { ctx with response = HttpResult.empty }
+    { ctx with response = HttpResult.empty; userState = Map.empty }
 
   let httpLoop (ctxOuter : HttpContext) (consumer : WebPart) =
 
