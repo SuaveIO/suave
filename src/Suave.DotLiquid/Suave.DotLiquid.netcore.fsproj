@@ -17,6 +17,6 @@
     <PackageReference Include="FSharp.Core" Version="4.1.*" />
     <PackageReference Include="System.Reflection" Version="4.3.0" />
     <PackageReference Include="System.Reflection.TypeExtensions" Version="4.3.0" />
-    <PackageReference Include="DotLiquid" Version="2.0.55" />
+    <PackageReference Include="DotLiquid" Version="2.0.174" />
   </ItemGroup>
 </Project>
