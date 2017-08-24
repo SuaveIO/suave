@@ -85,7 +85,7 @@
     <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.6'">
       <ItemGroup>
         <Reference Include="DotLiquid">
-          <HintPath>..\..\packages\DotLiquid\lib\net451\DotLiquid.dll</HintPath>
+          <HintPath>..\..\packages\DotLiquid\lib\net45\DotLiquid.dll</HintPath>
           <Private>True</Private>
           <Paket>True</Paket>
         </Reference>
