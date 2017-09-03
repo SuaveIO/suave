@@ -170,7 +170,7 @@ namespace :dotnetcli do
 
   desc 'Create Suave nugets packages'
   task :pack  => [:versioning, 'build/pkg-netcore', :coreclr_binaries] do
-    out_dir = File.expand_path "build/pkg-netcore" 
+    out_dir = File.expand_path "build/pkg-netcore"
     [ "src/Suave/Suave.netcore.fsproj", "src/Experimental/Suave.Experimental.netcore.fsproj", "src/Suave.DotLiquid/Suave.DotLiquid.netcore.fsproj" ].each do |item|
         system dotnet_exe_path, %W|pack #{item} --configuration #{Configuration} --output "#{out_dir}" --no-build -v n /p:Version=#{ENV['NUGET_VERSION']}|
     end
