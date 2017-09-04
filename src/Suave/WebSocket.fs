@@ -314,6 +314,7 @@ module WebSocket =
       else
         Choice2Of2 (RequestErrors.BAD_REQUEST "Bad Request" ctx)
 
+  /// The handShakeWithSubprotocol combinator captures a WebSocket and pass it to the provided `continuation`
   let handShakeWithSubprotocol (choose : string [] -> HttpContext -> Async<string option>) (continuation : WebSocket -> HttpContext -> SocketOp<unit>) (ctx : HttpContext) = async {
     match validateHandShake ctx with
     | Choice1Of2 webSocketKey ->
@@ -336,7 +337,7 @@ module WebSocket =
     | Choice2Of2 response -> return! response
   }
 
-  /// The handShakeWithSubprotocol combinator captures a WebSocket and pass it to the provided `continuation`
+  /// The handShake combinator captures a WebSocket and pass it to the provided `continuation`
   let handShake (continuation : WebSocket -> HttpContext -> SocketOp<unit>) (ctx : HttpContext) = async {
     match validateHandShake ctx with
     | Choice1Of2 webSocketKey ->
