@@ -7,6 +7,7 @@
     <DefineConstants>$(DefineConstants);DNXCORE50;NETSTANDARD1_5</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="ViewEngine.fs" />
     <Compile Include="Html.fs" />
     <Compile Include="Xml.fs" />
     <Compile Include="Template.fs" />
