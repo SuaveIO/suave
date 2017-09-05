@@ -81,6 +81,7 @@ let wsWithErrorHandling (webSocket : WebSocket) (context: HttpContext) =
 let app : WebPart = 
   choose [
     path "/websocket" >=> handShake ws
+    path "/websocketWithSubprotocol" >=> handShakeWithSubprotocol (chooseSubprotocol "test") ws
     path "/websocketWithError" >=> handShake wsWithErrorHandling
     GET >=> choose [ path "/" >=> file "index.html"; browseHome ]
     NOT_FOUND "Found no handlers." ]
