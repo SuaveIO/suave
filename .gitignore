@@ -6,6 +6,7 @@ gh-pages/
 docs/output/
 miTLS/
 .bundle/
+paket.template
 
 Suave.v11.suo
 Suave.sln.DotSettings.user

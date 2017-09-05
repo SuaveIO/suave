@@ -213,46 +213,22 @@ task :tests => [:'tests:stress', :'tests:unit']
 
 directory 'build/pkg'
 
-task :create_nuget_quick => [:versioning, 'build/pkg'] do
-  projects = FileList['src/**/*.fsproj'].exclude(/.netcore.fsproj/).exclude(/Tests/)
-  knowns = Set.new(projects.map { |f| Albacore::Project.new f }.map { |p| p.id })
-  authors = "Ademar Gonzalez, Henrik Feldt"
-  projects.each do |f|
-    p = Albacore::Project.new f
-    n = create_nuspec p, knowns
-    d = get_dependencies n
-    m = %{type file
-id #{p.id}
-version #{ENV['NUGET_VERSION']}
-title #{p.id}
-authors #{authors}
-owners #{authors}
-description #{suave_description}
-language en-GB
-copyright #{authors}
-licenseUrl https://github.com/SuaveIO/Suave/blob/master/COPYING
-projectUrl http://suave.io
-iconUrl https://raw.githubusercontent.com/SuaveIO/resources/master/images/head_trans.png
-files
-  #{p.proj_path_base}/bin/#{Configuration}/#{p.id}.* ==\> lib/net40
-releaseNotes
-  #{n.metadata.release_notes.each_line.reject{|x| x.strip == ""}.join}
-dependencies
-  #{d}
-}
-    begin
-      File.open("paket.template", "w") do |template|
-        template.write m
-      end
-      system ".paket/paket.exe", %w|pack output build/pkg|, clr_command: true
-    ensure
-      File.delete "paket.template"
-    end
-  end
+nugets_pack :nugets_quick => [:versioning, 'build/pkg'] do |x|
+  x.configuration = Configuration
+  x.exe = '.paket/paket.exe'
+  x.files = FileList['src/**/*.fsproj'].exclude(/.netcore.fsproj/).exclude(/Tests/)
+  x.output = 'build/pkg'
+  x.authors = "Ademar Gonzalez, Henrik Feldt"
+  x.version = ENV['NUGET_VERSION']
+  x.description = suave_description
+  x.language = 'en-GB'
+  x.license_url = 'https://github.com/SuaveIO/Suave/blob/master/COPYING'
+  x.project_url = 'https://suave.io'
+  x.icon_url = 'https://raw.githubusercontent.com/SuaveIO/resources/master/images/head_trans.png'
 end
 
 desc 'create suave nuget'
-task :nugets => ['build/pkg', :versioning, :compile, :create_nuget_quick]
+task :nugets => ['build/pkg', :versioning, :compile, :nugets_quick]
 
 desc 'create suave nuget with .NET Core'
 task :nugets_with_netcore => [:nugets, 'dotnetcli:do_netcorepackage', 'dotnetcli:merge']
