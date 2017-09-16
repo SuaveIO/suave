@@ -93,7 +93,7 @@ bundle
 bundle exec rake
 ```
 
-After you managed to build with the rake script, you can also use `./build.sh` on any OS or `build.cmd` on Windows which only compile solution and run tests.
+After you managed to build with the rake script, you can also use `./build.sh` on any OS or `build.cmd` on Windows which only compile solution and run tests. **You need msbuild on PATH**: use the VS Developer Console to build.
 
 ## Libuv installation
 
