@@ -144,14 +144,18 @@ module WebSocket =
 
   let readBytes (transport : ITransport) (n : int) =
     let arr = Array.zeroCreate n
-    let rec loop i = socket {
+    // TODO: Remove logic of handling reset connections when this issue would be fixed in the mono (https://bugzilla.xamarin.com/show_bug.cgi?id=53229).
+    let maxFailedAttempts = 10
+    let rec loop i failedAttempts = socket {
       if i = n then
         return arr
       else
         let! read = transport.read <| ArraySegment(arr,i,n - i)
-        return! loop (i+read)
+        if failedAttempts >= maxFailedAttempts then failwith "Connection reset by peer"
+        return! if read = 0 then failedAttempts + 1 else failedAttempts
+                |> loop (i+read)
       }
-    loop 0
+    loop 0 0
 
   let readBytesIntoByteSegment retrieveByteSegment (transport : ITransport) (n : int) =
     let byteSegmentRetrieved: ByteSegment = retrieveByteSegment n
