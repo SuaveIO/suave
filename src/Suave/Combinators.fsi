@@ -1576,6 +1576,9 @@ module EventSource =
   /// to start a new event-stream protocol session with the browser.
   val handShake : fCont:(Connection -> SocketOp<Connection>) -> WebPart
 
+module TransferEncoding =
+  val chunked: (Connection -> SocketOp<'a * Connection>) -> WebPart
+
 module Control =
 
   /// <summary><para>

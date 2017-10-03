@@ -794,6 +794,29 @@ module EventSource =
     }
     |> succeed
 
+module TransferEncoding =
+  open Suave
+  open Suave.Sockets
+  open Suave.Sockets.Control
+
+  let chunked asyncWriteChunks (ctx : HttpContext) =
+    let task (conn, response) = socket {
+      let! (_, conn) = asyncWriteLn "" conn
+      let! (_, conn) = asyncWriteChunks conn
+      return conn
+    }
+    { ctx with
+        response =
+          {
+            ctx.response with
+              status = ctx.response.status
+              headers = ("Transfer-Encoding", "chunked") :: ctx.response.headers
+              writePreamble = true
+              content = SocketTask task
+          }
+    }
+    |> succeed
+
 module Control =
 
   let CLOSE (ctx : HttpContext) =
