@@ -183,7 +183,7 @@ module Cookie =
                secure   = secure }
       |> slidingExpiry relativeExpiry
 
-    | err ->
+    | Choice2Of2 err ->
       failwithf "Suave internal error on encryption %A" err
 
   /// Tries to read the cookie by `cookieName` from the mapping of cookie-name
