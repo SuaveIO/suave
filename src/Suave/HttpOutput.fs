@@ -95,6 +95,18 @@ module HttpOutput =
           return connection
            }
 
+  let flushChunk conn = socket {
+    let! conn = flush conn
+    return (), conn
+  }
+
+  let inline writeChunk (chunk : byte []) = withConnection {
+    let chunkLength = chunk.Length.ToString("X")
+    do! asyncWriteLn chunkLength
+    do! asyncWriteLn (System.Text.Encoding.UTF8.GetString(chunk))
+    do! flushChunk
+  }
+
   let inline executeTask ctx r errorHandler = async {
     try
       let! q  = r

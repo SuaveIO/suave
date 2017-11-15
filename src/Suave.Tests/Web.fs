@@ -7,6 +7,8 @@ open Suave.Operators
 open Suave.ParsingAndControl
 open Suave.Logging
 open Suave.Testing
+open Suave.Sockets.Control
+open Suave.Sockets.AsyncSocket
 open System
 open System.Net
 open System.Net.Http
@@ -41,6 +43,33 @@ let parsing_tests (_: SuaveConfig) =
       Expect.equal (TraceHeader.parseTraceHeaders headers).traceId expected.traceId "should parse trace id"
       Expect.equal (TraceHeader.parseTraceHeaders headers).reqParentId expected.reqParentId "should parse span id to parent span id"
     ]
+
+[<Tests>]
+let transferEncodingChunkedTests (cfg : SuaveConfig) =
+  let writeChunks conn = socket {
+    let! (_, conn) = HttpOutput.writeChunk "h"B conn
+    let! (_, conn) = HttpOutput.writeChunk "e"B conn
+    let! (_, conn) = HttpOutput.writeChunk "l"B conn
+    let! (_, conn) = HttpOutput.writeChunk "l"B conn
+    let! (_, conn) = HttpOutput.writeChunk "o"B conn
+    let! (_, conn) = HttpOutput.writeChunk " "B conn
+    let! (_, conn) = HttpOutput.writeChunk "w"B conn
+    let! (_, conn) = HttpOutput.writeChunk "o"B conn
+    let! (_, conn) = HttpOutput.writeChunk "r"B conn
+    let! (_, conn) = HttpOutput.writeChunk "l"B conn
+    let! (_, conn) = HttpOutput.writeChunk "d"B conn
+    return! HttpOutput.writeChunk [||] conn
+  }
+
+  let webPart =
+    Filters.path "/" >=> TransferEncoding.chunked writeChunks
+
+  testList "when using chunked transfer encoding" [
+    testCase "should encode data as chunked" <| fun _ ->
+      let ctx = runWith cfg webPart
+      let res = req HttpMethod.GET "/" None ctx
+      Expect.equal res "hello world" "should return hello world"
+  ]
 
 [<Tests>]
 let keepAliveTests (cfg : SuaveConfig) =
