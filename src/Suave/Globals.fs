@@ -1,5 +1,7 @@
 module Suave.Globals
 
+open System
+
 /// Get the current DateTimeOffset in UTC format.
 ///
 /// If you are unit-testing
@@ -12,10 +14,10 @@ let internal numberOfClients = ref 0L
 
 open System.Collections.Concurrent
 
-/// A map of compressed files:
-/// TODO - evaluate if we can't service requests
-/// by writing these to disk instead
-let internal compressedFilesMap = new ConcurrentDictionary<string,string>()
+/// A map of compressed files. The key is the is the name of the file, and value is 
+/// a pair: the name of the compressed file and timestamp of the original file at 
+/// time of compression.
+let internal compressedFilesMap = new ConcurrentDictionary<string,string * DateTime>()
 
 open System
 open System.Reflection
