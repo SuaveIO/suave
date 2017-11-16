@@ -1,4 +1,4 @@
-﻿namespace Suave
+namespace Suave
 
 open Suave.Sockets
 
@@ -1050,6 +1050,9 @@ module Filters =
 
   /// Match on the path
   val path : pathAfterDomain:string -> WebPart
+
+  /// Match on the path regardless of casing
+  val pathCi : pathAfterDomain:string -> WebPart
 
   /// Match on the initial path
   val pathStarts : pathAfterDomainSubstr:string -> WebPart

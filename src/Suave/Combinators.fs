@@ -1,4 +1,4 @@
-﻿namespace Suave
+namespace Suave
 
 open Suave.Operators
 open Suave.Sockets
@@ -294,6 +294,9 @@ module Filters =
 
   let path s (x : HttpContext) =
     async.Return (Option.iff (s = x.request.path) x)
+
+  let pathCi s (x : HttpContext) =
+    async.Return (Option.iff (String.Equals(s, x.request.path, StringComparison.CurrentCultureIgnoreCase)) x)
 
   let pathStarts s (x : HttpContext) =
     async.Return (Option.iff (x.request.path.StartsWith s) x)
