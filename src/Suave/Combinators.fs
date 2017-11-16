@@ -417,8 +417,25 @@ module Filters =
       | None ->
         fail
     F
+  
+  let pathScanCi (format : PrintfFormat<_,_,_,_,'t>) (handler : 't ->  WebPart) : WebPart =
+    let scan path =
+      try
+        let extract = sscanfci format path
+        Some extract
+      with _ -> 
+        None
+
+    let part (context:HttpContext) =
+      match scan context.request.path with
+      | Some extract ->
+        handler extract context
+      | None ->
+        fail
+    part
 
   let urlScan s x = pathScan s x
+  let urlScanCi s x = pathScanCi s x
 
   let timeoutWebPart (timeSpan : TimeSpan) (webPart : WebPart) : WebPart =
     fun (ctx : HttpContext) -> async {
