@@ -1057,6 +1057,9 @@ module Filters =
   /// Match on the initial path
   val pathStarts : pathAfterDomainSubstr:string -> WebPart
 
+  /// Match on the initial path regardless of casing
+  val pathStartsCi : pathAfterDomainSubstr:string -> WebPart
+
   /// Match on the method
   val ``method`` : ``method``:HttpMethod -> WebPart
 

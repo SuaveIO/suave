@@ -301,6 +301,9 @@ module Filters =
   let pathStarts s (x : HttpContext) =
     async.Return (Option.iff (x.request.path.StartsWith s) x)
 
+  let pathStartsCi s (x : HttpContext) =
+    async.Return (Option.iff (x.request.path.StartsWith (s, StringComparison.CurrentCultureIgnoreCase)) x)
+
   let url x = path x
 
   let ``method`` (m : HttpMethod) (x : HttpContext) =
