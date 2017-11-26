@@ -151,9 +151,10 @@ module WebSocket =
         return arr
       else
         let! read = transport.read <| ArraySegment(arr,i,n - i)
-        if failedAttempts >= maxFailedAttempts then failwith "Connection reset by peer"
-        return! if read = 0 then failedAttempts + 1 else failedAttempts
-                |> loop (i+read)
+        if failedAttempts >= maxFailedAttempts then
+          return! SocketOp.abort(ConnectionError "Connection reset by peer")
+        else
+          return! loop (i+read) (if read = 0 then failedAttempts + 1 else 0)
       }
     loop 0 0
 
