@@ -1,4 +1,4 @@
-﻿namespace Suave
+namespace Suave
 
 open Suave.Operators
 open Suave.Sockets
@@ -295,8 +295,14 @@ module Filters =
   let path s (x : HttpContext) =
     async.Return (Option.iff (s = x.request.path) x)
 
+  let pathCi s (x : HttpContext) =
+    async.Return (Option.iff (String.Equals(s, x.request.path, StringComparison.CurrentCultureIgnoreCase)) x)
+
   let pathStarts s (x : HttpContext) =
     async.Return (Option.iff (x.request.path.StartsWith s) x)
+
+  let pathStartsCi s (x : HttpContext) =
+    async.Return (Option.iff (x.request.path.StartsWith (s, StringComparison.CurrentCultureIgnoreCase)) x)
 
   let url x = path x
 
@@ -411,8 +417,25 @@ module Filters =
       | None ->
         fail
     F
+  
+  let pathScanCi (format : PrintfFormat<_,_,_,_,'t>) (handler : 't ->  WebPart) : WebPart =
+    let scan path =
+      try
+        let extract = sscanfci format path
+        Some extract
+      with _ -> 
+        None
+
+    let part (context:HttpContext) =
+      match scan context.request.path with
+      | Some extract ->
+        handler extract context
+      | None ->
+        fail
+    part
 
   let urlScan s x = pathScan s x
+  let urlScanCi s x = pathScanCi s x
 
   let timeoutWebPart (timeSpan : TimeSpan) (webPart : WebPart) : WebPart =
     fun (ctx : HttpContext) -> async {

@@ -1,4 +1,4 @@
-﻿module Suave.Sscanf
+module Suave.Sscanf
 
 open System
 open System.Text
@@ -66,6 +66,38 @@ let sscanf (pf:PrintfFormat<_,_,_,_,'t>) s : 't =
                    |> Array.map (fun c -> c |> Array.map Regex.Escape |> String.concat "(.*?)")
                    |> String.concat "%"
   let regex      = Regex("^" + regexStr + "$")
+  let formatters = formatStr.ToCharArray() // need original string here (possibly with "%%"s)
+                   |> Array.toList |> getFormatters
+  let groups =
+    regex.Match(s).Groups
+    |> Seq.cast<Group>
+    |> Seq.skip 1
+
+  let matches =
+    (groups, formatters)
+    ||> Seq.map2 (fun g f -> g.Value |> parsers.[f])
+    |> Seq.toArray
+
+  if matches.Length = 1 then
+    coerce matches.[0] typeof<'t> :?> 't
+  else
+    let tupleTypes = FSharpType.GetTupleElements(typeof<'t>)
+    let matches =
+      (matches,tupleTypes)
+      ||> Array.map2 ( fun a b -> coerce a b)
+    FSharpValue.MakeTuple(matches, typeof<'t>) :?> 't
+
+
+/// Parse the format in 'pf' from the string 's' regardless of casing, failing and raising an exception
+/// otherwise
+let sscanfci (pf:PrintfFormat<_,_,_,_,'t>) s : 't =
+  let formatStr  = pf.Value
+  let constants  = formatStr.Split([|"%%"|], StringSplitOptions.None) 
+                   |> Array.map (fun x -> x.Split(separators, StringSplitOptions.None))
+  let regexStr   = constants 
+                   |> Array.map (fun c -> c |> Array.map Regex.Escape |> String.concat "(.*?)")
+                   |> String.concat "%"
+  let regex      = Regex("^" + regexStr + "$", RegexOptions.IgnoreCase)
   let formatters = formatStr.ToCharArray() // need original string here (possibly with "%%"s)
                    |> Array.toList |> getFormatters
   let groups =
