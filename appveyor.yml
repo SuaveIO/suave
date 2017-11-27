@@ -16,7 +16,7 @@ install:
  
 build_script:
  - cmd: gem sources -r https://rubygems.org/
- - cmd: gem install bundler --no-ri --no-rdoc --source https://rubygems.org/
+ - cmd: gem install bundler --no-ri --no-rdoc --source https://rubygems.org/ --conservative
  - cmd: bundle install
  - cmd: bundle exec rake ci
  
