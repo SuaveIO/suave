@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <AssemblyName>Suave.LibUv</AssemblyName>
+    <PackageId>Suave.LibUv</PackageId>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Native.fs" />
+    <Compile Include="Tcp.fs" />
+    <Compile Include="LibUvServerFactory.fs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Suave\Suave.netcore.fsproj" PrivateAssets="All" />
+    <PackageReference Include="Libuv" Version="1.10.0" />
+  </ItemGroup>
+</Project>

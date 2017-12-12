@@ -242,7 +242,10 @@ let websocketTests cfg =
         mre.WaitOne() |> ignore
         clientWebSocket.Close()
         Expect.isTrue (testByteArray (int PayloadSize.Bit32) echo.Value) "Should be echoed"
-
+      
+      #if NETCOREAPP2_0
+      ptestCase "echo large number of messages to client" <| fun _ -> ()
+      #else      
       testCase websocketUrl subprotocols "echo large number of messages to client" <| fun mre clientWebSocket ->
         let amountOfMessages = 1000
         let echo = ref []
@@ -265,6 +268,7 @@ let websocketTests cfg =
 
         Expect.equal echo.Value expectedMessages "should be equal"
         Expect.equal (!count) amountOfMessages "received message count on websocket"
+      #endif
     ]
   
   testList "websocket tests" [ websocketTests websocketAppUrl [||]
