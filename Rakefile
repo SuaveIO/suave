@@ -191,6 +191,13 @@ namespace :dotnetcli do
     end
   end
 
+  task :stress_quick do
+    system dotnet_exe_path, %W|run --project examples/Pong/Pong.netcore.fsproj|
+  end
+
+  desc 'run a stress test'
+  task :stress => [:build_lib, :stress_quick]
+
   task :unit_quick do
     system dotnet_exe_path, %W|run --project src/Suave.Tests/Suave.Tests.netcore.fsproj -- --sequenced|
   end

@@ -2,7 +2,7 @@
   <PropertyGroup>
     <TargetFramework>netcoreapp1.1</TargetFramework>
     <OutputType>Exe</OutputType>
-    <AssemblyName>Example</AssemblyName>
+    <AssemblyName>Pong</AssemblyName>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="AssemblyVersionInfo.fs" Condition="Exists('AssemblyVersionInfo.fs')" />
