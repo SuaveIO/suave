@@ -104,7 +104,7 @@ namespace :dotnetcli do
   end
 
   task :coreclr_binaries => 'tools/coreclr' do
-    dotnet_version = '1.0.1'
+    dotnet_version = '2.0.0'
     dotnet_installed_version = get_installed_dotnet_version
     # check if required version of .net core sdk is already installed, otherwise download and install it
     if dotnet_installed_version == dotnet_version then
@@ -190,6 +190,14 @@ namespace :dotnetcli do
       end
     end
   end
+
+  task :unit_quick do
+    system dotnet_exe_path, %W|run --project src/Suave.Tests/Suave.Tests.netcore.fsproj -- --sequenced|
+  end
+
+  desc 'run unit tests on .NET Core 2.0'
+  task :unit => [:build_lib, :unit_quick]
+
 end
 
 namespace :tests do
@@ -234,7 +242,7 @@ desc 'create suave nuget with .NET Core'
 task :nugets_with_netcore => [:nugets, 'dotnetcli:do_netcorepackage', 'dotnetcli:merge']
 
 desc 'compile, gen versions and test'
-task :ci => [:compile, :'tests:unit']
+task :ci => [:compile, :'tests:unit', :'dotnetcli:unit']
 
 desc 'compile, gen versions, test'
 task :default => [:compile, :'tests:unit', :'docs:build']
