@@ -171,22 +171,30 @@ namespace :dotnetcli do
   desc 'Create Suave nugets packages'
   task :pack  => [:versioning, 'build/pkg-netcore', :coreclr_binaries] do
     out_dir = File.expand_path "build/pkg-netcore"
-    [ "src/Suave/Suave.netcore.fsproj", "src/Suave.Testing/Suave.Testing.netcore.fsproj", "src/Experimental/Suave.Experimental.netcore.fsproj", "src/Suave.DotLiquid/Suave.DotLiquid.netcore.fsproj" ].each do |item|
+    [ "src/Suave/Suave.netcore.fsproj", "src/Suave.Testing/Suave.Testing.netcore.fsproj", "src/Experimental/Suave.Experimental.netcore.fsproj", "src/Suave.DotLiquid/Suave.DotLiquid.netcore.fsproj", "src/Suave.LibUv/Suave.LibUv.netcore.fsproj" ].each do |item|
         system dotnet_exe_path, %W|pack #{item} --configuration #{Configuration} --output "#{out_dir}" --no-build -v n /p:Version=#{ENV['NUGET_VERSION']}|
     end
   end
 
   task :do_netcorepackage => [ :restore, :build, :pack ]
 
+  def merge_nugets(dotnet_exe_path, item, version, framework)
+    sourcenupkg = "../build/pkg/#{item}.#{version}.nupkg"
+    netcorenupkg = "../build/pkg-netcore/#{item}.#{version}.nupkg"
+    system dotnet_exe_path, %W|mergenupkg --source "#{sourcenupkg}" --other "#{netcorenupkg}" --framework #{framework}|
+  end
+
   desc 'Merge standard and dotnetcli nupkgs; note the need to run :nugets before'
-  task :merge => :coreclr_binaries do
+  task :merge => :coreclr_binaries do    
     system dotnet_exe_path, %W|restore tools/tools.proj -v n|
+    version = SemVer.find.format("%M.%m.%p%s")
+
     Dir.chdir "tools" do
       [ "Suave", "Suave.Testing", "Suave.Experimental", "Suave.DotLiquid" ].each do |item|
-          version = SemVer.find.format("%M.%m.%p%s")
-          sourcenupkg = "../build/pkg/#{item}.#{version}.nupkg"
-          netcorenupkg = "../build/pkg-netcore/#{item}.#{version}.nupkg"
-          system dotnet_exe_path, %W|mergenupkg --source "#{sourcenupkg}" --other "#{netcorenupkg}" --framework netstandard1.6|
+          merge_nugets(dotnet_exe_path, item, version, "netstandard1.6")
+      end
+      [ "Suave.LibUv" ].each do |item|
+          merge_nugets(dotnet_exe_path, item, version, "netstandard2.0")
       end
     end
   end
