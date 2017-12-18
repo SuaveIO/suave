@@ -64,81 +64,81 @@ type uv_handle_cb  = delegate of IntPtr -> unit
 [<UnmanagedFunctionPointer(CallingConvention.Cdecl)>]
 type uv_walk_cb  = delegate of IntPtr * IntPtr -> unit
 
-[<DllImport("libuv.dll", CallingConvention = CallingConvention.Cdecl)>]
+[<DllImport("libuv", CallingConvention = CallingConvention.Cdecl)>]
 extern int uv_tcp_init(IntPtr loop, IntPtr handle)
 
-[<DllImport("libuv.dll", CallingConvention = CallingConvention.Cdecl)>]
+[<DllImport("libuv", CallingConvention = CallingConvention.Cdecl)>]
 extern int uv_tcp_nodelay(IntPtr handle, int enable)
 
-[<DllImport("libuv.dll", CallingConvention = CallingConvention.Cdecl)>]
+[<DllImport("libuv", CallingConvention = CallingConvention.Cdecl)>]
 extern int uv_ip4_addr(string ip, int port, [<Out>] sockaddr_in& address)
 
-[<DllImport("libuv.dll", CallingConvention = CallingConvention.Cdecl)>]
+[<DllImport("libuv", CallingConvention = CallingConvention.Cdecl)>]
 extern int uv_ip6_addr(string ip, int port, [<Out>] sockaddr_in6& address)
 
-[<DllImport("libuv.dll", CallingConvention = CallingConvention.Cdecl)>]
+[<DllImport("libuv", CallingConvention = CallingConvention.Cdecl)>]
 extern int uv_tcp_bind(IntPtr handle, sockaddr_in& sockaddr, int flags)
 
-[<DllImport("libuv.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "uv_tcp_bind")>]
+[<DllImport("libuv", CallingConvention = CallingConvention.Cdecl, EntryPoint = "uv_tcp_bind")>]
 extern int uv_tcp_bind6(IntPtr handle, sockaddr_in6&  sockaddr, uint32 flags)
 
-[<DllImport("libuv.dll", CallingConvention = CallingConvention.Cdecl)>]
+[<DllImport("libuv", CallingConvention = CallingConvention.Cdecl)>]
 extern int uv_listen(IntPtr stream, int backlog, uv_connection_cb callback)
 
-[<DllImport("libuv.dll", CallingConvention = CallingConvention.Cdecl)>]
+[<DllImport("libuv", CallingConvention = CallingConvention.Cdecl)>]
 extern int uv_accept(IntPtr server, IntPtr client)
 
-[<DllImport("libuv.dll", CallingConvention = CallingConvention.Cdecl)>]
+[<DllImport("libuv", CallingConvention = CallingConvention.Cdecl)>]
 extern int uv_read_start(IntPtr stream, uv_alloc_cb alloc_callback, uv_read_cb read_callback)
 
-[<DllImport ("libuv.dll", CallingConvention = CallingConvention.Cdecl)>]
+[<DllImport ("libuv", CallingConvention = CallingConvention.Cdecl)>]
 extern int uv_read_stop(IntPtr stream)
 
 /// Loops
 
-[<DllImport("libuv.dll", CallingConvention = CallingConvention.Cdecl)>]
+[<DllImport("libuv", CallingConvention = CallingConvention.Cdecl)>]
 extern IntPtr uv_default_loop()
 
-[<DllImport("libuv.dll", CallingConvention = CallingConvention.Cdecl)>]
+[<DllImport("libuv", CallingConvention = CallingConvention.Cdecl)>]
 extern int uv_loop_init(IntPtr handle)
 
-[<DllImport("libuv.dll", CallingConvention = CallingConvention.Cdecl)>]
+[<DllImport("libuv", CallingConvention = CallingConvention.Cdecl)>]
 extern int uv_loop_close(IntPtr ptr)
 
-[<DllImport("libuv.dll", CallingConvention = CallingConvention.Cdecl)>]
+[<DllImport("libuv", CallingConvention = CallingConvention.Cdecl)>]
 extern int uv_loop_size()
 
-[<DllImport("libuv.dll", CallingConvention = CallingConvention.Cdecl)>]
+[<DllImport("libuv", CallingConvention = CallingConvention.Cdecl)>]
 extern void uv_stop(IntPtr loop)
 
-[<DllImport("libuv.dll", CallingConvention = CallingConvention.Cdecl)>]
+[<DllImport("libuv", CallingConvention = CallingConvention.Cdecl)>]
 extern int uv_run(IntPtr loop, int mode)
 
-[<DllImport("libuv.dll", CallingConvention = CallingConvention.Cdecl)>]
+[<DllImport("libuv", CallingConvention = CallingConvention.Cdecl)>]
 extern void uv_update_time(IntPtr loop)
 
-[<DllImport("libuv.dll", CallingConvention = CallingConvention.Cdecl)>]
+[<DllImport("libuv", CallingConvention = CallingConvention.Cdecl)>]
 extern uint64 uv_now(IntPtr loop)
 
-[<DllImport("libuv.dll", CallingConvention = CallingConvention.Cdecl)>]
+[<DllImport("libuv", CallingConvention = CallingConvention.Cdecl)>]
 extern sbyte *uv_strerror(int systemErrorCode)
 
-[<DllImport("libuv.dll", CallingConvention = CallingConvention.Cdecl)>]
+[<DllImport("libuv", CallingConvention = CallingConvention.Cdecl)>]
 extern sbyte *uv_err_name(int systemErrorCode)
 
-[<DllImport("libuv.dll", CallingConvention = CallingConvention.Cdecl)>]
+[<DllImport("libuv", CallingConvention = CallingConvention.Cdecl)>]
 extern void uv_close(IntPtr handle, uv_close_cb cb)
 
-[<DllImport("libuv.dll", EntryPoint = "uv_write", CallingConvention = CallingConvention.Cdecl)>]
+[<DllImport("libuv", EntryPoint = "uv_write", CallingConvention = CallingConvention.Cdecl)>]
 extern int uv_write(IntPtr req, IntPtr handle, uv_buf_t[] bufs, int bufcnt, uv_write_cb write_callback)
 
-[<DllImport("libuv.dll", CallingConvention = CallingConvention.Cdecl)>]
+[<DllImport("libuv", CallingConvention = CallingConvention.Cdecl)>]
 extern int uv_idle_init(IntPtr loop, IntPtr idle)
 
-[<DllImport("libuv.dll", CallingConvention = CallingConvention.Cdecl)>]
+[<DllImport("libuv", CallingConvention = CallingConvention.Cdecl)>]
 extern int uv_idle_start(IntPtr idle, uv_handle_cb callback)
 
-[<DllImport("libuv.dll", CallingConvention = CallingConvention.Cdecl)>]
+[<DllImport("libuv", CallingConvention = CallingConvention.Cdecl)>]
 extern int uv_idle_stop(IntPtr idle)
 
 type uv_handle_type =
@@ -180,17 +180,17 @@ type uv_request_type =
 let UV_EOF = -4095
 let UV_ECONNRESET = -4077
 
-[<DllImport("libuv.dll", CallingConvention = CallingConvention.Cdecl)>]
+[<DllImport("libuv", CallingConvention = CallingConvention.Cdecl)>]
 extern int uv_handle_size(uv_handle_type t)
 
-[<DllImport("libuv.dll", CallingConvention = CallingConvention.Cdecl)>]
+[<DllImport("libuv", CallingConvention = CallingConvention.Cdecl)>]
 extern int uv_req_size(uv_request_type t)
 
-[<DllImport("libuv.dll", CallingConvention=CallingConvention.Cdecl)>]
+[<DllImport("libuv", CallingConvention=CallingConvention.Cdecl)>]
 extern int uv_async_init(IntPtr loop, IntPtr handle, uv_handle_cb callback)
 
-[<DllImport("libuv.dll", CallingConvention = CallingConvention.Cdecl)>]
+[<DllImport("libuv", CallingConvention = CallingConvention.Cdecl)>]
 extern int uv_async_send(IntPtr handle);
 
-[<DllImport("libuv.dll", CallingConvention = CallingConvention.Cdecl)>]
+[<DllImport("libuv", CallingConvention = CallingConvention.Cdecl)>]
 extern void uv_walk(IntPtr loop, uv_walk_cb cb, IntPtr arg);
