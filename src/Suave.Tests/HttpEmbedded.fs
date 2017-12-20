@@ -12,11 +12,7 @@ let embedded_resources cfg =
   let runWithConfig = runWith cfg
 
   testList "test Embedded.browse" [
-      #if NETCOREAPP2_0
-      ptestCase "200 OK returns embedded file" <| fun _ -> ()
-      #else
       testCase "200 OK returns embedded file" <| fun _ ->
         let actual = runWithConfig browseDefaultAsssembly |> req HttpMethod.GET "/embedded-resource.txt" None
         Expect.equal actual "Hello World!" "expecting 'Hello World!'"
-      #endif
     ]
