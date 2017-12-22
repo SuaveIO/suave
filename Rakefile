@@ -8,7 +8,6 @@ require 'albacore/tasks/versionizer'
 require 'albacore/tasks/release'
 require 'albacore/task_types/nugets_pack'
 require 'albacore/task_types/asmver'
-require './tools/paket_pack'
 require 'semver'
 
 Albacore::Tasks::Versionizer.new :versioning
@@ -213,18 +212,24 @@ task :tests => [:'tests:stress', :'tests:unit']
 
 directory 'build/pkg'
 
-nugets_pack :nugets_quick => [:versioning, 'build/pkg'] do |x|
-  x.configuration = Configuration
-  x.exe = '.paket/paket.exe'
-  x.files = FileList['src/**/*.fsproj'].exclude(/.netcore.fsproj/).exclude(/Tests/)
-  x.output = 'build/pkg'
-  x.authors = "Ademar Gonzalez, Henrik Feldt"
-  x.version = ENV['NUGET_VERSION']
-  x.description = suave_description
-  x.language = 'en-GB'
-  x.license_url = 'https://github.com/SuaveIO/Suave/blob/master/COPYING'
-  x.project_url = 'https://suave.io'
-  x.icon_url = 'https://raw.githubusercontent.com/SuaveIO/resources/master/images/head_trans.png'
+task :nugets_quick => [:versioning, 'build/pkg'] do
+  FileList['src/**/*.fsproj'].exclude(/.netcore.fsproj/).exclude(/Tests/).each do |proj|
+    taskName = "nugets_quick:" + proj
+    nugets_pack taskName do |x|
+      x.configuration = Configuration
+      x.exe = '.paket/paket.exe'
+      x.files = FileList[proj]
+      x.output = 'build/pkg'
+      x.authors = "Ademar Gonzalez, Henrik Feldt"
+      x.version = ENV['NUGET_VERSION']
+      x.description = suave_description
+      x.language = 'en-GB'
+      x.license_url = 'https://github.com/SuaveIO/Suave/blob/master/COPYING'
+      x.project_url = 'https://suave.io'
+      x.icon_url = 'https://raw.githubusercontent.com/SuaveIO/resources/master/images/head_trans.png'
+    end
+    Rake::Task[taskName].invoke
+  end
 end
 
 desc 'create suave nuget'
