@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
-    <DotNetCliToolReference Include="dotnet-mergenupkg" Version="1.*" />
+    <DotNetCliToolReference Include="dotnet-mergenupkg" Version="2.*" />
   </ItemGroup>
 
 </Project>
