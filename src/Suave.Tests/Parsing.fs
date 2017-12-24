@@ -60,23 +60,23 @@ let parsingMultipart cfg =
       let actual = runWithConfig testMultipartForm |> req HttpMethod.POST "/" (Some byteArrayContent)
       Expect.equal actual "Bob <bob@wishfulcoding.mailgun.org>" "Should return correct value"
 
-    testCase "parsing a large urlencoded form data" <| fun _ ->
+    testCase "parsing a large urlencoded form data - stripped-text" <| fun _ ->
       Assert.Equal("", "hallo wereld",
         runWithConfig (testUrlEncodedForm "stripped-text") |> reqGZip HttpMethod.POST "/" (Some <| new StringContent(postData2, Encoding.UTF8, "application/x-www-form-urlencoded")))
 
-    testCase "parsing a large urlencoded form data" <| fun _ ->
+    testCase "parsing a large urlencoded form data - from" <| fun _ ->
       Assert.Equal("", "Pepijn de Vos <pepijndevos@gmail.com>",
         runWithConfig (testUrlEncodedForm "from") |> reqGZip HttpMethod.POST "/" (Some <| new StringContent(postData3, Encoding.UTF8, "application/x-www-form-urlencoded")))
 
-    testCase "parsing a large urlencoded form data" <| fun _ ->
+    testCase "parsing a large urlencoded form data - subject" <| fun _ ->
       Assert.Equal("", "no attachment 2",
         runWithConfig (testUrlEncodedForm "subject") |> reqGZip HttpMethod.POST "/" (Some <| new StringContent(postData3, Encoding.UTF8, "application/x-www-form-urlencoded")))
 
-    testCase "parsing a large urlencoded form data" <| fun _ ->
+    testCase "parsing a large urlencoded form data - body-plain" <| fun _ ->
       Assert.Equal("", "identifier 123abc",
         runWithConfig (testUrlEncodedForm "body-plain") |> reqGZip HttpMethod.POST "/" (Some <| new StringContent(postData3, Encoding.UTF8, "application/x-www-form-urlencoded")))
 
-    testCase "parsing a large urlencoded form data" <| fun _ ->
+    testCase "parsing a large urlencoded form data - body-html" <| fun _ ->
       Assert.Equal("", "field-does-not-exists",
         runWithConfig (testUrlEncodedForm "body-html") |> reqGZip HttpMethod.POST "/" (Some <| new StringContent(postData3, Encoding.UTF8, "application/x-www-form-urlencoded")))
   ]
