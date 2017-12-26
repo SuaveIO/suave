@@ -3,19 +3,21 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
 VisualStudioVersion = 15.0.26124.0
 MinimumVisualStudioVersion = 15.0.26124.0
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Suave.netcore", "Suave/Suave.netcore.fsproj", "{87A7BC50-A26D-4370-B175-BF4BB4E7416B}"
+Project("{f2a71f9b-5d33-465a-a702-920d77279786}") = "Suave.netcore", "Suave\Suave.netcore.fsproj", "{87A7BC50-A26D-4370-B175-BF4BB4E7416B}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Suave.DotLiquid.netcore", "Suave.DotLiquid/Suave.DotLiquid.netcore.fsproj", "{FF35C4E4-9B3C-42F1-96C3-6972D9A94DAD}"
+Project("{f2a71f9b-5d33-465a-a702-920d77279786}") = "Suave.DotLiquid.netcore", "Suave.DotLiquid\Suave.DotLiquid.netcore.fsproj", "{FF35C4E4-9B3C-42F1-96C3-6972D9A94DAD}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Suave.Experimental.netcore", "Experimental/Suave.Experimental.netcore.fsproj", "{44C7A32F-EA26-49D4-82C9-8B51E17524D0}"
+Project("{f2a71f9b-5d33-465a-a702-920d77279786}") = "Suave.Experimental.netcore", "Experimental\Suave.Experimental.netcore.fsproj", "{44C7A32F-EA26-49D4-82C9-8B51E17524D0}"
 EndProject
-Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Suave.Testing.netcore", "Suave.Testing/Suave.Testing.netcore.fsproj", "{D0F5B5CB-9CF6-4E32-8F46-030279294C32}"
+Project("{f2a71f9b-5d33-465a-a702-920d77279786}") = "Suave.Testing.netcore", "Suave.Testing\Suave.Testing.netcore.fsproj", "{D0F5B5CB-9CF6-4E32-8F46-030279294C32}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Suave.Tests.netcore", "Suave.Tests/Suave.Tests.netcore.fsproj", "{571C4BDE-692A-4AED-BE44-7F1F7A25EBED}"
+Project("{f2a71f9b-5d33-465a-a702-920d77279786}") = "Suave.Tests.netcore", "Suave.Tests\Suave.Tests.netcore.fsproj", "{571C4BDE-692A-4AED-BE44-7F1F7A25EBED}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Example.netcore", "../examples/Example/Example.netcore.fsproj", "{22083A27-CB0B-48CA-A9E9-9DD3A4DCF841}"
+Project("{f2a71f9b-5d33-465a-a702-920d77279786}") = "Example.netcore", "..\examples\Example\Example.netcore.fsproj", "{22083A27-CB0B-48CA-A9E9-9DD3A4DCF841}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Pong.netcore", "../examples/Pong/Pong.netcore.fsproj", "{A66900CD-B912-4C6C-B76A-008E94802380}"
+Project("{f2a71f9b-5d33-465a-a702-920d77279786}") = "Pong.netcore", "..\examples\Pong\Pong.netcore.fsproj", "{A66900CD-B912-4C6C-B76A-008E94802380}"
+EndProject
+Project("{f2a71f9b-5d33-465a-a702-920d77279786}") = "Suave.LibUv.netcore", "Suave.LibUv\Suave.LibUv.netcore.fsproj", "{83A5DD6C-29E5-4516-8316-3944243D2EC0}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -114,5 +116,17 @@ Global
 		{A66900CD-B912-4C6C-B76A-008E94802380}.Release|x64.Build.0 = Release|x64
 		{A66900CD-B912-4C6C-B76A-008E94802380}.Release|x86.ActiveCfg = Release|x86
 		{A66900CD-B912-4C6C-B76A-008E94802380}.Release|x86.Build.0 = Release|x86
+		{83A5DD6C-29E5-4516-8316-3944243D2EC0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{83A5DD6C-29E5-4516-8316-3944243D2EC0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{83A5DD6C-29E5-4516-8316-3944243D2EC0}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{83A5DD6C-29E5-4516-8316-3944243D2EC0}.Debug|x64.Build.0 = Debug|Any CPU
+		{83A5DD6C-29E5-4516-8316-3944243D2EC0}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{83A5DD6C-29E5-4516-8316-3944243D2EC0}.Debug|x86.Build.0 = Debug|Any CPU
+		{83A5DD6C-29E5-4516-8316-3944243D2EC0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{83A5DD6C-29E5-4516-8316-3944243D2EC0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{83A5DD6C-29E5-4516-8316-3944243D2EC0}.Release|x64.ActiveCfg = Release|Any CPU
+		{83A5DD6C-29E5-4516-8316-3944243D2EC0}.Release|x64.Build.0 = Release|Any CPU
+		{83A5DD6C-29E5-4516-8316-3944243D2EC0}.Release|x86.ActiveCfg = Release|Any CPU
+		{83A5DD6C-29E5-4516-8316-3944243D2EC0}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
