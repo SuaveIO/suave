@@ -189,10 +189,7 @@ namespace :dotnetcli do
     version = SemVer.find.format("%M.%m.%p%s")
 
     Dir.chdir "tools" do
-      [ "Suave", "Suave.Testing", "Suave.Experimental", "Suave.DotLiquid" ].each do |item|
-          merge_nugets(dotnet_exe_path, item, version, "netstandard1.6")
-      end
-      [ "Suave.LibUv" ].each do |item|
+      [ "Suave", "Suave.Testing", "Suave.Experimental", "Suave.DotLiquid", "Suave.LibUv" ].each do |item|
           merge_nugets(dotnet_exe_path, item, version, "netstandard2.0")
       end
     end
