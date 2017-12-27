@@ -103,7 +103,7 @@ namespace :dotnetcli do
   end
 
   task :coreclr_binaries => 'tools/coreclr' do
-    dotnet_version = '2.0.0'
+    dotnet_version = '2.0.3'
     dotnet_installed_version = get_installed_dotnet_version
     # check if required version of .net core sdk is already installed, otherwise download and install it
     if dotnet_installed_version == dotnet_version then
@@ -189,10 +189,7 @@ namespace :dotnetcli do
     version = SemVer.find.format("%M.%m.%p%s")
 
     Dir.chdir "tools" do
-      [ "Suave", "Suave.Testing", "Suave.Experimental", "Suave.DotLiquid" ].each do |item|
-          merge_nugets(dotnet_exe_path, item, version, "netstandard1.6")
-      end
-      [ "Suave.LibUv" ].each do |item|
+      [ "Suave", "Suave.Testing", "Suave.Experimental", "Suave.DotLiquid", "Suave.LibUv" ].each do |item|
           merge_nugets(dotnet_exe_path, item, version, "netstandard2.0")
       end
     end
@@ -261,8 +258,8 @@ task :nugets => ['build/pkg', :versioning, :compile, :nugets_quick]
 desc 'create suave nuget with .NET Core'
 task :nugets_with_netcore => [:nugets, 'dotnetcli:do_netcorepackage', 'dotnetcli:merge']
 
-desc 'compile, gen versions and test'
-task :ci => [:compile, :'tests:unit', :'dotnetcli:unit']
+desc 'compile, gen versions, test and generate nuget'
+task :ci => [:compile, :'tests:unit', :'dotnetcli:unit', :nugets_with_netcore]
 
 desc 'compile, gen versions, test'
 task :default => [:compile, :'tests:unit', :'docs:build']

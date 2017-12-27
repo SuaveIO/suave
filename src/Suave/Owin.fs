@@ -247,9 +247,9 @@ type WebSocketSendAsync =
 type WebSocketReceiveAsync =
         Func<ArraySegment<byte> (* data *),
              CancellationToken (* cancel *),
-             Task<Tuple<int (* messageType *),
-                        bool (* endOfMessage *),
-                        int (* count *)>>>
+             Task<int (* messageType *) *
+                  bool (* endOfMessage *) *
+                  int (* count *)>>
 
 type WebSocketReceiveTuple =
         Tuple<int (* messageType *),
@@ -403,7 +403,7 @@ module OwinApp =
             match result with
             | Choice1Of2 (a,b,c) ->
               Array.ConstrainedCopy(b, 0, data.Array, data.Offset, b.Length)
-              return Tuple<_,_,_>(int (fromOpcode a), true, b.Length)
+              return (int (fromOpcode a), true, b.Length)
             | Choice2Of2 err ->
               return failwith (err.ToString())
             }
