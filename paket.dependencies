@@ -57,5 +57,5 @@ group Docs
 group SourceLink
   storage: none
   source https://www.nuget.org/api/v2/
-  nuget SourceLink.Create.GitHub 2.7.1
-  clitool dotnet-sourcelink-git 2.7.1 framework: netcoreapp2.0
+  nuget SourceLink.Create.CommandLine 2.7.1
+  nuget SourceLink.Embed.PaketFiles 2.7.1
