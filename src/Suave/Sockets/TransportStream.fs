@@ -1,4 +1,4 @@
-﻿namespace Suave.Sockets
+namespace Suave.Sockets
 
 open System
 open System.IO
@@ -34,7 +34,7 @@ type TransportStream(transport : ITransport) =
       }
     Async.StartAsTask (task, TaskCreationOptions.AttachedToParent,ct)
 
-  #if !NETSTANDARD1_5
+  #if !NETSTANDARD2_0
   override x.BeginRead(buffer : byte[],offset : int,count : int,  callback : AsyncCallback, state : obj) : IAsyncResult=
     let task = x.ReadAsync(buffer,offset,count)
     Task<_>.ToIAsyncResult(task,callback,state)
@@ -58,7 +58,7 @@ type TransportStream(transport : ITransport) =
       }
     Async.StartAsTask (task, TaskCreationOptions.AttachedToParent,ct) :> Task
 
-  #if !NETSTANDARD1_5
+  #if !NETSTANDARD2_0
   override x.BeginWrite(buffer : byte[],offset : int,count : int,  callback : AsyncCallback, state : obj) : IAsyncResult=
     let task = x.WriteAsync(buffer,offset,count)
     Task<_>.ToIAsyncResult(task :?> Task<unit>,callback,state)

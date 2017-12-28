@@ -1,4 +1,4 @@
-﻿namespace Suave
+namespace Suave
 
 open Suave.Sockets
 open Suave.Sockets.Control
@@ -34,7 +34,7 @@ type DefaultTlsProvider() =
   interface TlsProvider with
     member this.wrap(connection : Connection, cert : obj) = socket {
       let sslStream = new SslStream(new TransportStream(connection.transport))
-      #if NETSTANDARD1_5
+      #if NETSTANDARD2_0
       do! SocketOp.ofTask <| sslStream.AuthenticateAsServerAsync (cert :?> X509Certificate)
       #else
       sslStream.AuthenticateAsServer (cert :?> X509Certificate)

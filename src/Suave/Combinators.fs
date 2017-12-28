@@ -653,7 +653,7 @@ module Embedded =
   open Response
   open ServeResource
 
-  #if !NETSTANDARD1_5
+  #if !NETSTANDARD2_0
   let defaultSourceAssembly =
     if Assembly.GetEntryAssembly() = null
     then Assembly.GetCallingAssembly()
@@ -699,7 +699,7 @@ module Embedded =
               content = SocketTask (writeResource resourceName) }}
     |> succeed
 
-  #if !NETSTANDARD1_5
+  #if !NETSTANDARD2_0
   let sendResourceFromDefaultAssembly resourceName compression =
     sendResource defaultSourceAssembly resourceName compression
   #endif
@@ -712,7 +712,7 @@ module Embedded =
       (Path.GetExtension)
       (sendResource assembly)
 
-  #if !NETSTANDARD1_5
+  #if !NETSTANDARD2_0
   let resourceFromDefaultAssembly name =
     resource defaultSourceAssembly name
   #endif
@@ -720,7 +720,7 @@ module Embedded =
   let browse assembly =
     warbler (fun ctx -> resource assembly (ctx.request.path.TrimStart [|'/'|]))
 
-  #if !NETSTANDARD1_5
+  #if !NETSTANDARD2_0
   let browseDefaultAsssembly =
     browse defaultSourceAssembly
   #endif

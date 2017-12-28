@@ -1,4 +1,4 @@
-﻿/// A module for rendering DotLiquid template with Suave
+/// A module for rendering DotLiquid template with Suave
 module Suave.DotLiquid
 
 open System
@@ -37,7 +37,7 @@ module internal Impl =
     let o = obj()
     fun f -> lock o f
 
-  #if NETSTANDARD1_5
+  #if NETSTANDARD2_0
   open System.Reflection
   #endif
 
@@ -51,7 +51,7 @@ module internal Impl =
           let fields = FSharpType.GetRecordFields ty
           Template.RegisterSafeType(ty, [| for f in fields -> f.Name |])
           for f in fields do loop f.PropertyType
-        #if NETSTANDARD1_5
+        #if NETSTANDARD2_0
         elif ty.GetTypeInfo().IsGenericType then
         #else
         elif ty.IsGenericType then

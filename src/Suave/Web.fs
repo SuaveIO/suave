@@ -88,7 +88,7 @@ module Web =
       compressedFilesFolder = None
       logger                = Targets.create Info [| "Suave" |]
       tcpServerFactory      = new DefaultTcpServerFactory()
-      #if NETSTANDARD1_5
+      #if NETSTANDARD2_0
       cookieSerialiser      = new JsonFormatterSerialiser()
       #else
       cookieSerialiser      = new BinaryFormatterSerialiser()

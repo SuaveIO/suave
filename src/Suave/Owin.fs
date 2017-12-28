@@ -274,7 +274,7 @@ module OwinApp =
   open System.Text
   open System.Globalization
 
-  #if !NETSTANDARD1_5
+  #if !NETSTANDARD2_0
   open System.Diagnostics
 
   /// http://www.tugberkugurlu.com/archive/logging-in-the-owin-world-with-microsoft-owin--introduction
@@ -506,7 +506,7 @@ module OwinApp =
         // per-request storage
         "suave.UserData",                           HttpContext.userState_ <--> untyped
 
-        #if !NETSTANDARD1_5
+        #if !NETSTANDARD2_0
         // MSFT non standard
         // readable
         OwinConstants.MSFT.traceFactoryDelegate,    HttpContext.runtime_ >--> HttpRuntime.logger_ >--> ((fun x -> traceFactory x), (fun v x -> x)) <--> untyped

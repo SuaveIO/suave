@@ -1,4 +1,4 @@
-﻿namespace Suave
+namespace Suave
 
 open System.IO
 
@@ -6,7 +6,7 @@ type CookieSerialiser =
   abstract serialise : Map<string, obj> -> byte []
   abstract deserialise : byte [] -> Map<string, obj>
 
-#if NETSTANDARD1_5
+#if NETSTANDARD2_0
 open System.Runtime.Serialization.Json
 
 type JsonFormatterSerialiser() =

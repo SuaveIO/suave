@@ -23,7 +23,7 @@ open System
 open System.Reflection
 
 /// This returns the assembly version of Suave
-#if NETSTANDARD1_5
+#if NETSTANDARD2_0
 type private ThisGlobal = { UsedByGetExecutingAssembly: string }
 
 let SuaveVersion = typeof<ThisGlobal>.GetTypeInfo().Assembly.GetName().Version.ToString()

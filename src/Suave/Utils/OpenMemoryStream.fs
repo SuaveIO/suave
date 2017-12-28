@@ -1,4 +1,4 @@
-﻿namespace Suave.Utils
+namespace Suave.Utils
 
 #nowarn "864"
 
@@ -22,7 +22,7 @@ type internal OpenStream(stream : MemoryStream) =
   member x.RealDispose() =
     stream.Dispose()
 
-  #if !NETSTANDARD1_5
+  #if !NETSTANDARD2_0
 
   override x.Close() =
     ()
@@ -107,7 +107,7 @@ type internal OpenMemoryStream() =
   member x.ToArray() =
     base.stream.ToArray()
   
-  #if !NETSTANDARD1_5
+  #if !NETSTANDARD2_0
   member x.GetBuffer() =
     base.stream.GetBuffer()
   #endif
