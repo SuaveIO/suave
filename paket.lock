@@ -160,6 +160,14 @@ NUGET
 GITHUB
   remote: haf/YoLo
     YoLo.fs (76e16a4c9338c2f04cb067add0e3a33b42a0f396)
+GROUP Libuv
+STORAGE: NONE
+NUGET
+  remote: https://www.nuget.org/api/v2
+    Libuv (1.10)
+      Microsoft.NETCore.Platforms (>= 1.0.1) - restriction: >= netstandard1.0
+    Microsoft.NETCore.Platforms (2.0.1) - restriction: >= netstandard1.0
+
 GROUP SourceLink
 STORAGE: NONE
 NUGET

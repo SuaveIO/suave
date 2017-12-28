@@ -14,6 +14,11 @@ group Build
   source https://nuget.org/api/v2
   nuget NuGet.CommandLine
 
+group Libuv
+  storage: none
+  source https://nuget.org/api/v2
+  nuget libuv
+
 group Tests
   framework: NET46
   source https://nuget.org/api/v2
