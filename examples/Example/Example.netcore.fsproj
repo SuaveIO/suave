@@ -3,7 +3,6 @@
     <TargetFramework>netcoreapp2.0</TargetFramework>
     <OutputType>Exe</OutputType>
     <AssemblyName>Example</AssemblyName>
-    <DefineConstants>$(DefineConstants)</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="..\..\paket-files\examples\haf\YoLo\YoLo.fs">
