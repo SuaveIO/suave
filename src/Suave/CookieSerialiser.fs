@@ -6,7 +6,6 @@ type CookieSerialiser =
   abstract serialise : Map<string, obj> -> byte []
   abstract deserialise : byte [] -> Map<string, obj>
 
-#if NETSTANDARD2_0
 open System.Runtime.Serialization.Json
 
 type JsonFormatterSerialiser() =
@@ -21,8 +20,7 @@ type JsonFormatterSerialiser() =
       use ms = new MemoryStream(data)
       let f = new DataContractJsonSerializer(typeof<_>)
       f.ReadObject(ms) :?> _
-      
-#else
+
 open System.Runtime.Serialization.Formatters.Binary
 
 type BinaryFormatterSerialiser() =
@@ -37,5 +35,3 @@ type BinaryFormatterSerialiser() =
       use ms = new MemoryStream(data)
       let f = new BinaryFormatter()
       f.Deserialize ms :?> _
-
-#endif

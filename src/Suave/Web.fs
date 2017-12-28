@@ -88,11 +88,7 @@ module Web =
       compressedFilesFolder = None
       logger                = Targets.create Info [| "Suave" |]
       tcpServerFactory      = new DefaultTcpServerFactory()
-      #if NETSTANDARD2_0
-      cookieSerialiser      = new JsonFormatterSerialiser()
-      #else
       cookieSerialiser      = new BinaryFormatterSerialiser()
-      #endif
       tlsProvider           = new DefaultTlsProvider()
       hideHeader            = false
       maxContentLength      = 10000000 // 10 megabytes

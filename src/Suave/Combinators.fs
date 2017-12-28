@@ -653,12 +653,10 @@ module Embedded =
   open Response
   open ServeResource
 
-  #if !NETSTANDARD2_0
   let defaultSourceAssembly =
     if Assembly.GetEntryAssembly() = null
     then Assembly.GetCallingAssembly()
     else Assembly.GetEntryAssembly()
-  #endif
 
   let resources (assembly : Assembly) =
     assembly.GetManifestResourceNames()
@@ -699,10 +697,8 @@ module Embedded =
               content = SocketTask (writeResource resourceName) }}
     |> succeed
 
-  #if !NETSTANDARD2_0
   let sendResourceFromDefaultAssembly resourceName compression =
     sendResource defaultSourceAssembly resourceName compression
-  #endif
 
   let resource assembly name =
     resource
@@ -712,18 +708,14 @@ module Embedded =
       (Path.GetExtension)
       (sendResource assembly)
 
-  #if !NETSTANDARD2_0
   let resourceFromDefaultAssembly name =
     resource defaultSourceAssembly name
-  #endif
 
   let browse assembly =
     warbler (fun ctx -> resource assembly (ctx.request.path.TrimStart [|'/'|]))
 
-  #if !NETSTANDARD2_0
   let browseDefaultAsssembly =
     browse defaultSourceAssembly
-  #endif
 
 // See www.w3.org/TR/eventsource/#event-stream-interpretation
 module EventSource =
