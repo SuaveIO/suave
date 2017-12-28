@@ -201,7 +201,7 @@ NUGET
       Expecto (>= 4.0.3)
       FsCheck (>= 2.7.1)
       FSharp.Core (>= 3.1.2.5)
-    FsCheck (2.8.2)
+    FsCheck (2.7.1)
       FSharp.Core (>= 3.1.2.5)
     FSharp.Charting (0.90.14)
     FSharp.Core (4.0.0.1) - redirects: force
