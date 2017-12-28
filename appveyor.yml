@@ -7,8 +7,10 @@ environment:
   matrix:
    - arch: "x86"
      MSBUILD_PLATFORM: x86
+     PATH: '%USERPROFILE%\.nuget\packages\libuv\1.10.0\runtimes\win-x86\native;%PATH%'
    - arch: "x64"
      MSBUILD_PLATFORM: "Any CPU"
+     PATH: '%USERPROFILE%\.nuget\packages\libuv\1.10.0\runtimes\win-x64\native;%PATH%'
 
 install:
  - set PATH=C:\Ruby22\bin;%PATH% # use Ruby 2.2.6
