@@ -62,5 +62,6 @@ group Docs
 group SourceLink
   storage: none
   source https://www.nuget.org/api/v2/
-  nuget SourceLink.Create.CommandLine 2.7.1
-  nuget SourceLink.Embed.PaketFiles 2.7.1
+  source https://ci.appveyor.com/nuget/sourcelink/
+  nuget SourceLink.Create.CommandLine 2.7.2-b654
+  nuget SourceLink.Embed.PaketFiles 2.7.2-b654
