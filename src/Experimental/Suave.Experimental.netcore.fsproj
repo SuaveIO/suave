@@ -4,7 +4,6 @@
     <AssemblyName>Suave.Experimental</AssemblyName>
     <PackageId>Suave.Experimental</PackageId>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <DefineConstants>$(DefineConstants);NETSTANDARD2_0</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="ViewEngine.fs" />
