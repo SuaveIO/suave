@@ -171,9 +171,9 @@ NUGET
 GROUP SourceLink
 STORAGE: NONE
 NUGET
-  remote: https://ci.appveyor.com/nuget/sourcelink
-    SourceLink.Create.CommandLine (2.7.2-b654)
-    SourceLink.Embed.PaketFiles (2.7.2-b654)
+  remote: https://www.nuget.org/api/v2
+    SourceLink.Create.CommandLine (2.7.2)
+    SourceLink.Embed.PaketFiles (2.7.2)
 
 GROUP Tests
 RESTRICTION: == net46
