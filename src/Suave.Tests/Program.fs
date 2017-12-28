@@ -8,10 +8,6 @@ open ExpectoExtensions
 
 open System
 
-#if NETCOREAPP2_0
-open System.Runtime.InteropServices
-#endif
-
 [<EntryPoint>]
 let main args =
 
@@ -33,14 +29,7 @@ let main args =
     firstRun <- defaultMainThisAssemblyWithParam testConfig args
     Console.WriteLine "Done."
 
-  #if NETCOREAPP2_0
-  if not (RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) then
-    Console.WriteLine "Skipping default TCP engine tests for non Windows platforms."
-  else
-    runDefaultEngine()
-  #else
   runDefaultEngine()
-  #endif
 
   if firstRun <> 0 then
     firstRun
