@@ -40,6 +40,11 @@ module Cookie =
   let parseResultCookie (s : string) : HttpCookie =
     let parseExpires (str : string) =
       DateTimeOffset.ParseExact(str, "R", CultureInfo.InvariantCulture)
+    let parseSameSite (str : string) =
+      match str with
+      | "Strict" -> Some Strict
+      | "Lax" -> Some Lax
+      | _ -> None
     s.Split(';')
     |> Array.map (fun (x : string) ->
         let parts = x.Split('=')
@@ -55,6 +60,7 @@ module Cookie =
         | "Expires", expires        -> iter + 1, { cookie with expires = Some (parseExpires expires) }
         | "HttpOnly", _             -> iter + 1, { cookie with httpOnly = true }
         | "Secure", _               -> iter + 1, { cookie with secure = true }
+        | "SameSite", sameSite      -> iter + 1, { cookie with sameSite = parseSameSite sameSite}
         | _                         -> iter + 1, cookie)
         (0, { HttpCookie.empty with httpOnly = false }) // default when parsing
     |> snd
@@ -106,7 +112,7 @@ module Cookie =
 
     let cookieHeaders =
       ctx.response.cookies
-      |> Map.put cookie.name cookie // possibly overwrite
+      |> Map.add cookie.name cookie // possibly overwrite
       |> Map.toList
       |> List.map snd // get HttpCookie-s
       |> List.map HttpCookie.toHeader
@@ -177,7 +183,7 @@ module Cookie =
                secure   = secure }
       |> slidingExpiry relativeExpiry
 
-    | err ->
+    | Choice2Of2 err ->
       failwithf "Suave internal error on encryption %A" err
 
   /// Tries to read the cookie by `cookieName` from the mapping of cookie-name

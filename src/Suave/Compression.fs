@@ -96,20 +96,26 @@ module Compression =
                       compression compressionFolder ctx =
     socket {
       if compression && stream.Length > int64(MIN_BYTES_TO_COMPRESS) && stream.Length < int64(MAX_BYTES_TO_COMPRESS) then
-        let enconding = parseEncoder ctx.request
-        match enconding with
+        let encoding = parseEncoder ctx.request
+        match encoding with
         | Some n ->
           try
-            if Globals.compressedFilesMap.ContainsKey key then
-              let lastModified = getLast key
-              let cmprInfo = new FileInfo(Globals.compressedFilesMap.[key])
-              if lastModified > cmprInfo.CreationTime then
+            // look this up, we may have already compressed it
+            let map = Globals.compressedFilesMap
+            let lastModified = getLast key
+            match map.TryGetValue key with
+            | true, (_, previousLastModified) -> 
+              if lastModified > previousLastModified then
+                // this file has a later modification date than it did when we compressed it
                 let! newPath = compressFile n stream compressionFolder
-                Globals.compressedFilesMap.[key] <- newPath
-            else
-              let! newPath =  compressFile n stream compressionFolder
-              Globals.compressedFilesMap.TryAdd(key,newPath) |> ignore
-            return Some n, new FileStream(Globals.compressedFilesMap.[key], FileMode.Open, FileAccess.Read, FileShare.Read) :> Stream
+                map.[key] <- (newPath, lastModified)
+                // Here it is tempting to delete the old compressed file, but is that 
+                // safe? Perhaps it could be being served on another request?
+            | _ -> 
+                let! newPath = compressFile n stream compressionFolder
+                let value = (newPath, lastModified)
+                (key, value) |> map.TryAdd |> ignore
+            return Some n, new FileStream(map.[key] |> fst, FileMode.Open, FileAccess.Read, FileShare.Read) :> Stream
           finally
             stream.Dispose()
         | None ->

@@ -8,6 +8,10 @@ open ExpectoExtensions
 
 open System
 
+#if NETCOREAPP2_0
+open System.Runtime.InteropServices
+#endif
+
 [<EntryPoint>]
 let main args =
 
@@ -23,9 +27,20 @@ let main args =
         bindings = [ HttpBinding.createSimple HTTP "127.0.0.1" 9001 ]
         logger   = Targets.create Warn [| "Suave"; "Tests" |] }
 
-  Console.WriteLine "Running tests with default TCP engine."
-  let firstRun = defaultMainThisAssemblyWithParam testConfig args
-  Console.WriteLine "Done."
+  let mutable firstRun = 0
+  let runDefaultEngine() =
+    Console.WriteLine "Running tests with default TCP engine."
+    firstRun <- defaultMainThisAssemblyWithParam testConfig args
+    Console.WriteLine "Done."
+
+  #if NETCOREAPP2_0
+  if not (RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) then
+    Console.WriteLine "Skipping default TCP engine tests for non Windows platforms."
+  else
+    runDefaultEngine()
+  #else
+  runDefaultEngine()
+  #endif
 
   if firstRun <> 0 then
     firstRun

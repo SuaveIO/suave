@@ -24,9 +24,9 @@ build_script:
  - cmd: msbuild /t:Restore src/Suave.sln
  - cmd: msbuild /t:Restore src/Suave.netcore.sln
  - cmd: gem sources -r https://rubygems.org/
- - cmd: gem install bundler --no-ri --no-rdoc --source https://rubygems.org/
+ - cmd: gem install bundler --no-ri --no-rdoc --source https://rubygems.org/ --conservative
  - cmd: bundle install
- - cmd: bundle exec rake appveyor
+ - cmd: bundle exec rake ci
  
 artifacts:
  - path: build\pkg\*.nupkg 

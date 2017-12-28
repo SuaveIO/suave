@@ -2,15 +2,10 @@
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
     <OutputType>Exe</OutputType>
-    <AssemblyName>Example</AssemblyName>
-    <DefineConstants>$(DefineConstants);NETCOREAPP1_1</DefineConstants>
+    <AssemblyName>Pong</AssemblyName>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="..\..\paket-files\examples\haf\YoLo\YoLo.fs">
-      <Paket>True</Paket>
-      <Link>paket-files/YoLo.fs</Link>
-    </Compile>
-    <Compile Include="CounterDemo.fs" />
+    <Compile Include="AssemblyVersionInfo.fs" Condition="Exists('AssemblyVersionInfo.fs')" />
     <Compile Include="Program.fs" />
   </ItemGroup>
   <ItemGroup>

@@ -33,6 +33,10 @@ module WebSocket =
     >=> Writers.setHeader "Sec-WebSocket-Accept" handShakeToken
     >=> Response.response HTTP_101 [||] // HTTP 1xx responses  MUST NOT contain a body
 
+  let handShakeWithSubprotocolResponse (subprotocol : string) (handShakeToken : string) =
+    Writers.setHeader "Sec-WebSocket-Protocol" subprotocol
+    >=> handShakeResponse handShakeToken
+
   type Opcode = Continuation | Text | Binary | Reserved | Close | Ping | Pong
 
   let toOpcode = function
@@ -140,14 +144,19 @@ module WebSocket =
 
   let readBytes (transport : ITransport) (n : int) =
     let arr = Array.zeroCreate n
-    let rec loop i = socket {
+    // TODO: Remove logic of handling reset connections when this issue would be fixed in the mono (https://bugzilla.xamarin.com/show_bug.cgi?id=53229).
+    let maxFailedAttempts = 10
+    let rec loop i failedAttempts = socket {
       if i = n then
         return arr
       else
         let! read = transport.read <| ArraySegment(arr,i,n - i)
-        return! loop (i+read)
+        if failedAttempts >= maxFailedAttempts then
+          return! SocketOp.abort(ConnectionError "Connection reset by peer")
+        else
+          return! loop (i+read) (if read = 0 then failedAttempts + 1 else 0)
       }
-    loop 0
+    loop 0 0
 
   let readBytesIntoByteSegment retrieveByteSegment (transport : ITransport) (n : int) =
     let byteSegmentRetrieved: ByteSegment = retrieveByteSegment n
@@ -174,7 +183,7 @@ module WebSocket =
   let fork f = ThreadPool.QueueUserWorkItem(WaitCallback(f)) |> ignore
 
   /// This class represents a WebSocket connection, it provides an interface to read and write to a WebSocket.
-  type WebSocket(connection : Connection) =
+  type WebSocket(connection : Connection, subprotocol: string option) =
 
     let readExtendedLength header = socket {
       if header.length = 126 then
@@ -275,43 +284,78 @@ module WebSocket =
 
     member this.send opcode bs fin = sendFrame opcode bs fin
 
-  let internal handShakeAux webSocketKey continuation (ctx : HttpContext) =
+    member this.subprotocol = subprotocol
+
+  let internal handShakeAux webSocketProtocol webSocketKey continuation (ctx : HttpContext) =
     socket {
       let webSocketHash = sha1 <| webSocketKey + magicGUID
       let handShakeToken = Convert.ToBase64String webSocketHash
-      let! something = HttpOutput.run (handShakeResponse handShakeToken) ctx
-      let webSocket = new WebSocket(ctx.connection)
+      let! something =
+        match webSocketProtocol with
+        | Some subprotocol -> HttpOutput.run (handShakeWithSubprotocolResponse subprotocol handShakeToken) ctx
+        | None -> HttpOutput.run (handShakeResponse handShakeToken) ctx
+      let webSocket = new WebSocket(ctx.connection, webSocketProtocol)
       do! continuation webSocket ctx
     }
 
-  /// The handShake combinator captures a WebSocket and pass it to the provided `continuation`
-  let handShake (continuation : WebSocket -> HttpContext -> SocketOp<unit>) (ctx : HttpContext) = async {
+  let chooseSubprotocol (subprotocol : string) (requestSubprotocols : string []) (ctx : HttpContext) = async {
+    if Array.exists ((=) subprotocol) requestSubprotocols then
+      return Some subprotocol
+    else
+      return None
+  }
+
+  let validateHandShake (ctx : HttpContext) =
     let r = ctx.request
     if r.``method`` <> HttpMethod.GET then
-      return! RequestErrors.METHOD_NOT_ALLOWED "Method not allowed" ctx
-    elif r.header "upgrade"  |> Choice.map (fun s -> s.ToLower()) <> Choice1Of2 "websocket" then
-      return! RequestErrors.BAD_REQUEST "Bad Request" ctx
+      Choice2Of2 (RequestErrors.METHOD_NOT_ALLOWED "Method not allowed" ctx)
+    elif r.header "upgrade" |> Choice.map (fun s -> s.ToLower()) <> Choice1Of2 "websocket" then
+      Choice2Of2 (RequestErrors.BAD_REQUEST "Bad Request" ctx)
     else
-      match r.header "connection" with
-      // rfc 6455 - Section 4.1.6 : The request MUST contain a |Connection| header field whose value
-      // MUST include the "Upgrade" token.
-      | Choice1Of2 str when String.contains "Upgrade" str ->
+      if r.header "connection" |> Choice.map (fun s -> s.ToLower()) = Choice1Of2 "upgrade" then
         match r.header "sec-websocket-key" with
-        | Choice1Of2 webSocketKey ->
-          let! a = handShakeAux webSocketKey continuation ctx
-          match a with
-          | Choice1Of2 _ ->
-            do ()
+        | Choice1Of2 webSocketKey -> Choice1Of2 webSocketKey
+        | _ -> Choice2Of2 (RequestErrors.BAD_REQUEST "Missing 'sec-websocket-key' header" ctx)
+      else
+        Choice2Of2 (RequestErrors.BAD_REQUEST "Bad Request" ctx)
 
-          | Choice2Of2 err ->
-            ctx.runtime.logger.info (
-              eventX "WebSocket disconnected"
-              >> setSingleName "Suave.Websocket.handShake"
-              >> setFieldValue "error" err)
+  /// The handShakeWithSubprotocol combinator captures a WebSocket and pass it to the provided `continuation`
+  let handShakeWithSubprotocol (choose : string [] -> HttpContext -> Async<string option>) (continuation : WebSocket -> HttpContext -> SocketOp<unit>) (ctx : HttpContext) = async {
+    match validateHandShake ctx with
+    | Choice1Of2 webSocketKey ->
+      let! subprotocol =
+        match ctx.request.header "sec-websocket-protocol" with
+        | Choice1Of2 webSocketProtocol -> choose (webSocketProtocol.Split [|','|]) ctx
+        | _ -> Async.result None
 
-          return! Control.CLOSE ctx
-        | _ ->
-          return! RequestErrors.BAD_REQUEST "Missing 'sec-websocket-key' header" ctx
-      | _ ->
-        return! RequestErrors.BAD_REQUEST "Bad Request" ctx
-    }
+      let! a = handShakeAux subprotocol webSocketKey continuation ctx
+      match a with
+      | Choice1Of2 _ ->
+        do ()
+      | Choice2Of2 err ->
+        ctx.runtime.logger.info (
+          eventX "WebSocket disconnected"
+          >> setSingleName "Suave.Websocket.handShakeWithSubprotocol"
+          >> setFieldValue "error" err)
+
+      return! Control.CLOSE ctx
+    | Choice2Of2 response -> return! response
+  }
+
+  /// The handShake combinator captures a WebSocket and pass it to the provided `continuation`
+  let handShake (continuation : WebSocket -> HttpContext -> SocketOp<unit>) (ctx : HttpContext) = async {
+    match validateHandShake ctx with
+    | Choice1Of2 webSocketKey ->
+      let! a = handShakeAux None webSocketKey continuation ctx
+      match a with
+      | Choice1Of2 _ ->
+        do ()
+      | Choice2Of2 err ->
+        ctx.runtime.logger.info (
+          eventX "WebSocket disconnected"
+          >> setSingleName "Suave.Websocket.handShake"
+          >> setFieldValue "error" err)
+
+      return! Control.CLOSE ctx
+    | Choice2Of2 response -> return! response
+  }

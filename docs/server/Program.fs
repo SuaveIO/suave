@@ -2,6 +2,7 @@
 
 open Argu
 open Suave
+open Suave.Utils
 open Suave.Http
 open Suave.Filters
 open Suave.Redirection

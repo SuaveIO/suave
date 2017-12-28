@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <AssemblyName>Suave.Testing</AssemblyName>
+    <PackageId>Suave.Testing</PackageId>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Testing.fs" />
+    <Compile Include="AssemblyVersionInfo.fs" Condition="Exists('AssemblyVersionInfo.fs')" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Suave\Suave.netcore.fsproj" PrivateAssets="All" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Expecto" Version="5.0.*" />
+  </ItemGroup>
+</Project>

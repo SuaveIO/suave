@@ -52,3 +52,4 @@ group Docs
   nuget FsLibTool
   nuget Argu
   nuget Stripe.net
+  github haf/YoLo YoLo.fs

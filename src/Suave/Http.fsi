@@ -60,6 +60,10 @@ module Http =
 
     static member tryParse : code:int -> Choice<HttpCode, string>
 
+  type SameSite =
+    | Strict
+    | Lax
+
   /// HTTP cookie
   type HttpCookie =
     { name     : string
@@ -71,7 +75,8 @@ module Http =
       /// This cookie is not forwarded over plaintext transports
       secure   : bool
       /// This cookie is not readable from JavaScript
-      httpOnly : bool }
+      httpOnly : bool
+      sameSite : SameSite option }
 
     static member name_ : Property<HttpCookie, string>
     static member value_ : Property<HttpCookie, string>
@@ -80,6 +85,7 @@ module Http =
     static member domain_ : Property<HttpCookie, string option>
     static member secure_ : Property<HttpCookie, bool>
     static member httpOnly_ : Property<HttpCookie, bool>
+    static member sameSite_ : Property<HttpCookie, SameSite option>
 
   [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
   module HttpCookie =
@@ -88,6 +94,7 @@ module Http =
     val create : name:string -> value:string -> expires:DateTimeOffset option
                -> path:string option -> domain:string option -> secure:bool
                -> httpOnly:bool
+               -> sameSite:SameSite option
                -> HttpCookie
 
     /// Create a new cookie with the given name, value, and defaults:

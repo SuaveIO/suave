@@ -247,9 +247,9 @@ type WebSocketSendAsync =
 type WebSocketReceiveAsync =
         Func<ArraySegment<byte> (* data *),
              CancellationToken (* cancel *),
-             Task<Tuple<int (* messageType *),
-                        bool (* endOfMessage *),
-                        int (* count *)>>>
+             Task<int (* messageType *) *
+                  bool (* endOfMessage *) *
+                  int (* count *)>>
 
 type WebSocketReceiveTuple =
         Tuple<int (* messageType *),
@@ -368,7 +368,7 @@ module OwinApp =
         | Some x -> unbox x
         | None -> null // not a required environment item; will not be present if no user is signed in
       ),
-      (fun v x -> x |> Map.put "principal" (box v))
+      (fun v x -> x |> Map.add "principal" (box v))
 
     let constant x =
       ((fun _ -> x),(fun v x -> x)) <--> untyped
@@ -379,7 +379,7 @@ module OwinApp =
 
     let mapFindLens key : Property<Map<string, _>, _> =
       (fun x -> x |> Map.pick (fun k v -> if k.Equals(key, StringComparison.Ordinal) then Some v else None)),
-      (fun v x -> x |> Map.put key v)
+      (fun v x -> x |> Map.add key v)
 
     let stringlyTyped (toString : 'a -> string) (ofString : string -> 'a) : Iso<'a, string> =
       (fun x -> toString x),
@@ -389,21 +389,21 @@ module OwinApp =
 
     let webSocketSendAsync (webSocket : WebSocket) =
       new WebSocketSendAsync(
-        fun (data: ArraySegment<byte>) (messageType: int) fin ct -> 
+        fun (data: ArraySegment<byte>) (messageType: int) fin ct ->
           let send = webSocket.send (toOpcode (byte messageType)) data fin
           let task = Async.StartAsTask (send, TaskCreationOptions.None, ct)
           task :> Task)
 
     let webSocketReceiveAsync (webSocket : WebSocket) =
       new WebSocketReceiveAsync(
-        fun (data: ArraySegment<byte>) ct -> 
+        fun (data: ArraySegment<byte>) ct ->
           let arr = Array.sub data.Array data.Offset data.Count
           let receive = async {
             let! result = webSocket.read ()
             match result with
             | Choice1Of2 (a,b,c) ->
               Array.ConstrainedCopy(b, 0, data.Array, data.Offset, b.Length)
-              return Tuple<_,_,_>(int (fromOpcode a), true, b.Length)
+              return (int (fromOpcode a), true, b.Length)
             | Choice2Of2 err ->
               return failwith (err.ToString())
             }
@@ -411,7 +411,7 @@ module OwinApp =
 
     let webSocketCloseAsync (webSocket : WebSocket) =
       new WebSocketCloseAsync(
-        fun closeStatus closeDescription ct -> 
+        fun closeStatus closeDescription ct ->
           let close = async {
             let! res = webSocket.send Close (ByteSegment([||])) true
             return ()
@@ -502,7 +502,7 @@ module OwinApp =
         OwinConstants.CommonKeys.remoteIpAddress,   HttpContext.clientIp_ <--> stringlyTyped (sprintf "%O") IPAddress.Parse <--> untyped
         OwinConstants.CommonKeys.remotePort,        HttpContext.clientPort_ <--> stringlyTyped string uint16 <--> untyped
         OwinConstants.CommonKeys.traceOutput,       HttpContext.runtime_ >--> HttpRuntime.logger_ >--> ((fun x -> textWriter x), (fun v x -> x)) <--> untyped
-        
+
         // per-request storage
         "suave.UserData",                           HttpContext.userState_ <--> untyped
 
@@ -588,10 +588,10 @@ module OwinApp =
 
     let requestPath =
       if requestPathBase<>"/" && uri.AbsolutePath.StartsWith requestPathBase then
-        uri.AbsolutePath.Substring(requestPathBase.Length) 
+        uri.AbsolutePath.Substring(requestPathBase.Length)
       else
         uri.AbsolutePath
-    
+
     let owinMap = SirLensALot.owinMap cts.Token requestPathBase requestPath
                                       requestHeadersLens responseHeadersLens
                                       responseStreamLens onSendingHeadersLens
@@ -644,11 +644,11 @@ module OwinApp =
         HttpContext.request_ >--> HttpRequest.headers_,
         HttpContext.response_ >--> HttpResult.headers_
 
-      let handleResponse  (rhs : Dictionary<string, string[]>) = 
+      let handleResponse  (rhs : Dictionary<string, string[]>) =
         let handleKey = function
-          | Headers.Fields.Response.setCookie as key -> 
+          | Headers.Fields.Response.setCookie as key ->
             rhs.[key] |> Seq.map (fun v -> key,v) |> Seq.toList
-          | _ as key -> 
+          | _ as key ->
             [key, String.concat ", " rhs.[key]]
 
         Seq.collect handleKey rhs.Keys |> Seq.toList
@@ -686,7 +686,7 @@ module OwinApp =
       member x.Values =
         let owinValues = Seq.map (fun key -> Lens.get (owinRW.[key]) !state) owinRW.Keys
         let userValues = Seq.map (fun (a:KeyValuePair<_,_>) -> a.Value) (!state).userState
-        let unionValues = List<_>(owinValues) 
+        let unionValues = List<_>(owinValues)
         unionValues.AddRange userValues
         unionValues :> ICollection<_>
 
@@ -727,7 +727,7 @@ module OwinApp =
         |> Seq.map (fun key -> KeyValuePair(key, (x :> IDictionary<_, _>).[key]))
         |> fun seq -> (seq :> IEnumerable).GetEnumerator()
 
-  let runOwin requestPathBase (owin : OwinApp) (cont : WebPart) = 
+  let runOwin requestPathBase (owin : OwinApp) (cont : WebPart) =
     fun (ctx : HttpContext) ->
 
       let verbose message =
@@ -753,9 +753,9 @@ module OwinApp =
         let ctx = { ctx with request = { ctx.request with url = originalUrl }}
 
         if wrapper.HeadersSent then
-          let request = 
+          let request =
             if wrapper.CloseConnection then
-              { ctx.request with headers = [ "connection", "close" ] } 
+              { ctx.request with headers = [ "connection", "close" ] }
             else
               ctx.request
           let response = { ctx.response with content = NullContent; writePreamble = false }

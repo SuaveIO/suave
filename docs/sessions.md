@@ -144,5 +144,3 @@ let app =
 In this example, `View.page` is a function that generates the output, using the user state `Map<string, obj>` to display the messages in a nice way.
 
 We've covered two different ways of managing state.  Session state persists throughout the session, while `userData` has a per-request lifetime.
-
-_(NOTE: Currently, Suave is keeping `userData` across requests if those requests are served from the same TCP connection, which is how Suave implements HTTP keep-alive.  There is an [issue to fix this behavior](https://github.com/SuaveIO/suave/issues/616), but if this is causing unintended issues, adding `>=> Writers.unsetUserData "messages"` at the end of the `path "/"` pipeline will ensure that it is cleared out.)_

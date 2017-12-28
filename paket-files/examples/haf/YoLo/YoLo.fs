@@ -1,5 +1,5 @@
 [<AutoOpen>]
-module YoLo
+module internal Suave.Utils.YoLo
 
 #nowarn "64"
 

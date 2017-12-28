@@ -8,7 +8,6 @@ require 'albacore/tasks/versionizer'
 require 'albacore/tasks/release'
 require 'albacore/task_types/nugets_pack'
 require 'albacore/task_types/asmver'
-require './tools/paket_pack'
 require 'semver'
 
 Albacore::Tasks::Versionizer.new :versioning
@@ -21,20 +20,21 @@ Configuration = ENV['CONFIGURATION'] || 'Release'
 Platform = ENV['MSBUILD_PLATFORM'] || 'Any CPU'
 
 task :paket_files do
-  sh %{ruby -pi.bak -e "gsub(/module internal YoLo/, 'module internal Suave.Utils.YoLo')" paket-files/haf/YoLo/YoLo.fs}
-  sh %{ruby -pi.bak -e "gsub(/module internal YoLo/, 'module internal Suave.Utils.YoLo')" paket-files/examples/haf/YoLo/YoLo.fs}
+  sh %{ruby -pi.bak -e "gsub(/module YoLo/, 'module internal Suave.Utils.YoLo')" paket-files/haf/YoLo/YoLo.fs}
+  sh %{ruby -pi.bak -e "gsub(/module YoLo/, 'module internal Suave.Utils.YoLo')" paket-files/examples/haf/YoLo/YoLo.fs}
+  sh %{ruby -pi.bak -e "gsub(/module YoLo/, 'module internal Suave.Utils.YoLo')" paket-files/docs/haf/YoLo/YoLo.fs}
   sh %{ruby -pi.bak -e "gsub(/namespace Logary.Facade/, 'namespace Suave.Logging')" paket-files/logary/logary/src/Logary.Facade/Facade.fs}
 end
 
 desc "Restore paket.exe"
 task :restore_paket do
-  system 'tools/paket.bootstrapper.exe', clr_command: true unless
-    File.exists? 'tools/paket.exe'
+  system '.paket/paket.bootstrapper.exe', clr_command: true unless
+    File.exists? '.paket/paket.exe'
 end
 
 task :paket_restore do
-  system 'tools/paket.exe', 'restore', clr_command: true
-  system 'tools/paket.exe', %w|restore group Build|, clr_command: true
+  system '.paket/paket.exe', 'restore', clr_command: true
+  system '.paket/paket.exe', %w|restore group Build|, clr_command: true
 end
 
 desc 'Restore all packages'
@@ -103,7 +103,7 @@ namespace :dotnetcli do
   end
 
   task :coreclr_binaries => 'tools/coreclr' do
-    dotnet_version = '1.0.1'
+    dotnet_version = '2.0.3'
     dotnet_installed_version = get_installed_dotnet_version
     # check if required version of .net core sdk is already installed, otherwise download and install it
     if dotnet_installed_version == dotnet_version then
@@ -128,11 +128,12 @@ namespace :dotnetcli do
         unless File.exists? "tools/dotnet-install.sh"
 
       system 'bash',
-        %W|--install-dir "#{coreclr_bin_dir}"
-           --channel "stable"
-           --version "#{dotnet_version}|
+        %W|tools/dotnet-install.sh
+           --install-dir tools/coreclr
+           --channel stable
+           --version #{dotnet_version}|
 
-      ENV['PATH'] = "#{coreclr_bin_dir}/dotnet:#{ENV['PATH']}"
+      ENV['PATH'] = "#{coreclr_bin_dir}:#{ENV['PATH']}"
     else
       system 'powershell',
         %W|Invoke-WebRequest "https://dot.net/v1/dotnet-install.ps1" -OutFile "tools/dotnet-install.ps1"| \
@@ -146,6 +147,9 @@ namespace :dotnetcli do
 
       ENV['PATH'] = "#{coreclr_bin_dir};#{ENV['PATH']}"
     end
+
+    system 'dotnet',
+      %W|--info|
 
   end
 
@@ -165,26 +169,46 @@ namespace :dotnetcli do
 
   desc 'Create Suave nugets packages'
   task :pack  => [:versioning, 'build/pkg-netcore', :coreclr_binaries] do
-    out_dir = File.expand_path "build/pkg-netcore" 
-    [ "src/Suave/Suave.netcore.fsproj", "src/Experimental/Suave.Experimental.netcore.fsproj", "src/Suave.DotLiquid/Suave.DotLiquid.netcore.fsproj" ].each do |item|
+    out_dir = File.expand_path "build/pkg-netcore"
+    [ "src/Suave/Suave.netcore.fsproj", "src/Suave.Testing/Suave.Testing.netcore.fsproj", "src/Experimental/Suave.Experimental.netcore.fsproj", "src/Suave.DotLiquid/Suave.DotLiquid.netcore.fsproj", "src/Suave.LibUv/Suave.LibUv.netcore.fsproj" ].each do |item|
         system dotnet_exe_path, %W|pack #{item} --configuration #{Configuration} --output "#{out_dir}" --no-build -v n /p:Version=#{ENV['NUGET_VERSION']}|
     end
   end
 
   task :do_netcorepackage => [ :restore, :build, :pack ]
 
+  def merge_nugets(dotnet_exe_path, item, version, framework)
+    sourcenupkg = "../build/pkg/#{item}.#{version}.nupkg"
+    netcorenupkg = "../build/pkg-netcore/#{item}.#{version}.nupkg"
+    system dotnet_exe_path, %W|mergenupkg --source "#{sourcenupkg}" --other "#{netcorenupkg}" --framework #{framework}|
+  end
+
   desc 'Merge standard and dotnetcli nupkgs; note the need to run :nugets before'
-  task :merge => :coreclr_binaries do
+  task :merge => :coreclr_binaries do    
     system dotnet_exe_path, %W|restore tools/tools.proj -v n|
+    version = SemVer.find.format("%M.%m.%p%s")
+
     Dir.chdir "tools" do
-      [ "Suave", "Suave.Experimental", "Suave.DotLiquid" ].each do |item|
-          version = SemVer.find.format("%M.%m.%p%s")
-          sourcenupkg = "../build/pkg/#{item}.#{version}.nupkg"
-          netcorenupkg = "../build/pkg-netcore/#{item}.#{version}.nupkg"
-          system dotnet_exe_path, %W|mergenupkg --source "#{sourcenupkg}" --other "#{netcorenupkg}" --framework netstandard1.6|
+      [ "Suave", "Suave.Testing", "Suave.Experimental", "Suave.DotLiquid", "Suave.LibUv" ].each do |item|
+          merge_nugets(dotnet_exe_path, item, version, "netstandard2.0")
       end
     end
   end
+
+  task :stress_quick do
+    system dotnet_exe_path, %W|run --project examples/Pong/Pong.netcore.fsproj|
+  end
+
+  desc 'run a stress test'
+  task :stress => [:build_lib, :stress_quick]
+
+  task :unit_quick do
+    system dotnet_exe_path, %W|run --project src/Suave.Tests/Suave.Tests.netcore.fsproj -- --sequenced|
+  end
+
+  desc 'run unit tests on .NET Core 2.0'
+  task :unit => [:build_lib, :unit_quick]
+
 end
 
 namespace :tests do
@@ -208,52 +232,34 @@ task :tests => [:'tests:stress', :'tests:unit']
 
 directory 'build/pkg'
 
-task :create_nuget_quick => [:versioning, 'build/pkg'] do
-  projects = FileList['src/**/*.fsproj'].exclude(/.netcore.fsproj/).exclude(/Tests/)
-  knowns = Set.new(projects.map { |f| Albacore::Project.new f }.map { |p| p.id })
-  authors = "Ademar Gonzalez, Henrik Feldt"
-  projects.each do |f|
-    p = Albacore::Project.new f
-    n = create_nuspec p, knowns
-    d = get_dependencies n
-    m = %{type file
-id #{p.id}
-version #{ENV['NUGET_VERSION']}
-title #{p.id}
-authors #{authors}
-owners #{authors}
-description #{suave_description}
-language en-GB
-copyright #{authors}
-licenseUrl https://github.com/SuaveIO/Suave/blob/master/COPYING
-projectUrl http://suave.io
-iconUrl https://raw.githubusercontent.com/SuaveIO/resources/master/images/head_trans.png
-files
-  #{p.proj_path_base}/bin/#{Configuration}/#{p.id}.* ==\> lib/net40
-releaseNotes
-  #{n.metadata.release_notes.each_line.reject{|x| x.strip == ""}.join}
-dependencies
-  #{d}
-}
-    begin
-      File.open("paket.template", "w") do |template|
-        template.write m
-      end
-      system "tools/paket.exe", %w|pack output build/pkg|, clr_command: true
-    ensure
-      File.delete "paket.template"
+task :nugets_quick => [:versioning, 'build/pkg'] do
+  FileList['src/**/*.fsproj'].exclude(/.netcore.fsproj/).exclude(/Tests/).each do |proj|
+    taskName = "nugets_quick:" + proj
+    nugets_pack taskName do |x|
+      x.configuration = Configuration
+      x.exe = '.paket/paket.exe'
+      x.files = FileList[proj]
+      x.output = 'build/pkg'
+      x.authors = "Ademar Gonzalez, Henrik Feldt"
+      x.version = ENV['NUGET_VERSION']
+      x.description = suave_description
+      x.language = 'en-GB'
+      x.license_url = 'https://github.com/SuaveIO/Suave/blob/master/COPYING'
+      x.project_url = 'https://suave.io'
+      x.icon_url = 'https://raw.githubusercontent.com/SuaveIO/resources/master/images/head_trans.png'
     end
+    Rake::Task[taskName].invoke
   end
 end
 
 desc 'create suave nuget'
-task :nugets => ['build/pkg', :versioning, :compile, :create_nuget_quick]
+task :nugets => ['build/pkg', :versioning, :compile, :nugets_quick]
 
 desc 'create suave nuget with .NET Core'
 task :nugets_with_netcore => [:nugets, 'dotnetcli:do_netcorepackage', 'dotnetcli:merge']
 
-desc 'compile, gen versions, test and create nuget'
-task :appveyor => [:compile, :'tests:unit', :nugets_with_netcore]
+desc 'compile, gen versions, test and generate nuget'
+task :ci => [:compile, :'tests:unit', :'dotnetcli:unit', :nugets_with_netcore]
 
 desc 'compile, gen versions, test'
 task :default => [:compile, :'tests:unit', :'docs:build']
@@ -311,5 +317,5 @@ task :docs => :'docs:build'
 Albacore::Tasks::Release.new :release,
                              pkg_dir: 'build/pkg',
                              depend_on: [:compile, :nugets_with_netcore, :'docs:deploy'],
-                             nuget_exe: 'packages/build/NuGet.CommandLine/tools/NuGet.exe',
+                             nuget_exe: '.paket/paket.exe',
                              api_key: ENV['NUGET_KEY']

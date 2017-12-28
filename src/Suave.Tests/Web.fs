@@ -3,8 +3,17 @@
 open Expecto
 
 open Suave
+open Suave.Operators
 open Suave.ParsingAndControl
 open Suave.Logging
+open Suave.Testing
+open Suave.Sockets.Control
+open Suave.Sockets.AsyncSocket
+open System
+open System.Net
+open System.Net.Http
+open System.Threading
+open Suave.Http
 
 let private (=>) a b = a, b
 
@@ -36,7 +45,71 @@ let parsing_tests (_: SuaveConfig) =
     ]
 
 [<Tests>]
-let keepAliveTests =
+let transferEncodingChunkedTests (cfg : SuaveConfig) =
+  let writeChunks conn = socket {
+    let! (_, conn) = HttpOutput.writeChunk "h"B conn
+    let! (_, conn) = HttpOutput.writeChunk "e"B conn
+    let! (_, conn) = HttpOutput.writeChunk "l"B conn
+    let! (_, conn) = HttpOutput.writeChunk "l"B conn
+    let! (_, conn) = HttpOutput.writeChunk "o"B conn
+    let! (_, conn) = HttpOutput.writeChunk " "B conn
+    let! (_, conn) = HttpOutput.writeChunk "w"B conn
+    let! (_, conn) = HttpOutput.writeChunk "o"B conn
+    let! (_, conn) = HttpOutput.writeChunk "r"B conn
+    let! (_, conn) = HttpOutput.writeChunk "l"B conn
+    let! (_, conn) = HttpOutput.writeChunk "d"B conn
+    return! HttpOutput.writeChunk [||] conn
+  }
+
+  let webPart =
+    Filters.path "/" >=> TransferEncoding.chunked writeChunks
+
+  testList "when using chunked transfer encoding" [
+    testCase "should encode data as chunked" <| fun _ ->
+      let ctx = runWith cfg webPart
+      let res = req HttpMethod.GET "/" None ctx
+      Expect.equal res "hello world" "should return hello world"
+  ]
+
+[<Tests>]
+let keepAliveTests (cfg : SuaveConfig) =
+  let runWithConfig = runWith cfg
+
+  let setUserState (state : string) : WebPart =
+    context (fun ctx ->
+      Writers.setUserData "state" state)
+
+  let getUserState =
+    context (fun ctx -> 
+      match Map.tryFind "state" ctx.userState with
+      | Some value -> Successful.OK (value.ToString ())
+      | None -> Successful.OK "unexist")
+
+  let webPart =
+    choose [
+      Filters.path "/set" >=> setUserState "exist" >=> getUserState
+      Filters.path "/get" >=> getUserState
+      ]
+
+  let keepAliveUserDataLifetimeTest =
+    testCase "userData Persists per Connection Instead of per Request" <| fun _ ->
+      let ctx = runWithConfig webPart
+
+      let reqResp client ctx path =
+        let defaultTimeout = TimeSpan.FromSeconds 10.
+        use request = createRequest HttpMethod.GET path "" None (endpointUri ctx.suaveConfig)
+        request.Headers.ConnectionClose <- Nullable(false)
+        use result = request |> send client defaultTimeout ctx
+        contentString result
+
+      withContext (fun ctx ->
+        use handler = createHandler DecompressionMethods.None None
+        use client = createClient handler
+        let res = reqResp client ctx "set"
+        Expect.equal res "exist" "should return exist"
+        let res = reqResp client ctx "get"
+        Expect.equal res "unexist" "should return unexist") ctx
+
   let genKeepAliveTest httpVersion connectionHeader shouldAddKeepAlive =
     let connectionHeaderDesc, reqHeaders =
       match connectionHeader with
@@ -52,6 +125,7 @@ let keepAliveTests =
       let actual = HttpOutput.addKeepAliveHeader reqContext
       Expect.equal actual.response.headers expected.response.headers message
 
+
   testList "when processing keep-alive directives" [
     genKeepAliveTest "HTTP/1.0" None false
     genKeepAliveTest "HTTP/1.0" (Some "close") false
@@ -59,4 +133,5 @@ let keepAliveTests =
     genKeepAliveTest "HTTP/1.1" None false
     genKeepAliveTest "HTTP/1.1" (Some "close") false
     genKeepAliveTest "HTTP/1.1" (Some "Keep-Alive") false
+    keepAliveUserDataLifetimeTest
   ]

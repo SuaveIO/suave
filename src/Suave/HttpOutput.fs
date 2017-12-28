@@ -20,6 +20,21 @@ module HttpOutput =
       { context with response = { context.response with headers = ("Connection","Keep-Alive") :: context.response.headers } }
     | _ -> context
 
+  let inline writeContentLengthHeader (content : byte[]) (context : HttpContext) = withConnection {
+    match context.request.``method``, context.response.status.code with
+    | (_, 100)
+    | (_, 101)
+    | (_, 204)
+    | (HttpMethod.CONNECT, 201)
+    | (HttpMethod.CONNECT, 202)
+    | (HttpMethod.CONNECT, 203)
+    | (HttpMethod.CONNECT, 205)
+    | (HttpMethod.CONNECT, 206) ->
+      do! asyncWriteLn ""
+    | _ ->
+      do! asyncWriteLn (String.Concat [| "Content-Length: "; content.Length.ToString(); Bytes.eol |])
+    }
+
   let inline writeHeaders exclusions (headers : (string*string) seq) = withConnection {
     for x,y in headers do
       if not (List.exists (fun y -> x.ToLower().Equals(y)) exclusions) then
@@ -46,7 +61,8 @@ module HttpOutput =
       | Some n ->
         let! (_, connection) = asyncWriteLn (String.Concat [| "Content-Encoding: "; n.ToString() |]) connection
         // http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.13
-        let! (_, connection) = asyncWriteLn (String.Concat [| "Content-Length: "; content.Length.ToString(); Bytes.eol |]) connection
+        // https://tools.ietf.org/html/rfc7230#section-3.3.2
+        let! (_, connection) = writeContentLengthHeader content context connection
         if context.request.``method`` <> HttpMethod.HEAD && content.Length > 0 then
           let! (_,connection) = asyncWriteBufferedBytes content connection
           let! connection = flush connection
@@ -56,7 +72,8 @@ module HttpOutput =
           return connection
       | None ->
         // http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.13
-        let! (_, connection) = asyncWriteLn (String.Concat [| "Content-Length: "; content.Length.ToString(); Bytes.eol |]) connection
+        // https://tools.ietf.org/html/rfc7230#section-3.3.2
+        let! (_, connection) = writeContentLengthHeader content context connection
         if context.request.``method`` <> HttpMethod.HEAD && content.Length > 0 then
           let! (_,connection) = asyncWriteBufferedBytes content connection
           let! connection = flush connection
@@ -70,13 +87,25 @@ module HttpOutput =
       }
     | NullContent -> socket {
         if writePreamble then
-          let! (_, connection) = asyncWriteLn (String.Concat [| "Content-Length: 0"; Bytes.eol |]) context.connection
+          let! (_, connection) = writeContentLengthHeader [||] context context.connection
           let! connection = flush connection
           return connection
         else
           let! connection = flush context.connection
           return connection
            }
+
+  let flushChunk conn = socket {
+    let! conn = flush conn
+    return (), conn
+  }
+
+  let inline writeChunk (chunk : byte []) = withConnection {
+    let chunkLength = chunk.Length.ToString("X")
+    do! asyncWriteLn chunkLength
+    do! asyncWriteLn (System.Text.Encoding.UTF8.GetString(chunk))
+    do! flushChunk
+  }
 
   let inline executeTask ctx r errorHandler = async {
     try

@@ -33,6 +33,7 @@ type FormProp<'a> =
   | TextProp of Property<'a, string>
   | PasswordProp of Property<'a, Password>
   | DecimalProp of Property<'a, decimal>
+  | DateTimeProp of Property<'a, DateTime>
 
 type Form<'a> = Form of FormProp<'a> list * ServerSideValidation<'a> list
 
@@ -55,6 +56,13 @@ let (|Optional|_|) (typ : Type) =
   else None
   #endif
 
+let private parseDateTime (s:string) =
+  let b,v = DateTime.TryParse s
+  if b then
+    Choice1Of2 v
+  else
+    Choice2Of2 "Invalid date representation"
+
 let private parse = function
 | Optional(t), "" -> Choice1Of2 None |> Choice.map box
 | Optional(genT), value ->
@@ -63,12 +71,14 @@ let private parse = function
   | t, value when t = typeof<Password> -> Password value |> Choice1Of2 |> Choice.map (Some >> box)
   | t, value when t = typeof<Decimal> -> Parse.decimal value |> Choice.map (Some >> box)
   | t, value when t = typeof<MailAddress> -> MailAddress.Create value |> Choice.map (Some >> box)
+  | t, value when t = typeof<DateTime> -> parseDateTime value |> Choice.map (Some >> box)
   | t, _ -> failwithf "not supported type: %s" t.FullName
 
 | t, value when t = typeof<String> -> Choice1Of2 value |> Choice.map box
 | t, value when t = typeof<Password> -> Password value |> Choice1Of2 |> Choice.map box
 | t, value when t = typeof<Decimal> -> Parse.decimal value |> Choice.map box
 | t, value when t = typeof<MailAddress> -> MailAddress.Create value |> Choice.map box
+| t, value when t = typeof<DateTime> -> parseDateTime value |> Choice.map box
 | t, _ -> failwithf "not supported type: %s" t.FullName
 
 let private validateSingle ((quotF, ((test, msg, _) : Validation<'b>)), value : 'a) =
@@ -97,11 +107,13 @@ let private getQuotName = function
   | TextProp (q, _) -> getName q
   | PasswordProp (q, _) -> getName q
   | DecimalProp (q, _) -> getName q
+  | DateTimeProp (q, _) -> getName q
 
 let private validate' = function
   | TextProp p, v -> validate (p, v)
   | PasswordProp p, v -> validate (p, v)
   | DecimalProp p, v -> validate (p, v)
+  | DateTimeProp p, v -> validate (p, v)
 
 let bindForm<'a> (form : Form<'a>) (req : HttpRequest) =
   let bindForm key = Model.Binding.form key Choice1Of2
@@ -192,6 +204,7 @@ let private inputType = function
   | t when t = typeof<Password> -> "password"
   | t when t = typeof<MailAddress> -> "email"
   | t when t = typeof<Decimal> -> "number"
+  | t when t = typeof<DateTime> -> "datetime-local"
   | t -> failwithf "not supported type: %s" t.FullName
 
 let inline private thrd (_,_,x) = x
@@ -200,6 +213,7 @@ let private getHtmlAttrs = function
   | TextProp (_,xs) -> xs |> List.map thrd
   | PasswordProp (_, xs) -> xs |> List.map thrd
   | DecimalProp (_,xs) -> xs |> List.map thrd
+  | DateTimeProp (_,xs) -> xs |> List.map thrd
 
 let private getHtmlProps (Form (props,_)) (quotF : 'a -> Expr<'b>) : (string * string) list =
   props
@@ -226,6 +240,7 @@ let private format : (obj -> string) = function
   | :? string as s -> s
   | :? int as i -> string i
   | :? decimal as d -> formatDec d
+  | :? DateTime as d -> d.ToString("yyyy-MM-dd H:mm:ss")
   | t -> failwithf "unsupported type: %s" (t.GetType().FullName)
 
 let selectInput<'a, 'b when 'b : equality>

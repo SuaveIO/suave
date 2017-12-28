@@ -1,15 +1,20 @@
-﻿<Project Sdk="FSharp.NET.Sdk;Microsoft.NET.Sdk">
-
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>netstandard1.6</TargetFramework>
+    <TargetFramework>netstandard2.0</TargetFramework>
     <AssemblyName>Suave</AssemblyName>
     <PackageId>Suave</PackageId>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <DefineConstants>$(DefineConstants);DNXCORE50;NETSTANDARD1_5</DefineConstants>
   </PropertyGroup>
-
   <ItemGroup>
-    <Compile Include="../../paket-files/haf/YoLo/YoLo.fs" />
+    <Compile Include="..\..\paket-files\haf\YoLo\YoLo.fs">
+      <Paket>True</Paket>
+      <Link>Utils/YoLo.fs</Link>
+    </Compile>
+    <Compile Include="..\..\paket-files\logary\logary\src\Logary.Facade\Facade.fs">
+      <Paket>True</Paket>
+      <Link>Utils/Facade.fs</Link>
+    </Compile>
     <Compile Include="Utils/Aether.fs" />
     <Compile Include="Utils/AsyncExtensions.fs" />
     <Compile Include="Utils/AsyncResultCell.fs" />
@@ -26,7 +31,6 @@
     <Compile Include="Utils/Property.fs" />
     <Compile Include="Utils/Parse.fs" />
     <Compile Include="Utils/CultureInfoCache.fs" />
-    <Compile Include="../../paket-files/logary/logary/src/Logary.Facade/Facade.fs" />
     <Compile Include="Utils/TraceHeader.fs" />
     <Compile Include="Globals.fs" />
     <Compile Include="CookieSerialiser.fs" />
@@ -68,11 +72,9 @@
     <Compile Include="WebSocket.fs" />
     <Compile Include="Owin.fs" />
     <Compile Include="Json.fs" />
+    <Compile Include="AssemblyVersionInfo.fs" Condition="Exists('AssemblyVersionInfo.fs')" />
   </ItemGroup>
-
   <ItemGroup>
-    <PackageReference Include="FSharp.NET.Sdk" Version="1.0.*" PrivateAssets="All" />
-    <PackageReference Include="FSharp.Core" Version="4.1.*" />
     <PackageReference Include="System.Data.Common" Version="4.1.0" />
     <PackageReference Include="System.Diagnostics.Process" Version="4.1.0" />
     <PackageReference Include="System.Security.Cryptography.Primitives" Version="4.3.0" />
@@ -81,5 +83,4 @@
     <PackageReference Include="System.Security.Claims" Version="4.0.1" />
     <PackageReference Include="System.Runtime.Serialization.Json" Version="4.0.2" />
   </ItemGroup>
-
 </Project>

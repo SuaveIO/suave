@@ -1,7 +1,7 @@
 GEM
   remote: https://rubygems.org/
   specs:
-    albacore (2.7.0)
+    albacore (3.0.0.pre.alpha.5)
       map (~> 6.5)
       nokogiri (~> 1.5)
       rake (~> 10)
@@ -20,7 +20,7 @@ PLATFORMS
   x86-mingw32
 
 DEPENDENCIES
-  albacore (~> 2.3)
+  albacore (~> 3.0.0.pre.alpha.5)
 
 BUNDLED WITH
    1.15.0

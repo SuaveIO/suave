@@ -15,47 +15,49 @@
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
+    <DebugType>portable</DebugType>
     <Optimize>false</Optimize>
     <Tailcalls>false</Tailcalls>
     <OutputPath>bin\Debug\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <WarningLevel>3</WarningLevel>
-    <DocumentationFile>bin\Debug\Experimental.xml</DocumentationFile>
+    <DocumentationFile>bin\Debug\Suave.Experimental.xml</DocumentationFile>
     <PlatformTarget>AnyCPU</PlatformTarget>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <DebugType>pdbonly</DebugType>
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>portable</DebugType>
     <Optimize>true</Optimize>
     <Tailcalls>true</Tailcalls>
     <OutputPath>bin\Release\</OutputPath>
     <DefineConstants>TRACE</DefineConstants>
     <WarningLevel>3</WarningLevel>
-    <DocumentationFile>bin\Release\Experimental.xml</DocumentationFile>
+    <DocumentationFile>bin\Release\Suave.Experimental.xml</DocumentationFile>
     <PlatformTarget>AnyCPU</PlatformTarget>
-    <DebugSymbols>true</DebugSymbols>
   </PropertyGroup>
   <PropertyGroup>
     <MinimumVisualStudioVersion Condition="'$(MinimumVisualStudioVersion)' == ''">11</MinimumVisualStudioVersion>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|x86' ">
     <DebugSymbols>true</DebugSymbols>
+    <DebugType>portable</DebugType>
     <Optimize>false</Optimize>
     <Tailcalls>false</Tailcalls>
     <OutputPath>bin\Debug\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <WarningLevel>3</WarningLevel>
-    <DocumentationFile>bin\Debug\Experimental.xml</DocumentationFile>
+    <DocumentationFile>bin\Debug\Suave.Experimental.xml</DocumentationFile>
     <PlatformTarget>x86</PlatformTarget>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|x86' ">
-    <DebugType>pdbonly</DebugType>
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>portable</DebugType>
     <Optimize>true</Optimize>
     <Tailcalls>true</Tailcalls>
     <OutputPath>bin\Release\</OutputPath>
     <DefineConstants>TRACE</DefineConstants>
     <WarningLevel>3</WarningLevel>
-    <DocumentationFile>bin\Release\Experimental.xml</DocumentationFile>
-    <DebugSymbols>true</DebugSymbols>
+    <DocumentationFile>bin\Release\Suave.Experimental.xml</DocumentationFile>
     <PlatformTarget>x86</PlatformTarget>
   </PropertyGroup>
   <Choose>
@@ -73,6 +75,7 @@
   <Import Project="$(FSharpTargetsPath)" Condition="Exists('$(FSharpTargetsPath)')" />
   <ItemGroup>
     <Compile Include="AssemblyVersionInfo.fs" Condition="Exists('AssemblyVersionInfo.fs')" />
+    <Compile Include="ViewEngine.fs" />
     <Compile Include="Html.fs" />
     <Compile Include="Xml.fs" />
     <Compile Include="Template.fs" />
@@ -92,7 +95,6 @@
       <Project>{3DC9193E-BD0C-4486-9C58-56B630C36623}</Project>
     </ProjectReference>
   </ItemGroup>
-  <Import Project="..\..\tools\paket.targets" />
   <Choose>
     <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.6'">
       <ItemGroup>

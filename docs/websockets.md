@@ -53,9 +53,34 @@ Then, use the `handShake` function to fit it in your web server:
 {% highlight fsharp %}
 let app : WebPart =
     choose [
-      path "/websocket" >=> handShake ws
-      GET >=> choose [ path "/" >=> file "index.html"; browseHome ]
-      NOT_FOUND "Found no handlers." ]
+        path "/websocket" >=> handShake ws
+        GET >=> choose [ path "/" >=> file "index.html"; browseHome ]
+        NOT_FOUND "Found no handlers." ]
+{% endhighlight %}
+
+Also, `handShakeWithSubprotocol` can be used to support WebSocket subprotocol
+
+To support a specific subprotocol, use builtin function chooseSubprotocol or write your own choose function
+
+{% highlight fsharp %}
+open Suave.Sockets
+open Suave.Sockets.Control
+open Suave.WebSocket
+
+let ws (webSocket : WebSocket) (context: HttpContext) =
+    // here, webSocket.subprotocol should be Some "test"
+    socket {
+      ...
+    }
+
+let customize (subprotocol : string) (requestSubprotocols : string []) (ctx : HttpContext) = async {
+    let subprotocol = .... // subprotocol choose logic
+    return Some subprotocol
+}
+
+let app : WebPart =
+    choose [
+        path "/websocket" >=> handShakeWithSubprotocol (chooseSubprotocol "test") ws ]
 {% endhighlight %}
 
 The complete example can be found [here](https://github.com/SuaveIO/suave/tree/master/examples/WebSocket).

@@ -34,7 +34,10 @@
     <DocumentationFile>bin\Release\Suave.xml</DocumentationFile>
     <DefineConstants>
     </DefineConstants>
+<<<<<<< HEAD
+=======
     <DebugType>portable</DebugType>
+>>>>>>> master
   </PropertyGroup>
   <PropertyGroup>
     <MinimumVisualStudioVersion Condition="'$(MinimumVisualStudioVersion)' == ''">11</MinimumVisualStudioVersion>
@@ -62,7 +65,10 @@
     <DocumentationFile>bin\Release\Suave.XML</DocumentationFile>
     <DefineConstants>
     </DefineConstants>
+<<<<<<< HEAD
+=======
     <DebugType>portable</DebugType>
+>>>>>>> master
     <PlatformTarget>x86</PlatformTarget>
   </PropertyGroup>
   <Choose>

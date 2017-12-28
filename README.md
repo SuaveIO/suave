@@ -43,7 +43,7 @@ Now that you've discovered how to do "Hello World!", go read the
 # Suave.Testing
 
 We have a NuGet ready for your testing needs; Suave is an excellent server for
-running in-process integation tests, as it's very fast to spawn. On an ordinary
+running in-process integration tests, as it's very fast to spawn. On an ordinary
 laptop, running hundreds of randomised tests and micro-benchmarks as well as all
 Suave unit tests, take about 5 seconds on mono.
 
@@ -93,7 +93,7 @@ bundle
 bundle exec rake
 ```
 
-After you managed to build with the rake script, you can also use `./build.sh` on any OS or `build.cmd` on Windows which only compile solution and run tests.
+After you managed to build with the rake script, you can also use `./build.sh` on any OS or `build.cmd` on Windows which only compile solution and run tests. **You need msbuild on PATH**: use the VS Developer Console to build.
 
 ## Libuv installation
 
