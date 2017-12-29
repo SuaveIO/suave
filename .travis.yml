@@ -7,8 +7,8 @@ sudo: required
 dotnet: 2.0.3
 
 mono:
- - 4.8.0
- - 5.2.0
+ - 5.4.0
+ - 5.4.1
  - latest # => "stable release"
  - weekly # => "latest commits"
 
