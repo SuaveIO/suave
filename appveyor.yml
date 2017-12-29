@@ -1,16 +1,18 @@
+os: Visual Studio 2017
+init:
+- git config --global core.autocrlf input
 version: 2.0.{build}
 
 environment:
   matrix:
    - arch: "x86"
      MSBUILD_PLATFORM: x86
+     PATH: '%USERPROFILE%\.nuget\packages\libuv\1.10.0\runtimes\win-x86\native;%PATH%'
    - arch: "x64"
      MSBUILD_PLATFORM: "Any CPU"
+     PATH: '%USERPROFILE%\.nuget\packages\libuv\1.10.0\runtimes\win-x64\native;%PATH%'
 
 install:
- - ps: Start-FileDownload 'https://github.com/libuv/libuv/archive/v1.9.1.zip'
- - cmd: 7z x v1.9.1.zip & cd libuv-1.9.1 & vcbuild.bat %arch% shared debug
- - cmd: mkdir src\Suave.Tests\bin\Release\ & cp libuv-1.9.1\Debug\libuv.dll src\Suave.Tests\bin\Release\libuv.dll
  - set PATH=C:\Ruby22\bin;%PATH% # use Ruby 2.2.6
  - cmd: ruby --version
  
@@ -27,5 +29,3 @@ test:  off
 
 nuget:
   project_feed: true
-
-
