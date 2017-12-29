@@ -23,16 +23,10 @@ module Headers =
   
   /// Parse a culture info as given in the 'Accept-Language' Header field.
   let parseCultureInfo =
-
-  #if NETSTANDARD2_0
-    let cultureNames =
-      new System.Collections.Generic.HashSet<string>(Utils.CultureInfoCache.allCulturesList, System.StringComparer.OrdinalIgnoreCase)
-  #else
     let cultureNames =
       new System.Collections.Generic.HashSet<string>(
         System.Globalization.CultureInfo.GetCultures(System.Globalization.CultureTypes.AllCultures)
         |> Seq.map (fun c -> c.Name), System.StringComparer.OrdinalIgnoreCase)
-  #endif
 
     let isValidCulture s =
       System.String.IsNullOrWhiteSpace s |> not &&

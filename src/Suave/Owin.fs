@@ -274,7 +274,6 @@ module OwinApp =
   open System.Text
   open System.Globalization
 
-  #if !NETSTANDARD2_0
   open System.Diagnostics
 
   /// http://www.tugberkugurlu.com/archive/logging-in-the-owin-world-with-microsoft-owin--introduction
@@ -297,7 +296,6 @@ module OwinApp =
           true
       )
     new Func<_, _>(createLogger)
-  #endif
 
   let textWriter (suaveLogger : Logger) : IO.TextWriter =
     { new IO.TextWriter(CultureInfo.InvariantCulture) with
@@ -506,11 +504,9 @@ module OwinApp =
         // per-request storage
         "suave.UserData",                           HttpContext.userState_ <--> untyped
 
-        #if !NETSTANDARD2_0
         // MSFT non standard
         // readable
         OwinConstants.MSFT.traceFactoryDelegate,    HttpContext.runtime_ >--> HttpRuntime.logger_ >--> ((fun x -> traceFactory x), (fun v x -> x)) <--> untyped
-        #endif
       ]
 
   type HeadersDictionary = Dictionary<string, string[]>

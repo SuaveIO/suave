@@ -3,7 +3,6 @@ namespace Suave
 open Suave.Sockets
 open Suave.Sockets.Control
 open Suave.Utils.AsyncExtensions
-open System.Security.Authentication
 open System.Security.Cryptography.X509Certificates
 open System.Net.Security
 
@@ -34,11 +33,7 @@ type DefaultTlsProvider() =
   interface TlsProvider with
     member this.wrap(connection : Connection, cert : obj) = socket {
       let sslStream = new SslStream(new TransportStream(connection.transport))
-      #if NETSTANDARD2_0
-      do! SocketOp.ofTask <| sslStream.AuthenticateAsServerAsync (cert :?> X509Certificate)
-      #else
       sslStream.AuthenticateAsServer (cert :?> X509Certificate)
-      #endif
       let tlsTransport = new DefaultTlsTransport(connection, sslStream)
       return { connection with transport = tlsTransport }
     }
