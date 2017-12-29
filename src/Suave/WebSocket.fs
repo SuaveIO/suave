@@ -18,7 +18,7 @@ module WebSocket =
   let magicGUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
   let internal sha1 (x : string) =
-#if NETSTANDARD1_5
+#if NETSTANDARD2_0
     let crpto = SHA1.Create()
 #else
     let crpto = new SHA1Managed()

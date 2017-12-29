@@ -1,4 +1,4 @@
-﻿namespace Suave
+namespace Suave
 
 /// Inspired by https://github.com/NancyFx/Nancy/blob/45860c82e4df8e2d380997ddf1d19d61400fb145/src/Nancy/RequestHeaders.cs
 module Headers =
@@ -23,16 +23,10 @@ module Headers =
   
   /// Parse a culture info as given in the 'Accept-Language' Header field.
   let parseCultureInfo =
-
-  #if NETSTANDARD1_5
-    let cultureNames =
-      new System.Collections.Generic.HashSet<string>(Utils.CultureInfoCache.allCulturesList, System.StringComparer.OrdinalIgnoreCase)
-  #else
     let cultureNames =
       new System.Collections.Generic.HashSet<string>(
         System.Globalization.CultureInfo.GetCultures(System.Globalization.CultureTypes.AllCultures)
         |> Seq.map (fun c -> c.Name), System.StringComparer.OrdinalIgnoreCase)
-  #endif
 
     let isValidCulture s =
       System.String.IsNullOrWhiteSpace s |> not &&

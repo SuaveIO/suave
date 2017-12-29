@@ -644,11 +644,7 @@ module Http =
         compressionFolder = "."
         logger            = Targets.create Debug [| "Suave" |]
         matchedBinding    = HttpBinding.defaults
-        #if NETSTANDARD1_5
-        cookieSerialiser  = new JsonFormatterSerialiser()
-        #else
         cookieSerialiser  = new BinaryFormatterSerialiser()
-        #endif
         tlsProvider       = null
         hideHeader        = false
         maxContentLength  = 1024 }

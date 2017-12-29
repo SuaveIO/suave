@@ -140,6 +140,9 @@ let runServer maxConcurrentOps bufferSize autoGrow (binding: SocketBinding) star
               (acceptingConnections: AsyncResultCell<StartedData>) serveClient = async {
   try
     use listenSocket = new Socket(binding.endpoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp)
+    #if NETSTANDARD2_0
+    listenSocket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, 1)
+    #endif
     listenSocket.NoDelay <- true
 
     let transportPool, bufferManager =

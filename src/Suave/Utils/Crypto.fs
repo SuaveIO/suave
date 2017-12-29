@@ -1,4 +1,4 @@
-﻿/// Small crypto module that can do HMACs and generate random strings to use
+/// Small crypto module that can do HMACs and generate random strings to use
 /// as keys, as well as create a 'cryptobox'; i.e. a AES256+HMACSHA256 box with
 /// compressed plaintext contents so that they can be easily stored in cookies.
 module Suave.Utils.Crypto
@@ -19,7 +19,7 @@ let HMACLength = 32us // = 256 / 8
 
 /// Calculate the HMAC of the passed data given a private key
 let hmacAtOffset (key : byte []) offset count (data : byte[]) =
-#if NETSTANDARD1_5
+#if NETSTANDARD2_0
   use hmac = new HMACSHA256()
 #else
   use hmac = HMAC.Create(HMACAlgorithm)
@@ -84,7 +84,7 @@ type SecretboxDecryptionError =
   | AlteredOrCorruptMessage of string
 
 let private secretboxInit key iv =
-#if NETSTANDARD1_5
+#if NETSTANDARD2_0
   let aes = Aes.Create()
 #else
   let aes = new AesManaged()

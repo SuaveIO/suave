@@ -39,22 +39,13 @@ type Form<'a> = Form of FormProp<'a> list * ServerSideValidation<'a> list
 
 let formatDec (d : Decimal) = d.ToString(Globalization.CultureInfo.InvariantCulture)
 
-#if NETSTANDARD1_5
 open System.Reflection
-#endif
 
 let (|Optional|_|) (typ : Type) =
-  #if NETSTANDARD1_5
-  if typ.GetTypeInfo().IsGenericType
-     && typ.GetGenericTypeDefinition() = typedefof<option<_>> then
-    Some(typ.GetGenericArguments().[0])
-  else None
-  #else
   if typ.IsGenericType
      && typ.GetGenericTypeDefinition() = typedefof<option<_>> then
     Some(typ.GetGenericArguments().[0])
   else None
-  #endif
 
 let private parseDateTime (s:string) =
   let b,v = DateTime.TryParse s

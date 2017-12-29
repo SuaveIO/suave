@@ -138,16 +138,8 @@ let rec parser (reader : XmlReader) (Xml(l) as k) =
 let processTemplate (data : Map<string,Binder>) ({ request = httpRequest; runtime = runtime } as ctx : HttpContext) =
   try
     let file = Files.resolvePath runtime.homeDirectory httpRequest.url.AbsolutePath
-    #if NETSTANDARD1_5
-    let settings = new XmlReaderSettings()
-    settings.DtdProcessing <- DtdProcessing.Prohibit
-    settings.IgnoreWhitespace <- true
-    settings.IgnoreWhitespace <- false
-    let xmlReader = XmlReader.Create(file, settings)
-    #else
     let xmlReader = new XmlTextReader(file)
     xmlReader.Namespaces <- false
-    #endif
 
     let transform = parser xmlReader (Xml [])
 

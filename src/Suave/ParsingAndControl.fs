@@ -1,4 +1,4 @@
-﻿namespace Suave
+namespace Suave
 
 /// Parsing and control flow handling for web requests
 module internal ParsingAndControl =
@@ -169,9 +169,5 @@ module internal ParsingAndControl =
 
   let resolveDirectory homeDirectory =
     match homeDirectory with
-#if NETSTANDARD1_5
-    | None   -> Path.GetDirectoryName(typeof<ScanResult>.GetTypeInfo().Assembly.Location)
-#else
     | None   -> Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location)
-#endif
     | Some s -> s
