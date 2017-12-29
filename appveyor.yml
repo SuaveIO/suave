@@ -1,6 +1,6 @@
 os: Visual Studio 2017
 init:
-- git config --global core.autocrlf input
+  - git config --global core.autocrlf input
 version: 2.0.{build}
 
 environment:

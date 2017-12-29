@@ -168,6 +168,13 @@ NUGET
       Microsoft.NETCore.Platforms (>= 1.0.1) - restriction: >= netstandard1.0
     Microsoft.NETCore.Platforms (2.0.1) - restriction: >= netstandard1.0
 
+GROUP SourceLink
+STORAGE: NONE
+NUGET
+  remote: https://www.nuget.org/api/v2
+    SourceLink.Create.CommandLine (2.7.2)
+    SourceLink.Embed.PaketFiles (2.7.2)
+
 GROUP Tests
 RESTRICTION: == net46
 NUGET
