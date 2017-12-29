@@ -22,8 +22,6 @@ type internal OpenStream(stream : MemoryStream) =
   member x.RealDispose() =
     stream.Dispose()
 
-  #if !NETSTANDARD2_0
-
   override x.Close() =
     ()
 
@@ -38,8 +36,6 @@ type internal OpenStream(stream : MemoryStream) =
 
   override x.EndWrite ar =
     stream.EndWrite ar
-
-  #endif
 
   override x.CanRead =
     stream.CanRead
@@ -107,10 +103,8 @@ type internal OpenMemoryStream() =
   member x.ToArray() =
     base.stream.ToArray()
   
-  #if !NETSTANDARD2_0
   member x.GetBuffer() =
     base.stream.GetBuffer()
-  #endif
 
   member x.WriteTo(other : Stream) =
     base.stream.WriteTo other
