@@ -4,7 +4,6 @@
     <AssemblyName>Suave.DotLiquid</AssemblyName>
     <PackageId>Suave.DotLiquid</PackageId>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <DefineConstants>$(DefineConstants);NETSTANDARD2_0</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Library.fs" />
