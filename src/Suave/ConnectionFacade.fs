@@ -99,8 +99,12 @@ type Reader(segments:LinkedList<BufferSegment>, bufferManager : BufferManager, t
         if n > 0 && n + b.length >= index then
           //procees, free and remove
           let! res = SocketOp.ofAsync <| select (ArraySegment(b.buffer.Array, b.offset, b.length)) b.length
-          do bufferManager.FreeBuffer(b.buffer, "Suave.Web.scanMarker")
-          segments.Remove currentnode
+          match res with
+          | Continue _ ->
+            do bufferManager.FreeBuffer(b.buffer, "Suave.Web.scanMarker")
+            segments.Remove currentnode
+          | FailWith err ->
+            return! SocketOp.abort err
         n <- n + b.length
         currentnode <- currentnode.Previous
     }
