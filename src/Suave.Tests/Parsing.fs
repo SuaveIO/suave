@@ -181,3 +181,16 @@ let parsingMultipart2 cfg =
       finally
         disposeContext ctx
     ]
+
+[<Tests>]
+let testLineBuffer cfg =
+  let longUri = String.replicate (cfg.bufferSize + 100) "A" 
+  let runWithConfig = runWith cfg
+
+  testList "test line buffer" [
+
+    testCase "GET uri larger than line buffer length" <| fun _ ->
+      let actual = runWithConfig (OK "response") |> req HttpMethod.GET longUri None
+      Expect.equal actual "Line Too Long" "expecting data to be returned"
+
+    ]
