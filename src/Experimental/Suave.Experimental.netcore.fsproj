@@ -18,6 +18,7 @@
     <ProjectReference Include="..\Suave\Suave.netcore.fsproj" PrivateAssets="All" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="FSharp.Core" Version="4.1.18" />
     <PackageReference Include="System.Xml.ReaderWriter" Version="4.3.0" />
     <PackageReference Include="System.Net.Mail" Version="1.0.0-rtm-00002" />
     <PackageReference Include="Newtonsoft.Json" Version="9.0.1" />
