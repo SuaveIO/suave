@@ -3,6 +3,7 @@
     <TargetFramework>netcoreapp2.0</TargetFramework>
     <AssemblyName>Suave.Tests</AssemblyName>
     <OutputType>Exe</OutputType>
+    <UseStandardResourceNames>false</UseStandardResourceNames>
   </PropertyGroup>
   <ItemGroup>
     <Content Include="large_xml.xml" />
@@ -23,10 +24,7 @@
     <Compile Include="Web.fs" />
     <Compile Include="HttpWriters.fs" />
     <Compile Include="HttpFile.fs" />
-
-    <!-- No browseDefaultAsssembly for netstandard 1.6 -->
-    <!-- Compile Include="HttpEmbedded.fs" /--> 
-
+    <Compile Include="HttpEmbedded.fs" /> 
     <Compile Include="HttpVerbs.fs" />
     <Compile Include="HttpApplicatives.fs" />
     <Compile Include="HttpAuthentication.fs" />
@@ -109,6 +107,7 @@
     <ProjectReference Include="..\Suave.DotLiquid\Suave.DotLiquid.netcore.fsproj" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="FSharp.Core" Version="4.1.18" />
     <PackageReference Include="Expecto" Version="5.1.1" />
     <PackageReference Include="Expecto.FsCheck" Version="5.1.1" />
     <PackageReference Include="websocketsharp.core" Version="1.0.0" />
