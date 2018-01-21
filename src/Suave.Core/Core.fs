@@ -1,4 +1,23 @@
 namespace Suave.Core
 
-type Core() =
-    member this.X = "F#"
+open ParsecClone
+
+type HttpMethod =
+  | OPTIONS
+  | GET
+  | HEAD
+  | POST
+  | PUT
+  | DELETE
+  | TRACE
+  | PATCH
+  | CONNECT
+
+module Request =
+
+
+
+  ()
+
+module Response =
+  ()

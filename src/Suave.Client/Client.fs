@@ -7,9 +7,10 @@ open System.Net.Http
 open System.Text
 open System.Runtime.CompilerServices
 open Hopac
+open Suave.Core
 
-[<assembly: InternalsVisibleTo "HttpFs.IntegrationTests">]
-[<assembly: InternalsVisibleTo "HttpFs.UnitTests">]
+[<assembly: InternalsVisibleTo "Suave.Client.IntegrationTests">]
+[<assembly: InternalsVisibleTo "Suave.Client.UnitTests">]
 ()
 
 [<AutoOpen>]
@@ -35,17 +36,6 @@ module HttpFS =
   [<Measure>] type ms
 
   let DefaultBodyEncoding = Encoding.UTF8
-
-  type HttpMethod =
-    | Options
-    | Get
-    | Head
-    | Post
-    | Put
-    | Delete
-    | Trace
-    | Patch
-    | Connect
 
   // Same as System.Net.DecompressionMethods, but I didn't want to expose that
   type DecompressionScheme =
