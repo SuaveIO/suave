@@ -184,7 +184,7 @@ namespace :dotnetcli do
   end
 
   desc 'Merge standard and dotnetcli nupkgs; note the need to run :nugets before'
-  task :merge => :coreclr_binaries do    
+  task :merge => :coreclr_binaries do
     system dotnet_exe_path, %W|restore tools/tools.proj -v n|
     version = SemVer.find.format("%M.%m.%p%s")
 
