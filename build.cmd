@@ -1,15 +1,3 @@
 @echo off
-cls
-
-.paket\paket.bootstrapper.exe
-if errorlevel 1 (
-  exit /b %errorlevel%
-)
-
 .paket\paket.exe restore
-if errorlevel 1 (
-  exit /b %errorlevel%
-)
-
-msbuild src\Suave.sln /p:Configuration=Release
-src\Suave.Tests\bin\Release\Suave.Tests.exe --sequenced
+packages\build\FAKE\tools\FAKE.exe build.fsx %*

@@ -4,36 +4,22 @@ packages/
 build/
 gh-pages/
 docs/output/
-miTLS/
-.bundle/
 paket.template
 
-Suave.v11.suo
-Suave.sln.DotSettings.user
 *.userprefs
 *.swp
 *.suo
 *.orig
 
-_UpgradeReport_Files/
-Backup/
-test-results/
-
 AssemblyVersionInfo.fs
 paket.exe
 *.lock
 !paket.lock
-*.nuspec
 
-.DS_Store
 *.bak
 paket-files/
 docs/output/
 
-project.lock.json
-*.project.lock.json
-dotnet-dev-*
-tools/coreclr/
-tools/dotnet-install.*
 .vs/
 .vscode/
+.fake/

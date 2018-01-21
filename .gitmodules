@@ -1,0 +1,3 @@
+[submodule "vendor/ParsecClone"]
+	path = vendor/ParsecClone
+	url = git@github.com:SuaveIO/ParsecClone.git

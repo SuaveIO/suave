@@ -1,0 +1,23 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<FSharpLintSettings xmlns="https://github.com/fsprojects/FSharpLint/blob/master/ConfigurationSchema.xsd">
+  <IgnoreFiles Update="Overwrite"><![CDATA[AssemblyInfo.*]]></IgnoreFiles>
+  <Analysers>
+    <Typography>
+      <Rules>
+        <MaxCharactersOnLine>
+          <Enabled>False</Enabled>
+          <Length>80</Length>
+        </MaxCharactersOnLine>
+        <TrailingNewLineInFile>
+          <Enabled>True</Enabled>
+        </TrailingNewLineInFile>
+        <TrailingWhitespaceOnLine>
+          <Enabled>True</Enabled>
+          <IgnoreBlankLines>True</IgnoreBlankLines>
+          <NumberOfSpacesAllowed>0</NumberOfSpacesAllowed>
+          <OneSpaceAllowedAfterOperator>True</OneSpaceAllowedAfterOperator>
+        </TrailingWhitespaceOnLine>
+      </Rules>
+    </Typography>
+  </Analysers>
+</FSharpLintSettings>

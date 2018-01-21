@@ -1,59 +1,47 @@
-framework: NET46
-source https://nuget.org/api/v2
+source https://api.nuget.org/v3/index.json
 redirects auto
 
-nuget FSharp.Core ~> 3.1.2
-nuget openssl.redist
+nuget FSharp.Core 4.2.3
 nuget DotLiquid
-nuget RazorEngine
+nuget Hopac
+nuget ParsecClone
+nuget System.Reflection.Emit.Lightweight
 
 github haf/YoLo YoLo.fs
-github logary/logary:c70468f60602e1ab954a38e574b946d4ffbda11d src/Logary.Facade/Facade.fs
+github logary/logary:ee3f348bae14852818b93e93a81a6af140a91fba src/Logary.Facade/Facade.fs
 
 group Build
-  source https://nuget.org/api/v2
-  nuget NuGet.CommandLine
+  source https://api.nuget.org/v3/index.json
+  nuget FAKE
+  github fsharp/FAKE modules/Octokit/Octokit.fsx
 
 group Libuv
   storage: none
-  source https://nuget.org/api/v2
+  source https://api.nuget.org/v3/index.json
   nuget libuv
 
 group Tests
-  framework: NET46
-  source https://nuget.org/api/v2
-  nuget FSharp.Core ~> 4 redirects: force
-  nuget System.Reflection.Metadata 1.4.1
+  source https://api.nuget.org/v3/index.json
+  #nuget System.Reflection.Metadata
   nuget WebSocketSharp
   nuget FsCheck
   nuget Expecto
   nuget Expecto.FsCheck
   nuget Expecto.BenchmarkDotNet
-  nuget Http.fs
   nuget FSharp.Charting
   nuget DotLiquid
 
 group Examples
-  framework: NET46
-  source https://nuget.org/api/v2
-  nuget FSharp.Core ~> 4 redirects: force
-  nuget Topshelf.FSharp
-  nuget Topshelf ~> 3
-  nuget Nancy.Owin
-  nuget Freya 3.0.0-b300
-  nuget Freya.Core 3.0.0-b300
+  source https://api.nuget.org/v3/index.json
   nuget Microsoft.Owin
   nuget Microsoft.Owin.Hosting
   nuget Owin
   nuget Chiron
-  nuget identityserver3
   nuget Microsoft.AspNet.SignalR.Owin
   github haf/YoLo YoLo.fs
 
 group Docs
-  framework: NET46
-  source https://nuget.org/api/v2
-  nuget FSharp.Core ~> 4 redirects: force
+  source https://api.nuget.org/v3/index.json
   nuget FsLibTool
   nuget Argu
   nuget Stripe.net
@@ -61,6 +49,6 @@ group Docs
 
 group SourceLink
   storage: none
-  source https://nuget.org/api/v2
+  source https://api.nuget.org/v3/index.json
   nuget SourceLink.Create.CommandLine 2.7.2
   nuget SourceLink.Embed.PaketFiles 2.7.2

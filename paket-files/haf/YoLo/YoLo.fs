@@ -1,4 +1,4 @@
-[<AutoOpen>]
+﻿[<AutoOpen>]
 module internal Suave.Utils.YoLo
 
 #nowarn "64"
@@ -27,6 +27,10 @@ module Choice =
   let mapSnd f = function
     | Choice1Of2 v -> Choice1Of2 v
     | Choice2Of2 v -> Choice2Of2 (f v)
+
+  let map2 f1 f2: Choice<'a, 'b> -> Choice<'c, 'd> = function
+    | Choice1Of2 v -> Choice1Of2 (f1 v)
+    | Choice2Of2 v -> Choice2Of2 (f2 v)
 
   let bind (f : 'a -> Choice<'b, 'c>) (v : Choice<'a, 'c>) =
     match v with
@@ -67,7 +71,19 @@ module Choice =
 
   let ofOption onMissing = function
     | Some x -> Choice1Of2 x
-    | None   -> Choice2Of2 onMissing
+    | None   -> Choice2Of2 (onMissing ())
+
+  let ofResult = function
+    | Ok x -> Choice1Of2 x
+    | Error x -> Choice2Of2 x
+
+  let toResult = function
+    | Choice1Of2 x -> Ok x
+    | Choice2Of2 x -> Error x
+    
+  let orDefault value = function
+    | Choice1Of2 v -> v
+    | _ -> value ()
 
   let inject f = function
     | Choice1Of2 x -> f x; Choice1Of2 x
@@ -119,6 +135,105 @@ module Choice =
       lift2 (fun x _ -> x) m1 m2
 
 
+module Result =
+
+  let map2 f1 f2: Result<'a, 'b> -> Result<'c, 'd> = function
+    | Ok v -> Ok (f1 v)
+    | Error v -> Error (f2 v)
+
+  let bindError (f : 'a -> Result<'c, 'b>) (v : Result<'c, 'a>) =
+    match v with
+    | Ok x -> Ok x
+    | Error x -> f x
+    
+  let fold f g =
+    function
+    | Ok x -> f x
+    | Error y -> g y
+    
+  let apply f v =
+    Result.bind (fun f' ->
+      Result.bind (fun v' ->
+        Ok (f' v')) v) f
+
+  let applyError f v =
+    Result.bind (fun f' ->
+      bindError (fun v' ->
+        Error (f' v')) v) f
+
+  let lift2 f v1 v2 =
+    apply (apply (Ok f) v1) v2
+
+  let lift3 f v1 v2 v3 =
+    apply (apply (apply (Ok f) v1) v2) v3
+
+  let lift4 f v1 v2 v3 v4 =
+    apply (apply (apply (apply (Ok f) v1) v2) v3) v4
+
+  let lift5 f v1 v2 v3 v4 v5 =
+    apply (apply (apply (apply (apply (Ok f) v1) v2) v3) v4) v5
+
+  let ofOption onMissing = function
+    | Some x -> Ok x
+    | None   -> Error onMissing
+
+  let toChoice = function
+    | Ok x -> Choice1Of2 x
+    | Error x -> Choice2Of2 x
+
+  let ofChoice = function
+    | Choice1Of2 x -> Ok x
+    | Choice2Of2 x -> Error x
+
+  let inject f = function
+    | Ok x -> f x; Ok x
+    | Error x -> Error x
+
+  let injectError f = function
+    | Ok x -> Ok x
+    | Error x -> f x; Error x
+
+  module Operators =
+
+    let inline (>>=) m f =
+      Result.bind f m
+
+    let inline (>>-) m f = // snd
+      bindError f m
+
+    let inline (=<<) f m =
+      Result.bind f m
+
+    let inline (-<<) f m = // snd
+      bindError f m
+
+    let inline (>>*) m f =
+      inject f m
+
+    let inline (>>@) m f = // snd
+      injectError f m
+
+    let inline (<*>) f m =
+      apply f m
+
+    let inline (<!>) f m =
+      Result.map f m
+
+    let inline (>!>) m f =
+      Result.map f m
+
+    let inline (<@>) f m = // snd
+      Result.mapError f m
+
+    let inline (>@>) m f = // snd
+      Result.mapError f m
+
+    let inline ( *>) m1 m2 =
+      lift2 (fun _ x -> x) m1 m2
+
+    let inline ( <*) m1 m2 =
+      lift2 (fun x _ -> x) m1 m2
+
 module Option =
 
   let create x = Some x
@@ -146,7 +261,7 @@ module Option =
 
   let toChoice case2 = function
     | Some x -> Choice1Of2 x
-    | None   -> Choice2Of2 case2
+    | None   -> Choice2Of2 (case2 ())
 
   let ofNullable nullable : 'a option =
     match box nullable with
@@ -161,7 +276,7 @@ module Option =
     | None      -> new Nullable<_>()
 
   let orDefault x = function
-    | None -> x
+    | None -> x ()
     | Some y -> y
 
   let inject f = function
@@ -315,15 +430,6 @@ module Bytes =
       i <- i + 1
     xx = 0u
 
-module Map =
-
-  /// put a key to the map; if it's not there already, just add it
-  /// otherwise, remove the existing key and place it there.
-  let put k v m =
-    match m |> Map.tryFind k with
-    | Some _ -> m |> Map.remove k |> Map.add k v
-    | None -> m |> Map.add k v
-
 [<RequireQualifiedAccess>]
 module Culture =
   open System.Globalization
@@ -411,6 +517,27 @@ module Array =
     for i in 0 .. arr1.Length - 1 do
       b <- b && (arr1.[i] = arr2.[i])
     b
+
+  /// Returns a sequence that yields chunks of length n.
+  /// Each chunk is returned as an array.
+  /// Thanks to
+  /// https://nbevans.wordpress.com/2014/03/13/really-simple-way-to-split-a-f-sequence-into-chunks-partitions/
+  let chunk (n: uint32) (s: seq<'t>) = seq {
+    let n = int n
+    let pos = ref 0
+    let buffer = Array.zeroCreate<'t> n
+
+    for x in s do
+      buffer.[!pos] <- x
+      if !pos = n - 1 then
+        yield buffer |> Array.copy
+        pos := 0
+      else
+        incr pos
+
+    if !pos > 0 then
+      yield Array.sub buffer 0 !pos
+  }
 
 module Regex =
   open System.Text.RegularExpressions
@@ -596,6 +723,23 @@ module List =
   /// Transform a "list<Choice>" into a "Choice<list>" and collect the results
   /// using apply.
   let sequenceChoiceA x = traverseChoiceA id x
+
+  /// Map a Result-producing function over a list to get a new Result using
+  /// applicative style. ('a -> Result<'b, 'c>) -> 'a list -> Result<'b list, 'c>
+  let rec traverseResultA f list =
+    let (<*>) = Result.apply
+    let cons head tail = head :: tail
+
+    // right fold over the list
+    let initState = Result.Ok []
+    let folder head tail =
+      Result.Ok cons <*> (f head) <*> tail
+
+    List.foldBack folder list initState
+
+  /// Transform a "list<Result>" into a "Result<list>" and collect the results
+  /// using apply.
+  let sequenceResultA x = traverseResultA id x
 
 module Seq =
 

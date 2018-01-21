@@ -20,7 +20,7 @@ type LogLevel =
   /// some important business event occurred.
   | Info
   /// The log message is a warning; e.g. there was an unhandled exception or
-  /// an event occurred which was unexpected. Sometimes human corrective action
+  /// an even occurred which was unexpected. Sometimes human corrective action
   /// is needed.
   | Warn
   /// The log message is at an error level, meaning an unhandled exception
@@ -328,7 +328,7 @@ module Literate =
                 | Text -> ConsoleColor.White
                 | Subtext -> ConsoleColor.Gray
                 | Punctuation -> ConsoleColor.DarkGray
-                | LevelVerbose -> ConsoleColor.Gray
+                | LevelVerbose -> ConsoleColor.DarkGray
                 | LevelDebug -> ConsoleColor.Gray
                 | LevelInfo -> ConsoleColor.White
                 | LevelWarning -> ConsoleColor.Yellow
@@ -615,18 +615,24 @@ module internal Formatting =
       DateTimeOffset(utcTicks, TimeSpan.Zero).LocalDateTime.ToString("HH:mm:ss", options.formatProvider),
       Subtext
 
-    let themedMessageParts =
-      message.value |> literateFormatValue options message.fields |> snd
+    let _, themedMessageParts =
+      message.value |> literateFormatValue options message.fields
 
     let themedExceptionParts = literateColouriseExceptions options message
 
-    [ "[", Punctuation
-      formatLocalTime message.utcTicks
-      " ", Subtext
-      options.getLogLevelText message.level, getLogLevelToken message.level
-      "] ", Punctuation ]
-    @ themedMessageParts
-    @ themedExceptionParts
+    [ yield "[", Punctuation
+      yield formatLocalTime message.utcTicks
+      yield " ", Subtext
+      yield options.getLogLevelText message.level, getLogLevelToken message.level
+      yield "] ", Punctuation
+      yield! themedMessageParts
+      if not (isNull message.name) && message.name.Length > 0 then
+        yield " ", Subtext
+        yield "<", Punctuation
+        yield String.concat "." message.name, Subtext
+        yield ">", Punctuation
+      yield! themedExceptionParts
+    ]
 
   let literateDefaultColourWriter sem (parts : (string * ConsoleColor) list) =
     lock sem <| fun _ ->
@@ -786,12 +792,14 @@ type LiterateConsoleTarget(name, minLevel, ?options, ?literateTokeniser, ?output
     member x.name = name
     member x.logWithAck level msgFactory =
       if level >= minLevel then
-        colourWriter (colouriseThenNewLine (msgFactory level))
-      async.Return ()
+        async { do colourWriter (colouriseThenNewLine (msgFactory level)) }
+      else
+        async.Return ()
     member x.log level msgFactory =
       if level >= minLevel then
-        colourWriter (colouriseThenNewLine (msgFactory level))
-      async.Return ()
+        async { do colourWriter (colouriseThenNewLine (msgFactory level)) }
+      else
+        async.Return ()
 
 type TextWriterTarget(name, minLevel, writer : System.IO.TextWriter, ?formatter) =
   let formatter = defaultArg formatter Formatting.defaultFormatter
@@ -800,12 +808,16 @@ type TextWriterTarget(name, minLevel, writer : System.IO.TextWriter, ?formatter)
   interface Logger with
     member x.name = name
     member x.log level messageFactory =
-      if level >= minLevel then log (messageFactory level)
-      async.Return ()
+      if level >= minLevel then
+        async { do log (messageFactory level) }
+      else
+        async.Return ()
 
     member x.logWithAck level messageFactory =
-      if level >= minLevel then log (messageFactory level)
-      async.Return ()
+      if level >= minLevel then
+        async { log (messageFactory level) }
+      else
+        async.Return ()
 
 type OutputWindowTarget(name, minLevel, ?formatter) =
   let formatter = defaultArg formatter Formatting.defaultFormatter
@@ -814,12 +826,16 @@ type OutputWindowTarget(name, minLevel, ?formatter) =
   interface Logger with
     member x.name = name
     member x.log level messageFactory =
-      if level >= minLevel then log (messageFactory level)
-      async.Return ()
+      if level >= minLevel then
+        async { do log (messageFactory level) }
+      else
+        async.Return ()
 
     member x.logWithAck level messageFactory =
-      if level >= minLevel then log (messageFactory level)
-      async.Return ()
+      if level >= minLevel then
+        async { do log (messageFactory level) }
+      else
+        async.Return ()
 
 /// A logger to use for combining a number of other loggers
 type CombiningTarget(name, otherLoggers : Logger list) =
@@ -860,13 +876,14 @@ module Global =
     let updating = obj()
     let mutable fwClock : uint32 = snd !config
     let mutable logger : Logger = (fst !config).getLogger name
-    let rec withLogger action =
-      let cfg, cfgClock = !config // copy to local
-      let fwCurr = fwClock // copy to local
-      if cfgClock <> fwCurr then
+
+    let withLogger action =
+      if snd !config <> fwClock then
         lock updating <| fun _ ->
-          logger <- cfg.getLogger name
-          fwClock <- fwCurr + 1u
+          let cfg, cfgClock = !config
+          if cfgClock <> fwClock then
+            logger <- cfg.getLogger name
+            fwClock <- cfgClock
       action logger
 
     let ensureName (m : Message) =
@@ -883,6 +900,7 @@ module Global =
   let internal getStaticLogger (name : string []) =
     Flyweight name
 
+  /// Gets the current timestamp.
   let timestamp () : EpochNanoSeconds =
     (fst !config).timestamp ()
 
