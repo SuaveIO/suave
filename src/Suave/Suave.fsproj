@@ -146,7 +146,6 @@
     <Compile Include="Json.fs" />
     <Compile Include="AssemblyVersionInfo.fs" Condition="Exists('AssemblyVersionInfo.fs')" />
     <None Include="paket.references" />
-    <Content Include="App.config" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="mscorlib" />
