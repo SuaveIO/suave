@@ -41,7 +41,7 @@ let tests (cfg : SuaveConfig) =
   let uriFor (res : string) =
     SuaveConfig.firstBindingUri cfg res ""
 
-  let postTo res = Request.create Post (uriFor res) |> Request.setHeader (Connection "Close")
+  let postTo res = Request.create Post (uriFor res)
 
   testCase "can send/receive" <| fun _ ->
     let ctx = runWithConfig app
