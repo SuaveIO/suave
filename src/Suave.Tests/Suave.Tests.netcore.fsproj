@@ -111,6 +111,6 @@
     <PackageReference Include="Expecto" Version="5.1.1" />
     <PackageReference Include="Expecto.FsCheck" Version="5.1.1" />
     <PackageReference Include="websocketsharp.core" Version="1.0.0" />
-    <PackageReference Include="Http.fs" Version="4.1.2" />
+    <PackageReference Include="Http.fs" Version="5.0.0" />
   </ItemGroup>
 </Project>

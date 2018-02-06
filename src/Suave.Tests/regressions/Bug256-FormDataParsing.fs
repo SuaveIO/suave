@@ -41,7 +41,7 @@ let tests (cfg : SuaveConfig) =
   let uriFor (res : string) =
     SuaveConfig.firstBindingUri cfg res ""
 
-  let postTo res = Request.create Post (uriFor res) |> Request.keepAlive false
+  let postTo res = Request.create Post (uriFor res) |> Request.setHeader (Connection "Close")
 
   testCase "can send/receive" <| fun _ ->
     let ctx = runWithConfig app
@@ -49,7 +49,6 @@ let tests (cfg : SuaveConfig) =
       use fs = File.OpenRead (pathOf "regressions/pix.gif")
       let file = "pix.gif", ContentType.create("image", "gif"), StreamData fs
 
-      //printfn "--- get response"
       let data =
         postTo "gifs/echo"
         |> Request.body (BodyForm [ FormFile ("img", file) ])
