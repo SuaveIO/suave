@@ -10,6 +10,13 @@ open Suave.Logging.Message
 open Suave.Sockets
 open Suave.Utils
 
+#if NETSTANDARD2_0
+open System.Runtime.InteropServices
+open FSharp.NativeInterop
+
+open Native
+#endif
+
 let private logger = Log.create "Suave.Tcp"
 
 /// The max backlog of number of requests
@@ -136,12 +143,30 @@ let job (serveClient : TcpWorker<unit>)
 
 type TcpServer = StartedData -> AsyncResultCell<StartedData> -> TcpWorker<unit> -> Async<unit>
 
+#if NETSTANDARD2_0
+#nowarn "9"
+
+let enableRebinding (listenSocket: Socket) =
+  let mutable optionValue = 1
+  let mutable setsockoptStatus = 0
+
+  if RuntimeInformation.IsOSPlatform(OSPlatform.Linux) then  
+    setsockoptStatus <- setsockopt(listenSocket.Handle, SOL_SOCKET_LINUX, SO_REUSEADDR_LINUX, NativePtr.toNativeInt<int> &&optionValue, uint32(sizeof<int>))
+  else if RuntimeInformation.IsOSPlatform(OSPlatform.OSX) then  
+    setsockoptStatus <- setsockopt(listenSocket.Handle, SOL_SOCKET_OSX, SO_REUSEADDR_OSX, NativePtr.toNativeInt<int> &&optionValue, uint32(sizeof<int>))    
+
+  if setsockoptStatus <> 0 then
+    logger.warn(
+          eventX "Setting SO_REUSEADDR failed with errno '{errno}'."
+          >> setFieldValue "errno" (Marshal.GetLastWin32Error()))
+#endif
+
 let runServer maxConcurrentOps bufferSize autoGrow (binding: SocketBinding) startData
               (acceptingConnections: AsyncResultCell<StartedData>) serveClient = async {
   try
     use listenSocket = new Socket(binding.endpoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp)
     #if NETSTANDARD2_0
-    listenSocket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, 1)
+    enableRebinding(listenSocket)
     #endif
     listenSocket.NoDelay <- true
 

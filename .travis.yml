@@ -1,8 +1,11 @@
 ---
 language: csharp
 
+os:
+  - linux
+  - osx
+
 dist: trusty
-sudo: required
 
 dotnet: 2.0.3
 
@@ -15,13 +18,16 @@ mono:
 install:
  - rvm install 2.2.3
  - gem install bundler
- - sudo apt-get update -y
- - sudo apt-get install -y gnupg automake libtool
- - curl -sSL https://github.com/libuv/libuv/archive/v1.9.1.tar.gz | tar zxf - -C /tmp
- - (cd /tmp/libuv-1.9.1/ && ./autogen.sh && ./configure && make && sudo make install)
- - sudo ldconfig
- # for apache bench (ab)
- - sudo apt-get install -qq apache2-utils
+ - if [ "$TRAVIS_OS_NAME" == "linux" ];
+   then sudo apt-get update -y;
+   else brew update;
+   fi
+
+before_script:
+ - if [ "$TRAVIS_OS_NAME" == "linux" ];
+   then export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:~/.nuget/packages/libuv/1.10.0/runtimes/linux-x64/native;
+   else ln -s ~/.nuget/packages/libuv/1.10.0/runtimes/osx/native/libuv.dylib /usr/local/lib/libuv.dylib;
+   fi
 
 script:
  - bundle && bundle exec rake ci
@@ -30,4 +36,3 @@ matrix:
   allow_failures:
     - mono: latest
     - mono: weekly
-    - mono: 5.0.0
