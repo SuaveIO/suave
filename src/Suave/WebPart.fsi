@@ -1,6 +1,7 @@
 ﻿[<AutoOpen>]
 module Suave.WebPart
-
+/// Takes 'a and returns SuaveTask of 'a
+/// SuaveTask is also known as AsyncOption
 type WebPart<'a> = 'a -> Async<'a option>
 
 val inline succeed : WebPart<'a>
@@ -9,11 +10,11 @@ val fail<'a>  : Async<'a option>
 
 val never : WebPart<'a>
 
-/// Classic bind
+/// Classic bind (for SuaveTask)
 val bind : f:('a -> Async<'b option>) -> a: Async<'a option> -> Async<'b option>
 
-/// Left-to-right Kleisli composition.
-val compose : first:('a -> Async<'b option>) -> second:('b -> Async<'c option>) ->  'a -> Async<'c option> 
+/// Left-to-right Kleisli composition (for SuaveTask).
+val compose : first:('a -> Async<'b option>) -> second:('b -> Async<'c option>) ->  'a -> Async<'c option>
 
 type AsyncOptionBuilder =
   new : unit -> AsyncOptionBuilder
@@ -46,11 +47,11 @@ val choose : options:WebPart<'a> list -> WebPart<'a>
 /// +------------+                                            +--------------+
 /// | url "/a"   +----------+                       +---------+   cont1      |
 /// +------------+          |                       |         +--------------+
-///                         |                       |                         
+///                         |                       |
 /// +-------------+         |       +----------+    |         +--------------+
 /// |  url "/b"   +---------+-------+ injected +----+---------+  cont2       |
 /// +-------------+         |       +----------+    |         +--------------+
-///                         |                       |                         
+///                         |                       |
 /// +-------------+         |                       |         +--------------+
 /// | url "/b"    +---------+                       +---------+  cont3       |
 /// +-------------+                                           +--------------+
