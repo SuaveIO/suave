@@ -1,14 +1,23 @@
 ﻿[<AutoOpen>]
 module Suave.WebPart
+(*
+SuaveTask of 'a is defined as `Async<'a option>`. It's implied that by returning None, the SuaveTask expects Suave to
+continue on to the next (in the `choose` below). Another name for `SuaveTask` is `AsyncOption` as can be seen in the
+builder definition below.
 
+WebPart of 'a is defined as a function that takes 'a and returns SuaveTask of 'a or AsyncOption of 'a
+
+WebPart without a specific type parameter is understood as WebPart of HttpContext.
+
+*)
 type WebPart<'a> = 'a -> Async<'a option>
-
+// WebPart
 let inline succeed x = async.Return (Some x)
-
+// SuaveTask
 let fail<'a> : Async<'a option> = async.Return (Option<'a>.None)
-
+// WebPart
 let never : WebPart<'a> = fun x -> fail
-
+// Operates on SuaveTask
 let bind (f: 'a -> Async<'b option>) (a: Async<'a option>) = async {
   let! p = a
   match p with
@@ -18,7 +27,7 @@ let bind (f: 'a -> Async<'b option>) (a: Async<'a option>) = async {
     let r = f q
     return! r
   }
-
+// Operates on SuaveTask
 let compose (first : 'a -> Async<'b option>) (second : 'b -> Async<'c option>)
             : 'a -> Async<'c option> =
   fun x ->
@@ -38,7 +47,7 @@ let rec choose (options : WebPart<'a> list) : WebPart<'a> =
   match options with
   | []        -> return None
   | p :: tail ->
-    let! res = p arg 
+    let! res = p arg
     match res with
     | Some x -> return Some x
     | None   -> return! choose tail arg
@@ -56,7 +65,7 @@ let rec inject (postOp : WebPart<'a>) (pairs : (WebPart<'a> * WebPart<'a>) list)
       | None   -> return! inject postOp tail arg
     }
 
-let inline warbler f a = f a a 
+let inline warbler f a = f a a
 
 let inline cnst x = fun _ -> x
 
