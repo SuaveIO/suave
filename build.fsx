@@ -2,6 +2,7 @@
 
 #r "paket: groupref Build //"
 open Fake.Core
+open Fake.Core
 #load ".fake/build.fsx/intellisense.fsx"
 open Fake
 open Fake.Core
@@ -17,7 +18,7 @@ open System.Text
 Console.OutputEncoding <- Encoding.UTF8
 
 let release = ReleaseNotes.load "RELEASE_NOTES.md"
-let version = release.SemVer
+let Configuration = Environment.environVarOrDefault "CONFIGURATION" "Release"
 
 let Release_2_1_105 (options: DotNet.CliInstallOptions) =
     { options with
@@ -36,6 +37,7 @@ let install = lazy DotNet.install Release_2_1_105
 let inline withWorkDir wd =
   DotNet.Options.lift install.Value
   >> DotNet.Options.withWorkingDirectory wd
+  >> DotNet.Options.withCustomParams (Some (sprintf "/p:Configuration=%s" Configuration))
 
 // Set general properties without arguments
 let inline dotnetSimple arg = DotNet.Options.lift install.Value arg
@@ -72,10 +74,9 @@ Target.create "Replace" <| fun _ ->
 Target.create "Build" <| fun _ ->
   DotNet.build dotnetSimple "Suave.sln"
 
-let testNetCoreDir = "src" </> "Suave.Tests" </> "bin" </> "Release" </> "netcoreapp2.0"
-
-Target.create "Test" <| fun _ ->
-  let res = DotNet.exec id "run" (testNetCoreDir </> "Suave.Tests.dll")
+Target.create "Tests" <| fun _ ->
+  let path = "src" </> "Suave.Tests"
+  let res = DotNet.exec id "run" (sprintf "%s --framework netcoreapp2.0 -- --debug --summary --sequenced" path)
   if not res.OK then
     res.Errors |> Seq.iter (eprintfn "%s")
     failwith "Tests failed."
@@ -96,8 +97,8 @@ open Fake.Core.TargetOperators
   ==> "AsmInfo"
   ==> "Replace"
   ==> "Build"
-  ==> "Test"
+  ==> "Tests"
   ==> "Pack"
   ==> "Release"
 
-Target.runOrDefault "Test"
+Target.runOrDefault "Tests"
