@@ -1,7 +1,12 @@
-os: Visual Studio 2017
+image:
+  - Visual Studio 2015
+  - Visual Studio 2017
+
+build_script:
+  - cmd: build.cmd
+
 init:
   - git config --global core.autocrlf input
-version: 2.0.{build}
 
 environment:
   matrix:
@@ -11,16 +16,6 @@ environment:
    - arch: "x64"
      MSBUILD_PLATFORM: "Any CPU"
      PATH: '%USERPROFILE%\.nuget\packages\libuv\1.10.0\runtimes\win-x64\native;%PATH%'
-
-install:
- - set PATH=C:\Ruby22\bin;%PATH% # use Ruby 2.2.6
- - cmd: ruby --version
- 
-build_script:
- - cmd: gem sources -r https://rubygems.org/
- - cmd: gem install bundler --no-ri --no-rdoc --source https://rubygems.org/ --conservative
- - cmd: bundle install
- - cmd: bundle exec rake ci
  
 artifacts:
  - path: build\pkg\*.nupkg 

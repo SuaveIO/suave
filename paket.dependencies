@@ -3,10 +3,15 @@ framework net461, netcoreapp2.0, netstandard2.0
 storage none
 
 nuget FSharp.Core !~> 4.3.4
-nuget openssl.redist # TO CONSIDER https://www.nuget.org/packages/System.Security.Cryptography.OpenSsl/4.4.0
 nuget DotLiquid
-nuget RazorEngine
 nuget Libuv
+nuget System.Reflection.Metadata ~> 1.5
+nuget WebSocketSharp prerelease
+nuget FsCheck
+nuget Expecto
+nuget Expecto.FsCheck
+nuget Expecto.BenchmarkDotNet
+nuget Http.fs
 
 github haf/YoLo YoLo.fs
 github logary/logary:c70468f60602e1ab954a38e574b946d4ffbda11d src/Logary.Facade/Facade.fs
@@ -16,33 +21,16 @@ group Build
   nuget FAKE
   github fsharp/FAKE modules/Octokit/Octokit.fsx
 
-group Tests
-  framework net461, netcoreapp2.0, netstandard2.0
-  source https://api.nuget.org/v3/index.json
-  storage none
-  nuget FSharp.Core !~> 4.3.4
-  nuget System.Reflection.Metadata ~> 1.5
-  nuget WebSocketSharp prerelease
-  nuget FsCheck
-  nuget Expecto
-  nuget Expecto.FsCheck
-  nuget Expecto.BenchmarkDotNet
-  nuget Http.fs
-  nuget FSharp.Charting
-  nuget DotLiquid
-
 group Examples
   framework net461, netcoreapp2.0
   source https://api.nuget.org/v3/index.json
   nuget FSharp.Core !~> 4.3.4
   nuget Topshelf.FSharp
   nuget Topshelf prerelease
-  nuget Nancy.Owin
   nuget Microsoft.Owin
   nuget Microsoft.Owin.Hosting
   nuget Owin
-  nuget Chiron
-  nuget identityserver3
+  nuget Nancy.Owin
   nuget Microsoft.AspNet.SignalR.Owin
   github haf/YoLo YoLo.fs
 

@@ -1,6 +1,4 @@
-group Tests
 FSharp.Core
-FSharp.Charting
 Expecto
 Expecto.FsCheck
 Expecto.BenchmarkDotNet

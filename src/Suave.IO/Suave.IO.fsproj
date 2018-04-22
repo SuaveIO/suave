@@ -1,17 +1,17 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFrameworks>net461;netstandard2.0</TargetFrameworks>
-    <AssemblyName>Suave.Experimental</AssemblyName>
+    <AssemblyName>Suave.IO</AssemblyName>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="AssemblyInfo.fs" />
-    <Compile Include="ViewEngine.fs" />
-    <Compile Include="Html.fs" />
-    <Compile Include="Xml.fs" />
-    <Compile Include="Template.fs" />
-    <Compile Include="Data.fs" />
-    <Compile Include="Form.fs" />
+    <Compile Include="..\..\paket-files\docs\haf\YoLo\YoLo.fs">
+      <Paket>True</Paket>
+      <Link>paket-files/YoLo.fs</Link>
+    </Compile>
+    <Compile Include="Program.fs" />
+    <Content Include="Dockerfile" />
     <ProjectReference Include="..\Suave\Suave.fsproj" />
   </ItemGroup>
   <Import Project="..\..\.paket\Paket.Restore.targets" />

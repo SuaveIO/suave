@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>netcoreapp2.0</TargetFramework>
+    <TargetFrameworks>net461;netcoreapp2.0</TargetFrameworks>
     <AssemblyName>Suave.Tests</AssemblyName>
     <OutputType>Exe</OutputType>
     <UseStandardResourceNames>false</UseStandardResourceNames>
@@ -101,16 +101,10 @@
     </None>
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Suave\Suave.netcore.fsproj" />
-    <ProjectReference Include="..\Suave.LibUv\Suave.LibUv.netcore.fsproj" />
-    <ProjectReference Include="..\Suave.Testing\Suave.Testing.netcore.fsproj" />
-    <ProjectReference Include="..\Suave.DotLiquid\Suave.DotLiquid.netcore.fsproj" />
+    <ProjectReference Include="..\Suave\Suave.fsproj" />
+    <ProjectReference Include="..\Suave.LibUv\Suave.LibUv.fsproj" />
+    <ProjectReference Include="..\Suave.Testing\Suave.Testing.fsproj" />
+    <ProjectReference Include="..\Suave.DotLiquid\Suave.DotLiquid.fsproj" />
   </ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="FSharp.Core" Version="4.3.2" />
-    <PackageReference Include="Expecto" Version="5.1.1" />
-    <PackageReference Include="Expecto.FsCheck" Version="5.1.1" />
-    <PackageReference Include="websocketsharp.core" Version="1.0.0" />
-    <PackageReference Include="Http.fs" Version="5.0.0" />
-  </ItemGroup>
+  <Import Project="..\..\.paket\Paket.Restore.targets" />
 </Project>

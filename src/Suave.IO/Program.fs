@@ -1,4 +1,4 @@
-﻿module Server
+﻿module Suave.IO.Program
 
 open Argu
 open Suave

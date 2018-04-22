@@ -1,5 +1,6 @@
 bin/
 obj/
+.idea/
 packages/
 build/
 gh-pages/

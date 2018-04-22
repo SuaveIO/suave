@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFrameworks>net461;netstandard2.0</TargetFramework>
+    <TargetFrameworks>net461;netstandard2.0</TargetFrameworks>
     <AssemblyName>Suave</AssemblyName>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
@@ -13,6 +13,7 @@
       <Paket>True</Paket>
       <Link>Utils/Facade.fs</Link>
     </Compile>
+    <Compile Include="AssemblyInfo.fs" />
     <Compile Include="Utils/Aether.fs" />
     <Compile Include="Utils/AsyncExtensions.fs" />
     <Compile Include="Utils/AsyncResultCell.fs" />
@@ -71,7 +72,6 @@
     <Compile Include="WebSocket.fs" />
     <Compile Include="Owin.fs" />
     <Compile Include="Json.fs" />
-    <Compile Include="AssemblyVersionInfo.fs" Condition="Exists('AssemblyVersionInfo.fs')" />
   </ItemGroup>
   <Import Project="..\..\.paket\Paket.Restore.targets" />
 </Project>

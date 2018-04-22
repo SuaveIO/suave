@@ -2,7 +2,6 @@
 open Suave.Http
 open Suave.Successful
 open System
-open System.Net
 open System.Threading
 open System.Diagnostics
 
