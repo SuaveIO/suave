@@ -86,14 +86,13 @@ let tests =
     testPropertyWithConfig fsCheckConfig "sum of bytes" <|
       fun (UTF8String (_, _, bytesCount) as sample, bufSize) ->
         if bufSize < 6 then
-          true 
+          true
         else
           let concatenated = sample.concat ()
-
-          logger.debugWithBP (
-            eventX "'sum of bytes' called with string length {len}"
-            >> setField "sample" sample
-            >> setField "len" concatenated.Length)
+          logger.verboseWithBP (fun level ->
+            eventX "'sum of bytes' called with string length {len}" level
+            |> setField "sample" sample
+            |> setField "len" concatenated.Length)
           |> Async.RunSynchronously
 
           let mutable bufferedBytes = 0
