@@ -1,5 +1,0 @@
-group Examples
-FSharp.Core
-Owin
-Microsoft.Owin
-Microsoft.AspNet.SignalR.Owin
