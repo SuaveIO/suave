@@ -1,19 +1,21 @@
 #!/usr/bin/env fsharpi
 
-#r "paket: groupref Build
-nuget Fake.DotNet.AssemblyInfo
-nuget Fake.Core.Target
-nuget Fake.DotNet.Cli //"
+#r "paket: groupref Build //"
 #load ".fake/build.fsx/intellisense.fsx"
 open Fake.Core
 open Fake.DotNet
+open Fake.IO.Globbing.Operators
+open Fake.IO.FileSystemOperators
+open Fake.Tools
 open System.IO
 
+
+let version = "1.0.0" // ??
 let Release_2_1_105 (options: DotNet.CliInstallOptions) =
     { options with
         InstallerOptions = (fun io ->
             { io with
-                Branch = "release/2.1.105"
+                Branch = "release/2.1.1xx"
             })
         Channel = None
         Version = DotNet.Version "2.1.105"
@@ -37,7 +39,7 @@ Target.create "Restore" <| fun _ ->
   DotNet.restore dotnetSimple "Suave.sln"
 
 Target.create "AsmInfo" <| fun _ ->
-  let commitHash = Information.getCurrentHash()
+  let commitHash = Git.Information.getCurrentHash()
   projects |> Seq.iter (fun project ->
     let dir = Path.GetDirectoryName project
     let name = Path.GetFileNameWithoutExtension project
@@ -49,4 +51,6 @@ Target.create "AsmInfo" <| fun _ ->
        AssemblyInfo.FileVersion version])
 
 Target.create "Build" <| fun _ ->
-  DotNet.exec dotnetSimple "build" "Suave.sln"
+  DotNet.build dotnetSimple "Suave.sln"
+
+Target.runOrDefault "Build"
