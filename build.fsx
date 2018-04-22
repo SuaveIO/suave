@@ -78,7 +78,7 @@ Target.create "Build" <| fun _ ->
 
 Target.create "Tests" <| fun _ ->
   let path = "src" </> "Suave.Tests"
-  let res = DotNet.exec id "run" (sprintf "--framework netcoreapp2.0 --project %s -- --debug --summary --sequenced" path)
+  let res = DotNet.exec id "run" (sprintf "--framework netcoreapp2.0 --project %s -- --summary --sequenced" path)
   if not res.OK then
     res.Errors |> Seq.iter (eprintfn "%s")
     failwith "Tests failed."
