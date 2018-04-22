@@ -1,11 +1,22 @@
 #!/usr/bin/env fsharpi
 
-#r "paket:
+#r "paket: groupref Build
 nuget Fake.DotNet.Cli //"
+#load ".fake/build.fsx/intellisense.fsx"
 open Fake.DotNet
 
+let Release_2_1_105 (options: DotNet.CliInstallOptions) =
+    { options with
+        InstallerOptions = (fun io ->
+            { io with
+                Branch = "release/2.1.105"
+            })
+        Channel = None
+        Version = DotNet.Version "2.1.105"
+    }
+
 // Lazily install DotNet SDK in the correct version if not available
-let install = lazy DotNet.install DotNet.Release_2_1_105
+let install = lazy DotNet.install Release_2_1_105
 
 // Define general properties across various commands (with arguments)
 let inline withWorkDir wd =
