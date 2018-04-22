@@ -1,9 +1,13 @@
 #!/usr/bin/env fsharpi
 
 #r "paket: groupref Build
+nuget Fake.DotNet.AssemblyInfo
+nuget Fake.Core.Target
 nuget Fake.DotNet.Cli //"
 #load ".fake/build.fsx/intellisense.fsx"
+open Fake.Core
 open Fake.DotNet
+open System.IO
 
 let Release_2_1_105 (options: DotNet.CliInstallOptions) =
     { options with
@@ -26,5 +30,23 @@ let inline withWorkDir wd =
 // Set general properties without arguments
 let inline dotnetSimple arg = DotNet.Options.lift install.Value arg
 
-DotNet.restore dotnetSimple "Suave.sln"
-DotNet.exec dotnetSimple "build" "Suave.sln"
+let projects =
+  !! "src/**/Suave.*.fsproj"
+
+Target.create "Restore" <| fun _ ->
+  DotNet.restore dotnetSimple "Suave.sln"
+
+Target.create "AsmInfo" <| fun _ ->
+  let commitHash = Information.getCurrentHash()
+  projects |> Seq.iter (fun project ->
+    let dir = Path.GetDirectoryName project
+    let name = Path.GetFileNameWithoutExtension project
+    let filePath = dir </> "AssemblyInfo.fs"
+    AssemblyInfoFile.createFSharp filePath
+      [AssemblyInfo.Title name
+       AssemblyInfo.Description "Suave — a smooth, open source, F# web server."
+       AssemblyInfo.Version version
+       AssemblyInfo.FileVersion version])
+
+Target.create "Build" <| fun _ ->
+  DotNet.exec dotnetSimple "build" "Suave.sln"
