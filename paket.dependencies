@@ -30,7 +30,6 @@ group Build
   nuget Fake.Core.Target
   nuget Fake.Core.Process
   nuget Fake.Core.String
-  nuget Fake.DotNet.AssemblyInfoFile
   nuget Fake.Core.ReleaseNotes
   nuget Fake.IO.FileSystem
   nuget Fake.Tools.Git

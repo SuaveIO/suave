@@ -39,16 +39,17 @@ Target.create "Restore" <| fun _ ->
   DotNet.restore dotnetSimple "Suave.sln"
 
 Target.create "AsmInfo" <| fun _ ->
-  let commitHash = Git.Information.getCurrentHash()
   projects |> Seq.iter (fun project ->
     let dir = Path.GetDirectoryName project
     let name = Path.GetFileNameWithoutExtension project
     let filePath = dir </> "AssemblyInfo.fs"
     AssemblyInfoFile.createFSharp filePath
-      [AssemblyInfo.Title name
-       AssemblyInfo.Description "Suave — a smooth, open source, F# web server."
-       AssemblyInfo.Version version
-       AssemblyInfo.FileVersion version])
+      [ AssemblyInfo.Title name
+        AssemblyInfo.Description "Suave — a smooth, open source, F# web server."
+        AssemblyInfo.Version version
+        AssemblyInfo.FileVersion version
+        AssemblyInfo.Metadata ("Commit", Git.Information.getCurrentHash ())
+      ])
 
 Target.create "Replace" <| fun _ ->
   // TODO: replace Logary.Facade with Suave.Logging
@@ -56,5 +57,13 @@ Target.create "Replace" <| fun _ ->
 
 Target.create "Build" <| fun _ ->
   DotNet.build dotnetSimple "Suave.sln"
+
+// Dependencies
+open Fake.Core.TargetOperators
+
+"Restore"
+  ==> "AsmInfo"
+  ==> "Replace"
+  ==> "Build"
 
 Target.runOrDefault "Build"
