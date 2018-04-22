@@ -1,30 +1,28 @@
-framework: NET46
-source https://nuget.org/api/v2
-redirects auto
+source https://api.nuget.org/v3/index.json
+framework net461, netcoreapp2.0, netstandard2.0
+storage none
 
-nuget FSharp.Core ~> 3.1.2
-nuget openssl.redist
+nuget FSharp.Core !~> 4.3.4
+nuget openssl.redist # TO CONSIDER https://www.nuget.org/packages/System.Security.Cryptography.OpenSsl/4.4.0
 nuget DotLiquid
 nuget RazorEngine
+nuget Libuv
 
 github haf/YoLo YoLo.fs
 github logary/logary:c70468f60602e1ab954a38e574b946d4ffbda11d src/Logary.Facade/Facade.fs
 
 group Build
-  source https://nuget.org/api/v2
-  nuget NuGet.CommandLine
-
-group Libuv
-  storage: none
-  source https://nuget.org/api/v2
-  nuget libuv
+  source https://api.nuget.org/v3/index.json
+  nuget FAKE
+  github fsharp/FAKE modules/Octokit/Octokit.fsx
 
 group Tests
-  framework: NET46
-  source https://nuget.org/api/v2
-  nuget FSharp.Core ~> 4 redirects: force
-  nuget System.Reflection.Metadata 1.4.1
-  nuget WebSocketSharp
+  framework net461, netcoreapp2.0, netstandard2.0
+  source https://api.nuget.org/v3/index.json
+  storage none
+  nuget FSharp.Core !~> 4.3.4
+  nuget System.Reflection.Metadata ~> 1.5
+  nuget WebSocketSharp prerelease
   nuget FsCheck
   nuget Expecto
   nuget Expecto.FsCheck
@@ -34,14 +32,12 @@ group Tests
   nuget DotLiquid
 
 group Examples
-  framework: NET46
-  source https://nuget.org/api/v2
-  nuget FSharp.Core ~> 4 redirects: force
+  framework net461, netcoreapp2.0
+  source https://api.nuget.org/v3/index.json
+  nuget FSharp.Core !~> 4.3.4
   nuget Topshelf.FSharp
-  nuget Topshelf ~> 3
+  nuget Topshelf prerelease
   nuget Nancy.Owin
-  nuget Freya 3.0.0-b300
-  nuget Freya.Core 3.0.0-b300
   nuget Microsoft.Owin
   nuget Microsoft.Owin.Hosting
   nuget Owin
@@ -51,9 +47,9 @@ group Examples
   github haf/YoLo YoLo.fs
 
 group Docs
-  framework: NET46
+  framework netcoreapp2.0
   source https://nuget.org/api/v2
-  nuget FSharp.Core ~> 4 redirects: force
+  nuget FSharp.Core !~> 4.3.4
   nuget FsLibTool
   nuget Argu
   nuget Stripe.net
