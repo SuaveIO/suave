@@ -18,33 +18,52 @@ github logary/logary:c70468f60602e1ab954a38e574b946d4ffbda11d src/Logary.Facade/
 
 group Build
   source https://api.nuget.org/v3/index.json
-  nuget FAKE
-  github fsharp/FAKE modules/Octokit/Octokit.fsx
+  framework: netstandard2.0
+  storage:none
+
+  clitool dotnet-fake
+  nuget NETStandard.Library.NETFramework
+  nuget Fake.DotNet.Cli
+  nuget Fake.DotNet.Paket
+  nuget Fake.Core.Target
+  nuget Fake.Core.Process
+  nuget Fake.Core.String
+  nuget Fake.Core.ReleaseNotes
+  nuget Fake.IO.FileSystem
+  nuget Fake.Tools.Git
 
 group Examples
-  framework net461, netcoreapp2.0
   source https://api.nuget.org/v3/index.json
+  framework net461, netcoreapp2.0
   nuget FSharp.Core !~> 4.3.4
   nuget Topshelf.FSharp
   nuget Topshelf prerelease
-  nuget Microsoft.Owin
-  nuget Microsoft.Owin.Hosting
-  nuget Owin
-  nuget Nancy.Owin
-  nuget Microsoft.AspNet.SignalR.Owin
   github haf/YoLo YoLo.fs
 
 group Docs
+  source https://api.nuget.org/v3/index.json
   framework netcoreapp2.0
-  source https://nuget.org/api/v2
-  nuget FSharp.Core !~> 4.3.4
-  nuget FsLibTool
+
+group Docs
+  source https://api.nuget.org/v3/index.json
+  framework: netstandard2.0
+  storage:none
+
+  clitool dotnet-fable
   nuget Argu
+  nuget FSharp.Core !~> 4.3.4
+  nuget Fable.Core
+  nuget Fable.Import.Browser
+  nuget Fable.Import.Node
+  nuget Fable.PowerPack
+  nuget Fable.React prerelease
+  nuget FsLibTool
+  nuget Fulma prerelease
   nuget Stripe.net
   github haf/YoLo YoLo.fs
 
 group SourceLink
+  source https://api.nuget.org/v3/index.json
   storage: none
-  source https://nuget.org/api/v2
   nuget SourceLink.Create.CommandLine 2.7.2
   nuget SourceLink.Embed.PaketFiles 2.7.2

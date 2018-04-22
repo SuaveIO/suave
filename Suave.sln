@@ -19,7 +19,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "docs", "docs", "{C7760769-4
 		.\README.md = .\README.md
 	EndProjectSection
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Suave.Experimental", "src\Experimental\Suave.Experimental.fsproj", "{488FC139-5013-46A2-9982-2C40A6F1F777}"
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Suave.Experimental", "src\Suave.Experimental\Suave.Experimental.fsproj", "{488FC139-5013-46A2-9982-2C40A6F1F777}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "examples", "examples", "{E05A9F83-E283-4258-AB0E-AF626002B6EF}"
 EndProject
