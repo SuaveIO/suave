@@ -1,5 +1,7 @@
 bin/
 obj/
+.fake/
+.idea/
 packages/
 build/
 gh-pages/
@@ -19,7 +21,7 @@ _UpgradeReport_Files/
 Backup/
 test-results/
 
-AssemblyVersionInfo.fs
+AssemblyInfo.fs
 paket.exe
 *.lock
 !paket.lock

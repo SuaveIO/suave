@@ -1,66 +1,71 @@
-framework: NET46
-source https://nuget.org/api/v2
-redirects auto
+source https://api.nuget.org/v3/index.json
+framework net461, netcoreapp2.0, netstandard2.0
+storage none
 
-nuget FSharp.Core ~> 3.1.2
-nuget openssl.redist
+nuget FSharp.Core !~> 4.3.4
 nuget DotLiquid
-nuget RazorEngine
+nuget Libuv
+nuget System.Reflection.Metadata ~> 1.5
+nuget WebSocketSharp prerelease
+nuget FsCheck
+nuget Expecto
+nuget Expecto.FsCheck
+nuget Expecto.BenchmarkDotNet
+nuget Http.fs
 
 github haf/YoLo YoLo.fs
 github logary/logary:c70468f60602e1ab954a38e574b946d4ffbda11d src/Logary.Facade/Facade.fs
 
 group Build
-  source https://nuget.org/api/v2
-  nuget NuGet.CommandLine
+  source https://api.nuget.org/v3/index.json
+  framework: netstandard2.0
+  storage:none
 
-group Libuv
-  storage: none
-  source https://nuget.org/api/v2
-  nuget libuv
-
-group Tests
-  framework: NET46
-  source https://nuget.org/api/v2
-  nuget FSharp.Core ~> 4 redirects: force
-  nuget System.Reflection.Metadata 1.4.1
-  nuget WebSocketSharp
-  nuget FsCheck
-  nuget Expecto
-  nuget Expecto.FsCheck
-  nuget Expecto.BenchmarkDotNet
-  nuget Http.fs
-  nuget FSharp.Charting
-  nuget DotLiquid
+  clitool dotnet-fake
+  nuget NETStandard.Library.NETFramework
+  nuget Fake.DotNet.Cli
+  nuget Fake.DotNet.Paket
+  nuget Fake.DotNet.AssemblyInfoFile
+  nuget Fake.DotNet.Testing.Expecto
+  nuget Fake.Core.Target
+  nuget Fake.Core.Process
+  nuget Fake.Core.String
+  nuget Fake.Core.ReleaseNotes
+  nuget Fake.IO.FileSystem
+  nuget Fake.Tools.Git
 
 group Examples
-  framework: NET46
-  source https://nuget.org/api/v2
-  nuget FSharp.Core ~> 4 redirects: force
+  source https://api.nuget.org/v3/index.json
+  framework net461, netcoreapp2.0
+  nuget FSharp.Core !~> 4.3.4
   nuget Topshelf.FSharp
-  nuget Topshelf ~> 3
-  nuget Nancy.Owin
-  nuget Freya 3.0.0-b300
-  nuget Freya.Core 3.0.0-b300
-  nuget Microsoft.Owin
-  nuget Microsoft.Owin.Hosting
-  nuget Owin
-  nuget Chiron
-  nuget identityserver3
-  nuget Microsoft.AspNet.SignalR.Owin
+  nuget Topshelf prerelease
   github haf/YoLo YoLo.fs
 
 group Docs
-  framework: NET46
-  source https://nuget.org/api/v2
-  nuget FSharp.Core ~> 4 redirects: force
-  nuget FsLibTool
+  source https://api.nuget.org/v3/index.json
+  framework netcoreapp2.0
+
+group Docs
+  source https://api.nuget.org/v3/index.json
+  framework: netcoreapp2.0
+  storage:none
+
+  clitool dotnet-fable
   nuget Argu
+  nuget FSharp.Core !~> 4.3.4
+  nuget Fable.Core
+  nuget Fable.Import.Browser
+  nuget Fable.Import.Node
+  nuget Fable.PowerPack
+  nuget Fable.React prerelease
+  nuget FsLibTool
+  nuget Fulma prerelease
   nuget Stripe.net
   github haf/YoLo YoLo.fs
 
 group SourceLink
+  source https://api.nuget.org/v3/index.json
   storage: none
-  source https://nuget.org/api/v2
   nuget SourceLink.Create.CommandLine 2.7.2
   nuget SourceLink.Embed.PaketFiles 2.7.2

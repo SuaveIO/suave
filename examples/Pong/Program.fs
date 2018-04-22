@@ -1,5 +1,6 @@
-﻿open Suave
-open Suave.Http
+﻿module Pong.Program
+
+open Suave
 open Suave.Successful
 open System
 open System.Net
@@ -30,14 +31,12 @@ let execute cmd args =
   proc.StartInfo.Arguments        <- args
   proc.StartInfo.CreateNoWindow   <- true
 
-  let r = proc.Start()
+  let _ = proc.Start()
   proc.WaitForExit()
   proc.StandardOutput.ReadToEnd()
 
-open System.Text.RegularExpressions
-
 [<EntryPoint>]
-let main _ =
+let main argv =
   let cts = new CancellationTokenSource()
   let listening, server = startWebServerAsync config app
   Async.Start(server, cts.Token)

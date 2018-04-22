@@ -150,10 +150,10 @@ let enableRebinding (listenSocket: Socket) =
   let mutable optionValue = 1
   let mutable setsockoptStatus = 0
 
-  if RuntimeInformation.IsOSPlatform(OSPlatform.Linux) then  
+  if RuntimeInformation.IsOSPlatform(OSPlatform.Linux) then
     setsockoptStatus <- setsockopt(listenSocket.Handle, SOL_SOCKET_LINUX, SO_REUSEADDR_LINUX, NativePtr.toNativeInt<int> &&optionValue, uint32(sizeof<int>))
-  else if RuntimeInformation.IsOSPlatform(OSPlatform.OSX) then  
-    setsockoptStatus <- setsockopt(listenSocket.Handle, SOL_SOCKET_OSX, SO_REUSEADDR_OSX, NativePtr.toNativeInt<int> &&optionValue, uint32(sizeof<int>))    
+  else if RuntimeInformation.IsOSPlatform(OSPlatform.OSX) then
+    setsockoptStatus <- setsockopt(listenSocket.Handle, SOL_SOCKET_OSX, SO_REUSEADDR_OSX, NativePtr.toNativeInt<int> &&optionValue, uint32(sizeof<int>))
 
   if setsockoptStatus <> 0 then
     logger.warn(

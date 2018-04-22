@@ -1,27 +1,41 @@
----
 language: csharp
-
-os:
-  - linux
-  - osx
-
 dist: trusty
-
+sudo: false
 dotnet: 2.0.3
 
-mono:
- - 5.4.0
- - 5.4.1
- - latest # => "stable release"
- - weekly # => "latest commits"
+matrix:
+  fast_finish: true
+  
+  include:
+    - os: linux
+      mono: 5.8.1
+    - os: linux
+      mono: weekly
+    - os: linux
+      mono: latest
+    - os: osx
+      osx_image: xcode9.3
+      mono: 5.4.1
+    - os: osx
+      osx_image: xcode9.3
+      mono: 5.8.1
+    - os: osx
+      osx_image: xcode9.3
+      mono: latest
 
-install:
- - rvm install 2.2.3
- - gem install bundler
- - if [ "$TRAVIS_OS_NAME" == "linux" ];
-   then sudo apt-get update -y;
-   else brew update;
-   fi
+  allow_failures:
+    - mono: weekly # latest commit
+    - mono: latest # "stable" release
+
+addons:
+  apt:
+    packages:
+    - dotnet-sharedframework-microsoft.netcore.app-1.1.2
+
+env:
+  global:
+    - DOTNET_CLI_TELEMETRY_OPTOUT: 1
+    - DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
 
 before_script:
  - if [ "$TRAVIS_OS_NAME" == "linux" ];
@@ -30,9 +44,4 @@ before_script:
    fi
 
 script:
- - bundle && bundle exec rake ci
-
-matrix:
-  allow_failures:
-    - mono: latest
-    - mono: weekly
+  - ./build.sh
