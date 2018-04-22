@@ -17,6 +17,8 @@ open System.IO
 open System.Text
 Console.OutputEncoding <- Encoding.UTF8
 
+// brew install libuv
+
 let release = ReleaseNotes.load "RELEASE_NOTES.md"
 let Configuration = Environment.environVarOrDefault "CONFIGURATION" "Release"
 
@@ -76,7 +78,7 @@ Target.create "Build" <| fun _ ->
 
 Target.create "Tests" <| fun _ ->
   let path = "src" </> "Suave.Tests"
-  let res = DotNet.exec id "run" (sprintf "%s --framework netcoreapp2.0 -- --debug --summary --sequenced" path)
+  let res = DotNet.exec id "run" (sprintf "--framework netcoreapp2.0 --project %s -- --debug --summary --sequenced" path)
   if not res.OK then
     res.Errors |> Seq.iter (eprintfn "%s")
     failwith "Tests failed."
