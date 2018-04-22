@@ -13,7 +13,7 @@
       <Paket>True</Paket>
       <Link>Utils/Facade.fs</Link>
     </Compile>
-    <Compile Include="AssemblyInfo.fs" />
+    <Compile Include="AssemblyInfo.fs" Condition="Exists('AssemblyInfo.fs')" />
     <Compile Include="Utils/Aether.fs" />
     <Compile Include="Utils/AsyncExtensions.fs" />
     <Compile Include="Utils/AsyncResultCell.fs" />

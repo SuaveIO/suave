@@ -50,6 +50,10 @@ Target.create "AsmInfo" <| fun _ ->
        AssemblyInfo.Version version
        AssemblyInfo.FileVersion version])
 
+Target.create "Replace" <| fun _ ->
+  // TODO: replace Logary.Facade with Suave.Logging
+  ()
+
 Target.create "Build" <| fun _ ->
   DotNet.build dotnetSimple "Suave.sln"
 

@@ -2,8 +2,6 @@
 
 open Argu
 open Suave
-open Suave.Utils
-open Suave.Http
 open Suave.Filters
 open Suave.Redirection
 open Suave.RequestErrors
@@ -16,7 +14,7 @@ open System.IO
 open System.Net
 open Stripe
 
-let logger = Log.create "Server"
+let logger = Log.create "Suave.IO"
 
 type Arguments =
   | [<Mandatory>] Binding of string * int
@@ -27,17 +25,6 @@ with
       match s with
       | Home _ -> "specify a working directory."
       | Binding _ -> "specify a listener '<hostname> <port>'"
-
-
-let ensureTLS12() =
-  let provider = Env.var "MONO_TLS_PROVIDER"
-  match provider with
-  | Some value when value <> "btls" ->
-    failwith "MONO_TLS_PROVIDER must equal 'btls'"
-  | None ->
-    failwith "MONO_TLS_PROVIDER must equal 'btls'"
-  | _ ->
-    ()
 
 let addExnLogging (fwp: 'a -> WebPart) =
   fun input ctx ->
@@ -74,7 +61,7 @@ let subscribeCustomer =
       return email, token, tokenType, planId
   }) (addExnLogging callApi) BAD_REQUEST
 
-let app : WebPart =
+let app: WebPart =
   choose [
     POST >=> path "/promote" >=> subscribeCustomer
     Files.browseHome
@@ -84,11 +71,10 @@ let app : WebPart =
 
 [<EntryPoint>]
 let main argv =
-  let parser = ArgumentParser.Create("""mono server.exe --binding <ip4oripv6> <port> --home <homedir>""")
+  let parser = ArgumentParser.Create("""dotnet run -- --binding <ip4oripv6> <port> --home <homedir>""")
   let parsed = parser.Parse argv
   let (host, port) = parsed.GetResult <@ Binding @>
   let home = parsed.GetResult <@ Home @> |> Path.GetFullPath
-  ensureTLS12 ()
   ServicePointManager.SecurityProtocol <- SecurityProtocolType.Tls12
   StripeConfiguration.SetApiKey (Env.varRequired "STRIPE_PRIVATE_KEY")
 

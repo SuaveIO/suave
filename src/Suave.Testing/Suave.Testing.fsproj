@@ -5,7 +5,7 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="AssemblyInfo.fs" />
+    <Compile Include="AssemblyInfo.fs" Condition=" Exists('AssemblyInfo.fs') " />
     <Compile Include="Testing.fs" />
     <ProjectReference Include="..\Suave\Suave.fsproj" />
   </ItemGroup>

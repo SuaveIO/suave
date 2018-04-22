@@ -6,6 +6,7 @@
     <UseStandardResourceNames>false</UseStandardResourceNames>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="AssemblyInfo.fs" Condition=" Exists('AssemblyInfo.fs') " />
     <Content Include="large_xml.xml" />
     <Content Include="PerfLab.fsx" />
     <Compile Include="AssemblyVersionInfo.fs" Condition="Exists('AssemblyVersionInfo.fs')" />
@@ -44,9 +45,6 @@
     <Compile Include="Types.fs" />
     <Compile Include="WebSocket.fs" />
 
-    <!-- No RazorEngine for netcore -->
-    <!-- Compile Include="Razor.fs" /-->
-
     <Compile Include="DotLiquid.fs" />
     <Compile Include="ServerKey.fs" />
     <Compile Include="ExpectoExtensions.fs" />
@@ -78,13 +76,6 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="request-hangs.txt">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <None Include="App.config" />
-    <Content Include="Views\razor.cshtml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Views\razor-de-DE.cshtml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="fallback.cshtml">

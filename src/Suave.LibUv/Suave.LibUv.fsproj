@@ -7,7 +7,7 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="AssemblyInfo.fs" />
+    <Compile Include="AssemblyInfo.fs" Condition=" Exists('AssemblyInfo.fs') " />
     <Compile Include="Native.fs" />
     <Compile Include="Tcp.fs" />
     <Compile Include="LibUvServerFactory.fs" />

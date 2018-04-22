@@ -2,7 +2,7 @@
 /// library. See https://github.com/logary/logary for details. This module is
 /// completely stand-alone in that it has no external references and its adapter
 /// in Logary has been well tested.
-namespace Logary.Facade
+namespace Suave.Logging
 
 open System
 open System.Runtime.CompilerServices
@@ -230,35 +230,35 @@ module LoggerEx =
     /// Log with backpressure
     member x.verboseWithBP (messageFactory : LogLevel -> Message) : Async<unit> =
       x.log Verbose messageFactory
-      
+
     member x.debug (messageFactory : LogLevel -> Message) : unit =
       logWithTimeout x Debug messageFactory |> Async.Start
 
     /// Log with backpressure
     member x.debugWithBP (messageFactory : LogLevel -> Message) : Async<unit> =
       x.log Debug messageFactory
-      
+
     member x.info (messageFactory : LogLevel -> Message) : unit =
       logWithTimeout x Info messageFactory |> Async.Start
 
     /// Log with backpressure
     member x.infoWithBP (messageFactory : LogLevel -> Message) : Async<unit> =
       x.log Info messageFactory
-      
+
     member x.warn (messageFactory : LogLevel -> Message) : unit =
       logWithTimeout x Warn messageFactory |> Async.Start
 
     /// Log with backpressure
     member x.warnWithBP (messageFactory : LogLevel -> Message) : Async<unit> =
       x.log Warn messageFactory
-      
+
     member x.error (messageFactory : LogLevel -> Message) : unit =
       logWithTimeout x Error messageFactory |> Async.Start
 
     /// Log with backpressure
     member x.errorWithBP (messageFactory : LogLevel -> Message) : Async<unit> =
       x.log Error messageFactory
-      
+
     member x.fatal (messageFactory : LogLevel -> Message) : unit =
       logWithTimeout x Fatal messageFactory |> Async.Start
 
@@ -697,16 +697,16 @@ module internal LiterateFormatting =
     let foundProp (prop: FsMtParser.Property) = tokens.Add (PropToken (prop.name, prop.format))
     FsMtParser.parseParts template foundText foundProp
     tokens :> seq<TemplateToken>
-  
+
   [<AutoOpen>]
   module OutputTemplateTokenisers =
 
-    let tokeniseTimestamp format (options : LiterateOptions) (message : Message) = 
+    let tokeniseTimestamp format (options : LiterateOptions) (message : Message) =
       let localDateTimeOffset = DateTimeOffset(message.utcTicks, TimeSpan.Zero).ToLocalTime()
       let formattedTimestamp = localDateTimeOffset.ToString(format, options.formatProvider)
       seq { yield formattedTimestamp, Subtext }
 
-    let tokeniseTimestampUtc format (options : LiterateOptions) (message : Message) = 
+    let tokeniseTimestampUtc format (options : LiterateOptions) (message : Message) =
       let utcDateTimeOffset = DateTimeOffset(message.utcTicks, TimeSpan.Zero)
       let formattedTimestamp = utcDateTimeOffset.ToString(format, options.formatProvider)
       seq { yield formattedTimestamp, Subtext }
@@ -737,7 +737,7 @@ module internal LiterateFormatting =
   /// would be: `[{timestampLocal:HH:mm:ss} {level}] {message}{newline}{exceptions}`.
   /// Available template fields are: `timestamp`, `timestampUtc`, `level`, `source`,
   /// `newline`, `tab`, `message`, `exceptions`. Any misspelled or otheriwese invalid property
-  /// names will be treated as `LiterateToken.MissingTemplateField`. 
+  /// names will be treated as `LiterateToken.MissingTemplateField`.
   let tokeniserForOutputTemplate template : LiterateTokeniser =
     let tokens = parseTemplate template
     fun options message ->
