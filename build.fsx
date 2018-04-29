@@ -5,8 +5,7 @@
 open Fake
 open Fake.Core
 open Fake.DotNet
-open Fake.DotNet.Testing
-open Fake.Api.Github
+open Fake.Api
 open Fake.Tools
 open Fake.IO
 open Fake.IO.Globbing.Operators
@@ -50,7 +49,7 @@ let projects =
 Target.create "Clean" <| fun _ ->
   !! "src/**/bin"
   ++ "src/**/obj"
-  |> Shell.CleanDirs
+  |> Shell.cleanDirs
 
 Target.create "Restore" <| fun _ ->
   DotNet.restore dotnetSimple "Suave.sln"
@@ -65,7 +64,7 @@ Target.create "AsmInfo" <| fun _ ->
         AssemblyInfo.Description "Suave — a smooth, open source, F# web server."
         AssemblyInfo.Version release.AssemblyVersion
         AssemblyInfo.FileVersion release.AssemblyVersion
-        AssemblyInfo.Metadata ("Commit", Information.getCurrentHash ())
+        AssemblyInfo.Metadata ("Commit", Git.Information.getCurrentHash ())
       ])
 
 Target.create "Replace" <| fun _ ->
@@ -107,10 +106,10 @@ Target.create "Release" <| fun _ ->
   Git.Branches.tag "" tag
   Git.Branches.pushTag "" remote tag
 
-  Github.createClientWithToken (envRequired "GITHUB_TOKEN")
-  |> Github.draftNewRelease gitOwner gitName release.NugetVersion
+  GitHub.createClientWithToken (Environment.environVarOrFail "GITHUB_TOKEN")
+  |> GitHub.draftNewRelease gitOwner gitName release.NugetVersion
       (Option.isSome release.SemVer.PreRelease) release.Notes
-  |> Github.publishDraft
+  |> GitHub.publishDraft
   |> Async.RunSynchronously
 
 // Dependencies
