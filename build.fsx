@@ -90,12 +90,12 @@ Target.create "CheckEnv" <| fun _ ->
   ignore (Environment.environVarOrFail "GITHUB_TOKEN")
 
 Target.create "Release" <| fun _ ->
-  let gitOwner, gitName = "logary", "logary"
+  let gitOwner, gitName = "SuaveIO", "suave"
   let gitOwnerName = gitOwner + "/" + gitName
   let remote =
       Git.CommandHelper.getGitResult "" "remote -v"
       |> Seq.tryFind (fun s -> s.EndsWith "(push)" && s.Contains gitOwnerName)
-      |> function None -> "git@github.com:logary/logary.git"
+      |> function None -> "git@github.com:SuaveIO/suave.git"
                 | Some s -> s.Split().[0]
 
   Git.Staging.stageAll ""
