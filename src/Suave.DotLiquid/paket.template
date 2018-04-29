@@ -4,3 +4,10 @@ owners Ademar Gonzalez, Henrik Feldt
 description Suave is a simple web development F# library providing a lightweight web server and a set of combinators to manipulate route flow and task composition.
 licenseUrl https://github.com/SuaveIO/Suave/blob/master/LICENSE
 iconUrl https://raw.githubusercontent.com/SuaveIO/resources/master/images/head_trans.png
+files
+  bin/Release/net461/Suave.DotLiquid.dll => lib/net461
+  bin/Release/net461/Suave.DotLiquid.xml => lib/net461
+  bin/Release/net461/Suave.DotLiquid.pdb => lib/net461
+  bin/Release/netstandard2.0/Suave.DotLiquid.dll => lib/netstandard2.0
+  bin/Release/netstandard2.0/Suave.DotLiquid.xml => lib/netstandard2.0
+  bin/Release/netstandard2.0/Suave.DotLiquid.pdb => lib/netstandard2.0
