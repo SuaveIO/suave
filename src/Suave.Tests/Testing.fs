@@ -1,3 +1,5 @@
+module Suave.Testing
+
 (** For testing suave applications easily
 
 Example:
@@ -20,7 +22,6 @@ Example:
     Expect.equal  "Bob <bob@wishfulcoding.mailgun.org>" ""
 
 *)
-module Suave.Testing
 
 open System
 open System.Diagnostics

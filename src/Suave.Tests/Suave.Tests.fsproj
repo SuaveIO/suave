@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFrameworks>net461;netcoreapp2.0</TargetFrameworks>
     <AssemblyName>Suave.Tests</AssemblyName>
@@ -7,6 +7,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" Condition=" Exists('AssemblyInfo.fs') " />
+    <Compile Include="Testing.fs" />
     <Content Include="large_xml.xml" />
     <Content Include="PerfLab.fsx" />
     <Compile Include="AssemblyVersionInfo.fs" Condition="Exists('AssemblyVersionInfo.fs')" />
@@ -25,7 +26,7 @@
     <Compile Include="Web.fs" />
     <Compile Include="HttpWriters.fs" />
     <Compile Include="HttpFile.fs" />
-    <Compile Include="HttpEmbedded.fs" /> 
+    <Compile Include="HttpEmbedded.fs" />
     <Compile Include="HttpVerbs.fs" />
     <Compile Include="HttpApplicatives.fs" />
     <Compile Include="HttpAuthentication.fs" />
@@ -44,7 +45,6 @@
     <Compile Include="Cookie.fs" />
     <Compile Include="Types.fs" />
     <Compile Include="WebSocket.fs" />
-
     <Compile Include="DotLiquid.fs" />
     <Compile Include="ServerKey.fs" />
     <Compile Include="ExpectoExtensions.fs" />
@@ -94,7 +94,6 @@
   <ItemGroup>
     <ProjectReference Include="..\Suave\Suave.fsproj" />
     <ProjectReference Include="..\Suave.LibUv\Suave.LibUv.fsproj" />
-    <ProjectReference Include="..\Suave.Testing\Suave.Testing.fsproj" />
     <ProjectReference Include="..\Suave.DotLiquid\Suave.DotLiquid.fsproj" />
   </ItemGroup>
   <Import Project="..\..\.paket\Paket.Restore.targets" />

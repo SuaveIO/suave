@@ -44,7 +44,9 @@ let inline withWorkDir wd =
 let inline dotnetSimple arg = DotNet.Options.lift install.Value arg
 
 let projects =
-  !! "src/**/Suave.*.fsproj"
+  !! "src/**/Suave*.fsproj"
+  -- "src/*.Tests/*.fsproj"
+  -- "src/*.IO/*.fsproj"
 
 Target.create "Clean" <| fun _ ->
   !! "src/**/bin"
@@ -83,8 +85,23 @@ Target.create "Tests" <| fun _ ->
     failwith "Tests failed."
 
 Target.create "Pack" <| fun _ ->
-  projects |> Seq.iter (fun project ->
-    DotNet.Paket.pack (fun opts -> { opts with WorkingDir = Path.GetDirectoryName project }))
+  let pkg = Path.GetFullPath "./pkg"
+  let props (project: string) (p: Paket.PaketPackParams) =
+    { p with OutputPath = pkg
+             IncludeReferencedProjects = true
+             Symbols = true
+             ProjectUrl = "https://suave.io"
+             Version = release.SemVer.ToString()
+             WorkingDir = Path.GetDirectoryName project
+             ReleaseNotes = String.Join("\n", release.Notes)
+             //LicenseUrl = "https://opensource.org/licenses/Apache-2.0"
+             TemplateFile = "paket.template" }
+
+  projects
+  |> Seq.iter (fun project -> DotNet.Paket.pack (props project))
+
+Target.create "Push" <| fun _ ->
+  Paket.push (fun p -> { p with WorkingDir = "./pkg" })
 
 Target.create "CheckEnv" <| fun _ ->
   ignore (Environment.environVarOrFail "GITHUB_TOKEN")

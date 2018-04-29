@@ -1,0 +1,6 @@
+type project
+authors Ademar Gonzalez, Henrik Feldt
+owners Ademar Gonzalez, Henrik Feldt
+description Suave is a simple web development F# library providing a lightweight web server and a set of combinators to manipulate route flow and task composition.
+licenseUrl https://github.com/SuaveIO/Suave/blob/master/LICENSE
+iconUrl https://raw.githubusercontent.com/SuaveIO/resources/master/images/head_trans.png
