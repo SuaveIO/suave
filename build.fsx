@@ -101,9 +101,12 @@ Target.create "Pack" <| fun _ ->
   |> Seq.iter (fun project -> DotNet.Paket.pack (props project))
 
 Target.create "Push" <| fun _ ->
-  Paket.push (fun p -> { p with WorkingDir = "./pkg" })
+  Paket.push (fun p ->
+    { p with WorkingDir = "./pkg"
+             ApiKey = Environment.environVarOrFail "NUGET_KEY" })
 
 Target.create "CheckEnv" <| fun _ ->
+  ignore (Environment.environVarOrFail "NUGET_KEY")
   ignore (Environment.environVarOrFail "GITHUB_TOKEN")
 
 Target.create "Release" <| fun _ ->
@@ -142,7 +145,6 @@ open Fake.Core.TargetOperators
   ==> "Build"
   ==> "Tests"
   ==> "Pack"
-  ==> "Push"
   ==> "Release"
 
 Target.runOrDefault "Tests"
