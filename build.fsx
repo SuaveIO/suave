@@ -142,6 +142,7 @@ open Fake.Core.TargetOperators
   ==> "Build"
   ==> "Tests"
   ==> "Pack"
+  ==> "Push"
   ==> "Release"
 
 Target.runOrDefault "Tests"
