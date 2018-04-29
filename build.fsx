@@ -1,20 +1,20 @@
 #!/usr/bin/env fsharpi
 
 #r "paket: groupref Build //"
-open Fake.Core
-open Fake.Core
 #load ".fake/build.fsx/intellisense.fsx"
 open Fake
 open Fake.Core
 open Fake.DotNet
 open Fake.DotNet.Testing
+open Fake.Api.Github
+open Fake.Tools
 open Fake.IO
 open Fake.IO.Globbing.Operators
 open Fake.IO.FileSystemOperators
-open Fake.Tools.Git
 open System
 open System.IO
 open System.Text
+
 Console.OutputEncoding <- Encoding.UTF8
 
 // brew install libuv
@@ -69,7 +69,7 @@ Target.create "AsmInfo" <| fun _ ->
       ])
 
 Target.create "Replace" <| fun _ ->
-  Shell.ReplaceInFiles
+  Shell.replaceInFiles
     [ "Logary.Facade", "Suave.Logging" ]
     (!! "paket-files/logary/logary/src/Logary.Facade/Facade.fs")
 
@@ -87,12 +87,37 @@ Target.create "Pack" <| fun _ ->
   projects |> Seq.iter (fun project ->
     DotNet.Paket.pack (fun opts -> { opts with WorkingDir = Path.GetDirectoryName project }))
 
+Target.create "CheckEnv" <| fun _ ->
+  ignore (Environment.environVarOrFail "GITHUB_TOKEN")
+
 Target.create "Release" <| fun _ ->
-  printfn "TODO"
-  ()
+  let gitOwner, gitName = "logary", "logary"
+  let gitOwnerName = gitOwner + "/" + gitName
+  let remote =
+      Git.CommandHelper.getGitResult "" "remote -v"
+      |> Seq.tryFind (fun s -> s.EndsWith "(push)" && s.Contains gitOwnerName)
+      |> function None -> "git@github.com:logary/logary.git"
+                | Some s -> s.Split().[0]
+
+  Git.Staging.stageAll ""
+  Git.Commit.exec "" (sprintf "Release of v%O" release.SemVer)
+  Git.Branches.pushBranch "" remote (Git.Information.getBranchName "")
+
+  let tag = sprintf "v%O" release.SemVer
+  Git.Branches.tag "" tag
+  Git.Branches.pushTag "" remote tag
+
+  Github.createClientWithToken (envRequired "GITHUB_TOKEN")
+  |> Github.draftNewRelease gitOwner gitName release.NugetVersion
+      (Option.isSome release.SemVer.PreRelease) release.Notes
+  |> Github.publishDraft
+  |> Async.RunSynchronously
 
 // Dependencies
 open Fake.Core.TargetOperators
+
+"CheckEnv"
+  ==> "Release"
 
 "Clean"
   ==> "Restore"
