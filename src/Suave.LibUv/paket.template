@@ -11,3 +11,10 @@ files
   bin/Release/netstandard2.0/Suave.LibUv.dll => lib/netstandard2.0
   bin/Release/netstandard2.0/Suave.LibUv.xml => lib/netstandard2.0
   bin/Release/netstandard2.0/Suave.LibUv.pdb => lib/netstandard2.0
+dependencies
+  framework: net461
+    FSharp.Core ~> 4
+    Suave ~> 2
+  framework: netstandard20
+    FSharp.Core ~> 4
+    Suave ~> 2
