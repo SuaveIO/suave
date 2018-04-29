@@ -7,6 +7,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".paket", ".paket", "{F0556E
 	ProjectSection(SolutionItems) = preProject
 		.\paket.dependencies = .\paket.dependencies
 		.\paket.lock = .\paket.lock
+		build.fsx = build.fsx
 	EndProjectSection
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Suave", "src\Suave\Suave.fsproj", "{3DC9193E-BD0C-4486-9C58-56B630C36623}"

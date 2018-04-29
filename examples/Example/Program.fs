@@ -18,7 +18,7 @@ let basicAuth =
   Authentication.authenticateBasic ((=) ("foo", "bar"))
 
 // This demonstrates how to customise the console logger output.
-// In most cases you wont need this. Instead you can use the more succinct: 
+// In most cases you wont need this. Instead you can use the more succinct:
 // `let logger = Targets.create Verbose [||]`
 let loggingOptions =
   { Literate.LiterateOptions.create() with
