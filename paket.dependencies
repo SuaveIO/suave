@@ -39,7 +39,6 @@ group Examples
   nuget FSharp.Core !~> 4.3.4
   nuget Topshelf.FSharp
   nuget Topshelf prerelease
-  github haf/YoLo YoLo.fs
 
 group Docs
   source https://api.nuget.org/v3/index.json
@@ -61,7 +60,6 @@ group Docs
   nuget FsLibTool
   nuget Fulma prerelease
   nuget Stripe.net
-  github haf/YoLo YoLo.fs
 
 group SourceLink
   source https://api.nuget.org/v3/index.json

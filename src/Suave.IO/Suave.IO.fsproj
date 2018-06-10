@@ -7,14 +7,13 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="..\..\paket-files\docs\haf\YoLo\YoLo.fs">
-      <Paket>True</Paket>
-      <Link>paket-files/YoLo.fs</Link>
-    </Compile>
     <None Include="Dockerfile" />
     <Compile Include="AssemblyInfo.fs" Condition=" Exists('AssemblyInfo.fs') " />
     <Compile Include="Program.fs" />
     <ProjectReference Include="..\Suave\Suave.fsproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="paket-files\" />
   </ItemGroup>
   <Import Project="..\..\.paket\Paket.Restore.targets" />
 </Project>

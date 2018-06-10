@@ -6,12 +6,11 @@
     <AssemblyName>WebSocket</AssemblyName>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="..\..\paket-files\examples\haf\YoLo\YoLo.fs">
-      <Paket>True</Paket>
-      <Link>paket-files/YoLo.fs</Link>
-    </Compile>
     <Compile Include="Program.fs" />
     <ProjectReference Include="../../src/Suave/Suave.fsproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="paket-files\" />
   </ItemGroup>
   <Import Project="..\..\.paket\Paket.Restore.targets" />
 </Project>
