@@ -73,52 +73,17 @@ All of our tests use this assembly; you can do too.
 
 # How to Build
 
-We're using a cross-platform build suite called
-[albacore](https://github.com/Albacore/albacore)/[rake](https://github.com/ruby/rake).
-
-## Build prerequisites
-
-* [Ruby](https://www.ruby-lang.org/en/documentation/installation/)
-* [RubyGems](https://rubygems.org/pages/download)
-* [Bundler](http://bundler.io/)
-* [Libuv](https://github.com/libuv/libuv)
-
-On Linux and OS X/macOS you should have ruby out of the box (you might need to install bundler though). 
-On Windows, you have to [install it](https://github.com/albacore/albacore/#installing-ruby-on-windows).
-
-To execute the build script, invoke following commands:
+To execute the build script, invoke following command on the Linux or MacOs console:
 
 ```
-bundle
-bundle exec rake
+./build.sh
 ```
 
-After you managed to build with the rake script, you can also use `./build.sh` on any OS or `build.cmd` on Windows which only compile solution and run tests. **You need msbuild on PATH**: use the VS Developer Console to build.
+Or in the Microsoft Windows MSDOS console:
 
-## Libuv installation
-
-On OS X:
-
-    brew install libuv --universal
-    and then `export LD_LIBRARY_PATH=/usr/local/lib:/usr/lib:/lib`
-
-On Windows:
-
-    @powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-FileDownload 'https://github.com/libuv/libuv/archive/v1.7.5.zip'"
-    7z x v1.7.5.zip & cd libuv-1.7.5 & vcbuild.bat x86 shared debug
-    mkdir src\\Suave.Tests\\bin\\Release\\ & cp libuv-1.7.5\\Debug\\libuv.dll src\\Suave.Tests\\bin\\Release\\libuv.dll
-
-On Linux Ubuntu/Debian:
-
-    sudo apt-get install automake libtool
-    curl -sSL https://github.com/libuv/libuv/archive/v1.7.5.tar.gz | sudo tar zxfv - -C /usr/local/src
-    cd /usr/local/src/libuv-1.7.5
-    sudo sh autogen.sh
-    sudo ./configure
-    sudo make
-    sudo make install
-    sudo rm -rf /usr/local/src/libuv-1.7.5 && cd ~/
-    sudo ldconfig
+```
+build
+```
 
 # Coding Guidelines
 
