@@ -14,9 +14,6 @@ nuget Expecto.FsCheck
 nuget Expecto.BenchmarkDotNet
 nuget Http.fs
 
-github haf/YoLo YoLo.fs
-github logary/logary:c70468f60602e1ab954a38e574b946d4ffbda11d src/Logary.Facade/Facade.fs
-
 group Build
   source https://api.nuget.org/v3/index.json
   framework: netstandard2.0

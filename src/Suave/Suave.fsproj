@@ -5,15 +5,9 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="..\..\paket-files\haf\YoLo\YoLo.fs">
-      <Paket>True</Paket>
-      <Link>Utils/YoLo.fs</Link>
-    </Compile>
-    <Compile Include="..\..\paket-files\logary\logary\src\Logary.Facade\Facade.fs">
-      <Paket>True</Paket>
-      <Link>Utils/Facade.fs</Link>
-    </Compile>
     <Compile Include="AssemblyInfo.fs" Condition="Exists('AssemblyInfo.fs')" />
+    <Compile Include="Utils/YoLo.fs" />
+    <Compile Include="Utils/Logging.fs" />
     <Compile Include="Utils/Aether.fs" />
     <Compile Include="Utils/AsyncExtensions.fs" />
     <Compile Include="Utils/AsyncResultCell.fs" />
