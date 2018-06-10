@@ -4,6 +4,7 @@ storage none
 
 nuget FSharp.Core !~> 4.3.4
 nuget DotLiquid
+nuget RazorEngine
 nuget Libuv
 nuget System.Reflection.Metadata ~> 1.5
 nuget WebSocketSharp prerelease
