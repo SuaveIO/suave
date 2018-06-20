@@ -1,3 +1,6 @@
+## New in v2.4.2 (Released 2018-06-20)
+* Improve pathScan logic
+
 ## New in v2.4.1 (Released 2018-06-10)
 * Removed external source code references from build process to address licensing concerns.
 
