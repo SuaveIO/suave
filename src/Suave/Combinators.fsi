@@ -1165,7 +1165,7 @@ module Filters =
   /// 'u', uint64</para><para>
   /// 'x', check (String.forall Char.IsLower) &gt;&gt; ((+) "0x") &gt;&gt; int64</para><para>
   /// 'X', check (String.forall Char.IsUpper) &gt;&gt; ((+) "0x") &gt;&gt; int64</para><para>
-  /// 'o', ((+) "0o") &gt;&gt; int64</para><para>
+  /// 'o', ((+) "0o") &gt;&gt; int64. Base8 numbers; e.g. "1" = 0o1 = 1, "7" = 0o7 = 7, "10" = 0o10 = 8.</para><para>
   /// 'e', float</para><para>
   /// 'E', float</para><para>
   /// 'f', float</para><para>

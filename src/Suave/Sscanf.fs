@@ -49,7 +49,7 @@ let rec getFormatters xs =
 
 // Coerce integer types
 let coerce o (v: Type) =
-  printfn "Convert %A to %s" o (v.FullName)
+  //printfn "Convert %A to %s" o (v.FullName)
   match v with
   | v when v = typeof<int16> ->
     int16 (unbox<int64> o) |> box

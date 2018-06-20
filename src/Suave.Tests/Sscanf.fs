@@ -7,7 +7,7 @@ open Suave.Sscanf
 
 [<Tests>]
 let scanTests (_ : SuaveConfig) =
-  testList "when scanning " [
+  testList "when scanning" [
     testCase "with escaped % before escaped placeholder in string" <| fun _ ->
       let result = sscanf "(%%%s,%M)" "(%hello, 4.53)"
       Expect.equal result ("hello", 4.53m) "should match correctly"
@@ -27,7 +27,7 @@ let scanTests (_ : SuaveConfig) =
 
     testCase "with mixed datatypes" <| fun _ ->
       let result = sscanf "%b-%d-%i,%u,%x,%X,%o" "false-42--31,13,ff,FF,42"
-      Expect.equal result (false, 42, -31, 13, 0xff, 0xFF, 0o42)
+      Expect.equal result (false, 42, -31, 13u, 0xff, 0xFF, 0o42)
                    "should parse each item correctly"
 
     testCase "with mixed, space separated datatypes" <| fun _ ->
