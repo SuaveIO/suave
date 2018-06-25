@@ -1,3 +1,6 @@
+## New in v2.4.3 (Released 2018-06-24)
+* Fix #702 - Can't parse  negatives number in forms
+
 ## New in v2.4.2 (Released 2018-06-20)
 * Improve pathScan logic
 

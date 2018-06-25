@@ -16,4 +16,4 @@ module Parse =
   let uint64 = parseUsing UInt64.TryParse
   let uri = parseUsing (fun s -> Uri.TryCreate(s, UriKind.RelativeOrAbsolute))
   let dateTime = parseUsing (fun s -> DateTime.TryParse(s, CultureInfo.InvariantCulture.DateTimeFormat, DateTimeStyles.RoundtripKind))
-  let decimal = parseUsing (fun s -> Decimal.TryParse(s, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture))
+  let decimal = parseUsing (fun s -> Decimal.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture))
