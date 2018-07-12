@@ -115,7 +115,7 @@ let job (serveClient : TcpWorker<unit>)
       transport       = transport
       bufferManager   = bufferManager
       lineBuffer      = bufferManager.PopBuffer "Suave.Tcp.job"
-      segments        = []
+      segments        = new LinkedList<BufferSegment>()
       lineBufferCount = 0 }
 
   try

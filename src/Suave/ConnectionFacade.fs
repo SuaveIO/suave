@@ -252,7 +252,9 @@ type Reader(segments:LinkedList<BufferSegment>, bufferManager : BufferManager, t
       }
     loop bytes
 
-type ConnectionFacade(logger:Logger,matchedBinding: HttpBinding) =
+type ConnectionFacade(connection: Connection, logger:Logger,matchedBinding: HttpBinding) =
+
+  let reader = new Reader(connection.segments,connection.bufferManager,connection.transport,connection.lineBuffer)
 
   let files = List<HttpUpload>()
   let multiPartFields = List<string*string>()
@@ -464,9 +466,6 @@ type ConnectionFacade(logger:Logger,matchedBinding: HttpBinding) =
   member this.processRequest (ctx:HttpContext) = socket {
     let verbose message = logger.verbose (eventX message)
 
-    let segments = new LinkedList<_>(ctx.connection.segments)
-    let reader = new Reader(segments,ctx.connection.bufferManager,ctx.connection.transport,ctx.connection.lineBuffer)
-
     verbose "reading first line of request"
     let! firstLine = reader.readLine
 
@@ -512,5 +511,5 @@ type ConnectionFacade(logger:Logger,matchedBinding: HttpBinding) =
     multiPartFields.Clear()
     _rawForm <- [||]
 
-    return Some { ctx with request = request; connection = { ctx.connection with segments = Seq.toList segments } }
+    return Some { ctx with request = request; }
   }

@@ -2,6 +2,8 @@
 
 open System.Net
 open System
+open System.Collections.Generic
+
 open Suave.Utils
 open Suave.Utils.Bytes
 
@@ -12,7 +14,7 @@ type Connection =
     transport     : ITransport
     bufferManager : BufferManager
     lineBuffer    : ArraySegment<byte>
-    segments      : BufferSegment list
+    segments      : LinkedList<BufferSegment>
     lineBufferCount : int }
 
   member x.ipAddr : IPAddress =
@@ -29,7 +31,7 @@ module Connection =
       transport     = null
       bufferManager = null
       lineBuffer    = ArraySegment<byte>()
-      segments      = []
+      segments      = new LinkedList<BufferSegment>()
       lineBufferCount = 0 }
 
   let inline receive (cn : Connection) (buf : ByteSegment) =
