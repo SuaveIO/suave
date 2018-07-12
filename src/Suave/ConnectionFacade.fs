@@ -260,7 +260,7 @@ type ConnectionFacade(connection: Connection, logger:Logger,matchedBinding: Http
   let multiPartFields = List<string*string>()
   let mutable _rawForm : byte array = [||]
 
-  let readFilePart (reader:Reader) boundary (headerParams : Dictionary<string,string>) fieldName contentType = socket {
+  let readFilePart boundary (headerParams : Dictionary<string,string>) fieldName contentType = socket {
     let tempFilePath = Path.GetTempFileName()
     use tempFile = new FileStream(tempFilePath, FileMode.Truncate)
     let! a =
@@ -301,7 +301,7 @@ type ConnectionFacade(connection: Connection, logger:Logger,matchedBinding: Http
       return None
     }
 
-  let parseMultipartMixed (reader:Reader) fieldName boundary : SocketOp<unit> =
+  let parseMultipartMixed fieldName boundary : SocketOp<unit> =
     let rec loop = socket {
       let! firstLine = reader.readLine
 
@@ -321,7 +321,7 @@ type ConnectionFacade(connection: Connection, logger:Logger,matchedBinding: Http
             eventX "Parsing {contentType}... -> readFilePart"
             >> setFieldValue "contentType" contentType)
 
-          let! res = readFilePart reader boundary headerParams fieldName contentType
+          let! res = readFilePart boundary headerParams fieldName contentType
 
           logger.verbose (
             eventX "Parsed {contentType} <- readFilePart"
@@ -348,7 +348,7 @@ type ConnectionFacade(connection: Connection, logger:Logger,matchedBinding: Http
     loop
 
   /// Parses multipart data from the stream, feeding it into the HttpRequest's property Files.
-  let parseMultipart (reader:Reader) (boundary:string) : SocketOp<unit> =
+  let parseMultipart (boundary:string) : SocketOp<unit> =
     let parsePart = socket {
 
         let! partHeaders = reader.readHeaders
@@ -370,7 +370,7 @@ type ConnectionFacade(connection: Connection, logger:Logger,matchedBinding: Http
         match partHeaders %% "content-type" with
         | Choice1Of2 x when String.startsWith "multipart/mixed" x ->
           let subboundary = "--" + (x.Substring(x.IndexOf('=') + 1) |> String.trimStart |> String.trimc '"')
-          do! parseMultipartMixed reader fieldName subboundary
+          do! parseMultipartMixed fieldName subboundary
           let! a = reader.skip (boundary.Length)
           return ()
 
@@ -380,7 +380,7 @@ type ConnectionFacade(connection: Connection, logger:Logger,matchedBinding: Http
             >> setFieldValue "contentType" contentType
             >> setSingleName "Suave.Web.parseMultipart")
 
-          let! res = readFilePart reader boundary headerParams fieldName contentType
+          let! res = readFilePart boundary headerParams fieldName contentType
 
           logger.verbose (
             eventX "Parsed {contentType} <- readFilePart"
@@ -420,7 +420,7 @@ type ConnectionFacade(connection: Connection, logger:Logger,matchedBinding: Http
     }
 
   /// Reads raw POST data
-  let getRawPostData (reader:Reader) contentLength =
+  let getRawPostData contentLength =
     socket {
       let offset = ref 0
       let rawForm = Array.zeroCreate contentLength
@@ -431,7 +431,7 @@ type ConnectionFacade(connection: Connection, logger:Logger,matchedBinding: Http
       return rawForm
     }
 
-  let parsePostData (reader:Reader)  maxContentLength (contentLengthHeader : Choice<string,_>) contentTypeHeader = socket {
+  let parsePostData maxContentLength (contentLengthHeader : Choice<string,_>) contentTypeHeader = socket {
     match contentLengthHeader with
     | Choice1Of2 contentLengthString ->
       let contentLength = Convert.ToInt32 contentLengthString
@@ -443,7 +443,7 @@ type ConnectionFacade(connection: Connection, logger:Logger,matchedBinding: Http
 
         match contentTypeHeader with
         | Choice1Of2 ce when String.startsWith "application/x-www-form-urlencoded" ce ->
-          let! rawForm = getRawPostData reader contentLength
+          let! rawForm = getRawPostData contentLength
           _rawForm <- rawForm
           return ()
 
@@ -451,11 +451,11 @@ type ConnectionFacade(connection: Connection, logger:Logger,matchedBinding: Http
           let boundary = "--" + (ce |> String.substring (ce.IndexOf('=') + 1) |> String.trimStart |> String.trimc '"')
 
           logger.verbose (eventX "Parsing multipart")
-          do! parseMultipart reader boundary
+          do! parseMultipart boundary
           return ()
 
         | Choice1Of2 _ | Choice2Of2 _ ->
-          let! rawForm = getRawPostData reader contentLength
+          let! rawForm = getRawPostData contentLength
           _rawForm <- rawForm
           return ()
       | Choice2Of2 _ -> return ()
@@ -492,7 +492,7 @@ type ConnectionFacade(connection: Connection, logger:Logger,matchedBinding: Http
       verbose "sent 100-continue response"
 
     verbose "parsing post data"
-    do! parsePostData reader ctx.runtime.maxContentLength (headers %% "content-length") (headers %% "content-type")
+    do! parsePostData ctx.runtime.maxContentLength (headers %% "content-length") (headers %% "content-type")
 
     let request =
       { httpVersion      = httpVersion
