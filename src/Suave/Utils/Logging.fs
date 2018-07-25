@@ -206,82 +206,34 @@ type Logger =
   /// You need to start the (cold) async value for the logging to happen.
   ///
   /// You should not do blocking/heavy operations in the callback.
-  abstract member log : LogLevel -> (LogLevel -> Message) -> Async<unit>
+  abstract member log : LogLevel -> (LogLevel -> Message) -> unit
 
 /// Syntactic sugar on top of Logger for F# libraries.
 [<AutoOpen>]
 module LoggerEx =
-  let private logWithTimeout (logger : Logger) level messageFactory =
-    async {
-      let! child = Async.StartChild (logger.log level messageFactory, 5000)
-      try
-        do! child
-      with
-      | :? TimeoutException ->
-        Console.Error.WriteLine(
-          "Logary (facade) message timed out. This means that you have an underperforming target. (Reevaluated) message name '{0}'.",
-          String.concat "." (messageFactory level).name)
-    }
-
+  
   type Logger with
+
     member x.verbose (messageFactory : LogLevel -> Message) : unit =
-      logWithTimeout x Verbose messageFactory |> Async.Start
-
-    /// Log with backpressure
-    member x.verboseWithBP (messageFactory : LogLevel -> Message) : Async<unit> =
       x.log Verbose messageFactory
-      
+
     member x.debug (messageFactory : LogLevel -> Message) : unit =
-      logWithTimeout x Debug messageFactory |> Async.Start
-
-    /// Log with backpressure
-    member x.debugWithBP (messageFactory : LogLevel -> Message) : Async<unit> =
       x.log Debug messageFactory
-      
+
     member x.info (messageFactory : LogLevel -> Message) : unit =
-      logWithTimeout x Info messageFactory |> Async.Start
-
-    /// Log with backpressure
-    member x.infoWithBP (messageFactory : LogLevel -> Message) : Async<unit> =
       x.log Info messageFactory
-      
+
     member x.warn (messageFactory : LogLevel -> Message) : unit =
-      logWithTimeout x Warn messageFactory |> Async.Start
-
-    /// Log with backpressure
-    member x.warnWithBP (messageFactory : LogLevel -> Message) : Async<unit> =
       x.log Warn messageFactory
-      
+
     member x.error (messageFactory : LogLevel -> Message) : unit =
-      logWithTimeout x Error messageFactory |> Async.Start
-
-    /// Log with backpressure
-    member x.errorWithBP (messageFactory : LogLevel -> Message) : Async<unit> =
       x.log Error messageFactory
-      
-    member x.fatal (messageFactory : LogLevel -> Message) : unit =
-      logWithTimeout x Fatal messageFactory |> Async.Start
 
-    /// Log with backpressure
-    member x.fatalWithBP (messageFactory : LogLevel -> Message) : Async<unit> =
+    member x.fatal (messageFactory : LogLevel -> Message) : unit =
       x.log Fatal messageFactory
 
-    /// Log a message, but don't synchronously wait for the message to be placed
-    /// inside the logging library's buffers. Instead the message will be added
-    /// to the logging library's buffers asynchronously (with respect to the
-    /// caller) with a timeout of 5 seconds, and will then be dropped.
-    ///
-    /// This is the way we avoid the unbounded buffer problem.
-    ///
-    /// If you have dropped messages, they will be logged to STDERR. You should load-
-    /// test your app to ensure that your targets can send at a rate high enough
-    /// without dropping messages.
-    ///
-    /// It's recommended to have alerting on STDERR.
     member x.logSimple message : unit =
-      logWithTimeout x message.level (fun _ -> message) |> Async.Start
-
-    // TODO: timeXXX functions
+      x.log message.level (fun _ -> message)
 
 type LoggingConfig =
   { /// The `timestamp` function should preferably be monotonic and not 'jumpy'
@@ -791,7 +743,6 @@ type LiterateConsoleTarget(name, minLevel, ?options, ?literateTokeniser, ?output
     member x.log level msgFactory =
       if level >= minLevel then
         colourWriter (colouriseThenNewLine (msgFactory level))
-      async.Return ()
 
 type TextWriterTarget(name, minLevel, writer : System.IO.TextWriter, ?formatter) =
   let formatter = defaultArg formatter Formatting.defaultFormatter
@@ -801,7 +752,6 @@ type TextWriterTarget(name, minLevel, writer : System.IO.TextWriter, ?formatter)
     member x.name = name
     member x.log level messageFactory =
       if level >= minLevel then log (messageFactory level)
-      async.Return ()
 
     member x.logWithAck level messageFactory =
       if level >= minLevel then log (messageFactory level)
@@ -815,7 +765,6 @@ type OutputWindowTarget(name, minLevel, ?formatter) =
     member x.name = name
     member x.log level messageFactory =
       if level >= minLevel then log (messageFactory level)
-      async.Return ()
 
     member x.logWithAck level messageFactory =
       if level >= minLevel then log (messageFactory level)
@@ -834,8 +783,7 @@ type CombiningTarget(name, otherLoggers : Logger list) =
     member x.log level messageFactory =
       otherLoggers
       |> List.map (fun l -> l.log level messageFactory)
-      |> Async.Parallel
-      |> Async.Ignore // Async<unit>
+      |> ignore
 
 module Global =
   /// This is the global semaphore for colourising the console output. Ensure

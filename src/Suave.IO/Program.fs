@@ -32,7 +32,7 @@ let addExnLogging (fwp: 'a -> WebPart) =
       try
         return! fwp input ctx
       with e ->
-        do! logger.fatalWithBP (eventX "Unhandled {exception}" >> setField "exception" e)
+        do logger.fatal (eventX "Unhandled {exception}" >> setField "exception" e)
         return! INTERNAL_ERROR "Unhandled internal exception" ctx
     }
 

@@ -123,17 +123,15 @@ module Cookie =
           (Headers.Fields.Response.setCookie, header) :: headers)
           (ctx.response.headers |> List.filter notSetCookie)
 
-    let toLog =
-      if cookie.value.Length > 4096 then
-        ctx.runtime.logger.warnWithBP (
-          eventX "Cookie {cookieName} has {cookieBytes} which is too large! Lengths over 4 096 bytes risk corruption in some browsers; consider alternate storage"
-          >> setFieldValue "cookieName" cookie.name
-          >> setFieldValue "cookieBytes" cookie.value.Length)
-      else async.Return ()
+    if cookie.value.Length > 4096 then
+      ctx.runtime.logger.warn (
+        eventX "Cookie {cookieName} has {cookieBytes} which is too large! Lengths over 4 096 bytes risk corruption in some browsers; consider alternate storage"
+        >> setFieldValue "cookieName" cookie.name
+        >> setFieldValue "cookieBytes" cookie.value.Length)
 
-    toLog |> Async.bind (fun _ ->
-      { ctx with response = { ctx.response with headers = headers' } }
-      |> succeed)
+
+    succeed { ctx with response = { ctx.response with headers = headers' } }
+      
 
   let unsetCookie (cookieName : string) =
     let startEpoch = DateTimeOffset(1970, 1, 1, 0, 0, 1, TimeSpan.Zero) |> Some

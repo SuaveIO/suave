@@ -374,23 +374,25 @@ module Filters =
     "{clientIp} {processId} {userName} [{utcNow:dd/MMM/yyyy:hh:mm:ss %K}] \"{requestMethod} {requestUrlPath} {httpVersion}\" {httpStatusCode} {responseContentLength}", fieldList |> Map
 
   let logWithLevel (level : LogLevel) (logger : Logger) (formatter : HttpContext -> string) (ctx : HttpContext) =
-    logger.log level (fun _ ->
-      { value         = Event (formatter ctx)
-        level         = level
-        name          = [| "Suave"; "Http"; "requests" |]
-        fields        = Map.empty
-        timestamp     = Suave.Logging.Global.timestamp() })
-    |> Async.map (fun () -> Some ctx)
+    async{
+      logger.log level (fun _ ->
+        { value         = Event (formatter ctx)
+          level         = level
+          name          = [| "Suave"; "Http"; "requests" |]
+          fields        = Map.empty
+          timestamp     = Suave.Logging.Global.timestamp() })
+      return Some ctx }
 
   let logWithLevelStructured (level : LogLevel) (logger : Logger) (templateAndFieldsCreator : HttpContext -> (string * Map<string,obj>)) (ctx : HttpContext) =
-    logger.log level (fun _ ->
-      let template, fields = templateAndFieldsCreator ctx
-      { value         = Event template
-        level         = level
-        name          = [| "Suave"; "Http"; "requests" |]
-        fields        = fields
-        timestamp     = Suave.Logging.Global.timestamp() })
-    |> Async.map (fun () -> Some ctx)
+    async{
+      logger.log level (fun _ ->
+        let template, fields = templateAndFieldsCreator ctx
+        { value         = Event template
+          level         = level
+          name          = [| "Suave"; "Http"; "requests" |]
+          fields        = fields
+          timestamp     = Suave.Logging.Global.timestamp() })
+      return Some ctx }
 
   let logStructured (logger : Logger) (structuredFormatter : HttpContext -> (string * Map<string,obj>)) =
     logWithLevelStructured LogLevel.Debug logger structuredFormatter
