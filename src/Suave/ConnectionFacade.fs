@@ -13,14 +13,13 @@ open Suave.Utils.Parsing
 open Suave.Logging
 open Suave.Logging.Message
 open Suave.Sockets
-open Suave.Sockets.Connection
 open Suave.Sockets.Control
 open Suave.Sockets.SocketOp.Operators
 open Suave.Utils.Bytes
 
-type ScanResult = NeedMore | Found of int
+type ScanResult = NeedMore | Found of int | Error of Error
 type SelectResult = FailWith of Error | Continue of int
-type SelectFunction = ArraySegment<byte> -> int -> Async<SelectResult>
+type SelectFunction = ArraySegment<byte> -> int -> SelectResult
 
 module internal Aux =
 
@@ -46,32 +45,33 @@ module internal Aux =
 
 type Reader(segments:LinkedList<BufferSegment>, bufferManager : BufferManager, transport, lineBuffer : ArraySegment<byte>) =
   /// Splits the segment list in two lits of ArraySegment; the first one containing a total of index bytes
-  let split index (select:SelectFunction) markerLength : Async<SelectResult> =
-    let rec loop acc selectResult : Async<SelectResult>  =  async {
+  // this function deals with nothing async we soul remove the async
+  let split index (select:SelectFunction) markerLength : SelectResult =
+    let rec loop acc selectResult : SelectResult  = 
       match selectResult with
       | Continue count ->
         if segments.Count = 0 then
-         return Continue count
+         Continue count
         else
           let pair = segments.First.Value
           segments.RemoveFirst()
           if acc + pair.length < index then
-            let! selectResult = select (ArraySegment(pair.buffer.Array, pair.offset, pair.length)) pair.length
+            let selectResult = select (ArraySegment(pair.buffer.Array, pair.offset, pair.length)) pair.length
             match selectResult with
             | Continue _ ->
               bufferManager.FreeBuffer(pair.buffer, "Suave.Web.split")
-              return! loop (acc + pair.length) (Continue(count + acc + pair.length))
+              loop (acc + pair.length) (Continue(count + acc + pair.length))
             | FailWith s ->
-              return FailWith s
+              FailWith s
           elif acc + pair.length >= index then
             let bytesRead = index - acc
-            let! selectResult = select (ArraySegment(pair.buffer.Array, pair.offset, bytesRead)) bytesRead
+            let selectResult = select (ArraySegment(pair.buffer.Array, pair.offset, bytesRead)) bytesRead
             match selectResult with
             | Continue _ ->
               let remaining = pair.length - bytesRead
               if remaining = markerLength then
                 bufferManager.FreeBuffer(pair.buffer, "Suave.Web.split")
-                return Continue(count + bytesRead)
+                Continue(count + bytesRead)
               else
                 if remaining - markerLength >= 0 then
                   let segment =
@@ -79,53 +79,51 @@ type Reader(segments:LinkedList<BufferSegment>, bufferManager : BufferManager, t
                                          (pair.offset  + bytesRead  + markerLength)
                                          (remaining - markerLength)
                   segments.AddFirst(segment) |> ignore
-                  return Continue (count + bytesRead)
+                  Continue (count + bytesRead)
                 else
                   Aux.skipBuffers segments (markerLength - remaining)
-                  return Continue(count + bytesRead)
+                  Continue(count + bytesRead)
              | FailWith s ->
-               return FailWith s
-            else return failwith "Suave.Web.split: invalid case"
+               FailWith s
+            else failwith "Suave.Web.split: invalid case"
       | FailWith s ->
-        return FailWith s
-      }
+        FailWith s
     loop 0 (Continue 0)
 
-  let freeArraySegments index (select: SelectFunction) = socket {
+  let freeArraySegments index (select: SelectFunction) =
     let mutable n = 0
     let mutable currentnode = segments.Last
     while currentnode<>null do
         let b = currentnode.Value
         if n > 0 && n + b.length >= index then
           //procees, free and remove
-          let! res = SocketOp.ofAsync <| select (ArraySegment(b.buffer.Array, b.offset, b.length)) b.length
+          let res = select (ArraySegment(b.buffer.Array, b.offset, b.length)) b.length
           match res with
           | Continue _ ->
-            do bufferManager.FreeBuffer(b.buffer, "Suave.Web.scanMarker")
+            do bufferManager.FreeBuffer(b.buffer, "Suave.Web.freeArraySegments")
             segments.Remove currentnode
           | FailWith err ->
-            return! SocketOp.abort err
+            failwith (sprintf "%A" err)
         n <- n + b.length
         currentnode <- currentnode.Previous
-    }
 
   /// Iterates over a BufferSegment list looking for a marker, data before the marker
   /// is sent to the function select and the corresponding buffers are released
   /// Returns the number of bytes read.
-  let scanMarker (marker: byte[]) (select : SelectFunction) = socket {
+  let scanMarker (marker: byte[]) (select : SelectFunction) = 
+    fun _ ->
 
     match kmpW marker segments with
     | Some x ->
-      let! res = SocketOp.ofAsync <| split x select marker.Length
+      let res = split x select marker.Length
       match res with
       | Continue n ->
-        return Found n
+        Found n
       | FailWith s ->
-        return! SocketOp.abort s
+        Error s
     | None   ->
-      do! freeArraySegments marker.Length select
-      return NeedMore
-    }
+      freeArraySegments marker.Length select
+      NeedMore
 
   let readMoreData = async {
     let buff = bufferManager.PopBuffer("Suave.Web.readMoreData")
@@ -145,13 +143,15 @@ type Reader(segments:LinkedList<BufferSegment>, bufferManager : BufferManager, t
   /// and returns the number of bytes read and the connection
   let readUntilPattern scanData =
     let rec loop  = socket {
-      let! res = scanData
+      let res = scanData ()
       match res with
       | Found a ->
         return a
       | NeedMore ->
         do! readMoreData
         return! loop
+      | Error s ->
+        return! SocketOp.abort s
     }
     loop
 
@@ -170,27 +170,26 @@ type Reader(segments:LinkedList<BufferSegment>, bufferManager : BufferManager, t
   let readUntilEOL select =
     readUntilPattern (scanMarker EOL select)
 
-  member x.skip n = socket {
-    return! SocketOp.ofAsync <| split n (fun a b -> async { return Continue 0}  ) 0
-    }
+  member x.skip n = 
+    split n (fun a b -> Continue 0 ) 0
 
   /// Read the stream until the marker appears and return the number of bytes
   /// read.
-  member x.readUntil (marker : byte []) (select : ArraySegment<_> -> int -> Async<SelectResult>) =
+  member x.readUntil (marker : byte []) (select : ArraySegment<_> -> int -> SelectResult) =
     readUntilPattern (scanMarker marker select)
 
   /// Read a line from the stream, calling UTF8.toString on the bytes before the EOL marker
   member x.readLine = socket {
     let offset = ref 0
     let! count =
-      readUntilEOL (fun a count -> async {
+      readUntilEOL (fun a count -> 
         if !offset + count > lineBuffer.Count then 
-          return FailWith (InputDataError (Some 414, "Line Too Long"))
+          FailWith (InputDataError (Some 414, "Line Too Long"))
         else
           Array.blit a.Array a.Offset lineBuffer.Array (lineBuffer.Offset + !offset) count
           offset := !offset + count
-          return Continue !offset
-      })
+          Continue !offset
+      )
     let result = UTF8.toStringAtOffset lineBuffer.Array lineBuffer.Offset count
     return result
   }
@@ -198,10 +197,10 @@ type Reader(segments:LinkedList<BufferSegment>, bufferManager : BufferManager, t
   member x.skipLine = socket {
     let offset = ref 0
     let! _ =
-      readUntilEOL (fun a count -> async {
+      readUntilEOL (fun a count ->
         offset := !offset + count
-        return Continue !offset
-      })
+        Continue !offset
+      )
     return offset
   }
 
@@ -211,14 +210,14 @@ type Reader(segments:LinkedList<BufferSegment>, bufferManager : BufferManager, t
       let offset = ref 0
       let buf = lineBuffer
       let! count =
-        readUntilEOL (fun a count -> async {
+        readUntilEOL (fun a count -> 
           if !offset + count > lineBuffer.Count then 
-            return FailWith (InputDataError (Some 431, "Request Header Fields Too Large"))
+            FailWith (InputDataError (Some 431, "Request Header Fields Too Large"))
           else
             Array.blit a.Array a.Offset buf.Array (buf.Offset + !offset) count
             offset := !offset + count
-            return Continue !offset
-        })
+            Continue !offset
+        )
       if count <> 0 then
         let line = UTF8.toStringAtOffset buf.Array buf.Offset count
         let indexOfColon = line.IndexOf(':')
@@ -264,10 +263,9 @@ type ConnectionFacade(connection: Connection, logger:Logger,matchedBinding: Http
     let tempFilePath = Path.GetTempFileName()
     use tempFile = new FileStream(tempFilePath, FileMode.Truncate)
     let! a =
-      reader.readUntil (ASCII.bytes (eol + boundary)) (fun x y -> async {
-          do! tempFile.AsyncWrite(x.Array, x.Offset, y)
-          return Continue 0
-          })
+      reader.readUntil (ASCII.bytes (eol + boundary)) (fun x y -> 
+          do tempFile.Write(x.Array, x.Offset, y)
+          Continue 0)
     let fileLength = tempFile.Length
     tempFile.Dispose()
 
@@ -337,10 +335,10 @@ type ConnectionFacade(connection: Connection, logger:Logger,matchedBinding: Http
         | Choice2Of2 _ ->
           use mem = new MemoryStream()
           let! a =
-            reader.readUntil (ASCII.bytes(eol + boundary)) (fun x y -> async {
-                do! mem.AsyncWrite(x.Array, x.Offset, y)
-                return Continue 0
-              })
+            reader.readUntil (ASCII.bytes(eol + boundary)) (fun x y -> 
+                mem.Write(x.Array, x.Offset, y)
+                Continue 0
+              )
           let byts = mem.ToArray()
           multiPartFields.Add (fieldName, UTF8.toStringAtOffset byts 0 byts.Length)
           return! loop
@@ -371,7 +369,7 @@ type ConnectionFacade(connection: Connection, logger:Logger,matchedBinding: Http
         | Choice1Of2 x when String.startsWith "multipart/mixed" x ->
           let subboundary = "--" + (x.Substring(x.IndexOf('=') + 1) |> String.trimStart |> String.trimc '"')
           do! parseMultipartMixed fieldName subboundary
-          let! a = reader.skip (boundary.Length)
+          let a = reader.skip (boundary.Length)
           return ()
 
         | Choice1Of2 contentType when headerParams.ContainsKey "filename" ->
@@ -392,10 +390,10 @@ type ConnectionFacade(connection: Connection, logger:Logger,matchedBinding: Http
         | Choice1Of2 _ | Choice2Of2 _ ->
           use mem = new MemoryStream()
           let! a =
-            reader.readUntil (ASCII.bytes (eol + boundary)) (fun x y -> async {
-              do! mem.AsyncWrite(x.Array, x.Offset, y)
-              return Continue 0
-            })
+            reader.readUntil (ASCII.bytes (eol + boundary)) (fun x y ->
+              mem.Write(x.Array, x.Offset, y)
+              Continue 0
+            )
           let byts = mem.ToArray()
           multiPartFields.Add(fieldName, UTF8.toStringAtOffset byts 0 byts.Length)
           return ()
