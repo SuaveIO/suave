@@ -93,7 +93,9 @@ type Reader(segments:LinkedList<BufferSegment>, bufferManager : BufferManager, t
   let freeArraySegments index (select: SelectFunction) =
     let mutable n = 0
     let mutable currentnode = segments.Last
-    while currentnode<>null do
+    let mutable error = false
+    let mutable result = Choice1Of2 ()
+    while currentnode<>null && not error do
         let b = currentnode.Value
         if n > 0 && n + b.length >= index then
           //procees, free and remove
@@ -103,9 +105,11 @@ type Reader(segments:LinkedList<BufferSegment>, bufferManager : BufferManager, t
             do bufferManager.FreeBuffer(b.buffer, "Suave.Web.freeArraySegments")
             segments.Remove currentnode
           | FailWith err ->
-            failwith (sprintf "%A" err)
+            result <- Choice2Of2 err
+            error <- true
         n <- n + b.length
         currentnode <- currentnode.Previous
+    result
 
   /// Iterates over a BufferSegment list looking for a marker, data before the marker
   /// is sent to the function select and the corresponding buffers are released
@@ -122,8 +126,11 @@ type Reader(segments:LinkedList<BufferSegment>, bufferManager : BufferManager, t
       | FailWith s ->
         Error s
     | None   ->
-      freeArraySegments marker.Length select
-      NeedMore
+      match freeArraySegments marker.Length select with
+      | Choice1Of2 () ->
+        NeedMore
+      | Choice2Of2 s ->
+        Error s
 
   let readMoreData = async {
     let buff = bufferManager.PopBuffer("Suave.Web.readMoreData")
