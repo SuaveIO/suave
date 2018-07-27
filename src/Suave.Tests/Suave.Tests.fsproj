@@ -4,6 +4,8 @@
     <AssemblyName>Suave.Tests</AssemblyName>
     <OutputType>Exe</OutputType>
     <UseStandardResourceNames>false</UseStandardResourceNames>
+    <ServerGarbageCollection>true</ServerGarbageCollection>
+    <ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" Condition=" Exists('AssemblyInfo.fs') " />
@@ -90,6 +92,7 @@
     <None Include="liquid\child.liquid">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Include="app.config" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Suave\Suave.fsproj" />

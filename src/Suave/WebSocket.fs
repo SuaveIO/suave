@@ -219,7 +219,7 @@ module WebSocket =
       runAsyncWithSemaphore writeSemaphore (writeFrame connection frame)
 
     let readFrame () = socket {
-      assert (List.length connection.segments = 0)
+      assert (Seq.length connection.segments = 0)
       let! arr = readBytes connection.transport 2
       let header = exctractHeader arr
       let! extendedLength = readExtendedLength header
@@ -242,7 +242,7 @@ module WebSocket =
       }
 
     let readFrameIntoSegment (byteSegmentForLengthFunc: int -> ByteSegment) = socket {
-      assert (List.length connection.segments = 0)
+      assert (Seq.length connection.segments = 0)
       let! arr = readBytes connection.transport 2
       let header = exctractHeader arr
       let! extendedLength = readExtendedLength header

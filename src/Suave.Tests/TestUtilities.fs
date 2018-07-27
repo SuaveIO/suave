@@ -186,7 +186,6 @@ type InspectableLog() =
 
     member x.log level msgFactory =
       x.logs <- { level = level; value = Factory msgFactory } :: x.logs
-      async.Return ()
 
     member x.logWithAck level msgFactory : Async<unit> =
       x.logs <- { level = level; value = Factory msgFactory } :: x.logs

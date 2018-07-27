@@ -29,7 +29,7 @@ module internal ParsingAndControl =
   /// Free up a list of buffers
   let inline free context connection =
     connection.segments
-    |> List.iter (fun (x : BufferSegment) ->
+    |> Seq.iter (fun (x : BufferSegment) ->
       connection.bufferManager.FreeBuffer (x.buffer, context)) 
 
   /// Load a readable plain-text stream, based on the protocol in use. If plain HTTP
@@ -52,7 +52,7 @@ module internal ParsingAndControl =
 
     let logger = ctxOuter.runtime.logger
 
-    let facade = new ConnectionFacade(logger,ctxOuter.runtime.matchedBinding)
+    let facade = new ConnectionFacade(ctxOuter.connection, logger,  ctxOuter.runtime.matchedBinding)
 
     let rec loop (_ctx : HttpContext) = async {
       let event message =

@@ -1,6 +1,7 @@
 module Suave.Tests.AsyncSocket
 
 open System
+open System.Collections.Generic
 open System.Text
 open System.Net
 open FsCheck
@@ -49,7 +50,7 @@ let tests =
       { transport = tx
         bufferManager = bm
         lineBuffer = bm.PopBuffer "First buffer"
-        segments = []
+        segments = new LinkedList<_>()
         lineBufferCount = 0
         socketBinding = SocketBinding.create IPAddress.Loopback 8080us
       }

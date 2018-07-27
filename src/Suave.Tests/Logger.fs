@@ -15,7 +15,7 @@ let ``CombiningLogger.log`` (_ : SuaveConfig) =
       let log2 = InspectableLog()
       let log3 = InspectableLog()
       let logger = CombiningTarget([| "combining-target" |], [ log1; log2; log3 ]) :> Logger
-      logger.log LogLevel.Info (Message.eventX "hello") |> Async.RunSynchronously
+      logger.log LogLevel.Info (Message.eventX "hello")
       Expect.equal log1.logs.Length 1 "log1 should have 1 logged message"
       Expect.equal log2.logs.Length 1 "log2 should have 1 logged message"
       Expect.equal log3.logs.Length 1 "log3 should have 1 logged message"

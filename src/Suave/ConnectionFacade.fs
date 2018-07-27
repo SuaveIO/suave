@@ -13,14 +13,13 @@ open Suave.Utils.Parsing
 open Suave.Logging
 open Suave.Logging.Message
 open Suave.Sockets
-open Suave.Sockets.Connection
 open Suave.Sockets.Control
 open Suave.Sockets.SocketOp.Operators
 open Suave.Utils.Bytes
 
-type ScanResult = NeedMore | Found of int
+type ScanResult = NeedMore | Found of int | Error of Error
 type SelectResult = FailWith of Error | Continue of int
-type SelectFunction = ArraySegment<byte> -> int -> Async<SelectResult>
+type SelectFunction = ArraySegment<byte> -> int -> SelectResult
 
 module internal Aux =
 
@@ -46,32 +45,33 @@ module internal Aux =
 
 type Reader(segments:LinkedList<BufferSegment>, bufferManager : BufferManager, transport, lineBuffer : ArraySegment<byte>) =
   /// Splits the segment list in two lits of ArraySegment; the first one containing a total of index bytes
-  let split index (select:SelectFunction) markerLength : Async<SelectResult> =
-    let rec loop acc selectResult : Async<SelectResult>  =  async {
+  // this function deals with nothing async we soul remove the async
+  let split index (select:SelectFunction) markerLength : SelectResult =
+    let rec loop acc selectResult : SelectResult  = 
       match selectResult with
       | Continue count ->
         if segments.Count = 0 then
-         return Continue count
+         Continue count
         else
           let pair = segments.First.Value
           segments.RemoveFirst()
           if acc + pair.length < index then
-            let! selectResult = select (ArraySegment(pair.buffer.Array, pair.offset, pair.length)) pair.length
+            let selectResult = select (ArraySegment(pair.buffer.Array, pair.offset, pair.length)) pair.length
             match selectResult with
             | Continue _ ->
               bufferManager.FreeBuffer(pair.buffer, "Suave.Web.split")
-              return! loop (acc + pair.length) (Continue(count + acc + pair.length))
+              loop (acc + pair.length) (Continue(count + acc + pair.length))
             | FailWith s ->
-              return FailWith s
+              FailWith s
           elif acc + pair.length >= index then
             let bytesRead = index - acc
-            let! selectResult = select (ArraySegment(pair.buffer.Array, pair.offset, bytesRead)) bytesRead
+            let selectResult = select (ArraySegment(pair.buffer.Array, pair.offset, bytesRead)) bytesRead
             match selectResult with
             | Continue _ ->
               let remaining = pair.length - bytesRead
               if remaining = markerLength then
                 bufferManager.FreeBuffer(pair.buffer, "Suave.Web.split")
-                return Continue(count + bytesRead)
+                Continue(count + bytesRead)
               else
                 if remaining - markerLength >= 0 then
                   let segment =
@@ -79,53 +79,58 @@ type Reader(segments:LinkedList<BufferSegment>, bufferManager : BufferManager, t
                                          (pair.offset  + bytesRead  + markerLength)
                                          (remaining - markerLength)
                   segments.AddFirst(segment) |> ignore
-                  return Continue (count + bytesRead)
+                  Continue (count + bytesRead)
                 else
                   Aux.skipBuffers segments (markerLength - remaining)
-                  return Continue(count + bytesRead)
+                  Continue(count + bytesRead)
              | FailWith s ->
-               return FailWith s
-            else return failwith "Suave.Web.split: invalid case"
+               FailWith s
+            else failwith "Suave.Web.split: invalid case"
       | FailWith s ->
-        return FailWith s
-      }
+        FailWith s
     loop 0 (Continue 0)
 
-  let freeArraySegments index (select: SelectFunction) = socket {
+  let freeArraySegments index (select: SelectFunction) =
     let mutable n = 0
     let mutable currentnode = segments.Last
-    while currentnode<>null do
+    let mutable error = false
+    let mutable result = Choice1Of2 ()
+    while currentnode<>null && not error do
         let b = currentnode.Value
         if n > 0 && n + b.length >= index then
           //procees, free and remove
-          let! res = SocketOp.ofAsync <| select (ArraySegment(b.buffer.Array, b.offset, b.length)) b.length
+          let res = select (ArraySegment(b.buffer.Array, b.offset, b.length)) b.length
           match res with
           | Continue _ ->
-            do bufferManager.FreeBuffer(b.buffer, "Suave.Web.scanMarker")
+            do bufferManager.FreeBuffer(b.buffer, "Suave.Web.freeArraySegments")
             segments.Remove currentnode
           | FailWith err ->
-            return! SocketOp.abort err
+            result <- Choice2Of2 err
+            error <- true
         n <- n + b.length
         currentnode <- currentnode.Previous
-    }
+    result
 
   /// Iterates over a BufferSegment list looking for a marker, data before the marker
   /// is sent to the function select and the corresponding buffers are released
   /// Returns the number of bytes read.
-  let scanMarker (marker: byte[]) (select : SelectFunction) = socket {
+  let scanMarker (marker: byte[]) (select : SelectFunction) = 
+    fun _ ->
 
     match kmpW marker segments with
     | Some x ->
-      let! res = SocketOp.ofAsync <| split x select marker.Length
+      let res = split x select marker.Length
       match res with
       | Continue n ->
-        return Found n
+        Found n
       | FailWith s ->
-        return! SocketOp.abort s
+        Error s
     | None   ->
-      do! freeArraySegments marker.Length select
-      return NeedMore
-    }
+      match freeArraySegments marker.Length select with
+      | Choice1Of2 () ->
+        NeedMore
+      | Choice2Of2 s ->
+        Error s
 
   let readMoreData = async {
     let buff = bufferManager.PopBuffer("Suave.Web.readMoreData")
@@ -145,13 +150,15 @@ type Reader(segments:LinkedList<BufferSegment>, bufferManager : BufferManager, t
   /// and returns the number of bytes read and the connection
   let readUntilPattern scanData =
     let rec loop  = socket {
-      let! res = scanData
+      let res = scanData ()
       match res with
       | Found a ->
         return a
       | NeedMore ->
         do! readMoreData
         return! loop
+      | Error s ->
+        return! SocketOp.abort s
     }
     loop
 
@@ -170,27 +177,26 @@ type Reader(segments:LinkedList<BufferSegment>, bufferManager : BufferManager, t
   let readUntilEOL select =
     readUntilPattern (scanMarker EOL select)
 
-  member x.skip n = socket {
-    return! SocketOp.ofAsync <| split n (fun a b -> async { return Continue 0}  ) 0
-    }
+  member x.skip n = 
+    split n (fun a b -> Continue 0 ) 0
 
   /// Read the stream until the marker appears and return the number of bytes
   /// read.
-  member x.readUntil (marker : byte []) (select : ArraySegment<_> -> int -> Async<SelectResult>) =
+  member x.readUntil (marker : byte []) (select : ArraySegment<_> -> int -> SelectResult) =
     readUntilPattern (scanMarker marker select)
 
   /// Read a line from the stream, calling UTF8.toString on the bytes before the EOL marker
   member x.readLine = socket {
     let offset = ref 0
     let! count =
-      readUntilEOL (fun a count -> async {
+      readUntilEOL (fun a count -> 
         if !offset + count > lineBuffer.Count then 
-          return FailWith (InputDataError (Some 414, "Line Too Long"))
+          FailWith (InputDataError (Some 414, "Line Too Long"))
         else
           Array.blit a.Array a.Offset lineBuffer.Array (lineBuffer.Offset + !offset) count
           offset := !offset + count
-          return Continue !offset
-      })
+          Continue !offset
+      )
     let result = UTF8.toStringAtOffset lineBuffer.Array lineBuffer.Offset count
     return result
   }
@@ -198,10 +204,10 @@ type Reader(segments:LinkedList<BufferSegment>, bufferManager : BufferManager, t
   member x.skipLine = socket {
     let offset = ref 0
     let! _ =
-      readUntilEOL (fun a count -> async {
+      readUntilEOL (fun a count ->
         offset := !offset + count
-        return Continue !offset
-      })
+        Continue !offset
+      )
     return offset
   }
 
@@ -211,14 +217,14 @@ type Reader(segments:LinkedList<BufferSegment>, bufferManager : BufferManager, t
       let offset = ref 0
       let buf = lineBuffer
       let! count =
-        readUntilEOL (fun a count -> async {
+        readUntilEOL (fun a count -> 
           if !offset + count > lineBuffer.Count then 
-            return FailWith (InputDataError (Some 431, "Request Header Fields Too Large"))
+            FailWith (InputDataError (Some 431, "Request Header Fields Too Large"))
           else
             Array.blit a.Array a.Offset buf.Array (buf.Offset + !offset) count
             offset := !offset + count
-            return Continue !offset
-        })
+            Continue !offset
+        )
       if count <> 0 then
         let line = UTF8.toStringAtOffset buf.Array buf.Offset count
         let indexOfColon = line.IndexOf(':')
@@ -252,20 +258,21 @@ type Reader(segments:LinkedList<BufferSegment>, bufferManager : BufferManager, t
       }
     loop bytes
 
-type ConnectionFacade(logger:Logger,matchedBinding: HttpBinding) =
+type ConnectionFacade(connection: Connection, logger:Logger,matchedBinding: HttpBinding) =
+
+  let reader = new Reader(connection.segments,connection.bufferManager,connection.transport,connection.lineBuffer)
 
   let files = List<HttpUpload>()
   let multiPartFields = List<string*string>()
   let mutable _rawForm : byte array = [||]
 
-  let readFilePart (reader:Reader) boundary (headerParams : Dictionary<string,string>) fieldName contentType = socket {
+  let readFilePart boundary (headerParams : Dictionary<string,string>) fieldName contentType = socket {
     let tempFilePath = Path.GetTempFileName()
     use tempFile = new FileStream(tempFilePath, FileMode.Truncate)
     let! a =
-      reader.readUntil (ASCII.bytes (eol + boundary)) (fun x y -> async {
-          do! tempFile.AsyncWrite(x.Array, x.Offset, y)
-          return Continue 0
-          })
+      reader.readUntil (ASCII.bytes (eol + boundary)) (fun x y -> 
+          do tempFile.Write(x.Array, x.Offset, y)
+          Continue 0)
     let fileLength = tempFile.Length
     tempFile.Dispose()
 
@@ -299,7 +306,7 @@ type ConnectionFacade(logger:Logger,matchedBinding: HttpBinding) =
       return None
     }
 
-  let parseMultipartMixed (reader:Reader) fieldName boundary : SocketOp<unit> =
+  let parseMultipartMixed fieldName boundary : SocketOp<unit> =
     let rec loop = socket {
       let! firstLine = reader.readLine
 
@@ -319,7 +326,7 @@ type ConnectionFacade(logger:Logger,matchedBinding: HttpBinding) =
             eventX "Parsing {contentType}... -> readFilePart"
             >> setFieldValue "contentType" contentType)
 
-          let! res = readFilePart reader boundary headerParams fieldName contentType
+          let! res = readFilePart boundary headerParams fieldName contentType
 
           logger.verbose (
             eventX "Parsed {contentType} <- readFilePart"
@@ -335,10 +342,10 @@ type ConnectionFacade(logger:Logger,matchedBinding: HttpBinding) =
         | Choice2Of2 _ ->
           use mem = new MemoryStream()
           let! a =
-            reader.readUntil (ASCII.bytes(eol + boundary)) (fun x y -> async {
-                do! mem.AsyncWrite(x.Array, x.Offset, y)
-                return Continue 0
-              })
+            reader.readUntil (ASCII.bytes(eol + boundary)) (fun x y -> 
+                mem.Write(x.Array, x.Offset, y)
+                Continue 0
+              )
           let byts = mem.ToArray()
           multiPartFields.Add (fieldName, UTF8.toStringAtOffset byts 0 byts.Length)
           return! loop
@@ -346,7 +353,7 @@ type ConnectionFacade(logger:Logger,matchedBinding: HttpBinding) =
     loop
 
   /// Parses multipart data from the stream, feeding it into the HttpRequest's property Files.
-  let parseMultipart (reader:Reader) (boundary:string) : SocketOp<unit> =
+  let parseMultipart (boundary:string) : SocketOp<unit> =
     let parsePart = socket {
 
         let! partHeaders = reader.readHeaders
@@ -368,8 +375,8 @@ type ConnectionFacade(logger:Logger,matchedBinding: HttpBinding) =
         match partHeaders %% "content-type" with
         | Choice1Of2 x when String.startsWith "multipart/mixed" x ->
           let subboundary = "--" + (x.Substring(x.IndexOf('=') + 1) |> String.trimStart |> String.trimc '"')
-          do! parseMultipartMixed reader fieldName subboundary
-          let! a = reader.skip (boundary.Length)
+          do! parseMultipartMixed fieldName subboundary
+          let a = reader.skip (boundary.Length)
           return ()
 
         | Choice1Of2 contentType when headerParams.ContainsKey "filename" ->
@@ -378,7 +385,7 @@ type ConnectionFacade(logger:Logger,matchedBinding: HttpBinding) =
             >> setFieldValue "contentType" contentType
             >> setSingleName "Suave.Web.parseMultipart")
 
-          let! res = readFilePart reader boundary headerParams fieldName contentType
+          let! res = readFilePart boundary headerParams fieldName contentType
 
           logger.verbose (
             eventX "Parsed {contentType} <- readFilePart"
@@ -390,10 +397,10 @@ type ConnectionFacade(logger:Logger,matchedBinding: HttpBinding) =
         | Choice1Of2 _ | Choice2Of2 _ ->
           use mem = new MemoryStream()
           let! a =
-            reader.readUntil (ASCII.bytes (eol + boundary)) (fun x y -> async {
-              do! mem.AsyncWrite(x.Array, x.Offset, y)
-              return Continue 0
-            })
+            reader.readUntil (ASCII.bytes (eol + boundary)) (fun x y ->
+              mem.Write(x.Array, x.Offset, y)
+              Continue 0
+            )
           let byts = mem.ToArray()
           multiPartFields.Add(fieldName, UTF8.toStringAtOffset byts 0 byts.Length)
           return ()
@@ -418,7 +425,7 @@ type ConnectionFacade(logger:Logger,matchedBinding: HttpBinding) =
     }
 
   /// Reads raw POST data
-  let getRawPostData (reader:Reader) contentLength =
+  let getRawPostData contentLength =
     socket {
       let offset = ref 0
       let rawForm = Array.zeroCreate contentLength
@@ -429,7 +436,7 @@ type ConnectionFacade(logger:Logger,matchedBinding: HttpBinding) =
       return rawForm
     }
 
-  let parsePostData (reader:Reader)  maxContentLength (contentLengthHeader : Choice<string,_>) contentTypeHeader = socket {
+  let parsePostData maxContentLength (contentLengthHeader : Choice<string,_>) contentTypeHeader = socket {
     match contentLengthHeader with
     | Choice1Of2 contentLengthString ->
       let contentLength = Convert.ToInt32 contentLengthString
@@ -441,7 +448,7 @@ type ConnectionFacade(logger:Logger,matchedBinding: HttpBinding) =
 
         match contentTypeHeader with
         | Choice1Of2 ce when String.startsWith "application/x-www-form-urlencoded" ce ->
-          let! rawForm = getRawPostData reader contentLength
+          let! rawForm = getRawPostData contentLength
           _rawForm <- rawForm
           return ()
 
@@ -449,11 +456,11 @@ type ConnectionFacade(logger:Logger,matchedBinding: HttpBinding) =
           let boundary = "--" + (ce |> String.substring (ce.IndexOf('=') + 1) |> String.trimStart |> String.trimc '"')
 
           logger.verbose (eventX "Parsing multipart")
-          do! parseMultipart reader boundary
+          do! parseMultipart boundary
           return ()
 
         | Choice1Of2 _ | Choice2Of2 _ ->
-          let! rawForm = getRawPostData reader contentLength
+          let! rawForm = getRawPostData contentLength
           _rawForm <- rawForm
           return ()
       | Choice2Of2 _ -> return ()
@@ -463,9 +470,6 @@ type ConnectionFacade(logger:Logger,matchedBinding: HttpBinding) =
   /// when done
   member this.processRequest (ctx:HttpContext) = socket {
     let verbose message = logger.verbose (eventX message)
-
-    let segments = new LinkedList<_>(ctx.connection.segments)
-    let reader = new Reader(segments,ctx.connection.bufferManager,ctx.connection.transport,ctx.connection.lineBuffer)
 
     verbose "reading first line of request"
     let! firstLine = reader.readLine
@@ -493,7 +497,7 @@ type ConnectionFacade(logger:Logger,matchedBinding: HttpBinding) =
       verbose "sent 100-continue response"
 
     verbose "parsing post data"
-    do! parsePostData reader ctx.runtime.maxContentLength (headers %% "content-length") (headers %% "content-type")
+    do! parsePostData ctx.runtime.maxContentLength (headers %% "content-length") (headers %% "content-type")
 
     let request =
       { httpVersion      = httpVersion
@@ -512,5 +516,5 @@ type ConnectionFacade(logger:Logger,matchedBinding: HttpBinding) =
     multiPartFields.Clear()
     _rawForm <- [||]
 
-    return Some { ctx with request = request; connection = { ctx.connection with segments = Seq.toList segments } }
+    return Some { ctx with request = request; }
   }
