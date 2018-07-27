@@ -1,3 +1,6 @@
+## New in v2.5.0-beta (Pre-released 2018-07-27)
+* Performance optimizations (mostly by removing harmful or unneeded async code)
+
 ## New in v2.4.3 (Released 2018-06-24)
 * Fix #702 - Can't parse  negatives number in forms
 
