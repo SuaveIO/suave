@@ -1,3 +1,6 @@
+## New in v2.5.0-beta2 (Pre-released 2018-07-31)
+* Fix #706 - Websockets don't work in firefox
+
 ## New in v2.5.0-beta (Pre-released 2018-07-27)
 * Performance optimizations (mostly by removing harmful or unneeded async code)
 
