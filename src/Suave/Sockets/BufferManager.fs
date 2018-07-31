@@ -81,8 +81,8 @@ type BufferManager(totalBytes, bufferSize, autoGrow) =
 
   /// Frees the buffer back to the buffer pool.
   member x.FreeBuffer(args : ArraySegment<_>, ?caller : string) =
-    // Not trivial to check for double frees now
-    //if segments. args then failwithf "double free buffer %d" args.Offset
+    // Prevent information leaking
+    Array.Clear(args.Array,args.Offset,args.Count)
     segments.Add args
     logger.verbose (
       Message.eventX "Freeing buffer at {offset} from {caller}. Free segments {segmentCount}."
