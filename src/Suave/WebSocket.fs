@@ -305,6 +305,16 @@ module WebSocket =
       return None
   }
 
+  let validateConnectionHeader (header:Choice<string,string>) =
+    match header with
+    | Choice1Of2 s -> 
+      let parts = 
+        s.ToLower().Split([|','|],StringSplitOptions.RemoveEmptyEntries)
+        |> Array.map (fun (s:string) -> s.Trim())
+      Array.contains "upgrade" parts
+    | _ ->
+      false
+
   let validateHandShake (ctx : HttpContext) =
     let r = ctx.request
     if r.``method`` <> HttpMethod.GET then
@@ -312,7 +322,7 @@ module WebSocket =
     elif r.header "upgrade" |> Choice.map (fun s -> s.ToLower()) <> Choice1Of2 "websocket" then
       Choice2Of2 (RequestErrors.BAD_REQUEST "Bad Request" ctx)
     else
-      if r.header "connection" |> Choice.map (fun s -> s.ToLower()) = Choice1Of2 "upgrade" then
+      if validateConnectionHeader (r.header "connection") then
         match r.header "sec-websocket-key" with
         | Choice1Of2 webSocketKey -> Choice1Of2 webSocketKey
         | _ -> Choice2Of2 (RequestErrors.BAD_REQUEST "Missing 'sec-websocket-key' header" ctx)
