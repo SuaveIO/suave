@@ -54,11 +54,10 @@ module internal ParsingAndControl =
 
     let facade = new ConnectionFacade(ctxOuter.connection, logger,  ctxOuter.runtime.matchedBinding)
 
-    let rec loop (_ctx : HttpContext) = async {
-      let event message =
-       eventX message 
-       >> setSingleName "Suave.ParsingAndControl.httpLoop.loop"
+    let event message =
+       eventX message >> setSingleName "Suave.ParsingAndControl.httpLoop.loop"
 
+    let rec loop (_ctx : HttpContext) = async {
       logger.verbose (event "Processing request... -> processor")
       let! result' = facade.processRequest _ctx
       logger.verbose (event "Processed request. <- processor")
@@ -67,7 +66,6 @@ module internal ParsingAndControl =
         match result with
         | None ->
           logger.verbose (event "'result = None', exiting")
-
         | Some ctx ->
           let! result'' = HttpOutput.addKeepAliveHeader ctx |> HttpOutput.run consumer
           match result'' with
@@ -90,53 +88,38 @@ module internal ParsingAndControl =
                   free "Suave.Web.httpLoop.loop (case Choice2Of2, else branch)" ctx.connection
                   logger.verbose (event "Connection: close")
                   return ()
-
           | Choice2Of2 err ->
-            logger.info (
-              event "Socket error while running webpart, exiting"
-              >> addExn err)
-
+            logger.verbose (event "Socket error while running webpart, exiting" >> addExn err)
       | Choice2Of2 err ->
         match err with
         | InputDataError (None, msg) ->
-          logger.info (event "Error parsing HTTP request with {message}"
-                       >> setFieldValue "message" msg)
-
+          logger.verbose (event "Error parsing HTTP request with {message}" >> setFieldValue "message" msg)
           let! result''' = HttpOutput.run (RequestErrors.BAD_REQUEST msg) ctxOuter
           match result''' with
           | Choice1Of2 _ ->
             logger.verbose (event "Exiting http loop")
-
           | Choice2Of2 err ->
-            logger.verbose (event "Socket error while sending BAD_REQUEST, exiting"
-                            >> setFieldValue "error" err)
-
+            logger.verbose (event "Socket error while sending BAD_REQUEST, exiting" >> setFieldValue "error" err)
         | InputDataError (Some status,msg) ->
-          logger.info (event "Error parsing HTTP request with {message}"
-                       >> setFieldValue "message" msg)
+          logger.verbose (event "Error parsing HTTP request with {message}" >> setFieldValue "message" msg)
           match Http.HttpCode.tryParse status with 
           | (Choice1Of2 statusCode) ->
             let! result''' = HttpOutput.run (Response.response statusCode (UTF8.bytes msg)) ctxOuter
             match result''' with
             | Choice1Of2 _ ->
               logger.verbose (event "Exiting http loop")
-
             | Choice2Of2 err ->
-              logger.verbose (event "Socket error while sending BAD_REQUEST, exiting"
-                              >> setFieldValue "error" err)
+              logger.verbose (event "Socket error while sending BAD_REQUEST, exiting" >> setFieldValue "error" err)
           | (Choice2Of2 err) ->
             logger.warn (event "Invalid HTTP status code {statusCode}" >> setFieldValue "statusCode" status)
             let! result''' = HttpOutput.run (RequestErrors.BAD_REQUEST msg) ctxOuter
             match result''' with
             | Choice1Of2 _ ->
               logger.verbose (event "Exiting http loop")
-
             | Choice2Of2 err ->
-              logger.verbose (event "Socket error while sending BAD_REQUEST, exiting"
-                              >> setFieldValue "error" err)
+              logger.verbose (event "Socket error while sending BAD_REQUEST, exiting" >> setFieldValue "error" err)
         | err ->
-          logger.verbose (event "Socket error while processing request, exiting"
-                          >> setFieldValue "error" err)
+          logger.verbose (event "Socket error while processing request, exiting" >> setFieldValue "error" err)
     }
     loop ctxOuter
 
