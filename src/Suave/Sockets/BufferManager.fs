@@ -51,12 +51,7 @@ type BufferManager(totalBytes, bufferSize, autoGrow) =
     let rec loop tries =
       if tries = 0 then
         let msg = "Could not adquire a buffer, too many retries."
-        logger.logWithAck Error (
-          Message.eventX msg
-          >> Message.setFieldValue "segmentCount" segments.Count
-        )
-        // wait for logging infrastructure to Ack this
-        |> Async.RunSynchronously
+        logger.log Error (Message.eventX msg >> Message.setFieldValue "segmentCount" segments.Count)
         raise (Exception msg)
       else
         match segments.TryTake() with
