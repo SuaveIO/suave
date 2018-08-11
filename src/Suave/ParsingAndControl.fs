@@ -111,7 +111,7 @@ module internal ParsingAndControl =
         | None ->
           logger.verbose (event "'result = None', exiting")
         | Some ctx ->
-          let! result'' = HttpOutput.addKeepAliveHeader ctx |> HttpOutput.run consumer
+          let! result'' = HttpOutput.run consumer (HttpOutput.addKeepAliveHeader ctx)
           match result'' with
           | Choice1Of2 result -> 
             match result with
