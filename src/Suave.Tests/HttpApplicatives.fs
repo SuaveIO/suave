@@ -28,7 +28,7 @@ let applicativeTests cfg =
       Expect.equal res "A" "Should return A"
 
     testCase "url with spaces: pathScan" <| fun _ ->
-      let res = runWithConfig (pathScan "/foo/%s" (fun s -> OK s)) |> req HttpMethod.GET "/foo/get by" None
+      let res = runWithConfig (pathScan "/foo/%s" OK) |> req HttpMethod.GET "/foo/get by" None
       Expect.equal res "get by" "Should return 'get buy'"
 
     testCase "when not matching on Host" <| fun _ ->
