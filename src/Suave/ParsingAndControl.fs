@@ -2,27 +2,12 @@ namespace Suave
 
 /// Parsing and control flow handling for web requests
 module internal ParsingAndControl =
-  open System
-  open System.IO
-  open System.Text
-  open System.Diagnostics
-  open System.Net
-  open System.Net.Sockets
-  open System.Threading
-  open System.Threading.Tasks
-  open System.Collections.Generic
 
-  open Suave.Globals
-  open Suave.Compression
+  open System.IO
   open Suave.Sockets
-  open Suave.Sockets.Connection
   open Suave.Sockets.Control
-  open Suave.Sockets.SocketOp.Operators
   open Suave.Tcp
-  
   open Suave.Utils
-  open Suave.Utils.Bytes
-  open Suave.Utils.Parsing
   open Suave.Logging
   open Suave.Logging.Message
 
@@ -42,8 +27,6 @@ module internal ParsingAndControl =
     | HTTPS o -> 
       return! runtime.tlsProvider.wrap (connection,o)
     }
-
-  open System.Net.Sockets
 
   let inline cleanResponse (ctx : HttpContext) =
     { ctx with response = HttpResult.empty; userState = Map.empty }
@@ -150,14 +133,11 @@ module internal ParsingAndControl =
       return ()
     }
 
-
   /// Starts a new web worker, given the configuration and a web part to serve.
   let startWebWorkerAsync (bufferSize, maxOps) (webpart : WebPart) (runtime : HttpRuntime) runServer =
     startTcpIpServerAsync (requestLoop runtime webpart)
                           runtime.matchedBinding.socketBinding
                           runServer
-
-  open System.Reflection
 
   let resolveDirectory homeDirectory =
     match homeDirectory with

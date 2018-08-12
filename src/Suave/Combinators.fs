@@ -5,9 +5,6 @@ open Suave.Sockets
 
 module Response =
 
-  open System
-  open System.IO
-
   let response (statusCode : HttpCode) (cnt : byte []) =
     fun (ctx : HttpContext) ->
       let response =
@@ -401,7 +398,6 @@ module Filters =
     logWithLevel LogLevel.Debug logger formatter
 
   open Suave.Sscanf
-  open ServerErrors
 
   let pathScan (pf : PrintfFormat<_,_,_,_,'t>) (h : 't ->  WebPart) : WebPart =
 
