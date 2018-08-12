@@ -323,11 +323,35 @@ module Http =
 
   type Host = string
 
+  type HttpBinding =
+    { scheme        : Protocol
+      socketBinding : SocketBinding }
+
+    member x.uri (path : string) query =
+      let path' =
+        match Uri.TryCreate(path, UriKind.Absolute) with
+        | true, uri when uri.Scheme = "http" || uri.Scheme = "https" -> uri.AbsolutePath
+        | _ when path.StartsWith "/" -> path
+        | _ -> "/" + path
+      String.Concat [
+        x.scheme.ToString(); "://"; x.socketBinding.ToString()
+        path'
+        (match query with | "" -> "" | qs -> "?" + qs)
+      ]
+      |> Uri
+
+    override x.ToString() =
+      String.Concat [ x.scheme.ToString(); "://"; x.socketBinding.ToString() ]
+
+    static member scheme_ = Property<HttpBinding,_> (fun x -> x.scheme) (fun v x -> { x with scheme = v })
+    static member socketBinding_ = Property<HttpBinding,_> (fun x -> x.socketBinding) (fun v x -> { x with socketBinding=v })
+
   type HttpRequest =
     { httpVersion     : string
-      url             : Uri
-      host            : Host
-      ``method``      : HttpMethod
+      binding         : HttpBinding
+      rawPath         : string
+      rawHost         : string
+      rawMethod       : string
       headers         : (string * string) list
       rawForm         : byte []
       rawQuery        : string
@@ -335,15 +359,18 @@ module Http =
       multiPartFields : (string * string) list
       trace           : TraceHeader }
     static member httpVersion_     = Property<HttpRequest,_> (fun x -> x.httpVersion) (fun v (x : HttpRequest) -> { x with httpVersion = v })
-    static member url_             = Property<HttpRequest,_> (fun x -> x.url) (fun v x -> { x with url = v })
-    static member host_            = Property<HttpRequest,_> (fun x -> x.host) (fun v x -> { x with host = v })
-    static member method_          = Property<HttpRequest,_> (fun x -> x.``method``) (fun v x -> { x with ``method`` = v })
+    static member absolutePath_    = Property<HttpRequest,_> (fun x -> x.rawPath) (fun v x -> { x with rawPath = v })
+    static member binding_         = Property<HttpRequest,_> (fun x -> x.binding) (fun v x -> { x with binding = v })
+    static member rawHost_         = Property<HttpRequest,_> (fun x -> x.rawHost) (fun v x -> { x with rawHost = v })
+    static member rawMethod_       = Property<HttpRequest,_> (fun x -> x.rawMethod ) (fun v x -> { x with rawMethod = v })
     static member headers_         = Property<HttpRequest,_> (fun x -> x.headers) (fun v x -> { x with headers = v })
     static member rawForm_         = Property<HttpRequest,_> (fun x -> x.rawForm) (fun v x -> { x with rawForm = v })
     static member rawQuery_        = Property<HttpRequest,_> (fun x -> x.rawQuery) (fun v x -> { x with rawQuery = v })
     static member files_           = Property<HttpRequest,_> (fun x -> x.files) (fun v x -> { x with files = v })
     static member multipartFields_ = Property<HttpRequest,_> (fun x -> x.multiPartFields) (fun v x -> { x with multiPartFields = v })
     static member trace_           = Property<HttpRequest,_> (fun x -> x.trace) (fun v x -> { x with trace = v })
+
+    member x.url = x.binding.uri x.rawPath x.rawQuery
 
     member x.query =
       Parsing.parseData x.rawQuery
@@ -405,47 +432,31 @@ module Http =
       x.clientHost true [ "x-forwarded-host" ]
 
     member x.path =
-      System.Net.WebUtility.UrlDecode x.url.AbsolutePath
+      System.Net.WebUtility.UrlDecode x.rawPath
+
+    member x.method = HttpMethod.parse x.rawMethod
+
+    member x.host =
+      match x.rawHost with
+      | s when System.Text.RegularExpressions.Regex.IsMatch(s, ":\d+$") ->
+        s.Substring(0, s.LastIndexOf(':'))
+      | s -> s
 
   [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
   module HttpRequest =
 
-    open Suave.Utils
-
     let empty =
       { httpVersion     = "HTTP/1.1"
-        url             = Uri "http://localhost/"
-        host            = "localhost"
-        ``method``      = HttpMethod.OTHER ""
+        rawPath = "/"
+        binding = { scheme = HTTP; socketBinding = SocketBinding.create IPAddress.Any 8080us }
+        rawHost            = "localhost"
+        rawMethod     = "GET"
         headers         = []
         rawForm         = Array.empty
         rawQuery        = ""
         files           = []
         multiPartFields = []
         trace           = TraceHeader.empty }
-
-  type HttpBinding =
-    { scheme        : Protocol
-      socketBinding : SocketBinding }
-
-    member x.uri (path : string) query =
-      let path' =
-        match Uri.TryCreate(path, UriKind.Absolute) with
-        | true, uri when uri.Scheme = "http" || uri.Scheme = "https" -> uri.AbsolutePath
-        | _ when path.StartsWith "/" -> path
-        | _ -> "/" + path
-      String.Concat [
-        x.scheme.ToString(); "://"; x.socketBinding.ToString()
-        path'
-        (match query with | "" -> "" | qs -> "?" + qs)
-      ]
-      |> Uri
-
-    override x.ToString() =
-      String.Concat [ x.scheme.ToString(); "://"; x.socketBinding.ToString() ]
-
-    static member scheme_ = Property<HttpBinding,_> (fun x -> x.scheme) (fun v x -> { x with scheme = v })
-    static member socketBinding_ = Property<HttpBinding,_> (fun x -> x.socketBinding) (fun v x -> { x with socketBinding=v })
 
   [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
   module HttpBinding =

@@ -478,19 +478,12 @@ type ConnectionFacade(connection: Connection, logger:Logger,matchedBinding: Http
       parseUrl firstLine
       @|! (None, "Invalid ")
 
-    let meth = HttpMethod.parse rawMethod
-
     verbose "reading headers"
     let! headers = reader.readHeaders
 
     // Respond with 400 Bad Request as
     // per http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html
-    let! host =
-      (headers %% "host" |> Choice.map (function
-        | s when System.Text.RegularExpressions.Regex.IsMatch(s, ":\d+$") ->
-          s.Substring(0, s.LastIndexOf(':'))
-        | s -> s))
-      @|! (None, "Missing 'Host' header")
+    let! rawHost = headers %% "host" @|! (None, "Missing 'Host' header")
 
     if headers %% "expect" = Choice1Of2 "100-continue" then
       let! _ = HttpOutput.run Intermediate.CONTINUE ctx
@@ -501,9 +494,10 @@ type ConnectionFacade(connection: Connection, logger:Logger,matchedBinding: Http
 
     let request =
       { httpVersion      = httpVersion
-        url              = matchedBinding.uri path rawQuery
-        host             = host
-        ``method``       = meth
+        binding          = matchedBinding
+        rawPath          = path
+        rawHost          = rawHost
+        rawMethod        = rawMethod
         headers          = headers
         rawForm          = _rawForm
         rawQuery         = rawQuery
