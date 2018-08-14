@@ -160,22 +160,28 @@ module Http =
   /// necessarily as seen from the client.
   type Host = string
 
+  /// A HTTP binding is a protocol is the product of HTTP or HTTP, a DNS or IP
+  /// binding and a port number.
+  type HttpBinding =
+    { scheme        : Protocol
+      socketBinding : SocketBinding }
+
+    member uri : path:string -> query:string -> Uri
+
+    /// Overrides the default ToString() method to provide an implementation that
+    /// is assignable to a BaseUri for a RestClient/HttpClient.
+    override ToString : unit -> string
+
+    static member scheme_ : Property<HttpBinding,Protocol>
+    static member socketBinding_ : Property<HttpBinding, SocketBinding>
+
   /// A holder for the data extracted from the request.
   type HttpRequest =
     { httpVersion     : string
-      url             : Uri
-      /// The Host that the web server responds to; not necessarily the host called
-      /// by the client, as the request may have traversed proxies. As Suave
-      /// binds to an IP rather than IP+Hostname, this can be anything the client
-      /// has passed as the Host header. If you're behind a proxy, it may be the
-      /// DNS name of the node that the reverse proxy forwards to, or if you're
-      /// exposing Suave publically, it should match the public DNS name of the
-      /// node.
-      ///
-      /// To ensure the correct host-name is being called, you can use `Http.host`
-      /// in your web app.
-      host            : Host
-      ``method``      : HttpMethod
+      binding         : HttpBinding
+      rawPath         : string
+      rawHost         : string
+      rawMethod       : string
       headers         : (string * string) list
       rawForm         : byte []
       rawQuery        : string
@@ -184,9 +190,10 @@ module Http =
       trace           : TraceHeader }
 
     static member httpVersion_ : Property<HttpRequest, string>
-    static member url_ : Property<HttpRequest, Uri>
-    static member host_ : Property<HttpRequest, Host>
-    static member method_ : Property<HttpRequest, HttpMethod>
+    static member absolutePath_ : Property<HttpRequest, string>
+    static member binding_ : Property<HttpRequest, HttpBinding>
+    static member rawHost_ : Property<HttpRequest, string>
+    static member rawMethod_ : Property<HttpRequest, string>
     static member headers_ : Property<HttpRequest, (string * string) list>
     static member rawForm_ : Property<HttpRequest, byte[]>
     static member rawQuery_ : Property<HttpRequest, string>
@@ -248,27 +255,30 @@ module Http =
     /// See docs on clientHost
     member clientHostTrustProxy : Host
 
-    /// path is equal to UrlDecode(url.AbsolutePath)
+    /// path is equal to UrlDecode(rawPath)
     member path : string
+
+    /// Returns Uri object representing the url associated with this request
+    member url : Uri
+
+    /// The Host that the web server responds to; not necessarily the host called
+    /// by the client, as the request may have traversed proxies. As Suave
+    /// binds to an IP rather than IP+Hostname, this can be anything the client
+    /// has passed as the Host header. If you're behind a proxy, it may be the
+    /// DNS name of the node that the reverse proxy forwards to, or if you're
+    /// exposing Suave publically, it should match the public DNS name of the
+    /// node.
+    ///
+    /// To ensure the correct host-name is being called, you can use `Http.host`
+    /// in your web app.
+    member host : Host
+
+    /// Returns a HttpMethod 
+    member method : HttpMethod
 
   [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
   module HttpRequest =
     val empty : HttpRequest
-
-  /// A HTTP binding is a protocol is the product of HTTP or HTTP, a DNS or IP
-  /// binding and a port number.
-  type HttpBinding =
-    { scheme        : Protocol
-      socketBinding : SocketBinding }
-
-    member uri : path:string -> query:string -> Uri
-
-    /// Overrides the default ToString() method to provide an implementation that
-    /// is assignable to a BaseUri for a RestClient/HttpClient.
-    override ToString : unit -> string
-
-    static member scheme_ : Property<HttpBinding,Protocol>
-    static member socketBinding_ : Property<HttpBinding, SocketBinding>
 
   [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
   module HttpBinding =

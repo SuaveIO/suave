@@ -33,7 +33,7 @@ let owinUnit cfg =
     Dictionary(dict(List.map (fun (a,b) -> a,[|b|]) m), StringComparer.OrdinalIgnoreCase)
 
   let createOwin () =
-    let request = { HttpRequest.empty with ``method`` = HttpMethod.PUT }
+    let request = { HttpRequest.empty with rawMethod = "PUT" }
     new OwinApp.OwinContext("/", { HttpContext.empty with request = request })
     :> IDictionary<string, obj>
 
@@ -112,7 +112,7 @@ let owinUnit cfg =
         let subj =
           let request =
             { HttpRequest.empty with
-                url = Uri(requestUri)
+                rawPath = "/path"
                 headers = [("host","localhost")]
                 rawQuery = "q=a&b=c"
               }

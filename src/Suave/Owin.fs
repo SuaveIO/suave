@@ -330,13 +330,9 @@ module OwinApp =
       ),
       fun v x -> invalidOp "cannot change the bound addresses after start."
 
-    let methodString : Property<HttpMethod, string> =
-      (fun x -> x.ToString()),
-      (fun v x -> HttpMethod.parse v)
-
     let uriScheme : Property<_, string> =
-      (fun (uri : Uri) -> uri.Scheme),
-      (fun v uri -> UriBuilder(uri, Scheme = v).Uri)
+      (fun (uri : HttpBinding) -> uri.scheme.ToString()),
+      (fun v uri -> uri)
 
     let uriAbsolutePath : Property<_, _> =
       (fun (uri : Uri) -> uri.AbsolutePath),
@@ -442,9 +438,9 @@ module OwinApp =
 
       [ // 3.2.1 Request Data
         // writeable / value???
-        OwinConstants.requestScheme,        HttpContext.request_ >--> HttpRequest.url_ >--> uriScheme <--> untyped
+        OwinConstants.requestScheme,        HttpContext.request_ >--> HttpRequest.binding_ >--> uriScheme <--> untyped
         // writeable / value
-        OwinConstants.requestMethod,        HttpContext.request_ >--> HttpRequest.method_ >--> methodString <--> untyped
+        OwinConstants.requestMethod,        HttpContext.request_ >--> HttpRequest.rawMethod_ <--> untyped
         // writeable / value
         OwinConstants.requestPathBase,      writable requestPathBase
         // writeable / value
@@ -731,8 +727,6 @@ module OwinApp =
 
       async {
 
-        let originalUrl = ctx.request.url
-
         let initialState =
           { ctx with
                 response = { ctx.response with status = HTTP_200.status } }
@@ -745,8 +739,6 @@ module OwinApp =
         verbose "Suave back in control"
 
         let ctx = wrapper.finalise()
-
-        let ctx = { ctx with request = { ctx.request with url = originalUrl }}
 
         if wrapper.HeadersSent then
           let request =
