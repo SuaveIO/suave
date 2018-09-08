@@ -1,7 +1,5 @@
 ﻿/// The logging namespace, which contains the logging abstraction for this
-/// library. See https://github.com/logary/logary for details. This module is
-/// completely stand-alone in that it has no external references and its adapter
-/// in Logary has been well tested.
+/// library.
 namespace Suave.Logging
 
 open System
