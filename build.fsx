@@ -69,11 +69,6 @@ Target.create "AsmInfo" <| fun _ ->
         AssemblyInfo.Metadata ("Commit", Git.Information.getCurrentHash ())
       ])
 
-Target.create "Replace" <| fun _ ->
-  Shell.replaceInFiles
-    [ "Logary.Facade", "Suave.Logging" ]
-    (!! "paket-files/logary/logary/src/Logary.Facade/Facade.fs")
-
 Target.create "Build" <| fun _ ->
   DotNet.build dotnetSimple "Suave.sln"
 
@@ -141,7 +136,6 @@ open Fake.Core.TargetOperators
 "Clean"
   ==> "Restore"
   ==> "AsmInfo"
-  ==> "Replace"
   ==> "Build"
   ==> "Tests"
   ==> "Pack"
