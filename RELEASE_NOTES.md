@@ -1,3 +1,8 @@
+## New in v2.5.0 (Released 2018-09-08)
+* This release brings a few performance fixes which allows Suave to start competing in the TechEmpower Framework Benchmarks.
+* Fix #706 - Websockets don't work in Firefox.
+* This release also includes breaking changes in the Suave.Logging namespace as we diverge from Logary facade.
+
 ## New in v2.5.0-beta2 (Pre-released 2018-07-31)
 * Fix #706 - Websockets don't work in firefox
 
