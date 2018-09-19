@@ -178,6 +178,17 @@ module Redirection =
 </html>"
       url HTTP_302.message))
 
+  let see_other url =
+    setHeader "Location" url
+    >=> setHeader "Content-Type" "text/html; charset=utf-8"
+    >=> response HTTP_303 (
+      UTF8.bytes(sprintf "<html>
+  <body>
+    <a href=\"%s\">%s</a>
+  </body>
+</html>"
+      url HTTP_303.message))
+
   let not_modified : WebPart =
     fun ctx -> { ctx with response = {status = HTTP_304.status; headers = []; content = Bytes [||]; writePreamble = true }} |> succeed
 
