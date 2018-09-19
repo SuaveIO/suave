@@ -443,6 +443,28 @@ module Redirection =
   val redirect : location:string -> WebPart
 
   /// <summary><para>
+  /// Composite:
+  /// </para><para>
+  /// HTTP/1.1 303 See Other
+  /// </para><para>
+  /// Location: 'location'
+  /// </para><para>
+  /// Content-Type: text/html; charset=utf-8
+  /// </para><para>
+  /// &lt;html&gt;
+  ///   &lt;body&gt;
+  ///    &lt;a href=&quot;'location'&quot;&gt;See Other&lt;/a&gt;
+  ///   &lt;/body&gt;
+  /// &lt;/html&gt;
+  /// </para><para>
+  /// The 303 (See Other) status code indicates that the server is
+  /// redirecting the user agent to a different resource, as indicated by a
+  /// URI in the Location header field, which is intended to provide an
+  /// indirect response to the original request.  
+  /// </para></summary>
+  val see_other : location:string -> WebPart
+
+  /// <summary><para>
   /// If the client has performed a conditional GET request and access is
   /// allowed, but the document has not been modified, the server SHOULD
   /// respond with this status code. The 304 response MUST NOT contain a
