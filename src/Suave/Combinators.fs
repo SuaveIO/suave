@@ -479,7 +479,7 @@ module ServeResource =
       >> ctx.runtime.logger.logSimple
 
     let sendIt name compression =
-      setHeader "Last-Modified" ((getLast key : DateTime).ToString("R"))
+      setHeader "Last-Modified" ((getLast key : DateTimeOffset).ToString("R"))
       >=> setHeader "Vary" "Accept-Encoding"
       >=> setMimeType name
       >=> send key compression
@@ -490,11 +490,14 @@ module ServeResource =
       | Some value ->
         match ctx.request.header "if-modified-since" with
         | Choice1Of2 v ->
-          match Parse.dateTime v with
+          match Parse.dateTimeOffset v with
           | Choice1Of2 date ->
-            if getLast key > date then sendIt value.name value.compression ctx
+            let lm = getLast key
+            // RFC1123 is only precise to the second so the comparison must be done with this precision
+            let lmSeconds = new DateTimeOffset(lm.Year, lm.Month, lm.Day, lm.Hour, lm.Minute, lm.Second, lm.Offset)
+            if lmSeconds > date then sendIt value.name value.compression ctx
             else NOT_MODIFIED ctx
-          | Choice2Of2 parse_error -> bad_request [||] ctx
+          | Choice2Of2 _parse_error -> bad_request [||] ctx
         | Choice2Of2 _ ->
           sendIt value.name value.compression ctx
       | None ->
@@ -587,7 +590,7 @@ module Files =
     resource
       fileName
       (File.Exists)
-      (fun name -> FileInfo(name).LastAccessTime)
+      (fun name -> new DateTimeOffset(FileInfo(name).LastWriteTime))
       (Path.GetExtension)
       sendFile
 
@@ -713,7 +716,7 @@ module Embedded =
     resource
       name
       (fun name -> resources assembly |> Array.exists ((=) name))
-      (fun _ -> lastModified assembly)
+      (fun _ -> new DateTimeOffset(lastModified assembly))
       (Path.GetExtension)
       (sendResource assembly)
 
