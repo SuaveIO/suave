@@ -1,3 +1,7 @@
+## New in v2.5.1 (Released 2018-09-29)
+* Fix multiple problems with last-modified handling (#713).
+* Introduces combinator `Redirection.see_other` (#712).
+
 ## New in v2.5.0 (Released 2018-09-08)
 * This release brings a few performance fixes which allows Suave to start competing in the TechEmpower Framework Benchmarks.
 * Fix #706 - Websockets don't work in Firefox.
