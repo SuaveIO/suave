@@ -21,18 +21,8 @@ Console.OutputEncoding <- Encoding.UTF8
 let release = ReleaseNotes.load "RELEASE_NOTES.md"
 let Configuration = Environment.environVarOrDefault "CONFIGURATION" "Release"
 
-let Release_2_1_105 (options: DotNet.CliInstallOptions) =
-    { options with
-        InstallerOptions = (fun io ->
-            { io with
-                Branch = "release/2.1.1xx"
-            })
-        Channel = None
-        Version = DotNet.Version "2.1.105"
-    }
-
 // Lazily install DotNet SDK in the correct version if not available
-let install = lazy DotNet.install Release_2_1_105
+let install = lazy DotNet.install (fun x -> { x with Version = DotNet.Version "2.1.402" })
 
 // Define general properties across various commands (with arguments)
 let inline withWorkDir wd =
@@ -74,7 +64,7 @@ Target.create "Build" <| fun _ ->
 
 Target.create "Tests" <| fun _ ->
   let path = "src" </> "Suave.Tests"
-  let res = DotNet.exec id "run" (sprintf "--framework netcoreapp2.0 --project %s -- --summary --sequenced" path)
+  let res = DotNet.exec id "run" (sprintf "--framework netcoreapp2.1 --project %s -- --summary --sequenced" path)
   if not res.OK then
     res.Errors |> Seq.iter (eprintfn "%s")
     failwith "Tests failed."
