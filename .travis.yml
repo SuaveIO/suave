@@ -1,6 +1,7 @@
 language: csharp
 dist: trusty
 sudo: false
+mono: none
 dotnet: 2.1.402
 
 matrix:
@@ -8,24 +9,7 @@ matrix:
   
   include:
     - os: linux
-      mono: 5.8.0
-    - os: linux
-      mono: weekly
-    - os: linux
-      mono: latest
     - os: osx
-      osx_image: xcode9.3
-      mono: 5.4.1
-    - os: osx
-      osx_image: xcode9.3
-      mono: 5.8.1
-    - os: osx
-      osx_image: xcode9.3
-      mono: latest
-
-  allow_failures:
-    - mono: weekly # latest commit
-    - mono: latest # "stable" release
 
 env:
   global:
