@@ -3,5 +3,4 @@ Expecto
 Expecto.FsCheck
 Expecto.BenchmarkDotNet
 WebSocketSharp
-Http.fs
 DotLiquid
