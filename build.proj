@@ -1,28 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
 <Project>
   <Import Project="Sdk.props" Sdk="Microsoft.NET.Sdk" />
-
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
   </PropertyGroup>
-
-  <Import Project=".paket\Paket.Restore.targets" />
   <Import Project="Sdk.targets" Sdk="Microsoft.NET.Sdk" />
-
   <PropertyGroup>
     <RepoRootDir>$([System.IO.Path]::GetFullPath("$(MSBuildThisFileDirectory)"))</RepoRootDir>
-    <BuildDependsOn></BuildDependsOn>
-    <CoreBuildDependsOn></CoreBuildDependsOn>
+    <BuildDependsOn>
+    </BuildDependsOn>
+    <CoreBuildDependsOn>
+    </CoreBuildDependsOn>
   </PropertyGroup>
-
   <Target Name="Build">
-    <Exec IgnoreStandardErrorWarningFormat="true" Command='dotnet fake build' WorkingDirectory="$(RepoRootDir)" />
+    <Exec IgnoreStandardErrorWarningFormat="true" Command="dotnet fake build" WorkingDirectory="$(RepoRootDir)" />
   </Target>
-
   <Target Name="Pack">
   </Target>
-
   <Target Name="Test">
   </Target>
-
   <Target Name="VSTest" DependsOnTargets="Test" />
+  <Import Project=".paket\Paket.Restore.targets" />
 </Project>

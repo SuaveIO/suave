@@ -12,7 +12,7 @@ module private Helpers =
     | Choice2Of2 _ -> b
 
   /// Maybe convert to int32 from string
-  let muint32 str =
+  let muint32 (str:string) =
     match System.UInt32.TryParse str with
     | true, i -> Choice1Of2 i
     | _       -> Choice2Of2 "couldn't convert to int32"

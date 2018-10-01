@@ -1,12 +1,10 @@
 ﻿module Suave.Tests.FormDataParsing
 
-open HttpFs
-open HttpFs.Client
 open Expecto
 open System
 open System.IO
+open System.Net.Http
 open System.Reflection
-open Hopac
 open Suave
 open Suave.Utils
 open Suave.Logging
@@ -41,20 +39,19 @@ let tests (cfg : SuaveConfig) =
   let uriFor (res : string) =
     SuaveConfig.firstBindingUri cfg res ""
 
-  let postTo res = Request.create Post (uriFor res)
-
   testCase "can send/receive" <| fun _ ->
     let ctx = runWithConfig app
     try
       use fs = File.OpenRead (pathOf "regressions/pix.gif")
-      let file = "pix.gif", ContentType.create("image", "gif"), StreamData fs
+      use formdata = new MultipartFormDataContent()
+      let upload = new StreamContent(fs)
+      upload.Headers.ContentType <- Headers.MediaTypeHeaderValue("image/gif")
+      formdata.Add(upload,"file","pix.gif")
+      use client = new HttpClient()
+      let response =
+        client.PostAsync(uriFor "gifs/echo",formdata).Result
 
-      let data =
-        postTo "gifs/echo"
-        |> Request.body (BodyForm [ FormFile ("img", file) ])
-        |> Request.responseAsBytes
-        |> run
-
+      let data = response.Content.ReadAsByteArrayAsync().Result
       fs.Seek(0L, SeekOrigin.Begin) |> ignore
 
       use ms = new MemoryStream()

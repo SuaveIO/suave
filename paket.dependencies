@@ -1,18 +1,16 @@
 source https://api.nuget.org/v3/index.json
-framework net461, netcoreapp2.0, netstandard2.0
+framework net461, netcoreapp2.1, netstandard2.0
 storage none
 
-nuget FSharp.Core !~> 4.3.4
+nuget FSharp.Core
 nuget DotLiquid
 nuget RazorEngine
 nuget Libuv
-nuget System.Reflection.Metadata ~> 1.5
-nuget WebSocketSharp prerelease
+nuget WebSocketSharp
 nuget FsCheck
 nuget Expecto
 nuget Expecto.FsCheck
 nuget Expecto.BenchmarkDotNet
-nuget Http.fs
 
 group Build
   source https://api.nuget.org/v3/index.json
@@ -35,31 +33,19 @@ group Build
 
 group Examples
   source https://api.nuget.org/v3/index.json
-  framework net461, netcoreapp2.0
-  nuget FSharp.Core !~> 4.3.4
+  framework net461, netcoreapp2.1
+  nuget FSharp.Core
   nuget Topshelf.FSharp
-  nuget Topshelf prerelease
+  nuget Topshelf
 
 group Docs
   source https://api.nuget.org/v3/index.json
-  framework netcoreapp2.0
-
-group Docs
-  source https://api.nuget.org/v3/index.json
-  framework: netcoreapp2.0
+  framework: netcoreapp2.1
   storage:none
 
-  clitool dotnet-fable
   nuget Argu
-  nuget FSharp.Core !~> 4.3.4
-  nuget Fable.Core
-  nuget Fable.Import.Browser
-  nuget Fable.Import.Node
-  nuget Fable.PowerPack
-  nuget Fable.React prerelease
+  nuget FSharp.Core
   nuget FsLibTool
-  nuget Fulma prerelease
-  nuget Stripe.net
 
 group SourceLink
   source https://api.nuget.org/v3/index.json
