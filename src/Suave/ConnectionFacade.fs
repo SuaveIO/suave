@@ -17,9 +17,9 @@ open Suave.Sockets.Control
 open Suave.Sockets.SocketOp.Operators
 open Suave.Utils.Bytes
 
-type ScanResult = NeedMore | Found of int | Error of Error
-type SelectResult = FailWith of Error | Continue of int
-type SelectFunction = ArraySegment<byte> -> int -> SelectResult
+type internal ScanResult = NeedMore | Found of int | Error of Error
+type internal SelectResult = FailWith of Error | Continue of int
+type internal SelectFunction = ArraySegment<byte> -> int -> SelectResult
 
 module internal Aux =
 
@@ -43,7 +43,7 @@ module internal Aux =
       return! SocketOp.abort (Error.SocketError SocketError.Shutdown)
     }
 
-type Reader(segments:LinkedList<BufferSegment>, bufferManager : BufferManager, transport, lineBuffer : ArraySegment<byte>) =
+type internal Reader(segments:LinkedList<BufferSegment>, bufferManager : BufferManager, transport, lineBuffer : ArraySegment<byte>) =
   /// Splits the segment list in two lits of ArraySegment; the first one containing a total of index bytes
   // this function deals with nothing async we soul remove the async
   let split index (select:SelectFunction) markerLength : SelectResult =
@@ -258,7 +258,7 @@ type Reader(segments:LinkedList<BufferSegment>, bufferManager : BufferManager, t
       }
     loop bytes
 
-type ConnectionFacade(connection: Connection, logger:Logger,matchedBinding: HttpBinding) =
+type internal ConnectionFacade(connection: Connection, logger:Logger,matchedBinding: HttpBinding) =
 
   let reader = new Reader(connection.segments,connection.bufferManager,connection.transport,connection.lineBuffer)
 
