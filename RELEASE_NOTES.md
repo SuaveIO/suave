@@ -1,3 +1,6 @@
+## New in v2.5.2 (Released 2018-10-11)
+* Fixes type name collision issue (#715)
+
 ## New in v2.5.1 (Released 2018-09-29)
 * Fix multiple problems with last-modified handling (#713).
 * Introduces combinator `Redirection.see_other` (#712).
