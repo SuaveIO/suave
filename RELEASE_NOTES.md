@@ -1,3 +1,6 @@
+## New in v2.5.3 (Released 2018-11-10)
+* Fix regression in Owin module (#717)
+
 ## New in v2.5.2 (Released 2018-10-11)
 * Fixes type name collision issue (#715)
 
