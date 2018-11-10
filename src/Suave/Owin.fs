@@ -332,7 +332,16 @@ module OwinApp =
 
     let uriScheme : Property<_, string> =
       (fun (uri : HttpBinding) -> uri.scheme.ToString()),
-      (fun v uri -> uri)
+      (fun v uri ->
+        { uri with
+            scheme =
+              match v.ToLowerInvariant() with
+              | "http" ->
+                HTTP
+              | "https" ->
+                HTTPS null
+              | _ ->
+                invalidOp (sprintf "Invalid scheme: '%s'" v)})
 
     let uriAbsolutePath : Property<_, _> =
       (fun (uri : Uri) -> uri.AbsolutePath),
