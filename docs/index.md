@@ -42,7 +42,7 @@ open Suave
 startWebServer defaultConfig (Successful.OK "Hello World!")
 {% endhighlight %}
 
-The above statement will start a web server on default port 8083 over HTTP.
+The above statement will start a web server on default port 8080 over HTTP.
 `startWebServer` takes a configuration record and the WebPart `(OK "Hello
 World")` It's worth noting that with the above, your application will block on
 the function call, until you cancel the `Async.DefaultCancellationToken`. If you
