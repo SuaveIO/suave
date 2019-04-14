@@ -1,3 +1,6 @@
+## New in v2.5.4 (Released 2019-04-14)
+* Fix compilation error (#728)
+
 ## New in v2.5.3 (Released 2018-11-10)
 * Fix regression in Owin module (#717)
 
