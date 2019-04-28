@@ -578,7 +578,7 @@ module Http =
         x.connection.ipAddr
 
     member x.clientIpTrustProxy =
-      x.clientIp true [ "x-real-ip" ]
+      x.clientIp true [ "x-real-ip"; "x-forwarded-for" ]
 
     member x.isLocal =
       IPAddress.IsLoopback (x.clientIp false [])
