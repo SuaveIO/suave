@@ -403,10 +403,10 @@ module Filters =
       return Some ctx }
 
   let logStructured (logger : Logger) (structuredFormatter : HttpContext -> (string * Map<string,obj>)) =
-    logWithLevelStructured LogLevel.Debug logger structuredFormatter
+    logWithLevelStructured LogLevel.Info logger structuredFormatter
 
   let log (logger : Logger) (formatter : HttpContext -> string) =
-    logWithLevel LogLevel.Debug logger formatter
+    logWithLevel LogLevel.Info logger formatter
 
   open Suave.Sscanf
 
