@@ -344,7 +344,7 @@ module WebSocket =
         do ()
       | Choice2Of2 err ->
         ctx.runtime.logger.info (
-          eventX "WebSocket disconnected"
+          eventX "WebSocket disconnected {error}"
           >> setSingleName "Suave.Websocket.handShakeWithSubprotocol"
           >> setFieldValue "error" err)
 
@@ -362,7 +362,7 @@ module WebSocket =
         do ()
       | Choice2Of2 err ->
         ctx.runtime.logger.info (
-          eventX "WebSocket disconnected"
+          eventX "WebSocket disconnected {error}"
           >> setSingleName "Suave.Websocket.handShake"
           >> setFieldValue "error" err)
 
