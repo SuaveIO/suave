@@ -1,4 +1,4 @@
-﻿/// The logging namespace, which contains the logging abstraction for this
+/// The logging namespace, which contains the logging abstraction for this
 /// library.
 namespace Suave.Logging
 
@@ -209,14 +209,17 @@ type Logger =
 /// Syntactic sugar on top of Logger for F# libraries.
 [<AutoOpen>]
 module LoggerEx =
+  open System.Diagnostics
   
   type Logger with
 
+    [<Conditional("DEBUG")>]
     member x.verbose (messageFactory : LogLevel -> Message) : unit =
       x.log Verbose messageFactory
 
+    [<Conditional("DEBUG")>]
     member x.debug (messageFactory : LogLevel -> Message) : unit =
-      x.log Debug messageFactory
+      x.log LogLevel.Debug messageFactory
 
     member x.info (messageFactory : LogLevel -> Message) : unit =
       x.log Info messageFactory
