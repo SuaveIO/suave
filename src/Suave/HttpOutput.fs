@@ -1,4 +1,4 @@
-﻿namespace Suave
+namespace Suave
 
 module HttpOutput =
 
@@ -6,6 +6,8 @@ module HttpOutput =
   open Suave.Sockets
   open Suave.Sockets.Control
   open Suave.Utils
+  open Suave.Logging
+  open Suave.Logging.Message
 
   open System
 
@@ -115,21 +117,28 @@ module HttpOutput =
       return! errorHandler ex "request failed" ctx
   }
 
+  let writeResponse (newCtx:HttpContext) =
+    socket{
+      if newCtx.response.writePreamble then
+        let! (_, connection) = writePreamble ["server";"date";"content-length"] newCtx newCtx.connection
+        let! connection = writeContent true { newCtx with connection = connection } newCtx.response.content
+        return { newCtx with connection = connection }
+      else
+        let! connection =  writeContent false newCtx newCtx.response.content
+        return { newCtx with connection = connection }
+        }
+
   /// Check if the web part can perform its work on the current request. If it
   /// can't it will return None and the run method will return.
   let inline run (webPart : WebPart) ctx = 
-    socket {
-      let! result = SocketOp.ofAsync <| executeTask ctx (webPart ctx) ctx.runtime.errorHandler
-      match result with 
+    async {
+      match! executeTask ctx (webPart ctx) ctx.runtime.errorHandler with 
       | Some newCtx ->
-        if newCtx.response.writePreamble then
-          let! (_, connection) = writePreamble ["server";"date";"content-length"] newCtx newCtx.connection
-          let! connection = writeContent true { newCtx with connection = connection } newCtx.response.content
-          return Some { newCtx with connection = connection }
-        else
-          let! connection =  writeContent false newCtx newCtx.response.content
-          return Some { newCtx with connection = connection }
-
+        match! writeResponse newCtx with
+        | Choice1Of2 ctx -> return Some ctx
+        | Choice2Of2 err ->
+          newCtx.runtime.logger.error (eventX "Socket error while writing response {error}" >> setFieldValue "error" err)
+          return None
       | None ->
         return None
   }

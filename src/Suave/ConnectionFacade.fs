@@ -1,4 +1,4 @@
-﻿
+
 #nowarn "40"
 namespace Suave
 
@@ -486,7 +486,7 @@ type internal ConnectionFacade(connection: Connection, logger:Logger,matchedBind
     let! rawHost = headers %% "host" @|! (None, "Missing 'Host' header")
 
     if headers %% "expect" = Choice1Of2 "100-continue" then
-      let! _ = HttpOutput.run Intermediate.CONTINUE ctx
+      let! _ = SocketOp.ofAsync(HttpOutput.run Intermediate.CONTINUE ctx)
       verbose "sent 100-continue response"
 
     verbose "parsing post data"

@@ -292,8 +292,8 @@ module WebSocket =
       let handShakeToken = Convert.ToBase64String webSocketHash
       let! something =
         match webSocketProtocol with
-        | Some subprotocol -> HttpOutput.run (handShakeWithSubprotocolResponse subprotocol handShakeToken) ctx
-        | None -> HttpOutput.run (handShakeResponse handShakeToken) ctx
+        | Some subprotocol -> SocketOp.ofAsync(HttpOutput.run (handShakeWithSubprotocolResponse subprotocol handShakeToken) ctx)
+        | None -> SocketOp.ofAsync(HttpOutput.run (handShakeResponse handShakeToken) ctx)
       let webSocket = new WebSocket(ctx.connection, webSocketProtocol)
       do! continuation webSocket ctx
     }
