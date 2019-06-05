@@ -1,3 +1,7 @@
+## New in v2.5.5 (Released 2019-06-04)
+* Support for "x-forwarded-for".
+* A few changes to logging.
+
 ## New in v2.5.4 (Released 2019-04-14)
 * Fix compilation error (#728)
 
