@@ -1053,7 +1053,7 @@ module ServerErrors =
   /// The server does not recognize the request method and can not support
   /// it for any resource.
   /// </para></summary>
-  val NOT_IMPLEMENTED : body:string [] -> WebPart
+  val NOT_IMPLEMENTED : body:string -> WebPart
   
   /// An upstream server that suave communicated with did not respond in a timely fashion
   val bad_gateway : bytes:byte [] -> WebPart
