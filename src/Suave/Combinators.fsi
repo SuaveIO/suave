@@ -1038,7 +1038,23 @@ module ServerErrors =
   /// from fulfilling the request.
   /// </para></summary>
   val INTERNAL_ERROR : body:string -> WebPart
-
+  
+  /// <summary><para>
+  /// 501
+  /// </para><para>
+  /// The server does not recognize the request method and can not support
+  /// it for any resource.
+  /// </para></summary>
+  val not_implemented : bytes:byte [] -> WebPart
+  
+  /// <summary><para>
+  /// 501
+  /// </para><para>
+  /// The server does not recognize the request method and can not support
+  /// it for any resource.
+  /// </para></summary>
+  val NOT_IMPLEMENTED : body:string -> WebPart
+  
   /// An upstream server that suave communicated with did not respond in a timely fashion
   val bad_gateway : bytes:byte [] -> WebPart
 
