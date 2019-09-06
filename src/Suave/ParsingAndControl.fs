@@ -122,5 +122,5 @@ module internal ParsingAndControl =
 
   let resolveDirectory homeDirectory =
     match homeDirectory with
-    | None   -> Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location)
+    | None   -> Path.GetDirectoryName(System.AppContext.BaseDirectory)
     | Some s -> s
