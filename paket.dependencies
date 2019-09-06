@@ -4,7 +4,6 @@ source https://api.nuget.org/v3/index.json
 framework net461, netcoreapp2.1, netstandard2.0
 storage none
 
-nuget FSharp.Core >= 4.3.4 < 5 lowest_matching:true
 nuget DotLiquid
 nuget RazorEngine
 nuget Libuv
@@ -19,6 +18,7 @@ group Build
   framework: netstandard2.0
   storage:none
 
+  nuget FSharp.Core 4.5.0.0
   clitool dotnet-fake
   nuget NETStandard.Library.NETFramework
   nuget Fake.DotNet.Cli
