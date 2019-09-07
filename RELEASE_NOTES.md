@@ -1,3 +1,7 @@
+## New in v2.5.6 (Released 2019-09-06)
+* Added method NOT_IMPLEMENTED (#733)
+* FIX: CoreRT compiled binaries not working (#735)
+
 ## New in v2.5.5 (Released 2019-06-04)
 * Support for "x-forwarded-for".
 * A few changes to logging.
