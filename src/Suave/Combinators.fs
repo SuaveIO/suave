@@ -171,23 +171,21 @@ module Redirection =
     setHeader "Location" url
     >=> setHeader "Content-Type" "text/html; charset=utf-8"
     >=> response HTTP_302 (
-      UTF8.bytes(sprintf "<html>
+      UTF8.bytes("<html>
   <body>
-    <a href=\"%s\">%s</a>
+    <a href=\"" + url  + "\">" + HTTP_302.message + "</a>
   </body>
-</html>"
-      url HTTP_302.message))
+</html>"))
 
   let see_other url =
     setHeader "Location" url
     >=> setHeader "Content-Type" "text/html; charset=utf-8"
     >=> response HTTP_303 (
-      UTF8.bytes(sprintf "<html>
+      UTF8.bytes("<html>
   <body>
-    <a href=\"%s\">%s</a>
+    <a href=\"" + url + "\">" + HTTP_303.message + "</a>
   </body>
-</html>"
-      url HTTP_303.message))
+</html>"))
 
   let not_modified : WebPart =
     fun ctx -> { ctx with response = {status = HTTP_304.status; headers = []; content = Bytes [||]; writePreamble = true }} |> succeed
@@ -353,19 +351,18 @@ module Filters =
     let dash = function | "" | null -> "-" | x -> x
     let ci = Globalization.CultureInfo("en-US")
     let processId = System.Diagnostics.Process.GetCurrentProcess().Id.ToString()
-    sprintf "%O %s %s [%s] \"%s %s %s\" %d %d"
-      ctx.clientIpTrustProxy
-      processId //TODO: obtain connection owner via Ident protocol
-                         // Authentication.UserNameKey
-      (match Map.tryFind "userName" ctx.userState with Some x -> x :?> string | None -> "-")
-      (DateTime.UtcNow.ToString("dd/MMM/yyyy:hh:mm:ss %K", ci))
-      (string ctx.request.``method``)
-      ctx.request.url.AbsolutePath
-      ctx.request.httpVersion
-      ctx.response.status.code
-      (match ctx.response.content with
-      | Bytes bs -> bs.Length
-      | _ -> 0)
+    ctx.clientIpTrustProxy.ToString() + " " +
+    processId + " " + //TODO: obtain connection owner via Ident protocol
+                       // Authentication.UserNameKey
+    (match Map.tryFind "userName" ctx.userState with Some x -> x :?> string | None -> "-") + " [" +
+    (DateTime.UtcNow.ToString("dd/MMM/yyyy:hh:mm:ss %K", ci)) + "] \"" +
+    (string ctx.request.``method``) + " " +
+    ctx.request.url.AbsolutePath + " " +
+    ctx.request.httpVersion + "\" " +
+    ctx.response.status.code.ToString() + " " +
+    (match ctx.response.content with
+    | Bytes bs -> bs.Length.ToString()
+    | _ -> "0")
 
   let logFormatStructured (ctx : HttpContext) =
     let fieldList : (string*obj) list = [
@@ -426,13 +423,13 @@ module Filters =
       | None ->
         fail
     F
-  
+
   let pathScanCi (format : PrintfFormat<_,_,_,_,'t>) (handler : 't ->  WebPart) : WebPart =
     let scan path =
       try
         let extract = sscanfci format path
         Some extract
-      with _ -> 
+      with _ ->
         None
 
     let part (context:HttpContext) =
@@ -502,10 +499,10 @@ module ServeResource =
           sendIt value.name value.compression ctx
       | None ->
         let ext = getExtension key
-        log (sprintf "failed to find matching mime for ext '%s'" ext)
+        log ("failed to find matching mime for ext '" + ext + "'")
         fail
     else
-      log (sprintf "failed to find resource by key '%s'" key)
+      log ("failed to find resource by key '" + key + "'")
       fail
 
 module ContentRange =
@@ -519,7 +516,7 @@ module ContentRange =
     let start = int64 rangeArray.[0]
     let finish = if Int64.TryParse (rangeArray.[1], ref 0L) then Some <| int64 rangeArray.[1] else None
     start, finish
-    
+
   let (|ContentRange|_|) (context:HttpContext) =
     match context.request.header "range" with
     | Choice1Of2 rangeValue -> Some <| parseContentRange rangeValue
@@ -561,16 +558,16 @@ module Files =
         try
           match encoding with
           | Some n ->
-            let! (_,conn) = asyncWriteLn (sprintf "Content-Range: bytes %d-%d/*" start finish) conn
+            let! (_,conn) = asyncWriteLn ("Content-Range: bytes " + start.ToString() + "-" + finish.ToString() + "/*") conn
             let! (_,conn) = asyncWriteLn (String.Concat [| "Content-Encoding: "; n.ToString() |]) conn
-            let! (_,conn) = asyncWriteLn (sprintf "Content-Length: %d\r\n" (fs : Stream).Length) conn
+            let! (_,conn) = asyncWriteLn ("Content-Length: " + (fs : Stream).Length.ToString() + "\r\n") conn
             let! conn = flush conn
             if ctx.request.``method`` <> HttpMethod.HEAD && fs.Length > 0L then
               do! transferStream conn fs
             return conn
           | None ->
-            let! (_,conn) = asyncWriteLn (sprintf "Content-Range: bytes %d-%d/%d" start finish total) conn
-            let! (_,conn) = asyncWriteLn (sprintf "Content-Length: %d\r\n" (fs : Stream).Length) conn
+            let! (_,conn) = asyncWriteLn ("Content-Range: bytes " + start.ToString() + "-" + finish.ToString() + "/" + total.ToString()) conn
+            let! (_,conn) = asyncWriteLn ("Content-Length: " + (fs : Stream).Length.ToString() + "\r\n") conn
             let! conn = flush conn
             if ctx.request.``method`` <> HttpMethod.HEAD && fs.Length > 0L then
               do! transferStream conn fs
@@ -688,14 +685,14 @@ module Embedded =
       match encoding with
       | Some n ->
         let! (_,conn) =  asyncWriteLn (String.Concat [| "Content-Encoding: "; n.ToString() |]) conn
-        let! (_,conn) = asyncWriteLn (sprintf "Content-Length: %d\r\n" (fs: Stream).Length) conn
+        let! (_,conn) = asyncWriteLn ("Content-Length: " + (fs: Stream).Length.ToString() + "\r\n") conn
         let! conn = flush conn
         if ctx.request.``method`` <> HttpMethod.HEAD && fs.Length > 0L then
           do! transferStream conn fs
         fs.Dispose()
         return conn
       | None ->
-        let! (_,conn) = asyncWriteLn (sprintf "Content-Length: %d\r\n" (fs: Stream).Length) conn
+        let! (_,conn) = asyncWriteLn ("Content-Length: " + (fs: Stream).Length.ToString() + "\r\n") conn
         let! conn = flush conn
         if ctx.request.``method`` <> HttpMethod.HEAD && fs.Length > 0L then
           do! transferStream conn fs
@@ -956,7 +953,7 @@ module CORS =
     | InclusiveOption.Some (m :: ms) ->
       let exists = m.ToString() = value || List.exists (fun m -> m.ToString() = value) ms
       if exists then
-        let header = sprintf "%s,%s" (m.ToString()) (ms |> Seq.map (fun i -> i.ToString()) |> String.concat( ", "))
+        let header = (m.ToString()) + "," + (ms |> Seq.map (fun i -> i.ToString()) |> String.concat( ", "))
         Writers.setHeader AccessControlAllowMethods header
       else
         succeed

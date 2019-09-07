@@ -20,7 +20,7 @@ module Headers =
     match System.Decimal.TryParse(s, System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture) with
     | true, d -> Some d
     | _ -> None
-  
+
   /// Parse a culture info as given in the 'Accept-Language' Header field.
   let parseCultureInfo =
     let cultureNames =
@@ -104,5 +104,5 @@ module Headers =
   /// Headers are lowercased, so can use string.Equals
   let getAll (target : NameValueList) (key : string) =
     match target |> List.choose (fun (a, b) -> if a.Equals key then Some b else None) with
-    | [] -> Choice2Of2 (sprintf "Couldn't find key '%s' in NameValueList" key)
+    | [] -> Choice2Of2 ("Couldn't find key '" + key + "' in NameValueList")
     | l  -> Choice1Of2 l

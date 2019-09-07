@@ -19,7 +19,7 @@ module Web =
       >> addExn ex)
 
     if ctx.isLocal then
-      Response.response HTTP_500 (UTF8.bytes (sprintf "<h1>%s</h1><br/>%A" ex.Message ex)) ctx
+      Response.response HTTP_500 (UTF8.bytes ("<h1>" + ex.Message + "</h1><br/>" + ex.ToString())) ctx
     else
       Response.response HTTP_500 (UTF8.bytes HTTP_500.message) ctx
 

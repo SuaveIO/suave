@@ -341,7 +341,7 @@ module OwinApp =
               | "https" ->
                 HTTPS null
               | _ ->
-                invalidOp (sprintf "Invalid scheme: '%s'" v)})
+                invalidOp ("Invalid scheme: '" + v + "'")})
 
     let uriAbsolutePath : Property<_, _> =
       (fun (uri : Uri) -> uri.AbsolutePath),
@@ -500,9 +500,9 @@ module OwinApp =
         OwinConstants.CommonKeys.clientCertificate, constant Unchecked.defaultof<Security.Cryptography.X509Certificates.X509Certificate>
         OwinConstants.CommonKeys.onSendingHeaders,  onSendingHeadersLens <--> untyped
         OwinConstants.CommonKeys.isLocal,           HttpContext.isLocal_ <--> untyped
-        OwinConstants.CommonKeys.localIpAddress,    HttpContext.runtime_ >--> HttpRuntime.matchedBinding_ >--> HttpBinding.socketBinding_ >--> SocketBinding.ip_ <--> stringlyTyped (sprintf "%O") IPAddress.Parse <--> untyped
+        OwinConstants.CommonKeys.localIpAddress,    HttpContext.runtime_ >--> HttpRuntime.matchedBinding_ >--> HttpBinding.socketBinding_ >--> SocketBinding.ip_ <--> stringlyTyped (fun s -> s.ToString()) IPAddress.Parse <--> untyped
         OwinConstants.CommonKeys.localPort,         HttpContext.runtime_  >--> HttpRuntime.matchedBinding_ >--> HttpBinding.socketBinding_ >--> SocketBinding.port_ <--> stringlyTyped string uint16 <--> untyped
-        OwinConstants.CommonKeys.remoteIpAddress,   HttpContext.clientIp_ <--> stringlyTyped (sprintf "%O") IPAddress.Parse <--> untyped
+        OwinConstants.CommonKeys.remoteIpAddress,   HttpContext.clientIp_ <--> stringlyTyped (fun s -> s.ToString()) IPAddress.Parse <--> untyped
         OwinConstants.CommonKeys.remotePort,        HttpContext.clientPort_ <--> stringlyTyped string uint16 <--> untyped
         OwinConstants.CommonKeys.traceOutput,       HttpContext.runtime_ >--> HttpRuntime.logger_ >--> ((fun x -> textWriter x), (fun v x -> x)) <--> untyped
 

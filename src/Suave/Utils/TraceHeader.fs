@@ -48,7 +48,7 @@ type TraceHeader =
     let tryParseUint64 x =
       match System.UInt64.TryParse x with
       | true, value -> Choice1Of2 value
-      | false, _    -> Choice2Of2 (sprintf "Couldn't parse '%s' to int64" x)
+      | false, _    -> Choice2Of2 ("Couldn't parse '" + x + "' to int64")
     let parent = "x-b3-spanid"  |> getFirst headers |> Choice.bind tryParseUint64 |> Option.ofChoice
     let trace  = "x-b3-traceid" |> getFirst headers |> Choice.bind tryParseUint64 |> Option.ofChoice
     TraceHeader.create trace parent

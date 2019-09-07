@@ -41,12 +41,12 @@ module Choice =
     match v with
     | Choice1Of2 x -> Choice1Of2 x
     | Choice2Of2 x -> f x
-    
+
   let fold f g =
     function
     | Choice1Of2 x -> f x
     | Choice2Of2 y -> g y
-    
+
   let apply f v =
     bind (fun f' ->
       bind (fun v' ->
@@ -80,7 +80,7 @@ module Choice =
   let toResult = function
     | Choice1Of2 x -> Ok x
     | Choice2Of2 x -> Error x
-    
+
   let orDefault value = function
     | Choice1Of2 v -> v
     | _ -> value ()
@@ -145,12 +145,12 @@ module Result =
     match v with
     | Ok x -> Ok x
     | Error x -> f x
-    
+
   let fold f g =
     function
     | Ok x -> f x
     | Error y -> g y
-    
+
   let apply f v =
     Result.bind (fun f' ->
       Result.bind (fun v' ->
@@ -328,7 +328,7 @@ module String =
 #else
     a.Equals(b, StringComparison.InvariantCultureIgnoreCase)
 #endif
-    
+
   /// Compare ordinally with ignore case.
   let equalsOrdinalCI (str1: string) (str2: string) =
     String.Equals(str1, str2, StringComparison.OrdinalIgnoreCase)
@@ -354,25 +354,25 @@ module String =
 
   let trim (s: string) =
     s.Trim()
-  
+
   let trimc (toTrim: char) (s: string) =
     s.Trim toTrim
-  
+
   let trimStart (s: string) =
     s.TrimStart()
-  
+
   let split (c: char) (s: string) =
     s.Split c |> Array.toList
-  
+
   let splita (c: char) (s: string) =
     s.Split c
-  
+
   let startsWith (substring: string) (s: string) =
     s.StartsWith substring
-  
+
   let contains (substring: string) (s: string) =
     s.Contains substring
-  
+
   let substring index (s: string) =
     s.Substring index
 
@@ -800,8 +800,8 @@ module App =
     use stream = assembly.GetManifestResourceStream name
     if stream = null then
       assembly.GetManifestResourceNames()
-      |> Array.fold (fun s t -> sprintf "%s\n - %s" s t) ""
-      |> sprintf "couldn't find resource named '%s', from: %s" name
+      |> Array.fold (fun s t -> s + "\n - " + t) ""
+      |> (fun s ->  "couldn't find resource named '" + name + "', from: " + s)
       |> Choice2Of2
     else
       use reader = new StreamReader(stream)
@@ -819,7 +819,7 @@ module App =
 
 module Dictionary =
   open System.Collections.Generic
-    
+
     /// Attempts to retrieve a value as an option from a dictionary using the provided key
     let tryFind key (dict: Dictionary<_, _>) =
       match dict.TryGetValue key with

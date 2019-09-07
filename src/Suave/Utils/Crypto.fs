@@ -99,7 +99,7 @@ let private secretboxInit key iv =
 
 let secretbox (key : byte []) (msg : byte []) =
   if key.Length <> int KeyLength then
-    Choice2Of2 (InvalidKeyLength (sprintf "key should be %d bytes but was %d bytes" KeyLength (key.Length)))
+    Choice2Of2 (InvalidKeyLength ("key should be " + (KeyLength.ToString()) + " bytes but was " + (key.Length.ToString()) + " bytes"  ))
   elif msg.Length = 0 then
     Choice2Of2 EmptyMessageGiven
   else
@@ -140,9 +140,7 @@ let secretboxOpen (key : byte []) (cipherText : byte []) =
 
   if cipherText.Length < int (HMACLength + IVLength) then
     Choice2Of2 (
-      TruncatedMessage (
-        sprintf "cipher text length was %d but expected >= %d"
-                cipherText.Length (HMACLength + IVLength)))
+      TruncatedMessage ("cipher text length was " + (cipherText.Length.ToString()) + " but expected >= " + (HMACLength + IVLength).ToString()))
   elif not (Bytes.equalsConstantTime hmacCalc hmacGiven) then
     Choice2Of2 (AlteredOrCorruptMessage "calculated HMAC does not match expected/given")
   else

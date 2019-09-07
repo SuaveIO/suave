@@ -39,7 +39,7 @@ let authenticateBasicAsync f protectedPart ctx =
   | Choice2Of2 _ ->
     challenge ctx
 
-let authenticateBasic f protectedPart ctx = 
+let authenticateBasic f protectedPart ctx =
   authenticateBasicAsync (f >> async.Return) protectedPart ctx
 
 module internal Utils =
@@ -99,9 +99,10 @@ let authenticate relativeExpiry secure
     cookieState state missingCookie decryptionFailure fSuccess)
 
 let authenticateWithLogin relativeExpiry loginPage fSuccess : WebPart =
+  let decryptionFailure  = (fun s -> s.ToString()) >> RequestErrors.BAD_REQUEST >> Choice2Of2
   authenticate relativeExpiry false
                (fun () -> Choice2Of2(Redirection.FOUND loginPage))
-               (sprintf "%A" >> RequestErrors.BAD_REQUEST >> Choice2Of2)
+               decryptionFailure
                fSuccess
 
 let authenticated relativeExpiry secure : WebPart =

@@ -94,10 +94,7 @@ module WebSocket =
 
   type ByteSegmentCapacityException(requiredCapacity: int, actualCapacity: int) =
     inherit Exception(
-      sprintf
-        "Byte segment provided to read websocket message does not have enough capacity [Required Capacity: %i, Actual Capacity: %i]"
-        requiredCapacity
-        actualCapacity)
+      "Byte segment provided to read websocket message does not have enough capacity [Required Capacity: " + requiredCapacity.ToString() + ", Actual Capacity: " + actualCapacity.ToString() + "]")
 
   let internal exctractHeader (arr: byte []) =
     let bytes x = arr.[x]
@@ -228,7 +225,7 @@ module WebSocket =
       let! mask = readBytes connection.transport 4
 
       if extendedLength > uint64 Int32.MaxValue then
-        let reason = sprintf "Frame size of %d bytes exceeds maximum accepted frame size (2 GB)" extendedLength
+        let reason = "Frame size of " + extendedLength.ToString() + " bytes exceeds maximum accepted frame size (2 GB)"
         let data =
           [| yield! BitConverter.GetBytes (CloseCode.CLOSE_TOO_LARGE.code) |> bytesToNetworkOrder
              yield! UTF8.bytes reason |]
@@ -251,7 +248,7 @@ module WebSocket =
       let! mask = readBytes connection.transport 4
 
       if extendedLength > uint64 Int32.MaxValue then
-        let reason = sprintf "Frame size of %d bytes exceeds maximum accepted frame size (2 GB)" extendedLength
+        let reason = "Frame size of " + extendedLength.ToString() + " bytes exceeds maximum accepted frame size (2 GB)"
         let data =
             [| yield! BitConverter.GetBytes (CloseCode.CLOSE_TOO_LARGE.code) |> bytesToNetworkOrder
                yield! UTF8.bytes reason |]
@@ -307,8 +304,8 @@ module WebSocket =
 
   let validateConnectionHeader (header:Choice<string,string>) =
     match header with
-    | Choice1Of2 s -> 
-      let parts = 
+    | Choice1Of2 s ->
+      let parts =
         s.ToLower().Split([|','|],StringSplitOptions.RemoveEmptyEntries)
         |> Array.map (fun (s:string) -> s.Trim())
       Array.contains "upgrade" parts

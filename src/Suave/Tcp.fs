@@ -31,9 +31,7 @@ type StartedData =
   member x.GetStartedListeningElapsedMilliseconds() =
     ((x.socketBoundUtc |> Option.fold (fun _ t -> t) x.startCalledUtc) - x.startCalledUtc).TotalMilliseconds
   override x.ToString() =
-    sprintf "%.3f ms with binding %O:%d"
-      (x.GetStartedListeningElapsedMilliseconds())
-      x.binding.ip x.binding.port
+    (x.GetStartedListeningElapsedMilliseconds()).ToString() + " ms with binding " + x.binding.ip.ToString() + ":"  + x.binding.port.ToString()
 
 /// Stop the TCP listener server
 let stopTcp reason (socket : Socket) =

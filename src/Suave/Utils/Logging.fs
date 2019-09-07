@@ -210,7 +210,7 @@ type Logger =
 [<AutoOpen>]
 module LoggerEx =
   open System.Diagnostics
-  
+
   type Logger with
 
     [<Conditional("DEBUG")>]
@@ -508,8 +508,8 @@ module internal Formatting =
       Set.ofSeq matchedFields, List.ofSeq themedParts
 
     | Gauge (value, units) ->
-      Set.empty, [ sprintf "%i" value, NumericSymbol
-                   sprintf "%s" units, KeywordSymbol ]
+      Set.empty, [ value.ToString(), NumericSymbol
+                   units, KeywordSymbol ]
 
   let formatValue (fields : Map<string, obj>) (pv : PointValue) =
     let matchedFields, themedParts =
@@ -618,10 +618,8 @@ module internal Formatting =
     let formatFields (ignored : Set<string>) (fields : Map<string, obj>) =
       if not (Map.isEmpty fields) then
         fields
-        |> Seq.filter (fun (KeyValue (k, _)) ->
-          not (ignored |> Set.contains k))
-        |> Seq.map (fun (KeyValue (k, v)) ->
-          sprintf "\n - %s: %O" k v)
+        |> Seq.filter (fun (KeyValue (k, _)) -> not (ignored |> Set.contains k))
+        |> Seq.map (fun (KeyValue (k, v)) -> "\n - " + k + ": " + v.ToString())
         |> String.concat ""
       else
         ""
@@ -650,16 +648,16 @@ module internal LiterateFormatting =
     let foundProp (prop: FsMtParser.Property) = tokens.Add (PropToken (prop.name, prop.format))
     FsMtParser.parseParts template foundText foundProp
     tokens :> seq<TemplateToken>
-  
+
   [<AutoOpen>]
   module OutputTemplateTokenisers =
 
-    let tokeniseTimestamp format (options : LiterateOptions) (message : Message) = 
+    let tokeniseTimestamp format (options : LiterateOptions) (message : Message) =
       let localDateTimeOffset = DateTimeOffset(message.utcTicks, TimeSpan.Zero).ToLocalTime()
       let formattedTimestamp = localDateTimeOffset.ToString(format, options.formatProvider)
       seq { yield formattedTimestamp, Subtext }
 
-    let tokeniseTimestampUtc format (options : LiterateOptions) (message : Message) = 
+    let tokeniseTimestampUtc format (options : LiterateOptions) (message : Message) =
       let utcDateTimeOffset = DateTimeOffset(message.utcTicks, TimeSpan.Zero)
       let formattedTimestamp = utcDateTimeOffset.ToString(format, options.formatProvider)
       seq { yield formattedTimestamp, Subtext }
@@ -690,7 +688,7 @@ module internal LiterateFormatting =
   /// would be: `[{timestampLocal:HH:mm:ss} {level}] {message}{newline}{exceptions}`.
   /// Available template fields are: `timestamp`, `timestampUtc`, `level`, `source`,
   /// `newline`, `tab`, `message`, `exceptions`. Any misspelled or otheriwese invalid property
-  /// names will be treated as `LiterateToken.MissingTemplateField`. 
+  /// names will be treated as `LiterateToken.MissingTemplateField`.
   let tokeniserForOutputTemplate template : LiterateTokeniser =
     let tokens = parseTemplate template
     fun options message ->

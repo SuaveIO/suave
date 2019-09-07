@@ -14,17 +14,17 @@ type IDictionary<'b,'a> with
   member dict.TryLookup key =
     match dict.TryGetValue key with
     | true, v  -> Choice1Of2 v
-    | false, _ -> Choice2Of2 (sprintf "Key %A was not present" key)
+    | false, _ -> Choice2Of2 ("Key " + (key.ToString()) + " was not present")
 
 let getFirst (target : NameValueList) (key : string) =
   match target |> List.tryPick (fun (a, b) -> if a.Equals key then Some b else None) with
   | Some b -> Choice1Of2 b
-  | None   -> Choice2Of2 (sprintf "Couldn't find key '%s' in NameValueList" key)
+  | None   -> Choice2Of2 ("Couldn't find key '" + key + "' in NameValueList")
 
 let getFirstCaseInsensitive (target : NameValueList) (key : string) =
   match target |> List.tryPick (fun (a, b) -> if String.equalsCaseInsensitive a key then Some b else None) with
   | Some b -> Choice1Of2 b
-  | None   -> Choice2Of2 (sprintf "Couldn't find key '%s' in NameValueList" key)
+  | None   -> Choice2Of2 ("Couldn't find key '" + key + "' in NameValueList")
 
 [<System.Obsolete("Use getFirstCaseInsensitive with an i")>]
 let getFirstCaseInsensitve (target : NameValueList) (key : string) =
@@ -33,7 +33,7 @@ let getFirstCaseInsensitve (target : NameValueList) (key : string) =
 let getFirstOpt (target : NameOptionValueList) (key : string) =
   match target |> List.tryPick (fun (a,b) -> if a.Equals key then b else None) with
   | Some b -> Choice1Of2 b
-  | None -> Choice2Of2 (sprintf "Couldn't find key '%s' in NameOptionValueList" key)
+  | None -> Choice2Of2 ("Couldn't find key '" + key + "' in NameOptionValueList")
 
 let tryGetChoice1 f x =
   match f x with

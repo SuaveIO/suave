@@ -131,7 +131,7 @@ module Cookie =
 
 
     succeed { ctx with response = { ctx.response with headers = headers' } }
-      
+
 
   let unsetCookie (cookieName : string) =
     let startEpoch = DateTimeOffset(1970, 1, 1, 0, 0, 1, TimeSpan.Zero) |> Some
@@ -239,9 +239,7 @@ module Cookie =
                    : WebPart =
     context (fun ctx ->
       let debug message =
-        ctx.runtime.logger.debug (
-          eventX message
-          >> setSingleName "Suave.Cookie.cookieState")
+        ctx.runtime.logger.debug (eventX message >> setSingleName "Suave.Cookie.cookieState")
 
       let setCookies plainText =
         let httpCookie, clientCookie =
@@ -270,7 +268,7 @@ module Cookie =
           wp_kont
 
       | Choice2Of2 (DecryptionError err) ->
-        debug (sprintf "decryption error: %A" err)
+        debug ("decryption error: "  + err.ToString())
         match decryptionFailure err with
         | Choice1Of2 plainText ->
           debug "Existing, broken cookie, setting cookie text anew"

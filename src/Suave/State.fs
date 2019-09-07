@@ -68,7 +68,7 @@ module CookieStateStore =
         >> setSingleName "Suave.State.CookieStateStore.stateful")
 
       let cipherTextCorrupt =
-        sprintf "%A" >> RequestErrors.BAD_REQUEST >> Choice2Of2
+        (fun s -> s.ToString()) >> RequestErrors.BAD_REQUEST >> Choice2Of2
 
       let setExpiry : WebPart =
         Writers.setUserData (StateStoreType + "-expiry") relativeExpiry
@@ -93,7 +93,7 @@ module CookieStateStore =
     let private createStateStore (serialiser : CookieSerialiser) (userState : Map<string, obj>) (ss : obj) =
       { new StateStore with
           member x.get key =
-            ss 
+            ss
             :?> byte []
             |> serialiser.deserialise
             |> Map.tryFind key

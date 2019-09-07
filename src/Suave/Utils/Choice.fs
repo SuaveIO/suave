@@ -24,7 +24,7 @@ let parser (parse : string -> bool * 'a) (err : string) =
   fun original ->
     match parse original with
     | true, res -> Choice1Of2 res
-    | _, _      -> Choice2Of2 (sprintf "%s. Input value \"%O\"" err original)
+    | _, _      -> Choice2Of2 (err + ". Input value '" + original + "'" )
 
 module Operators =
 

@@ -193,7 +193,7 @@ module Http =
       | HTTP_505 -> "Cannot fulfill request."
 
     member x.describe () =
-      sprintf "%d %s: %s" x.code x.reason x.message
+       x.code.ToString()  + " " + x.reason + ": " + x.message
 
     member x.status = { code = x.code; reason = x.reason }
 
@@ -207,7 +207,7 @@ module Http =
         Choice1Of2 x
 
       | None ->
-        Choice2Of2 (sprintf "Couldn't convert %i to HttpCode. Please send a PR to https://github.com/suaveio/suave if you want it" code)
+        Choice2Of2 ("Couldn't convert " + code.ToString() + " to HttpCode. Please send a PR to https://github.com/suaveio/suave if you want it")
 
   and private HttpCodeStatics() =
     static member val mapCases : Lazy<Map<string,HttpCode>> =
@@ -516,18 +516,18 @@ module Http =
     static member writePreamble_ = Property<HttpResult,_> (fun x -> x.writePreamble) (fun v x -> { x with writePreamble = v })
 
   type ServerKey = byte []
-  
+
   [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
   module ServerKey =
-    
+
     let validate (key : ServerKey) =
       if key.Length <> int Crypto.KeyLength then
         failwithf "Invalid server key length - should be %i, but was %i" Crypto.KeyLength key.Length
       key
-    
+
     let fromBase64 =
       Convert.FromBase64String >> validate
-    
+
   type IPAddress with
     static member tryParseC str =
       match IPAddress.TryParse str with
