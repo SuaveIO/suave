@@ -5,7 +5,6 @@ module Web =
 
   open System
   open System.IO
-  open System.Net
   open Suave.Utils
   open Suave.Logging
   open Suave.Logging.Message
@@ -18,7 +17,7 @@ module Web =
       >> setSingleName "Suave.Web.defaultErrorHandler"
       >> addExn ex)
 
-    if ctx.isLocal then
+    if ctx.isLocalTrustProxy then
       Response.response HTTP_500 (UTF8.bytes ("<h1>" + ex.Message + "</h1><br/>" + ex.ToString())) ctx
     else
       Response.response HTTP_500 (UTF8.bytes HTTP_500.message) ctx

@@ -582,6 +582,9 @@ module Http =
 
     member x.isLocal =
       IPAddress.IsLoopback (x.clientIp false [])
+      
+    member x.isLocalTrustProxy =
+      IPAddress.IsLoopback (x.clientIp true [ "x-real-ip"; "x-forwarded-for" ])
 
     member x.clientPort trustProxy sources : Port =
       if trustProxy then

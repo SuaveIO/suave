@@ -1,4 +1,4 @@
-﻿namespace Suave
+namespace Suave
 
 [<AutoOpen>]
 module Http =
@@ -426,6 +426,8 @@ module Http =
     member clientIpTrustProxy : IPAddress
 
     member isLocal : bool
+
+    member isLocalTrustProxy : bool
 
     member clientPort : trustProxy:bool -> sources:string list -> Port
 
