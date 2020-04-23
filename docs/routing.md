@@ -37,7 +37,7 @@ let app =
 startWebServer defaultConfig app
 {% endhighlight %}
 
-By using `choose` we execute different logic depending on whether the request was a GET or a POST, and depending on whether the url was /hello or /goodbye. If a request matches a given path in the decision tree, `choose` will return `Some HttpContext`, if it doesn't, `choose` will return `None`. The end result is that when someone makes a request the server will walk down this tree looking for the first part that returns `Some HttpContext`, and then return it to the client. If no part of the tree returns `Some HttpContext` then the result is an exception. You can can also add a default route which returns a 404 page.
+By using `choose` we execute different logic depending on whether the request was a GET or a POST, and depending on whether the url was /hello or /goodbye. If a request matches a given path in the decision tree, `choose` will return `Some HttpContext`, if it doesn't, `choose` will return `None`. The end result is that when someone makes a request the server will walk down this tree looking for the first part that returns `Some HttpContext`, and then return it to the client. If no part of the tree returns `Some HttpContext` then the result is an exception. You can also add a default route which returns a 404 page.
 
 The server won't evaluate the entire data structure for every request, only the actual decisions, so there is no need to be concerned about performance.
 
