@@ -9,6 +9,7 @@
   <ItemGroup>
     <Compile Include="Program.fs" />
     <ProjectReference Include="../../src/Suave/Suave.fsproj" />
+    <PackageReference Update="FSharp.Core" Version="4.7.2" />
   </ItemGroup>
   <Import Project="..\..\.paket\Paket.Restore.targets" />
 </Project>

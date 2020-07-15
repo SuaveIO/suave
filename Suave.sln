@@ -42,8 +42,6 @@ Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Suave.LibUv", "src\Suave.Li
 EndProject
 Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Suave.IO", "src\Suave.IO\Suave.IO.fsproj", "{614E13B0-E2AE-4E59-8CF0-D80235BBC04C}"
 EndProject
-Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Suave.Razor", "src\Suave.Razor\Suave.Razor.fsproj", "{C1DC691B-1019-4A15-AA17-0C5CB0E0909C}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -148,14 +146,6 @@ Global
 		{614E13B0-E2AE-4E59-8CF0-D80235BBC04C}.Release|Any CPU.Build.0 = Release|Any CPU
 		{614E13B0-E2AE-4E59-8CF0-D80235BBC04C}.Release|x86.ActiveCfg = Release|Any CPU
 		{614E13B0-E2AE-4E59-8CF0-D80235BBC04C}.Release|x86.Build.0 = Release|Any CPU
-		{C1DC691B-1019-4A15-AA17-0C5CB0E0909C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{C1DC691B-1019-4A15-AA17-0C5CB0E0909C}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{C1DC691B-1019-4A15-AA17-0C5CB0E0909C}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{C1DC691B-1019-4A15-AA17-0C5CB0E0909C}.Debug|x86.Build.0 = Debug|Any CPU
-		{C1DC691B-1019-4A15-AA17-0C5CB0E0909C}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{C1DC691B-1019-4A15-AA17-0C5CB0E0909C}.Release|Any CPU.Build.0 = Release|Any CPU
-		{C1DC691B-1019-4A15-AA17-0C5CB0E0909C}.Release|x86.ActiveCfg = Release|Any CPU
-		{C1DC691B-1019-4A15-AA17-0C5CB0E0909C}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
