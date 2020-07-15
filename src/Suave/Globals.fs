@@ -19,14 +19,13 @@ open System.Collections.Concurrent
 /// time of compression.
 let internal compressedFilesMap = new ConcurrentDictionary<string,string * DateTime>()
 
-open System
 open System.Reflection
 
 /// This returns the assembly version of Suave
 let SuaveVersion = Assembly.GetExecutingAssembly().GetName().Version.ToString()
 
 /// This is the server header
-let ServerHeader = String.Concat [| "Server: Suave (https://suave.io)" |]
+let ServerHeader = "Server: Suave (https://suave.io)"
 
 [<assembly:System.Runtime.CompilerServices.InternalsVisibleToAttribute("Suave.LibUv")>]
 [<assembly:System.Runtime.CompilerServices.InternalsVisibleToAttribute("Suave.Experimental")>]
