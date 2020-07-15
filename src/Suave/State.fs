@@ -1,6 +1,5 @@
 module Suave.State
 
-open Suave.Utils
 open Suave.Cookie
 open Suave.Logging
 open Suave.Logging.Message
@@ -13,10 +12,6 @@ type StateStore =
   abstract set<'T> : string -> 'T -> WebPart
 
 module CookieStateStore =
-
-  open System
-  open System.IO
-  open System.Collections.Generic
 
   /// The user state key for the state store. Always "Suave.State.CookieStateStore".
   [<Literal>]
@@ -53,13 +48,18 @@ module CookieStateStore =
            |> ctx.runtime.cookieSerialiser.serialise
 
          | Some data ->
-           let m = ctx.runtime.cookieSerialiser.deserialise data
-           debug (event "In fPlainText, has existing {cookie}"
-                  >> setFieldValue "cookie" m)
+           try
+             let m = ctx.runtime.cookieSerialiser.deserialise data
+             debug (event "In fPlainText, has existing {cookie}" >> setFieldValue "cookie" m)
 
-           m
-           |> Map.add cookieName (box value)
-           |> ctx.runtime.cookieSerialiser.serialise))
+             m
+             |> Map.add cookieName (box value)
+             |> ctx.runtime.cookieSerialiser.serialise
+           with ex ->
+             debug (event "In fPlainText, couldn't deserialize cookie data")
+             Map.empty
+             |> Map.add cookieName (box value)
+             |> ctx.runtime.cookieSerialiser.serialise))
 
   let stateful relativeExpiry secure : WebPart =
     context (fun ctx ->
@@ -93,9 +93,12 @@ module CookieStateStore =
     let private createStateStore (serialiser : CookieSerialiser) (userState : Map<string, obj>) (ss : obj) =
       { new StateStore with
           member x.get key =
-            ss
-            :?> byte []
-            |> serialiser.deserialise
+            let map =
+              try 
+                serialiser.deserialise (ss :?> byte [])
+              with ex ->
+                Map.empty
+            map
             |> Map.tryFind key
             |> Option.map unbox
           member x.set key value =
