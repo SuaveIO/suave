@@ -1,4 +1,4 @@
-﻿module Suave.Tests.Logger
+module Suave.Tests.Logger
 
 open Suave
 open Suave.Logging
@@ -19,4 +19,22 @@ let ``CombiningLogger.log`` (_ : SuaveConfig) =
       Expect.equal log1.logs.Length 1 "log1 should have 1 logged message"
       Expect.equal log2.logs.Length 1 "log2 should have 1 logged message"
       Expect.equal log3.logs.Length 1 "log3 should have 1 logged message"
+  ]
+
+[<Tests>]
+let ``Message.setFieldValue`` (_ : SuaveConfig) =
+  testList "Message.setFieldValue" [
+    testCase "Message.setFieldValue works" <| fun _ ->
+      let template = "[{clientAddress}] {message} {user} {foo}"
+      let message =
+        (Message.eventX template
+          >> Message.setFieldValue "foo" "Bar"
+          >> Message.setFieldValue "clientAddress" "127.0.0.1"
+          >> Message.setFieldValue "message" "Hello World"
+          >> Message.setFieldValue "user" "ademar") LogLevel.Info
+      let s = Formatting.defaultFormatter message
+      Expect.isTrue (s.Contains("127.0.0.1")) "should have logged the field value"
+      Expect.isTrue (s.Contains("Hello World")) "should have logged the field value"
+      Expect.isTrue (s.Contains("ademar")) "should have logged the field value"
+      Expect.isTrue (s.Contains("Bar")) "should have logged the field value"
   ]
