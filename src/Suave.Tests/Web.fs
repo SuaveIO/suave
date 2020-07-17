@@ -1,4 +1,4 @@
-﻿module Suave.Tests.Web
+module Suave.Tests.Web
 
 open Expecto
 
@@ -81,9 +81,9 @@ let keepAliveTests (cfg : SuaveConfig) =
 
   let getUserState =
     context (fun ctx -> 
-      match Map.tryFind "state" ctx.userState with
-      | Some value -> Successful.OK (value.ToString ())
-      | None -> Successful.OK "unexist")
+      match ctx.userState.TryGetValue "state"  with
+      | true, value -> Successful.OK (value.ToString ())
+      | false, _ -> Successful.OK "unexist")
 
   let webPart =
     choose [

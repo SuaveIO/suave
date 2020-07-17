@@ -1,4 +1,4 @@
-﻿module Suave.Tests.HttpAuthentication
+module Suave.Tests.HttpAuthentication
 
 open System
 open System.Net
@@ -24,12 +24,15 @@ let authTests cfg =
   let pasw = "bar"
   let basicCredentials = sprintf "%s:%s" user pasw |> Encoding.Default.GetBytes |> Convert.ToBase64String
 
+  let getUserName ctx =
+    match ctx.userState.TryGetValue UserNameKey  with
+    | true, username -> sprintf "hello %O" username
+    | false,_ -> "no user"
+
   testList "basic authetication" [
     testCase "add username to userstate for protectedPart only" <| fun _ ->
       let okUser = context <| fun ctx ->
-        match Map.tryFind UserNameKey ctx.userState with
-        | Some username -> sprintf "hello %O" username
-        | None -> "no user"
+        getUserName ctx
         |> OK
 
       let app =
@@ -51,9 +54,7 @@ let authTests cfg =
 
     testCase "add username to userstate for protectedPart (async)" <| fun _ ->
       let okUser = context <| fun ctx ->
-        match Map.tryFind UserNameKey ctx.userState with
-        | Some username -> sprintf "hello %O" username
-        | None -> "no user"
+        getUserName ctx
         |> OK
 
       let authenticate credentials = async { return credentials = ("foo", "bar") }
