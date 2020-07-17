@@ -10,7 +10,6 @@ open Suave.Cookie
 open Suave.State.CookieStateStore
 open Suave.Operators
 
-
 let UserNameKey = "userName"
 
 let internal parseAuthenticationToken (token : string) =
@@ -21,7 +20,10 @@ let internal parseAuthenticationToken (token : string) =
   (parts.[0].ToLower(), decoded.Substring(0,indexOfColon), decoded.Substring(indexOfColon+1))
 
 let inline private addUserName username ctx =
-  ctx.userState.Add(UserNameKey, (box username))
+  if ctx.userState.ContainsKey UserNameKey then
+    ctx.userState.[UserNameKey] <- box username
+  else
+    ctx.userState.Add(UserNameKey, box username)
   ctx
 
 let authenticateBasicAsync f protectedPart ctx =

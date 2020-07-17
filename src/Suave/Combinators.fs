@@ -73,7 +73,10 @@ module Writers =
     |> succeed
 
   let setUserData key value (ctx : HttpContext) =
-    ctx.userState.Add(key, (box value))
+    if ctx.userState.ContainsKey key then
+      ctx.userState.[key] <- box value
+    else
+      ctx.userState.Add(key, box value)
     succeed ctx
 
   let unsetUserData key (ctx : HttpContext) =
