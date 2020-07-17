@@ -1,4 +1,4 @@
-﻿module Suave.Model
+module Suave.Model
 
 open Suave.Utils
 
@@ -22,8 +22,6 @@ let binding = ChoiceBuilder()
 module Binding =
 
   open Suave
-  open Suave.Http
-  open Suave.Utils
 
   let bind fBind
            (fCont : 'a -> (HttpContext -> 'c))
@@ -35,7 +33,7 @@ module Binding =
       | Choice2Of2 err -> fErr err)
 
   let bindReq f fCont fErr =
-    bind (Aether.Lens.get HttpContext.request_ >> f) fCont fErr
+    bind (fun ctx -> f ctx.request) fCont fErr
 
   let header key f (req : HttpRequest) =
     req.header key
