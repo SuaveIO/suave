@@ -109,7 +109,7 @@ module internal ParsingAndControl =
       let! result = loadConnection runtime connection
       match result with
       | Choice1Of2 connection' ->
-        do! httpLoop { HttpContext.empty with runtime = runtime; connection = connection' } consumer
+        do! httpLoop { HttpContext.empty with runtime = runtime; connection = connection'; userState = new Dictionary<string,obj>() } consumer
       | Choice2Of2 err ->
         runtime.logger.info (eventX "Socket error while loading the connection, exiting")
       return ()
