@@ -30,9 +30,7 @@ let authTests cfg =
     | false,_ -> "no user"
 
   let okUser =
-    context(fun ctx ->
-      printfn "%A" ctx
-      OK(getUserName ctx))
+    context(fun ctx -> OK(getUserName ctx))
 
   let app =
     choose [
