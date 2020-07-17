@@ -90,7 +90,9 @@ module CookieStateStore =
 
   module HttpContext =
 
-    let private createStateStore (serialiser : CookieSerialiser) (userState : Map<string, obj>) (ss : obj) =
+    open System.Collections.Generic
+
+    let private createStateStore (serialiser : CookieSerialiser) (userState : Dictionary<string, obj>) (ss : obj) =
       { new StateStore with
           member x.get key =
             let map =
@@ -102,15 +104,15 @@ module CookieStateStore =
             |> Map.tryFind key
             |> Option.map unbox
           member x.set key value =
-            let expiry = userState |> Map.find (StateStoreType + "-expiry") :?> CookieLife
+            let expiry = userState.[(StateStoreType + "-expiry")] :?> CookieLife
             write expiry key value
           }
 
     /// Read the session store from the HttpContext.
     let state (ctx : HttpContext) =
-      ctx.userState
-      |> Map.tryFind StateStoreType
-      |> Option.map (createStateStore ctx.runtime.cookieSerialiser ctx.userState)
+      match ctx.userState.TryGetValue StateStoreType with
+      | true, x -> Some (createStateStore ctx.runtime.cookieSerialiser ctx.userState x)
+      | _, _ -> None
 
 #if SYSTEM_RUNTIME_CACHING
 /// This module contains the implementation for the memory-cache backed session

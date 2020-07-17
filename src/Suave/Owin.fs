@@ -363,15 +363,14 @@ module OwinApp =
         v.CopyTo ms // TO CONSIDER: save the stream instead and read from it when writing data
         ms.ToArray())
 
-    let claimsPrincipal : Property<Map<string, obj>, ClaimsPrincipal> =
+    let claimsPrincipal : Property<Dictionary<string, obj>, ClaimsPrincipal> =
       (fun x ->
-        x
-        |> Map.tryFind "principal" // TODO: add support for ClaimsPrincipal in Core
+        x.TryGetValue "principal" // TODO: add support for ClaimsPrincipal in Core
         |> function
-        | Some x -> unbox x
-        | None -> null // not a required environment item; will not be present if no user is signed in
+        | true, x -> unbox x
+        | false, _ -> null // not a required environment item; will not be present if no user is signed in
       ),
-      (fun v x -> x |> Map.add "principal" (box v))
+      (fun v x -> x.Add("principal", (box v));x)
 
     let constant x =
       ((fun _ -> x),(fun v x -> x)) <--> untyped
@@ -380,9 +379,9 @@ module OwinApp =
       let r = ref x
       ((fun _ -> !r),(fun v y -> r:=v;y)) <--> untyped
 
-    let mapFindLens key : Property<Map<string, _>, _> =
-      (fun x -> x |> Map.pick (fun k v -> if k.Equals(key, StringComparison.Ordinal) then Some v else None)),
-      (fun v x -> x |> Map.add key v)
+    let mapFindLens key : Property<Dictionary<string, _>, _> =
+      (fun x -> x.[key]),
+      (fun v x -> x.Add(key, v);x)
 
     let stringlyTyped (toString : 'a -> string) (ofString : string -> 'a) : Iso<'a, string> =
       (fun x -> toString x),
@@ -668,7 +667,10 @@ module OwinApp =
 
     interface IDictionary<string, obj> with
       member x.Remove k =
-        owinRW.Remove k || (if (!state).userState.ContainsKey k then state := { !state with userState = (!state).userState.Remove k}; true else false)
+        let removeKey _ =
+          (!state).userState.Remove k |> ignore
+          (!state).userState
+        owinRW.Remove k || (if (!state).userState.ContainsKey k then state := { !state with userState = removeKey () }; true else false)
 
       member x.Item
         with get key =

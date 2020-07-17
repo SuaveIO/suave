@@ -4,6 +4,7 @@ namespace Suave
 module Http =
 
   open System
+  open System.Collections.Generic
   open System.Net
   open Suave.Utils
   open Suave.Logging
@@ -403,7 +404,7 @@ module Http =
       connection : Connection
 
       /// The user state for the request being processed
-      userState  : Map<string, obj>
+      userState  : Dictionary<string, obj>
 
       /// The response for the request being processed
       response   : HttpResult }
@@ -442,7 +443,7 @@ module Http =
 
     /// read-only
     static member connection_  : Property<HttpContext, Connection>
-    static member userState_   : Property<HttpContext, Map<string, obj>>
+    static member userState_   : Property<HttpContext, Dictionary<string, obj>>
     static member response_    : Property<HttpContext, HttpResult>
 
     /// read-only

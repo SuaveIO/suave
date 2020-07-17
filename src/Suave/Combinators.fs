@@ -73,12 +73,12 @@ module Writers =
     |> succeed
 
   let setUserData key value (ctx : HttpContext) =
-    { ctx with userState = ctx.userState |> Map.add key (box value) }
-    |> succeed
+    ctx.userState.Add(key, (box value))
+    succeed ctx
 
   let unsetUserData key (ctx : HttpContext) =
-    { ctx with userState = ctx.userState |> Map.remove key }
-    |> succeed
+    ctx.userState.Remove(key) |> ignore
+    succeed ctx
 
   // TODO: I'm not sure about having MIME types in the Writers module
   let createMimeType name compression =
@@ -346,6 +346,9 @@ module Filters =
   let TRACE   (x : HttpContext) = ``method`` HttpMethod.TRACE x
   let OPTIONS (x : HttpContext) = ``method`` HttpMethod.OPTIONS x
 
+  let getUserName (ctx : HttpContext) =
+    match ctx.userState.TryGetValue "userName"  with true, x -> x :?> string | false, _ -> "-"
+
   let logFormat (ctx : HttpContext) =
 
     let dash = function | "" | null -> "-" | x -> x
@@ -354,7 +357,7 @@ module Filters =
     ctx.clientIpTrustProxy.ToString() + " " +
     processId + " " + //TODO: obtain connection owner via Ident protocol
                        // Authentication.UserNameKey
-    (match Map.tryFind "userName" ctx.userState with Some x -> x :?> string | None -> "-") + " [" +
+    (getUserName ctx) + " [" +
     (DateTime.UtcNow.ToString("dd/MMM/yyyy:hh:mm:ss %K", ci)) + "] \"" +
     (string ctx.request.``method``) + " " +
     ctx.request.url.AbsolutePath + " " +
@@ -368,7 +371,7 @@ module Filters =
     let fieldList : (string*obj) list = [
       "clientIp", box ctx.clientIpTrustProxy
       "processId", box (System.Diagnostics.Process.GetCurrentProcess().Id.ToString())
-      "userName", box (match Map.tryFind "userName" ctx.userState with Some x -> x :?> string | None -> "-")
+      "userName", box (getUserName ctx)
       "utcNow", box DateTime.UtcNow
       "requestMethod", box (ctx.request.``method``)
       "requestUrlPath", box (ctx.request.url.AbsolutePath)

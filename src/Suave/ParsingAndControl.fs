@@ -4,6 +4,7 @@ namespace Suave
 module internal ParsingAndControl =
 
   open System.IO
+  open System.Collections.Generic
   open Suave.Sockets
   open Suave.Sockets.Control
   open Suave.Tcp
@@ -29,7 +30,7 @@ module internal ParsingAndControl =
     }
 
   let inline cleanResponse (ctx : HttpContext) =
-    { ctx with response = HttpResult.empty; userState = Map.empty }
+    { ctx with response = HttpResult.empty; userState = new Dictionary<string,obj>() }
 
   let inline keepAlive (ctx : HttpContext) =
     match ctx.request.header "connection" with

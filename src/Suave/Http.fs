@@ -563,7 +563,7 @@ module Http =
     { request    : HttpRequest
       runtime    : HttpRuntime
       connection : Connection
-      userState  : Map<string, obj>
+      userState  : Dictionary<string, obj>
       response   : HttpResult }
 
     member x.clientIp trustProxy sources =
@@ -681,14 +681,14 @@ module Http =
   module HttpContext =
     let empty =
       { request    = HttpRequest.empty
-        userState  = Map.empty
+        userState  = new Dictionary<string,obj>()
         runtime    = HttpRuntime.empty
         connection = Connection.empty
         response   = HttpResult.empty }
 
     let create request runtime connection writePreamble =
       { request    = request
-        userState  = Map.empty
+        userState  = new Dictionary<string,obj>()
         runtime    = runtime
         connection = connection
         response   = { status = HTTP_404.status
