@@ -1,7 +1,7 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFrameworks>net461;netcoreapp2.1</TargetFrameworks>
+    <TargetFrameworks>netcoreapp2.1</TargetFrameworks>
     <AssemblyName>Suave.Tests</AssemblyName>
     <OutputType>Exe</OutputType>
     <UseStandardResourceNames>false</UseStandardResourceNames>
@@ -18,8 +18,6 @@
     <Compile Include="TestUtilities.fs" />
     <Content Include="regressions\Bug105-StopsResponding.fsx" />
     <Compile Include="regressions\Bug256-FormDataParsing.fs" />
-    <Content Include="regressions\Bug435.fsx" />
-    <Compile Include="regressions\Bug435-OwinContentLength.fs" />
     <Content Include="regressions\pix.gif">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
@@ -41,7 +39,6 @@
     <Compile Include="Connection.fs" />
     <Compile Include="Sscanf.fs" />
     <Compile Include="Json.fs" />
-    <Compile Include="Owin.fs" />
     <Compile Include="Auth.fs" />
     <Compile Include="LogLevel.fs" />
     <Compile Include="TraceHeader.fs" />
