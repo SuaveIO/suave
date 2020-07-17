@@ -64,7 +64,6 @@
     <Compile Include="ParsingAndControl.fs" />
     <Compile Include="Web.fs" />
     <Compile Include="WebSocket.fs" />
-    <Compile Include="Owin.fs" />
     <Compile Include="Json.fs" />
   </ItemGroup>
   <Import Project="..\..\.paket\Paket.Restore.targets" />

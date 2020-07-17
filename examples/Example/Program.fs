@@ -79,27 +79,6 @@ let mimeTypes =
   Writers.defaultMimeTypesMap
     @@ (function | ".avi" -> Writers.createMimeType "video/avi" false | _ -> None)
 
-module OwinSample =
-  open System.Collections.Generic
-  open Suave.Owin
-
-  let app : WebPart =
-    let owinApp (env : OwinEnvironment) =
-      let hello = "Hello, OWIN!"B
-
-      // NOTE: this is the default, per HTTP, and should not be necessary.
-      env.[OwinConstants.responseStatusCode] <- box 200
-
-      let responseHeaders : IDictionary<string, string[]> = unbox env.[OwinConstants.responseHeaders]
-      responseHeaders.["Content-Type"] <- [| "text/plain" |]
-      responseHeaders.["Content-Length"] <- [| string hello.Length |]
-
-      let responseStream : IO.Stream = unbox env.[OwinConstants.responseBody]
-      responseStream.Write(hello, 0, hello.Length)
-      async.Return ()
-
-    OwinApp.ofApp "/" owinApp
-
 let unzipBody : WebPart =
   fun ctx -> WebPart.asyncOption {
     if ctx.request.header "content-encoding" = Choice1Of2 "gzip" then
@@ -141,6 +120,7 @@ let app =
     (path "/apple" <|> path "/orange") >=> OK "Hello Fruit"
     GET >=> path "/query" >=> request( fun x -> cond (x.queryParam "name") (fun y -> OK ("Hello " + y)) never)
     GET >=> path "/query" >=> OK "Hello beautiful"
+    GET >=> path "/error" >=> (context(fun ctx -> failwith "terror" ; OK "Do not reach this point"))
     path "/redirect" >=> Redirection.redirect "/redirected"
     path "/redirected" >=>  OK "You have been redirected."
     path "/date" >=> warbler (fun _ -> OK (DateTimeOffset.UtcNow.ToString("o")))
@@ -163,11 +143,6 @@ let app =
           | None ->
             store.set "counter" 1
             >=> OK "First time")
-    GET
-      >=> path "/owin"
-      >=> Writers.setHeader "X-Custom-Before" "Before OWIN"
-      >=> OwinSample.app
-      >=> Writers.setHeader "X-Custom-After" "After OWIN"
     basicAuth <| choose [ // from here on it will require authentication
         // surf to: http://localhost:8082/es.html to view the ES
         GET >=> path "/events2" >=> request (fun _ -> EventSource.handShake (fun out ->
