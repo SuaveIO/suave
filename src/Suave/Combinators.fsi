@@ -1680,14 +1680,6 @@ module CORS =
       /// Max age in seconds the user agent is allowed to cache the result of the request.
       maxAge                  : int option }
 
-    static member allowedUris_           : Property<CORSConfig, InclusiveOption<string list>>
-    static member allowedMethods_        : Property<CORSConfig, InclusiveOption<HttpMethod list>>
-    static member allowCookies_          : Property<CORSConfig, bool>
-    static member exposeHeaders_         : Property<CORSConfig, InclusiveOption<string list>>
-    static member maxAge_                : Property<CORSConfig, int option>
-
-
-
   /// <summary><para>
   /// This WebPart handles CORS requests.
   /// </para><para>

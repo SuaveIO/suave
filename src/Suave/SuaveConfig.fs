@@ -1,4 +1,4 @@
-﻿namespace Suave
+namespace Suave
 
 open Suave.Logging
 open Suave.Utils
@@ -71,21 +71,6 @@ type SuaveConfig =
 
     /// Maximun upload size in bytes
     maxContentLength      : int }
-
-  static member bindings_              = Property<SuaveConfig,_> (fun x -> x.bindings)              (fun v x -> { x with bindings = v })
-  static member serverKey_             = Property<SuaveConfig,_> (fun x -> x.serverKey)             (fun v x -> { x with serverKey = v })
-  static member errorHandler_          = Property<SuaveConfig,_> (fun x -> x.errorHandler)          (fun v x -> { x with errorHandler = v })
-  static member listenTimeout_         = Property<SuaveConfig,_> (fun x -> x.listenTimeout)         (fun v x -> { x with listenTimeout = v })
-  static member ct_                    = Property<SuaveConfig,_> (fun x -> x.cancellationToken)     (fun v x -> { x with cancellationToken = v })
-  static member bufferSize_            = Property<SuaveConfig,_> (fun x -> x.bufferSize)            (fun v x -> { x with bufferSize = v })
-  static member maxOps_                = Property<SuaveConfig,_> (fun x -> x.maxOps)                (fun v x -> { x with maxOps = v })
-  static member mimeTypesMap_          = Property<SuaveConfig,_> (fun x -> x.mimeTypesMap)          (fun v x -> { x with mimeTypesMap = v })
-  static member homeFolder_            = Property<SuaveConfig,_> (fun x -> x.homeFolder)            (fun v x -> { x with homeFolder = v })
-  static member compressedFilesFolder_ = Property<SuaveConfig,_> (fun x -> x.compressedFilesFolder) (fun v x -> { x with compressedFilesFolder = v })
-  static member logger_                = Property<SuaveConfig,_> (fun x -> x.logger)                (fun v x -> { x with logger = v })
-  static member tcpServerFactory_      = Property<SuaveConfig,_> (fun x -> x.tcpServerFactory)      (fun v x -> { x with tcpServerFactory = v })
-  static member hideHeader_            = Property<SuaveConfig,_> (fun x -> x.hideHeader)            (fun v x -> { x with hideHeader = v })
-  static member maxContentLength_      = Property<SuaveConfig,_> (fun x -> x.maxContentLength)      (fun v x -> { x with maxContentLength = v })
 
   member x.withBindings(v)              = { x with bindings = v }
   member x.withServerKey(v)             = { x with serverKey = v }

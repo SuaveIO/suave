@@ -4,18 +4,11 @@ namespace Suave
 module Http =
 
   open System
-  open System.IO
   open System.Collections.Generic
-  open System.Net.Sockets
   open System.Net
   open System.Text
   open Suave.Utils
-  open Suave.Utils.Aether
-  open Suave.Utils.Aether.Operators
-  open Suave.Utils.Collections
   open Suave.Sockets
-  open Suave.Tcp
-  open Suave.Utils
   open Suave.Logging
 
   open Microsoft.FSharp.Reflection
@@ -287,9 +280,6 @@ module Http =
     { name        : string
       compression : bool }
 
-    static member name_ = Property (fun x -> x.name) (fun v (x : MimeType) -> { x with name = v })
-    static member compression_ = Property (fun x -> x.compression) (fun v (x : MimeType) -> { x with compression = v })
-
   type MimeTypesMap = string -> MimeType option
 
   type HttpUpload =
@@ -297,11 +287,6 @@ module Http =
       fileName     : string
       mimeType     : string
       tempFilePath : string }
-
-    static member fieldName_ = Property<HttpUpload,_> (fun x -> x.fieldName) (fun v x -> { x with fieldName = v })
-    static member fileName_ = Property<HttpUpload,_> (fun x -> x.fileName) (fun v x -> { x with fileName = v })
-    static member mimeType_ = Property<HttpUpload,_> (fun x -> x.mimeType) (fun v x -> { x with mimeType = v })
-    static member tempFilePath_ = Property<HttpUpload,_> (fun x -> x.tempFilePath) (fun v x -> { x with tempFilePath = v })
 
   [<AllowNullLiteral>]
   type TlsProvider =
@@ -343,9 +328,6 @@ module Http =
     override x.ToString() =
       String.Concat [ x.scheme.ToString(); "://"; x.socketBinding.ToString() ]
 
-    static member scheme_ = Property<HttpBinding,_> (fun x -> x.scheme) (fun v x -> { x with scheme = v })
-    static member socketBinding_ = Property<HttpBinding,_> (fun x -> x.socketBinding) (fun v x -> { x with socketBinding=v })
-
   type HttpRequest =
     { httpVersion     : string
       binding         : HttpBinding
@@ -358,17 +340,6 @@ module Http =
       files           : HttpUpload list
       multiPartFields : (string * string) list
       trace           : TraceHeader }
-    static member httpVersion_     = Property<HttpRequest,_> (fun x -> x.httpVersion) (fun v (x : HttpRequest) -> { x with httpVersion = v })
-    static member absolutePath_    = Property<HttpRequest,_> (fun x -> x.rawPath) (fun v x -> { x with rawPath = v })
-    static member binding_         = Property<HttpRequest,_> (fun x -> x.binding) (fun v x -> { x with binding = v })
-    static member rawHost_         = Property<HttpRequest,_> (fun x -> x.rawHost) (fun v x -> { x with rawHost = v })
-    static member rawMethod_       = Property<HttpRequest,_> (fun x -> x.rawMethod ) (fun v x -> { x with rawMethod = v })
-    static member headers_         = Property<HttpRequest,_> (fun x -> x.headers) (fun v x -> { x with headers = v })
-    static member rawForm_         = Property<HttpRequest,_> (fun x -> x.rawForm) (fun v x -> { x with rawForm = v })
-    static member rawQuery_        = Property<HttpRequest,_> (fun x -> x.rawQuery) (fun v x -> { x with rawQuery = v })
-    static member files_           = Property<HttpRequest,_> (fun x -> x.files) (fun v x -> { x with files = v })
-    static member multipartFields_ = Property<HttpRequest,_> (fun x -> x.multiPartFields) (fun v x -> { x with multiPartFields = v })
-    static member trace_           = Property<HttpRequest,_> (fun x -> x.trace) (fun v x -> { x with trace = v })
 
     member x.url = x.binding.uri x.rawPath x.rawQuery
 
@@ -495,25 +466,11 @@ module Http =
                 | _ -> None),
       (fun cb -> SocketTask cb)
 
-    static member NullContent_ : PLens<HttpContent, unit> =
-      Aether.idLens <-?> HttpContent.NullContent__
-
-    static member Bytes_ : PLens<HttpContent, byte[]> =
-      Aether.idLens <-?> HttpContent.Bytes__
-
-    static member SocketTask_ : PLens<HttpContent, Connection * HttpResult -> SocketOp<Connection>> =
-      Aether.idLens <-?> HttpContent.SocketTask__
-
   and HttpResult =
     { status        : HttpStatus
       headers       : (string * string) list
       content       : HttpContent
       writePreamble : bool }
-
-    static member status_ = Property<HttpResult,_> (fun x -> x.status) (fun v x -> { x with status = v })
-    static member headers_ = Property<HttpResult,_> (fun x -> x.headers) (fun v x -> { x with headers = v })
-    static member content_ = Property<HttpResult,_> (fun x -> x.content) (fun v x -> { x with content = v })
-    static member writePreamble_ = Property<HttpResult,_> (fun x -> x.writePreamble) (fun v x -> { x with writePreamble = v })
 
   type ServerKey = byte []
 
@@ -547,23 +504,11 @@ module Http =
       hideHeader        : bool
       maxContentLength  : int }
 
-    static member serverKey_ = Property (fun x -> x.serverKey) (fun v x -> { x with serverKey = v })
-    static member errorHandler_ = Property (fun x -> x.errorHandler) (fun v x -> { x with errorHandler = v })
-    static member mimeTypesMap_ = Property (fun x -> x.mimeTypesMap) (fun v x -> { x with mimeTypesMap = v })
-    static member homeDirectory_ = Property (fun x -> x.homeDirectory) (fun v x -> { x with homeDirectory = v })
-    static member compressionFolder_ = Property (fun x -> x.compressionFolder) (fun v x -> { x with compressionFolder = v })
-    static member logger_ = Property (fun x -> x.logger) (fun v x -> { x with logger = v })
-    static member matchedBinding_ = Property (fun x -> x.matchedBinding) (fun v x -> { x with matchedBinding = v })
-    static member cookieSerialiser_ = Property (fun x -> x.cookieSerialiser) (fun v x -> { x with cookieSerialiser = v })
-    static member tlsProvider_ = Property (fun x -> x.tlsProvider) (fun v x -> { x with tlsProvider = v })
-    static member hideHeader_ = Property (fun x -> x.hideHeader) (fun v x -> { x with hideHeader = v })
-    static member maxContentLength_ = Property (fun x -> x.maxContentLength) (fun v x -> { x with maxContentLength = v })
-
   and HttpContext =
     { request    : HttpRequest
       runtime    : HttpRuntime
       connection : Connection
-      userState  : Map<string, obj>
+      userState  : Dictionary<string, obj>
       response   : HttpResult }
 
     member x.clientIp trustProxy sources =
@@ -615,18 +560,6 @@ module Http =
 
     member x.clientProtoTrustProxy =
       x.clientProto true [ "x-forwarded-proto" ]
-
-    static member request_     = Property (fun x -> x.request) (fun v x -> { x with request = v })
-    static member runtime_     = Property (fun x -> x.runtime) (fun v x -> { x with runtime = v })
-    static member connection_  = Property (fun x -> x.connection) (fun v x -> x)
-    static member userState_   = Property (fun x -> x.userState) (fun v x -> { x with userState = v })
-    static member response_    = Property (fun x -> x.response) (fun v x -> { x with response = v })
-
-    // read-only
-    static member clientIp_    = Property (fun (x : HttpContext) -> x.clientIpTrustProxy) (fun v x -> x)
-    static member isLocal_     = Property (fun (x : HttpContext) -> x.isLocal) (fun v x -> x)
-    static member clientPort_  = Property (fun (x : HttpContext) -> x.clientPortTrustProxy) (fun v x -> x)
-    static member clientProto_ = Property (fun (x : HttpContext) -> x.clientProtoTrustProxy) (fun v x -> x)
 
   and ErrorHandler = Exception -> String -> WebPart<HttpContext>
 
@@ -681,14 +614,14 @@ module Http =
   module HttpContext =
     let empty =
       { request    = HttpRequest.empty
-        userState  = Map.empty
+        userState  = null
         runtime    = HttpRuntime.empty
         connection = Connection.empty
         response   = HttpResult.empty }
 
     let create request runtime connection writePreamble =
       { request    = request
-        userState  = Map.empty
+        userState  = new Dictionary<string,obj>()
         runtime    = runtime
         connection = connection
         response   = { status = HTTP_404.status

@@ -1,4 +1,4 @@
-﻿namespace Suave.Logging
+namespace Suave.Logging
 
 open Suave
 open Suave.Utils
@@ -21,10 +21,6 @@ type TraceHeader =
     /// possibly a parent
     /// In ZipKin/Dapper-speak, this is the span parent id
     reqParentId : uint64 option }
-
-  static member traceId_     = Property (fun x -> x.traceId) (fun v x -> { x with traceId = v })
-  static member reqId_       = Property (fun x -> x.reqId) (fun v x -> { x with reqId = v })
-  static member reqParentId_ = Property (fun x -> x.reqParentId) (fun v x -> { x with reqParentId = v })
 
   /// The empty trace header has zeroes for trace and request id.
   static member empty =

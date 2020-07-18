@@ -1,4 +1,4 @@
-﻿module Suave.Authentication
+module Suave.Authentication
 
 open System
 open System.Text
@@ -10,7 +10,6 @@ open Suave.Cookie
 open Suave.State.CookieStateStore
 open Suave.Operators
 
-
 let UserNameKey = "userName"
 
 let internal parseAuthenticationToken (token : string) =
@@ -20,7 +19,12 @@ let internal parseAuthenticationToken (token : string) =
   let indexOfColon = decoded.IndexOf(':')
   (parts.[0].ToLower(), decoded.Substring(0,indexOfColon), decoded.Substring(indexOfColon+1))
 
-let inline private addUserName username ctx = { ctx with userState = ctx.userState |> Map.add UserNameKey (box username) }
+let inline private addUserName username ctx =
+  if ctx.userState.ContainsKey UserNameKey then
+    ctx.userState.[UserNameKey] <- box username
+  else
+    ctx.userState.Add(UserNameKey, box username)
+  ctx
 
 let authenticateBasicAsync f protectedPart ctx =
   let p = ctx.request
@@ -124,6 +128,7 @@ let deauthenticateWithLogin loginPage : WebPart =
 module HttpContext =
 
   let sessionId x =
-    x.userState
-    |> Map.tryFind StateStoreType
-    |> Option.map (fun x -> x :?> byte[] |> UTF8.toString |> parseData)
+    match x.userState.TryGetValue StateStoreType with
+    | true, x ->
+      Some (x :?> byte[] |> UTF8.toString |> parseData)
+    | _,_ -> None

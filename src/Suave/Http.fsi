@@ -4,6 +4,7 @@ namespace Suave
 module Http =
 
   open System
+  open System.Collections.Generic
   open System.Net
   open Suave.Utils
   open Suave.Logging
@@ -34,8 +35,6 @@ module Http =
     { code   : int
       reason : string
     }
-    static member code_ : Property<HttpStatus, int>
-    static member reason_ : Property<HttpStatus, string>
 
   /// The standard HTTP response codes
   type HttpCode =
@@ -78,15 +77,6 @@ module Http =
       httpOnly : bool
       sameSite : SameSite option }
 
-    static member name_ : Property<HttpCookie, string>
-    static member value_ : Property<HttpCookie, string>
-    static member expires_ : Property<HttpCookie, DateTimeOffset option>
-    static member path_ : Property<HttpCookie, string option>
-    static member domain_ : Property<HttpCookie, string option>
-    static member secure_ : Property<HttpCookie, bool>
-    static member httpOnly_ : Property<HttpCookie, bool>
-    static member sameSite_ : Property<HttpCookie, SameSite option>
-
   [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
   module HttpCookie =
 
@@ -124,10 +114,6 @@ module Http =
   type MimeType =
     { name        : string
       compression : bool }
-    /// MimeType name lens
-    static member name_ : Property<MimeType, string>
-    /// MimeType compression lens
-    static member compression_ : Property<MimeType, bool>
 
   type MimeTypesMap = string -> MimeType option
 
@@ -137,11 +123,6 @@ module Http =
       fileName     : string
       mimeType     : string
       tempFilePath : string }
-
-    static member fieldName_ : Property<HttpUpload, string>
-    static member fileName_ : Property<HttpUpload, string>
-    static member mimeType_ : Property<HttpUpload, string>
-    static member tempFilePath_ : Property<HttpUpload, string>
 
   [<AllowNullLiteral>]
   type TlsProvider =
@@ -172,9 +153,6 @@ module Http =
     /// is assignable to a BaseUri for a RestClient/HttpClient.
     override ToString : unit -> string
 
-    static member scheme_ : Property<HttpBinding,Protocol>
-    static member socketBinding_ : Property<HttpBinding, SocketBinding>
-
   /// A holder for the data extracted from the request.
   type HttpRequest =
     { httpVersion     : string
@@ -188,18 +166,6 @@ module Http =
       files           : HttpUpload list
       multiPartFields : (string * string) list
       trace           : TraceHeader }
-
-    static member httpVersion_ : Property<HttpRequest, string>
-    static member absolutePath_ : Property<HttpRequest, string>
-    static member binding_ : Property<HttpRequest, HttpBinding>
-    static member rawHost_ : Property<HttpRequest, string>
-    static member rawMethod_ : Property<HttpRequest, string>
-    static member headers_ : Property<HttpRequest, (string * string) list>
-    static member rawForm_ : Property<HttpRequest, byte[]>
-    static member rawQuery_ : Property<HttpRequest, string>
-    static member files_ : Property<HttpRequest, HttpUpload list>
-    static member multipartFields_ : Property<HttpRequest, (string * string) list>
-    static member trace_ : Property<HttpRequest, TraceHeader>
 
     /// Gets the query string from the HttpRequest. Use queryParam to try to fetch
     /// data for individual items.
@@ -313,17 +279,6 @@ module Http =
     /// data back to the client through Suave.
     | SocketTask of (Connection * HttpResult -> SocketOp<Connection>)
 
-    static member NullContent__  : (HttpContent -> unit option) * (unit -> HttpContent)
-    static member Bytes__       : (HttpContent -> byte [] option) * (byte [] -> HttpContent)
-    static member SocketTask__  : (HttpContent -> (Connection * HttpResult -> SocketOp<Connection>) option)
-                                * ((Connection * HttpResult -> SocketOp<Connection>) -> HttpContent)
-
-    static member NullContent_ : (HttpContent -> unit option)
-                               * (unit -> HttpContent -> HttpContent)
-    static member Bytes_ : (HttpContent -> byte [] option)
-                         * (byte [] -> HttpContent -> HttpContent)
-    static member SocketTask_ : (HttpContent -> (Connection * HttpResult -> SocketOp<Connection>) option)
-                              * ((Connection * HttpResult -> SocketOp<Connection>) -> HttpContent -> HttpContent)
 
   /// The HttpResult is the structure that you work with to tell Suave how to
   /// send the response. Have a look at the docs for HttpContent for further
@@ -333,11 +288,6 @@ module Http =
       headers       : (string * string) list
       content       : HttpContent
       writePreamble : bool }
-
-    static member status_ : Property<HttpResult,HttpStatus>
-    static member headers_ : Property<HttpResult,(string * string) list>
-    static member content_ : Property<HttpResult, HttpContent>
-    static member writePreamble_ : Property<HttpResult, bool>
 
   [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
   module HttpResult =
@@ -378,18 +328,6 @@ module Http =
       hideHeader        : bool
       maxContentLength  : int }
 
-    static member serverKey_ : Property<HttpRuntime, ServerKey>
-    static member errorHandler_ : Property<HttpRuntime, ErrorHandler>
-    static member mimeTypesMap_ : Property<HttpRuntime, MimeTypesMap>
-    static member homeDirectory_ : Property<HttpRuntime, string>
-    static member compressionFolder_ : Property<HttpRuntime, string>
-    static member logger_ : Property<HttpRuntime, Logger>
-    static member matchedBinding_ : Property<HttpRuntime, HttpBinding>
-    static member cookieSerialiser_ : Property<HttpRuntime, CookieSerialiser>
-    static member tlsProvider_ : Property<HttpRuntime, TlsProvider>
-    static member hideHeader_ : Property<HttpRuntime, bool>
-    static member maxContentLength_ : Property<HttpRuntime, int>
-
   /// The HttpContext is the container of the request, runtime, user-state and
   /// response.
   and HttpContext =
@@ -403,7 +341,7 @@ module Http =
       connection : Connection
 
       /// The user state for the request being processed
-      userState  : Map<string, obj>
+      userState  : Dictionary<string, obj>
 
       /// The response for the request being processed
       response   : HttpResult }
@@ -436,26 +374,6 @@ module Http =
     member clientProto : trustProxy:bool -> sources:string list -> string
 
     member clientProtoTrustProxy : string
-
-    static member request_     : Property<HttpContext, HttpRequest>
-    static member runtime_     : Property<HttpContext, HttpRuntime>
-
-    /// read-only
-    static member connection_  : Property<HttpContext, Connection>
-    static member userState_   : Property<HttpContext, Map<string, obj>>
-    static member response_    : Property<HttpContext, HttpResult>
-
-    /// read-only
-    static member clientIp_    : Property<HttpContext, IPAddress>
-
-    /// read-only
-    static member isLocal_     : Property<HttpContext, bool>
-
-    /// read-only
-    static member clientPort_  : Property<HttpContext, Port>
-
-    /// read-only
-    static member clientProto_ : Property<HttpContext, string>
 
   /// A WebPart is an asynchronous function that transforms the HttpContext.  An asynchronous return
   /// value of None indicates 'did not handle'.

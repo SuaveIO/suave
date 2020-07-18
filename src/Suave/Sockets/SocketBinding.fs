@@ -1,9 +1,8 @@
-﻿namespace Suave.Sockets
+namespace Suave.Sockets
 
 open System
 open System.Net
 open System.Net.Sockets
-open Suave.Utils
 
 /// A port is an unsigned short (uint16) structure
 type Port = uint16
@@ -20,9 +19,6 @@ type SocketBinding =
       String.Concat [ "["; x.ip.ToString(); "]:"; x.port.ToString() ]
     else
       String.Concat [ x.ip.ToString(); ":"; x.port.ToString() ]
-
-  static member ip_ = Property<SocketBinding,_> (fun x -> x.ip) (fun v x -> { x with ip=v })
-  static member port_ = Property<SocketBinding,_> (fun x -> x.port) (fun v x -> { x with port=v })
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module SocketBinding =
