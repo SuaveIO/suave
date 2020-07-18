@@ -1,3 +1,9 @@
+## New in v2.6.0-beta (Released 2020-07-18)
+* Makes HttpContext.userState a mutable dictionary enabling global user state per request.
+* FIX: Prevent showing detailed errors when proxied
+* Removes Owin module.
+* Removes lensed properties.
+
 ## New in v2.5.6 (Released 2019-09-06)
 * Added method NOT_IMPLEMENTED (#733)
 * FIX: CoreRT compiled binaries not working (#735)
