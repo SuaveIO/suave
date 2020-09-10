@@ -12,6 +12,10 @@ let ofOption onMissing = function
   | Some x -> Choice1Of2 x
   | None   -> Choice2Of2 onMissing
 
+let toOption = function
+  | Choice1Of2 x -> Some x
+  | Choice2Of2 _ -> None
+
 let orDefault onMissing = function
   | Choice1Of2 x -> x
   | Choice2Of2 _ -> onMissing
