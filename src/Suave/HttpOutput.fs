@@ -1,11 +1,26 @@
 namespace Suave
 
+open Suave.Utils
+
+module ByteConstants =
+
+  let defaultContentTypeHeaderBytes = ASCII.bytes "Content-Type: text/html\r\n"
+  let serverHeaderBytes = ASCII.bytes (Globals.ServerHeader + "\r\n")
+
+  let contentEncodingBytes = ASCII.bytes "Content-Encoding: "
+  let contentLengthBytes = ASCII.bytes "Content-Length: "
+  let EOL    =  ASCII.bytes "\r\n"
+  let EOLEOL =  ASCII.bytes "\r\n\r\n"
+
+  let httpVersionBytes = ASCII.bytes "HTTP/1.1 "
+  let spaceBytes = ASCII.bytes " "
+  let dateBytes = ASCII.bytes "\r\nDate: "
+  let colonBytes = ASCII.bytes ": "
+
 module HttpOutput =
 
-  open Suave.Globals
   open Suave.Sockets
   open Suave.Sockets.Control
-  open Suave.Utils
   open Suave.Logging
   open Suave.Logging.Message
 
@@ -13,7 +28,7 @@ module HttpOutput =
 
   let inline writeContentType (headers : (string*string) list) = withConnection {
     if not(List.exists(fun (x : string,_) -> x.ToLower().Equals("content-type")) headers )then
-      do! asyncWriteLn "Content-Type: text/html"
+      do! asyncWriteBufferedBytes ByteConstants.defaultContentTypeHeaderBytes
   }
 
   let addKeepAliveHeader (context : HttpContext) =
@@ -32,9 +47,9 @@ module HttpOutput =
     | (HttpMethod.CONNECT, 203)
     | (HttpMethod.CONNECT, 205)
     | (HttpMethod.CONNECT, 206) ->
-      do! asyncWriteLn ""
+      do! asyncWriteBufferedBytes ByteConstants.EOL
     | _ ->
-      do! asyncWriteLn (String.Concat [| "Content-Length: "; content.Length.ToString(); Bytes.eol |])
+      do! asyncWriteBufferedArrayBytes [| ByteConstants.contentLengthBytes; ASCII.bytes (content.Length.ToString()); ByteConstants.EOLEOL |]
     }
 
   let inline writeHeaders exclusions (headers : (string*string) seq) = withConnection {
@@ -47,9 +62,10 @@ module HttpOutput =
 
     let r = context.response
 
-    do! asyncWriteLn (String.concat " " [ "HTTP/1.1"; r.status.code.ToString(); r.status.reason ])
-    if not context.runtime.hideHeader then do! asyncWriteLn ServerHeader
-    do! asyncWriteLn (String.Concat( [| "Date: "; Globals.utcNow().ToString("R") |]))
+    do! asyncWriteBufferedArrayBytes [| ByteConstants.httpVersionBytes; ASCII.bytes (r.status.code.ToString());
+      ByteConstants.spaceBytes; ASCII.bytes (r.status.reason); ByteConstants.dateBytes; ASCII.bytes (Globals.utcNow().ToString("R")); ByteConstants.EOL |]
+    if not context.runtime.hideHeader then
+      do! asyncWriteBufferedBytes ByteConstants.serverHeaderBytes
 
     do! writeHeaders exclusions r.headers
     do! writeContentType r.headers
@@ -84,9 +100,7 @@ module HttpOutput =
           let! connection = flush connection
           return connection
       }
-    | SocketTask f -> socket {
-        return! f (context.connection, context.response)
-      }
+    | SocketTask f -> f (context.connection, context.response)
     | NullContent -> socket {
         if writePreamble then
           let! (_, connection) = writeContentLengthHeader [||] context context.connection
@@ -109,7 +123,7 @@ module HttpOutput =
     do! flushChunk
   }
 
-  let inline executeTask ctx r errorHandler = async {
+  let inline executeTask (ctx:HttpContext) r errorHandler = async {
     try
       let! q  = r
       return q

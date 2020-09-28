@@ -109,6 +109,17 @@ let asyncWriteBufferedBytes (b : byte[]) (connection : Connection) : SocketOp<un
     else return (),connection
   }
 
+let asyncWriteBufferedArrayBytes (xxs:(byte[])[]) (connection : Connection) : SocketOp<unit*Connection> =
+  let rec loop index cnn =
+    socket{
+      if index >= xxs.Length then
+        return (),cnn
+      else
+        let! (_, cnn') = asyncWriteBufferedBytes xxs.[index] cnn
+        return! loop (index + 1) cnn'
+        }
+  loop 0 connection
+
 let transferStreamWithBufer (buf: ArraySegment<_>) (toStream : Connection) (from : Stream) : SocketOp<unit> =
   let rec doBlock () = socket {
     let! read = SocketOp.ofAsync <| from.AsyncRead (buf.Array, buf.Offset, buf.Count)
