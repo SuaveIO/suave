@@ -39,3 +39,4 @@ tools/coreclr/
 tools/dotnet-install.*
 .vs/
 .vscode/
+.ionide
