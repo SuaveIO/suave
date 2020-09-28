@@ -27,21 +27,21 @@ let inline private addUserName username ctx =
   ctx
 
 let authenticateBasicAsync f protectedPart ctx =
-  let p = ctx.request
-  match p.header "authorization" with
-  | Choice1Of2 header ->
-    let (typ, username, password) = parseAuthenticationToken header
-    if (typ.Equals("basic")) then
-      async {
-        let! authenticated = f (username, password)
-        if authenticated then
-          return! protectedPart (addUserName username ctx)
-        else
-          return! challenge (addUserName username ctx)
-      }
-    else challenge (addUserName username ctx)
-  | Choice2Of2 _ ->
-    challenge ctx
+  async {
+    let p = ctx.request
+    match p.header "authorization" with
+    | Choice1Of2 header ->
+      let (typ, username, password) = parseAuthenticationToken header
+      if (typ.Equals("basic")) then
+          let! authenticated = f (username, password)
+          if authenticated then
+            return! protectedPart (addUserName username ctx)
+          else
+            return! challenge ctx
+      else return! challenge ctx
+    | Choice2Of2 _ ->
+      return! challenge ctx
+  }
 
 let authenticateBasic f protectedPart ctx =
   authenticateBasicAsync (f >> async.Return) protectedPart ctx
