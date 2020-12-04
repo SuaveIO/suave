@@ -53,7 +53,7 @@ module Headers =
     |> Seq.filter (fst >> (=) lowerName)
     |> Seq.map snd
 
-  /// group headers by name and collect all headers in a dictionary.
+  /// group headers by name and collect all headers in a dictionary with format String<label>:Seq<String<values>>
   let getHeaders ctx =
     ctx.request.headers
     |> Seq.groupBy fst
