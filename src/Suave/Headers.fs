@@ -53,11 +53,11 @@ module Headers =
     |> Seq.filter (fst >> (=) lowerName)
     |> Seq.map snd
 
-  /// group headers by name and collect all headers in a dictionary.
+  /// group headers by name and collect all headers in a dictionary with format String<label>:Seq<String<values>>
   let getHeaders ctx =
     ctx.request.headers
     |> Seq.groupBy fst
-    |> Seq.map (fun (k,v) -> k, Seq.map fst v)
+    |> Seq.map (fun (k,v) -> k, Seq.map snd v)
     |> dict
     |> fun d -> new System.Collections.Generic.Dictionary<_,_>(d, System.StringComparer.OrdinalIgnoreCase)
     :> System.Collections.Generic.IDictionary<_,_>
