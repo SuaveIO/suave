@@ -186,7 +186,7 @@ let page fileName model : WebPart =
 ///
 ///     do registerFiltersByName "MyFilters"
 ///
-let registerFiltersByName name =
+let registerFiltersByName(name:string) =
   let asm = Assembly.GetEntryAssembly()
   let typ = 
     asm.GetTypes()

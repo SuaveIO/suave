@@ -16,7 +16,7 @@ module Headers =
     | _ -> None
 
   /// Parse a decimal as given in a header field.
-  let parseDecimal s =
+  let parseDecimal(s: string) =
     match System.Decimal.TryParse(s, System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture) with
     | true, d -> Some d
     | _ -> None

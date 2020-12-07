@@ -41,7 +41,7 @@ type TraceHeader =
       reqParentId = spanParentId }
 
   static member parseTraceHeaders (headers : NameValueList) =
-    let tryParseUint64 x =
+    let tryParseUint64(x: string) =
       match System.UInt64.TryParse x with
       | true, value -> Choice1Of2 value
       | false, _    -> Choice2Of2 ("Couldn't parse '" + x + "' to int64")

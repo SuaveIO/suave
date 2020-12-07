@@ -12,7 +12,7 @@ let private parseDecimal x = Decimal.Parse(x, System.Globalization.CultureInfo.I
 /// The supported characters for the formatter
 let parsers =
   dict [
-    'b', Boolean.Parse >> box
+    'b', (fun (s:string) -> Boolean.Parse s) >> box
     'd', int64 >> box
     'i', int64 >> box
     's', box

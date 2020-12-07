@@ -442,7 +442,7 @@ module Http =
       { scheme        = scheme
         socketBinding = SocketBinding.create ip port }
 
-    let createSimple scheme ip (port : int) =
+    let createSimple scheme (ip: string) (port : int) =
       { scheme        = scheme
         socketBinding = SocketBinding.create (IPAddress.Parse ip) (uint16 port) }
 
@@ -486,7 +486,7 @@ module Http =
       Convert.FromBase64String >> validate
 
   type IPAddress with
-    static member tryParseC str =
+    static member tryParseC(str: string) =
       match IPAddress.TryParse str with
       | false, _ -> Choice2Of2 ()
       | _, ip    -> Choice1Of2 ip
