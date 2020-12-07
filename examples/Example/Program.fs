@@ -67,7 +67,7 @@ let testApp =
 System.Net.ServicePointManager.DefaultConnectionLimit <- Int32.MaxValue
 
 // How to write a new primitive WebPart
-let sleep milliseconds message: WebPart =
+let sleep (milliseconds:int) message: WebPart =
   fun (x : HttpContext) ->
     async {
       do! Async.Sleep milliseconds
