@@ -10,7 +10,6 @@
     <Compile Include="CounterDemo.fs" />
     <Compile Include="Program.fs" />
     <ProjectReference Include="../../src/Suave/Suave.fsproj" />
-    <PackageReference Update="FSharp.Core" Version="4.7.2" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="paket-files\" />
