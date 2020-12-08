@@ -1,3 +1,9 @@
+## New in v2.6.0 (Released 2020-12-07)
+* Target netstandard2.1 and drop net461
+* Introduces proxy web part
+* Optimization: use byte arrays instead of strings for hardcoded literals
+* FIX: Sequence map bug in getHeaders (#747)
+
 ## New in v2.6.0-beta (Released 2020-07-18)
 * Makes HttpContext.userState a mutable dictionary enabling global user state per request.
 * FIX: Prevent showing detailed errors when proxied
