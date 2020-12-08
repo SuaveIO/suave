@@ -1,18 +1,31 @@
 #!/usr/bin/env fsharpi
 
-#r "paket: groupref Build //"
+#r "paket: 
+nuget FSharp.Core
+nuget Fake.Api.GitHub
+nuget Fake.DotNet.MSBuild
+nuget Fake.DotNet.Cli
+nuget Fake.DotNet.Paket
+nuget Fake.DotNet.AssemblyInfoFile
+nuget Fake.DotNet.Testing.Expecto
+nuget Fake.Core.Target
+nuget Fake.Core.Process
+nuget Fake.Core.String
+nuget Fake.Core.ReleaseNotes
+nuget Fake.IO.FileSystem
+nuget Fake.Tools.Git //"
 #load ".fake/build.fsx/intellisense.fsx"
 open Fake
 open Fake.Core
 open Fake.DotNet
-open Fake.Api
-open Fake.Tools
 open Fake.IO
 open Fake.IO.Globbing.Operators
 open Fake.IO.FileSystemOperators
 open System
 open System.IO
 open System.Text
+open Fake.Tools
+open Fake.Api
 
 Console.OutputEncoding <- Encoding.UTF8
 
