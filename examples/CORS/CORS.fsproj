@@ -1,14 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFrameworks>net461;netcoreapp3.1</TargetFrameworks>
+    <TargetFrameworks>netcoreapp3.1</TargetFrameworks>
     <OutputType>Exe</OutputType>
     <AssemblyName>CORS</AssemblyName>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Program.fs" />
     <ProjectReference Include="../../src/Suave/Suave.fsproj" />
-    <PackageReference Update="FSharp.Core" Version="4.7.2" />
   </ItemGroup>
   <Import Project="..\..\.paket\Paket.Restore.targets" />
 </Project>
