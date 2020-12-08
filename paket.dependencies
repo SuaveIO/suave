@@ -15,10 +15,10 @@ nuget Expecto.BenchmarkDotNet
 
 group Build
   source https://api.nuget.org/v3/index.json
-  framework: netstandard2.1
+  framework: netstandard2.0
   storage:none
 
-  nuget FSharp.Core
+  nuget FSharp.Core 4.7.0.0
   clitool dotnet-fake
   nuget NETStandard.Library.NETFramework
   nuget Fake.DotNet.Cli
