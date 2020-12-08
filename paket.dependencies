@@ -1,4 +1,4 @@
-version 5.226.0
+version 5.249.0
 
 source https://api.nuget.org/v3/index.json
 framework netcoreapp3.1, netstandard2.1
@@ -15,11 +15,10 @@ nuget Expecto.BenchmarkDotNet
 
 group Build
   source https://api.nuget.org/v3/index.json
-  framework: netstandard2.0
+  framework: netstandard2.1
   storage:none
 
-  nuget FSharp.Core 4.7.0.0
-  clitool dotnet-fake
+  nuget FSharp.Core
   nuget NETStandard.Library.NETFramework
   nuget Fake.DotNet.Cli
   nuget Fake.DotNet.Paket
