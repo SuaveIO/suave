@@ -129,6 +129,14 @@ imagine would like to be called with a parameter which is almost always the same
 value for another function body's call-site, put that parameter before
 more-often-varying parameters in the function signature.
 
+## Building the website
+
+Run the following in the docs directory. It requires Ruby installed.
+
+``
+bundle exec jekyll build
+``
+
 ## Testing
 
 Run Tests as a console app. Return status code = 0 means success.
