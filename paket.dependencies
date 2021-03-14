@@ -7,6 +7,7 @@ storage none
 nuget FSharp.Core
 nuget DotLiquid
 nuget Libuv
+nuget System.Runtime.Serialization.Json
 nuget WebSocketSharp
 nuget FsCheck
 nuget Expecto
