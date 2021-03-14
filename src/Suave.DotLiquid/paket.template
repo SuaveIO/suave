@@ -5,9 +5,14 @@ description Suave is a simple web development F# library providing a lightweight
 licenseUrl https://github.com/SuaveIO/Suave/blob/master/LICENSE
 iconUrl https://raw.githubusercontent.com/SuaveIO/resources/master/images/head_trans.png
 files
-  bin/Release/netstandard2.1/Suave.DotLiquid.dll => lib/netstandard2.1
-  bin/Release/netstandard2.1/Suave.DotLiquid.xml => lib/netstandard2.1
-  bin/Release/netstandard2.1/Suave.DotLiquid.pdb => lib/netstandard2.1
+  bin/Release/netstandard2.0/Suave.DotLiquid.dll => lib/netstandard2.0
+  bin/Release/netstandard2.0/Suave.DotLiquid.xml => lib/netstandard2.0
+  bin/Release/netstandard2.0/Suave.DotLiquid.pdb => lib/netstandard2.0
+  bin/Release/xamarin.mac2xamarin.mac200/Suave.DotLiquid.dll => lib/xamarin.mac2xamarin.mac200
+  bin/Release/xamarin.mac2xamarin.mac200/Suave.DotLiquid.xml => lib/xamarin.mac2xamarin.mac200
+  bin/Release/xamarin.mac2xamarin.mac200/Suave.DotLiquid.pdb => lib/netstandard2.0
 dependencies
-  framework: netstandard21
+  framework: netstandard20
+    Suave ~> 2.6
+  framework: xamarin.mac20
     Suave ~> 2.6

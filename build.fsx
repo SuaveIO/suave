@@ -1,6 +1,6 @@
 #!/usr/bin/env fsharpi
 
-#r "paket: 
+#r "paket:
 nuget FSharp.Core
 nuget Fake.Api.GitHub
 nuget Fake.DotNet.MSBuild
@@ -73,7 +73,8 @@ Target.create "AsmInfo" <| fun _ ->
       ])
 
 Target.create "Build" <| fun _ ->
-  DotNet.build dotnetSimple "Suave.sln"
+  // DotNet.build dotnetSimple "Suave.sln"
+  MSBuild.build id "Suave.sln"
 
 Target.create "Tests" <| fun _ ->
   let path = "src" </> "Suave.Tests"

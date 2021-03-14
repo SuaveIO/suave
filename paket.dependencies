@@ -1,7 +1,7 @@
 version 5.249.0
 
 source https://api.nuget.org/v3/index.json
-framework netcoreapp3.1, netstandard2.1
+framework netcoreapp3.1, netstandard2.0, xamarinmac
 storage none
 
 nuget FSharp.Core
