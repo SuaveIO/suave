@@ -12,6 +12,7 @@
     <Compile Include="Template.fs" />
     <Compile Include="Data.fs" />
     <Compile Include="Form.fs" />
+    <Compile Include="Router.fs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Suave\Suave.fsproj" />
