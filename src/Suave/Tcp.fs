@@ -177,8 +177,11 @@ let runServer maxConcurrentOps bufferSize autoGrow (binding: SocketBinding) star
     use! disposable = Async.OnCancel(fun () ->
       stopTcp "runServer async cancelled" listenSocket)
 
+    // get the actual assigned port from listeSocket
+    let _binding = { startData.binding with port = uint16((listenSocket.LocalEndPoint :?> IPEndPoint).Port) }
+
     let startData =
-      { startData with socketBoundUtc = Some (Globals.utcNow()) }
+      { startData with socketBoundUtc = Some (Globals.utcNow()); binding = _binding }
 
     acceptingConnections.complete startData |> ignore
 
