@@ -58,16 +58,19 @@ module HttpOutput =
         do! asyncWriteLn (String.Concat [| x; ": "; y |])
     }
 
-  let inline writePreamble exclusions (context: HttpContext) = withConnection {
+  let inline writePreamble (context: HttpContext) = withConnection {
 
     let r = context.response
 
     do! asyncWriteBufferedArrayBytes [| ByteConstants.httpVersionBytes; ASCII.bytes (r.status.code.ToString());
       ByteConstants.spaceBytes; ASCII.bytes (r.status.reason); ByteConstants.dateBytes; ASCII.bytes (Globals.utcNow().ToString("R")); ByteConstants.EOL |]
-    if not context.runtime.hideHeader then
-      do! asyncWriteBufferedBytes ByteConstants.serverHeaderBytes
 
-    do! writeHeaders exclusions r.headers
+    if context.runtime.hideHeader then
+      do! writeHeaders ["date";"content-length"] r.headers
+    else
+      do! asyncWriteBufferedBytes ByteConstants.serverHeaderBytes
+      do! writeHeaders ["server";"date";"content-length"] r.headers
+
     do! writeContentType r.headers
     }
 
@@ -134,7 +137,7 @@ module HttpOutput =
   let writeResponse (newCtx:HttpContext) =
     socket{
       if newCtx.response.writePreamble then
-        let! (_, connection) = writePreamble ["server";"date";"content-length"] newCtx newCtx.connection
+        let! (_, connection) = writePreamble newCtx newCtx.connection
         let! connection = writeContent true { newCtx with connection = connection } newCtx.response.content
         return { newCtx with connection = connection }
       else

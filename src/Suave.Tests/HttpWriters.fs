@@ -189,4 +189,15 @@ let headers cfg =
           ],
           hdrs |> getRespHeaders "Vary"))
         ctx
+
+    testCase "setHeader adds Server header with hideHeader = true" <| fun _ ->
+      let ctx = runWith { cfg with hideHeader = true } (Writers.setHeader "Server" "My custom value" >=> OK "test")
+
+      withContext (fun _ ->
+        let hdrs = requestHeaders ()
+        Assert.Equal(
+          "expecting Server header value",
+          [ "Server", "My custom value" ],
+          hdrs |> getRespHeaders "Server"))
+        ctx
   ]
