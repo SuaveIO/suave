@@ -1,3 +1,7 @@
+## New in v2.6.1 (Released 2021-05-15)
+* Allow to set custom Server header (#755)
+* Report assigned ephemeral port  when binding to port 0 (#754)
+
 ## New in v2.6.0 (Released 2020-12-07)
 * Target netstandard2.1 and drop net461
 * Introduces proxy web part
