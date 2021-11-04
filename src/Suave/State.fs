@@ -10,6 +10,8 @@ type StateStore =
   abstract get<'T> : string -> 'T option
   /// Set an item in the state store
   abstract set<'T> : string -> 'T -> WebPart
+  // Unset an item in the state store
+  abstract unset : string -> WebPart
 
 module CookieStateStore =
 
@@ -61,6 +63,52 @@ module CookieStateStore =
              |> Map.add cookieName (box value)
              |> ctx.runtime.cookieSerialiser.serialise))
 
+
+  let remove (cookieName : string) =
+    context (fun ctx ->
+      let event message =
+        eventX message
+        >> setFieldValue "cookieName" cookieName
+        >> setSingleName "Suave.State.CookieStateStore.remove"
+
+      let debug eventFactory =
+        ctx.runtime.logger.debug eventFactory
+
+      let cookieState =
+        { serverKey      = ctx.runtime.serverKey
+          cookieName     = StateCookie
+          userStateKey   = StateStoreType
+          relativeExpiry = Session
+          secure         = false }
+
+      debug (event "Removing {cookieName}")
+      updateCookies cookieState (function
+        | None ->          
+            debug (event "In fPlainText, no existing cookie")
+
+            Map.empty
+            |> ctx.runtime.cookieSerialiser.serialise
+          
+        | Some data ->
+            let m =
+                try
+                    ctx.runtime.cookieSerialiser.deserialise data
+
+                with _ ->
+                    debug (event "In fPlainText, couldn't deserialize cookie data")
+
+                    Map.empty
+
+            if m |> Map.containsKey cookieName then
+                debug (event "In fPlainText, has existing {cookie}" >> setFieldValue "cookie" m)
+
+                m
+                |> Map.remove cookieName   // Remove the key if we have gotten this far.
+                |> ctx.runtime.cookieSerialiser.serialise
+            else
+                // Otherwise, just return the original (serialised) data.
+                data))
+
   let stateful relativeExpiry secure : WebPart =
     context (fun ctx ->
       ctx.runtime.logger.debug (
@@ -106,6 +154,8 @@ module CookieStateStore =
           member x.set key value =
             let expiry = userState.[(StateStoreType + "-expiry")] :?> CookieLife
             write expiry key value
+          member x.unset key =
+            remove key
           }
 
     /// Read the session store from the HttpContext.
