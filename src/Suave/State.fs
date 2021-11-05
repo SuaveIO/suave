@@ -64,7 +64,7 @@ module CookieStateStore =
              |> ctx.runtime.cookieSerialiser.serialise))
 
 
-  let remove (cookieName : string) =
+  let remove relativeExpiry (cookieName : string) =
     context (fun ctx ->
       let event message =
         eventX message
@@ -78,7 +78,7 @@ module CookieStateStore =
         { serverKey      = ctx.runtime.serverKey
           cookieName     = StateCookie
           userStateKey   = StateStoreType
-          relativeExpiry = Session
+          relativeExpiry = relativeExpiry
           secure         = false }
 
       debug (event "Removing {cookieName}")
@@ -99,12 +99,20 @@ module CookieStateStore =
 
                     Map.empty
 
+            // Although not strictly needed, this allows us to avoid unnecessarily
+            // re-serialising the same data if the key is not present.
             if m |> Map.containsKey cookieName then
                 debug (event "In fPlainText, has existing {cookie}" >> setFieldValue "cookie" m)
 
-                m
-                |> Map.remove cookieName   // Remove the key if we have gotten this far.
-                |> ctx.runtime.cookieSerialiser.serialise
+                try
+                    m
+                    |> Map.remove cookieName   // Remove the key if we have gotten this far.
+                    |> ctx.runtime.cookieSerialiser.serialise
+                with _ ->
+                    debug (event "In fPlainText, couldn't serialize cookie data")
+
+                    // Return the original data on failure.
+                    data
             else
                 // Otherwise, just return the original (serialised) data.
                 data))
@@ -155,7 +163,8 @@ module CookieStateStore =
             let expiry = userState.[(StateStoreType + "-expiry")] :?> CookieLife
             write expiry key value
           member x.unset key =
-            remove key
+            let expiry = userState.[(StateStoreType + "-expiry")] :?> CookieLife
+            remove expiry key
           }
 
     /// Read the session store from the HttpContext.
