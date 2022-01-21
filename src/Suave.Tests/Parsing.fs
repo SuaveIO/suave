@@ -215,8 +215,17 @@ let testParseBoundary =
               "-idczlATz:FmvuIs'aHQSrGltky:Td")
              ("multipart/form-data; boundary=99233d57-854a-4b17-905b-ae37970e8a39",
               "99233d57-854a-4b17-905b-ae37970e8a39")
-             ("multipart/form-data; charset=utf8; boundary=---------------------------19533183328386942351998832384",
+             ("multipart/form-data; boundary=---------------------------19533183328386942351998832384",
               "---------------------------19533183328386942351998832384") ]
+           |> List.map compare
+           |> ignore
+
+      testCase "Matching boundaries with charset defined"
+      <| fun _ ->
+           [ ("multipart/form-data; charset=utf8; boundary=\"abc123 / + _,_.():=? as\"",
+              "abc123 / + _,_.():=? as")
+             ("multipart/form-mixed; charset=utf8; boundary=/tkQKiFqMgZt:mHzua_JFrUFWHgNid",
+              "/tkQKiFqMgZt:mHzua_JFrUFWHgNid")]
            |> List.map compare
            |> ignore
 
