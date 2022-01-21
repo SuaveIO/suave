@@ -63,8 +63,8 @@ let headerParams (header : string) =
 /// Parse the boundary from the value of the Content-Type header.
 /// Based on the allowed set from
 /// https://www.rfc-editor.org/rfc/rfc2046#section-5.1.1
-/// it allows alphanumeric characters, punctuations and spaces (except at the
-/// end. Qutation marks seem to be optional as well.
+/// It allows alphanumeric characters, punctuations and spaces (except at the
+/// end). Quotation marks seem to be optional as well.
 ///
 let parseBoundary contentType =
   let pattern = "boundary=\"?([a-zA-Z0-9'\(\)+_,-.\/:=? ]*)(?<! )\"?"
