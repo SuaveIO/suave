@@ -5,6 +5,7 @@ open System
 open System.Collections.Generic
 open System.IO
 open System.Net
+open System.Text.RegularExpressions
 
 /// Gets whether the passed ip is a local IPv4 or IPv6 address.
 /// Example: 127.0.0.1, ::1 return true. If the IP cannot be parsed,
@@ -58,3 +59,8 @@ let parseKVPairs arr =
 let headerParams (header : string) =
   let parts = header |> String.splita ';' |> Array.map String.trimStart
   parseKVPairs parts
+
+/// Parse the boundary from the value of the Content-Type header.
+let parseBoundary contentType =
+  let pattern = "boundary=(\w*)"
+  Regex.Match(contentType, pattern).Groups.[1].Value
