@@ -14,6 +14,7 @@ open Suave.Successful
 open Suave.Utils
 open Suave.Tests.TestUtilities
 open Suave.Testing
+open Suave.Utils.Parsing
 
 [<Tests>]
 let parseQuery =
@@ -192,5 +193,49 @@ let testLineBuffer cfg =
     testCase "GET uri larger than line buffer length" <| fun _ ->
       let actual = runWithConfig (OK "response") |> req HttpMethod.GET longUri None
       Expect.equal actual "Line Too Long" "expecting data to be returned"
+  ]
 
-    ]
+[<Tests>]
+let testParseBoundary =
+
+  let compare tuple =
+    match tuple with
+    | (contentType, expected) ->
+      Expect.equal (parseBoundary contentType) expected "Parsed boundary does not match expected value"
+
+  testList
+    "test multipart boundary parsing"
+    [ testCase "Matching boundaries"
+      <| fun _ ->
+           [ ("multipart/form-data; boundary=\"abc123 / + _,_.():=? as\"",
+              "abc123 / + _,_.():=? as")
+             ("multipart/form-data; boundary=/tkQKiFqMgZt:mHzua_JFrUFWHgNid",
+              "/tkQKiFqMgZt:mHzua_JFrUFWHgNid")
+             ("multipart/mixed; boundary=-idczlATz:FmvuIs'aHQSrGltky:Td",
+              "-idczlATz:FmvuIs'aHQSrGltky:Td")
+             ("multipart/form-data; boundary=99233d57-854a-4b17-905b-ae37970e8a39",
+              "99233d57-854a-4b17-905b-ae37970e8a39")
+             ("multipart/form-data; charset=utf8; boundary=---------------------------19533183328386942351998832384",
+              "---------------------------19533183328386942351998832384") ]
+           |> List.map compare
+           |> ignore
+
+      testCase "Boundaries with spaces at the end"
+      <| fun _ ->
+           [ ("multipart/form-data; boundary=/tkQKiFqMgZt:mHzua_JFrUFWHgNi d  ",
+              "/tkQKiFqMgZt:mHzua_JFrUFWHgNi d")
+             ("multipart/mixed; boundary=\"------------020601 070403020003080 006 \"",
+              "------------020601 070403020003080 006") ]
+           |> List.map compare
+           |> ignore
+
+      testCase "Not matching boundaries"
+      <| fun _ ->
+           [
+             ("multipart/form-data; boundary=unicorn🦄", "unicorn")
+             ("multipart/form-data; boundary=%rfeo@", "")
+             ("multipart/form-data; boundary=", "")]
+           |> List.map compare
+           |> ignore
+      ]
+

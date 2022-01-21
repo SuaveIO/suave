@@ -61,6 +61,11 @@ let headerParams (header : string) =
   parseKVPairs parts
 
 /// Parse the boundary from the value of the Content-Type header.
+/// Based on the allowed set from
+/// https://www.rfc-editor.org/rfc/rfc2046#section-5.1.1
+/// it allows alphanumeric characters, punctuations and spaces (except at the
+/// end. Qutation marks seem to be optional as well.
+///
 let parseBoundary contentType =
-  let pattern = "boundary=(\w*)"
+  let pattern = "boundary=\"?([a-zA-Z0-9'\(\)+_,-.\/:=? ]*)(?<! )\"?"
   Regex.Match(contentType, pattern).Groups.[1].Value
