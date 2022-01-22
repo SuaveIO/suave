@@ -5,6 +5,7 @@ open System
 open System.Collections.Generic
 open System.IO
 open System.Net
+open System.Text.RegularExpressions
 
 /// Gets whether the passed ip is a local IPv4 or IPv6 address.
 /// Example: 127.0.0.1, ::1 return true. If the IP cannot be parsed,
@@ -58,3 +59,13 @@ let parseKVPairs arr =
 let headerParams (header : string) =
   let parts = header |> String.splita ';' |> Array.map String.trimStart
   parseKVPairs parts
+
+/// Parse the boundary from the value of the Content-Type header.
+/// Based on the allowed set from
+/// https://www.rfc-editor.org/rfc/rfc2046#section-5.1.1
+/// It allows alphanumeric characters, punctuations and spaces (except at the
+/// end). Quotation marks seem to be optional as well.
+///
+let parseBoundary contentType =
+  let pattern = "boundary=\"?([a-zA-Z0-9'\(\)+_,-.\/:=? ]*)(?<! )\"?"
+  Regex.Match(contentType, pattern).Groups.[1].Value
