@@ -35,7 +35,7 @@ let release = ReleaseNotes.load "RELEASE_NOTES.md"
 let Configuration = Environment.environVarOrDefault "CONFIGURATION" "Release"
 
 // Lazily install DotNet SDK in the correct version if not available
-let install = lazy DotNet.install (fun opt -> { opt with Version = DotNet.Version "3.1.404" })
+let install = lazy DotNet.install (fun opt -> { opt with Version = DotNet.Version "3.1.416" })
 
 // Define general properties across various commands (with arguments)
 let inline withWorkDir wd =
