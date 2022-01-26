@@ -1,3 +1,7 @@
+## New in v2.6.2 (Released 2022-01-26)
+* Removing keys from session state (#757)
+* FIX: Issue parsing boundary from multipart/form-data Content-Type header (#759)
+
 ## New in v2.6.1 (Released 2021-05-15)
 * Allow to set custom Server header (#755)
 * Report assigned ephemeral port  when binding to port 0 (#754)
