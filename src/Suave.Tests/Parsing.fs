@@ -1,4 +1,4 @@
-﻿module Suave.Tests.Parsing
+module Suave.Tests.Parsing
 
 open Expecto
 open System
@@ -31,6 +31,15 @@ let parseQuery =
       let subject =
         Parsing.parseData ""
       Expect.equal subject.Length 0 "Should be empty list"
+
+    testCase "can parse query containing url" <| fun _ ->
+      let url_val ="http://localhost:4000/api/payment-return/63a617517c5be574cd2fcbea/aHR0cDovL2xvY2FsaG9zdDozMDAwL3dpemFyZC93d2MtbXV0dWFsLWZ1bmQtdHJ1c3QvY29tcGxldGU="
+      let subject =
+        Parsing.parseData "id=e0eb213d-95d3-4f09-bdcd-ef6ea7b1ef94&return_url=" + url_val
+      Expect.equal subject.Length 2 "Should have two values"
+
+      let actual = subject.[1] |> snd |> Option.get
+      Expect.equal actual url_val "Should contain url_val"
     ]
 
 [<Tests>]
