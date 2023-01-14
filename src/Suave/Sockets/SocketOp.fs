@@ -96,12 +96,6 @@ module SocketOp =
     return Choice1Of2 s
     }
 
-  /// lift a ValueTask type to the SocketOp
-  let ofValueTask (a : ValueTask<'a>) : SocketOp<'a> = async {
-    let! s = a.AsTask()
-    return Choice1Of2 s
-    }
-
   module Operators =
 
     /// See SocketOp.orInputError
