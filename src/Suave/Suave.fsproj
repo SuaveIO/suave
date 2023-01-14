@@ -63,6 +63,7 @@
     <Compile Include="Web.fs" />
     <Compile Include="WebSocket.fs" />
     <Compile Include="Json.fs" />
+    <Compile Include="Stream.fs" />
     <Compile Include="Proxy.fs" />
   </ItemGroup>
   <Import Project="..\..\.paket\Paket.Restore.targets" />
