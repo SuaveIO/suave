@@ -7,11 +7,7 @@ open Suave.Sockets.Connection
 open Suave.Sockets.Control
 
 open System
-open System.Collections.Generic
 open System.IO
-open System.Net
-open System.Net.Sockets
-open System.Threading.Tasks
 open System.Text
 
 /// A TCP Worker is a thing that takes a TCP client and returns an asynchronous
@@ -120,7 +116,7 @@ let asyncWriteBufferedArrayBytes (xxs:(byte[])[]) (connection : Connection) : So
         }
   loop 0 connection
 
-let transferStreamWithBufer (buf: ArraySegment<_>) (toStream : Connection) (from : Stream) : SocketOp<unit> =
+let transferStreamWithBuffer (buf: ArraySegment<_>) (toStream : Connection) (from : Stream) : SocketOp<unit> =
   let rec doBlock () = socket {
     let! read = SocketOp.ofAsync <| from.AsyncRead (buf.Array, buf.Offset, buf.Count)
     if read <= 0 then
@@ -134,5 +130,42 @@ let transferStreamWithBufer (buf: ArraySegment<_>) (toStream : Connection) (from
 let transferStream (toStream : Connection) (from : Stream) : SocketOp<unit> =
   socket {
     let buf = toStream.bufferManager.PopBuffer()
-    do! finalize (transferStreamWithBufer buf toStream from) (fun () -> toStream.bufferManager.FreeBuffer buf)
+    do! finalize (transferStreamWithBuffer buf toStream from) (fun () -> toStream.bufferManager.FreeBuffer buf)
+  }
+
+let transferStreamChunked (conn : Connection) (from : Stream) : SocketOp<unit> =
+  socket {
+    let buf = conn.bufferManager.PopBuffer()
+
+    use _ =
+      {
+        new IDisposable with
+          member this.Dispose() =
+            conn.bufferManager.FreeBuffer buf
+      }
+
+    let rec doBlock conn =
+      socket {
+        let! read = SocketOp.ofAsync <| from.AsyncRead (buf.Array, buf.Offset, buf.Count)
+
+        if read <= 0 then
+          do! send conn (ArraySegment<_>(Encoding.ASCII.GetBytes "0"))
+          do! send conn Bytes.eolArraySegment
+          do! send conn Bytes.eolArraySegment
+        else
+          let readHex = read.ToString("X")
+
+          do! send conn (ArraySegment<_>(Encoding.ASCII.GetBytes readHex))
+          do! send conn Bytes.eolArraySegment
+
+          do! send conn (ArraySegment<_>(buf.Array, buf.Offset, read))
+          do! send conn Bytes.eolArraySegment
+
+          do! doBlock conn
+      }
+
+    let! (_, conn) = asyncWriteLn "" conn
+    let! conn = flush conn
+
+    do! doBlock conn
   }
