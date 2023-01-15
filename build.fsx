@@ -57,7 +57,7 @@ Target.create "Clean" <| fun _ ->
   |> Shell.cleanDirs
 
 Target.create "Restore" <| fun _ ->
-  DotNet.restore dotnetSimple "Suave.sln"
+  DotNet.restore id "Suave.sln"
 
 Target.create "AsmInfo" <| fun _ ->
   projects |> Seq.iter (fun project ->
