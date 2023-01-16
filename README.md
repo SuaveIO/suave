@@ -17,8 +17,7 @@ non-blocking fashion throughout.
 
 | Platform | Status         |
 | -------- | -------------- |
-| Windows  | [![Build status](https://ci.appveyor.com/api/projects/status/g0lum9qndwb018sy/branch/master?svg=true)](https://ci.appveyor.com/project/AdemarGonzalez/suave/branch/master) |
-| Mono/Linux     | [![Build status](https://travis-ci.org/SuaveIO/suave.svg?branch=master)](https://travis-ci.org/SuaveIO/suave) |
+| Linux     | [![Build status](https://github.com/SuaveIO/suave/actions/workflows/build-suave.yml/badge.svg)](https://github.com/SuaveIO/suave/actions/workflows/build-suave.yml) |
 
 What follows is a tutorial on how to create applications. Scroll past the
 tutorial to see detailed function documentation.

@@ -57,7 +57,7 @@ Target.create "Clean" <| fun _ ->
   |> Shell.cleanDirs
 
 Target.create "Restore" <| fun _ ->
-  DotNet.restore dotnetSimple "Suave.sln"
+  DotNet.restore (fun args -> { args with MSBuildParams = { MSBuild.CliArguments.Create() with DisableInternalBinLog = true }}) "Suave.sln"
 
 Target.create "AsmInfo" <| fun _ ->
   projects |> Seq.iter (fun project ->
@@ -73,11 +73,11 @@ Target.create "AsmInfo" <| fun _ ->
       ])
 
 Target.create "Build" <| fun _ ->
-  DotNet.build dotnetSimple "Suave.sln"
+  DotNet.build (fun args -> { args with MSBuildParams = { MSBuild.CliArguments.Create() with DisableInternalBinLog = true }}) "Suave.sln"
 
 Target.create "Tests" <| fun _ ->
   let path = "src" </> "Suave.Tests"
-  let res = DotNet.exec id "run" (sprintf "--framework netcoreapp3.1 --project %s -- --summary --sequenced" path)
+  let res = DotNet.exec id "run" (sprintf "--framework net6.0 --project %s -- --summary --sequenced" path)
   if not res.OK then
     res.Errors |> Seq.iter (eprintfn "%s")
     failwith "Tests failed."
