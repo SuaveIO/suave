@@ -55,11 +55,9 @@ Target.create "Clean" <| fun _ ->
   !! "src/**/bin"
   ++ "src/**/obj"
   |> Shell.cleanDirs
-  
-let disableInternalBinLog args = { args with MSBuildParams = { MSBuild.CliArguments.Create() with DisableInternalBinLog = true }}
 
 Target.create "Restore" <| fun _ ->
-  DotNet.restore disableInternalBinLog "Suave.sln"
+  DotNet.restore (fun args -> { args with MSBuildParams = { MSBuild.CliArguments.Create() with DisableInternalBinLog = true }}) "Suave.sln"
 
 Target.create "AsmInfo" <| fun _ ->
   projects |> Seq.iter (fun project ->
@@ -75,7 +73,7 @@ Target.create "AsmInfo" <| fun _ ->
       ])
 
 Target.create "Build" <| fun _ ->
-  DotNet.build disableInternalBinLog "Suave.sln"
+  DotNet.build (fun args -> { args with MSBuildParams = { MSBuild.CliArguments.Create() with DisableInternalBinLog = true }}) "Suave.sln"
 
 Target.create "Tests" <| fun _ ->
   let path = "src" </> "Suave.Tests"
