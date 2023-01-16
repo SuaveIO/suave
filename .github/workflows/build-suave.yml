@@ -20,5 +20,9 @@ jobs:
       uses: actions/setup-dotnet@v3
       with:
         dotnet-version: 6.0.x
+    - name: Add libuv to the path
+      run: echo "LD_LIBRARY_PATH=/home/runner/.nuget/packages/libuv/1.10.0/runtimes/linux-x64/native;" >> $GITHUB_ENV
+    - name: Echo LD_LIBRARY_PATH
+      run: echo $LD_LIBRARY_PATH
     - name: Build
       run: ./build.sh
