@@ -15,11 +15,6 @@ let okStream (makeStream : Async<Stream>) : WebPart =
       socket {
         use! stream = SocketOp.ofAsync makeStream
 
-        let start = 0L
-        let total = stream.Length
-        let finish = start + stream.Length - 1L
-
-        let! (), conn = asyncWriteLn $"Content-Range: bytes %i{start}-%i{finish}/%i{total}" conn
         let! (), conn = asyncWriteLn $"Content-Length: %i{stream.Length}\r\n" conn
         let! conn = flush conn
 
@@ -48,6 +43,9 @@ let okStreamChunked (makeStream : Async<Stream>) : WebPart =
     let write (conn, _) =
       socket {
         use! stream = SocketOp.ofAsync makeStream
+
+        let! (), conn = asyncWriteLn "" conn
+        let! conn = flush conn
 
         if ctx.request.``method`` <> HttpMethod.HEAD then
           do! transferStreamChunked conn stream

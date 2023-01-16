@@ -8,13 +8,9 @@ open Suave.Testing
 open System.IO
 open System.Text
 
-let private repeat n s =
-  Seq.init n (fun _ -> s)
-  |> String.concat ""
-
 [<Tests>]
 let streamTests (cfg : SuaveConfig) =
-  let expected = repeat 16384 "Hello, world.\n"
+  let expected = String.replicate 16384 "Hello, world.\n"
 
   let makeStream =
     async {

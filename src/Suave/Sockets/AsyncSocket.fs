@@ -164,8 +164,5 @@ let transferStreamChunked (conn : Connection) (from : Stream) : SocketOp<unit> =
           do! doBlock conn
       }
 
-    let! (_, conn) = asyncWriteLn "" conn
-    let! conn = flush conn
-
     do! doBlock conn
   }
