@@ -1,4 +1,4 @@
-﻿[<AutoOpen>]
+[<AutoOpen>]
 module Suave.WebPart
 (*
 SuaveTask of 'a is defined as `Async<'a option>`. It's implied that by returning None, the SuaveTask expects Suave to
@@ -39,6 +39,7 @@ type AsyncOptionBuilder() =
   member this.ReturnFrom(x : Async<'a option>) = x
   member this.Delay(f: unit ->  Async<'a option>) = async { return! f () }
   member this.Bind(x :Async<'a option>, f : 'a -> Async<'b option>) : Async<'b option> = bind f x
+  member this.Bind(x :'a option, f : 'a -> Async<'b option>) : Async<'b option> = bind f (async.Return x)
 
 let asyncOption = AsyncOptionBuilder()
 

@@ -1,4 +1,4 @@
-﻿[<AutoOpen>]
+[<AutoOpen>]
 module Suave.WebPart
 /// Takes 'a and returns SuaveTask of 'a
 /// SuaveTask is also known as AsyncOption
@@ -23,6 +23,7 @@ type AsyncOptionBuilder =
   member ReturnFrom : Async<'a option> -> Async<'a option>
   member Delay : (unit ->  Async<'a option>) -> Async<'a option>
   member Bind : Async<'a option> * ('a -> Async<'b option>) ->  Async<'b option>
+  member Bind : ('a option) * ('a -> Async<'b option>) ->  Async<'b option>
 
 ///  With this workflow you can write WebParts like this
 ///  let task ctx = asyncOption {
