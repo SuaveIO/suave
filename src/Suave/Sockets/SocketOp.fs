@@ -13,7 +13,7 @@ type Error =
   /// specification (TCP/HTTP/1.1/SSE/WebSocket etc).
   ///
   /// For a HTTP socket user this means a response of '400 Bad Request', or for
-  /// example WebSockets would abort the connection. 
+  /// example WebSockets would abort the connection.
   /// You can specify `Some statusCode` as response status code. If `None` status code 400 will be used.
   | InputDataError of (int option*string)
   /// Represents an IO/network error; to be used when we do not have a SocketError
@@ -73,7 +73,7 @@ module SocketOp =
     let! x = value
     match x with
     | Choice1Of2 x -> return Choice1Of2 (f x)
-    | Choice2Of2 (err : Error) -> return Choice2Of2 err 
+    | Choice2Of2 (err : Error) -> return Choice2Of2 err
     }
 
   /// Map f over the error value in SocketOp
@@ -130,18 +130,18 @@ module Utils =
       (args.UserToken :?> AsyncUserToken).Continuation <- k
 
       if not (op args) then
-        k args  
-  
+        k args
+
   /// Prepares the arguments by setting the buffer.
   let setBuffer (buf : ByteSegment) (args: SocketAsyncEventArgs) =
     args.SetBuffer(buf.Array, buf.Offset, buf.Count)
 
   let accept (socket : Socket) evArgs =
     asyncDo socket.AcceptAsync ignore (fun a -> a.AcceptSocket) evArgs
-  
+
   let trans (a : SocketAsyncEventArgs) =
     new ArraySegment<_>(a.Buffer, a.Offset, a.BytesTransferred)
-   
+
   /// Makes sure the finalizer is called regardless of the result of executing body
   let finalize (body: SocketOp<unit>) (finalizer: unit -> unit) =
     async {
