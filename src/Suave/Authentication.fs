@@ -127,8 +127,8 @@ let deauthenticateWithLogin loginPage : WebPart =
 
 module HttpContext =
 
-  let sessionId x =
-    match x.userState.TryGetValue StateStoreType with
+  let sessionId ctx =
+    match ctx.userState.TryGetValue StateStoreType with
     | true, x ->
       Some (x :?> byte[] |> Encoding.UTF8.GetString |> parseData)
     | _,_ -> None

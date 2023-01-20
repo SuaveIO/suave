@@ -28,9 +28,6 @@ open Suave.Sockets
 /// general response functions
 module Response =
 
-  /// Respond with a given status code, http message, content in the body to a http request.
-  // val response_f : status_code:HttpCode -> ( Connection -> SocketOp<unit>) -> request:HttpContext -> (Connection -> SocketOp<unit>)
-
   /// Respond with a given status code, http reason phrase, content in the body to a http request.
   val response : statusCode:HttpCode -> content:byte [] -> WebPart
 
@@ -1687,6 +1684,6 @@ module CORS =
   /// </para></summary>
   /// <remarks>
   /// </remarks>
-  val cors : CORSConfig:(CORSConfig) -> WebPart
+  val cors : config:(CORSConfig) -> WebPart
 
   val defaultCORSConfig : CORSConfig

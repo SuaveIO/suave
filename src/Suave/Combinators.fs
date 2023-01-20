@@ -5,19 +5,19 @@ open Suave.Sockets
 
 module Response =
 
-  let response (statusCode : HttpCode) (cnt : byte []) =
+  let response (statusCode : HttpCode) (content : byte []) =
     fun (ctx : HttpContext) ->
       let response =
-        { ctx.response with status = statusCode.status; content = Bytes cnt }
+        { ctx.response with status = statusCode.status; content = Bytes content }
       { ctx with response = response } |> succeed
 
 module Writers =
 
   open System
 
-  let setStatus (s : HttpCode) : WebPart =
+  let setStatus (status : HttpCode) : WebPart =
     fun ctx ->
-      { ctx with response = { ctx.response with status = s.status }}
+      { ctx with response = { ctx.response with status = status.status }}
       |> succeed
 
   let setStatusCode (code : int) : WebPart =
@@ -84,7 +84,8 @@ module Writers =
   let createMimeType name compression =
     { name=name; compression=compression } |> Some
 
-  let defaultMimeTypesMap = function
+  let defaultMimeTypesMap (ext:string) =
+    match ext with
     | ".bmp" -> createMimeType "image/bmp" false
     | ".css" -> createMimeType "text/css" true
     | ".gif" -> createMimeType "image/gif" false
@@ -110,7 +111,7 @@ module Writers =
     | ".eot" -> createMimeType "application/vnd.ms-fontobject" false
     | _      -> None
 
-  let setMimeType t = setHeader "Content-Type" t
+  let setMimeType mimeType = setHeader "Content-Type" mimeType
 
 // 1xx
 module Intermediate =
@@ -130,18 +131,18 @@ module Successful =
   open Suave.Utils
   open Response
 
-  let ok s : WebPart =
-    fun ctx -> { ctx with response = { ctx.response with status = HTTP_200.status; content = Bytes s }} |> succeed
+  let ok bytes : WebPart =
+    fun ctx -> { ctx with response = { ctx.response with status = HTTP_200.status; content = Bytes bytes }} |> succeed
 
-  let OK (a:string) = ok (Encoding.UTF8.GetBytes a)
+  let OK (body:string) = ok (Encoding.UTF8.GetBytes body)
 
-  let created s = response HTTP_201 s
+  let created bytes = response HTTP_201 bytes
 
-  let CREATED (s:string) = created (Encoding.UTF8.GetBytes s)
+  let CREATED (body:string) = created (Encoding.UTF8.GetBytes body)
 
-  let accepted s = response HTTP_202 s
+  let accepted bytes = response HTTP_202 bytes
 
-  let ACCEPTED (s:string) = accepted (Encoding.UTF8.GetBytes s)
+  let ACCEPTED (body:string) = accepted (Encoding.UTF8.GetBytes body)
 
   let no_content : WebPart =
     fun ctx -> { ctx with response = { status = HTTP_204.status; headers = ctx.response.headers; content = Bytes [||]; writePreamble = true }} |> succeed
@@ -166,23 +167,23 @@ module Redirection =
 
   let FOUND location = found location
 
-  let redirect url =
-    setHeader "Location" url
+  let redirect location =
+    setHeader "Location" location
     >=> setHeader "Content-Type" "text/html; charset=utf-8"
     >=> response HTTP_302 (
       Encoding.UTF8.GetBytes("<html>
   <body>
-    <a href=\"" + url  + "\">" + HTTP_302.message + "</a>
+    <a href=\"" + location  + "\">" + HTTP_302.message + "</a>
   </body>
 </html>"))
 
-  let see_other url =
-    setHeader "Location" url
+  let see_other location =
+    setHeader "Location" location
     >=> setHeader "Content-Type" "text/html; charset=utf-8"
     >=> response HTTP_303 (
       Encoding.UTF8.GetBytes("<html>
   <body>
-    <a href=\"" + url + "\">" + HTTP_303.message + "</a>
+    <a href=\"" + location + "\">" + HTTP_303.message + "</a>
   </body>
 </html>"))
 
@@ -198,90 +199,90 @@ module RequestErrors =
   open Response
   open Writers
 
-  let bad_request s = response HTTP_400 s
+  let bad_request bytes = response HTTP_400 bytes
 
-  let BAD_REQUEST (s:string) = bad_request (Encoding.UTF8.GetBytes s)
+  let BAD_REQUEST (body:string) = bad_request (Encoding.UTF8.GetBytes body)
 
   /// 401: see http://stackoverflow.com/questions/3297048/403-forbidden-vs-401-unauthorized-http-responses/12675357
-  let unauthorized s =
+  let unauthorized bytes =
     setHeader "WWW-Authenticate" "Basic realm=\"protected\""
-    >=> response HTTP_401 s
+    >=> response HTTP_401 bytes
 
-  let UNAUTHORIZED (s:string) = unauthorized (Encoding.UTF8.GetBytes s)
+  let UNAUTHORIZED (body:string) = unauthorized (Encoding.UTF8.GetBytes body)
 
   let challenge = UNAUTHORIZED HTTP_401.message
 
-  let forbidden s = response HTTP_403 s
+  let forbidden bytes = response HTTP_403 bytes
 
-  let FORBIDDEN (s:string) = forbidden (Encoding.UTF8.GetBytes s)
+  let FORBIDDEN (body:string) = forbidden (Encoding.UTF8.GetBytes body)
 
-  let not_found s = response HTTP_404 s
+  let not_found bytes = response HTTP_404 bytes
 
-  let NOT_FOUND (s:string) = not_found (Encoding.UTF8.GetBytes s)
+  let NOT_FOUND (body:string) = not_found (Encoding.UTF8.GetBytes body)
 
-  let method_not_allowed s = response HTTP_405 s
+  let method_not_allowed bytes = response HTTP_405 bytes
 
-  let METHOD_NOT_ALLOWED (s:string) = method_not_allowed (Encoding.UTF8.GetBytes s)
+  let METHOD_NOT_ALLOWED (body:string) = method_not_allowed (Encoding.UTF8.GetBytes body)
 
-  let not_acceptable s = response HTTP_406 s
+  let not_acceptable bytes = response HTTP_406 bytes
 
-  let NOT_ACCEPTABLE (s:string) = not_acceptable (Encoding.UTF8.GetBytes s)
+  let NOT_ACCEPTABLE (body:string) = not_acceptable (Encoding.UTF8.GetBytes body)
 
   let request_timeout = response HTTP_408 [||]
 
   // all-caps req.timeout elided intentionally, as nothing can be passed to
   // a writing client
 
-  let conflict s = response HTTP_409 s
+  let conflict bytes = response HTTP_409 bytes
 
-  let CONFLICT (s:string) = conflict (Encoding.UTF8.GetBytes s)
+  let CONFLICT (body:string) = conflict (Encoding.UTF8.GetBytes body)
 
-  let gone s = response HTTP_410 s
+  let gone bytes = response HTTP_410 bytes
 
-  let GONE (s:string) = gone (Encoding.UTF8.GetBytes s)
+  let GONE (body:string) = gone (Encoding.UTF8.GetBytes body)
 
-  let unsupported_media_type s = response HTTP_415 s
+  let unsupported_media_type bytes = response HTTP_415 bytes
 
-  let UNSUPPORTED_MEDIA_TYPE (s:string) = unsupported_media_type (Encoding.UTF8.GetBytes s)
+  let UNSUPPORTED_MEDIA_TYPE (body:string) = unsupported_media_type (Encoding.UTF8.GetBytes body)
 
-  let unprocessable_entity s = response HTTP_422 s
+  let unprocessable_entity bytes = response HTTP_422 bytes
 
-  let UNPROCESSABLE_ENTITY (s:string) = unprocessable_entity (Encoding.UTF8.GetBytes s)
+  let UNPROCESSABLE_ENTITY (body:string) = unprocessable_entity (Encoding.UTF8.GetBytes body)
 
-  let precondition_required body = response HTTP_428 body
+  let precondition_required bytes = response HTTP_428 bytes
 
-  let PRECONDITION_REQUIRED (s:string) = precondition_required (Encoding.UTF8.GetBytes s)
+  let PRECONDITION_REQUIRED (body:string) = precondition_required (Encoding.UTF8.GetBytes body)
 
-  let too_many_requests s = response HTTP_429 s
+  let too_many_requests bytes = response HTTP_429 bytes
 
-  let TOO_MANY_REQUESTS (s:string) = too_many_requests (Encoding.UTF8.GetBytes s)
+  let TOO_MANY_REQUESTS (body:string) = too_many_requests (Encoding.UTF8.GetBytes body)
 
 module ServerErrors =
 
   open System.Text
   open Response
 
-  let internal_error arr = response HTTP_500 arr
+  let internal_error bytes = response HTTP_500 bytes
 
-  let INTERNAL_ERROR (s:string) = internal_error (Encoding.UTF8.GetBytes s)
+  let INTERNAL_ERROR (body:string) = internal_error (Encoding.UTF8.GetBytes body)
 
-  let not_implemented arr = response HTTP_501 arr
+  let not_implemented bytes = response HTTP_501 bytes
 
-  let NOT_IMPLEMENTED (s:string) = not_implemented (Encoding.UTF8.GetBytes s)
+  let NOT_IMPLEMENTED (body:string) = not_implemented (Encoding.UTF8.GetBytes body)
 
-  let bad_gateway arr = response HTTP_502 arr
+  let bad_gateway bytes = response HTTP_502 bytes
 
-  let BAD_GATEWAY (s:string) = bad_gateway (Encoding.UTF8.GetBytes s)
+  let BAD_GATEWAY (body:string) = bad_gateway (Encoding.UTF8.GetBytes body)
 
-  let service_unavailable arr = response HTTP_503 arr
+  let service_unavailable bytes = response HTTP_503 bytes
 
-  let SERVICE_UNAVAILABLE (s:string) = service_unavailable (Encoding.UTF8.GetBytes s)
+  let SERVICE_UNAVAILABLE (body:string) = service_unavailable (Encoding.UTF8.GetBytes body)
 
-  let gateway_timeout arr = response HTTP_504 arr
+  let gateway_timeout bytes = response HTTP_504 bytes
 
-  let GATEWAY_TIMEOUT (s:string) = gateway_timeout (Encoding.UTF8.GetBytes s)
+  let GATEWAY_TIMEOUT (body:string) = gateway_timeout (Encoding.UTF8.GetBytes body)
 
-  let invalid_http_version arr = response HTTP_505 arr
+  let invalid_http_version bytes = response HTTP_505 bytes
 
   let INVALID_HTTP_VERSION = invalid_http_version (Encoding.UTF8.GetBytes HTTP_505.message)
 
@@ -296,22 +297,22 @@ module Filters =
     let iff b x =
       if b then Some x else None
 
-  let path s (x : HttpContext) =
-    async.Return (Option.iff (s = x.request.path) x)
+  let path pathAfterDomain (x : HttpContext) =
+    async.Return (Option.iff (pathAfterDomain = x.request.path) x)
 
-  let pathCi s (x : HttpContext) =
-    async.Return (Option.iff (String.Equals(s, x.request.path, StringComparison.CurrentCultureIgnoreCase)) x)
+  let pathCi pathAfterDomain (x : HttpContext) =
+    async.Return (Option.iff (String.Equals(pathAfterDomain, x.request.path, StringComparison.CurrentCultureIgnoreCase)) x)
 
-  let pathStarts (s:string) (x : HttpContext) =
-    async.Return (Option.iff (x.request.path.StartsWith s) x)
+  let pathStarts (pathAfterDomainSubstr:string) (x : HttpContext) =
+    async.Return (Option.iff (x.request.path.StartsWith pathAfterDomainSubstr) x)
 
-  let pathStartsCi s (x : HttpContext) =
-    async.Return (Option.iff (x.request.path.StartsWith (s, StringComparison.CurrentCultureIgnoreCase)) x)
+  let pathStartsCi pathAfterDomainSubstr (x : HttpContext) =
+    async.Return (Option.iff (x.request.path.StartsWith (pathAfterDomainSubstr, StringComparison.CurrentCultureIgnoreCase)) x)
 
   let url x = path x
 
-  let ``method`` (m : HttpMethod) (x : HttpContext) =
-    async.Return (Option.iff (m = x.request.``method``) x)
+  let ``method`` (method : HttpMethod) (x : HttpContext) =
+    async.Return (Option.iff (method = x.request.``method``) x)
 
   let isSecure (x : HttpContext) =
     async.Return (Option.iff x.runtime.matchedBinding.scheme.secure x)
@@ -319,8 +320,8 @@ module Filters =
   let hasFlag flag (ctx : HttpContext) =
     if ctx.request.queryFlag flag then succeed ctx else fail
 
-  let pathRegex regex (x : HttpContext) =
-    async.Return (Option.iff (Regex.IsMatch(x.request.path, regex)) x)
+  let pathRegex pathAfterDomainRegex (x : HttpContext) =
+    async.Return (Option.iff (Regex.IsMatch(x.request.path, pathAfterDomainRegex)) x)
 
   let urlRegex x = pathRegex x
 
@@ -379,20 +380,20 @@ module Filters =
     ]
     "{clientIp} {processId} {userName} [{utcNow:dd/MMM/yyyy:hh:mm:ss %K}] \"{requestMethod} {requestUrlPath} {httpVersion}\" {httpStatusCode} {responseContentLength}", fieldList |> Map
 
-  let logWithLevel (level : LogLevel) (logger : Logger) (formatter : HttpContext -> string) (ctx : HttpContext) =
+  let logWithLevel (level : LogLevel) (logger : Logger) (messageFun : HttpContext -> string) (ctx : HttpContext) =
     async{
       logger.log level (fun _ ->
-        { value         = Event (formatter ctx)
+        { value         = Event (messageFun ctx)
           level         = level
           name          = [| "Suave"; "Http"; "requests" |]
           fields        = Map.empty
           timestamp     = Suave.Logging.Global.timestamp() })
       return Some ctx }
 
-  let logWithLevelStructured (level : LogLevel) (logger : Logger) (templateAndFieldsCreator : HttpContext -> (string * Map<string,obj>)) (ctx : HttpContext) =
+  let logWithLevelStructured (level : LogLevel) (logger : Logger) (messageFun : HttpContext -> (string * Map<string,obj>)) (ctx : HttpContext) =
     async{
       logger.log level (fun _ ->
-        let template, fields = templateAndFieldsCreator ctx
+        let template, fields = messageFun ctx
         { value         = Event template
           level         = level
           name          = [| "Suave"; "Http"; "requests" |]
@@ -400,11 +401,11 @@ module Filters =
           timestamp     = Suave.Logging.Global.timestamp() })
       return Some ctx }
 
-  let logStructured (logger : Logger) (structuredFormatter : HttpContext -> (string * Map<string,obj>)) =
-    logWithLevelStructured LogLevel.Info logger structuredFormatter
+  let logStructured (logger : Logger) (messageFun : HttpContext -> (string * Map<string,obj>)) =
+    logWithLevelStructured LogLevel.Info logger messageFun
 
-  let log (logger : Logger) (formatter : HttpContext -> string) =
-    logWithLevel LogLevel.Info logger formatter
+  let log (logger : Logger) (messageFun : HttpContext -> string) =
+    logWithLevel LogLevel.Info logger messageFun
 
   open Suave.Sscanf
 
@@ -444,10 +445,10 @@ module Filters =
   let urlScan s x = pathScan s x
   let urlScanCi s x = pathScanCi s x
 
-  let timeoutWebPart (timeSpan : TimeSpan) (webPart : WebPart) : WebPart =
+  let timeoutWebPart (timeout : TimeSpan) (child : WebPart) : WebPart =
     fun (ctx : HttpContext) -> async {
       try
-        return! Async.WithTimeout (timeSpan, webPart ctx)
+        return! Async.WithTimeout (timeout, child ctx)
       with
         | :? TimeoutException ->
           return! Response.response HttpCode.HTTP_408 (Encoding.UTF8.GetBytes "Request Timeout") ctx
@@ -674,13 +675,13 @@ module Embedded =
   let lastModified (assembly : Assembly) =
     FileInfo(assembly.Location).CreationTime
 
-  let sendResource (assembly : Assembly)
+  let sendResource (source : Assembly)
                     resourceName
                     (compression : bool)
                     (ctx : HttpContext) =
     let writeResource name (conn, _) = socket {
-      let fs = assembly.GetManifestResourceStream(name)
-      let getLm = fun _ -> lastModified assembly
+      let fs = source.GetManifestResourceStream(name)
+      let getLm = fun _ -> lastModified source
       let! encoding,fs = Compression.transformStream name fs getLm compression ctx.runtime.compressionFolder ctx
 
       match encoding with
@@ -710,19 +711,19 @@ module Embedded =
   let sendResourceFromDefaultAssembly resourceName compression =
     sendResource defaultSourceAssembly resourceName compression
 
-  let resource assembly name =
+  let resource source name =
     resource
       name
-      (fun name -> resources assembly |> Array.exists ((=) name))
-      (fun _ -> new DateTimeOffset(lastModified assembly))
+      (fun name -> resources source |> Array.exists ((=) name))
+      (fun _ -> new DateTimeOffset(lastModified source))
       (Path.GetExtension)
-      (sendResource assembly)
+      (sendResource source)
 
   let resourceFromDefaultAssembly name =
     resource defaultSourceAssembly name
 
-  let browse assembly =
-    warbler (fun ctx -> resource assembly (ctx.request.path.TrimStart [|'/'|]))
+  let browse source =
+    warbler (fun ctx -> resource source (ctx.request.path.TrimStart [|'/'|]))
 
   let browseDefaultAsssembly =
     browse defaultSourceAssembly
@@ -752,11 +753,11 @@ module EventSource =
   let comment (out : Connection) (cmt : string) =
     out <<. ": " + cmt + ES_EOL
 
-  let eventType (out : Connection) (evType : string) =
-    out <<. "event: " + evType + ES_EOL
+  let eventType (out : Connection) (eventType : string) =
+    out <<. "event: " + eventType + ES_EOL
 
-  let data (out : Connection) (text : string) =
-    out <<. "data: " + text + ES_EOL
+  let data (out : Connection) (data : string) =
+    out <<. "data: " + data + ES_EOL
 
   let esId (out : Connection) (lastEventId : string) =
     out <<. "id: " + lastEventId + ES_EOL
@@ -800,7 +801,7 @@ module EventSource =
       return! f out
     }
 
-  let handShake f (ctx : HttpContext) =
+  let handShake fCont (ctx : HttpContext) =
     { ctx with
         response =
           { ctx.response with
@@ -813,7 +814,7 @@ module EventSource =
                 // also see http://wiki.nginx.org/HttpProxyModule#proxy_buffering
                 :: ("X-Accel-Buffering",           "no")
                 :: []
-              content = SocketTask (handShakeAux f)
+              content = SocketTask (handShakeAux fCont)
           }
     }
     |> succeed

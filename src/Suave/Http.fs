@@ -258,17 +258,17 @@ module Http =
 
     let empty = createKV "" ""
 
-    let toHeader (x : HttpCookie) =
+    let toHeader (cookie : HttpCookie) =
       let app (sb : StringBuilder) (value : string) = sb.Append value |> ignore
-      let sb = new StringBuilder(String.Concat [ x.name; "="; x.value ])
+      let sb = new StringBuilder(String.Concat [ cookie.name; "="; cookie.value ])
       let app value = app sb (String.Concat [";"; value])
       let appkv k fMap v = v |> Option.iter (fun v -> app (String.Concat [ k; "="; fMap v ]))
-      x.domain  |> appkv "Domain" id
-      x.path    |> appkv "Path" id
-      x.expires |> appkv "Expires" (fun (i : DateTimeOffset) -> i.ToString("R"))
-      if x.httpOnly then app "HttpOnly"
-      if x.secure    then app "Secure"
-      match x.sameSite with
+      cookie.domain  |> appkv "Domain" id
+      cookie.path    |> appkv "Path" id
+      cookie.expires |> appkv "Expires" (fun (i : DateTimeOffset) -> i.ToString("R"))
+      if cookie.httpOnly then app "HttpOnly"
+      if cookie.secure    then app "Secure"
+      match cookie.sameSite with
       | None -> ()
       | Some(sameSite) ->
         match sameSite with
@@ -371,11 +371,11 @@ module Http =
     member x.formData (key : string) =
       getFirstOpt x.form key
 
-    member x.fieldData (k : string) =
-      getFirst x.multiPartFields k
+    member x.fieldData (key : string) =
+      getFirst x.multiPartFields key
 
     member this.Item
-      with get(x) =
+      with get(key) =
 
         let inline (>>=) f1 f2 x =
           match f1 x with
@@ -387,7 +387,7 @@ module Http =
             >>= (tryGetChoice1 this.formData)
             >>= (tryGetChoice1 <| getFirst this.multiPartFields)
 
-        params' x
+        params' key
 
     member x.clientHost trustProxy sources : string =
       if trustProxy then
@@ -486,8 +486,8 @@ module Http =
       Convert.FromBase64String >> validate
 
   type IPAddress with
-    static member tryParseC(str: string) =
-      match IPAddress.TryParse str with
+    static member tryParseC(ip: string) =
+      match IPAddress.TryParse ip with
       | false, _ -> Choice2Of2 ()
       | _, ip    -> Choice1Of2 ip
 
@@ -634,5 +634,5 @@ module Http =
     let runtime x = x.runtime
     let response x = x.response
 
-  let request apply (a : HttpContext) = apply a.request a
-  let context apply (a : HttpContext) = apply a a
+  let request apply (context : HttpContext) = apply context.request context
+  let context apply (context : HttpContext) = apply context context

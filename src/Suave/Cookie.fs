@@ -1,4 +1,4 @@
-﻿namespace Suave
+namespace Suave
 
 module Cookie =
 
@@ -18,8 +18,8 @@ module Cookie =
     | NoCookieFound of cookieName:string
     | DecryptionError of error:Crypto.SecretboxDecryptionError
 
-  let parseCookies (s : string) : HttpCookie list =
-    s.Split([|';'|], StringSplitOptions.RemoveEmptyEntries)
+  let parseCookies (cookieString : string) : HttpCookie list =
+    cookieString.Split([|';'|], StringSplitOptions.RemoveEmptyEntries)
     |> Array.toList
     |> List.map (String.trim)
     |> List.map (fun (cookie : string) ->
@@ -37,7 +37,7 @@ module Cookie =
           None)
     |> List.choose id
 
-  let parseResultCookie (s : string) : HttpCookie =
+  let parseResultCookie (cookieString : string) : HttpCookie =
     let parseExpires (str : string) =
       DateTimeOffset.ParseExact(str, "R", CultureInfo.InvariantCulture)
     let parseSameSite (str : string) =
@@ -45,7 +45,7 @@ module Cookie =
       | "Strict" -> Some Strict
       | "Lax" -> Some Lax
       | _ -> None
-    s.Split(';')
+    cookieString.Split(';')
     |> Array.map (fun (x : string) ->
         let parts = x.Split('=')
         if parts.Length > 1 then
@@ -133,9 +133,9 @@ module Cookie =
     succeed { ctx with response = { ctx.response with headers = headers' } }
 
 
-  let unsetCookie (cookieName : string) =
+  let unsetCookie (name : string) =
     let startEpoch = DateTimeOffset(1970, 1, 1, 0, 0, 1, TimeSpan.Zero) |> Some
-    let stringValue = HttpCookie.toHeader { HttpCookie.createKV cookieName "x" with expires = startEpoch }
+    let stringValue = HttpCookie.toHeader { HttpCookie.createKV name "x" with expires = startEpoch }
     Writers.addHeader Headers.Fields.Response.setCookie stringValue
 
   let setPair (httpCookie : HttpCookie) (clientCookie : HttpCookie) : WebPart =
@@ -186,7 +186,7 @@ module Cookie =
 
   /// Tries to read the cookie by `cookieName` from the mapping of cookie-name
   /// to cookie. If it exists, it is decrypted with the `cryptoKey`.
-  let readCookies cryptoKey cookieName (cookies : Map<string, HttpCookie>) =
+  let readCookies key cookieName (cookies : Map<string, HttpCookie>) =
     let _, dec = Bytes.cookieEncoding
     let found =
       cookies
@@ -197,15 +197,15 @@ module Cookie =
     match found with
     | Choice1Of2 (cookie, cipherData) ->
       cipherData
-      |> Crypto.secretboxOpen cryptoKey
+      |> Crypto.secretboxOpen key
       |> Choice.mapSnd DecryptionError
       |> Choice.map (fun plainText -> cookie, plainText)
 
     | Choice2Of2 x ->
       Choice2Of2 x
 
-  let refreshCookies relativeExpiry httpCookie : WebPart =
-    slidingExpiry relativeExpiry httpCookie ||> setPair
+  let refreshCookies expiry cookie : WebPart =
+    slidingExpiry expiry cookie ||> setPair
 
   let updateCookies (csctx : CookiesState) fPlainText : WebPart =
     context (fun ctx ->
@@ -224,7 +224,7 @@ module Cookie =
           debug "First time"
           fPlainText None
 
-      /// Since the contents will completely change every write, we simply re-generate the cookie
+      // Since the contents will completely change every write, we simply re-generate the cookie
       generateCookies csctx.serverKey csctx.cookieName
                        csctx.relativeExpiry csctx.secure
                        plainText

@@ -70,21 +70,21 @@ let inline warbler f a = f a a
 
 let inline cnst x = fun _ -> x
 
-let cond d f g a =
-  match d with
+let cond item f g a =
+  match item with
   | Choice1Of2 x -> f x a
   | Choice2Of2 _ -> g a
 
-let inline tryThen (a : WebPart<'a>) (b : WebPart<'a>) : WebPart<'a> =
+let inline tryThen (first : WebPart<'a>) (second : WebPart<'a>) : WebPart<'a> =
   fun x ->
     async {
-      let! e = a x
+      let! e = first x
       match e with
-      | None -> return! b x
+      | None -> return! second x
       | r -> return r
     }
 
-let inline concatenate a b = fun x ->
-    match a x with
-    | None   -> b x
+let inline concatenate first second = fun x ->
+    match first x with
+    | None   -> second x
     | r      -> r
