@@ -12,11 +12,8 @@ module Response =
       { ctx with response = response } |> succeed
 
 module Writers =
-  // TODO: transform into a set of lenses with Aether
-  // @ https://github.com/xyncro/aether and move closer to HttpContext.
 
   open System
-  open Suave.Utils
 
   let setStatus (s : HttpCode) : WebPart =
     fun ctx ->
@@ -129,22 +126,22 @@ module Intermediate =
 
 // 2xx
 module Successful =
-
+  open System.Text
   open Suave.Utils
   open Response
 
   let ok s : WebPart =
     fun ctx -> { ctx with response = { ctx.response with status = HTTP_200.status; content = Bytes s }} |> succeed
 
-  let OK a = ok (UTF8.bytes a)
+  let OK (a:string) = ok (Encoding.UTF8.GetBytes a)
 
   let created s = response HTTP_201 s
 
-  let CREATED s = created (UTF8.bytes s)
+  let CREATED (s:string) = created (Encoding.UTF8.GetBytes s)
 
   let accepted s = response HTTP_202 s
 
-  let ACCEPTED s = accepted (UTF8.bytes s)
+  let ACCEPTED (s:string) = accepted (Encoding.UTF8.GetBytes s)
 
   let no_content : WebPart =
     fun ctx -> { ctx with response = { status = HTTP_204.status; headers = ctx.response.headers; content = Bytes [||]; writePreamble = true }} |> succeed
@@ -153,8 +150,7 @@ module Successful =
 
 // 3xx
 module Redirection =
-
-  open Suave.Utils
+  open System.Text
   open Response
   open Writers
 
@@ -174,7 +170,7 @@ module Redirection =
     setHeader "Location" url
     >=> setHeader "Content-Type" "text/html; charset=utf-8"
     >=> response HTTP_302 (
-      UTF8.bytes("<html>
+      Encoding.UTF8.GetBytes("<html>
   <body>
     <a href=\"" + url  + "\">" + HTTP_302.message + "</a>
   </body>
@@ -184,7 +180,7 @@ module Redirection =
     setHeader "Location" url
     >=> setHeader "Content-Type" "text/html; charset=utf-8"
     >=> response HTTP_303 (
-      UTF8.bytes("<html>
+      Encoding.UTF8.GetBytes("<html>
   <body>
     <a href=\"" + url + "\">" + HTTP_303.message + "</a>
   </body>
@@ -198,39 +194,38 @@ module Redirection =
 
 // 4xx
 module RequestErrors =
-
-  open Suave.Utils
+  open System.Text
   open Response
   open Writers
 
   let bad_request s = response HTTP_400 s
 
-  let BAD_REQUEST s = bad_request (UTF8.bytes s)
+  let BAD_REQUEST (s:string) = bad_request (Encoding.UTF8.GetBytes s)
 
   /// 401: see http://stackoverflow.com/questions/3297048/403-forbidden-vs-401-unauthorized-http-responses/12675357
   let unauthorized s =
     setHeader "WWW-Authenticate" "Basic realm=\"protected\""
     >=> response HTTP_401 s
 
-  let UNAUTHORIZED s = unauthorized (UTF8.bytes s)
+  let UNAUTHORIZED (s:string) = unauthorized (Encoding.UTF8.GetBytes s)
 
   let challenge = UNAUTHORIZED HTTP_401.message
 
   let forbidden s = response HTTP_403 s
 
-  let FORBIDDEN s = forbidden (UTF8.bytes s)
+  let FORBIDDEN (s:string) = forbidden (Encoding.UTF8.GetBytes s)
 
   let not_found s = response HTTP_404 s
 
-  let NOT_FOUND message = not_found (UTF8.bytes message)
+  let NOT_FOUND (s:string) = not_found (Encoding.UTF8.GetBytes s)
 
   let method_not_allowed s = response HTTP_405 s
 
-  let METHOD_NOT_ALLOWED s = method_not_allowed (UTF8.bytes s)
+  let METHOD_NOT_ALLOWED (s:string) = method_not_allowed (Encoding.UTF8.GetBytes s)
 
   let not_acceptable s = response HTTP_406 s
 
-  let NOT_ACCEPTABLE message = not_acceptable (UTF8.bytes message)
+  let NOT_ACCEPTABLE (s:string) = not_acceptable (Encoding.UTF8.GetBytes s)
 
   let request_timeout = response HTTP_408 [||]
 
@@ -239,62 +234,62 @@ module RequestErrors =
 
   let conflict s = response HTTP_409 s
 
-  let CONFLICT message = conflict (UTF8.bytes message)
+  let CONFLICT (s:string) = conflict (Encoding.UTF8.GetBytes s)
 
   let gone s = response HTTP_410 s
 
-  let GONE s = gone (UTF8.bytes s)
+  let GONE (s:string) = gone (Encoding.UTF8.GetBytes s)
 
   let unsupported_media_type s = response HTTP_415 s
 
-  let UNSUPPORTED_MEDIA_TYPE s = unsupported_media_type (UTF8.bytes s)
+  let UNSUPPORTED_MEDIA_TYPE (s:string) = unsupported_media_type (Encoding.UTF8.GetBytes s)
 
   let unprocessable_entity s = response HTTP_422 s
 
-  let UNPROCESSABLE_ENTITY s = unprocessable_entity (UTF8.bytes s)
+  let UNPROCESSABLE_ENTITY (s:string) = unprocessable_entity (Encoding.UTF8.GetBytes s)
 
   let precondition_required body = response HTTP_428 body
 
-  let PRECONDITION_REQUIRED body = precondition_required (UTF8.bytes body)
+  let PRECONDITION_REQUIRED (s:string) = precondition_required (Encoding.UTF8.GetBytes s)
 
   let too_many_requests s = response HTTP_429 s
 
-  let TOO_MANY_REQUESTS s = too_many_requests (UTF8.bytes s)
+  let TOO_MANY_REQUESTS (s:string) = too_many_requests (Encoding.UTF8.GetBytes s)
 
 module ServerErrors =
 
-  open Suave.Utils
+  open System.Text
   open Response
 
   let internal_error arr = response HTTP_500 arr
 
-  let INTERNAL_ERROR message = internal_error (UTF8.bytes message)
+  let INTERNAL_ERROR (s:string) = internal_error (Encoding.UTF8.GetBytes s)
 
   let not_implemented arr = response HTTP_501 arr
 
-  let NOT_IMPLEMENTED message = not_implemented (UTF8.bytes message)
+  let NOT_IMPLEMENTED (s:string) = not_implemented (Encoding.UTF8.GetBytes s)
 
   let bad_gateway arr = response HTTP_502 arr
 
-  let BAD_GATEWAY message = bad_gateway (UTF8.bytes message)
+  let BAD_GATEWAY (s:string) = bad_gateway (Encoding.UTF8.GetBytes s)
 
   let service_unavailable arr = response HTTP_503 arr
 
-  let SERVICE_UNAVAILABLE message = service_unavailable (UTF8.bytes message)
+  let SERVICE_UNAVAILABLE (s:string) = service_unavailable (Encoding.UTF8.GetBytes s)
 
   let gateway_timeout arr = response HTTP_504 arr
 
-  let GATEWAY_TIMEOUT message = gateway_timeout (UTF8.bytes message)
+  let GATEWAY_TIMEOUT (s:string) = gateway_timeout (Encoding.UTF8.GetBytes s)
 
   let invalid_http_version arr = response HTTP_505 arr
 
-  let INVALID_HTTP_VERSION = invalid_http_version (UTF8.bytes HTTP_505.message)
+  let INVALID_HTTP_VERSION = invalid_http_version (Encoding.UTF8.GetBytes HTTP_505.message)
 
 module Filters =
-  open Suave.Utils
   open Suave.Utils.AsyncExtensions
   open Suave.Logging
   open System
+  open System.Text
   open System.Text.RegularExpressions
 
   module private Option =
@@ -455,7 +450,7 @@ module Filters =
         return! Async.WithTimeout (timeSpan, webPart ctx)
       with
         | :? TimeoutException ->
-          return! Response.response HttpCode.HTTP_408 (UTF8.bytes "Request Timeout") ctx
+          return! Response.response HttpCode.HTTP_408 (Encoding.UTF8.GetBytes "Request Timeout") ctx
           }
 
 /// not part of the public API at this point
@@ -736,21 +731,20 @@ module Embedded =
 module EventSource =
   open System
   open Suave
-  open Suave.Sockets
   open Suave.Sockets.Control
   open Suave.Sockets.Connection
-  open Suave.Utils
+  open System.Text
 
   [<Literal>]
   let private ES_EOL = "\n"
 
-  let private ES_EOL_S = ArraySegment<_>(UTF8.bytes ES_EOL, 0, 1)
+  let private ES_EOL_S = ArraySegment<_>(Encoding.UTF8.GetBytes ES_EOL, 0, 1)
 
   let asyncWrite (out : Connection) (data : string) =
-    asyncWriteBytes out (UTF8.bytes data)
+    asyncWriteBytes out (Encoding.UTF8.GetBytes data)
 
   let (<<.) (out : Connection) (data : string) =
-    asyncWriteBytes out (UTF8.bytes data)
+    asyncWriteBytes out (Encoding.UTF8.GetBytes data)
 
   let dispatch (out : Connection) =
     send out ES_EOL_S

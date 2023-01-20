@@ -11,6 +11,7 @@ module internal ParsingAndControl =
   open Suave.Utils
   open Suave.Logging
   open Suave.Logging.Message
+  open System.Text
 
   /// Free up a list of buffers
   let inline free context connection =
@@ -60,7 +61,7 @@ module internal ParsingAndControl =
         logger.verbose (event "Error parsing HTTP request with {message}" >> setFieldValue "message" msg)
         match Http.HttpCode.tryParse status with 
         | (Choice1Of2 statusCode) ->
-          match! HttpOutput.run (Response.response statusCode (UTF8.bytes msg)) ctxOuter with
+          match! HttpOutput.run (Response.response statusCode (Encoding.UTF8.GetBytes msg)) ctxOuter with
           | _ -> logger.verbose (event "Exiting http loop")
         | (Choice2Of2 err) ->
           logger.warn (event "Invalid HTTP status code {statusCode}" >> setFieldValue "statusCode" status)

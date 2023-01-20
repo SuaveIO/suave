@@ -1,4 +1,4 @@
-﻿
+
 open Suave
 open Suave.Http
 open Suave.Operators
@@ -11,6 +11,7 @@ open Suave.Utils
 
 open System
 open System.Net
+open System.Text
 
 open Suave.Sockets
 open Suave.Sockets.Control
@@ -36,7 +37,7 @@ let ws (webSocket : WebSocket) (context: HttpContext) =
       // the last element is the FIN byte, explained later
       | (Text, data, true) ->
         // the message can be converted to a string
-        let str = UTF8.toString data
+        let str = Encoding.UTF8.GetString data
         let response = sprintf "response to %s" str
 
         // the response needs to be converted to a ByteSegment

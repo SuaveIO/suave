@@ -11,6 +11,7 @@ open DotLiquid.NamingConventions
 open Microsoft.FSharp.Reflection
 open Suave
 open Suave.Utils
+open Suave.Utils.Async
 open Suave.Successful
 open Suave.Files
 

@@ -111,7 +111,7 @@ let authenticateWithLogin relativeExpiry loginPage fSuccess : WebPart =
 
 let authenticated relativeExpiry secure : WebPart =
   context (fun ctx ->
-    let data = generateData ctx |> UTF8.bytes
+    let data = generateData ctx |> Encoding.UTF8.GetBytes
     authenticate relativeExpiry secure
                  (fun _ -> Choice1Of2 data)
                  (fun _ -> Choice1Of2 data)
@@ -130,5 +130,5 @@ module HttpContext =
   let sessionId x =
     match x.userState.TryGetValue StateStoreType with
     | true, x ->
-      Some (x :?> byte[] |> UTF8.toString |> parseData)
+      Some (x :?> byte[] |> Encoding.UTF8.GetString |> parseData)
     | _,_ -> None

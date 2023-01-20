@@ -6,6 +6,7 @@ open System
 open System.IO
 open System.Collections.Generic
 open System.Net.Sockets
+open System.Text
 
 open Suave
 open Suave.Utils
@@ -197,7 +198,7 @@ type internal Reader(segments:LinkedList<BufferSegment>, bufferManager : BufferM
           offset := !offset + count
           Continue !offset
       )
-    let result = UTF8.toStringAtOffset lineBuffer.Array lineBuffer.Offset count
+    let result = Encoding.UTF8.GetString(lineBuffer.Array, lineBuffer.Offset, count)
     return result
   }
 
@@ -226,7 +227,7 @@ type internal Reader(segments:LinkedList<BufferSegment>, bufferManager : BufferM
             Continue !offset
         )
       if count <> 0 then
-        let line = UTF8.toStringAtOffset buf.Array buf.Offset count
+        let line = Encoding.UTF8.GetString(buf.Array, buf.Offset, count)
         let indexOfColon = line.IndexOf(':')
         let header = (line.Substring(0, indexOfColon).ToLower(), line.Substring(indexOfColon+1).TrimStart())
         return! loop (header :: headers)
@@ -347,7 +348,7 @@ type internal ConnectionFacade(connection: Connection, logger:Logger,matchedBind
                 Continue 0
               )
           let byts = mem.ToArray()
-          multiPartFields.Add (fieldName, UTF8.toStringAtOffset byts 0 byts.Length)
+          multiPartFields.Add (fieldName, Encoding.UTF8.GetString(byts, 0, byts.Length))
           return! loop
       }
     loop
@@ -402,7 +403,7 @@ type internal ConnectionFacade(connection: Connection, logger:Logger,matchedBind
               Continue 0
             )
           let byts = mem.ToArray()
-          multiPartFields.Add(fieldName, UTF8.toStringAtOffset byts 0 byts.Length)
+          multiPartFields.Add(fieldName, Encoding.UTF8.GetString(byts, 0, byts.Length))
           return ()
       }
 

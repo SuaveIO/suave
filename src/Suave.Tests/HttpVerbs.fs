@@ -1,4 +1,4 @@
-﻿module Suave.Tests.HttpVerbs
+module Suave.Tests.HttpVerbs
 
 open System
 open System.Text
@@ -145,7 +145,7 @@ let posts cfg =
     testCase "POST multipart file with unicode file-name" <| fun _ ->
       let multipart = new MultipartFormDataContent()
       let fileContent = "there is no cake"
-      let data = new ByteArrayContent(UTF8.bytes fileContent)
+      let data = new ByteArrayContent(Encoding.UTF8.GetBytes fileContent)
       data.Headers.ContentType <- Headers.MediaTypeHeaderValue.Parse "text/html"
       multipart.Add(data,"attached-file","文档内容.txt")
       let actual = runWithConfig (getFileContent ()) |> req HttpMethod.POST "/" (Some multipart)
@@ -155,7 +155,7 @@ let posts cfg =
       let multipart = new MultipartFormDataContent()
       let fileContent = "there is no cake"
       let filename = "文档内容.txt"
-      let data = new ByteArrayContent(UTF8.bytes fileContent)
+      let data = new ByteArrayContent(Encoding.UTF8.GetBytes fileContent)
       data.Headers.ContentType <- Headers.MediaTypeHeaderValue.Parse "text/html"
       multipart.Add(data,"attached-file",filename)
       let actual = runWithConfig (getFileName ()) |> req HttpMethod.POST "/" (Some multipart)

@@ -6,13 +6,15 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" Condition="Exists('AssemblyInfo.fs')" />
-    <Compile Include="Utils/YoLo.fs" />
+    <Compile Include="Utils/Async.fs" />
+    <Compile Include="Utils/String.fs" />
     <Compile Include="Utils/Logging.fs" />
     <Compile Include="Utils/AsyncExtensions.fs" />
     <Compile Include="Utils/AsyncResultCell.fs" />
     <Compile Include="Utils/Collections.fs" />
     <Compile Include="Utils/ASCII.fs" />
     <Compile Include="Utils/Choice.fs" />
+    <Compile Include="Utils/Option.fs" />
     <Compile Include="Utils/ThreadSafeRandom.fs" />
     <Compile Include="Utils/Bytes.fs" />
     <Compile Include="Utils/Compression.fs" />

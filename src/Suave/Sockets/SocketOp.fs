@@ -1,7 +1,8 @@
-﻿namespace Suave.Sockets
+namespace Suave.Sockets
 
 open System
 open System.Net.Sockets
+open System.Threading.Tasks
 
 type private SystemSocketError = SocketError
 
@@ -28,7 +29,7 @@ type SocketOp<'a> = Async<Choice<'a,Error>>
 /// The module
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module SocketOp =
-  open Suave.Utils
+  open Suave.Utils.Async
   open System.Threading.Tasks
 
   /// create a new successful value

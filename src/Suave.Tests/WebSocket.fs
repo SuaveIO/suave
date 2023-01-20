@@ -1,4 +1,4 @@
-﻿module Suave.Tests.WebSocket
+module Suave.Tests.WebSocket
 
 open Expecto
 
@@ -42,7 +42,7 @@ let websocketTests cfg =
         let! msg = webSocket.read()
         match msg with
         | (Text, data, true) ->
-          let str = UTF8.toString data
+          let str = Encoding.UTF8.GetString data
           match str with
           | "BinaryRequest7bit" ->
             let message = ArraySegment(Array.create (int PayloadSize.Bit7) 0uy)

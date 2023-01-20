@@ -1,8 +1,6 @@
-﻿namespace Suave.Utils
+namespace Suave.Utils
 
 open System
-open System.IO
-open System.Text
 
 type BufferSegment = struct
   val public buffer : ArraySegment<byte>

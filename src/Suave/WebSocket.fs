@@ -10,7 +10,6 @@ module WebSocket =
   open Suave.Logging.Message
 
   open System
-  open System.Collections.Concurrent
   open System.Security.Cryptography
   open System.Text
   open System.Threading
@@ -18,11 +17,7 @@ module WebSocket =
   let magicGUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
   let internal sha1 (x : string) =
-#if NETSTANDARD2_0
     let crpto = SHA1.Create()
-#else
-    let crpto = new SHA1Managed()
-#endif
     let bytes = Encoding.ASCII.GetBytes x
     let hash = crpto.ComputeHash bytes
     hash
@@ -228,7 +223,7 @@ module WebSocket =
         let reason = "Frame size of " + extendedLength.ToString() + " bytes exceeds maximum accepted frame size (2 GB)"
         let data =
           [| yield! BitConverter.GetBytes (CloseCode.CLOSE_TOO_LARGE.code) |> bytesToNetworkOrder
-             yield! UTF8.bytes reason |]
+             yield! Encoding.UTF8.GetBytes reason |]
         do! sendFrame Close (ArraySegment(data)) true
         return! SocketOp.abort (InputDataError(None, reason))
       else
@@ -251,7 +246,7 @@ module WebSocket =
         let reason = "Frame size of " + extendedLength.ToString() + " bytes exceeds maximum accepted frame size (2 GB)"
         let data =
             [| yield! BitConverter.GetBytes (CloseCode.CLOSE_TOO_LARGE.code) |> bytesToNetworkOrder
-               yield! UTF8.bytes reason |]
+               yield! Encoding.UTF8.GetBytes reason |]
         do! sendFrame Close (ArraySegment(data)) true
         return! SocketOp.abort (InputDataError(None, reason))
       else
@@ -333,7 +328,7 @@ module WebSocket =
       let! subprotocol =
         match ctx.request.header "sec-websocket-protocol" with
         | Choice1Of2 webSocketProtocol -> choose (webSocketProtocol.Split [|','|]) ctx
-        | _ -> Async.result None
+        | _ -> async.Return None
 
       let! a = handShakeAux subprotocol webSocketKey continuation ctx
       match a with

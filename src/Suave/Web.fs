@@ -5,6 +5,7 @@ module Web =
 
   open System
   open System.IO
+  open System.Text
   open Suave.Utils
   open Suave.Logging
   open Suave.Logging.Message
@@ -18,9 +19,9 @@ module Web =
       >> addExn ex)
 
     if ctx.isLocalTrustProxy then
-      Response.response HTTP_500 (UTF8.bytes ("<h1>" + ex.Message + "</h1><br/>" + ex.ToString())) ctx
+      Response.response HTTP_500 (Encoding.UTF8.GetBytes("<h1>" + ex.Message + "</h1><br/>" + ex.ToString())) ctx
     else
-      Response.response HTTP_500 (UTF8.bytes HTTP_500.message) ctx
+      Response.response HTTP_500 (Encoding.UTF8.GetBytes HTTP_500.message) ctx
 
   /// Starts the web server asynchronously.
   ///

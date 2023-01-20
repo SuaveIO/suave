@@ -9,6 +9,7 @@ open Expecto
 open Expecto.Logging
 open Expecto.Logging.Message
 open Suave
+open Suave.Utils
 open Suave.Sockets
 open Suave.Tests.TestUtilities
 
