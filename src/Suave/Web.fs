@@ -54,10 +54,7 @@ module Web =
           config.maxOps, config.bufferSize, config.autoGrow,
           runtime.matchedBinding.socketBinding)
 
-      ParsingAndControl.startWebWorkerAsync (config.bufferSize, config.maxOps)
-                                            webpart
-                                            runtime
-                                            tcpServer
+      ParsingAndControl.startWebWorkerAsync webpart runtime tcpServer
 
     let servers =
        List.map (toRuntime >> startWebWorkerAsync) config.bindings

@@ -117,7 +117,7 @@ module internal ParsingAndControl =
     }
 
   /// Starts a new web worker, given the configuration and a web part to serve.
-  let startWebWorkerAsync (bufferSize, maxOps) (webpart : WebPart) (runtime : HttpRuntime) runServer =
+  let startWebWorkerAsync (webpart : WebPart) (runtime : HttpRuntime) runServer =
     startTcpIpServerAsync (requestLoop runtime webpart)
                           runtime.matchedBinding.socketBinding
                           runServer
