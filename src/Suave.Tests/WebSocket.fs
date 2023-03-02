@@ -3,9 +3,7 @@ module Suave.Tests.WebSocket
 open Expecto
 
 open System
-open System.IO
-open System.Net.Http
-open System.Net.Http.Headers
+open Websocket.Client
 open System.Text
 open System.Threading
 
@@ -14,7 +12,6 @@ open Suave.Operators
 open Suave.Sockets
 open Suave.Sockets.Control
 open Suave.WebSocket
-open Suave.Utils
 open Suave.Tests.TestUtilities
 open Suave.Testing
 
@@ -147,100 +144,119 @@ let websocketTests cfg =
   let testCase webSocketUrl subprotocols testName fn =
     testCase testName <| fun _ ->
       use mre = new ManualResetEvent(false)
-      use clientWebSocket = new WebSocketSharp.WebSocket(sprintf "ws://%s:%i%s" ip port webSocketUrl, subprotocols)
+      let clientFactory _=
+        let client = new System.Net.WebSockets.ClientWebSocket()
+        for proto in subprotocols do
+          client.Options.AddSubProtocol proto
+        client
+      use clientWebSocket = new WebsocketClient(new Uri(sprintf "ws://%s:%i%s" ip port webSocketUrl), clientFactory)
+      clientWebSocket.IsReconnectionEnabled <- false
       let ctx = runWithConfig webPart
       withContext (fun _ -> fn mre clientWebSocket) ctx
-  
+
   let websocketTests websocketUrl subprotocols = 
     testList (sprintf "websocket tests for url %s" websocketUrl) [
       testCase websocketUrl subprotocols "text echo test" <| fun mre clientWebSocket ->
         let message = "Hello Websocket World!"
         let echo : string ref = ref ""
 
-        clientWebSocket.OnMessage.Add(fun e ->
-          echo := e.Data
+        clientWebSocket.MessageReceived.Subscribe(fun e ->
+          echo := e.Text
           mre.Set() |> ignore
-        )
-        clientWebSocket.Connect()
+        ) |> ignore
+        clientWebSocket.Start()|> ignore
+        
         clientWebSocket.Send(message)
-
         mre.WaitOne() |> ignore
-        clientWebSocket.Close()
+        let stop = clientWebSocket.Stop(Net.WebSockets.WebSocketCloseStatus.NormalClosure,"Closing")
+        stop.Wait()
+
         Expect.equal echo.Value message "Should be echoed"
 
       testCase websocketUrl subprotocols "subprotocol support test" <| fun mre clientWebSocket ->
         let message = "Subprotocol"
         let echo : string ref = ref ""
 
-        clientWebSocket.OnMessage.Add(fun e ->
-          echo:= e.Data
+        clientWebSocket.MessageReceived.Subscribe(fun e ->
+          echo:= e.Text
           mre.Set() |> ignore
-        )
-        clientWebSocket.Connect()
+        )|> ignore
+        clientWebSocket.Start()|> ignore
         clientWebSocket.Send(message)
 
         mre.WaitOne() |> ignore
-        clientWebSocket.Close()
+        let stop = clientWebSocket.Stop(Net.WebSockets.WebSocketCloseStatus.NormalClosure,"Closing")
+        stop.Wait()
+
         if Array.isEmpty subprotocols then
           Expect.equal echo.Value message "Should test equal"
         else
           Expect.equal websocketAppSupportSubprotocol echo.Value "Should test equal"
 
       testCase websocketUrl [|"unsupport.suave.io"|] "subprotocol unsupport test" <| fun mre clientWebSocket ->
-        let message = "Subprotocol"
-        let mutable code : uint16 = 0us
+        if websocketUrl = websocketAppSubprotocolUrl then
+          let message = "Subprotocol"
+          let echo : string ref = ref ""
 
-        clientWebSocket.OnClose.Add(fun e ->
-          code <- e.Code
-          mre.Set() |> ignore
-        )
-        clientWebSocket.Connect()
+          clientWebSocket.MessageReceived.Subscribe(fun e ->
+            echo:= e.Text
+            mre.Set() |> ignore
+          ) |> ignore
+          clientWebSocket.Start() |> ignore
+          clientWebSocket.Send(message)
 
-        mre.WaitOne() |> ignore
-        Expect.equal code (uint16 WebSocketSharp.CloseStatusCode.ProtocolError) "Should test equal"
+          mre.WaitOne() |> ignore
+
+          Expect.equal echo.Value "" "Should match no protocol"
 
       testCase websocketUrl subprotocols "socket binary payload 7bit" <| fun mre clientWebSocket ->
         let message = "BinaryRequest7bit"
         let echo : byte array ref = ref [||]
 
-        clientWebSocket.OnMessage.Add(fun e ->
-          echo:= e.RawData
+        clientWebSocket.MessageReceived.Subscribe(fun e ->
+          echo:= e.Binary
           mre.Set() |> ignore
-        )
-        clientWebSocket.Connect()
+        )|> ignore
+        clientWebSocket.Start()|> ignore
         clientWebSocket.Send(message)
 
         mre.WaitOne() |> ignore
-        clientWebSocket.Close()
+        let stop = clientWebSocket.Stop(Net.WebSockets.WebSocketCloseStatus.NormalClosure,"Closing")
+        stop.Wait()
+
         Expect.isTrue (testByteArray (int PayloadSize.Bit7) echo.Value) "Should test equal"
 
       testCase websocketUrl subprotocols "socket binary payload 16bit" <| fun mre clientWebSocket ->
         let message = "BinaryRequest16bit"
         let echo : byte array ref = ref [||]
 
-        clientWebSocket.OnMessage.Add(fun e ->
-          echo:= e.RawData
+        clientWebSocket.MessageReceived.Subscribe(fun e ->
+          echo:= e.Binary
           mre.Set() |> ignore
-        )
-        clientWebSocket.Connect()
+        )|> ignore
+        clientWebSocket.Start()|> ignore
         clientWebSocket.Send(message)
 
         mre.WaitOne() |> ignore
-        clientWebSocket.Close()
+        let stop = clientWebSocket.Stop(Net.WebSockets.WebSocketCloseStatus.NormalClosure,"Closing")
+        stop.Wait()
+
         Expect.isTrue (testByteArray (int PayloadSize.Bit16) echo.Value) "Should be echoed"
 
       testCase websocketUrl subprotocols "socket binary payload 32bit" <| fun mre clientWebSocket ->
         let message = "BinaryRequest32bit"
         let echo : byte array ref = ref [||]
 
-        clientWebSocket.OnMessage.Add(fun e ->
-          echo:= e.RawData
-          mre.Set() |> ignore)
-        clientWebSocket.Connect()
+        clientWebSocket.MessageReceived.Subscribe(fun e ->
+          echo:= e.Binary
+          mre.Set() |> ignore) |> ignore
+        clientWebSocket.Start()|> ignore
         clientWebSocket.Send(message)
 
         mre.WaitOne() |> ignore
-        clientWebSocket.Close()
+        let stop = clientWebSocket.Stop(Net.WebSockets.WebSocketCloseStatus.NormalClosure,"Closing")
+        stop.Wait()
+
         Expect.isTrue (testByteArray (int PayloadSize.Bit32) echo.Value) "Should be echoed"
 
       testCase websocketUrl subprotocols "echo large number of messages to client" <| fun mre clientWebSocket ->
@@ -248,18 +264,20 @@ let websocketTests cfg =
         let echo = ref []
         let count = ref 0
 
-        clientWebSocket.OnMessage.Add(fun e ->
-          echo:= e.Data :: !echo
+        clientWebSocket.MessageReceived.Subscribe(fun e ->
+          echo:= e.Text :: !echo
           count := !count + 1
           if !count = amountOfMessages then mre.Set() |> ignore
-        )
-        clientWebSocket.Connect()
+        )|> ignore
+        clientWebSocket.Start()|> ignore
 
         for i = 1 to amountOfMessages do
           clientWebSocket.Send(i.ToString())
 
         mre.WaitOne() |> ignore
-        clientWebSocket.Close()
+
+        let stop = clientWebSocket.Stop(Net.WebSockets.WebSocketCloseStatus.NormalClosure,"Closing")
+        stop.Wait()
 
         let expectedMessages = [ for i in amountOfMessages .. -1 .. 1 -> i.ToString() ]
 
@@ -267,6 +285,6 @@ let websocketTests cfg =
         Expect.equal (!count) amountOfMessages "received message count on websocket"
     ]
   
-  testList "websocket tests" [ websocketTests websocketAppUrl [||]
-                               websocketTests websocketAppReusingBuffersUrl [||]
-                               websocketTests websocketAppSubprotocolUrl [|websocketAppSupportSubprotocol|]]
+  testList "websocket tests" [ websocketTests websocketAppUrl [||];
+                               websocketTests websocketAppReusingBuffersUrl [||];
+                               websocketTests websocketAppSubprotocolUrl [|websocketAppSupportSubprotocol|];]

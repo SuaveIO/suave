@@ -2,5 +2,5 @@ FSharp.Core
 Expecto
 Expecto.FsCheck
 Expecto.BenchmarkDotNet
-WebSocketSharp
+Websocket.Client
 DotLiquid

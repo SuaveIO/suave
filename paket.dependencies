@@ -7,7 +7,7 @@ storage none
 nuget FSharp.Core
 nuget DotLiquid
 nuget Libuv
-nuget WebSocketSharp
+nuget Websocket.Client
 nuget FsCheck
 nuget Expecto
 nuget Expecto.FsCheck
