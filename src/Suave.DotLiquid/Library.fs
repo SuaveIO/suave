@@ -1,7 +1,6 @@
 /// A module for rendering DotLiquid template with Suave
 module Suave.DotLiquid
 
-open System
 open System.Reflection
 open System.Collections.Generic
 open System.Collections.Concurrent
@@ -9,11 +8,10 @@ open System.IO
 open DotLiquid
 open DotLiquid.NamingConventions
 open Microsoft.FSharp.Reflection
-open Suave
 open Suave.Utils
-open Suave.Utils.Async
 open Suave.Successful
 open Suave.Files
+open Suave.Utils.Async
 
 // -------------------------------------------------------------------------------------------------
 // Registering things with DotLiquid
@@ -89,9 +87,9 @@ module internal Impl =
     fun k v ->
       dict [k, box v] |> Hash.FromDictionary |> t.Render
 
-  /// Asynchronously loads a template & remembers the last write time
+    /// Asynchronously loads a template & remembers the last write time
   /// (so that we can automatically reload the template when file changes)
-  let fileTemplate (typ, fileName) = async {
+  let fileTemplate (typ, fileName: string) = async {
     let writeTime = File.GetLastWriteTime fileName
     use file = new FileStream(fileName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite)
     use reader = new StreamReader(file)

@@ -1,5 +1,5 @@
 STORAGE: NONE
-RESTRICTION: == net6.0
+RESTRICTION: == net7.0
 NUGET
   remote: https://api.nuget.org/v3/index.json
     BenchmarkDotNet (0.13.5)
@@ -65,14 +65,12 @@ NUGET
       Microsoft.Extensions.DependencyInjection.Abstractions (>= 7.0)
       Microsoft.Extensions.Primitives (>= 7.0)
     Microsoft.Extensions.Primitives (7.0)
-      System.Runtime.CompilerServices.Unsafe (>= 6.0)
     Microsoft.NETCore.Platforms (7.0)
     Mono.Cecil (0.11.4)
     Perfolizer (0.2.1)
       System.Memory (>= 4.5.3)
     System.CodeDom (7.0)
     System.Collections.Immutable (7.0)
-      System.Runtime.CompilerServices.Unsafe (>= 6.0)
     System.Management (7.0)
       System.CodeDom (>= 7.0)
     System.Memory (4.5.5)
@@ -81,7 +79,6 @@ NUGET
       System.Collections.Immutable (>= 7.0)
     System.Runtime.CompilerServices.Unsafe (6.0)
     System.Text.Encoding.CodePages (7.0)
-      System.Runtime.CompilerServices.Unsafe (>= 6.0)
     System.Threading.Channels (7.0)
     Websocket.Client (4.6.1)
       System.Reactive (>= 5.0)
@@ -89,7 +86,7 @@ NUGET
 
 GROUP Docs
 STORAGE: NONE
-RESTRICTION: == net6.0
+RESTRICTION: == net7.0
 NUGET
   remote: https://api.nuget.org/v3/index.json
     Argu (6.1.1)
@@ -103,8 +100,10 @@ NUGET
     PPrint (2.0)
       FSharp.Core (>= 3.1.2.5)
     System.Configuration.ConfigurationManager (7.0)
+      System.Diagnostics.EventLog (>= 7.0)
       System.Security.Cryptography.ProtectedData (>= 7.0)
       System.Security.Permissions (>= 7.0)
+    System.Diagnostics.EventLog (7.0)
     System.Drawing.Common (7.0)
       Microsoft.Win32.SystemEvents (>= 7.0)
     System.Security.Cryptography.ProtectedData (7.0.1)
@@ -114,7 +113,7 @@ NUGET
       System.Drawing.Common (>= 7.0)
 
 GROUP Examples
-RESTRICTION: == net6.0
+RESTRICTION: == net7.0
 NUGET
   remote: https://api.nuget.org/v3/index.json
     FSharp.Core (7.0.200)

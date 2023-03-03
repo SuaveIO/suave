@@ -1,7 +1,7 @@
 version 5.249.0
 
 source https://api.nuget.org/v3/index.json
-framework net6.0
+framework net7.0
 storage none
 
 nuget FSharp.Core
@@ -15,14 +15,14 @@ nuget Expecto.BenchmarkDotNet
 
 group Examples
   source https://api.nuget.org/v3/index.json
-  framework net6.0
+  framework net7.0
   nuget FSharp.Core
   nuget Topshelf.FSharp
   nuget Topshelf
 
 group Docs
   source https://api.nuget.org/v3/index.json
-  framework: net6.0
+  framework: net7.0
   storage:none
 
   nuget Argu
