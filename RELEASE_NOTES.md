@@ -1,3 +1,7 @@
+## New in v2.7.0-beta (Released 2023-03-03)
+* Target net7.0
+* Introduces `okStream` and `okStreamChunked` (#765)
+
 ## New in v2.6.2 (Released 2022-01-26)
 * Removing keys from session state (#757)
 * FIX: Issue parsing boundary from multipart/form-data Content-Type header (#759)
