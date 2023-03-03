@@ -1,3 +1,3 @@
-dotnet restore build.proj
-dotnet tool install fake-cli
-dotnet fake build %*
+dotnet tool restore
+dotnet paket restore
+dotnet run --project ./build/build.fsproj -- -t Tests

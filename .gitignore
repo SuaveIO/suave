@@ -4,7 +4,6 @@ pkg/
 .fake/
 .idea/
 packages/
-build/
 gh-pages/
 docs/output/
 miTLS/

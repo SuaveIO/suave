@@ -34,3 +34,26 @@ group SourceLink
   storage: none
   nuget SourceLink.Create.CommandLine 2.7.2
   nuget SourceLink.Embed.PaketFiles 2.7.2
+  
+group FakeBuild
+  source https://api.nuget.org/v3/index.json
+  framework: net6.0
+  storage: none
+
+  nuget FSharp.Core
+  nuget Fake.Api.GitHub
+  nuget Fake.BuildServer.TeamFoundation
+  nuget Fake.Core.Environment
+  nuget Fake.Core.Process
+  nuget Fake.Core.ReleaseNotes
+  nuget Fake.Core.Target
+  nuget Fake.Core.Xml
+  nuget Fake.DotNet.AssemblyInfoFile
+  nuget Fake.DotNet.Cli
+  nuget Fake.DotNet.MSBuild
+  nuget Fake.Dotnet.NuGet
+  nuget Fake.DotNet.Paket
+  nuget Fake.DotNet.Testing.XUnit2
+  nuget Fake.IO.FileSystem
+  nuget Fake.IO.Zip  
+  nuget Fake.Tools.Git
