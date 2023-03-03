@@ -5,9 +5,9 @@ description Suave is a simple web development F# library providing a lightweight
 licenseUrl https://github.com/SuaveIO/Suave/blob/master/LICENSE
 iconUrl https://raw.githubusercontent.com/SuaveIO/resources/master/images/head_trans.png
 files
-  bin/Release/netstandard2.1/Suave.LibUv.dll => lib/netstandard2.1
-  bin/Release/netstandard2.1/Suave.LibUv.xml => lib/netstandard2.1
-  bin/Release/netstandard2.1/Suave.LibUv.pdb => lib/netstandard2.1
+  bin/Release/net7.0/Suave.LibUv.dll => lib/net7.0
+  bin/Release/net7.0/Suave.LibUv.xml => lib/net7.0
+  bin/Release/net7.0/Suave.LibUv.pdb => lib/net7.0
 dependencies
   framework: netstandard20
     Suave ~> 2.6
