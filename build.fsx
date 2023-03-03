@@ -29,22 +29,7 @@ open Fake.Api
 
 Console.OutputEncoding <- Encoding.UTF8
 
-// brew install libuv
-
 let release = ReleaseNotes.load "RELEASE_NOTES.md"
-let Configuration = Environment.environVarOrDefault "CONFIGURATION" "Release"
-
-// Lazily install DotNet SDK in the correct version if not available
-let install = lazy DotNet.install (fun opt -> { opt with Version = DotNet.Version "3.1.404" })
-
-// Define general properties across various commands (with arguments)
-let inline withWorkDir wd =
-  DotNet.Options.lift install.Value
-  >> DotNet.Options.withWorkingDirectory wd
-  >> DotNet.Options.withCustomParams (Some (sprintf "/p:Configuration=%s" Configuration))
-
-// Set general properties without arguments
-let inline dotnetSimple arg = DotNet.Options.lift install.Value arg
 
 let projects =
   !! "src/**/Suave*.fsproj"
@@ -77,7 +62,7 @@ Target.create "Build" <| fun _ ->
 
 Target.create "Tests" <| fun _ ->
   let path = "src" </> "Suave.Tests"
-  let res = DotNet.exec id "run" (sprintf "--framework net6.0 --project %s -- --summary --sequenced" path)
+  let res = DotNet.exec id "run" (sprintf "-c Release --framework net6.0 --project %s -- --summary --sequenced" path)
   if not res.OK then
     res.Errors |> Seq.iter (eprintfn "%s")
     failwith "Tests failed."
