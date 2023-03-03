@@ -10,13 +10,6 @@ open Suave.Logging.Message
 open Suave.Sockets
 open Suave.Utils
 
-#if NETSTANDARD2_0
-open System.Runtime.InteropServices
-open FSharp.NativeInterop
-
-open Native
-#endif
-
 let private logger = Log.create "Suave.Tcp"
 
 /// The max backlog of number of requests
