@@ -21,7 +21,7 @@ type Error =
   /// but just an error message; like in libuv calls.
   | ConnectionError of string
 
-type ByteSegment = System.ArraySegment<byte>
+type ByteSegment = Memory<byte>
 
 // Async is already a delayed type
 type SocketOp<'a> = Async<Choice<'a,Error>>
@@ -30,7 +30,6 @@ type SocketOp<'a> = Async<Choice<'a,Error>>
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module SocketOp =
   open Suave.Utils.Async
-  open System.Threading.Tasks
 
   /// create a new successful value
   let mreturn (x : 'T) : SocketOp<'T> =
@@ -134,14 +133,14 @@ module Utils =
         k args
 
   /// Prepares the arguments by setting the buffer.
-  let setBuffer (buf : ByteSegment) (args: SocketAsyncEventArgs) =
-    args.SetBuffer(buf.Array, buf.Offset, buf.Count)
+  let inline setBuffer (buf : ByteSegment) (args: SocketAsyncEventArgs) =
+    args.SetBuffer(buf)
 
   let accept (socket : Socket) evArgs =
     asyncDo socket.AcceptAsync ignore (fun a -> a.AcceptSocket) evArgs
 
-  let trans (a : SocketAsyncEventArgs) =
-    new ArraySegment<_>(a.Buffer, a.Offset, a.BytesTransferred)
+  //let trans (a : SocketAsyncEventArgs) =
+    //new ArraySegment<_>(a.Buffer, a.Offset, a.BytesTransferred)
 
   /// Makes sure the finalizer is called regardless of the result of executing body
   let finalize (body: SocketOp<unit>) (finalizer: unit -> unit) =

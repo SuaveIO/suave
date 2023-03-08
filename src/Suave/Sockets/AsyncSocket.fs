@@ -20,7 +20,7 @@ let flush (connection : Connection) : SocketOp<Connection> =
     let buff = connection.lineBuffer
     let lineBufferCount = connection.lineBufferCount
     if lineBufferCount> 0  then
-      do! send connection (new ArraySegment<_>(buff.Array, buff.Offset, lineBufferCount))
+      do! send connection (new Memory<_>(buff,0,lineBufferCount))
     return { connection with lineBufferCount = 0 }
   }
 
@@ -57,22 +57,22 @@ let asyncWrite (str: string) (connection: Connection) : SocketOp<unit * Connecti
       let buff = connection.lineBuffer
       let lineBufferCount = connection.lineBufferCount
       let maxByteCount = Encoding.UTF8.GetMaxByteCount(str.Length)
-      if maxByteCount > buff.Count then
-        do! send connection (new ArraySegment<_>(buff.Array, buff.Offset, lineBufferCount))
-        for offset, charCount in chunkBoundaries buff.Count str do
-          let byteCount = Encoding.UTF8.GetBytes(str, offset, charCount, buff.Array, buff.Offset)
+      if maxByteCount > buff.Length then
+        do! send connection (new Memory<_>(buff, 0, lineBufferCount))
+        for offset, charCount in chunkBoundaries buff.Length str do
+          let byteCount = Encoding.UTF8.GetBytes(str, offset, charCount, buff, 0)
           // don't waste time buffering here
-          do! send connection (new ArraySegment<_>(buff.Array, buff.Offset, byteCount))
+          do! send connection (new Memory<_>(buff, 0, byteCount))
         return (), { connection with lineBufferCount = 0 }
 
-      elif lineBufferCount + maxByteCount > buff.Count then
-        do! send connection (new ArraySegment<_>(buff.Array, buff.Offset, lineBufferCount))
+      elif lineBufferCount + maxByteCount > buff.Length then
+        do! send connection (new Memory<_>(buff, 0, lineBufferCount))
         // the string, char index, char count, bytes, byte index
-        let c = Encoding.UTF8.GetBytes(str, 0, str.Length, buff.Array, buff.Offset)
+        let c = Encoding.UTF8.GetBytes(str, 0, str.Length, buff, 0)
         return (), { connection with lineBufferCount = c }
 
       else
-        let c = Encoding.UTF8.GetBytes(str, 0, str.Length, buff.Array, buff.Offset + lineBufferCount )
+        let c = Encoding.UTF8.GetBytes(str, 0, str.Length, buff, lineBufferCount )
         return (), { connection with lineBufferCount = lineBufferCount + c }
   }
 
@@ -83,7 +83,7 @@ let asyncWriteLn (s : string) (connection : Connection) : SocketOp<unit*Connecti
 
 /// Write the string s to the stream asynchronously from a byte array
 let asyncWriteBytes (connection : Connection) (b : byte[]) : SocketOp<unit> = async {
-  if b.Length > 0 then return! send connection (new ArraySegment<_>(b, 0, b.Length))
+  if b.Length > 0 then return! send connection (new Memory<_>(b, 0, b.Length))
   else return Choice1Of2 ()
 }
 
@@ -92,15 +92,15 @@ let asyncWriteBufferedBytes (b : byte[]) (connection : Connection) : SocketOp<un
     if b.Length > 0 then
       let buff = connection.lineBuffer
       let lineBufferCount = connection.lineBufferCount
-      if lineBufferCount + b.Length > buff.Count then
+      if lineBufferCount + b.Length > buff.Length then
         // flush lineBuffer
         if lineBufferCount > 0 then
-          do! send connection (new ArraySegment<_>(buff.Array, buff.Offset, lineBufferCount))
+          do! send connection (new Memory<_>(buff, 0, lineBufferCount))
         // don't waste time buffering here
-        do! send connection (new ArraySegment<_>(b, 0, b.Length))
+        do! send connection (new Memory<_>(b, 0, b.Length))
         return (), { connection with lineBufferCount = 0 }
       else
-        Buffer.BlockCopy(b, 0, buff.Array, buff.Offset + lineBufferCount, b.Length)
+        Buffer.BlockCopy(b, 0, buff,0 + lineBufferCount, b.Length)
         return (),{ connection with lineBufferCount = lineBufferCount + b.Length }
     else return (),connection
   }
@@ -118,48 +118,43 @@ let asyncWriteBufferedArrayBytes (xxs:(byte[])[]) (connection : Connection) : So
 
 let transferStreamWithBuffer (buf: ArraySegment<_>) (toStream : Connection) (from : Stream) : SocketOp<unit> =
   let rec doBlock () = socket {
-    let! read = SocketOp.ofAsync <| from.AsyncRead (buf.Array, buf.Offset, buf.Count)
+    let! read = SocketOp.ofAsync <| from.AsyncRead (buf.Array, 0, buf.Array.Length)
     if read <= 0 then
       return ()
     else
-      do! send toStream (new ArraySegment<_>(buf.Array, buf.Offset, read))
+      do! send toStream (new Memory<_>(buf.Array, 0, read))
       return! doBlock () }
   doBlock ()
 
 /// Asynchronously write from the 'from' stream to the 'to' stream.
 let transferStream (toStream : Connection) (from : Stream) : SocketOp<unit> =
   socket {
-    let buf = toStream.bufferManager.PopBuffer()
-    do! finalize (transferStreamWithBuffer buf toStream from) (fun () -> toStream.bufferManager.FreeBuffer buf)
+    let buf = new ArraySegment<_>(Array.zeroCreate 1024)
+    do! transferStreamWithBuffer buf toStream from
   }
+
+let internal zeroCharMemory = new Memory<byte>(Encoding.ASCII.GetBytes "0")
 
 let transferStreamChunked (conn : Connection) (from : Stream) : SocketOp<unit> =
   socket {
-    let buf = conn.bufferManager.PopBuffer()
-
-    use _ =
-      {
-        new IDisposable with
-          member this.Dispose() =
-            conn.bufferManager.FreeBuffer buf
-      }
+    let buf = new ArraySegment<_>(Array.zeroCreate 1024)
 
     let rec doBlock conn =
       socket {
         let! read = SocketOp.ofAsync <| from.AsyncRead (buf.Array, buf.Offset, buf.Count)
 
         if read <= 0 then
-          do! send conn (ArraySegment<_>(Encoding.ASCII.GetBytes "0"))
-          do! send conn Bytes.eolArraySegment
-          do! send conn Bytes.eolArraySegment
+          do! send conn zeroCharMemory
+          do! send conn Bytes.eolMemory
+          do! send conn Bytes.eolMemory
         else
           let readHex = read.ToString("X")
 
-          do! send conn (ArraySegment<_>(Encoding.ASCII.GetBytes readHex))
-          do! send conn Bytes.eolArraySegment
+          do! send conn (Memory<_>(Encoding.ASCII.GetBytes readHex))
+          do! send conn Bytes.eolMemory
 
-          do! send conn (ArraySegment<_>(buf.Array, buf.Offset, read))
-          do! send conn Bytes.eolArraySegment
+          do! send conn (Memory<_>(buf.Array, buf.Offset, read))
+          do! send conn Bytes.eolMemory
 
           do! doBlock conn
       }

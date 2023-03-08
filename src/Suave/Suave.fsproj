@@ -28,7 +28,6 @@
     <Compile Include="Globals.fs" />
     <Compile Include="CookieSerialiser.fs" />
     <Compile Include="Sockets/SocketBinding.fs" />
-    <Compile Include="Sockets/BufferManager.fs" />
     <Compile Include="Sockets/ConcurrentPool.fs" />
     <Compile Include="Sockets/AsyncUserToken.fs" />
     <Compile Include="Sockets/SocketOp.fs" />

@@ -11,7 +11,7 @@ type DefaultTlsTransport(cn : Connection, ssl : SslStream) =
     member this.read (buf : ByteSegment) =
       async {
         try
-          let! a = ssl.ReadAsync(buf.Array,buf.Offset,buf.Count)
+          let! a = ssl.ReadAsync(buf)
           return Choice1Of2(a)
         with ex ->
           return Choice2Of2 <| ConnectionError (ex.ToString())
@@ -20,7 +20,7 @@ type DefaultTlsTransport(cn : Connection, ssl : SslStream) =
      member this.write(buf : ByteSegment) =
       async {
         try 
-          do! ssl.WriteAsync(buf.Array,buf.Offset,buf.Count)
+          do! ssl.WriteAsync(buf)
           return Choice1Of2()
         with ex ->
           return Choice2Of2 <| ConnectionError (ex.ToString())

@@ -14,10 +14,10 @@ module internal ParsingAndControl =
   open System.Text
 
   /// Free up a list of buffers
-  let inline free context connection =
-    connection.segments
-    |> Seq.iter (fun (x : BufferSegment) ->
-      connection.bufferManager.FreeBuffer (x.buffer, context)) 
+  //let inline free context connection =
+    //connection.segments
+    //|> Seq.iter (fun (x : BufferSegment) ->
+      //connection.bufferManager.FreeBuffer (x.buffer, context)) 
 
   /// Load a readable plain-text stream, based on the protocol in use. If plain HTTP
   /// is being used, the stream is returned as it, otherwise a new SslStream is created
@@ -89,7 +89,7 @@ module internal ParsingAndControl =
                 logger.verbose (event "'Connection: keep-alive' recurse")
                 return! loop (cleanResponse ctx)
               else
-                free "Suave.Web.httpLoop.loop" ctx.connection 
+                //free "Suave.Web.httpLoop.loop" ctx.connection 
                 logger.verbose (event "Connection: close")
                 return ()
       | Choice2Of2 err ->

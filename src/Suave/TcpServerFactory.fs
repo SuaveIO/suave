@@ -1,6 +1,5 @@
-﻿namespace Suave
+namespace Suave
 
-open Suave.Logging
 open Suave.Sockets
 open Suave.Tcp
 
@@ -15,4 +14,4 @@ type TcpServerFactory =
 type DefaultTcpServerFactory() =
   interface TcpServerFactory with
     member this.create (maxOps, bufferSize, autoGrow, binding) =
-      Tcp.runServer maxOps bufferSize autoGrow binding
+      Tcp.runServer maxOps binding

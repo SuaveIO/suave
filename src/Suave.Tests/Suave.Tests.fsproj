@@ -96,7 +96,6 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Suave\Suave.fsproj" />
-    <ProjectReference Include="..\Suave.LibUv\Suave.LibUv.fsproj" />
     <ProjectReference Include="..\Suave.DotLiquid\Suave.DotLiquid.fsproj" />
   </ItemGroup>
   <Import Project="..\..\.paket\Paket.Restore.targets" />

@@ -739,7 +739,7 @@ module EventSource =
   [<Literal>]
   let private ES_EOL = "\n"
 
-  let private ES_EOL_S = ArraySegment<_>(Encoding.UTF8.GetBytes ES_EOL, 0, 1)
+  let private ES_EOL_S = Memory<_>(Encoding.UTF8.GetBytes ES_EOL, 0, 1)
 
   let asyncWrite (out : Connection) (data : string) =
     asyncWriteBytes out (Encoding.UTF8.GetBytes data)

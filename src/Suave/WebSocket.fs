@@ -111,8 +111,8 @@ module WebSocket =
     if BitConverter.IsLittleEndian then bytes |> Array.rev else bytes
 
   let writeFrame (connection: Connection) (f: Frame) = socket {
-      do! connection.transport.write (ArraySegment([| f.OpcodeByte |], 0, 1))
-      do! connection.transport.write (ArraySegment(f.EncodedLength, 0, f.EncodedLength.Length))
+      do! connection.transport.write (Memory([| f.OpcodeByte |], 0, 1))
+      do! connection.transport.write (Memory(f.EncodedLength, 0, f.EncodedLength.Length))
       do! connection.transport.write f.Data
       }
 
@@ -123,14 +123,14 @@ module WebSocket =
     let firstByte = if fin then firstByte ||| 128uy else firstByte
 
     let encodedLength =
-        match data.Count with
+        match data.Length with
         | l when l >= 65536 ->
           [| yield 127uy
-             yield! BitConverter.GetBytes(uint64 data.Count) |> bytesToNetworkOrder |]
+             yield! BitConverter.GetBytes(uint64 data.Length) |> bytesToNetworkOrder |]
         | l when l >= 126 ->
           [| yield 126uy
-             yield! BitConverter.GetBytes(uint16 data.Count) |> bytesToNetworkOrder |]
-        | _ -> [| byte (data.Count) |]
+             yield! BitConverter.GetBytes(uint16 data.Length) |> bytesToNetworkOrder |]
+        | _ -> [| byte (data.Length) |]
 
     { Frame.OpcodeByte = firstByte; EncodedLength = encodedLength; Data = data }
 
@@ -142,7 +142,7 @@ module WebSocket =
       if i = n then
         return arr
       else
-        let! read = transport.read <| ArraySegment(arr,i,n - i)
+        let! read = transport.read <| Memory(arr,i,n - i)
         if failedAttempts >= maxFailedAttempts then
           return! SocketOp.abort(ConnectionError "Connection reset by peer")
         else
@@ -154,16 +154,16 @@ module WebSocket =
     let byteSegmentRetrieved: ByteSegment = retrieveByteSegment n
 
     let byteSegment =
-        match byteSegmentRetrieved.Count with
+        match byteSegmentRetrieved.Length with
         | count when count = n -> byteSegmentRetrieved
-        | count when count < n -> raise (ByteSegmentCapacityException(n, byteSegmentRetrieved.Count))
-        | _ -> ArraySegment(byteSegmentRetrieved.Array, byteSegmentRetrieved.Offset, n)
+        | count when count < n -> raise (ByteSegmentCapacityException(n, byteSegmentRetrieved.Length))
+        | _ -> byteSegmentRetrieved.Slice(0,n)
 
     let rec loop i = socket {
       if i = n then
         return byteSegment
       else
-        let! read = transport.read <| ArraySegment(byteSegment.Array,(byteSegment.Offset + i), n - i)
+        let! read = transport.read <| byteSegment.Slice(i, n - i) //ArraySegment(byteSegment.Array,(byteSegment.Offset + i), n - i)
         return! loop (i+read)
       }
     loop 0
@@ -211,7 +211,7 @@ module WebSocket =
       runAsyncWithSemaphore writeSemaphore (writeFrame connection frame)
 
     let readFrame () = socket {
-      assert (Seq.length connection.segments = 0)
+      //assert (Seq.length connection.segments = 0)
       let! arr = readBytes connection.transport 2
       let header = exctractHeader arr
       let! extendedLength = readExtendedLength header
@@ -224,7 +224,7 @@ module WebSocket =
         let data =
           [| yield! BitConverter.GetBytes (CloseCode.CLOSE_TOO_LARGE.code) |> bytesToNetworkOrder
              yield! Encoding.UTF8.GetBytes reason |]
-        do! sendFrame Close (ArraySegment(data)) true
+        do! sendFrame Close (Memory(data)) true
         return! SocketOp.abort (InputDataError(None, reason))
       else
         let! frame = readBytes connection.transport (int extendedLength)
@@ -234,7 +234,7 @@ module WebSocket =
       }
 
     let readFrameIntoSegment (byteSegmentForLengthFunc: int -> ByteSegment) = socket {
-      assert (Seq.length connection.segments = 0)
+      //assert (Seq.length connection.segments = 0)
       let! arr = readBytes connection.transport 2
       let header = exctractHeader arr
       let! extendedLength = readExtendedLength header
@@ -247,7 +247,7 @@ module WebSocket =
         let data =
             [| yield! BitConverter.GetBytes (CloseCode.CLOSE_TOO_LARGE.code) |> bytesToNetworkOrder
                yield! Encoding.UTF8.GetBytes reason |]
-        do! sendFrame Close (ArraySegment(data)) true
+        do! sendFrame Close (Memory(data)) true
         return! SocketOp.abort (InputDataError(None, reason))
       else
         let! frame = readBytesIntoByteSegment byteSegmentForLengthFunc connection.transport (int extendedLength)
@@ -256,17 +256,18 @@ module WebSocket =
         if header.hasMask
         then
           for i = 0 to (int extendedLength) - 1 do
-            let pos = frame.Offset + i
-            frame.Array.[pos] <- frame.Array.[pos] ^^^ mask.[i % 4]
+            //let pos = frame.Offset + i
+            //frame.Array.[pos] <- frame.Array.[pos] ^^^ mask.[i % 4]
+            frame.Span.[i] <- frame.Span.[i] ^^^ mask.[i % 4]
 
         return (header.opcode, frame, header.fin)
       }
 
     member this.read () = async {
-      let! result = runAsyncWithSemaphore readSemaphore (readFrameIntoSegment (Array.zeroCreate >> ArraySegment))
+      let! result = runAsyncWithSemaphore readSemaphore (readFrameIntoSegment (Array.zeroCreate >> Memory))
       return
         match result with
-        | Choice1Of2(opcode, frame, header) -> Choice1Of2(opcode, frame.Array, header)
+        | Choice1Of2(opcode, frame, header) -> Choice1Of2(opcode, frame, header)
         | Choice2Of2(error) -> Choice2Of2(error)
         }
 

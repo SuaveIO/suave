@@ -37,7 +37,7 @@ let ws (webSocket : WebSocket) (context: HttpContext) =
       // the last element is the FIN byte, explained later
       | (Text, data, true) ->
         // the message can be converted to a string
-        let str = Encoding.UTF8.GetString data
+        let str = Encoding.UTF8.GetString data.Span
         let response = sprintf "response to %s" str
 
         // the response needs to be converted to a ByteSegment

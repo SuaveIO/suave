@@ -1,7 +1,6 @@
 module Suave.Tcp
 
 open System
-open System.Collections.Generic
 open System.Threading
 open System.Net
 open System.Net.Sockets
@@ -40,6 +39,7 @@ let stopTcp reason (socket : Socket) =
     logger.debug (eventX "Failure stopping TCP server" >> addExn ex)
 
 open Suave.Sockets
+open System.IO.Pipelines
 
 let createTransport transportPool listenSocket =
   let readEventArg = new SocketAsyncEventArgs()
@@ -59,20 +59,17 @@ let createTransport transportPool listenSocket =
 
   new TcpTransport(acceptArg,readEventArg,writeEventArg, transportPool,listenSocket)
 
-let createPools listenSocket logger maxOps bufferSize autoGrow =
+let createPools listenSocket maxOps =
 
   let transportPool = new ConcurrentPool<TcpTransport>()
   transportPool.ObjectGenerator <- (fun _ -> createTransport transportPool listenSocket)
-
-  let bufferManager = new BufferManager(bufferSize * (maxOps + 1), bufferSize, autoGrow)
-  bufferManager.Init()
 
   //Pre-allocate a set of reusable transportObjects
   for x = 0 to maxOps - 1 do
     let transport = createTransport transportPool listenSocket
     transportPool.Push transport
 
-  (transportPool, bufferManager)
+  transportPool
 
 // NOTE: performance tip, on mono set nursery-size with a value larger than MAX_CONCURRENT_OPS * BUFFER_SIZE
 // i.e: export MONO_GC_PARAMS=nursery-size=128m
@@ -92,7 +89,7 @@ let private aFewTimes f =
 let job (serveClient : TcpWorker<unit>)
         binding
         (transport : ITransport)
-        (bufferManager : BufferManager) = async {
+        (pipe : Pipe) = async {
 
   Interlocked.Increment Globals.numberOfClients |> ignore
 
@@ -104,9 +101,8 @@ let job (serveClient : TcpWorker<unit>)
   let connection =
     { socketBinding   = binding
       transport       = transport
-      bufferManager   = bufferManager
-      lineBuffer      = bufferManager.PopBuffer "Suave.Tcp.job"
-      segments        = new LinkedList<BufferSegment>()
+      pipe   = pipe
+      lineBuffer      = Array.zeroCreate 8192
       lineBufferCount = 0 }
 
   try
@@ -122,7 +118,7 @@ let job (serveClient : TcpWorker<unit>)
     | ex ->
       logger.warn (eventX "TCP request processing failed" >> addExn ex)
 
-  bufferManager.FreeBuffer(connection.lineBuffer, "Suave.Tcp.job")
+  //bufferManager.FreeBuffer(connection.lineBuffer, "Suave.Tcp.job")
   logger.debug (eventX "Shutting down transport")
   do! transport.shutdown()
   Interlocked.Decrement(Globals.numberOfClients) |> ignore
@@ -152,7 +148,7 @@ let enableRebinding (listenSocket: Socket) =
           >> setFieldValue "errno" (Marshal.GetLastWin32Error()))
 #endif
 
-let runServer maxConcurrentOps bufferSize autoGrow (binding: SocketBinding) startData
+let runServer maxConcurrentOps (binding: SocketBinding) startData
               (acceptingConnections: AsyncResultCell<StartedData>) serveClient = async {
   try
     use listenSocket = new Socket(binding.endpoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp)
@@ -161,8 +157,8 @@ let runServer maxConcurrentOps bufferSize autoGrow (binding: SocketBinding) star
     #endif
     listenSocket.NoDelay <- true
 
-    let transportPool, bufferManager =
-      createPools listenSocket logger maxConcurrentOps bufferSize autoGrow
+    let transportPool =
+      createPools listenSocket maxConcurrentOps
 
     aFewTimes (fun () -> listenSocket.Bind binding.endpoint)
     listenSocket.Listen MaxBacklog
@@ -195,7 +191,7 @@ let runServer maxConcurrentOps bufferSize autoGrow (binding: SocketBinding) star
         match r with
         | Choice1Of2 remoteBinding ->
           // start a new async worker for each accepted TCP client
-          Async.Start (job serveClient remoteBinding transport bufferManager, token)
+          Async.Start (job serveClient remoteBinding transport (new Pipe()), token)
         | Choice2Of2 e ->
           failwithf "Socket failed to accept client, error: %A" e
 

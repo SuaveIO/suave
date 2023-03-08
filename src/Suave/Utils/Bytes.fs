@@ -1,30 +1,7 @@
 namespace Suave.Utils
 
 open System
-
-type BufferSegment = struct
-  val public buffer : ArraySegment<byte>
-  val public offset : int
-  val public length : int
-
-  new (buffer, offset, length) = {
-    buffer = buffer
-    offset = offset
-    length = length
-    }
-end
-
-[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
-module BufferSegment =
-
-  let inline create buffer offset length =
-    #if DEBUG
-    if length < 0 then failwithf "BufferSegment.create: length = %d < 0" length
-    #endif
-    new BufferSegment(buffer, offset, length)
-
-  let inline toArraySegment (b: BufferSegment) =
-    ArraySegment(b.buffer.Array, b.offset, b.length)
+open System.Buffers
 
 module internal Bytes =
 
@@ -57,6 +34,8 @@ module internal Bytes =
 
   /// The corresponding EOL array segment
   let eolArraySegment = new ArraySegment<_>(EOL, 0, 2)
+
+  let eolMemory = new Memory<byte>(EOL)
 
   /// Knuth-Morris-Pratt algorithm
   /// http://caml.inria.fr/pub/old_caml_site/Examples/oc/basics/kmp.ml
@@ -105,7 +84,7 @@ module internal Bytes =
           a.Array.[a.Offset + (i - acc)]
         else loop (k + 1) (acc + a.Count)
       loop 0 0
-
+(*
   let inline uniteArrayBufferSegment (aas : BufferSegment list) =
     fun (i : int) ->
       if   i < 0 then failwith "invalid args"
@@ -115,7 +94,7 @@ module internal Bytes =
           a.buffer.Array.[a.offset + (i - acc)]
         else loop (k + 1) (acc + a.length)
       loop 0 0
-
+      *)
   let kmpY p =
     let next = initNext p
     let m = Array.length p
@@ -129,7 +108,7 @@ module internal Bytes =
         if !j = 0 then incr i else j := next.[!j]
       done;
       if !j >= m then Some(!i - m) else None
-
+      (*
   let inline _kmpZ (p: byte []) (next: int []) m (xs : BufferSegment list) =
       let a = uniteArrayBufferSegment xs
       let n = List.fold (fun acc (x :  BufferSegment) -> acc + x.length) 0 xs
@@ -158,6 +137,43 @@ module internal Bytes =
       if !j >= m then Some(!i - m) else None
 
   let kmpW p (xs : BufferSegment seq) =
+    let next = initNext p
+    let m = Array.length p
+    _kmpW p next m xs
+    
+
+  let inline uniteArrayBufferSegment (aas : ReadOnlySequence<byte>) =
+    fun (i : int) ->
+      if   i < 0 then failwith "invalid args"
+      let rec loop k acc =
+        let a = aas.[k]
+        if i < acc + a.length then
+          a.buffer.Array.[a.offset + (i - acc)]
+        else loop (k + 1) (acc + a.length)
+      loop 0 0
+*)
+  let inline _kmpW (p: byte []) (next: int []) m (xs : ReadOnlySequence<byte>) =
+      //let a = uniteArrayBufferSegment (xs)
+      //xs.
+      //let n = Seq.fold (fun acc (x :  BufferSegment) -> acc + x.length) 0 xs
+      let n = xs.Length
+      let mutable i = 0L
+      let mutable j = 0L
+      let a (x) =
+        xs.Slice(xs.GetPosition(x)).First.Span[0]
+      while j < m && i < n do
+        if a(i) = p.[int j] then
+          i <- i + 1L
+          j <- j + 1L
+        else
+          if j = 0 then
+            i <- i + 1L
+          else
+            j <- next.[int j]
+      done;
+      if j >= m then Some(i - m) else None
+
+  let kmpW p (xs : ReadOnlySequence<byte>) =
     let next = initNext p
     let m = Array.length p
     _kmpW p next m xs

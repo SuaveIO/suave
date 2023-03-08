@@ -12,6 +12,7 @@ open Suave
 open Suave.Utils
 open Suave.Sockets
 open Suave.Tests.TestUtilities
+open System.IO.Pipelines
 
 [<Tests>]
 let tests =
@@ -30,8 +31,9 @@ let tests =
   let createStubTransport (writes: ResizeArray<byte[]>) =
     { new ITransport with
         member x.write (buf: ByteSegment) =
-          let written = Array.zeroCreate<byte> buf.Count
-          Buffer.BlockCopy(buf.Array, buf.Offset, written, 0, buf.Count)
+          let written = Array.zeroCreate<byte> buf.Length
+          let target = new Span<byte>(written, 0, buf.Length); //Modify start & length as required
+          buf.Span.CopyTo(target);
           writes.Add written
           async.Return (Choice.create ())
 
@@ -46,13 +48,10 @@ let tests =
     let writes = ResizeArray<_>()
     let tx = createStubTransport writes
     let conn =
-      let bufSize = max 6 bufSize
-      let bm = BufferManager (bufSize * 1000, bufSize, true)
       { transport = tx
-        bufferManager = bm
-        lineBuffer = bm.PopBuffer "First buffer"
-        segments = new LinkedList<_>()
+        lineBuffer = Array.zeroCreate bufSize
         lineBufferCount = 0
+        pipe = new Pipe ()
         socketBinding = SocketBinding.create IPAddress.Loopback 8080us
       }
     fn conn, writes

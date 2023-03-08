@@ -71,6 +71,10 @@ type Microsoft.FSharp.Control.AsyncBuilder with
   /// a standard .NET task which does not commpute a value
   member x.Bind(t : Task, f : unit -> Async<'R>) : Async<'R> = async.Bind(Async.AwaitTask t, f)
 
+  member x.Bind(t : ValueTask, f:'T -> Async<'R>) : Async<'R> = async.Bind(Async.AwaitTask(t.AsTask()), f)
+
+  member x.Bind(t : ValueTask<'T>, f:'T -> Async<'R>) : Async<'R> = async.Bind(Async.AwaitTask(t.AsTask()), f)
+
 type System.Threading.Tasks.Task<'T> with
   /// From Task-based asynchronous model to Begin/End pattern
   static member ToIAsyncResult<'T>(task: Task<'T>,callback: AsyncCallback,state:obj) : IAsyncResult =
