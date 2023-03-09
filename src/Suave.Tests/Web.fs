@@ -43,22 +43,25 @@ let parsing_tests (_: SuaveConfig) =
       Expect.equal (TraceHeader.parseTraceHeaders headers).traceId expected.traceId "should parse trace id"
       Expect.equal (TraceHeader.parseTraceHeaders headers).reqParentId expected.reqParentId "should parse span id to parent span id"
     ]
+open Suave
+open Suave.Sockets
 
 [<Tests>]
 let transferEncodingChunkedTests (cfg : SuaveConfig) =
-  let writeChunks conn = socket {
-    let! (_, conn) = HttpOutput.writeChunk "h"B conn
-    let! (_, conn) = HttpOutput.writeChunk "e"B conn
-    let! (_, conn) = HttpOutput.writeChunk "l"B conn
-    let! (_, conn) = HttpOutput.writeChunk "l"B conn
-    let! (_, conn) = HttpOutput.writeChunk "o"B conn
-    let! (_, conn) = HttpOutput.writeChunk " "B conn
-    let! (_, conn) = HttpOutput.writeChunk "w"B conn
-    let! (_, conn) = HttpOutput.writeChunk "o"B conn
-    let! (_, conn) = HttpOutput.writeChunk "r"B conn
-    let! (_, conn) = HttpOutput.writeChunk "l"B conn
-    let! (_, conn) = HttpOutput.writeChunk "d"B conn
-    return! HttpOutput.writeChunk [||] conn
+  let writeChunks (conn:Connection) = socket {
+
+    do! conn.writeChunk "h"B
+    do! conn.writeChunk "e"B
+    do! conn.writeChunk "l"B
+    do! conn.writeChunk "l"B
+    do! conn.writeChunk "o"B
+    do! conn.writeChunk " "B
+    do! conn.writeChunk "w"B
+    do! conn.writeChunk "o"B
+    do! conn.writeChunk "r"B
+    do! conn.writeChunk "l"B
+    do! conn.writeChunk "d"B
+    do! conn.writeChunk [||]
   }
 
   let webPart =
@@ -70,7 +73,7 @@ let transferEncodingChunkedTests (cfg : SuaveConfig) =
       let res = req HttpMethod.GET "/" None ctx
       Expect.equal res "hello world" "should return hello world"
   ]
-
+  
 [<Tests>]
 let keepAliveTests (cfg : SuaveConfig) =
   let runWithConfig = runWith cfg
@@ -122,7 +125,7 @@ let keepAliveTests (cfg : SuaveConfig) =
           "should add a keep-alive header to the response", { reqContext with response = { reqContext.response with headers = ("Connection","Keep-Alive") :: reqContext.response.headers } }
         else
           "should not modify the response headers", reqContext
-      let actual = HttpOutput.addKeepAliveHeader reqContext
+      let actual = HttpContext.addKeepAliveHeader reqContext
       Expect.equal actual.response.headers expected.response.headers message
 
 
