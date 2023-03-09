@@ -12,18 +12,18 @@ type DefaultTlsTransport(cn : Connection, ssl : SslStream) =
       async {
         try
           let! a = ssl.ReadAsync(buf)
-          return Choice1Of2(a)
+          return Ok(a)
         with ex ->
-          return Choice2Of2 <| ConnectionError (ex.ToString())
+          return Result.Error <| ConnectionError (ex.ToString())
         }
 
      member this.write(buf : ByteSegment) =
       async {
         try 
           do! ssl.WriteAsync(buf)
-          return Choice1Of2()
+          return Ok()
         with ex ->
-          return Choice2Of2 <| ConnectionError (ex.ToString())
+          return Result.Error <| ConnectionError (ex.ToString())
         
         }
     member this.shutdown() =

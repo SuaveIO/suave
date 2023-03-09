@@ -95,14 +95,44 @@ let injectSnd f = function
   | Choice1Of2 x -> Choice1Of2 x
   | Choice2Of2 x -> f x; Choice2Of2 x
 
+module Result =
+
+  let map f = function
+    | Result.Ok v -> Result.Ok (f v)
+    | Error msg -> Error msg
+
+  let bindSnd (f: 'a -> Result<'c, 'b>) (v: Result<'c, 'a>) =
+    match v with
+    | Result.Ok x -> Ok x
+    | Result.Error x -> f x
+
+  let bind (f: 'a -> Result<'b, 'c>) (v: Result<'a, 'c>) =
+    match v with
+    | Ok v -> f v
+    | Error c -> Error c
+
+  let bindUnit f = function
+    | Ok x -> f x
+    | Error _ -> Error ()
+
+  let orDefault onMissing = function
+    | Result.Ok x -> x
+    | Result.Error _ -> onMissing
+
+  let parser (parse : string -> bool * 'a) (err : string) =
+    fun original ->
+      match parse original with
+      | true, res -> Ok res
+      | _, _      -> Error (err + ". Input value '" + original + "'" )
+
 module Operators =
 
   let (|@) opt errorMsg =
     match opt with
-    | Some x -> Choice1Of2 x
-    | None -> Choice2Of2 errorMsg
+    | Some x -> Ok x
+    | None -> Error errorMsg
 
   let (||@) c errorMsg =
     match c with
-    | Choice1Of2 x -> Choice1Of2 x
-    | Choice2Of2 y -> Choice2Of2 errorMsg
+    | Ok x -> Ok x
+    | Error y -> Error errorMsg

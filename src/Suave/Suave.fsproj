@@ -33,13 +33,11 @@
     <Compile Include="Sockets/SocketOp.fs" />
     <Compile Include="Sockets/ITransport.fs" />
     <Compile Include="Sockets/TcpTransport.fs" />
-    <Compile Include="Sockets/Connection.fs" />
     <Compile Include="Sockets/SocketMonad.fs" />
+    <Compile Include="Sockets/Connection.fs" />
     <Compile Include="Sockets/AsyncSocket.fs" />
     <Compile Include="Sockets/TransportStream.fs" />
     <Compile Include="Native.fs" />
-    <Compile Include="Tcp.fs" />
-    <Compile Include="TcpServerFactory.fs" />
     <Compile Include="Sscanf.fs" />
     <Compile Include="WebPart.fsi" />
     <Compile Include="WebPart.fs" />
@@ -60,6 +58,8 @@
     <Compile Include="SuaveConfig.fs" />
     <Compile Include="HttpOutput.fs" />
     <Compile Include="ConnectionFacade.fs" />
+    <Compile Include="Tcp.fs" />
+    <Compile Include="TcpServerFactory.fs" />
     <Compile Include="ParsingAndControl.fs" />
     <Compile Include="Web.fs" />
     <Compile Include="WebSocket.fs" />

@@ -1,4 +1,4 @@
-﻿namespace Suave.Sockets.Control
+namespace Suave.Sockets.Control
 
 open System
 open System.Collections.Generic
@@ -6,7 +6,7 @@ open Suave.Sockets
 
 /// Workflow builder to read/write to async sockets with fail/success semantics
 type SocketMonad() =
-  member this.Return(x:'a) : SocketOp<'a> = async { return Choice1Of2 x }
+  member this.Return(x:'a) : SocketOp<'a> = async { return Ok x }
   member this.Zero() : SocketOp<unit> = this.Return()
   member this.ReturnFrom(x : SocketOp<'a>) : SocketOp<'a> = x
   member this.Delay(f: unit ->  SocketOp<'a>) = async { return! f () }
@@ -14,8 +14,8 @@ type SocketMonad() =
   member this.Bind(x : SocketOp<'a>,f : 'a -> SocketOp<'b>) : SocketOp<'b> = async {
     let! result = x
     match result with
-    | Choice1Of2 a -> return! f a
-    | Choice2Of2 b -> return Choice2Of2 b
+    | Ok a -> return! f a
+    | Error b -> return Result.Error b
     }
 
   member this.Combine(v, f) = this.Bind(v, fun () -> f)
@@ -24,9 +24,9 @@ type SocketMonad() =
     if guard() then
       let! result = body
       match result with
-      | Choice1Of2 a ->
+      | Ok a ->
         return! this.While(guard, body)
-      | Choice2Of2 _ ->
+      | Error _ ->
         return result
     else
       return! this.Zero()
@@ -62,7 +62,6 @@ module SocketMonad =
   /// The socket monad
   let socket = SocketMonad()
 
-
   type SocketState<'s,'a> = 's -> SocketOp<'a * 's>
 
   type SocketStateBuilder<'s>() =
@@ -91,5 +90,5 @@ module SocketMonad =
         x.Using(sequence.GetEnumerator(),
           fun (enum : IEnumerator<'a>) -> x.While(enum.MoveNext, x.Delay(fun _-> body enum.Current))) s
 
-  let withConnection = SocketStateBuilder<Connection>()
+  //let withConnection = SocketStateBuilder<Connection>()
 

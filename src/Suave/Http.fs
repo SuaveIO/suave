@@ -328,7 +328,7 @@ module Http =
     override x.ToString() =
       String.Concat [ x.scheme.ToString(); "://"; x.socketBinding.ToString() ]
 
-  type HttpRequest =
+  type [<Struct>] HttpRequest =
     { httpVersion     : string
       binding         : HttpBinding
       rawPath         : string
@@ -391,9 +391,10 @@ module Http =
 
     member x.clientHost trustProxy sources : string =
       if trustProxy then
+        let y = x //
         sources
         |> List.fold (fun state source ->
-          state |> Choice.bindSnd (fun _ -> x.header source))
+          state |> Choice.bindSnd (fun _ -> y.header source))
           (Choice2Of2 "")
         |> Choice.orDefault x.host
       else
@@ -449,7 +450,7 @@ module Http =
   type HttpContent =
     | NullContent
     | Bytes of byte []
-    | SocketTask of (Connection * HttpResult -> SocketOp<Connection>)
+    | SocketTask of (Connection * HttpResult -> SocketOp<unit>)
 
     static member NullContent__ =
       (function | NullContent -> Some ()
@@ -466,7 +467,7 @@ module Http =
                 | _ -> None),
       (fun cb -> SocketTask cb)
 
-  and HttpResult =
+  and [<Struct>] HttpResult =
     { status        : HttpStatus
       headers       : (string * string) list
       content       : HttpContent
@@ -504,7 +505,7 @@ module Http =
       hideHeader        : bool
       maxContentLength  : int }
 
-  and HttpContext =
+  and [<Struct>] HttpContext =
     { request    : HttpRequest
       runtime    : HttpRuntime
       connection : Connection
@@ -513,10 +514,11 @@ module Http =
 
     member x.clientIp trustProxy sources =
       if trustProxy then
+        let y = x
         sources
         |> List.fold (fun state source ->
           state |> Choice.bindSnd (fun _ ->
-            x.request.header source |> Choice.bindUnit IPAddress.tryParseC))
+            y.request.header source |> Choice.bindUnit IPAddress.tryParseC))
           (Choice2Of2 ())
         |> Choice.orDefault x.connection.ipAddr
       else
@@ -533,10 +535,11 @@ module Http =
 
     member x.clientPort trustProxy sources : Port =
       if trustProxy then
+        let y = x
         sources
         |> List.fold (fun state source ->
           state |> Choice.bindSnd (fun _ ->
-            x.request.header source
+            y.request.header source
             |> Choice.bind (
               Choice.parser UInt16.TryParse "failed to parse X-Forwarded-Port")))
           (Choice2Of2 "")
@@ -549,10 +552,11 @@ module Http =
 
     member x.clientProto trustProxy sources : string =
       if trustProxy then
+        let y = x
         sources
         |> List.fold (fun state source ->
           state |> Choice.bindSnd (fun _ ->
-            x.request.header source))
+            y.request.header source))
           (Choice2Of2 "")
         |> Choice.orDefault (x.runtime.matchedBinding.scheme.ToString())
       else
@@ -633,6 +637,12 @@ module Http =
     let userState x = x.userState
     let runtime x = x.runtime
     let response x = x.response
+
+    let addKeepAliveHeader (context : HttpContext) =
+      match context.request.httpVersion, context.request.header "connection" with
+      | "HTTP/1.0", Choice1Of2 v when String.equalsOrdinalCI v "keep-alive" ->
+        { context with response = { context.response with headers = ("Connection","Keep-Alive") :: context.response.headers } }
+      | _ -> context
 
   let request apply (context : HttpContext) = apply context.request context
   let context apply (context : HttpContext) = apply context context

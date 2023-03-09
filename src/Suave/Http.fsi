@@ -154,7 +154,7 @@ module Http =
     override ToString : unit -> string
 
   /// A holder for the data extracted from the request.
-  type HttpRequest =
+  type [<Struct>] HttpRequest =
     { httpVersion     : string
       binding         : HttpBinding
       rawPath         : string
@@ -277,13 +277,13 @@ module Http =
     /// control the flow of bytes by using a SocketOp. Contrasting with Bytes,
     /// setting the HttpContent as this discriminated union type lets you stream
     /// data back to the client through Suave.
-    | SocketTask of (Connection * HttpResult -> SocketOp<Connection>)
+    | SocketTask of (Connection * HttpResult -> SocketOp<unit>)
 
 
   /// The HttpResult is the structure that you work with to tell Suave how to
   /// send the response. Have a look at the docs for HttpContent for further
   /// details on what is possible.
-  and HttpResult =
+  and [<Struct>] HttpResult =
     { status        : HttpStatus
       headers       : (string * string) list
       content       : HttpContent
@@ -330,7 +330,7 @@ module Http =
 
   /// The HttpContext is the container of the request, runtime, user-state and
   /// response.
-  and HttpContext =
+  and [<Struct>] HttpContext =
     { /// The HTTP request being processed
       request    : HttpRequest
 
@@ -419,6 +419,8 @@ module Http =
     val create : request:HttpRequest -> runtime:HttpRuntime -> connection:Connection
                -> writePreamble:bool
                -> HttpContext
+
+    val addKeepAliveHeader : ctx: HttpContext -> HttpContext
 
   val request : apply:(HttpRequest -> HttpContext -> 'a) -> context:HttpContext -> 'a
   val context : apply:(HttpContext -> HttpContext -> 'a) -> context:HttpContext -> 'a

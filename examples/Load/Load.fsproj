@@ -3,7 +3,7 @@
   <PropertyGroup>
     <TargetFrameworks>net7.0</TargetFrameworks>
     <OutputType>Exe</OutputType>
-    <AssemblyName>Pong</AssemblyName>
+    <AssemblyName>Load</AssemblyName>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Program.fs" />

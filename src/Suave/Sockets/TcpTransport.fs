@@ -1,13 +1,12 @@
-﻿namespace Suave.Sockets
+namespace Suave.Sockets
 
-open System
 open System.Net
 open System.Net.Sockets
 
+[<AllowNullLiteral>]
 type TcpTransport(acceptArgs     : SocketAsyncEventArgs,
                   readArgs     : SocketAsyncEventArgs,
                   writeArgs     : SocketAsyncEventArgs,
-                  transportPool : ConcurrentPool<TcpTransport>,
                   listenSocket : Socket) =
 
   let shutdownSocket _ =
@@ -31,23 +30,22 @@ type TcpTransport(acceptArgs     : SocketAsyncEventArgs,
   interface ITransport with
     member this.read (buf : ByteSegment) =
       async{
-       if acceptArgs.AcceptSocket = null then
-         return Choice2Of2 (ConnectionError "read error: acceptArgs.AcceptSocket = null") 
-       else
-         return! asyncDo acceptArgs.AcceptSocket.ReceiveAsync (setBuffer buf) (fun a -> a.BytesTransferred) readArgs
-       }
+        if acceptArgs.AcceptSocket = null then
+          return Result.Error (ConnectionError "read error: acceptArgs.AcceptSocket = null") 
+        else
+          return! asyncDo acceptArgs.AcceptSocket.ReceiveAsync (setBuffer buf) (fun a -> a.BytesTransferred) readArgs
+        }
 
     member this.write (buf : ByteSegment) =
       async{
         if acceptArgs.AcceptSocket = null then
-         return Choice2Of2 (ConnectionError "write error: acceptArgs.AcceptSocket = null") 
-       else
-         return! asyncDo acceptArgs.AcceptSocket.SendAsync (setBuffer buf) ignore writeArgs
+          return Result.Error (ConnectionError "write error: acceptArgs.AcceptSocket = null") 
+        else
+          return! asyncDo acceptArgs.AcceptSocket.SendAsync (setBuffer buf) ignore writeArgs
       }
 
     member this.shutdown() = async {
       shutdownSocket ()
       acceptArgs.AcceptSocket <- null
-      transportPool.Push(this)
       return ()
       }

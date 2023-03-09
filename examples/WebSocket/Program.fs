@@ -61,7 +61,7 @@ let ws (webSocket : WebSocket) (context: HttpContext) =
 
 /// An example of explictly fetching websocket errors and handling them in your codebase.
 let wsWithErrorHandling (webSocket : WebSocket) (context: HttpContext) = 
-   
+
    let exampleDisposableResource = { new IDisposable with member __.Dispose() = printfn "Resource needed by websocket connection disposed" }
    let websocketWorkflow = ws webSocket context
    
@@ -69,9 +69,9 @@ let wsWithErrorHandling (webSocket : WebSocket) (context: HttpContext) =
     let! successOrError = websocketWorkflow
     match successOrError with
     // Success case
-    | Choice1Of2() -> ()
+    | Ok() -> ()
     // Error case
-    | Choice2Of2(error) ->
+    | Result.Error(error) ->
         // Example error handling logic here
         printfn "Error: [%A]" error
         exampleDisposableResource.Dispose()

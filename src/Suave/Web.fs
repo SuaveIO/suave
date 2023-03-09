@@ -1,5 +1,7 @@
 namespace Suave
 
+open TcpServerFactory
+
 [<AutoOpen>]
 module Web =
 
@@ -50,9 +52,7 @@ module Web =
 
     let startWebWorkerAsync runtime =
       let tcpServer =
-        config.tcpServerFactory.create(
-          config.maxOps, config.bufferSize, config.autoGrow,
-          runtime.matchedBinding.socketBinding)
+        (tcpServerFactory :> TcpServerFactory).create(config.maxOps, config.bufferSize, config.autoGrow,runtime.matchedBinding.socketBinding,runtime)
 
       ParsingAndControl.startWebWorkerAsync webpart runtime tcpServer
 
@@ -84,7 +84,6 @@ module Web =
       homeFolder            = None
       compressedFilesFolder = None
       logger                = Targets.create Info [| "Suave" |]
-      tcpServerFactory      = new DefaultTcpServerFactory()
       cookieSerialiser      = new BinaryFormatterSerialiser()
       tlsProvider           = new DefaultTlsProvider()
       hideHeader            = false

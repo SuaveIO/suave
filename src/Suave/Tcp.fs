@@ -15,6 +15,10 @@ let private logger = Log.create "Suave.Tcp"
 [<Literal>]
 let MaxBacklog = Int32.MaxValue
 
+/// A TCP Worker is a thing that takes a TCP client and returns an asynchronous
+/// workflow thereof.
+type TcpWorker<'a> = ConnectionFacade -> Async<'a>
+
 type StartedData =
   { startCalledUtc : DateTimeOffset
     socketBoundUtc : DateTimeOffset option
@@ -38,10 +42,9 @@ let stopTcp reason (socket : Socket) =
   with ex ->
     logger.debug (eventX "Failure stopping TCP server" >> addExn ex)
 
-open Suave.Sockets
 open System.IO.Pipelines
 
-let createTransport transportPool listenSocket =
+let createTransport listenSocket =
   let readEventArg = new SocketAsyncEventArgs()
   let userToken = new AsyncUserToken()
   readEventArg.UserToken <- userToken
@@ -57,19 +60,31 @@ let createTransport transportPool listenSocket =
   acceptArg.UserToken <- userToken
   acceptArg.add_Completed(fun a b -> userToken.Continuation b)
 
-  new TcpTransport(acceptArg,readEventArg,writeEventArg, transportPool,listenSocket)
+  new TcpTransport(acceptArg,readEventArg,writeEventArg, listenSocket)
 
-let createPools listenSocket maxOps =
+let createConnection listenSocket =
+  { socketBinding = SocketBinding.create IPAddress.IPv6Loopback 8080us;
+      transport     = createTransport listenSocket;
+      pipe = new Pipe();
+      lineBuffer    = Array.zeroCreate 8192;
+      lineBufferCount = 0 }
 
-  let transportPool = new ConcurrentPool<TcpTransport>()
-  transportPool.ObjectGenerator <- (fun _ -> createTransport transportPool listenSocket)
+let createConnectionFacade connectionPool listenSocket runtime =
+  let connection = createConnection listenSocket 
+  let facade = new ConnectionFacade(connection, runtime, logger, connectionPool)
+  facade
+
+let createPools listenSocket maxOps runtime =
+
+  let connectionPool = new ConcurrentPool<ConnectionFacade>()
+  connectionPool.ObjectGenerator <- (fun _ -> createConnectionFacade connectionPool listenSocket runtime)
 
   //Pre-allocate a set of reusable transportObjects
   for x = 0 to maxOps - 1 do
-    let transport = createTransport transportPool listenSocket
-    transportPool.Push transport
+    let connection = createConnectionFacade connectionPool listenSocket runtime
+    connectionPool.Push connection
 
-  transportPool
+  connectionPool
 
 // NOTE: performance tip, on mono set nursery-size with a value larger than MAX_CONCURRENT_OPS * BUFFER_SIZE
 // i.e: export MONO_GC_PARAMS=nursery-size=128m
@@ -86,29 +101,20 @@ let private aFewTimes f =
 // echo 5 > /proc/sys/net/ipv4/tcp_fin_timeout
 // echo 1 > /proc/sys/net/ipv4/tcp_tw_recycle
 // custom kernel with shorter TCP_TIMEWAIT_LEN in include/net/tcp.h
-let job (serveClient : TcpWorker<unit>)
-        binding
-        (transport : ITransport)
-        (pipe : Pipe) = async {
+let job (serveClient : TcpWorker<unit>) binding (connection : ConnectionFacade) = async {
 
   Interlocked.Increment Globals.numberOfClients |> ignore
 
-  logger.debug (
-    eventX "{client} connected. Now has {totalClients} connected"
+  logger.debug (eventX "{client} connected. Now has {totalClients} connected"
     >> setFieldValue "client" (binding.ip.ToString())
     >> setFieldValue "totalClients" (!Globals.numberOfClients))
 
-  let connection =
-    { socketBinding   = binding
-      transport       = transport
-      pipe   = pipe
-      lineBuffer      = Array.zeroCreate 8192
-      lineBufferCount = 0 }
+  connection.Connection.socketBinding <- binding
 
   try
     use! oo = Async.OnCancel (fun () ->
       logger.debug (eventX "Disconnected client (async cancel)")
-      Async.RunSynchronously (transport.shutdown()))
+      Async.RunSynchronously (connection.shutdown()))
 
     do! serveClient connection
   with
@@ -118,9 +124,8 @@ let job (serveClient : TcpWorker<unit>)
     | ex ->
       logger.warn (eventX "TCP request processing failed" >> addExn ex)
 
-  //bufferManager.FreeBuffer(connection.lineBuffer, "Suave.Tcp.job")
   logger.debug (eventX "Shutting down transport")
-  do! transport.shutdown()
+  do! connection.shutdown()
   Interlocked.Decrement(Globals.numberOfClients) |> ignore
   logger.debug (
     eventX "Disconnected {client}. {totalClients} connected."
@@ -148,7 +153,7 @@ let enableRebinding (listenSocket: Socket) =
           >> setFieldValue "errno" (Marshal.GetLastWin32Error()))
 #endif
 
-let runServer maxConcurrentOps (binding: SocketBinding) startData
+let runServer maxConcurrentOps (binding: SocketBinding) (runtime:HttpRuntime) startData
               (acceptingConnections: AsyncResultCell<StartedData>) serveClient = async {
   try
     use listenSocket = new Socket(binding.endpoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp)
@@ -157,8 +162,8 @@ let runServer maxConcurrentOps (binding: SocketBinding) startData
     #endif
     listenSocket.NoDelay <- true
 
-    let transportPool =
-      createPools listenSocket maxConcurrentOps
+    let connectionPool =
+      createPools listenSocket maxConcurrentOps runtime
 
     aFewTimes (fun () -> listenSocket.Bind binding.endpoint)
     listenSocket.Listen MaxBacklog
@@ -186,13 +191,14 @@ let runServer maxConcurrentOps (binding: SocketBinding) startData
 
     while not (token.IsCancellationRequested) do
       try
-        let transport = transportPool.Pop()
-        let! r = transport.accept()
+        let connection : ConnectionFacade = connectionPool.Pop()
+        let! r = (connection.Connection.transport :?> TcpTransport).accept()
         match r with
-        | Choice1Of2 remoteBinding ->
+        | Ok remoteBinding ->
           // start a new async worker for each accepted TCP client
-          Async.Start (job serveClient remoteBinding transport (new Pipe()), token)
-        | Choice2Of2 e ->
+          //connection.socketBinding <- remoteBinding
+          Async.Start (job serveClient remoteBinding connection, token)
+        | Result.Error e ->
           failwithf "Socket failed to accept client, error: %A" e
 
       with ex ->

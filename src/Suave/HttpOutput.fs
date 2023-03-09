@@ -1,6 +1,15 @@
 namespace Suave
 
+open System.Collections.Generic
 open Suave.Utils
+open Suave.Sockets
+open Suave.Sockets.Control
+open Suave.Logging
+open Suave.Logging.Message
+
+open System
+open Suave.Sockets.Connection
+open System.Text
 
 module ByteConstants =
 
@@ -17,27 +26,14 @@ module ByteConstants =
   let dateBytes = ASCII.bytes "\r\nDate: "
   let colonBytes = ASCII.bytes ": "
 
-module HttpOutput =
+type HttpOutput(connection: Connection, runtime: HttpRuntime) =
 
-  open Suave.Sockets
-  open Suave.Sockets.Control
-  open Suave.Logging
-  open Suave.Logging.Message
-
-  open System
-
-  let inline writeContentType (headers : (string*string) list) = withConnection {
+  member (*inline*) this.writeContentType (headers : (string*string) list) = socket {
     if not(List.exists(fun (x : string,_) -> x.ToLower().Equals("content-type")) headers )then
-      do! asyncWriteBufferedBytes ByteConstants.defaultContentTypeHeaderBytes
+      return! connection.asyncWriteBufferedBytes ByteConstants.defaultContentTypeHeaderBytes
   }
 
-  let addKeepAliveHeader (context : HttpContext) =
-    match context.request.httpVersion, context.request.header "connection" with
-    | "HTTP/1.0", Choice1Of2 v when String.equalsOrdinalCI v "keep-alive" ->
-      { context with response = { context.response with headers = ("Connection","Keep-Alive") :: context.response.headers } }
-    | _ -> context
-
-  let inline writeContentLengthHeader (content : byte[]) (context : HttpContext) = withConnection {
+  member (*inline*) this.writeContentLengthHeader (content : byte[]) (context : HttpContext) = socket {
     match context.request.``method``, context.response.status.code with
     | (_, 100)
     | (_, 101)
@@ -47,114 +43,127 @@ module HttpOutput =
     | (HttpMethod.CONNECT, 203)
     | (HttpMethod.CONNECT, 205)
     | (HttpMethod.CONNECT, 206) ->
-      do! asyncWriteBufferedBytes ByteConstants.EOL
+      return! connection.asyncWriteBufferedBytes ByteConstants.EOL
     | _ ->
-      do! asyncWriteBufferedArrayBytes [| ByteConstants.contentLengthBytes; ASCII.bytes (content.Length.ToString()); ByteConstants.EOLEOL |]
+      return! connection.asyncWriteBufferedArrayBytes [| ByteConstants.contentLengthBytes; ASCII.bytes (content.Length.ToString()); ByteConstants.EOLEOL |]
     }
 
-  let inline writeHeaders exclusions (headers : (string*string) seq) = withConnection {
+  member (*inline*) this.writeHeaders exclusions (headers : (string*string) seq) = socket {
     for x,y in headers do
       if not (List.exists (fun y -> x.ToLower().Equals(y)) exclusions) then
-        do! asyncWriteLn (String.Concat [| x; ": "; y |])
+        do! connection.asyncWriteLn (String.Concat [| x; ": "; y |])
     }
 
-  let inline writePreamble (context: HttpContext) = withConnection {
+  member this.writePreamble (response:HttpResult) = socket {
 
-    let r = context.response
-
-    do! asyncWriteBufferedArrayBytes [| ByteConstants.httpVersionBytes; ASCII.bytes (r.status.code.ToString());
+    let r = response
+    let preamble = [| ByteConstants.httpVersionBytes; ASCII.bytes (r.status.code.ToString());
       ByteConstants.spaceBytes; ASCII.bytes (r.status.reason); ByteConstants.dateBytes; ASCII.bytes (Globals.utcNow().ToString("R")); ByteConstants.EOL |]
+    do! connection.asyncWriteBufferedArrayBytes preamble 
 
-    if context.runtime.hideHeader then
-      do! writeHeaders ["date";"content-length"] r.headers
+    if runtime.hideHeader then
+      do! this.writeHeaders ["date";"content-length"] r.headers
     else
-      do! asyncWriteBufferedBytes ByteConstants.serverHeaderBytes
-      do! writeHeaders ["server";"date";"content-length"] r.headers
-
-    do! writeContentType r.headers
+      do! connection.asyncWriteBufferedBytes ByteConstants.serverHeaderBytes
+      do! this.writeHeaders ["server";"date";"content-length"] r.headers
+    do! this.writeContentType r.headers
     }
 
-  let inline writeContent writePreamble context = function
+  member (*inline*) this.writeContent writePreamble context = function
     | Bytes b -> socket {
-      let connection = context.connection
       let! (encoding, content : byte []) = Compression.transform b context connection
       match encoding with
       | Some n ->
-        let! (_, connection) = asyncWriteLn (String.Concat [| "Content-Encoding: "; n.ToString() |]) connection
+        do! connection.asyncWriteLn (String.Concat [| "Content-Encoding: "; n.ToString() |])
         // http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.13
         // https://tools.ietf.org/html/rfc7230#section-3.3.2
-        let! (_, connection) = writeContentLengthHeader content context connection
+        do! this.writeContentLengthHeader content context
         if context.request.``method`` <> HttpMethod.HEAD && content.Length > 0 then
-          let! (_,connection) = asyncWriteBufferedBytes content connection
-          let! connection = flush connection
-          return connection
+          do! connection.asyncWriteBufferedBytes content
+          do! connection.flush()
+          return ()
         else
-          let! connection = flush connection
-          return connection
+          do! connection.flush()
+          return ()
       | None ->
         // http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.13
         // https://tools.ietf.org/html/rfc7230#section-3.3.2
-        let! (_, connection) = writeContentLengthHeader content context connection
+        do! this.writeContentLengthHeader content context
         if context.request.``method`` <> HttpMethod.HEAD && content.Length > 0 then
-          let! (_,connection) = asyncWriteBufferedBytes content connection
-          let! connection = flush connection
-          return connection
+          do! connection.asyncWriteBufferedBytes content
+          do! connection.flush()
+          return ()
         else
-          let! connection = flush connection
-          return connection
+          do! connection.flush()
+          return ()
       }
     | SocketTask f -> f (context.connection, context.response)
     | NullContent -> socket {
         if writePreamble then
-          let! (_, connection) = writeContentLengthHeader [||] context context.connection
-          let! connection = flush connection
-          return connection
+          do! this.writeContentLengthHeader [||] context
+          do! connection.flush()
+          return ()
         else
-          let! connection = flush context.connection
-          return connection
+          do! connection.flush()
+          return ()
            }
-
-  let flushChunk conn = socket {
-    let! conn = flush conn
+ (*
+  member inline this.flushChunk conn = socket {
+    let! conn = this.flush conn
     return (), conn
   }
-
-  let inline writeChunk (chunk : byte []) = withConnection {
+ 
+  member inline this.writeChunk (chunk : byte []) conn = socket {
     let chunkLength = chunk.Length.ToString("X")
-    do! asyncWriteLn chunkLength
-    do! asyncWriteLn (System.Text.Encoding.UTF8.GetString(chunk))
-    do! flushChunk
-  }
+    let! a = this.asyncWriteLn chunkLength conn
+    let! a = this.asyncWriteLn (System.Text.Encoding.UTF8.GetString(chunk)) conn
+    let! a = this.flushChunk conn
+    ()
+  }*)
 
-  let inline executeTask (ctx:HttpContext) r errorHandler = async {
+  member this.executeTask task  = async {
     try
-      let! q  = r
+      let! q = task
       return q
     with ex ->
-      return! errorHandler ex "request failed" ctx
+      return! runtime.errorHandler ex "request failed" { HttpContext.empty with connection = connection; runtime = runtime }
   }
 
-  let writeResponse (newCtx:HttpContext) =
+  member this.writeResponse (newCtx:HttpContext) =
     socket{
       if newCtx.response.writePreamble then
-        let! (_, connection) = writePreamble newCtx newCtx.connection
-        let! connection = writeContent true { newCtx with connection = connection } newCtx.response.content
-        return { newCtx with connection = connection }
+        do! this.writePreamble newCtx.response
+        do! this.writeContent true newCtx newCtx.response.content
+        return ()
       else
-        let! connection =  writeContent false newCtx newCtx.response.content
-        return { newCtx with connection = connection }
+        let! connection =  this.writeContent false newCtx newCtx.response.content
+        return ()
         }
 
   /// Check if the web part can perform its work on the current request. If it
   /// can't it will return None and the run method will return.
-  let inline run (webPart : WebPart) ctx = 
+  member this.run request (webPart : WebPart) = 
     async {
-      match! executeTask ctx (webPart ctx) ctx.runtime.errorHandler with 
-      | Some newCtx ->
-        match! writeResponse newCtx with
-        | Choice1Of2 ctx -> return Some ctx
-        | Choice2Of2 err ->
-          newCtx.runtime.logger.error (eventX "Socket error while writing response {error}" >> setFieldValue "error" err)
+      let freshContext =
+        { connection = connection
+        ; runtime = runtime
+        ; request = request
+        ; userState = new Dictionary<string,obj>()
+        ; response = HttpResult.empty }
+      let task = webPart freshContext
+      match! this.executeTask task with 
+      | Some ctx ->
+        match! this.writeResponse ctx with
+        | Ok () ->
+          let keepAlive =
+            match ctx.request.header "connection" with
+            | Choice1Of2 conn ->
+              String.equalsOrdinalCI conn "keep-alive"
+            | Choice2Of2 _ ->
+              ctx.request.httpVersion.Equals("HTTP/1.1")
+          return Some keepAlive
+        | Result.Error err ->
+          ctx.runtime.logger.error (eventX "Socket error while writing response {error}" >> setFieldValue "error" err)
           return None
       | None ->
         return None

@@ -267,8 +267,8 @@ module WebSocket =
       let! result = runAsyncWithSemaphore readSemaphore (readFrameIntoSegment (Array.zeroCreate >> Memory))
       return
         match result with
-        | Choice1Of2(opcode, frame, header) -> Choice1Of2(opcode, frame, header)
-        | Choice2Of2(error) -> Choice2Of2(error)
+        | Ok(opcode, frame, header) -> Ok(opcode, frame, header)
+        | Result.Error(error) -> Result.Error(error)
         }
 
     /// Reads from the websocket and puts the data into a ByteSegment selected by the byteSegmentForLengthFunc parameter
@@ -285,8 +285,8 @@ module WebSocket =
       let handShakeToken = Convert.ToBase64String webSocketHash
       let! something =
         match webSocketProtocol with
-        | Some subprotocol -> SocketOp.ofAsync(HttpOutput.run (handShakeWithSubprotocolResponse subprotocol handShakeToken) ctx)
-        | None -> SocketOp.ofAsync(HttpOutput.run (handShakeResponse handShakeToken) ctx)
+        | Some subprotocol -> SocketOp.ofAsync((new HttpOutput(ctx.connection,ctx.runtime)).run ctx.request (handShakeWithSubprotocolResponse subprotocol handShakeToken))
+        | None -> SocketOp.ofAsync((new HttpOutput(ctx.connection,ctx.runtime)).run ctx.request (handShakeResponse handShakeToken))
       let webSocket = new WebSocket(ctx.connection, webSocketProtocol)
       do! continuation webSocket ctx
     }
@@ -333,9 +333,9 @@ module WebSocket =
 
       let! a = handShakeAux subprotocol webSocketKey continuation ctx
       match a with
-      | Choice1Of2 _ ->
+      | Ok _ ->
         do ()
-      | Choice2Of2 err ->
+      | Result.Error err ->
         ctx.runtime.logger.info (
           eventX "WebSocket disconnected {error}"
           >> setSingleName "Suave.Websocket.handShakeWithSubprotocol"
@@ -351,9 +351,9 @@ module WebSocket =
     | Choice1Of2 webSocketKey ->
       let! a = handShakeAux None webSocketKey continuation ctx
       match a with
-      | Choice1Of2 _ ->
+      | Ok _ ->
         do ()
-      | Choice2Of2 err ->
+      | Result.Error err ->
         ctx.runtime.logger.info (
           eventX "WebSocket disconnected {error}"
           >> setSingleName "Suave.Websocket.handShake"

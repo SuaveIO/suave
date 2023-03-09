@@ -1,7 +1,6 @@
 namespace Suave
 
 open Suave.Logging
-open Suave.Utils
 open System
 
 /// The core configuration of suave. See also Suave.Web.default_config which
@@ -53,11 +52,6 @@ type SuaveConfig =
     /// have been initialised).
     logger                : Logger
 
-    /// Pluggable TCP async sockets implementation. You can choose betwee libuv
-    /// and CLR's Async Socket Event Args. Currently defaults to the managed-only
-    /// implementation.
-    tcpServerFactory      : TcpServerFactory
-
     /// The cookie serialiser to use for converting the data you save in cookies
     /// from your application into a byte array.
     cookieSerialiser      : CookieSerialiser
@@ -83,7 +77,6 @@ type SuaveConfig =
   member x.withHomeFolder(v)            = { x with homeFolder = v }
   member x.withCompressedFilesFolder(v) = { x with compressedFilesFolder = v }
   member x.withLogger(v)                = { x with logger = v }
-  member x.withTcpServerFactory(v)      = { x with tcpServerFactory = v }
   member x.withHiddenHeader(v)          = { x with hideHeader = v }
   member x.withMaxContentLength(v)      = { x with maxContentLength = v }
 

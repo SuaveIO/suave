@@ -35,7 +35,7 @@ let tests =
           let target = new Span<byte>(written, 0, buf.Length); //Modify start & length as required
           buf.Span.CopyTo(target);
           writes.Add written
-          async.Return (Choice.create ())
+          async.Return (Ok ())
 
         member x.read (buf: ByteSegment): SocketOp<int> =
           failwith "Read is not supported in the stub"
@@ -98,14 +98,14 @@ let tests =
 
           let mutable bufferedBytes = 0
           let _, writes =
-            usingConn bufSize <| fun conn ->
-              let (res: Async<Choice<unit * Connection, Error>>) = AsyncSocket.asyncWrite concatenated conn
-              let (res: Choice<unit * Connection, Error>) = Async.RunSynchronously res
-              Expect.isChoice1Of2 res "Should write to stub successfully"
+            usingConn bufSize <| fun (conn:Connection) ->
+              let res = conn.asyncWrite concatenated
+              let (res) = Async.RunSynchronously res
+              Expect.isOk res "Should write to stub successfully"
               match res with
-              | Choice1Of2 (_, cn) ->
+              | Ok (_) ->
                 // Count the bytes that are left in the lineBuffer
-                bufferedBytes <- bufferedBytes + cn.lineBufferCount
+                bufferedBytes <- bufferedBytes + conn.lineBufferCount
               | _ ->
                 failwith "does not happen"
 
