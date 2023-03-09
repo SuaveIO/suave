@@ -107,19 +107,6 @@ type HttpOutput(connection: Connection, runtime: HttpRuntime) =
           do! connection.flush()
           return ()
            }
- (*
-  member inline this.flushChunk conn = socket {
-    let! conn = this.flush conn
-    return (), conn
-  }
- 
-  member inline this.writeChunk (chunk : byte []) conn = socket {
-    let chunkLength = chunk.Length.ToString("X")
-    let! a = this.asyncWriteLn chunkLength conn
-    let! a = this.asyncWriteLn (System.Text.Encoding.UTF8.GetString(chunk)) conn
-    let! a = this.flushChunk conn
-    ()
-  }*)
 
   member this.executeTask task  = async {
     try

@@ -1636,7 +1636,7 @@ module EventSource =
   val handShake : fCont:(Connection -> SocketOp<unit>) -> WebPart
 
 module TransferEncoding =
-  val chunked: SocketOp<unit> -> WebPart
+  val chunked: (Connection -> SocketOp<unit>) -> WebPart
 
 module Control =
 

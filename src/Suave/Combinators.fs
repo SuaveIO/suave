@@ -821,14 +821,12 @@ module EventSource =
 
 module TransferEncoding =
   open Suave
-  open Suave.Sockets
   open Suave.Sockets.Control
 
   let chunked asyncWriteChunks (ctx : HttpContext) =
-    let task (conn:Connection, response) = socket {
+    let task (conn:Connection,_) = socket {
       do! conn.asyncWriteLn ""
-      do! asyncWriteChunks
-      return ()
+      do! asyncWriteChunks conn
     }
     { ctx with
         response =

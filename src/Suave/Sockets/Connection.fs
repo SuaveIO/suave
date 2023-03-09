@@ -124,6 +124,14 @@ type Connection =
           }
     loop 0
 
+  member inline this.writeChunk (chunk : byte []) = socket {
+    let chunkLength = chunk.Length.ToString("X")
+    do! this.asyncWriteLn chunkLength
+    do! this.asyncWriteLn (System.Text.Encoding.UTF8.GetString(chunk))
+    do! this.flush()
+    ()
+  }
+
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Connection =
 
