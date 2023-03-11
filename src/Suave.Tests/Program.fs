@@ -20,7 +20,7 @@ let main args =
   let testConfig =
     { defaultConfig with
         bindings = [ HttpBinding.createSimple HTTP "127.0.0.1" 9001 ]
-        logger   = Targets.create Verbose [| "Suave"; "Tests" |] }
+        logger   = Targets.create Warn [| "Suave"; "Tests" |] }
 
   let mutable firstRun = 0
   let runDefaultEngine() =
