@@ -65,7 +65,7 @@ let wsWithErrorHandling (webSocket : WebSocket) (context: HttpContext) =
    let exampleDisposableResource = { new IDisposable with member __.Dispose() = printfn "Resource needed by websocket connection disposed" }
    let websocketWorkflow = ws webSocket context
    
-   async {
+   task {
     let! successOrError = websocketWorkflow
     match successOrError with
     // Success case

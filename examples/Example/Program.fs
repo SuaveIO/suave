@@ -192,13 +192,11 @@ let main argv =
       cancellationToken     = Async.DefaultCancellationToken
       bufferSize            = 2048
       maxOps                = 100
-      autoGrow              = true
       mimeTypesMap          = mimeTypes
       homeFolder            = None
       compressedFilesFolder = None
       logger                = logger
       cookieSerialiser      = new BinaryFormatterSerialiser()
-      tlsProvider           = new DefaultTlsProvider()
       hideHeader            = false
       maxContentLength      = 1000000 }
     app
