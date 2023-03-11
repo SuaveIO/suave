@@ -11,7 +11,7 @@ open Suave.Utils
 /// and that can be closed.
 type Connection =
   { mutable socketBinding : SocketBinding
-    transport     : ITransport
+    transport     : TcpTransport
     pipe : Pipe
     lineBuffer    : byte array
     mutable lineBufferCount : int }
@@ -28,32 +28,6 @@ type Connection =
       if this.lineBufferCount> 0  then
         do! this.transport.write (new Memory<_>(this.lineBuffer,0,this.lineBufferCount))
         this.lineBufferCount <- 0
-      return ()
-    }
-
-  // what is this used for ?
-  member inline this.chunkBoundaries maxChunkBytes (s : string) =
-    if maxChunkBytes < 6 then failwith "Cannot split into chunks of smaller than 6 bytes"
-    seq {
-      // One UTF-16 char can represent at most 3 UTF-8 bytes, because any 4-byte
-      // UTF-8 sequences are represented by two UTF-16 chars (a surrogate pair).
-      let maxChars = maxChunkBytes / 3
-      let mutable charsLeft = s.Length
-      let mutable charsSoFar = 0
-
-      while charsLeft > 0 do
-        let charsThisTime = min maxChars charsLeft
-        let lastCharIdx = charsSoFar + charsThisTime - 1
-        // Don't split a surrogate pair; if this segments ends on a
-        let charsThisTime =
-          if Char.IsHighSurrogate s.[lastCharIdx] then
-            charsThisTime - 1
-          else
-            charsThisTime
-        yield charsSoFar, charsThisTime
-
-        charsSoFar <- charsSoFar + charsThisTime
-        charsLeft <- charsLeft - charsThisTime
     }
 
   member inline this.asyncWrite (str: string) : SocketOp<unit> =
@@ -64,10 +38,9 @@ type Connection =
         let maxByteCount = Encoding.UTF8.GetMaxByteCount(str.Length)
         if maxByteCount > this.lineBuffer.Length then
           do! this.transport.write (new Memory<_>(this.lineBuffer, 0, this.lineBufferCount))
-          for offset, charCount in this.chunkBoundaries this.lineBuffer.Length str do
-            let byteCount = Encoding.UTF8.GetBytes(str, offset, charCount, this.lineBuffer, 0)
-            // don't waste time buffering here
-            do! this.transport.write (new Memory<_>(this.lineBuffer, 0, byteCount))
+          let byteCount = Encoding.UTF8.GetBytes(str, 0, str.Length, this.lineBuffer, 0)
+          // don't waste time buffering here
+          do! this.transport.write (new Memory<_>(this.lineBuffer, 0, byteCount))
           this.lineBufferCount <- 0
           return ()
 
@@ -90,27 +63,26 @@ type Connection =
     }
 
   /// Write the string s to the stream asynchronously from a byte array
-  member inline this.asyncWriteBytes (b : byte[]) : SocketOp<unit> = async {
-    if b.Length > 0 then return! this.transport.write (new Memory<_>(b, 0, b.Length))
-    else return Ok ()
+  member inline this.asyncWriteBytes (b : byte[]) : SocketOp<unit> =
+    task {
+    if b.Length > 0 then
+      return! this.transport.write (new Memory<_>(b, 0, b.Length))
+    else
+      return Ok ()
   }
 
   member inline this.asyncWriteBufferedBytes (b : byte[])  : SocketOp<unit> =
     socket {
-      if b.Length > 0 then
-        if this.lineBufferCount + b.Length > this.lineBuffer.Length then
-          // flush lineBuffer
-          if this.lineBufferCount > 0 then
-            do! this.transport.write (new Memory<_>(this.lineBuffer, 0, this.lineBufferCount))
-          // don't waste time buffering here
-          do! this.transport.write (new Memory<_>(b, 0, b.Length))
-          this.lineBufferCount <- 0
-          return ()
-        else
-          Buffer.BlockCopy(b, 0, this.lineBuffer,this.lineBufferCount, b.Length)
-          this.lineBufferCount <- this.lineBufferCount + b.Length
-          return ()
-      else return ()
+      if this.lineBufferCount + b.Length > this.lineBuffer.Length then
+        // flush lineBuffer
+        if this.lineBufferCount > 0 then
+          do! this.transport.write (new Memory<_>(this.lineBuffer, 0, this.lineBufferCount))
+        // don't waste time buffering here
+        do! this.transport.write (new Memory<_>(b, 0, b.Length))
+        this.lineBufferCount <- 0
+      else
+        Buffer.BlockCopy(b, 0, this.lineBuffer,this.lineBufferCount, b.Length)
+        this.lineBufferCount <- this.lineBufferCount + b.Length
     }
 
   member inline this.asyncWriteBufferedArrayBytes (xxs:(byte[])[]) : SocketOp<unit> =

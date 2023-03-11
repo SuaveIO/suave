@@ -62,9 +62,9 @@ module Aux =
         FailWith s
     loop bufferSequence 0 (Continue 0)
 
-type Reader(transport : ITransport, lineBuffer : byte array, pipe: Pipe) =
+type Reader(transport : TcpTransport, lineBuffer : byte array, pipe: Pipe) =
 
-  member (*inline*) x.readMoreData = async {
+  member (*inline*) x.readMoreData () = task {
     let buff = pipe.Writer.GetMemory()
     match! transport.read buff with
     | Ok x ->
@@ -75,12 +75,12 @@ type Reader(transport : ITransport, lineBuffer : byte array, pipe: Pipe) =
       return Result.Error error
     }
 
-  member (*inline*) x.getData = async{
+  member (*inline*) x.getData () = task{
       let (success, result) = pipe.Reader.TryRead()
       if success then
         return result
       else
-        let! result = x.readMoreData
+        let! result = x.readMoreData()
         let! result= pipe.Reader.ReadAsync()
         return result
   }
@@ -88,8 +88,8 @@ type Reader(transport : ITransport, lineBuffer : byte array, pipe: Pipe) =
   /// is sent to the function select
   /// Returns the number of bytes read.
   member (*inline*) x.scanMarker (marker: byte[]) (select : SelectFunction) = 
-    async{
-      let! result = x.getData
+    task{
+      let! result = x.getData()
       let bufferSequence = result.Buffer
       match kmpW marker bufferSequence with
       | ValueSome x ->
@@ -109,52 +109,65 @@ type Reader(transport : ITransport, lineBuffer : byte array, pipe: Pipe) =
   /// Read the passed stream into buff until the EOL (CRLF) has been reached
   /// and returns the number of bytes read and the connection
   member (*inline*) x.readUntilPattern marker select =
-    let rec loop  = socket {
-      let! res = x.scanMarker marker select
-      match res with
-      | Found a ->
-        return a
-      | NeedMore ->
-        do! x.readMoreData
-        return! loop
-      | Error s ->
-        return! SocketOp.abort s
+    task {
+      let reading = ref true
+      let error = ref false
+      let result = ref 0
+      let errorResult = ref (Ok(0))
+      while !reading && not !error do
+        let! res = x.scanMarker marker select
+        match res with
+        | Ok(Found a) ->
+          reading := false
+          result := a
+        | Ok(NeedMore) ->
+          let! a = x.readMoreData()
+          // continue reading
+          ()
+        | Result.Error s
+        | Ok(Error s) ->
+          error := true
+          errorResult := Result.Error s
+      if !error then
+        return !errorResult
+      else
+        return Ok (!result)
     }
-    loop
 
   member x.skip n =
-     async{
-    let! result= pipe.Reader.ReadAsync()
-    let bufferSequence = result.Buffer
-    // we really do not calling split because we are not doing anything with it
-    let res = Aux.split bufferSequence n (fun a b -> Continue 0 )
-    match res with
-      | Continue n ->
-        pipe.Reader.AdvanceTo(bufferSequence.GetPosition(n))
-        return Found n
-      | FailWith s ->
-        return Error s
-    }
+     task{
+      let! result= pipe.Reader.ReadAsync()
+      let bufferSequence = result.Buffer
+      // we really do not calling split because we are not doing anything with it
+      let res = Aux.split bufferSequence n (fun a b -> Continue 0 )
+      match res with
+        | Continue n ->
+          pipe.Reader.AdvanceTo(bufferSequence.GetPosition(n))
+          return Found n
+        | FailWith s ->
+          return Error s
+      }
 
   /// Read a line from the stream, calling UTF8.toString on the bytes before the EOL marker
-  member (*inline*) x.readLine = socket {
+  member (*inline*) x.readLine () = socket {
     let offset = ref 0
     let! count =
-      x.readUntilPattern EOL (fun a count -> 
-        if !offset + count > lineBuffer.Length then 
+      x.readUntilPattern EOL (fun a count ->
+        if !offset + count > lineBuffer.Length then
           FailWith (InputDataError (Some 414, "Line Too Long"))
         else
           let source = a.Span.Slice(0,count)
           let target = new Span<byte>(lineBuffer,!offset,count)
           source.CopyTo(target)
           offset := !offset + count
+          
           Continue !offset
       )
     let result = Encoding.UTF8.GetString(lineBuffer, 0, !offset)
     return result
   }
 
-  member x.skipLine = socket {
+  member x.skipLine ()= socket {
     let offset = ref 0
     let! _ =
       x.readUntilPattern EOL (fun a count ->
@@ -165,38 +178,40 @@ type Reader(transport : ITransport, lineBuffer : byte array, pipe: Pipe) =
   }
 
   /// Read all headers from the stream, returning a dictionary of the headers found
-  member (*inline*) x.readHeaders =
-    let rec loop headers = socket {
-      let offset = ref 0
-      let buf = lineBuffer
-      let! count =
-        x.readUntilPattern EOL (fun a count -> 
-          if !offset + count > lineBuffer.Length then 
-            FailWith (InputDataError (Some 431, "Request Header Fields Too Large"))
+  member (*inline*) x.readHeaders() =
+    task {
+      let headers = new List<string*string>()
+      let flag = ref true
+      let error = ref false
+      let result = ref (Ok ([]))
+      while !flag && (not !error)do
+        let! _line = x.readLine ()
+        match _line with
+        | Ok line ->
+          if line <> String.Empty then
+            let indexOfColon = line.IndexOf(':')
+            let header = (line.Substring(0, indexOfColon).ToLower(), line.Substring(indexOfColon+1).TrimStart())
+            headers.Add header
           else
-            let source = a.Span.Slice(0,count)
-            let target = new Span<byte>(lineBuffer, !offset, count)
-            source.CopyTo(target)
-            offset := !offset + count
-            Continue !offset
-        )
-      if !offset <> 0 then
-        let line = Encoding.UTF8.GetString(buf, 0, !offset)
-        let indexOfColon = line.IndexOf(':')
-        let header = (line.Substring(0, indexOfColon).ToLower(), line.Substring(indexOfColon+1).TrimStart())
-        return! loop (header :: headers)
-      else return headers
+            flag := false
+        | Result.Error e ->
+          error := true
+          result := Result.Error e
+
+      if !error then
+          return !result
+        else
+          return Ok(List.ofSeq headers)
     }
-    loop []
 
   /// Read the post data from the stream, given the number of bytes that makes up the post data.
   member (*inline*) x.readPostData (bytes : int) (select:ReadOnlyMemory<byte> -> int -> unit)  : SocketOp<unit> =
     let rec loop n : SocketOp<unit> =
-      async {
+      task {
         if n = 0 then
           return Result.Ok()
         else
-          let! result = x.getData
+          let! result = x.getData()
           let bufferSequence = result.Buffer
           if bufferSequence.Length > 0  then
             let segment = bufferSequence.First
@@ -212,7 +227,7 @@ type Reader(transport : ITransport, lineBuffer : byte array, pipe: Pipe) =
             if n = 0 then
               return Result.Ok()
             else
-              match! x.readMoreData with
+              match! x.readMoreData() with
               | Result.Ok _ ->
                 return! loop n
               | Result.Error error ->
@@ -269,13 +284,13 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, logger:Logge
     }
 
   let parseMultipartMixed fieldName boundary : SocketOp<unit> =
-    let rec loop = socket {
-      let! firstLine = reader.readLine
+    let rec loop () = socket {
+      let! firstLine = reader.readLine()
 
       if firstLine.Equals("--") then
         return ()
       else
-        let! partHeaders = reader.readHeaders
+        let! partHeaders = reader.readHeaders()
 
         let! (contentDisposition : string) =
           (partHeaders %% "content-disposition")
@@ -284,21 +299,17 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, logger:Logge
         match partHeaders %% "content-type" with
         | Choice1Of2 contentType ->
           let headerParams = headerParams contentDisposition
-          logger.verbose (
-            eventX "Parsing {contentType}... -> readFilePart"
-            >> setFieldValue "contentType" contentType)
+          logger.verbose (eventX "Parsing {contentType}... -> readFilePart" >> setFieldValue "contentType" contentType)
 
           let! res = readFilePart boundary headerParams fieldName contentType
-          logger.verbose (
-            eventX "Parsed {contentType} <- readFilePart"
-            >> setFieldValue "contentType" contentType)
+          logger.verbose (eventX "Parsed {contentType} <- readFilePart" >> setFieldValue "contentType" contentType)
 
           match res with
           | Some upload ->
             files.Add(upload)
-            return! loop
+            return! loop ()
           | None ->
-            return! loop
+            return! loop ()
 
         | Choice2Of2 _ ->
           use mem = new MemoryStream()
@@ -309,16 +320,14 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, logger:Logge
               )
           let byts = mem.ToArray()
           multiPartFields.Add (fieldName, Encoding.UTF8.GetString(byts, 0, byts.Length))
-          return! loop
+          return! loop ()
       }
-    loop
+    loop ()
 
   /// Parses multipart data from the stream, feeding it into the HttpRequest's property Files.
   let parseMultipart (boundary:string) : SocketOp<unit> =
-    let parsePart = socket {
-
-        let! partHeaders = reader.readHeaders
-
+    let parsePart () = socket {
+        let! partHeaders = reader.readHeaders()
         let! (contentDisposition : string) =
           (partHeaders %% "content-disposition")
           @|! (None, "Missing 'content-disposition'")
@@ -366,20 +375,42 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, logger:Logge
           return ()
       }
 
-    socket {
-      let mutable parsing = true
-      let! firstLine = reader.readLine
+    let something () = socket{
+        do! parsePart ()
+        let! line = reader.readLine()
+        return line
+    }
+
+    let firstPart(boundary) = socket{
+      let! firstLine = reader.readLine()
       if firstLine<>boundary then
         failwithf "Invalid multipart format: expected boundary '%s' got '%s'" boundary firstLine
+    }
 
-      while parsing do
-        do! parsePart
-        let! line = reader.readLine
-        if line.StartsWith("--") then
-          parsing <- false
-        else if line <> String.Empty then
-          failwith "Invalid multipart format"
+    let secondPart () = task{
+      let mutable parsing = true
+      let mutable error = false
+      let result = ref (Ok())
+      while parsing && not error do
+        let! _line = something ()
+        match _line with
+        | Ok line ->
+          if line.StartsWith("--") then
+            parsing <- false
+          else if line <> String.Empty then
+            failwith "Invalid multipart format"
+        | Result.Error e ->
+          result := Result.Error e
+          error <- true
+      if error then
+        return !result
+      else
+        return Ok()
+    }
 
+    socket {
+      do! firstPart (boundary)
+      do! secondPart ()
       return ()
     }
 
@@ -405,7 +436,7 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, logger:Logge
       let contentLength = Convert.ToInt32 contentLengthString
 
       if contentLength > maxContentLength then
-        return! async.Return (Result.Error (InputDataError (Some 413, "Payload too large")))
+        return! SocketOp.abort(InputDataError (Some 413, "Payload too large"))
       else
         logger.verbose (eventX "Expecting {contentLength} bytes" >> setFieldValue "contentLength" contentLength)
 
@@ -420,6 +451,7 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, logger:Logge
 
           logger.verbose (eventX "Parsing multipart")
           do! parseMultipart boundary
+          logger.verbose (eventX "Done parsing multipart")
           return ()
 
         | Choice1Of2 _ | Choice2Of2 _ ->
@@ -434,21 +466,21 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, logger:Logge
   member (*inline*) this.processRequest () = socket {
 
     logger.verbose (eventX  "reading first line of request")
-    let! firstLine = reader.readLine
+    let! firstLine = reader.readLine()
 
     let! rawMethod, path, rawQuery, httpVersion = 
       parseUrl firstLine
       @|! (None, "Invalid ")
 
     logger.verbose (eventX "reading headers")
-    let! headers = reader.readHeaders
+    let! headers = reader.readHeaders()
 
     // Respond with 400 Bad Request as
     // per http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html
     let! rawHost = headers %% "host" @|! (None, "Missing 'Host' header")
 
     if headers %% "expect" = Choice1Of2 "100-continue" then
-      let! _ = SocketOp.ofAsync((new HttpOutput(connection,runtime)).run HttpRequest.empty Intermediate.CONTINUE)
+      let! _ = (new HttpOutput(connection,runtime)).run HttpRequest.empty Intermediate.CONTINUE
       logger.verbose (eventX "sent 100-continue response")
 
     logger.verbose (eventX "parsing post data")
@@ -475,7 +507,7 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, logger:Logge
     return Some request
   }
 
-  member this.exitHttpLoopWithError (err:Error) = async{
+  member this.exitHttpLoopWithError (err:Error) = task{
       match err with
       | InputDataError (None, msg) ->
         logger.verbose (eventX "Error parsing HTTP request with {message}" >> setFieldValue "message" msg)
@@ -496,11 +528,12 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, logger:Logge
             logger.verbose (eventX "Exiting http loop")
       | err ->
         logger.verbose (eventX "Socket error while processing request, exiting {error}" >> setFieldValue "error" err)
+      return Ok(false)
     }
 
   member this.loop consumer =
     let rec loop =
-      async {
+      task {
         logger.verbose (eventX "Processing request... -> processor")
         let! result' = this.processRequest ()
         logger.verbose (eventX "Processed request. <- processor")
@@ -509,26 +542,24 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, logger:Logge
           match result with
           | None ->
             logger.verbose (eventX "'result = None', exiting")
+            return Ok (false)
           | Some request ->
-            match! (new HttpOutput(connection,runtime)).run request consumer with
-            | None -> ()
-            | Some keepAlive ->
+            match! (new HttpOutput(connection,runtime)).run request consumer  with
+            | Result.Error err -> return Result.Error err 
+            | Ok keepAlive ->
                 if keepAlive then
                   logger.verbose (eventX "'Connection: keep-alive' recurse")
-                  files.Clear()
-                  multiPartFields.Clear()
-                  _rawForm <- [||]
-                  return! loop
+                  return Ok (keepAlive)
                 else
-                  logger.verbose (eventX "Connection: close")
-                  return ()
+                  logger.info (eventX "Connection: close")
+                  return Ok(false)
         | Result.Error err ->
           // Couldn't parse HTTP request; answering with BAD_REQUEST and closing the connection.
-          do! this.exitHttpLoopWithError err
+          return! this.exitHttpLoopWithError err
       }
     loop
 
-  member this.shutdown() = async{
-    do! connection.transport.shutdown()
+  member this.shutdown() =
+    connection.lineBufferCount <- 0
+    connection.transport.shutdown()
     connectionPool.Push(this)
-    }

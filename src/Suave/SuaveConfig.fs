@@ -29,9 +29,6 @@ type SuaveConfig =
     /// buffer size for socket operations
     bufferSize             : int
 
-    /// Buffer manager auto grow
-    autoGrow               : bool
-
     /// max number of concurrent socket operations
     maxOps                 : int
 
@@ -55,9 +52,6 @@ type SuaveConfig =
     /// The cookie serialiser to use for converting the data you save in cookies
     /// from your application into a byte array.
     cookieSerialiser      : CookieSerialiser
-
-    /// A TLS provider implementation.
-    tlsProvider           : TlsProvider
 
     /// Make this true, if you want Suave not to display its server header in
     /// every response. Defaults to false.
@@ -95,7 +89,7 @@ module SuaveConfig =
                        compressionFolder
                        config.logger
                        config.cookieSerialiser
-                       config.tlsProvider
+                       //config.tlsProvider
                        config.hideHeader
                        config.maxContentLength
 

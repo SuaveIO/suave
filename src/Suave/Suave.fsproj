@@ -29,14 +29,11 @@
     <Compile Include="CookieSerialiser.fs" />
     <Compile Include="Sockets/SocketBinding.fs" />
     <Compile Include="Sockets/ConcurrentPool.fs" />
-    <Compile Include="Sockets/AsyncUserToken.fs" />
     <Compile Include="Sockets/SocketOp.fs" />
-    <Compile Include="Sockets/ITransport.fs" />
     <Compile Include="Sockets/TcpTransport.fs" />
     <Compile Include="Sockets/SocketMonad.fs" />
     <Compile Include="Sockets/Connection.fs" />
     <Compile Include="Sockets/AsyncSocket.fs" />
-    <Compile Include="Sockets/TransportStream.fs" />
     <Compile Include="Native.fs" />
     <Compile Include="Sscanf.fs" />
     <Compile Include="WebPart.fsi" />
@@ -45,7 +42,6 @@
     <Compile Include="Http.fsi" />
     <Compile Include="Http.fs" />
     <Compile Include="Headers.fs" />
-    <Compile Include="DefaultTlsProvider.fs" />
     <Compile Include="Compression.fs" />
     <Compile Include="Combinators.fsi" />
     <Compile Include="Combinators.fs" />

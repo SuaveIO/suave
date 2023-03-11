@@ -558,22 +558,23 @@ module Files =
         let! (encoding,fs) = Compression.transformStream file fs getLm compression ctx.runtime.compressionFolder ctx
         let finish = start + fs.Length - 1L
         try
-          match encoding with
-          | Some n ->
-            do! conn.asyncWriteLn ("Content-Range: bytes " + start.ToString() + "-" + finish.ToString() + "/*")
-            do! conn.asyncWriteLn (String.Concat [| "Content-Encoding: "; n.ToString() |])
-            do! conn.asyncWriteLn ("Content-Length: " + (fs : Stream).Length.ToString() + "\r\n")
-            do! conn.flush ()
-            if ctx.request.``method`` <> HttpMethod.HEAD && fs.Length > 0L then
-              do! transferStream conn fs
-            return ()
-          | None ->
-            do! conn.asyncWriteLn ("Content-Range: bytes " + start.ToString() + "-" + finish.ToString() + "/" + total.ToString())
-            do! conn.asyncWriteLn ("Content-Length: " + (fs : Stream).Length.ToString() + "\r\n")
-            do! conn.flush()
-            if ctx.request.``method`` <> HttpMethod.HEAD && fs.Length > 0L then
-              do! transferStream conn fs
-            return ()
+          try
+            match encoding with
+            | Some n ->
+              do! conn.asyncWriteLn ("Content-Range: bytes " + start.ToString() + "-" + finish.ToString() + "/*")
+              do! conn.asyncWriteLn (String.Concat [| "Content-Encoding: "; n.ToString() |])
+              do! conn.asyncWriteLn ("Content-Length: " + (fs : Stream).Length.ToString() + "\r\n")
+              do! conn.flush ()
+              if ctx.request.``method`` <> HttpMethod.HEAD && fs.Length > 0L then
+                do! transferStream conn fs
+            | None ->
+              do! conn.asyncWriteLn ("Content-Range: bytes " + start.ToString() + "-" + finish.ToString() + "/" + total.ToString())
+              do! conn.asyncWriteLn ("Content-Length: " + (fs : Stream).Length.ToString() + "\r\n")
+              do! conn.flush()
+              if ctx.request.``method`` <> HttpMethod.HEAD && fs.Length > 0L then
+                do! transferStream conn fs
+          with ex ->
+            raise ex
         finally
           fs.Dispose()
       }, status
@@ -683,7 +684,6 @@ module Embedded =
       let fs = source.GetManifestResourceStream(name)
       let getLm = fun _ -> lastModified source
       let! encoding,fs = Compression.transformStream name fs getLm compression ctx.runtime.compressionFolder ctx
-
       match encoding with
       | Some n ->
         do! conn.asyncWriteLn (String.Concat [| "Content-Encoding: "; n.ToString() |])
@@ -747,7 +747,7 @@ module EventSource =
   let (<<.) (out : Connection) (data : string) =
     out.asyncWriteBytes (Encoding.UTF8.GetBytes data)
 
-  let dispatch (out : Connection) =
+  let dispatch (out : Connection) : SocketOp<unit> =
     send out ES_EOL_S
 
   let comment (out : Connection) (cmt : string) =
@@ -801,7 +801,7 @@ module EventSource =
       return! f out
     }
 
-  let handShake fCont (ctx : HttpContext) =
+  let handShake (fCont: Connection -> SocketOp<unit>) (ctx : HttpContext) =
     { ctx with
         response =
           { ctx.response with
@@ -823,7 +823,7 @@ module TransferEncoding =
   open Suave
   open Suave.Sockets.Control
 
-  let chunked asyncWriteChunks (ctx : HttpContext) =
+  let chunked (asyncWriteChunks: Connection -> SocketOp<unit>) (ctx : HttpContext) =
     let task (conn:Connection,_) = socket {
       do! conn.asyncWriteLn ""
       do! asyncWriteChunks conn
@@ -858,9 +858,7 @@ module Control =
 
 module CORS =
 
-  open System
   open Successful
-  open Utils
 
   [<Literal>]
   let Origin = "Origin"

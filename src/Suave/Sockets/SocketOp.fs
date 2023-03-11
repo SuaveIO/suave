@@ -24,8 +24,7 @@ type Error =
 
 type ByteSegment = Memory<byte>
 
-// Async is already a delayed type
-type SocketOp<'a> = Async<Result<'a,Error>>
+type SocketOp<'a> = Task<Result<'a,Error>>
 
 /// The module
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
@@ -34,68 +33,68 @@ module SocketOp =
 
   /// create a new successful value
   let mreturn (x : 'T) : SocketOp<'T> =
-    async.Return (Ok x)
+    (task { return Ok(x) })
 
   /// create a new unsuccessful value
   let abort (x : Error) : SocketOp<_> =
-    async.Return (Result.Error x)
+    //async.Return (Result.Error x)
+    (task { return Result.Error(x) })
 
   /// says that something is wrong with the input on a protocol level and that
   /// it's therefore a bad request (user input error) -- the error already present
   /// is overwritten with the errorMsg parameter.
   let orInputError errorMsg : _ -> SocketOp<_> = function
-    | Choice1Of2 x -> async.Return (Ok x)
-    | Choice2Of2 _ -> async.Return (Result.Error (InputDataError errorMsg))
+    | Choice1Of2 x -> mreturn(x)
+    | Choice2Of2 _ -> abort (InputDataError errorMsg)
 
   /// same as the above, but let's you do something with the existing error message
   /// through the callback function passed
   let orInputErrorf fErrorMsg : _ -> SocketOp<_> = function
-    | Ok x -> async.Return (Ok x)
-    | Error (y : string) -> async.Return (Result.Error (InputDataError (fErrorMsg y)))
+    | Ok x -> mreturn(x)
+    | Error (y : string) -> abort (InputDataError (fErrorMsg y))
 
   /// Bind the result successful result of the SocketOp to fCont
-  let bind (fCont : _ -> SocketOp<_>) (value : SocketOp<_>) : SocketOp<_> = async {
-    let! x = value
-    match x with
-    | Ok x -> return! fCont x
-    | Error (err : Error) -> return Result.Error err
-    }
+  let bind (fCont : _ -> SocketOp<_>) (value : SocketOp<_>) : SocketOp<_> =
+    task {
+      let! x = value
+      match x with
+      | Ok x -> return! (fCont x)
+      | Error (err : Error) -> return Result.Error err
+      }
 
   /// Bind the error result of the SocketOp to fCont
-  let bindError (fCont : _ -> SocketOp<_>) (value : SocketOp<_>) : SocketOp<_> = async {
-    let! x = value
-    match x with
-    | Ok x -> return Ok x
-    | Error (err : Error) -> return! fCont err
-    }
+  let bindError (fCont : _ -> SocketOp<_>) (value : SocketOp<_>) : SocketOp<_> =
+    task {
+      let! x = value
+      match x with
+      | Ok x -> return Ok x
+      | Error (err : Error) -> return! (fCont err)
+      }
 
   /// Map f over the contained successful value in SocketOp
-  let map f (value : SocketOp<_>) : SocketOp<_> = async {
-    let! x = value
-    match x with
-    | Ok x -> return Ok (f x)
-    | Error (err : Error) -> return Result.Error err
-    }
+  let map f (value : SocketOp<_>) : SocketOp<_> =
+    task {
+      let! x = value
+      match x with
+      | Ok x -> return Ok (f x)
+      | Error (err : Error) -> return Result.Error err
+      }
 
   /// Map f over the error value in SocketOp
-  let mapError f (value : SocketOp<_>) : SocketOp<_> = async {
-    let! x = value
-    match x with
-    | Ok x -> return Ok x
-    | Error (err : Error) -> return Result.Error (f err)
-    }
+  let mapError f (value : SocketOp<_>) : SocketOp<_> =
+    task {
+      let! x = value
+      match x with
+      | Ok x -> return Ok x
+      | Error (err : Error) -> return Result.Error (f err)
+      }
 
   /// lift a Async<'a> type to the SocketOp
-  let ofAsync (a : Async<'a>) : SocketOp<'a> = async {
-    let! s = a
-    return Ok s
-    }
-
-  /// lift a Task type to the SocketOp
-  let ofTask (a : Task) : SocketOp<unit> = async {
-    let! s = a
-    return Ok s
-    }
+  let ofAsync (a : Async<'a>) : SocketOp<'a> =
+    task {
+      let! s = a
+      return Ok s
+      }
 
   module Operators =
 
@@ -110,43 +109,3 @@ module SocketOp =
     /// See SocketOp.bindError
     let (@|>) c fError =
       bindError fError c
-
-[<AutoOpen>]
-module Utils =
-  /// Wraps the Socket.xxxAsync logic into F# async logic.
-  let asyncDo (op : SocketAsyncEventArgs -> bool)
-              (prepare : SocketAsyncEventArgs -> unit)
-              (select: SocketAsyncEventArgs -> 'T)
-              (args : SocketAsyncEventArgs) =
-    Async.FromContinuations <| fun (ok, error, _) ->
-      prepare args
-
-      let k (args : SocketAsyncEventArgs) =
-        match args.SocketError with
-        | SystemSocketError.Success ->
-          let result = select args
-          ok (Ok result)
-        | e -> ok (Result.Error (SocketError e))
-
-      (args.UserToken :?> AsyncUserToken).Continuation <- k
-
-      if not (op args) then
-        k args
-
-  /// Prepares the arguments by setting the buffer.
-  let inline setBuffer (buf : ByteSegment) (args: SocketAsyncEventArgs) =
-    args.SetBuffer(buf)
-
-  let accept (socket : Socket) evArgs =
-    asyncDo socket.AcceptAsync ignore (fun a -> a.AcceptSocket) evArgs
-
-  //let trans (a : SocketAsyncEventArgs) =
-    //new ArraySegment<_>(a.Buffer, a.Offset, a.BytesTransferred)
-
-  /// Makes sure the finalizer is called regardless of the result of executing body
-  let finalize (body: SocketOp<unit>) (finalizer: unit -> unit) =
-    async {
-      let! result = body
-      do finalizer()
-      return result
-      }

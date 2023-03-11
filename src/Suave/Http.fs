@@ -501,7 +501,6 @@ module Http =
       logger            : Logger
       matchedBinding    : HttpBinding
       cookieSerialiser  : CookieSerialiser
-      tlsProvider       : TlsProvider
       hideHeader        : bool
       maxContentLength  : int }
 
@@ -596,12 +595,11 @@ module Http =
         logger            = Targets.create Debug [| "Suave" |]
         matchedBinding    = HttpBinding.defaults
         cookieSerialiser  = new BinaryFormatterSerialiser()
-        tlsProvider       = null
         hideHeader        = false
         maxContentLength  = 1024 }
 
     let create serverKey errorHandler mimeTypes homeDirectory compressionFolder
-           logger cookieSerialiser tlsProvider hideHeader maxContentLength binding =
+           logger cookieSerialiser hideHeader maxContentLength binding =
       { serverKey         = serverKey
         errorHandler      = errorHandler
         mimeTypesMap      = mimeTypes
@@ -610,7 +608,6 @@ module Http =
         logger            = logger
         matchedBinding    = binding
         cookieSerialiser  = cookieSerialiser
-        tlsProvider       = tlsProvider
         hideHeader        = hideHeader
         maxContentLength  = maxContentLength }
 
@@ -638,11 +635,11 @@ module Http =
     let runtime x = x.runtime
     let response x = x.response
 
-    let addKeepAliveHeader (context : HttpContext) =
-      match context.request.httpVersion, context.request.header "connection" with
+    let addKeepAliveHeader (ctx : HttpContext) =
+      match ctx.request.httpVersion, ctx.request.header "connection" with
       | "HTTP/1.0", Choice1Of2 v when String.equalsOrdinalCI v "keep-alive" ->
-        { context with response = { context.response with headers = ("Connection","Keep-Alive") :: context.response.headers } }
-      | _ -> context
+        { ctx with response = { ctx.response with headers = ("Connection","Keep-Alive") :: ctx.response.headers } }
+      | _ -> ctx
 
   let request apply (context : HttpContext) = apply context.request context
   let context apply (context : HttpContext) = apply context context

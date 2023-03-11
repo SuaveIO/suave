@@ -324,7 +324,6 @@ module Http =
       logger            : Logger
       matchedBinding    : HttpBinding
       cookieSerialiser  : CookieSerialiser
-      tlsProvider       : TlsProvider
       hideHeader        : bool
       maxContentLength  : int }
 
@@ -404,7 +403,7 @@ module Http =
                -> mimeTypes:MimeTypesMap -> homeDirectory:string
                -> compressionFolder:string -> logger:Logger
                -> cookieSerialiser:CookieSerialiser
-               -> tlsProvider:TlsProvider -> hideHeader:bool -> maxContentLength:int 
+               -> hideHeader:bool -> maxContentLength:int 
                -> binding:HttpBinding
                -> HttpRuntime
 

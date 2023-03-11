@@ -9,7 +9,7 @@ open System.Net.Security
 type DefaultTlsTransport(cn : Connection, ssl : SslStream) =
   interface ITransport with
     member this.read (buf : ByteSegment) =
-      async {
+      task {
         try
           let! a = ssl.ReadAsync(buf)
           return Ok(a)
@@ -18,7 +18,7 @@ type DefaultTlsTransport(cn : Connection, ssl : SslStream) =
         }
 
      member this.write(buf : ByteSegment) =
-      async {
+      task {
         try 
           do! ssl.WriteAsync(buf)
           return Ok()

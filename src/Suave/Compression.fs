@@ -1,4 +1,4 @@
-﻿namespace Suave
+namespace Suave
 
 module Compression =
 
@@ -57,7 +57,7 @@ module Compression =
          | _         -> None)
     | _ -> None
 
-  let transform (content : byte []) (ctx : HttpContext) connection : SocketOp<Algorithm option * byte []> =
+  let transform (content : byte []) (ctx : HttpContext) : SocketOp<Algorithm option * byte []> =
     socket {
       if content.Length > MIN_BYTES_TO_COMPRESS && content.Length < MAX_BYTES_TO_COMPRESS then
         let request = ctx.request
@@ -71,55 +71,86 @@ module Compression =
         return None, content
     }
 
-  let compress encoding path (fs : Stream) = socket {
+  let compress encoding path (fs : Stream) = task {
     use newFileStream = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.Write)
     match encoding with
     | GZIP ->
       use gzip = new GZipStream(newFileStream, CompressionMode.Compress)
-      do! SocketOp.ofTask (fs.CopyToAsync gzip)
+      do! (fs.CopyToAsync gzip)
+      return Ok ()
     | Deflate ->
       use deflate = new DeflateStream(newFileStream, CompressionMode.Compress)
-      do! SocketOp.ofTask (fs.CopyToAsync deflate)
+      do! (fs.CopyToAsync deflate)
+      return Ok ()
     | _ ->
       return failwith "invalid case."
   }
 
-  let compressFile n (stream : Stream) compressionFolder = socket {
+  let compressFile n (stream : Stream) compressionFolder : SocketOp<string>= task {
     let tempFileName = Path.GetRandomFileName()
     if not (Directory.Exists compressionFolder) then Directory.CreateDirectory compressionFolder |> ignore
     let newPath = Path.Combine(compressionFolder,tempFileName)
-    do! compress n newPath stream
-    return newPath
+    let! a = compress n newPath stream
+    match a with
+    | Ok () ->
+      return Ok (newPath)
+    | Result.Error e ->
+      return Result.Error e
   }
 
   let transformStream (key : string) (stream : Stream) (getLast : string -> DateTime)
                       compression compressionFolder ctx =
-    socket {
+    task {
       if compression && stream.Length > int64(MIN_BYTES_TO_COMPRESS) && stream.Length < int64(MAX_BYTES_TO_COMPRESS) then
         let encoding = parseEncoder ctx.request
         match encoding with
         | Some n ->
           try
-            // look this up, we may have already compressed it
-            let map = Globals.compressedFilesMap
-            let lastModified = getLast key
-            match map.TryGetValue key with
-            | true, (_, previousLastModified) -> 
-              if lastModified > previousLastModified then
+            try
+              // look this up, we may have already compressed it
+              let map = Globals.compressedFilesMap
+              let lastModified = getLast key
+              let result = ref String.Empty
+              let error = ref false
+              let errorResult = ref (Result.Error (Error.ConnectionError ""))
+              match map.TryGetValue key with
+              | true, (_, previousLastModified) when lastModified > previousLastModified -> 
                 // this file has a later modification date than it did when we compressed it
-                let! newPath = compressFile n stream compressionFolder
-                map.[key] <- (newPath, lastModified)
+                let! _newPath = compressFile n stream compressionFolder
+                match _newPath with
+                | Ok newPath ->
+                  map.[key] <- (newPath, lastModified)
+                  result := newPath
+                | Result.Error e ->
+                  error:= true
+                  errorResult := Result.Error e
                 // Here it is tempting to delete the old compressed file, but is that 
                 // safe? Perhaps it could be being served on another request?
-            | _ -> 
-                let! newPath = compressFile n stream compressionFolder
-                let value = (newPath, lastModified)
-                (key, value) |> map.TryAdd |> ignore
-            return Some n, new FileStream(map.[key] |> fst, FileMode.Open, FileAccess.Read, FileShare.Read) :> Stream
+
+              | true, (a,b) ->
+                result := a
+                ()
+              | _ ->
+                  let! _newPath = compressFile n stream compressionFolder
+                  match _newPath with
+                  | Ok newPath ->
+                    let value = (newPath, lastModified)
+                    let success = map.TryAdd (key, value)
+                    result := newPath
+                  | Result.Error e ->
+                    error:= true
+                    errorResult := Result.Error e
+              if !error then
+                return !errorResult
+              else
+                let stream = new FileStream(!result, FileMode.Open, FileAccess.Read, FileShare.Read) :> Stream
+                return Ok(Some n, stream)
+            with ex ->
+              return Result.Error(Error.ConnectionError ex.Message)
           finally
             stream.Dispose()
         | None ->
-          return None, stream
+          return Ok(None, stream)
       else
-        return None, stream
+        return Ok(None, stream)
     }

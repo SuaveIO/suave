@@ -6,6 +6,7 @@ module WebSocket =
   open Suave.Sockets.Control
   open Suave.Operators
   open Suave.Utils
+  open Suave.Utils.AsyncExtensions
   open Suave.Logging
   open Suave.Logging.Message
 
@@ -134,23 +135,17 @@ module WebSocket =
 
     { Frame.OpcodeByte = firstByte; EncodedLength = encodedLength; Data = data }
 
-  let readBytes (transport : ITransport) (n : int) =
+  let readBytes (transport : TcpTransport) (n : int) =
     let arr = Array.zeroCreate n
-    // TODO: Remove logic of handling reset connections when this issue would be fixed in the mono (https://bugzilla.xamarin.com/show_bug.cgi?id=53229).
-    let maxFailedAttempts = 10
-    let rec loop i failedAttempts = socket {
-      if i = n then
-        return arr
-      else
-        let! read = transport.read <| Memory(arr,i,n - i)
-        if failedAttempts >= maxFailedAttempts then
-          return! SocketOp.abort(ConnectionError "Connection reset by peer")
-        else
-          return! loop (i+read) (if read = 0 then failedAttempts + 1 else 0)
-      }
-    loop 0 0
+    socket {
+      let i = ref 0
+      while !i < n do
+        let! read = transport.read(Memory(arr,!i,n - !i))
+        i := !i+read
+      return arr
+    }
 
-  let readBytesIntoByteSegment retrieveByteSegment (transport : ITransport) (n : int) =
+  let readBytesIntoByteSegment retrieveByteSegment (transport : TcpTransport) (n : int) =
     let byteSegmentRetrieved: ByteSegment = retrieveByteSegment n
 
     let byteSegment =
@@ -169,8 +164,6 @@ module WebSocket =
     loop 0
 
   type internal Cont<'t> = 't -> unit
-
-  open System.Threading
 
   let fork f = ThreadPool.QueueUserWorkItem(WaitCallback(f)) |> ignore
 
@@ -200,9 +193,9 @@ module WebSocket =
 
     let releaseSemaphoreDisposable (semaphore: SemaphoreSlim) = { new IDisposable with member __.Dispose() = semaphore.Release() |> ignore }
 
-    let runAsyncWithSemaphore semaphore asyncAction = async {
+    let runAsyncWithSemaphore semaphore asyncAction = task {
       use releaseSemaphoreDisposable = releaseSemaphoreDisposable semaphore
-      do! semaphore.WaitAsync() |> Async.AwaitTask
+      do! semaphore.WaitAsync()
       return! asyncAction
       }
 
@@ -256,14 +249,12 @@ module WebSocket =
         if header.hasMask
         then
           for i = 0 to (int extendedLength) - 1 do
-            //let pos = frame.Offset + i
-            //frame.Array.[pos] <- frame.Array.[pos] ^^^ mask.[i % 4]
             frame.Span.[i] <- frame.Span.[i] ^^^ mask.[i % 4]
 
         return (header.opcode, frame, header.fin)
       }
 
-    member this.read () = async {
+    member this.read () = task {
       let! result = runAsyncWithSemaphore readSemaphore (readFrameIntoSegment (Array.zeroCreate >> Memory))
       return
         match result with
@@ -283,10 +274,13 @@ module WebSocket =
     socket {
       let webSocketHash = sha1 <| webSocketKey + magicGUID
       let handShakeToken = Convert.ToBase64String webSocketHash
-      let! something =
-        match webSocketProtocol with
-        | Some subprotocol -> SocketOp.ofAsync((new HttpOutput(ctx.connection,ctx.runtime)).run ctx.request (handShakeWithSubprotocolResponse subprotocol handShakeToken))
-        | None -> SocketOp.ofAsync((new HttpOutput(ctx.connection,ctx.runtime)).run ctx.request (handShakeResponse handShakeToken))
+      match webSocketProtocol with
+      | Some subprotocol ->
+        let! a = (new HttpOutput(ctx.connection,ctx.runtime)).run ctx.request (handShakeWithSubprotocolResponse subprotocol handShakeToken)
+        ()
+      | None ->
+        let! a = (new HttpOutput(ctx.connection,ctx.runtime)).run ctx.request (handShakeResponse handShakeToken)
+        ()
       let webSocket = new WebSocket(ctx.connection, webSocketProtocol)
       do! continuation webSocket ctx
     }
@@ -323,30 +317,28 @@ module WebSocket =
         Choice2Of2 (RequestErrors.BAD_REQUEST "Bad Request" ctx)
 
   /// The handShakeWithSubprotocol combinator captures a WebSocket and pass it to the provided `continuation`
-  let handShakeWithSubprotocol (choose : string [] -> HttpContext -> Async<string option>) (continuation : WebSocket -> HttpContext -> SocketOp<unit>) (ctx : HttpContext) = async {
-    match validateHandShake ctx with
-    | Choice1Of2 webSocketKey ->
-      let! subprotocol =
-        match ctx.request.header "sec-websocket-protocol" with
-        | Choice1Of2 webSocketProtocol -> choose (webSocketProtocol.Split [|','|]) ctx
-        | _ -> async.Return None
+  let handShakeWithSubprotocol (choose : string [] -> HttpContext -> Async<string option>) (continuation : WebSocket -> HttpContext -> SocketOp<unit>) (ctx : HttpContext) =
+    async {
+      match validateHandShake ctx with
+      | Choice1Of2 webSocketKey ->
+        let! subprotocol =
+          match ctx.request.header "sec-websocket-protocol" with
+          | Choice1Of2 webSocketProtocol -> choose (webSocketProtocol.Split [|','|]) ctx
+          | _ -> async.Return None
 
-      let! a = handShakeAux subprotocol webSocketKey continuation ctx
-      match a with
-      | Ok _ ->
-        do ()
-      | Result.Error err ->
-        ctx.runtime.logger.info (
-          eventX "WebSocket disconnected {error}"
-          >> setSingleName "Suave.Websocket.handShakeWithSubprotocol"
-          >> setFieldValue "error" err)
-
-      return! Control.CLOSE ctx
-    | Choice2Of2 response -> return! response
-  }
+        let! a = handShakeAux subprotocol webSocketKey continuation ctx
+        match a with
+        | Ok _ ->
+          do ()
+        | Result.Error err ->
+          ctx.runtime.logger.warn (eventX "WebSocket disconnected {error}" >> setSingleName "Suave.Websocket.handShakeWithSubprotocol"
+            >> setFieldValue "error" err)
+        return! Control.CLOSE ctx
+      | Choice2Of2 response -> return! response
+    }
 
   /// The handShake combinator captures a WebSocket and pass it to the provided `continuation`
-  let handShake (continuation : WebSocket -> HttpContext -> SocketOp<unit>) (ctx : HttpContext) = async {
+  let handShakeTask (continuation : WebSocket -> HttpContext -> SocketOp<unit>) (ctx : HttpContext) = task {
     match validateHandShake ctx with
     | Choice1Of2 webSocketKey ->
       let! a = handShakeAux None webSocketKey continuation ctx
@@ -354,11 +346,15 @@ module WebSocket =
       | Ok _ ->
         do ()
       | Result.Error err ->
-        ctx.runtime.logger.info (
-          eventX "WebSocket disconnected {error}"
-          >> setSingleName "Suave.Websocket.handShake"
+        ctx.runtime.logger.warn (eventX "WebSocket disconnected {error}" >> setSingleName "Suave.Websocket.handShake"
           >> setFieldValue "error" err)
-
       return! Control.CLOSE ctx
-    | Choice2Of2 response -> return! response
+    | Choice2Of2 response ->
+      Console.WriteLine("not valid response i guess")
+      return! response
+  }
+
+  let handShake (continuation : WebSocket -> HttpContext -> SocketOp<unit>) (ctx : HttpContext) = async {
+    do! handShakeTask continuation ctx
+    return Some ctx
   }

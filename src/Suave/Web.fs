@@ -1,6 +1,8 @@
 namespace Suave
 
 open TcpServerFactory
+open System.Threading.Tasks
+open System.Threading
 
 [<AutoOpen>]
 module Web =
@@ -52,7 +54,7 @@ module Web =
 
     let startWebWorkerAsync runtime =
       let tcpServer =
-        (tcpServerFactory :> TcpServerFactory).create(config.maxOps, config.bufferSize, config.autoGrow,runtime.matchedBinding.socketBinding,runtime)
+        (tcpServerFactory :> TcpServerFactory).create(config.maxOps, config.bufferSize, runtime.matchedBinding.socketBinding,runtime,config.cancellationToken)
 
       ParsingAndControl.startWebWorkerAsync webpart runtime tcpServer
 
@@ -60,13 +62,14 @@ module Web =
        List.map (toRuntime >> startWebWorkerAsync) config.bindings
 
     let listening = servers |> Seq.map fst |> Async.Parallel
-    let server    = servers |> Seq.map snd |> Async.Parallel |> Async.Ignore
+    let server    = servers |> Seq.map snd |> Task.WhenAll
     listening, server
 
   /// Runs the web server and blocks waiting for the asynchronous workflow to be cancelled or
   /// it returning itself.
   let startWebServer (config : SuaveConfig) (webpart : WebPart) =
-    Async.RunSynchronously(startWebServerAsync config webpart |> snd, cancellationToken = config.cancellationToken)
+    let task = startWebServerAsync config webpart |> snd
+    Task.WaitAll task
 
   /// The default configuration binds on IPv4, 127.0.0.1:8080 with a regular 500 Internal Error handler,
   /// with a timeout of one minute for computations to run. Waiting for 2 seconds for the socket bind
@@ -79,13 +82,11 @@ module Web =
       cancellationToken     = Async.DefaultCancellationToken
       bufferSize            = 8192 // 8 KiB
       maxOps                = 100
-      autoGrow              = true
       mimeTypesMap          = Writers.defaultMimeTypesMap
       homeFolder            = None
       compressedFilesFolder = None
       logger                = Targets.create Info [| "Suave" |]
       cookieSerialiser      = new BinaryFormatterSerialiser()
-      tlsProvider           = new DefaultTlsProvider()
       hideHeader            = false
       maxContentLength      = 10000000 // 10 megabytes
       }

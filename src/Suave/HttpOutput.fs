@@ -71,7 +71,7 @@ type HttpOutput(connection: Connection, runtime: HttpRuntime) =
 
   member (*inline*) this.writeContent writePreamble context = function
     | Bytes b -> socket {
-      let! (encoding, content : byte []) = Compression.transform b context connection
+      let! (encoding, content : byte []) = Compression.transform b context
       match encoding with
       | Some n ->
         do! connection.asyncWriteLn (String.Concat [| "Content-Encoding: "; n.ToString() |])
@@ -97,7 +97,9 @@ type HttpOutput(connection: Connection, runtime: HttpRuntime) =
           do! connection.flush()
           return ()
       }
-    | SocketTask f -> f (context.connection, context.response)
+    | SocketTask f -> socket{
+      do! f (connection, context.response)
+      }
     | NullContent -> socket {
         if writePreamble then
           do! this.writeContentLengthHeader [||] context
@@ -130,7 +132,7 @@ type HttpOutput(connection: Connection, runtime: HttpRuntime) =
   /// Check if the web part can perform its work on the current request. If it
   /// can't it will return None and the run method will return.
   member this.run request (webPart : WebPart) = 
-    async {
+    task {
       let freshContext =
         { connection = connection
         ; runtime = runtime
@@ -148,10 +150,10 @@ type HttpOutput(connection: Connection, runtime: HttpRuntime) =
               String.equalsOrdinalCI conn "keep-alive"
             | Choice2Of2 _ ->
               ctx.request.httpVersion.Equals("HTTP/1.1")
-          return Some keepAlive
+          return Ok keepAlive
         | Result.Error err ->
           ctx.runtime.logger.error (eventX "Socket error while writing response {error}" >> setFieldValue "error" err)
-          return None
+          return Result.Error err
       | None ->
-        return None
+        return Ok (false)
   }

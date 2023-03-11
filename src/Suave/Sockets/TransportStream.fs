@@ -20,7 +20,7 @@ type TransportStream(transport : ITransport) =
     raise (NotImplementedException())
 
   override x.Read (buffer : byte[],offset : int,count : int) : int =
-    match Async.RunSynchronously <| transport.read (Memory(buffer,offset,count)) with
+    match (transport.read (Memory(buffer,offset,count))).Result with
     | Ok n -> n
     | Error x -> raise (Exception(x.ToString()))
 
@@ -43,7 +43,7 @@ type TransportStream(transport : ITransport) =
     task.Result
 
   override x.Write (buffer : byte[],offset : int,count : int) =
-    match Async.RunSynchronously <| transport.write(Memory(buffer,offset,count)) with
+    match transport.write(Memory(buffer,offset,count)).Result with
     | Ok _ -> ()
     | Error x -> raise (Exception(x.ToString()))
 

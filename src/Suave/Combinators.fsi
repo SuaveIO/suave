@@ -1651,8 +1651,6 @@ module Control =
 
 module CORS =
 
-  open Utils
-
   [<RequireQualifiedAccess>]
   type InclusiveOption<'T> =
     | None
