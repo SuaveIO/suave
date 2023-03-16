@@ -52,6 +52,14 @@ let initTargets () =
       res.Errors |> Seq.iter (eprintfn "%s")
       failwith "Tests failed."
 
+  // Requires `httperf` installed on the server (only linux atm)
+  Target.create "Load" <| fun _ ->
+    let path = "examples" </> "Pong"
+    let res = DotNet.exec id "run" (sprintf "-c Release --framework net7.0 --project %s" path)
+    if not res.OK then
+      res.Errors |> Seq.iter (eprintfn "%s")
+      failwith "Tests failed."
+
   Target.create "Pack" <| fun _ ->
     let pkg = Path.GetFullPath "./pkg"
     let props (project: string) (p: Paket.PaketPackParams) =
@@ -108,6 +116,7 @@ let initTargets () =
     ==> "AsmInfo"
     ==> "Build"
     ==> "Tests"
+    ==> "Load"
     ==> "Pack"
     ==> "Release"
 
@@ -119,5 +128,5 @@ let main argv =
     |> Context.RuntimeContext.Fake
     |> Context.setExecutionContext
     initTargets ()
-    Target.runOrDefault "Tests"
+    Target.runOrDefault "Load"
     0

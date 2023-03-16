@@ -1,4 +1,4 @@
-﻿module Pong.Program
+module Pong.Program
 
 open Suave
 open Suave.Successful
@@ -45,7 +45,7 @@ let main argv =
   listening |> Async.RunSynchronously |> printfn "start stats: %A"
 
   // launch httperf
-  let output = execute "httperf" (sprintf "--hog --server=localhost --port=%d --uri=/ --rate=1000 --num-conns=1000 --num-calls=1000 --burst-length=20" port)
+  let output = execute "httperf" (sprintf "--hog --server=localhost --port=%d --uri=/ --rate=100 --num-conns=1000 --num-calls=1000 --burst-length=20" port)
 
   Console.WriteLine output
 
