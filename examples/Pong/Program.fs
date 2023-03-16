@@ -37,18 +37,17 @@ let execute cmd args =
 
 [<EntryPoint>]
 let main argv =
-  //let cts = new CancellationTokenSource()
-  startWebServer config app
-  //Async.Start(server, cts.Token)
+  let cts = new CancellationTokenSource()
+  let listening, server = startWebServerAsync config app
 
   // wait for the server to start listening
-  //listening |> Async.RunSynchronously |> printfn "start stats: %A"
+  listening |> Async.RunSynchronously |> printfn "start stats: %A"
 
   // launch httperf
-  //let output = execute "httperf" (sprintf "--hog --server=localhost --port=%d --uri=/ --rate=10 --num-conns=10 --num-calls=10 --burst-length=20" port)
+  let output = execute "httperf" (sprintf "--hog --server=localhost --port=%d --uri=/ --rate=10 --num-conns=100 --num-calls=1000 --burst-length=20" port)
 
-  //Console.WriteLine output
+  Console.WriteLine output
 
   //kill the server
-  //cts.Cancel()
+  cts.Cancel()
   0
