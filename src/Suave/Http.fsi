@@ -331,7 +331,7 @@ module Http =
   /// response.
   and [<Struct>] HttpContext =
     { /// The HTTP request being processed
-      request    : HttpRequest
+      mutable request    : HttpRequest
 
       /// The HttpRuntime for the request being processed
       runtime    : HttpRuntime

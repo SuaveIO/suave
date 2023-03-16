@@ -21,6 +21,8 @@ open Suave.Utils.Bytes
 open System.IO.Pipelines
 open Suave.Utils.AsyncExtensions
 open System.Buffers
+open System.Threading
+open System.Threading.Tasks
 
 [<Struct>]
 type ScanResult =
@@ -235,9 +237,11 @@ type Reader(transport : TcpTransport, lineBuffer : byte array, pipe: Pipe) =
       }
     loop bytes
 
-type ConnectionFacade(connection: Connection, runtime: HttpRuntime, logger:Logger, connectionPool: ConcurrentPool<ConnectionFacade>) =
+type ConnectionFacade(connection: Connection, runtime: HttpRuntime, logger:Logger, connectionPool: ConcurrentPool<ConnectionFacade>,webpart:WebPart) =
 
   let reader = new Reader(connection.transport,connection.lineBuffer,connection.pipe)
+
+  let httpOutput = new HttpOutput(connection,runtime)
 
   let files = List<HttpUpload>()
   let multiPartFields = List<string*string>()
@@ -480,7 +484,7 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, logger:Logge
     let! rawHost = headers %% "host" @|! (None, "Missing 'Host' header")
 
     if headers %% "expect" = Choice1Of2 "100-continue" then
-      let! _ = (new HttpOutput(connection,runtime)).run HttpRequest.empty Intermediate.CONTINUE
+      let! _ = httpOutput.run HttpRequest.empty Intermediate.CONTINUE
       logger.verbose (eventX "sent 100-continue response")
 
     logger.verbose (eventX "parsing post data")
@@ -511,7 +515,7 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, logger:Logge
       match err with
       | InputDataError (None, msg) ->
         logger.verbose (eventX "Error parsing HTTP request with {message}" >> setFieldValue "message" msg)
-        match! (new HttpOutput(connection,runtime)).run HttpRequest.empty (RequestErrors.BAD_REQUEST msg) with
+        match! httpOutput.run HttpRequest.empty (RequestErrors.BAD_REQUEST msg) with
         | _ ->
           logger.verbose (eventX "Exiting http loop")
 
@@ -519,11 +523,11 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, logger:Logge
         logger.verbose (eventX "Error parsing HTTP request with {message}" >> setFieldValue "message" msg)
         match Http.HttpCode.tryParse status with 
         | (Choice1Of2 statusCode) ->
-          match! (new HttpOutput(connection,runtime)).run HttpRequest.empty (Response.response statusCode (Encoding.UTF8.GetBytes msg)) with
+          match! httpOutput.run HttpRequest.empty (Response.response statusCode (Encoding.UTF8.GetBytes msg)) with
           | _ -> logger.verbose (eventX "Exiting http loop")
         | (Choice2Of2 err) ->
           logger.warn (eventX "Invalid HTTP status code {statusCode}" >> setFieldValue "statusCode" status)
-          match! (new HttpOutput(connection,runtime)).run HttpRequest.empty (RequestErrors.BAD_REQUEST msg) with
+          match! httpOutput.run HttpRequest.empty (RequestErrors.BAD_REQUEST msg) with
           | _ ->
             logger.verbose (eventX "Exiting http loop")
       | err ->
@@ -531,35 +535,67 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, logger:Logge
       return Ok(false)
     }
 
-  member this.loop consumer =
-    let rec loop =
-      task {
-        logger.verbose (eventX "Processing request... -> processor")
-        let! result' = this.processRequest ()
-        logger.verbose (eventX "Processed request. <- processor")
-        match result' with
-        | Ok result ->
-          match result with
-          | None ->
-            logger.verbose (eventX "'result = None', exiting")
-            return Ok (false)
-          | Some request ->
-            match! (new HttpOutput(connection,runtime)).run request consumer  with
-            | Result.Error err -> return Result.Error err 
-            | Ok keepAlive ->
-                if keepAlive then
-                  logger.verbose (eventX "'Connection: keep-alive' recurse")
-                  return Ok (keepAlive)
-                else
-                  logger.info (eventX "Connection: close")
-                  return Ok(false)
-        | Result.Error err ->
-          // Couldn't parse HTTP request; answering with BAD_REQUEST and closing the connection.
-          return! this.exitHttpLoopWithError err
-      }
-    loop
+  member this.loop  =
+    task {
+      logger.verbose (eventX "Processing request... -> processor")
+      let! result' = this.processRequest ()
+      logger.verbose (eventX "Processed request. <- processor")
+      match result' with
+      | Ok result ->
+        match result with
+        | None ->
+          logger.verbose (eventX "'result = None', exiting")
+          return Ok (false)
+        | Some request ->
+          match! httpOutput.run request webpart  with
+          | Result.Error err -> return Result.Error err 
+          | Ok keepAlive ->
+              if keepAlive then
+                logger.verbose (eventX "'Connection: keep-alive' recurse")
+                return Ok (keepAlive)
+              else
+                logger.verbose (eventX "Connection: close")
+                return Ok(false)
+      | Result.Error err ->
+        // Couldn't parse HTTP request; answering with BAD_REQUEST and closing the connection.
+        return! this.exitHttpLoopWithError err
+    }
 
   member this.shutdown() =
     connection.lineBufferCount <- 0
     connection.transport.shutdown()
     connectionPool.Push(this)
+
+  /// The request loop initialises a request with a processor to handle the
+  /// incoming stream and possibly pass the request to the web parts, a protocol,
+  /// a web part, an error handler and a Connection to use for read-write
+  /// communication -- getting the initial request stream.
+  member inline this.requestLoop =
+    task {
+      let flag = ref true
+      while !flag do
+        let! b = this.loop
+        match b with
+        | Ok b -> flag := b
+        | _ -> flag := false
+      return ()
+      }
+
+  member this.accept(binding) = task{
+    Interlocked.Increment Globals.numberOfClients |> ignore
+    logger.verbose (eventX "{client} connected. Now has {totalClients} connected"
+      >> setFieldValue "client" (binding.ip.ToString())
+      >> setFieldValue "totalClients" (!Globals.numberOfClients))
+    connection.socketBinding <- binding
+    try
+      do! this.requestLoop
+    with
+      | :? System.IO.EndOfStreamException ->
+        logger.debug (eventX "Disconnected client (end of stream)")
+    logger.verbose (eventX "Shutting down transport")
+    this.shutdown()
+    Interlocked.Decrement(Globals.numberOfClients) |> ignore
+    logger.verbose (eventX "Disconnected {client}. {totalClients} connected."
+      >> setFieldValue "client" (binding.ip.ToString())
+      >> setFieldValue "totalClients" (!Globals.numberOfClients))
+  }

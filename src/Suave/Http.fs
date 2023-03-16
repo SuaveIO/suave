@@ -505,7 +505,7 @@ module Http =
       maxContentLength  : int }
 
   and [<Struct>] HttpContext =
-    { request    : HttpRequest
+    { mutable request    : HttpRequest
       runtime    : HttpRuntime
       connection : Connection
       userState  : Dictionary<string, obj>

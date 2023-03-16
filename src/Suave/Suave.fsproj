@@ -56,7 +56,6 @@
     <Compile Include="ConnectionFacade.fs" />
     <Compile Include="Tcp.fs" />
     <Compile Include="TcpServerFactory.fs" />
-    <Compile Include="ParsingAndControl.fs" />
     <Compile Include="Web.fs" />
     <Compile Include="WebSocket.fs" />
     <Compile Include="Json.fs" />

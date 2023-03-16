@@ -54,19 +54,19 @@ let createConnection listenSocket cancellationToken bufferSize =
       lineBuffer    = Array.zeroCreate bufferSize;
       lineBufferCount = 0 }
 
-let createConnectionFacade connectionPool listenSocket (runtime: HttpRuntime) cancellationToken bufferSize =
+let createConnectionFacade connectionPool listenSocket (runtime: HttpRuntime) cancellationToken bufferSize webpart =
   let connection = createConnection listenSocket cancellationToken bufferSize
-  let facade = new ConnectionFacade(connection, runtime, logger, connectionPool)
+  let facade = new ConnectionFacade(connection, runtime, logger, connectionPool,webpart)
   facade
 
-let createPools listenSocket maxOps runtime cancellationToken bufferSize =
+let createPools listenSocket maxOps runtime cancellationToken bufferSize (webpart:WebPart) =
 
   let connectionPool = new ConcurrentPool<ConnectionFacade>()
-  connectionPool.ObjectGenerator <- (fun _ -> createConnectionFacade connectionPool listenSocket runtime cancellationToken bufferSize)
+  connectionPool.ObjectGenerator <- (fun _ -> createConnectionFacade connectionPool listenSocket runtime cancellationToken bufferSize webpart)
 
   //Pre-allocate a set of reusable transportObjects
   for x = 0 to maxOps - 1 do
-    let connection = createConnectionFacade connectionPool listenSocket runtime cancellationToken bufferSize
+    let connection = createConnectionFacade connectionPool listenSocket runtime cancellationToken bufferSize webpart
     connectionPool.Push connection
 
   connectionPool
@@ -91,28 +91,10 @@ let private aFewTimes f = task{
 // echo 5 > /proc/sys/net/ipv4/tcp_fin_timeout
 // echo 1 > /proc/sys/net/ipv4/tcp_tw_recycle
 // custom kernel with shorter TCP_TIMEWAIT_LEN in include/net/tcp.h
-let (*inline*) job (serveClient : TcpWorker<unit>) binding (connection : ConnectionFacade) = task {
-  Interlocked.Increment Globals.numberOfClients |> ignore
-  logger.debug (eventX "{client} connected. Now has {totalClients} connected"
-    >> setFieldValue "client" (binding.ip.ToString())
-    >> setFieldValue "totalClients" (!Globals.numberOfClients))
-  connection.Connection.socketBinding <- binding
-  try
-    do! serveClient connection
-  with
-    | :? System.IO.EndOfStreamException ->
-      logger.debug (eventX "Disconnected client (end of stream)")
-  logger.info (eventX "Shutting down transport")
-  connection.shutdown()
-  Interlocked.Decrement(Globals.numberOfClients) |> ignore
-  logger.info (eventX "Disconnected {client}. {totalClients} connected."
-    >> setFieldValue "client" (binding.ip.ToString())
-    >> setFieldValue "totalClients" (!Globals.numberOfClients))
-  }
 
 #nowarn "9"
 
-type TcpServer = StartedData -> AsyncResultCell<StartedData> -> TcpWorker<unit> -> Task<unit>
+type TcpServer = StartedData -> AsyncResultCell<StartedData> -> Task<unit>
 
 let enableRebinding (listenSocket: Socket) =
   let mutable optionValue = 1
@@ -127,8 +109,8 @@ let enableRebinding (listenSocket: Socket) =
     logger.warn(eventX "Setting SO_REUSEADDR failed with errno '{errno}'." >> setFieldValue "errno" (Marshal.GetLastWin32Error()))
 
 
-let runServer maxConcurrentOps bufferSize (binding: SocketBinding) (runtime:HttpRuntime) (cancellationToken: CancellationToken) startData
-              (acceptingConnections: AsyncResultCell<StartedData>) serveClient = task {
+let runServer maxConcurrentOps bufferSize (binding: SocketBinding) (runtime:HttpRuntime) (cancellationToken: CancellationToken) (webpart: WebPart) startData
+              (acceptingConnections: AsyncResultCell<StartedData>) = task {
 
   use listenSocket = new Socket(binding.endpoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp)
   try
@@ -136,7 +118,7 @@ let runServer maxConcurrentOps bufferSize (binding: SocketBinding) (runtime:Http
     enableRebinding(listenSocket)
     listenSocket.NoDelay <- true
 
-    let connectionPool = createPools listenSocket maxConcurrentOps runtime cancellationToken bufferSize
+    let connectionPool = createPools listenSocket maxConcurrentOps runtime cancellationToken bufferSize webpart
 
     do! aFewTimes (fun () -> listenSocket.Bind binding.endpoint)
     listenSocket.Listen MaxBacklog
@@ -164,7 +146,7 @@ let runServer maxConcurrentOps bufferSize (binding: SocketBinding) (runtime:Http
         match r with
         | Ok remoteBinding ->
           // Start a new task for each accepted TCP client
-          let task = Task.Factory.StartNew(fun () -> job serveClient remoteBinding connection)
+          let task = Task.Factory.StartNew(fun () -> connection.accept(remoteBinding))
           ()
         | Result.Error e ->
           failwithf "Socket failed to accept client, error: %A" e
@@ -186,7 +168,7 @@ let runServer maxConcurrentOps bufferSize (binding: SocketBinding) (runtime:Http
 /// listening to its address/port combination), and an asynchronous workflow that
 /// yields when the full server is cancelled. If the 'has started listening' workflow
 /// returns None, then the start timeout expired.
-let startTcpIpServerAsync (serveClient : TcpWorker<unit>) (binding : SocketBinding) (runServer : TcpServer) =
+let startTcpIpServerAsync (binding : SocketBinding) (runServer : TcpServer) =
 
   let acceptingConnections = new AsyncResultCell<StartedData>()
   Globals.numberOfClients := 0
@@ -196,4 +178,4 @@ let startTcpIpServerAsync (serveClient : TcpWorker<unit>) (binding : SocketBindi
           binding        = binding }
 
   acceptingConnections.awaitResult()
-    , runServer startData acceptingConnections serveClient
+    , runServer startData acceptingConnections

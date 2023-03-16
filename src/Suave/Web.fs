@@ -3,6 +3,7 @@ namespace Suave
 open TcpServerFactory
 open System.Threading.Tasks
 open System.Threading
+open Tcp
 
 [<AutoOpen>]
 module Web =
@@ -41,9 +42,14 @@ module Web =
   let startWebServerAsync (config : SuaveConfig) (webpart : WebPart) =
     ServerKey.validate config.serverKey |> ignore
 
+    let resolveDirectory homeDirectory =
+      match homeDirectory with
+      | None   -> Path.GetDirectoryName(System.AppContext.BaseDirectory)
+      | Some s -> s
+
     let homeFolder, compressionFolder =
-      ParsingAndControl.resolveDirectory config.homeFolder,
-      Path.Combine(ParsingAndControl.resolveDirectory config.compressedFilesFolder, "_temporary_compressed_files")
+      resolveDirectory config.homeFolder,
+      Path.Combine(resolveDirectory config.compressedFilesFolder, "_temporary_compressed_files")
 
     // spawn tcp listeners/web workers
     let toRuntime = SuaveConfig.toRuntime config homeFolder compressionFolder
@@ -54,9 +60,9 @@ module Web =
 
     let startWebWorkerAsync runtime =
       let tcpServer =
-        (tcpServerFactory :> TcpServerFactory).create(config.maxOps, config.bufferSize, runtime.matchedBinding.socketBinding,runtime,config.cancellationToken)
+        (tcpServerFactory :> TcpServerFactory).create(config.maxOps, config.bufferSize, runtime.matchedBinding.socketBinding,runtime,config.cancellationToken,webpart)
 
-      ParsingAndControl.startWebWorkerAsync webpart runtime tcpServer
+      startTcpIpServerAsync runtime.matchedBinding.socketBinding  tcpServer
 
     let servers =
        List.map (toRuntime >> startWebWorkerAsync) config.bindings

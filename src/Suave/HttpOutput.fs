@@ -8,8 +8,6 @@ open Suave.Logging
 open Suave.Logging.Message
 
 open System
-open Suave.Sockets.Connection
-open System.Text
 
 module ByteConstants =
 
@@ -27,6 +25,13 @@ module ByteConstants =
   let colonBytes = ASCII.bytes ": "
 
 type HttpOutput(connection: Connection, runtime: HttpRuntime) =
+
+  let mutable freshContext =
+        { connection = connection
+        ; runtime = runtime
+        ; request = HttpRequest.empty
+        ; userState = new Dictionary<string,obj>()
+        ; response = HttpResult.empty }
 
   member (*inline*) this.writeContentType (headers : (string*string) list) = socket {
     if not(List.exists(fun (x : string,_) -> x.ToLower().Equals("content-type")) headers )then
@@ -133,12 +138,8 @@ type HttpOutput(connection: Connection, runtime: HttpRuntime) =
   /// can't it will return None and the run method will return.
   member this.run request (webPart : WebPart) = 
     task {
-      let freshContext =
-        { connection = connection
-        ; runtime = runtime
-        ; request = request
-        ; userState = new Dictionary<string,obj>()
-        ; response = HttpResult.empty }
+      freshContext.request <- request
+      freshContext.userState.Clear()
       let task = webPart freshContext
       match! this.executeTask task with 
       | Some ctx ->

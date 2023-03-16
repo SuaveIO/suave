@@ -13,12 +13,13 @@ module TcpServerFactory =
                            * binding : SocketBinding
                            * runtime : HttpRuntime
                            * cancellationToken : CancellationToken
+                           * webPart : WebPart
                           -> TcpServer
 
   type DefaultTcpServerFactory() =
     interface TcpServerFactory with
-      member this.create (maxOps, bufferSize, binding, runtime,cancellationToken) =
-        Tcp.runServer maxOps bufferSize binding runtime cancellationToken
+      member this.create (maxOps, bufferSize, binding, runtime,cancellationToken,webPart) =
+        Tcp.runServer maxOps bufferSize binding runtime cancellationToken webPart
 
   let tcpServerFactory = new DefaultTcpServerFactory()
 

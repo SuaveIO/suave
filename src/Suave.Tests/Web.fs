@@ -4,7 +4,6 @@ open Expecto
 
 open Suave
 open Suave.Operators
-open Suave.ParsingAndControl
 open Suave.Logging
 open Suave.Testing
 open Suave.Sockets.Control
