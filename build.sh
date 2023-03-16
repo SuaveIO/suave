@@ -2,4 +2,4 @@
 source .env
 dotnet tool restore
 dotnet paket restore
-dotnet run --project ./build/build.fsproj -- -t Tests
+dotnet run --project ./build/build.fsproj -- -t Load
