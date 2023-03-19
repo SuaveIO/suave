@@ -2,7 +2,6 @@ namespace Suave
 
 open TcpServerFactory
 open System.Threading.Tasks
-open System.Threading
 open Tcp
 
 [<AutoOpen>]
@@ -18,11 +17,7 @@ module Web =
   /// The default error handler returns a 500 Internal Error in response to
   /// thrown exceptions.
   let defaultErrorHandler (ex : Exception) msg (ctx : HttpContext) =
-    ctx.runtime.logger.error (
-      eventX msg
-      >> setSingleName "Suave.Web.defaultErrorHandler"
-      >> addExn ex)
-
+    ctx.runtime.logger.error (eventX msg >> setSingleName "Suave.Web.defaultErrorHandler" >> addExn ex)
     if ctx.isLocalTrustProxy then
       Response.response HTTP_500 (Encoding.UTF8.GetBytes("<h1>" + ex.Message + "</h1><br/>" + ex.ToString())) ctx
     else
@@ -58,14 +53,14 @@ module Web =
     // that of Suave's configuration.
     Global.initialiseIfDefault { Global.defaultConfig with getLogger = fun _ -> config.logger }
 
-    let startWebWorkerAsync runtime =
+    let startWebWorker runtime =
       let tcpServer =
         (tcpServerFactory :> TcpServerFactory).create(config.maxOps, config.bufferSize, runtime.matchedBinding.socketBinding,runtime,config.cancellationToken,webpart)
 
-      startTcpIpServerAsync runtime.matchedBinding.socketBinding  tcpServer
+      startTcpIpServer runtime.matchedBinding.socketBinding tcpServer
 
     let servers =
-       List.map (toRuntime >> startWebWorkerAsync) config.bindings
+       List.map (toRuntime >> startWebWorker) config.bindings
 
     let listening = servers |> Seq.map fst |> Async.Parallel
     let server    = servers |> Seq.map snd |> Task.WhenAll

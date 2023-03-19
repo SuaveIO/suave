@@ -6,12 +6,14 @@ open Suave.Sockets.Control
 open System.Text
 open System
 open Suave.Utils
+open Suave
 
 /// A connection (TCP implied) is a thing that can read and write from a socket
 /// and that can be closed.
 type Connection =
   { mutable socketBinding : SocketBinding
     transport     : TcpTransport
+    reader     : HttpReader
     pipe : Pipe
     lineBuffer    : byte array
     mutable lineBufferCount : int }
@@ -57,7 +59,7 @@ type Connection =
           return ()
     }
 
-  member inline this.asyncWriteLn (s : string)  : SocketOp<unit> =
+  member inline this.asyncWriteLn (s : string) : SocketOp<unit> =
     socket {
       return! this.asyncWrite (s + Bytes.eol)
     }
@@ -110,6 +112,7 @@ module Connection =
   let empty : Connection =
     { socketBinding = SocketBinding.create IPAddress.IPv6Loopback 8080us
       transport     = null
+      reader     = null
       pipe = null
       lineBuffer    = [||]
       lineBufferCount = 0 }
@@ -120,14 +123,3 @@ module Connection =
   let inline send (cn :Connection) (buf : ByteSegment) =
     cn.transport.write buf
 
-  let transport_ =
-    (fun x -> x.transport),
-    fun v x -> { x with transport = v }
-
-  let pipe =
-    (fun x -> x.pipe),
-    fun v x -> { x with pipe = v }
-
-  let lineBuffer_ =
-    (fun x -> x.lineBuffer),
-    fun v x -> { x with lineBuffer = v }

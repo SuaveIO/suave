@@ -1,11 +1,10 @@
 module Suave.Tests.Program
 
-open Suave.Http
+open System
+open Suave
 open Suave.Web
 open Suave.Logging
 open ExpectoExtensions
-
-open System
 
 [<EntryPoint>]
 let main args =

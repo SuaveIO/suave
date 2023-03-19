@@ -32,7 +32,7 @@ type HttpOutput(connection: Connection, runtime: HttpRuntime) =
         ; request = HttpRequest.empty
         ; userState = new Dictionary<string,obj>()
         ; response = HttpResult.empty }
-
+       
   member (*inline*) this.writeContentType (headers : (string*string) list) = socket {
     if not(List.exists(fun (x : string,_) -> x.ToLower().Equals("content-type")) headers )then
       return! connection.asyncWriteBufferedBytes ByteConstants.defaultContentTypeHeaderBytes
@@ -86,10 +86,8 @@ type HttpOutput(connection: Connection, runtime: HttpRuntime) =
         if context.request.``method`` <> HttpMethod.HEAD && content.Length > 0 then
           do! connection.asyncWriteBufferedBytes content
           do! connection.flush()
-          return ()
         else
           do! connection.flush()
-          return ()
       | None ->
         // http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.13
         // https://tools.ietf.org/html/rfc7230#section-3.3.2
@@ -97,10 +95,8 @@ type HttpOutput(connection: Connection, runtime: HttpRuntime) =
         if context.request.``method`` <> HttpMethod.HEAD && content.Length > 0 then
           do! connection.asyncWriteBufferedBytes content
           do! connection.flush()
-          return ()
         else
           do! connection.flush()
-          return ()
       }
     | SocketTask f -> socket{
       do! f (connection, context.response)
@@ -109,10 +105,8 @@ type HttpOutput(connection: Connection, runtime: HttpRuntime) =
         if writePreamble then
           do! this.writeContentLengthHeader [||] context
           do! connection.flush()
-          return ()
         else
           do! connection.flush()
-          return ()
            }
 
   member this.executeTask task  = async {
@@ -128,33 +122,41 @@ type HttpOutput(connection: Connection, runtime: HttpRuntime) =
       if newCtx.response.writePreamble then
         do! this.writePreamble newCtx.response
         do! this.writeContent true newCtx newCtx.response.content
-        return ()
       else
-        let! connection =  this.writeContent false newCtx newCtx.response.content
-        return ()
+        do! this.writeContent false newCtx newCtx.response.content
         }
 
   /// Check if the web part can perform its work on the current request. If it
   /// can't it will return None and the run method will return.
-  member this.run request (webPart : WebPart) = 
+  member this.run (request:HttpRequest) (webPart : WebPart) = 
     task {
-      freshContext.request <- request
-      freshContext.userState.Clear()
-      let task = webPart freshContext
-      match! this.executeTask task with 
-      | Some ctx ->
-        match! this.writeResponse ctx with
-        | Ok () ->
-          let keepAlive =
-            match ctx.request.header "connection" with
-            | Choice1Of2 conn ->
-              String.equalsOrdinalCI conn "keep-alive"
-            | Choice2Of2 _ ->
-              ctx.request.httpVersion.Equals("HTTP/1.1")
-          return Ok keepAlive
-        | Result.Error err ->
-          ctx.runtime.logger.error (eventX "Socket error while writing response {error}" >> setFieldValue "error" err)
-          return Result.Error err
-      | None ->
-        return Ok (false)
+      try
+        freshContext.request <- request
+        freshContext.userState.Clear()
+        //Console.WriteLine "before calling webpart"
+        let task = webPart freshContext
+        //Console.WriteLine "after calling webpart"
+        //Console.WriteLine "before Execute task"
+        match! this.executeTask task with 
+        | Some ctx ->
+          //Console.WriteLine "before writeresponse"
+          match! this.writeResponse ctx with
+          | Ok () ->
+            //Console.WriteLine "after writeresponse"
+            let keepAlive =
+              match ctx.request.header "connection" with
+              | Choice1Of2 conn ->
+                String.equalsOrdinalCI conn "keep-alive"
+              | Choice2Of2 _ ->
+                ctx.request.httpVersion.Equals("HTTP/1.1")
+            //Console.WriteLine "exiting httpOutput.run"
+            return Ok (keepAlive)
+          | Result.Error err ->
+            ctx.runtime.logger.error (eventX "Socket error while writing response {error}" >> setFieldValue "error" err)
+            return Result.Error err
+        | None ->
+          return Ok (false)
+      with ex ->
+        //Console.WriteLine "nother one bytes the doost"
+        return Result.Error(Error.ConnectionError ex.Message)
   }

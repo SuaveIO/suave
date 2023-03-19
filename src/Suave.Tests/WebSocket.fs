@@ -41,7 +41,6 @@ let websocketTests cfg =
         | Ok msg ->
           match msg with
           | (Text, data:ByteSegment, true) ->
-            //data.Span.
             let str = Encoding.UTF8.GetString data.Span
             match str with
             | "BinaryRequest7bit" ->

@@ -89,7 +89,6 @@ module SuaveConfig =
                        compressionFolder
                        config.logger
                        config.cookieSerialiser
-                       //config.tlsProvider
                        config.hideHeader
                        config.maxContentLength
 

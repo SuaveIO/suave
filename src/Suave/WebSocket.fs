@@ -135,17 +135,20 @@ module WebSocket =
 
     { Frame.OpcodeByte = firstByte; EncodedLength = encodedLength; Data = data }
 
-  let readBytes (transport : TcpTransport) (n : int) =
-    let arr = Array.zeroCreate n
+  let readBytes (connection : Connection) (n : int) =
     socket {
-      let i = ref 0
-      while !i < n do
-        let! read = transport.read(Memory(arr,!i,n - !i))
-        i := !i+read
+      let arr = Array.zeroCreate n
+      let offset = ref 0
+      let reader = connection.reader
+      do! reader.readPostData n (fun a count ->
+          let source = a.Span.Slice(0,count)
+          let target = new Span<byte>(arr,!offset,count)
+          source.CopyTo(target)
+          offset := !offset + count)
       return arr
     }
 
-  let readBytesIntoByteSegment retrieveByteSegment (transport : TcpTransport) (n : int) =
+  let readBytesIntoByteSegment retrieveByteSegment (connection : Connection) (n : int) =
     let byteSegmentRetrieved: ByteSegment = retrieveByteSegment n
 
     let byteSegment =
@@ -154,14 +157,16 @@ module WebSocket =
         | count when count < n -> raise (ByteSegmentCapacityException(n, byteSegmentRetrieved.Length))
         | _ -> byteSegmentRetrieved.Slice(0,n)
 
-    let rec loop i = socket {
-      if i = n then
-        return byteSegment
-      else
-        let! read = transport.read <| byteSegment.Slice(i, n - i) //ArraySegment(byteSegment.Array,(byteSegment.Offset + i), n - i)
-        return! loop (i+read)
-      }
-    loop 0
+    let offset = ref 0
+    let reader = connection.reader
+    socket{
+      do! reader.readPostData n (fun a count ->
+        let source = a.Span.Slice(0,count)
+        let target = byteSegment.Span.Slice(!offset,count)
+        source.CopyTo(target)
+        offset := !offset + count)
+      return byteSegment
+    }
 
   type internal Cont<'t> = 't -> unit
 
@@ -172,10 +177,10 @@ module WebSocket =
 
     let readExtendedLength header = socket {
       if header.length = 126 then
-          let! bytes = readBytes connection.transport 2
+          let! bytes = readBytes connection 2
           return uint64(bytes.[0]) * 256UL + uint64(bytes.[1])
         elif header.length = 127 then
-          let! bytes = readBytes connection.transport 8
+          let! bytes = readBytes connection 8
           return uint64(bytes.[0]) * 65536UL * 65536UL * 65536UL * 256UL +
           uint64(bytes.[1]) * 65536UL * 65536UL * 65536UL +
           uint64(bytes.[2]) * 65536UL * 65536UL * 256UL +
@@ -205,12 +210,12 @@ module WebSocket =
 
     let readFrame () = socket {
       //assert (Seq.length connection.segments = 0)
-      let! arr = readBytes connection.transport 2
+      let! arr = readBytes connection 2
       let header = exctractHeader arr
       let! extendedLength = readExtendedLength header
 
       assert(header.hasMask)
-      let! mask = readBytes connection.transport 4
+      let! mask = readBytes connection 4
 
       if extendedLength > uint64 Int32.MaxValue then
         let reason = "Frame size of " + extendedLength.ToString() + " bytes exceeds maximum accepted frame size (2 GB)"
@@ -220,7 +225,7 @@ module WebSocket =
         do! sendFrame Close (Memory(data)) true
         return! SocketOp.abort (InputDataError(None, reason))
       else
-        let! frame = readBytes connection.transport (int extendedLength)
+        let! frame = readBytes connection (int extendedLength)
         // Messages from the client MUST be masked
         let data = if header.hasMask then frame |> Array.mapi (fun i x -> x ^^^ mask.[i % 4]) else frame
         return (header.opcode, data, header.fin)
@@ -228,12 +233,12 @@ module WebSocket =
 
     let readFrameIntoSegment (byteSegmentForLengthFunc: int -> ByteSegment) = socket {
       //assert (Seq.length connection.segments = 0)
-      let! arr = readBytes connection.transport 2
+      let! arr = readBytes connection 2
       let header = exctractHeader arr
       let! extendedLength = readExtendedLength header
 
       assert(header.hasMask)
-      let! mask = readBytes connection.transport 4
+      let! mask = readBytes connection 4
 
       if extendedLength > uint64 Int32.MaxValue then
         let reason = "Frame size of " + extendedLength.ToString() + " bytes exceeds maximum accepted frame size (2 GB)"
@@ -243,7 +248,7 @@ module WebSocket =
         do! sendFrame Close (Memory(data)) true
         return! SocketOp.abort (InputDataError(None, reason))
       else
-        let! frame = readBytesIntoByteSegment byteSegmentForLengthFunc connection.transport (int extendedLength)
+        let! frame = readBytesIntoByteSegment byteSegmentForLengthFunc connection (int extendedLength)
 
         // Messages from the client MUST be masked
         if header.hasMask
@@ -350,7 +355,6 @@ module WebSocket =
           >> setFieldValue "error" err)
       return! Control.CLOSE ctx
     | Choice2Of2 response ->
-      Console.WriteLine("not valid response i guess")
       return! response
   }
 

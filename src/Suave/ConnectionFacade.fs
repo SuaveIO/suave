@@ -1,7 +1,5 @@
-
 #nowarn "40"
 #nowarn "3370"
-
 namespace Suave
 
 open System
@@ -18,230 +16,14 @@ open Suave.Sockets
 open Suave.Sockets.Control
 open Suave.Sockets.SocketOp.Operators
 open Suave.Utils.Bytes
-open System.IO.Pipelines
-open Suave.Utils.AsyncExtensions
-open System.Buffers
 open System.Threading
 open System.Threading.Tasks
 
-[<Struct>]
-type ScanResult =
-  NeedMore | Found of found:int | Error of Error
-
-[<Struct>]
-type SelectResult =
-  FailWith of error:Error | Continue of int
-
-type SelectFunction = ReadOnlyMemory<byte> -> int -> SelectResult
-
-module Aux =
-  /// Splits the segment list in two lits of ArraySegment; the first one containing a total of index bytes
-  let inline split (bufferSequence:ReadOnlySequence<byte>) index (select:SelectFunction) : SelectResult =
-    let rec loop  (bufferSequence:ReadOnlySequence<byte>) acc selectResult : SelectResult = 
-      match selectResult with
-      | Continue count ->
-        if bufferSequence.Length = 0 then
-          Continue count
-        else
-          let pair = bufferSequence.First
-          if acc + pair.Length < index then
-            let selectResult = select pair pair.Length
-            match selectResult with
-            | Continue _ ->
-              loop (bufferSequence.Slice(pair.Length)) (acc + pair.Length) (Continue(count + acc + pair.Length))
-            | FailWith s ->
-              FailWith s
-          elif acc + pair.Length >= index then
-            let bytesRead = index - acc
-            let selectResult = select pair bytesRead
-            match selectResult with
-            | Continue _ ->
-              Continue(count + bytesRead)
-              | FailWith s ->
-                FailWith s
-            else failwith "Suave.Web.split: invalid case"
-      | FailWith s ->
-        FailWith s
-    loop bufferSequence 0 (Continue 0)
-
-type Reader(transport : TcpTransport, lineBuffer : byte array, pipe: Pipe) =
-
-  member (*inline*) x.readMoreData () = task {
-    let buff = pipe.Writer.GetMemory()
-    match! transport.read buff with
-    | Ok x ->
-      pipe.Writer.Advance(x)
-      let! flushResult = pipe.Writer.FlushAsync()
-      return Ok()
-    | Result.Error error ->
-      return Result.Error error
-    }
-
-  member (*inline*) x.getData () = task{
-      let (success, result) = pipe.Reader.TryRead()
-      if success then
-        return result
-      else
-        let! result = x.readMoreData()
-        let! result= pipe.Reader.ReadAsync()
-        return result
-  }
-  /// Iterates over a BufferSegment list looking for a marker, data before the marker
-  /// is sent to the function select
-  /// Returns the number of bytes read.
-  member (*inline*) x.scanMarker (marker: byte[]) (select : SelectFunction) = 
-    task{
-      let! result = x.getData()
-      let bufferSequence = result.Buffer
-      match kmpW marker bufferSequence with
-      | ValueSome x ->
-        let res = Aux.split bufferSequence (int x) select
-        match res with
-        | Continue n ->
-          pipe.Reader.AdvanceTo(bufferSequence.GetPosition(int64(n + marker.Length)))
-          return Result.Ok(Found n)
-        | FailWith s ->
-          return Result.Ok(Error s)
-      | ValueNone ->
-        let r = Aux.split bufferSequence (int(bufferSequence.Length - int64 marker.Length)) select
-        pipe.Reader.AdvanceTo(bufferSequence.GetPosition(bufferSequence.Length - int64 marker.Length))
-        return Result.Ok(NeedMore)
-  }
-
-  /// Read the passed stream into buff until the EOL (CRLF) has been reached
-  /// and returns the number of bytes read and the connection
-  member (*inline*) x.readUntilPattern marker select =
-    task {
-      let reading = ref true
-      let error = ref false
-      let result = ref 0
-      let errorResult = ref (Ok(0))
-      while !reading && not !error do
-        let! res = x.scanMarker marker select
-        match res with
-        | Ok(Found a) ->
-          reading := false
-          result := a
-        | Ok(NeedMore) ->
-          let! a = x.readMoreData()
-          // continue reading
-          ()
-        | Result.Error s
-        | Ok(Error s) ->
-          error := true
-          errorResult := Result.Error s
-      if !error then
-        return !errorResult
-      else
-        return Ok (!result)
-    }
-
-  member x.skip n =
-     task{
-      let! result= pipe.Reader.ReadAsync()
-      let bufferSequence = result.Buffer
-      // we really do not calling split because we are not doing anything with it
-      let res = Aux.split bufferSequence n (fun a b -> Continue 0 )
-      match res with
-        | Continue n ->
-          pipe.Reader.AdvanceTo(bufferSequence.GetPosition(n))
-          return Found n
-        | FailWith s ->
-          return Error s
-      }
-
-  /// Read a line from the stream, calling UTF8.toString on the bytes before the EOL marker
-  member (*inline*) x.readLine () = socket {
-    let offset = ref 0
-    let! count =
-      x.readUntilPattern EOL (fun a count ->
-        if !offset + count > lineBuffer.Length then
-          FailWith (InputDataError (Some 414, "Line Too Long"))
-        else
-          let source = a.Span.Slice(0,count)
-          let target = new Span<byte>(lineBuffer,!offset,count)
-          source.CopyTo(target)
-          offset := !offset + count
-          
-          Continue !offset
-      )
-    let result = Encoding.UTF8.GetString(lineBuffer, 0, !offset)
-    return result
-  }
-
-  member x.skipLine ()= socket {
-    let offset = ref 0
-    let! _ =
-      x.readUntilPattern EOL (fun a count ->
-        offset := !offset + count
-        Continue !offset
-      )
-    return offset
-  }
-
-  /// Read all headers from the stream, returning a dictionary of the headers found
-  member (*inline*) x.readHeaders() =
-    task {
-      let headers = new List<string*string>()
-      let flag = ref true
-      let error = ref false
-      let result = ref (Ok ([]))
-      while !flag && (not !error)do
-        let! _line = x.readLine ()
-        match _line with
-        | Ok line ->
-          if line <> String.Empty then
-            let indexOfColon = line.IndexOf(':')
-            let header = (line.Substring(0, indexOfColon).ToLower(), line.Substring(indexOfColon+1).TrimStart())
-            headers.Add header
-          else
-            flag := false
-        | Result.Error e ->
-          error := true
-          result := Result.Error e
-
-      if !error then
-          return !result
-        else
-          return Ok(List.ofSeq headers)
-    }
-
-  /// Read the post data from the stream, given the number of bytes that makes up the post data.
-  member (*inline*) x.readPostData (bytes : int) (select:ReadOnlyMemory<byte> -> int -> unit)  : SocketOp<unit> =
-    let rec loop n : SocketOp<unit> =
-      task {
-        if n = 0 then
-          return Result.Ok()
-        else
-          let! result = x.getData()
-          let bufferSequence = result.Buffer
-          if bufferSequence.Length > 0  then
-            let segment = bufferSequence.First
-            if segment.Length > n then
-              select segment n
-              pipe.Reader.AdvanceTo(bufferSequence.GetPosition(int64(n)))
-              return Result.Ok()
-            else
-              select segment segment.Length
-              pipe.Reader.AdvanceTo(bufferSequence.GetPosition(int64(segment.Length)))
-              return! loop (n - segment.Length)
-          else
-            if n = 0 then
-              return Result.Ok()
-            else
-              match! x.readMoreData() with
-              | Result.Ok _ ->
-                return! loop n
-              | Result.Error error ->
-                return Result.Error error
-      }
-    loop bytes
-
-type ConnectionFacade(connection: Connection, runtime: HttpRuntime, logger:Logger, connectionPool: ConcurrentPool<ConnectionFacade>,webpart:WebPart) =
-
-  let reader = new Reader(connection.transport,connection.lineBuffer,connection.pipe)
+type ConnectionFacade(connection: Connection, runtime: HttpRuntime, logger:Logger, connectionPool: ConcurrentPool<ConnectionFacade>, cancellationToken: CancellationToken,webpart:WebPart) =
 
   let httpOutput = new HttpOutput(connection,runtime)
+
+  let reader = connection.reader
 
   let files = List<HttpUpload>()
   let multiPartFields = List<string*string>()
@@ -256,7 +38,6 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, logger:Logge
           Continue 0)
     let fileLength = tempFile.Length
     tempFile.Dispose()
-
     if fileLength > 0L then
       let! filename =
         match headerParams.TryLookup "filename*" with
@@ -395,7 +176,7 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, logger:Logge
       let mutable parsing = true
       let mutable error = false
       let result = ref (Ok())
-      while parsing && not error do
+      while parsing && not error && not(cancellationToken.IsCancellationRequested) do
         let! _line = something ()
         match _line with
         | Ok line ->
@@ -535,7 +316,7 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, logger:Logge
       return Ok(false)
     }
 
-  member this.loop  =
+  member this.loop () =
     task {
       logger.verbose (eventX "Processing request... -> processor")
       let! result' = this.processRequest ()
@@ -547,15 +328,19 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, logger:Logge
           logger.verbose (eventX "'result = None', exiting")
           return Ok (false)
         | Some request ->
-          match! httpOutput.run request webpart  with
-          | Result.Error err -> return Result.Error err 
-          | Ok keepAlive ->
-              if keepAlive then
-                logger.verbose (eventX "'Connection: keep-alive' recurse")
-                return Ok (keepAlive)
-              else
-                logger.verbose (eventX "Connection: close")
-                return Ok(false)
+          try
+            match! httpOutput.run request webpart  with
+            | Result.Error err ->
+              return Result.Error err 
+            | Ok keepAlive ->
+                if keepAlive then
+                  logger.verbose (eventX "'Connection: keep-alive' recurse")
+                  return Ok (keepAlive)
+                else
+                  logger.verbose (eventX "Connection: close")
+                  return Ok(false)
+          with ex ->
+            return Result.Error (Error.ConnectionError ex.Message)
       | Result.Error err ->
         // Couldn't parse HTTP request; answering with BAD_REQUEST and closing the connection.
         return! this.exitHttpLoopWithError err
@@ -570,15 +355,20 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, logger:Logge
   /// incoming stream and possibly pass the request to the web parts, a protocol,
   /// a web part, an error handler and a Connection to use for read-write
   /// communication -- getting the initial request stream.
-  member inline this.requestLoop =
+  member (*inline*) this.requestLoop ()=
     task {
       let flag = ref true
-      while !flag do
-        let! b = this.loop
+      let result = ref (Ok ())
+      while !flag && not (cancellationToken.IsCancellationRequested) do
+        let! b = this.loop ()
         match b with
-        | Ok b -> flag := b
-        | _ -> flag := false
-      return ()
+        | Ok b ->
+          flag := b
+        | Result.Error e ->
+          flag := false
+          result := Result.Error e
+      reader.stop()
+      return result
       }
 
   member this.accept(binding) = task{
@@ -588,7 +378,9 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, logger:Logge
       >> setFieldValue "totalClients" (!Globals.numberOfClients))
     connection.socketBinding <- binding
     try
-      do! this.requestLoop
+      let task = Task.Factory.StartNew(reader.readLoop,cancellationToken)
+      let! a = this.requestLoop()
+      ()
     with
       | :? System.IO.EndOfStreamException ->
         logger.debug (eventX "Disconnected client (end of stream)")

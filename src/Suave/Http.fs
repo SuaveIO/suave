@@ -59,8 +59,6 @@ module Http =
     { code   : int
       reason : string
     }
-    static member code_ = (fun x -> x.code), fun v x -> { x with code = v }
-    static member reason_ = (fun x -> x.reason), fun v x -> { x with reason = v }
 
   type HttpCode =
     | HTTP_100 | HTTP_101
@@ -223,15 +221,6 @@ module Http =
       httpOnly : bool
       sameSite : SameSite option }
 
-    static member name_     = (fun x -> x.name),    fun v (x : HttpCookie) -> { x with name = v }
-    static member value_    = (fun x -> x.value), fun v (x : HttpCookie) -> { x with value = v }
-    static member expires_  = (fun x -> x.expires), fun v x -> { x with expires = v }
-    static member path_     = (fun x -> x.path), fun v (x : HttpCookie) -> { x with path = v }
-    static member domain_   = (fun x -> x.domain), fun v x -> { x with domain = v }
-    static member secure_   = (fun x -> x.secure), fun v x -> { x with secure = v }
-    static member httpOnly_ = (fun x -> x.httpOnly), fun v x -> { x with httpOnly = v }
-    static member sameSite_ = (fun x -> x.sameSite), fun v x -> { x with sameSite = v }
-
   [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
   module HttpCookie =
 
@@ -244,7 +233,6 @@ module Http =
         secure    = secure
         httpOnly = httpOnly
         sameSite = sameSite }
-
 
     let createKV name value =
       { name      = name
@@ -275,58 +263,6 @@ module Http =
         | Strict ->  Some "Strict" |> appkv "SameSite" id
         | Lax -> Some "Lax" |> appkv "SameSite" id
       sb.ToString ()
-
-  type MimeType =
-    { name        : string
-      compression : bool }
-
-  type MimeTypesMap = string -> MimeType option
-
-  type HttpUpload =
-    { fieldName    : string
-      fileName     : string
-      mimeType     : string
-      tempFilePath : string }
-
-  [<AllowNullLiteral>]
-  type TlsProvider =
-    abstract member wrap : Connection * obj -> SocketOp<Connection>
-
-  type Protocol =
-    | HTTP
-    | HTTPS of obj
-
-    member x.secure =
-      match x with
-      | HTTP    -> false
-      | HTTPS _ -> true
-
-    override x.ToString() =
-      match x with
-      | HTTP    -> "http"
-      | HTTPS _ -> "https"
-
-  type Host = string
-
-  type HttpBinding =
-    { scheme        : Protocol
-      socketBinding : SocketBinding }
-
-    member x.uri (path : string) query =
-      let path' =
-        match Uri.TryCreate(path, UriKind.Absolute) with
-        | true, uri when uri.Scheme = "http" || uri.Scheme = "https" -> uri.AbsolutePath
-        | _ when path.StartsWith "/" -> path
-        | _ -> "/" + path
-      String.Concat [
-        x.scheme.ToString(); "://"; x.socketBinding.ToString()
-        path'
-        (match query with | "" -> "" | qs -> "?" + qs)
-      ]
-      |> Uri
-
-    override x.ToString() =
-      String.Concat [ x.scheme.ToString(); "://"; x.socketBinding.ToString() ]
 
   type [<Struct>] HttpRequest =
     { httpVersion     : string
@@ -430,42 +366,10 @@ module Http =
         multiPartFields = []
         trace           = TraceHeader.empty }
 
-  [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
-  module HttpBinding =
-
-    let DefaultBindingPort = 8080us
-
-    let defaults =
-      { scheme        = HTTP
-        socketBinding = SocketBinding.create IPAddress.Loopback DefaultBindingPort }
-
-    let create scheme (ip : IPAddress) (port : Port) =
-      { scheme        = scheme
-        socketBinding = SocketBinding.create ip port }
-
-    let createSimple scheme (ip: string) (port : int) =
-      { scheme        = scheme
-        socketBinding = SocketBinding.create (IPAddress.Parse ip) (uint16 port) }
-
   type HttpContent =
     | NullContent
     | Bytes of byte []
     | SocketTask of (Connection * HttpResult -> SocketOp<unit>)
-
-    static member NullContent__ =
-      (function | NullContent -> Some ()
-                | _ -> None),
-      fun _ -> NullContent
-
-    static member Bytes__ =
-      (function | Bytes bs -> Some bs
-                | _ -> None),
-      Bytes
-
-    static member SocketTask__ =
-      (function | SocketTask cb -> Some cb
-                | _ -> None),
-      (fun cb -> SocketTask cb)
 
   and [<Struct>] HttpResult =
     { status        : HttpStatus
@@ -473,28 +377,9 @@ module Http =
       content       : HttpContent
       writePreamble : bool }
 
-  type ServerKey = byte []
-
-  [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
-  module ServerKey =
-
-    let validate (key : ServerKey) =
-      if key.Length <> int Crypto.KeyLength then
-        failwithf "Invalid server key length - should be %i, but was %i" Crypto.KeyLength key.Length
-      key
-
-    let fromBase64 =
-      Convert.FromBase64String >> validate
-
-  type IPAddress with
-    static member tryParseC(ip: string) =
-      match IPAddress.TryParse ip with
-      | false, _ -> Choice2Of2 ()
-      | _, ip    -> Choice1Of2 ip
-
   type HttpRuntime =
     { serverKey         : ServerKey
-      errorHandler      : ErrorHandler
+      errorHandler      : ErrorHandler // this shouldn't be here
       mimeTypesMap      : MimeTypesMap
       homeDirectory     : string
       compressionFolder : string
@@ -503,7 +388,6 @@ module Http =
       cookieSerialiser  : CookieSerialiser
       hideHeader        : bool
       maxContentLength  : int }
-
   and [<Struct>] HttpContext =
     { mutable request    : HttpRequest
       runtime    : HttpRuntime

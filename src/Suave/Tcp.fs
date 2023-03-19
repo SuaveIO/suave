@@ -47,16 +47,24 @@ open Microsoft.FSharp.NativeInterop
 let createTransport listenSocket cancellationToken =
   new TcpTransport(listenSocket,cancellationToken)
 
+let createReader transport lineBuffer pipe cancellationToken =
+  new HttpReader(transport, lineBuffer, pipe, cancellationToken)
+
 let createConnection listenSocket cancellationToken bufferSize =
+  let transport = createTransport listenSocket cancellationToken
+  let lineBuffer = Array.zeroCreate bufferSize
+  let pipe = new Pipe()
+  let reader = createReader transport lineBuffer pipe cancellationToken
   { socketBinding = SocketBinding.create IPAddress.IPv6Loopback 8080us;
-      transport     = createTransport listenSocket cancellationToken;
-      pipe = new Pipe();
-      lineBuffer    = Array.zeroCreate bufferSize;
+      transport     = transport;
+      reader = reader;
+      pipe = pipe;
+      lineBuffer    = lineBuffer;
       lineBufferCount = 0 }
 
 let createConnectionFacade connectionPool listenSocket (runtime: HttpRuntime) cancellationToken bufferSize webpart =
   let connection = createConnection listenSocket cancellationToken bufferSize
-  let facade = new ConnectionFacade(connection, runtime, logger, connectionPool,webpart)
+  let facade = new ConnectionFacade(connection, runtime, logger, connectionPool,cancellationToken,webpart)
   facade
 
 let createPools listenSocket maxOps runtime cancellationToken bufferSize (webpart:WebPart) =
@@ -87,6 +95,17 @@ let private aFewTimes f = task{
         do! Task.Delay 10
   }
 
+let private aFewTimesDeterministic f =
+  let mutable tries = 4
+  while tries > 0 do
+    if tries < 2 then
+      f (); tries <- -1
+    else
+      try f (); tries <- -1
+      with ex ->
+        tries <- tries - 1
+        do Thread.Sleep 10
+
 // consider:
 // echo 5 > /proc/sys/net/ipv4/tcp_fin_timeout
 // echo 1 > /proc/sys/net/ipv4/tcp_tw_recycle
@@ -94,7 +113,7 @@ let private aFewTimes f = task{
 
 #nowarn "9"
 
-type TcpServer = StartedData -> AsyncResultCell<StartedData> -> Task<unit>
+type TcpServer = StartedData -> AsyncResultCell<StartedData> -> Task
 
 let enableRebinding (listenSocket: Socket) =
   let mutable optionValue = 1
@@ -110,58 +129,65 @@ let enableRebinding (listenSocket: Socket) =
 
 
 let runServer maxConcurrentOps bufferSize (binding: SocketBinding) (runtime:HttpRuntime) (cancellationToken: CancellationToken) (webpart: WebPart) startData
-              (acceptingConnections: AsyncResultCell<StartedData>) = task {
+              (acceptingConnections: AsyncResultCell<StartedData>) =
+  Task.Run(fun () ->
+    use listenSocket = new Socket(binding.endpoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp)
+    try
 
-  use listenSocket = new Socket(binding.endpoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp)
-  try
+      enableRebinding(listenSocket)
+      listenSocket.NoDelay <- true
 
-    enableRebinding(listenSocket)
-    listenSocket.NoDelay <- true
+      let connectionPool = createPools listenSocket maxConcurrentOps runtime cancellationToken bufferSize webpart
 
-    let connectionPool = createPools listenSocket maxConcurrentOps runtime cancellationToken bufferSize webpart
+      aFewTimesDeterministic (fun () -> listenSocket.Bind binding.endpoint)
+      listenSocket.Listen MaxBacklog
 
-    do! aFewTimes (fun () -> listenSocket.Bind binding.endpoint)
-    listenSocket.Listen MaxBacklog
+      // Get the actual assigned port from listeSocket
+      let _binding = { startData.binding with port = uint16((listenSocket.LocalEndPoint :?> IPEndPoint).Port) }
 
-    // Get the actual assigned port from listeSocket
-    let _binding = { startData.binding with port = uint16((listenSocket.LocalEndPoint :?> IPEndPoint).Port) }
+      let startData =
+        { startData with socketBoundUtc = Some (Globals.utcNow()); binding = _binding }
 
-    let startData =
-      { startData with socketBoundUtc = Some (Globals.utcNow()); binding = _binding }
+      acceptingConnections.complete startData |> ignore
 
-    acceptingConnections.complete startData |> ignore
+      logger.info (
+        eventX "Smooth! Suave listener started in {startedListeningMilliseconds:#.###}ms with binding {ipAddress}:{port}"
+        >> setFieldValue "startedListeningMilliseconds" (startData.GetStartedListeningElapsedMilliseconds())
+        // .Address can throw exceptions, just log its string representation
+        >> setFieldValue "ipAddress" (startData.binding.ip.ToString())
+        >> setFieldValue "port" startData.binding.port
+        >> setSingleName "Suave.Tcp.runServer")
 
-    logger.info (
-      eventX "Smooth! Suave listener started in {startedListeningMilliseconds:#.###}ms with binding {ipAddress}:{port}"
-      >> setFieldValue "startedListeningMilliseconds" (startData.GetStartedListeningElapsedMilliseconds())
-      // .Address can throw exceptions, just log its string representation
-      >> setFieldValue "ipAddress" (startData.binding.ip.ToString())
-      >> setFieldValue "port" startData.binding.port
-      >> setSingleName "Suave.Tcp.runServer")
+      // we could have an old style imperative loop
+      let remoteBinding (socket : Socket) =
+        let rep = socket.RemoteEndPoint :?> IPEndPoint
+        { ip = rep.Address; port = uint16 rep.Port }
 
-    while not(cancellationToken.IsCancellationRequested) do
-        let connection : ConnectionFacade = connectionPool.Pop()
-        logger.verbose (eventX "Waiting for accept")
-        let! r = connection.Connection.transport.accept()
-        match r with
-        | Ok remoteBinding ->
-          // Start a new task for each accepted TCP client
-          let task = Task.Factory.StartNew(fun () -> connection.accept(remoteBinding))
-          ()
-        | Result.Error e ->
-          failwithf "Socket failed to accept client, error: %A" e
+      while not(cancellationToken.IsCancellationRequested) do
+          let connection : ConnectionFacade = connectionPool.Pop()
+          let continuation (vt: Task<Socket>) =
+            connection.Connection.transport.acceptSocket <- vt.Result
+            ignore(Task.Factory.StartNew(fun () -> connection.accept(remoteBinding vt.Result),cancellationToken))
+          logger.verbose (eventX "Waiting for accept")
+          let task = listenSocket.AcceptAsync(cancellationToken)
+          if task.IsCompleted then
+            connection.Connection.transport.acceptSocket <- task.Result
+            ignore(Task.Factory.StartNew(fun () -> connection.accept(remoteBinding task.Result),cancellationToken))
+          else
+            let task2 = task.AsTask().ContinueWith(new Action<Task<_>>(continuation),cancellationToken)
+            task2.Wait(cancellationToken)
 
-    stopTcp "cancellation requested" listenSocket
-  with
-    | :? System.OperationCanceledException
-    | :? System.Threading.Tasks.TaskCanceledException ->
-      stopTcp "The operation was canceled" listenSocket
-    | ex ->
-      stopTcp "runtime exception" listenSocket
-      logger.fatal (eventX "TCP server failed" >> addExn ex)
-      return raise ex
-    
-}
+      stopTcp "cancellation requested" listenSocket
+    with
+      | :? AggregateException
+      | :? OperationCanceledException
+      | :? TaskCanceledException ->
+        stopTcp "The operation was canceled" listenSocket
+      | ex ->
+        stopTcp "runtime exception" listenSocket
+        logger.fatal (eventX "TCP server failed" >> addExn ex)
+        //raise ex
+        )
 
 /// Start a new TCP server with a specific IP, Port and with a serve_client worker
 /// returning an async workflow whose result can be awaited (for when the tcp server has started
@@ -169,6 +195,18 @@ let runServer maxConcurrentOps bufferSize (binding: SocketBinding) (runtime:Http
 /// yields when the full server is cancelled. If the 'has started listening' workflow
 /// returns None, then the start timeout expired.
 let startTcpIpServerAsync (binding : SocketBinding) (runServer : TcpServer) =
+
+  let acceptingConnections = new AsyncResultCell<StartedData>()
+  Globals.numberOfClients := 0
+  let startData =
+        { startCalledUtc = Globals.utcNow ()
+          socketBoundUtc = None
+          binding        = binding }
+
+  acceptingConnections.awaitResult()
+    , runServer startData acceptingConnections
+
+let startTcpIpServer (binding : SocketBinding) (runServer : TcpServer) =
 
   let acceptingConnections = new AsyncResultCell<StartedData>()
   Globals.numberOfClients := 0
