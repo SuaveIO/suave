@@ -1,4 +1,4 @@
-﻿open System
+open System
 open System.Net
 
 open Suave
@@ -7,6 +7,7 @@ open Suave.Http
 open Suave.Filters
 open Suave.Files
 open Suave.Logging
+open System.Threading.Tasks
 
 let logger = Targets.create Verbose [||]
 
@@ -18,7 +19,7 @@ let config =
       logger     = logger }
 
 let listening, server = startWebServerAsync config (choose [ GET >=> browseHome ])
-Async.Start server
+Task.WaitAll server
 
 // wait for the server to start listening
 listening |> Async.RunSynchronously |> ignore

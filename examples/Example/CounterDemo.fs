@@ -1,4 +1,4 @@
-﻿module CounterDemo
+module CounterDemo
 
 module private Helpers =
   let (<!>) a b =
@@ -48,4 +48,4 @@ let counterDemo (req : HttpRequest) (out : Connection) =
 
     for a in actions do
       do! a
-    return out }
+    }

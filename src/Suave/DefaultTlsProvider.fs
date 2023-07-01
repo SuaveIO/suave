@@ -9,21 +9,21 @@ open System.Net.Security
 type DefaultTlsTransport(cn : Connection, ssl : SslStream) =
   interface ITransport with
     member this.read (buf : ByteSegment) =
-      async {
+      task {
         try
-          let! a = ssl.ReadAsync(buf.Array,buf.Offset,buf.Count)
-          return Choice1Of2(a)
+          let! a = ssl.ReadAsync(buf)
+          return Ok(a)
         with ex ->
-          return Choice2Of2 <| ConnectionError (ex.ToString())
+          return Result.Error <| ConnectionError (ex.ToString())
         }
 
      member this.write(buf : ByteSegment) =
-      async {
+      task {
         try 
-          do! ssl.WriteAsync(buf.Array,buf.Offset,buf.Count)
-          return Choice1Of2()
+          do! ssl.WriteAsync(buf)
+          return Ok()
         with ex ->
-          return Choice2Of2 <| ConnectionError (ex.ToString())
+          return Result.Error <| ConnectionError (ex.ToString())
         
         }
     member this.shutdown() =

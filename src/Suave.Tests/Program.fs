@@ -1,12 +1,10 @@
 module Suave.Tests.Program
 
-open Suave.Http
+open System
+open Suave
 open Suave.Web
 open Suave.Logging
-open Suave.LibUv
 open ExpectoExtensions
-
-open System
 
 [<EntryPoint>]
 let main args =
@@ -30,12 +28,5 @@ let main args =
     Console.WriteLine "Done."
 
   runDefaultEngine()
+  firstRun
 
-  if firstRun <> 0 then
-    firstRun
-  else
-    Console.WriteLine "Running tests with LibUv TCP engine."
-    let libUvConfig = { testConfig with tcpServerFactory = LibUvServerFactory() }
-    let r = defaultMainThisAssemblyWithParam libUvConfig args
-    Console.WriteLine "Done."
-    r

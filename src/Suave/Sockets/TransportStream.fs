@@ -20,17 +20,17 @@ type TransportStream(transport : ITransport) =
     raise (NotImplementedException())
 
   override x.Read (buffer : byte[],offset : int,count : int) : int =
-    match Async.RunSynchronously <| transport.read (ArraySegment(buffer,offset,count)) with
-    | Choice1Of2 n -> n
-    | Choice2Of2 x -> raise (Exception(x.ToString()))
+    match (transport.read (Memory(buffer,offset,count))).Result with
+    | Ok n -> n
+    | Error x -> raise (Exception(x.ToString()))
 
   override x.ReadAsync (buffer : byte[],offset : int,count : int, ct) =
 
     let task = async{ 
-      let! a = transport.read(ArraySegment(buffer,offset,count))
+      let! a = transport.read(Memory(buffer,offset,count))
       match a with
-      | Choice1Of2 x -> return x
-      | Choice2Of2 e -> return failwith (e.ToString())
+      | Ok x -> return x
+      | Error e -> return failwith (e.ToString())
       }
     Async.StartAsTask (task, TaskCreationOptions.AttachedToParent,ct)
 
@@ -43,16 +43,16 @@ type TransportStream(transport : ITransport) =
     task.Result
 
   override x.Write (buffer : byte[],offset : int,count : int) =
-    match Async.RunSynchronously <| transport.write(ArraySegment(buffer,offset,count)) with
-    | Choice1Of2 _ -> ()
-    | Choice2Of2 x -> raise (Exception(x.ToString()))
+    match transport.write(Memory(buffer,offset,count)).Result with
+    | Ok _ -> ()
+    | Error x -> raise (Exception(x.ToString()))
 
   override x.WriteAsync (buffer : byte[],offset : int,count : int, ct) =
     let task = async{ 
-      let! a = transport.write(ArraySegment(buffer,offset,count))
+      let! a = transport.write(Memory(buffer,offset,count))
       match a with
-      | Choice1Of2 x -> return x
-      | Choice2Of2 e -> return failwith (e.ToString())
+      | Ok x -> return x
+      | Error e -> return failwith (e.ToString())
       }
     Async.StartAsTask (task, TaskCreationOptions.AttachedToParent,ct) :> Task
 

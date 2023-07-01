@@ -37,7 +37,7 @@ let ws (webSocket : WebSocket) (context: HttpContext) =
       // the last element is the FIN byte, explained later
       | (Text, data, true) ->
         // the message can be converted to a string
-        let str = Encoding.UTF8.GetString data
+        let str = Encoding.UTF8.GetString data.Span
         let response = sprintf "response to %s" str
 
         // the response needs to be converted to a ByteSegment
@@ -61,17 +61,17 @@ let ws (webSocket : WebSocket) (context: HttpContext) =
 
 /// An example of explictly fetching websocket errors and handling them in your codebase.
 let wsWithErrorHandling (webSocket : WebSocket) (context: HttpContext) = 
-   
+
    let exampleDisposableResource = { new IDisposable with member __.Dispose() = printfn "Resource needed by websocket connection disposed" }
    let websocketWorkflow = ws webSocket context
    
-   async {
+   task {
     let! successOrError = websocketWorkflow
     match successOrError with
     // Success case
-    | Choice1Of2() -> ()
+    | Ok() -> ()
     // Error case
-    | Choice2Of2(error) ->
+    | Result.Error(error) ->
         // Example error handling logic here
         printfn "Error: [%A]" error
         exampleDisposableResource.Dispose()

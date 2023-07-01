@@ -39,7 +39,6 @@ let execute cmd args =
 let main argv =
   let cts = new CancellationTokenSource()
   let listening, server = startWebServerAsync config app
-  Async.Start(server, cts.Token)
 
   // wait for the server to start listening
   listening |> Async.RunSynchronously |> printfn "start stats: %A"

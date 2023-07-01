@@ -69,6 +69,7 @@ module Utilities =
     | HttpMethod.OTHER x -> failwithf "%A not a supported method" x
 
 open Utilities
+open System.Threading.Tasks
 
 /// This test context is a holder for the runtime values of the web
 /// server of suave, as well as the cancellation token that is
@@ -101,10 +102,10 @@ let runWithFactory factory config webParts : SuaveTestCtx =
   let binding = config.bindings.Head
   let baseUri = binding.ToString()
   let cts = new CancellationTokenSource()
+
   let config2 = { config with cancellationToken = cts.Token; bufferSize = 128; maxOps = 10 }
 
-  let listening, server = factory config webParts
-  Async.Start(server, cts.Token)
+  let listening, (server) = factory { config with cancellationToken = cts .Token; logger = Targets.create Warn [||] } webParts
   listening |> Async.RunSynchronously |> ignore // wait for the server to start listening
 
   { cts = cts

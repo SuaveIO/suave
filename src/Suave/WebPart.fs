@@ -85,6 +85,6 @@ let inline tryThen (first : WebPart<'a>) (second : WebPart<'a>) : WebPart<'a> =
     }
 
 let inline concatenate first second = fun x ->
-    match first x with
-    | None   -> second x
-    | r      -> r
+  match first x with
+  | None   -> second x
+  | r      -> r

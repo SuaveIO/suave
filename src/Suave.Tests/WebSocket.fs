@@ -33,96 +33,129 @@ let websocketTests cfg =
 
   let websocketAppUrl = "/websocket"
   let websocketApp (webSocket : WebSocket) =
-    fun cx -> socket {
+    fun cx -> task {
       let loop = ref true
-      while !loop do
-        let! msg = webSocket.read()
-        match msg with
-        | (Text, data, true) ->
-          let str = Encoding.UTF8.GetString data
-          match str with
-          | "BinaryRequest7bit" ->
-            let message = ArraySegment(Array.create (int PayloadSize.Bit7) 0uy)
-            do! webSocket.send Binary message true
-          | "BinaryRequest16bit" ->
-            let message = ArraySegment(Array.create (int PayloadSize.Bit16) 0uy)
-            do! webSocket.send Binary message true
-          | "BinaryRequest32bit" ->
-            let message = ArraySegment(Array.create (int PayloadSize.Bit32) 0uy)
-            do! webSocket.send Binary message true
-          | _ ->
-            do! webSocket.send Text (ArraySegment data) true
-        | (Ping, _, _) ->
-          do! webSocket.send Pong (ArraySegment([||])) true
-        | (Close, _, _) ->
-          do! webSocket.send Close (ArraySegment([||])) true
+      while loop.Value do
+        let! _msg = webSocket.read()
+        match _msg with
+        | Ok msg ->
+          match msg with
+          | (Text, data:ByteSegment, true) ->
+            let str = Encoding.UTF8.GetString data.Span
+            match str with
+            | "BinaryRequest7bit" ->
+              let message = Memory<_>(Array.create (int PayloadSize.Bit7) 0uy)
+              let! a = webSocket.send Binary message true
+              ()
+            | "BinaryRequest16bit" ->
+              let message = Memory<_>(Array.create (int PayloadSize.Bit16) 0uy)
+              let! a = webSocket.send Binary message true
+              ()
+            | "BinaryRequest32bit" ->
+              let message = Memory<_>(Array.create (int PayloadSize.Bit32) 0uy)
+              let! a = webSocket.send Binary message true
+              ()
+            | _ ->
+              let! a = webSocket.send Text data true
+              ()
+          | (Ping, _, _) ->
+            let! a = webSocket.send Pong (Memory<_>([||])) true
+            ()
+          | (Close, _, _) ->
+            let! a = webSocket.send Close (Memory<_>([||])) true
+            loop := false
+          | _ -> ()
+        | _ ->
           loop := false
-        | _ -> ()
+      return Ok()
       }
   
   let websocketAppReusingBuffersUrl = "/websocketAppReusingBuffers"
   let websocketAppReusingBuffers (webSocket : WebSocket) =
-    fun cx -> socket {
+    fun cx -> task {
       let loop = ref true
       while !loop do
-        let! msg = webSocket.readIntoByteSegment (fun lengthRequired -> ArraySegment(reuseableBuffer, 0, lengthRequired))
-        match msg with
-        | (Text, data, true) ->
-          let str = System.Text.Encoding.UTF8.GetString(data.Array, data.Offset, data.Count)
-          match str with
-          | "BinaryRequest7bit" ->
-            let message = ArraySegment(Array.create (int PayloadSize.Bit7) 0uy)
-            do! webSocket.send Binary message true
-          | "BinaryRequest16bit" ->
-            let message = ArraySegment(Array.create (int PayloadSize.Bit16) 0uy)
-            do! webSocket.send Binary message true
-          | "BinaryRequest32bit" ->
-            let message = ArraySegment(Array.create (int PayloadSize.Bit32) 0uy)
-            do! webSocket.send Binary message true
-          | _ ->
-            do! webSocket.send Text data true
-        | (Ping, _, _) ->
-          do! webSocket.send Pong (ArraySegment([||])) true
-        | (Close, _, _) ->
-          do! webSocket.send Close (ArraySegment([||])) true
+        let! _msg = webSocket.readIntoByteSegment (fun lengthRequired -> Memory<_>(reuseableBuffer, 0, lengthRequired))
+        match _msg with
+        | Ok msg ->
+          match msg with
+          | (Text, data, true) ->
+            let str = System.Text.Encoding.UTF8.GetString(data.Span)
+            match str with
+            | "BinaryRequest7bit" ->
+              let message = Memory<_>(Array.create (int PayloadSize.Bit7) 0uy)
+              let! a = webSocket.send Binary message true
+              ()
+            | "BinaryRequest16bit" ->
+              let message = Memory<_>(Array.create (int PayloadSize.Bit16) 0uy)
+              let! a = webSocket.send Binary message true
+              ()
+            | "BinaryRequest32bit" ->
+              let message = Memory<_>(Array.create (int PayloadSize.Bit32) 0uy)
+              let! a = webSocket.send Binary message true
+              ()
+            | _ ->
+              let! a = webSocket.send Text data true
+              ()
+          | (Ping, _, _) ->
+            let! a = webSocket.send Pong (Memory<_>([||])) true
+            ()
+          | (Close, _, _) ->
+            let! a = webSocket.send Close (Memory<_>([||])) true
+            loop := false
+          | _ -> ()
+        | _ ->
           loop := false
-        | _ -> ()
+      return Ok()
       }
 
   let websocketAppSubprotocolUrl = "/websocketAppSubprotocolUrl"
   let websocketAppSupportSubprotocol = "support.suave.io"
   let websocketAppSubprotocol (webSocket: WebSocket) =
-    fun cx -> socket {
+    fun cx -> task {
       let loop = ref true
       while !loop do
-        let! msg = webSocket.readIntoByteSegment (fun lengthRequired -> ArraySegment(reuseableBuffer, 0, lengthRequired))
-        match msg with
-        | (Text, data, true) ->
-          let str = System.Text.Encoding.UTF8.GetString(data.Array, data.Offset, data.Count)
-          match str with
-          | "BinaryRequest7bit" ->
-            let message = ArraySegment(Array.create (int PayloadSize.Bit7) 0uy)
-            do! webSocket.send Binary message true
-          | "BinaryRequest16bit" ->
-            let message = ArraySegment(Array.create (int PayloadSize.Bit16) 0uy)
-            do! webSocket.send Binary message true
-          | "BinaryRequest32bit" ->
-            let message = ArraySegment(Array.create (int PayloadSize.Bit32) 0uy)
-            do! webSocket.send Binary message true
-          | "Subprotocol" ->
-            match webSocket.subprotocol with
-            | Some subprotocol ->
-              do! webSocket.send Text (ArraySegment (System.Text.Encoding.UTF8.GetBytes subprotocol)) true
-            | None ->
-              do! webSocket.send Text (ArraySegment [||]) true
-          | _ ->
-            do! webSocket.send Text data true
-        | (Ping, _, _) ->
-          do! webSocket.send Pong (ArraySegment([||])) true
-        | (Close, _, _) ->
-          do! webSocket.send Close (ArraySegment([||])) true
-          loop := false
-        | _ -> ()
+        let! _msg = webSocket.readIntoByteSegment (fun lengthRequired -> Memory<_>(reuseableBuffer, 0, lengthRequired))
+        match _msg with
+        | Ok msg ->
+          match msg with
+          | (Text, data, true) ->
+            let str = System.Text.Encoding.UTF8.GetString(data.Span)
+            match str with
+            | "BinaryRequest7bit" ->
+              let message = Memory<_>(Array.create (int PayloadSize.Bit7) 0uy)
+              let! a = webSocket.send Binary message true
+              ()
+            | "BinaryRequest16bit" ->
+              let message = Memory<_>(Array.create (int PayloadSize.Bit16) 0uy)
+              let! a = webSocket.send Binary message true
+              ()
+            | "BinaryRequest32bit" ->
+              let message = Memory<_>(Array.create (int PayloadSize.Bit32) 0uy)
+              let! a = webSocket.send Binary message true
+              ()
+            | "Subprotocol" ->
+              match webSocket.subprotocol with
+              | Some subprotocol ->
+                let! a = webSocket.send Text (Memory<_> (System.Text.Encoding.UTF8.GetBytes subprotocol)) true
+                ()
+              | None ->
+                let! a = webSocket.send Text (Memory<_> [||]) true
+                ()
+            | _ ->
+              let! a = webSocket.send Text data true
+              ()
+          | (Ping, _, _) ->
+            let! a = webSocket.send Pong (Memory<_>([||])) true
+            ()
+          | (Close, _, _) ->
+            let! a = webSocket.send Close (Memory<_>([||])) true
+            loop := false
+          | _ -> ()
+        | _ ->
+         loop := false
+
+      return Ok()
     }
 
   let webPart = 

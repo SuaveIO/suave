@@ -25,24 +25,24 @@ let private httpWebResponseToHttpContext (ctx : HttpContext) (response : HttpWeb
     |> Seq.map (fun k -> k, response.Headers.Get k)
     |> Seq.toList
 
-  let writeContentLengthHeader conn = socket {
+  let writeContentLengthHeader (conn:Connection) = socket {
     match headers ? ("Content-Length") with
     | Some x ->
-      let! (_, conn) = asyncWriteLn (sprintf "Content-Length: %s" x) conn
-      return conn
+      do! conn.asyncWriteLn (sprintf "Content-Length: %s" x)
+      return ()
     | None ->
-      return conn
+      return ()
     }
 
   let content =
     SocketTask
       (fun (conn, _) -> socket {
-          let! conn = writeContentLengthHeader conn
-          let! (_, conn) = asyncWriteLn "" conn
-          let! conn = flush conn
+          do! writeContentLengthHeader conn
+          do! conn.asyncWriteLn ""
+          do! conn.flush()
           let stream = response.GetResponseStream ()
           do! transferStream conn stream
-          return conn
+          return ()
        })
 
   {

@@ -48,7 +48,7 @@ let compression cfg =
       testCase "gzip static file" <| fun _ ->
         Assert.Equal("length should match"
         , testFileSize
-        , (runWithConfig (Files.browseFileHome "test-text-file.txt") |> reqGZipBytes HttpMethod.GET "/" None).Length |> int64)
+        , (runWithConfig (Files.browseFileHome "test-text-file.txt") |> reqGZipBytes HttpMethod.GET "/test-text-file-gzip" None).Length |> int64)
     ]
 
 [<Tests>]

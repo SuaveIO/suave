@@ -1,53 +1,48 @@
-﻿namespace Suave.Sockets
+namespace Suave.Sockets
 
-open System
 open System.Net
 open System.Net.Sockets
+open System.Threading
+open Suave
 
-type TcpTransport(acceptArgs     : SocketAsyncEventArgs,
-                  readArgs     : SocketAsyncEventArgs,
-                  writeArgs     : SocketAsyncEventArgs,
-                  transportPool : ConcurrentPool<TcpTransport>,
-                  listenSocket : Socket) =
+[<AllowNullLiteral>]
+type TcpTransport(listenSocket : Socket, cancellationToken:CancellationToken) =
 
-  let shutdownSocket _ =
+  [<DefaultValue>]
+  val mutable acceptSocket :  Socket
+
+  let shutdownSocket (acceptSocket:Socket) =
     try
-      if acceptArgs.AcceptSocket <> null then
+      if acceptSocket <> null then
         try
-          acceptArgs.AcceptSocket.Shutdown(SocketShutdown.Both)
+          acceptSocket.Shutdown(SocketShutdown.Both)
         with _ ->
-          ()
-
-        acceptArgs.AcceptSocket.Dispose ()
+        acceptSocket.Dispose ()
     with _ -> ()
 
-  let remoteBinding (socket : Socket) =
+  let remoteBinding (socket : Socket) : SocketBinding =
     let rep = socket.RemoteEndPoint :?> IPEndPoint
     { ip = rep.Address; port = uint16 rep.Port }
 
   member this.accept() =
-      asyncDo listenSocket.AcceptAsync ignore (fun a -> remoteBinding a.AcceptSocket) acceptArgs
+    task{
+      let! a = listenSocket.AcceptAsync(cancellationToken)
+      this.acceptSocket <- a
+      return Ok(remoteBinding a)
+    }
 
-  interface ITransport with
-    member this.read (buf : ByteSegment) =
-      async{
-       if acceptArgs.AcceptSocket = null then
-         return Choice2Of2 (ConnectionError "read error: acceptArgs.AcceptSocket = null") 
-       else
-         return! asyncDo acceptArgs.AcceptSocket.ReceiveAsync (setBuffer buf) (fun a -> a.BytesTransferred) readArgs
-       }
-
-    member this.write (buf : ByteSegment) =
-      async{
-        if acceptArgs.AcceptSocket = null then
-         return Choice2Of2 (ConnectionError "write error: acceptArgs.AcceptSocket = null") 
-       else
-         return! asyncDo acceptArgs.AcceptSocket.SendAsync (setBuffer buf) ignore writeArgs
+  member this.read (buf : ByteSegment) =
+    task{
+      let! result = this.acceptSocket.ReceiveAsync(buf,cancellationToken)
+      return Ok(result)
       }
 
-    member this.shutdown() = async {
-      shutdownSocket ()
-      acceptArgs.AcceptSocket <- null
-      transportPool.Push(this)
-      return ()
-      }
+  member this.write (buf : ByteSegment) =
+    task{
+      let! result = this.acceptSocket.SendAsync(buf,cancellationToken)
+      return Ok()
+    }
+
+  member this.shutdown() =
+      shutdownSocket (this.acceptSocket)
+      this.acceptSocket <- null

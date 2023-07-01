@@ -11,17 +11,15 @@ open Suave.Sockets.Control
 /// The stream must support the `Length` property.
 let okStream (makeStream : Async<Stream>) : WebPart =
   fun ctx ->
-    let write (conn, _) =
+    let write (conn: Connection, _) =
       socket {
         use! stream = SocketOp.ofAsync makeStream
 
-        let! (), conn = asyncWriteLn $"Content-Length: %i{stream.Length}\r\n" conn
-        let! conn = flush conn
+        do! conn.asyncWriteLn $"Content-Length: %i{stream.Length}\r\n" 
+        do! conn.flush()
 
         if ctx.request.``method`` <> HttpMethod.HEAD then
           do! transferStream conn stream
-
-        return conn
       }
 
     {
@@ -40,17 +38,15 @@ let okStream (makeStream : Async<Stream>) : WebPart =
 /// You are responsible for setting the MIME type.
 let okStreamChunked (makeStream : Async<Stream>) : WebPart =
   fun ctx ->
-    let write (conn, _) =
+    let write (conn:Connection, _) =
       socket {
         use! stream = SocketOp.ofAsync makeStream
 
-        let! (), conn = asyncWriteLn "" conn
-        let! conn = flush conn
+        do! conn.asyncWriteLn ""
+        do! conn.flush()
 
         if ctx.request.``method`` <> HttpMethod.HEAD then
           do! transferStreamChunked conn stream
-
-        return conn
       }
 
     {

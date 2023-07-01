@@ -99,15 +99,14 @@ let app =
     path "/hello" >=> OK "Hello World"
     path "/byte-stream" >=> (fun ctx ->
 
-      let write (conn, _) = socket {
+      let write (conn:Connection, _) = socket {
         use ms = new MemoryStream()
         ms.Write([| 1uy; 2uy; 3uy |], 0, 3)
         ms.Seek(0L, SeekOrigin.Begin) |> ignore
         // do things here
-        let! (_,conn) = asyncWriteLn (sprintf "Content-Length: %d\r\n" ms.Length) conn
-        let! conn = flush conn
+        do! conn.asyncWriteLn (sprintf "Content-Length: %d\r\n" ms.Length) 
+        do! conn.flush()
         do! transferStream conn ms
-        return conn
       }
 
       { ctx with
@@ -151,7 +150,6 @@ let app =
             do! msg |> send out
             let msg = { id = "2"; data = "Second Message"; ``type`` = None }
             do! msg |> send out
-            return out
           }))
         GET >=> path "/events" >=> request (fun r -> EventSource.handShake (CounterDemo.counterDemo r))
         GET >=> browseHome //serves file if exists
@@ -194,14 +192,11 @@ let main argv =
       cancellationToken     = Async.DefaultCancellationToken
       bufferSize            = 2048
       maxOps                = 100
-      autoGrow              = true
       mimeTypesMap          = mimeTypes
       homeFolder            = None
       compressedFilesFolder = None
       logger                = logger
-      tcpServerFactory      = new DefaultTcpServerFactory()
       cookieSerialiser      = new BinaryFormatterSerialiser()
-      tlsProvider           = new DefaultTlsProvider()
       hideHeader            = false
       maxContentLength      = 1000000 }
     app

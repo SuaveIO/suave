@@ -6,9 +6,9 @@ module Http =
   open System
   open System.Collections.Generic
   open System.Net
-  open Suave.Utils
   open Suave.Logging
   open Suave.Sockets
+  open Suave
 
   /// These are the known HTTP methods. See http://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html
   type HttpMethod =
@@ -110,51 +110,8 @@ module Http =
     /// Assumes only valid characters go in, see http://tools.ietf.org/html/rfc6265#section-4.1.1
     val toHeader : cookie:HttpCookie -> string
 
-  /// A file's mime type and if compression is enabled or not
-  type MimeType =
-    { name        : string
-      compression : bool }
-
-  type MimeTypesMap = string -> MimeType option
-
-  /// A holder for uploaded file meta-data
-  type HttpUpload =
-    { fieldName    : string
-      fileName     : string
-      mimeType     : string
-      tempFilePath : string }
-
-  [<AllowNullLiteral>]
-  type TlsProvider =
-    abstract wrap : Connection * obj -> SocketOp<Connection>
-
-  /// Gets the supported protocols, HTTP and HTTPS with a certificate
-  type Protocol =
-    /// The HTTP protocol is the core protocol
-    | HTTP
-    /// The HTTP protocol tunneled in a TLS tunnel
-    | HTTPS of obj
-
-    member secure : bool
-
-  /// Type alias for string. This is the host as seen from the server; not
-  /// necessarily as seen from the client.
-  type Host = string
-
-  /// A HTTP binding is a protocol is the product of HTTP or HTTP, a DNS or IP
-  /// binding and a port number.
-  type HttpBinding =
-    { scheme        : Protocol
-      socketBinding : SocketBinding }
-
-    member uri : path:string -> query:string -> Uri
-
-    /// Overrides the default ToString() method to provide an implementation that
-    /// is assignable to a BaseUri for a RestClient/HttpClient.
-    override ToString : unit -> string
-
   /// A holder for the data extracted from the request.
-  type HttpRequest =
+  type [<Struct>] HttpRequest =
     { httpVersion     : string
       binding         : HttpBinding
       rawPath         : string
@@ -246,21 +203,7 @@ module Http =
   module HttpRequest =
     val empty : HttpRequest
 
-  [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
-  module HttpBinding =
-
-    val DefaultBindingPort : Port
-
-    /// This is the value of the default HttpBinding.
-    val defaults : HttpBinding
-
-    /// Create a HttpBinding for the given protocol, an IP address to bind to and
-    /// a port to listen on – this is the strongly typed overload.
-    val create : scheme:Protocol -> ip:IPAddress -> port:Port -> HttpBinding
-
-    /// Create a HttpBinding for the given protocol, an IP address to bind to and
-    /// a port to listen on – this is the "stringly typed" overload.
-    val createSimple : scheme:Protocol -> ip:string -> port:int -> HttpBinding
+  
 
   type HttpContent =
     /// This is the default HttpContent. If you place this is a HttpResult the web
@@ -277,13 +220,13 @@ module Http =
     /// control the flow of bytes by using a SocketOp. Contrasting with Bytes,
     /// setting the HttpContent as this discriminated union type lets you stream
     /// data back to the client through Suave.
-    | SocketTask of (Connection * HttpResult -> SocketOp<Connection>)
+    | SocketTask of (Connection * HttpResult -> SocketOp<unit>)
 
 
   /// The HttpResult is the structure that you work with to tell Suave how to
   /// send the response. Have a look at the docs for HttpContent for further
   /// details on what is possible.
-  and HttpResult =
+  and [<Struct>] HttpResult =
     { status        : HttpStatus
       headers       : (string * string) list
       content       : HttpContent
@@ -294,23 +237,6 @@ module Http =
 
     /// The empty HttpResult, with a 404 and a HttpContent.NullContent content
     val empty : HttpResult
-
-  /// A server-key is a 256 bit key with high entropy
-  type ServerKey = byte []
-
-  /// Utilities to ensure server keys are well-formed
-  [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
-  module ServerKey =
-    
-    /// Ensure that a server key is the proper length
-    val validate : ServerKey -> ServerKey
-
-    /// Create a key from a base-64 encoded string
-    val fromBase64 : (string -> ServerKey)
-
-  type IPAddress with
-    /// Try parse the IP address from a string, returning a choice.
-    static member tryParseC : ip:string -> Choice<IPAddress, unit>
 
   /// The HttpRuntime is created from the SuaveConfig structure when the web
   /// server starts. You can also use the `HttpRuntime` module to create a new
@@ -324,15 +250,14 @@ module Http =
       logger            : Logger
       matchedBinding    : HttpBinding
       cookieSerialiser  : CookieSerialiser
-      tlsProvider       : TlsProvider
       hideHeader        : bool
       maxContentLength  : int }
 
   /// The HttpContext is the container of the request, runtime, user-state and
   /// response.
-  and HttpContext =
+  and [<Struct>] HttpContext =
     { /// The HTTP request being processed
-      request    : HttpRequest
+      mutable request    : HttpRequest
 
       /// The HttpRuntime for the request being processed
       runtime    : HttpRuntime
@@ -404,7 +329,7 @@ module Http =
                -> mimeTypes:MimeTypesMap -> homeDirectory:string
                -> compressionFolder:string -> logger:Logger
                -> cookieSerialiser:CookieSerialiser
-               -> tlsProvider:TlsProvider -> hideHeader:bool -> maxContentLength:int 
+               -> hideHeader:bool -> maxContentLength:int 
                -> binding:HttpBinding
                -> HttpRuntime
 
@@ -419,6 +344,8 @@ module Http =
     val create : request:HttpRequest -> runtime:HttpRuntime -> connection:Connection
                -> writePreamble:bool
                -> HttpContext
+
+    val addKeepAliveHeader : ctx: HttpContext -> HttpContext
 
   val request : apply:(HttpRequest -> HttpContext -> 'a) -> context:HttpContext -> 'a
   val context : apply:(HttpContext -> HttpContext -> 'a) -> context:HttpContext -> 'a
