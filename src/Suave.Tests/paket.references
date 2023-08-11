@@ -4,3 +4,4 @@ Expecto.FsCheck
 Expecto.BenchmarkDotNet
 Websocket.Client
 DotLiquid
+Microsoft.Extensions.FileProviders.Embedded

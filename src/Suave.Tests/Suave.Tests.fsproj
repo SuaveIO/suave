@@ -4,7 +4,7 @@
     <TargetFrameworks>net7.0</TargetFrameworks>
     <AssemblyName>Suave.Tests</AssemblyName>
     <OutputType>Exe</OutputType>
-    <UseStandardResourceNames>false</UseStandardResourceNames>
+    <GenerateEmbeddedFilesManifest>true</GenerateEmbeddedFilesManifest>
     <ServerGarbageCollection>true</ServerGarbageCollection>
     <ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
@@ -59,6 +59,7 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <EmbeddedResource Include="embedded-resource.txt" />
+    <EmbeddedResource Include="wwwroot\**" />
     <Content Include="request.txt">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>

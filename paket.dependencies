@@ -5,6 +5,7 @@ framework net7.0
 storage none
 
 nuget FSharp.Core
+nuget Microsoft.Extensions.FileProviders.Embedded
 nuget System.IO.Pipelines
 nuget DotLiquid
 nuget Websocket.Client
