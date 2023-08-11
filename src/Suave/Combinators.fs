@@ -658,8 +658,11 @@ module Embedded =
   open System
   open System.IO
   open System.Reflection
+  open System.Xml
+  open System.Xml.Linq
 
   open Suave.Utils
+  open Suave.Utils.Option.Operators
   open Suave.Sockets.Control
 
   open Response
@@ -674,7 +677,11 @@ module Embedded =
     assembly.GetManifestResourceNames()
 
   let lastModified (assembly : Assembly) =
-    FileInfo(assembly.Location).CreationTime
+    // Assembly.Location might not be available, such as in single-file deployments.
+    if String.IsNullOrEmpty assembly.Location then
+      Diagnostics.Process.GetCurrentProcess().StartTime
+    else
+      FileInfo(assembly.Location).CreationTime
 
   let sendResource (source : Assembly)
                     resourceName
@@ -727,6 +734,84 @@ module Embedded =
 
   let browseDefaultAsssembly =
     browse defaultSourceAssembly
+
+  [<Literal>]
+  let defaultManifestFile = "Microsoft.Extensions.FileProviders.Embedded.Manifest.xml"
+
+  // Reference: https://github.com/dotnet/aspnetcore/blob/HEAD/src/FileProviders/Embedded/src/Manifest/ManifestParser.cs
+  let browseManifest (source: Assembly) manifestFile root =
+    let getElements (container: XContainer) = container.Elements()
+
+    let ensureElement (name: string) (container: XContainer) =
+      match container.Element name with
+      | null -> invalidOp $"Invalid manifest format. Missing '{name}' element name"
+      | elem -> elem
+
+    let ensureText (element: XElement) =
+      if Seq.isEmpty(getElements element)
+        && not element.IsEmpty
+        && element.Nodes() |> Seq.length |> (=) 1
+        && element.FirstNode.NodeType = XmlNodeType.Text
+      then
+        element.Value
+      else
+        invalidOp $"Invalid manifest format. '{element.Name.LocalName}' must contain a text value. '{element.Value}'"
+
+    let ensureName (element: XElement) =
+      let value = element.Attribute "Name" |> Option.ofObj >>= (fun a -> Option.ofObj a.Value)
+      match value with
+      | None -> invalidOp $"Invalid manifest format. '{element.Name}' must contain a 'Name' attribute."
+      | Some name -> name
+
+    let getResourcePath = ensureElement "ResourcePath" >> ensureText
+
+    let manifestFile = defaultArg manifestFile defaultManifestFile
+
+    let manifest =
+      manifestFile
+      |> source.GetManifestResourceStream
+      |> Option.ofObj
+      |> Option.map XDocument.Load
+      |> Option.defaultWith (fun () ->
+           invalidOp
+             $"Could not load the embedded file manifest '{manifestFile}' for assembly '{source.GetName().Name}'.")
+      |> ensureElement "Manifest"
+
+    let version =
+      manifest
+      |> ensureElement "ManifestVersion"
+      |> ensureText
+
+    if not (String.equalsConstantTime "1.0" version) then
+      invalidOp $"The embedded file manifest '{manifestFile}' for assembly '{source.GetName().Name}'" +
+        $"specifies an unsupported file format version: '{version}'."
+      |> ignore
+
+    let filesystem = ensureElement "FileSystem" manifest
+
+    let rec buildMapping prefix mapping (element: XElement) =
+      let path = prefix + (ensureName element)
+      match element.Name.LocalName with
+      | "File" -> Map.add path (getResourcePath element) mapping
+      | "Directory" -> mapElement element (path + "/") mapping
+      | invalidNode ->
+        invalidOp $"Invalid manifest format. Expected a 'File' or a 'Directory' node. Got '{invalidNode}' instead."
+
+    and mapElement element prefix mapping =
+      element |> getElements |> Seq.fold (buildMapping prefix) mapping
+
+    let resourceMapping = mapElement filesystem "" Map.empty
+
+    let resolveResource reqPath =
+      let path = [root; String.trimc '/' <!> Some reqPath] |> Seq.choose id |> String.concat "/"
+      Map.tryFind path resourceMapping
+
+    request (fun r ->
+      match resolveResource r.path with
+      | Some name -> resource source name
+      | None -> never)
+
+  let browseDefaultAsssemblyManifest manifestFile root = browseManifest defaultSourceAssembly manifestFile root
 
 // See www.w3.org/TR/eventsource/#event-stream-interpretation
 module EventSource =
