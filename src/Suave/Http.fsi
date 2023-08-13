@@ -124,17 +124,27 @@ module Http =
       multiPartFields : (string * string) list
       trace           : TraceHeader }
 
-    /// Gets the query string from the HttpRequest. Use queryParam to try to fetch
-    /// data for individual items.
+    /// Gets the query string from the `HttpRequest` as a list of `(key, value option)` tuples.
+    /// If a key is present without value, the entry will be `(key, None)`. It will be `(key, Some value)` otherwise.
+    /// If a key is present multiple times in the URL, this list will contain multiple entries.
+    ///
+    /// Use `queryParam` to try to fetch data for individual items.
     member query : (string * string option) list
 
-    /// Finds the key k from the query string in the HttpRequest. To access form
-    /// data, use either `formData` to access normal form data, or `fieldData` to
+    /// Gets the value of the first matching query parameter with `key` in the `HttpRequest` as `Choice1Of2`.
+    /// The `key` comparison is case-sensitive.
+    /// If `key` is not present, or no value is present for the first occurrence of `key`,
+    /// an error is returned as `Choice2Of2`.
+    ///
+    /// To access form data, use either `formData` to access normal form data, or `fieldData` to
     /// access the multipart-fields.
     member queryParam : key:string -> Choice<string, string>
 
-    /// Try to find the query parameter named `key`. Returns None if none was
-    /// found, otherwise Some.
+    /// Finds the first matching query parameter with `key` in the `HttpRequest` and returns
+    ///
+    /// - `None` if no matching parameter was found,
+    /// - `(key, None)` if a matching parameter was found, but without value, or
+    /// - `(key, Some value)` if a matching parameter was found.
     member queryParamOpt : key:string -> (string * string option) option
 
     /// Check the query string for a `flag`:
