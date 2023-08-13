@@ -136,6 +136,11 @@ Run the following in the docs directory. It requires Ruby installed.
 bundle exec jekyll build
 ``
 
+To generate the API documentation, run the following in the project root directory
+```cmd
+packages\docs\FsLibTool\tools\FsLibTool.exe src docs\_site
+```
+
 ## Testing
 
 Run Tests as a console app. Return status code = 0 means success.
