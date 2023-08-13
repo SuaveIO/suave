@@ -117,9 +117,10 @@ let myMethodName firstArg (second : WithType) = async { // and monad builder
   } // at base of 'let' + 2 spaces
 ```
 
-You need to document your methods with '///' to create XML-doc. A XML
-documentation file is generated together with the compilation and is distributed
-with the NuGet so that others can read your code's intentions easily.
+You need to document your methods with '///' to create inline documentation. This documentation
+is used for two purposes. First, to automatically generate on-line API documentation. Second, to
+generate an XML documentation file to be included in the NuGet package, so that users of the library
+can understand the intention behind a method easily.
 
 Don't put unnecessary parenthesis unless it makes the code more clear.
 

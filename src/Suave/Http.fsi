@@ -27,7 +27,7 @@ module Http =
   [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
   module HttpMethod =
 
-    /// Parse a string into a HttpMethod
+    /// Parse a string into a `HttpMethod`
     val parse : string -> HttpMethod
 
   /// A HTTP status code and reason message
@@ -80,7 +80,7 @@ module Http =
   [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
   module HttpCookie =
 
-    /// Create a new HttpCookie with all the given values.
+    /// Create a new `HttpCookie` with all the given values.
     val create : name:string -> value:string -> expires:DateTimeOffset option
                -> path:string option -> domain:string option -> secure:bool
                -> httpOnly:bool
@@ -92,11 +92,11 @@ module Http =
     /// - no explicit expiry time
     /// - path at "/", so that it's global to the domain that it's created under.
     /// - no specific domain (defaults to the current domain plus its subdomains)
-    /// - secure = false (you can set it over plain text HTTP - change to true in SSL terminator)
-    /// - http_only = true - the cookie can be read from JS - change this to
+    /// - `secure = false` (you can set it over plain text HTTP - change to true in SSL terminator)
+    /// - `httpOnly = true` - the cookie can be read from JS - change this to
     ///   false if you want to only be able to read the cookie from JS, but
     ///   Good default if you're implementing session handling.
-    /// - version: an optional version field
+    /// - `version`: an optional version field
     ///
     /// More reading:
     /// - http://www.nczonline.net/blog/2009/05/05/http-cookies-explained/
@@ -156,45 +156,45 @@ module Http =
     /// - `?` => `false`
     member queryFlag : flag:string -> bool
 
-    /// Gets the header for the given key in the HttpRequest
+    /// Gets the header for the given key in the `HttpRequest`
     member header : key:string -> Choice<string, string>
 
-    /// Gets the form as a ((string * string option) list) from the HttpRequest.
-    /// Use formData to get the data for a particular key or use the indexed
-    /// property in the HttpRequest.
+    /// Gets the form as a `((string * string option) list)` from the HttpRequest.
+    /// Use `formData` to get the data for a particular key or use the indexed
+    /// property in the `HttpRequest`.
     member form : (string * string option) list
 
-    /// Finds the key k from the form of the HttpRequest. To access query string
+    /// Finds the key k from the form of the `HttpRequest`. To access query string
     /// parameters, use `queryParam` or to access multipart form fields, use
     /// `fieldData`.
     member formData : key:string -> Choice<string, string>
 
-    /// Finds the key k from the multipart-form of the HttpRequest. To access
+    /// Finds the key k from the multipart-form of the `HttpRequest`. To access
     /// query string parameters, use `queryParam` or to access regular form data,
     /// use `formData`.
     member fieldData : key:string -> Choice<string, string>
 
     /// Syntactic Sugar to retrieve query string, form or multi-field values
-    /// from HttpRequest
+    /// from `HttpRequest`
     member Item : key:string -> string option with get
 
     /// Get the client's view of what host is being called. If you trust your
-    /// proxy the value will be fetched from X-Forwarded-Host, then the Host
+    /// proxy the value will be fetched from `X-Forwarded-Host`, then the `Host`
     /// headers. If you don't explicitly overwrite these headers in the proxy
     /// you may be open to clients spoofing the headers. Hence the explicit
-    /// interfaces which force you as a developer to think abou the problem.
+    /// interfaces which force you as a developer to think about the problem.
     member clientHost : trustProxy:bool -> sources:string list -> Host
 
-    /// See docs on clientHost
+    /// See docs on `clientHost`
     member clientHostTrustProxy : Host
 
-    /// path is equal to UrlDecode(rawPath)
+    /// path is equal to `UrlDecode(rawPath)`
     member path : string
 
-    /// Returns Uri object representing the url associated with this request
+    /// Returns `Uri` object representing the url associated with this request
     member url : Uri
 
-    /// The Host that the web server responds to; not necessarily the host called
+    /// The `Host` that the web server responds to; not necessarily the host called
     /// by the client, as the request may have traversed proxies. As Suave
     /// binds to an IP rather than IP+Hostname, this can be anything the client
     /// has passed as the Host header. If you're behind a proxy, it may be the
@@ -206,35 +206,35 @@ module Http =
     /// in your web app.
     member host : Host
 
-    /// Returns a HttpMethod 
+    /// Returns a `HttpMethod`
     member method : HttpMethod
 
   [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
   module HttpRequest =
     val empty : HttpRequest
 
-  
+
 
   type HttpContent =
-    /// This is the default HttpContent. If you place this is a HttpResult the web
+    /// This is the default `HttpContent`. If you place this in a `HttpResult` the web
     /// server won't be that happy. It's assumed by Suave that you place a proper
     /// Bytes or SocketTask content as the value – all built-in Http applicates
     /// do this properly.
     | NullContent
     /// This tells Suave to respond with an array of bytes. Since most responses
-    /// are small enough to fit into memory, this is the most used HttpContent
-    /// used as results. If you want a streaming result, use SocketTask instead;
+    /// are small enough to fit into memory, this is the most used `HttpContent`
+    /// used as results. If you want a streaming result, use `SocketTask` instead;
     /// useful when you're serving large files through Suave.
     | Bytes of byte []
-    /// This task, especially with the `writePreamble`-flag lets your WebPart
-    /// control the flow of bytes by using a SocketOp. Contrasting with Bytes,
-    /// setting the HttpContent as this discriminated union type lets you stream
+    /// This task, especially with the `writePreamble`-flag lets your `WebPart`
+    /// control the flow of bytes by using a `SocketOp`. Contrasting with `Bytes`,
+    /// setting the `HttpContent` as this discriminated union type lets you stream
     /// data back to the client through Suave.
     | SocketTask of (Connection * HttpResult -> SocketOp<unit>)
 
 
-  /// The HttpResult is the structure that you work with to tell Suave how to
-  /// send the response. Have a look at the docs for HttpContent for further
+  /// The `HttpResult` is the structure that you work with to tell Suave how to
+  /// send the response. Have a look at the docs for `HttpContent` for further
   /// details on what is possible.
   and [<Struct>] HttpResult =
     { status        : HttpStatus
@@ -245,10 +245,10 @@ module Http =
   [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
   module HttpResult =
 
-    /// The empty HttpResult, with a 404 and a HttpContent.NullContent content
+    /// The empty `HttpResult`, with a 404 and a `HttpContent.NullContent` content
     val empty : HttpResult
 
-  /// The HttpRuntime is created from the SuaveConfig structure when the web
+  /// The `HttpRuntime` is created from the `SuaveConfig` structure when the web
   /// server starts. You can also use the `HttpRuntime` module to create a new
   /// value yourself, or use the `empty` one.
   type HttpRuntime =
@@ -263,13 +263,13 @@ module Http =
       hideHeader        : bool
       maxContentLength  : int }
 
-  /// The HttpContext is the container of the request, runtime, user-state and
+  /// The `HttpContext` is the container of the request, runtime, user-state and
   /// response.
   and [<Struct>] HttpContext =
     { /// The HTTP request being processed
       mutable request    : HttpRequest
 
-      /// The HttpRuntime for the request being processed
+      /// The `HttpRuntime` for the request being processed
       runtime    : HttpRuntime
 
       /// The connection for the request being processed
@@ -281,7 +281,7 @@ module Http =
       /// The response for the request being processed
       response   : HttpResult }
 
-    /// Get the IP of the client from the HttpContext.
+    /// Get the IP of the client from the `HttpContext`.
     member clientIp : trustProxy:bool -> sources:string list -> IPAddress
 
     /// Warning; if you don't write these headers in your rev.proxy, the client will
@@ -310,8 +310,8 @@ module Http =
 
     member clientProtoTrustProxy : string
 
-  /// A WebPart is an asynchronous function that transforms the HttpContext.  An asynchronous return
-  /// value of None indicates 'did not handle'.
+  /// A `WebPart` is an asynchronous function that transforms the `HttpContext`.  An asynchronous return
+  /// value of `None` indicates 'did not handle'.
 
   /// An error handler takes the exception, a programmer-provided message, a
   /// request (that failed) and returns an asynchronous workflow for the handling
@@ -321,11 +321,11 @@ module Http =
   type WebPart = WebPart<HttpContext>
 
   /// a module that gives you the `empty` (beware) and `create` functions for creating
-  /// a HttpRuntime
+  /// a `HttpRuntime`
   [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
   module HttpRuntime =
 
-    /// The key length in bytes, references Crypto.KeyLength which is appropriate
+    /// The key length in bytes, references `Crypto.KeyLength` which is appropriate
     /// for the underlying AES-256 bit symmetric crypto in use.
     val ServerKeyLength : uint16
 
@@ -334,19 +334,19 @@ module Http =
     /// the output stream correctly.
     val empty : HttpRuntime
 
-    /// make a new HttpRuntime from the given parameters
+    /// make a new `HttpRuntime` from the given parameters
     val create : serverKey:ServerKey -> errorHandler:ErrorHandler
                -> mimeTypes:MimeTypesMap -> homeDirectory:string
                -> compressionFolder:string -> logger:Logger
                -> cookieSerialiser:CookieSerialiser
-               -> hideHeader:bool -> maxContentLength:int 
+               -> hideHeader:bool -> maxContentLength:int
                -> binding:HttpBinding
                -> HttpRuntime
 
-  /// A module that provides functions to create a new HttpContext.
+  /// A module that provides functions to create a new `HttpContext`.
   [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
   module HttpContext =
-    /// The empty HttpContext is fairly useless for doing real work; you'd be well
+    /// The empty `HttpContext` is fairly useless for doing real work; you'd be well
     /// adviced to write some of the properties. However, it can be quite useful
     /// in unit tests.
     val empty : HttpContext
