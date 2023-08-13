@@ -117,9 +117,10 @@ let myMethodName firstArg (second : WithType) = async { // and monad builder
   } // at base of 'let' + 2 spaces
 ```
 
-You need to document your methods with '///' to create XML-doc. A XML
-documentation file is generated together with the compilation and is distributed
-with the NuGet so that others can read your code's intentions easily.
+You need to document your methods with '///' to create inline documentation. This documentation
+is used for two purposes. First, to automatically generate on-line API documentation. Second, to
+generate an XML documentation file to be included in the NuGet package, so that users of the library
+can understand the intention behind a method easily.
 
 Don't put unnecessary parenthesis unless it makes the code more clear.
 
@@ -132,9 +133,16 @@ more-often-varying parameters in the function signature.
 
 Run the following in the docs directory. It requires Ruby installed.
 
-``
+```cmd
+# you may need to delete `Gemfile.lock` if your local Ruby version differs.
+bundle install
 bundle exec jekyll build
-``
+```
+
+To generate the API documentation, run the following in the project root directory
+```cmd
+packages\docs\FsLibTool\tools\FsLibTool.exe src docs\_site
+```
 
 ## Testing
 
@@ -142,9 +150,9 @@ Run Tests as a console app. Return status code = 0 means success.
 
 ## Upgrade openssl
 
-Windows: paket update openssl.redist
+Windows: `paket update openssl.redist`
 
-OS X: brew install openssl && brew update openssl && cp /usr/local/Cellar/openssl/1.0.1j_1/lib/ .
+OS X: `brew install openssl && brew update openssl && cp /usr/local/Cellar/openssl/1.0.1j_1/lib/ .`
 
 Linux: ...
 

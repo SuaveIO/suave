@@ -23,8 +23,7 @@ group Examples
 
 group Docs
   source https://api.nuget.org/v3/index.json
-  framework: net7.0
-  storage:none
+  framework net7.0
 
   nuget Argu
   nuget FSharp.Core

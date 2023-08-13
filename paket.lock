@@ -87,7 +87,6 @@ NUGET
       System.Threading.Channels (>= 5.0)
 
 GROUP Docs
-STORAGE: NONE
 RESTRICTION: == net7.0
 NUGET
   remote: https://api.nuget.org/v3/index.json
