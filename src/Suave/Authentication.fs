@@ -12,12 +12,22 @@ open Suave.Operators
 
 let UserNameKey = "userName"
 
-let internal parseAuthenticationToken (token : string) =
-  let parts = token.Split (' ')
-  let enc = parts.[1].Trim()
-  let decoded = ASCII.decodeBase64 enc
-  let indexOfColon = decoded.IndexOf(':')
-  (parts.[0].ToLower(), decoded.Substring(0,indexOfColon), decoded.Substring(indexOfColon+1))
+let internal tryParseBasicAuthenticationToken (rawHeader : string) =
+  match rawHeader.Split(' ') with
+  | [| basic; tokenBase64 |] when String.equalsOrdinalCI "basic" basic ->
+    match ASCII.tryDecodeBase64 tokenBase64 with
+    | Some token ->
+      match token.IndexOf(':') with
+      | -1 ->
+        None
+      | i ->
+        let username = token.Substring(0, i)
+        let password = token.Substring(i + 1)
+        Some (username, password)
+    | None ->
+      None
+  | _ ->
+    None
 
 let inline private addUserName username ctx =
   if ctx.userState.ContainsKey UserNameKey then
@@ -31,14 +41,15 @@ let authenticateBasicAsync f protectedPart ctx =
     let p = ctx.request
     match p.header "authorization" with
     | Choice1Of2 header ->
-      let (typ, username, password) = parseAuthenticationToken header
-      if (typ.Equals("basic")) then
+      match tryParseBasicAuthenticationToken header with
+      | Some (username, password) ->
           let! authenticated = f (username, password)
           if authenticated then
             return! protectedPart (addUserName username ctx)
           else
             return! challenge ctx
-      else return! challenge ctx
+      | None ->
+          return! challenge ctx
     | Choice2Of2 _ ->
       return! challenge ctx
   }
