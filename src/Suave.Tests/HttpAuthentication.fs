@@ -39,33 +39,34 @@ let authTests cfg =
       GET >=> path "/non-protected2" >=> okUser ]
 
   testList "basic authetication" [
+    let req path reqMod = reqResp HttpMethod.GET path "" None None DecompressionMethods.None reqMod (fun res -> int res.StatusCode, res.Content.ReadAsStringAsync().Result)
+
     testCase "add username to userstate for protectedPart only" <| fun _ ->
-
-      let req path reqMod = reqResp HttpMethod.GET path "" None None DecompressionMethods.None reqMod (fun res -> res.Content.ReadAsStringAsync().Result)
-
-      let res = runWithConfig app |> req "/non-protected1" id
+      let _, res = runWithConfig app |> req "/non-protected1" id
       Expect.equal res "no user" "access to /non-protected1 should result in no username"
 
-      let res = runWithConfig app |> req "/non-protected2" id
+      let _, res = runWithConfig app |> req "/non-protected2" id
       Expect.equal res "no user" "access to /non-protected2 should result in no username"
 
-      let res = runWithConfig app |> req "/protected" (fun reqmsg -> reqmsg.Headers.Authorization <- AuthenticationHeaderValue("Basic", basicCredentials); reqmsg)
+      let _, res = runWithConfig app |> req "/protected" (fun reqmsg -> reqmsg.Headers.Authorization <- AuthenticationHeaderValue("Basic", basicCredentials); reqmsg)
       Expect.equal res "hello foo" "should be username"
 
-      let res = runWithConfig app |> req "/non-protected1" id
+      let _, res = runWithConfig app |> req "/non-protected1" id
       Expect.equal res "no user" "access to /non-protected1 should result in no username (2)"
 
-      let res = runWithConfig app |> req "/non-protected2" id
+      let _, res = runWithConfig app |> req "/non-protected2" id
       Expect.equal res "no user" "access to /non-protected2 should result in no username (2)"
+
+    testCase "invalid Authorization token leads to challenge" <| fun _ ->
+      let code, _ = runWithConfig app |> req "/protected" (fun reqmsg -> reqmsg.Headers.Authorization <- AuthenticationHeaderValue("Basic", "totallyinvalid"); reqmsg)
+      Expect.equal code 401 "should be challenged"
 
     testCase "add username to userstate for protectedPart (async)" <| fun _ ->
 
       let authenticate credentials = async { return credentials = ("foo", "bar") }
       let app = GET >=> authenticateBasicAsync authenticate okUser
 
-      let req path reqMod = reqResp HttpMethod.GET path "" None None DecompressionMethods.None reqMod (fun res -> res.Content.ReadAsStringAsync().Result)
-
-      let res = runWithConfig app |> req "/protected" (fun reqmsg -> reqmsg.Headers.Authorization <- AuthenticationHeaderValue("Basic", basicCredentials); reqmsg)
+      let _, res = runWithConfig app |> req "/protected" (fun reqmsg -> reqmsg.Headers.Authorization <- AuthenticationHeaderValue("Basic", basicCredentials); reqmsg)
       Expect.equal res "hello foo" "should be username"
 
     ]
