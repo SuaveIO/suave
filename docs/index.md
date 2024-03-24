@@ -12,23 +12,10 @@ of embedding web server capabilities in my own applications. Still in its early
 stages Suave supports HTTPS, multiple TCP/IP bindings, Basic Access
 Authentication, Keep-Alive and HTTP compression.
 
-NuGet
------
+Getting started
+---------------
 
-To install Suave, add the following to your
-[paket](https://github.com/fsprojects/Paket).dependencies:
-
-{% highlight dosbatch %}
-source https://nuget.org/api/v2
-nuget Suave
-{% endhighlight %}
-
-Or you can use the legacy NuGet command line [Package Manager
-Console](http://docs.nuget.org/docs/start-here/using-the-package-manager-console):
-
-{% highlight dosbatch %}
-PM> Install-Package Suave
-{% endhighlight %}
+See [Suave's NuGet page](https://www.nuget.org/packages/Suave) for installation / usage instructions.
 
 The simplest possible application: Hello World!
 -----------------------------------------------
