@@ -2,6 +2,7 @@ namespace Suave
 
 open Suave.Operators
 open Suave.Sockets
+open System.Threading.Tasks
 
 module Response =
 
@@ -128,7 +129,6 @@ module Intermediate =
 // 2xx
 module Successful =
   open System.Text
-  open Suave.Utils
   open Response
 
   let ok bytes : WebPart =
@@ -288,7 +288,6 @@ module ServerErrors =
 
 module Filters =
   open Suave.Utils.AsyncExtensions
-  open Suave.Logging
   open System
   open System.Text
   open System.Text.RegularExpressions
@@ -380,33 +379,6 @@ module Filters =
     ]
     "{clientIp} {processId} {userName} [{utcNow:dd/MMM/yyyy:hh:mm:ss %K}] \"{requestMethod} {requestUrlPath} {httpVersion}\" {httpStatusCode} {responseContentLength}", fieldList |> Map
 
-  let logWithLevel (level : LogLevel) (logger : Logger) (messageFun : HttpContext -> string) (ctx : HttpContext) =
-    async{
-      logger.log level (fun _ ->
-        { value         = Event (messageFun ctx)
-          level         = level
-          name          = [| "Suave"; "Http"; "requests" |]
-          fields        = Map.empty
-          timestamp     = Suave.Logging.Global.timestamp() })
-      return Some ctx }
-
-  let logWithLevelStructured (level : LogLevel) (logger : Logger) (messageFun : HttpContext -> (string * Map<string,obj>)) (ctx : HttpContext) =
-    async{
-      logger.log level (fun _ ->
-        let template, fields = messageFun ctx
-        { value         = Event template
-          level         = level
-          name          = [| "Suave"; "Http"; "requests" |]
-          fields        = fields
-          timestamp     = Suave.Logging.Global.timestamp() })
-      return Some ctx }
-
-  let logStructured (logger : Logger) (messageFun : HttpContext -> (string * Map<string,obj>)) =
-    logWithLevelStructured LogLevel.Info logger messageFun
-
-  let log (logger : Logger) (messageFun : HttpContext -> string) =
-    logWithLevel LogLevel.Info logger messageFun
-
   open Suave.Sscanf
 
   let pathScan (pf : PrintfFormat<_,_,_,_,'t>) (h : 't ->  WebPart) : WebPart =
@@ -463,8 +435,6 @@ module ServeResource =
   open Redirection
   open RequestErrors
   open Suave.Utils
-  open Suave.Logging
-  open Suave.Logging.Message
 
   // If a response includes both an Expires header and a max-age directive,
   // the max-age directive overrides the Expires header, even if the Expires header is more restrictive
@@ -472,10 +442,6 @@ module ServeResource =
   let resource key exists getLast getExtension
                 (send : string -> bool -> WebPart)
                 ctx =
-    let log =
-      event Verbose
-      >> setSingleName "Suave.Http.ServeResource.resource"
-      >> ctx.runtime.logger.logSimple
 
     let sendIt name compression =
       setHeader "Last-Modified" ((getLast key : DateTimeOffset).ToString("R"))
@@ -500,11 +466,8 @@ module ServeResource =
         | Choice2Of2 _ ->
           sendIt value.name value.compression ctx
       | None ->
-        let ext = getExtension key
-        log ("failed to find matching mime for ext '" + ext + "'")
         fail
     else
-      log ("failed to find resource by key '" + key + "'")
       fail
 
 module ContentRange =
@@ -538,45 +501,40 @@ module Files =
   open System.IO
   open System.Text
 
-  open Suave.Utils
-  open Suave.Logging
-  open Suave.Logging.Message
-  open Suave.Sockets.Control
-
-  open Response
-  open Writers
   open Successful
-  open Redirection
   open ServeResource
   open ContentRange
 
   let sendFile fileName (compression : bool) (ctx : HttpContext) =
     let writeFile file =
       let fs, start, total, status = getFileStream ctx file
-      fun (conn:Connection, _) -> socket {
+      fun (conn:Connection, _) -> task {
         let getLm = fun path -> FileInfo(path).LastWriteTime
-        let! (encoding,fs) = Compression.transformStream file fs getLm compression ctx.runtime.compressionFolder ctx
-        let finish = start + fs.Length - 1L
-        try
+        match! Compression.transformStream file fs getLm compression ctx.runtime.compressionFolder ctx with
+        | Ok(encoding,fs) ->
+          let finish = start + fs.Length - 1L
           try
-            match encoding with
-            | Some n ->
-              do! conn.asyncWriteLn ("Content-Range: bytes " + start.ToString() + "-" + finish.ToString() + "/*")
-              do! conn.asyncWriteLn (String.Concat [| "Content-Encoding: "; n.ToString() |])
-              do! conn.asyncWriteLn ("Content-Length: " + (fs : Stream).Length.ToString() + "\r\n")
-              do! conn.flush ()
-              if ctx.request.``method`` <> HttpMethod.HEAD && fs.Length > 0L then
-                do! transferStream conn fs
-            | None ->
-              do! conn.asyncWriteLn ("Content-Range: bytes " + start.ToString() + "-" + finish.ToString() + "/" + total.ToString())
-              do! conn.asyncWriteLn ("Content-Length: " + (fs : Stream).Length.ToString() + "\r\n")
-              do! conn.flush()
-              if ctx.request.``method`` <> HttpMethod.HEAD && fs.Length > 0L then
-                do! transferStream conn fs
-          with ex ->
-            raise ex
-        finally
-          fs.Dispose()
+            try
+              match encoding with
+              | Some n ->
+                do! conn.asyncWriteLn ("Content-Range: bytes " + start.ToString() + "-" + finish.ToString() + "/*")
+                do! conn.asyncWriteLn (String.Concat [| "Content-Encoding: "; n.ToString() |])
+                do! conn.asyncWriteLn ("Content-Length: " + (fs : Stream).Length.ToString() + "\r\n")
+                do! conn.flush ()
+                if ctx.request.``method`` <> HttpMethod.HEAD && fs.Length > 0L then
+                  do! transferStream conn fs
+              | None ->
+                do! conn.asyncWriteLn ("Content-Range: bytes " + start.ToString() + "-" + finish.ToString() + "/" + total.ToString())
+                do! conn.asyncWriteLn ("Content-Length: " + (fs : Stream).Length.ToString() + "\r\n")
+                do! conn.flush()
+                if ctx.request.``method`` <> HttpMethod.HEAD && fs.Length > 0L then
+                  do! transferStream conn fs
+            with ex ->
+              raise ex
+          finally
+            fs.Dispose()
+        | Result.Error error ->
+          return failwith "error"
       }, status
     let task, status = writeFile fileName
     { ctx with
@@ -614,13 +572,7 @@ module Files =
       browseFile q.homeDirectory fileName h
 
   let browse rootPath : WebPart =
-    warbler (fun ctx ->
-      ctx.runtime.logger.verbose (
-        eventX "Files.browser trying {localFileUrl} at {rootPath}"
-        >> setFieldValue "localFileUrl" ctx.request.url.AbsolutePath
-        >> setFieldValue "rootPath" rootPath
-        >> setSingleName "Suave.Http.Files.browse")
-      file (resolvePath rootPath ctx.request.path))
+    warbler (fun ctx -> file (resolvePath rootPath ctx.request.path))
 
   let browseHome : WebPart =
     warbler (fun ctx -> browse ctx.runtime.homeDirectory)
@@ -661,11 +613,8 @@ module Embedded =
   open System.Xml
   open System.Xml.Linq
 
-  open Suave.Utils
   open Suave.Utils.Option.Operators
-  open Suave.Sockets.Control
 
-  open Response
   open ServeResource
 
   let defaultSourceAssembly =
@@ -687,26 +636,29 @@ module Embedded =
                     resourceName
                     (compression : bool)
                     (ctx : HttpContext) =
-    let writeResource name (conn:Connection, _) = socket {
+    let writeResource name (conn:Connection, _) = task {
       let fs = source.GetManifestResourceStream(name)
       let getLm = fun _ -> lastModified source
-      let! encoding,fs = Compression.transformStream name fs getLm compression ctx.runtime.compressionFolder ctx
-      match encoding with
-      | Some n ->
-        do! conn.asyncWriteLn (String.Concat [| "Content-Encoding: "; n.ToString() |])
-        do! conn.asyncWriteLn ("Content-Length: " + (fs: Stream).Length.ToString() + "\r\n")
-        do! conn.flush()
-        if ctx.request.``method`` <> HttpMethod.HEAD && fs.Length > 0L then
-          do! transferStream conn fs
-        fs.Dispose()
-        return ()
-      | None ->
-        do! conn.asyncWriteLn ("Content-Length: " + (fs: Stream).Length.ToString() + "\r\n")
-        do! conn.flush ()
-        if ctx.request.``method`` <> HttpMethod.HEAD && fs.Length > 0L then
-          do! transferStream conn fs
-        fs.Dispose()
-        return ()
+      match! Compression.transformStream name fs getLm compression ctx.runtime.compressionFolder ctx with
+      | Ok (encoding,fs) ->
+        match encoding with
+        | Some n ->
+          do! conn.asyncWriteLn (String.Concat [| "Content-Encoding: "; n.ToString() |])
+          do! conn.asyncWriteLn ("Content-Length: " + (fs: Stream).Length.ToString() + "\r\n")
+          do! conn.flush()
+          if ctx.request.``method`` <> HttpMethod.HEAD && fs.Length > 0L then
+            do! transferStream conn fs
+          fs.Dispose()
+          return ()
+        | None ->
+          do! conn.asyncWriteLn ("Content-Length: " + (fs: Stream).Length.ToString() + "\r\n")
+          do! conn.flush ()
+          if ctx.request.``method`` <> HttpMethod.HEAD && fs.Length > 0L then
+            do! transferStream conn fs
+          fs.Dispose()
+          return ()
+      | Result.Error error ->
+        return failwith "error"
     }
     { ctx with
         response =
@@ -832,7 +784,7 @@ module EventSource =
   let (<<.) (out : Connection) (data : string) =
     out.asyncWriteBytes (Encoding.UTF8.GetBytes data)
 
-  let dispatch (out : Connection) : SocketOp<unit> =
+  let dispatch (out : Connection) : ValueTask<int> =
     send out ES_EOL_S
 
   let comment (out : Connection) (cmt : string) =
@@ -866,7 +818,7 @@ module EventSource =
       { id = id; data = data; ``type`` = Some typ }
 
   let send (out : Connection) (msg : Message) =
-    socket {
+    task {
       do! msg.id |> esId out
       match msg.``type`` with
       | Some x -> do! x |> eventType out
@@ -876,7 +828,7 @@ module EventSource =
     }
 
   let private handShakeAux f (out : Connection, _) =
-    socket {
+    task {
       do! out.asyncWriteLn "" // newline after headers
       do! out.flush() // must flush lines buffer before using asyncWriteBytes
 
@@ -886,7 +838,7 @@ module EventSource =
       return! f out
     }
 
-  let handShake (fCont: Connection -> SocketOp<unit>) (ctx : HttpContext) =
+  let handShake (fCont: Connection -> Task<unit>) (ctx : HttpContext) =
     { ctx with
         response =
           { ctx.response with
@@ -908,8 +860,8 @@ module TransferEncoding =
   open Suave
   open Suave.Sockets.Control
 
-  let chunked (asyncWriteChunks: Connection -> SocketOp<unit>) (ctx : HttpContext) =
-    let task (conn:Connection,_) = socket {
+  let chunked (asyncWriteChunks: Connection -> System.Threading.Tasks.Task<unit>) (ctx : HttpContext) =
+    let task (conn:Connection,_) = task {
       do! conn.asyncWriteLn ""
       do! asyncWriteChunks conn
     }

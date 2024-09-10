@@ -7,8 +7,6 @@ module WebSocket =
   open Suave.Operators
   open Suave.Utils
   open Suave.Utils.AsyncExtensions
-  open Suave.Logging
-  open Suave.Logging.Message
 
   open System
   open System.Security.Cryptography
@@ -111,10 +109,11 @@ module WebSocket =
   let internal bytesToNetworkOrder (bytes : byte[]) =
     if BitConverter.IsLittleEndian then bytes |> Array.rev else bytes
 
-  let writeFrame (connection: Connection) (f: Frame) = socket {
-      do! connection.transport.write (Memory([| f.OpcodeByte |], 0, 1))
-      do! connection.transport.write (Memory(f.EncodedLength, 0, f.EncodedLength.Length))
-      do! connection.transport.write f.Data
+  let writeFrame (connection: Connection) (f: Frame) = task {
+      let! _ = connection.transport.write (Memory([| f.OpcodeByte |], 0, 1))
+      let! _ = connection.transport.write (Memory(f.EncodedLength, 0, f.EncodedLength.Length))
+      let! _ = connection.transport.write f.Data
+      return Ok()
       }
 
   let internal frame (opcode : Opcode) (data : ByteSegment)  (fin : bool) =
@@ -136,7 +135,7 @@ module WebSocket =
     { Frame.OpcodeByte = firstByte; EncodedLength = encodedLength; Data = data }
 
   let readBytes (connection : Connection) (n : int) =
-    socket {
+    task {
       let arr = Array.zeroCreate n
       let offset = ref 0
       let reader = connection.reader
@@ -145,7 +144,7 @@ module WebSocket =
           let target = new Span<byte>(arr,!offset,count)
           source.CopyTo(target)
           offset := !offset + count)
-      return arr
+      return Ok(arr)
     }
 
   let readBytesIntoByteSegment retrieveByteSegment (connection : Connection) (n : int) =
@@ -159,13 +158,13 @@ module WebSocket =
 
     let offset = ref 0
     let reader = connection.reader
-    socket{
+    task{
       do! reader.readPostData n (fun a count ->
         let source = a.Span.Slice(0,count)
         let target = byteSegment.Span.Slice(!offset,count)
         source.CopyTo(target)
         offset := !offset + count)
-      return byteSegment
+      return Ok(byteSegment)
     }
 
   type internal Cont<'t> = 't -> unit
@@ -208,29 +207,6 @@ module WebSocket =
       let frame = frame opcode bs fin
       runAsyncWithSemaphore writeSemaphore (writeFrame connection frame)
 
-    let readFrame () = socket {
-      //assert (Seq.length connection.segments = 0)
-      let! arr = readBytes connection 2
-      let header = exctractHeader arr
-      let! extendedLength = readExtendedLength header
-
-      assert(header.hasMask)
-      let! mask = readBytes connection 4
-
-      if extendedLength > uint64 Int32.MaxValue then
-        let reason = "Frame size of " + extendedLength.ToString() + " bytes exceeds maximum accepted frame size (2 GB)"
-        let data =
-          [| yield! BitConverter.GetBytes (CloseCode.CLOSE_TOO_LARGE.code) |> bytesToNetworkOrder
-             yield! Encoding.UTF8.GetBytes reason |]
-        do! sendFrame Close (Memory(data)) true
-        return! SocketOp.abort (InputDataError(None, reason))
-      else
-        let! frame = readBytes connection (int extendedLength)
-        // Messages from the client MUST be masked
-        let data = if header.hasMask then frame |> Array.mapi (fun i x -> x ^^^ mask.[i % 4]) else frame
-        return (header.opcode, data, header.fin)
-      }
-
     let readFrameIntoSegment (byteSegmentForLengthFunc: int -> ByteSegment) = socket {
       //assert (Seq.length connection.segments = 0)
       let! arr = readBytes connection 2
@@ -256,16 +232,12 @@ module WebSocket =
           for i = 0 to (int extendedLength) - 1 do
             frame.Span.[i] <- frame.Span.[i] ^^^ mask.[i % 4]
 
-        return (header.opcode, frame, header.fin)
+        return header.opcode, frame, header.fin
       }
 
-    member this.read () = task {
-      let! result = runAsyncWithSemaphore readSemaphore (readFrameIntoSegment (Array.zeroCreate >> Memory))
-      return
-        match result with
-        | Ok(opcode, frame, header) -> Ok(opcode, frame, header)
-        | Result.Error(error) -> Result.Error(error)
-        }
+    member this.read () = socket {
+      return! runAsyncWithSemaphore readSemaphore (readFrameIntoSegment (Array.zeroCreate >> Memory))
+      }
 
     /// Reads from the websocket and puts the data into a ByteSegment selected by the byteSegmentForLengthFunc parameter
     /// <param name="byteSegmentForLengthFunc">A function that takes in the message length in bytes required to hold the next websocket message and returns an appropriately sized ArraySegment of bytes</param>
@@ -336,8 +308,7 @@ module WebSocket =
         | Ok _ ->
           do ()
         | Result.Error err ->
-          ctx.runtime.logger.warn (eventX "WebSocket disconnected {error}" >> setSingleName "Suave.Websocket.handShakeWithSubprotocol"
-            >> setFieldValue "error" err)
+          do ()
         return! Control.CLOSE ctx
       | Choice2Of2 response -> return! response
     }
@@ -351,8 +322,7 @@ module WebSocket =
       | Ok _ ->
         do ()
       | Result.Error err ->
-        ctx.runtime.logger.warn (eventX "WebSocket disconnected {error}" >> setSingleName "Suave.Websocket.handShake"
-          >> setFieldValue "error" err)
+        Console.WriteLine($"WebSocket disconnected {err}",err)
       return! Control.CLOSE ctx
     | Choice2Of2 response ->
       return! response

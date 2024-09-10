@@ -4,13 +4,9 @@ open System
 open System.Threading
 open System.Net
 open System.Net.Sockets
-open Suave.Logging
-open Suave.Logging.Message
 open Suave.Sockets
 open Suave.Utils
 open System.Threading.Tasks
-
-let private logger = Log.create "Suave.Tcp"
 
 /// The max backlog of number of requests
 [<Literal>]
@@ -33,11 +29,9 @@ type StartedData =
 /// Stop the TCP listener server
 let stopTcp reason (socket : Socket) =
   try
-    logger.debug (eventX "Stopping TCP server {because}" >> setFieldValue "because" reason)
     socket.Dispose()
-    logger.debug (eventX "Stopped TCP server")
   with ex ->
-    logger.debug (eventX "Failure stopping TCP server" >> addExn ex)
+    ()
 
 open System.IO.Pipelines
 open System.Runtime.InteropServices
@@ -64,7 +58,7 @@ let createConnection listenSocket cancellationToken bufferSize =
 
 let createConnectionFacade connectionPool listenSocket (runtime: HttpRuntime) cancellationToken bufferSize webpart =
   let connection = createConnection listenSocket cancellationToken bufferSize
-  let facade = new ConnectionFacade(connection, runtime, logger, connectionPool,cancellationToken,webpart)
+  let facade = new ConnectionFacade(connection, runtime, connectionPool,cancellationToken,webpart)
   facade
 
 let createPools listenSocket maxOps runtime cancellationToken bufferSize (webpart:WebPart) =
@@ -124,10 +118,6 @@ let enableRebinding (listenSocket: Socket) =
   else if RuntimeInformation.IsOSPlatform(OSPlatform.OSX) then
     setsockoptStatus <- setsockopt(listenSocket.Handle, SOL_SOCKET_OSX, SO_REUSEADDR_OSX, NativePtr.toNativeInt<int> &&optionValue, uint32(sizeof<int>))
 
-  if setsockoptStatus <> 0 then
-    logger.warn(eventX "Setting SO_REUSEADDR failed with errno '{errno}'." >> setFieldValue "errno" (Marshal.GetLastWin32Error()))
-
-
 let runServer maxConcurrentOps bufferSize (binding: SocketBinding) (runtime:HttpRuntime) (cancellationToken: CancellationToken) (webpart: WebPart) startData
               (acceptingConnections: AsyncResultCell<StartedData>) =
   Task.Run(fun () ->
@@ -142,7 +132,6 @@ let runServer maxConcurrentOps bufferSize (binding: SocketBinding) (runtime:Http
       aFewTimesDeterministic (fun () -> listenSocket.Bind binding.endpoint)
       listenSocket.Listen MaxBacklog
 
-      // Get the actual assigned port from listeSocket
       let _binding = { startData.binding with port = uint16((listenSocket.LocalEndPoint :?> IPEndPoint).Port) }
 
       let startData =
@@ -150,26 +139,27 @@ let runServer maxConcurrentOps bufferSize (binding: SocketBinding) (runtime:Http
 
       acceptingConnections.complete startData |> ignore
 
-      logger.info (
-        eventX "Smooth! Suave listener started in {startedListeningMilliseconds:#.###}ms with binding {ipAddress}:{port}"
-        >> setFieldValue "startedListeningMilliseconds" (startData.GetStartedListeningElapsedMilliseconds())
-        // .Address can throw exceptions, just log its string representation
-        >> setFieldValue "ipAddress" (startData.binding.ip.ToString())
-        >> setFieldValue "port" startData.binding.port
-        >> setSingleName "Suave.Tcp.runServer")
+      let startedListeningMilliseconds = (startData.GetStartedListeningElapsedMilliseconds())
+      let ipAddress = (startData.binding.ip.ToString())
+      let port = startData.binding.port
 
-      // we could have an old style imperative loop
+      Console.WriteLine($"Smooth! Suave listener started in {startedListeningMilliseconds} ms with binding {ipAddress}:{port}")
+
       let remoteBinding (socket : Socket) =
         let rep = socket.RemoteEndPoint :?> IPEndPoint
         { ip = rep.Address; port = uint16 rep.Port }
 
       while not(cancellationToken.IsCancellationRequested) do
           let connection : ConnectionFacade = connectionPool.Pop()
+
           let continuation (vt: Task<Socket>) =
             connection.Connection.transport.acceptSocket <- vt.Result
             ignore(Task.Factory.StartNew(fun () -> connection.accept(remoteBinding vt.Result),cancellationToken))
-          logger.verbose (eventX "Waiting for accept")
+
           let task = listenSocket.AcceptAsync(cancellationToken)
+
+          // kestrel uses here  ThreadPool.UnsafeQueueUserWorkItem(kestrelConnection, preferLocal: false);
+
           if task.IsCompleted then
             connection.Connection.transport.acceptSocket <- task.Result
             ignore(Task.Factory.StartNew(fun () -> connection.accept(remoteBinding task.Result),cancellationToken))
@@ -185,8 +175,6 @@ let runServer maxConcurrentOps bufferSize (binding: SocketBinding) (runtime:Http
         stopTcp "The operation was canceled" listenSocket
       | ex ->
         stopTcp "runtime exception" listenSocket
-        logger.fatal (eventX "TCP server failed" >> addExn ex)
-        //raise ex
         )
 
 /// Start a new TCP server with a specific IP, Port and with a serve_client worker

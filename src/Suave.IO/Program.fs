@@ -1,14 +1,22 @@
-﻿module Suave.IO.Program
+module Suave.IO.Program
 
 open Argu
 open Suave
 open Suave.ServerErrors
-open Suave.Logging
-open Suave.Logging.Message
-open System.IO
-open System.Net
+open Suave.Operators
 
-let logger = Log.create "Suave.IO"
+open System.IO
+open Microsoft.Extensions.Logging
+open Suave.Filters
+
+let factory = LoggerFactory.Create(fun builder -> builder.AddConsole() |> ignore)
+let logger = factory.CreateLogger("Suave.IO")
+
+let log format : WebPart =
+  fun ctx -> async{
+    logger.LogInformation(format ctx);
+    return Some ctx
+    } 
 
 type Arguments =
   | [<Mandatory>] Binding of string * int
@@ -26,7 +34,7 @@ let addExnLogging (fwp: 'a -> WebPart) =
       try
         return! fwp input ctx
       with e ->
-        do logger.fatal (eventX "Unhandled {exception}" >> setField "exception" e)
+        do logger.LogCritical ("Unhandled exception", e)
         return! INTERNAL_ERROR "Unhandled internal exception" ctx
     }
 
@@ -35,7 +43,7 @@ let app: WebPart =
     Files.browseHome
     Files.browseFileHome "index.html"
     request (fun r -> INTERNAL_ERROR (sprintf "No file found at path %s" r.url.AbsolutePath))
-  ]
+  ] >=> log logFormat;
 
 [<EntryPoint>]
 let main argv =

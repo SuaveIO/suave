@@ -3,9 +3,6 @@ namespace Suave
 open System.Collections.Generic
 open Suave.Utils
 open Suave.Sockets
-open Suave.Sockets.Control
-open Suave.Logging
-open Suave.Logging.Message
 
 open System
 
@@ -33,12 +30,12 @@ type HttpOutput(connection: Connection, runtime: HttpRuntime) =
         ; userState = new Dictionary<string,obj>()
         ; response = HttpResult.empty }
        
-  member (*inline*) this.writeContentType (headers : (string*string) list) = socket {
+  member (*inline*) this.writeContentType (headers : (string*string) list) = task {
     if not(List.exists(fun (x : string,_) -> x.ToLower().Equals("content-type")) headers )then
       return! connection.asyncWriteBufferedBytes ByteConstants.defaultContentTypeHeaderBytes
   }
 
-  member (*inline*) this.writeContentLengthHeader (content : byte[]) (context : HttpContext) = socket {
+  member (*inline*) this.writeContentLengthHeader (content : byte[]) (context : HttpContext) = task {
     match context.request.``method``, context.response.status.code with
     | (_, 100)
     | (_, 101)
@@ -53,13 +50,15 @@ type HttpOutput(connection: Connection, runtime: HttpRuntime) =
       return! connection.asyncWriteBufferedArrayBytes [| ByteConstants.contentLengthBytes; ASCII.bytes (content.Length.ToString()); ByteConstants.EOLEOL |]
     }
 
-  member (*inline*) this.writeHeaders exclusions (headers : (string*string) seq) = socket {
-    for x,y in headers do
+  member (*inline*) this.writeHeaders exclusions (headers : (string*string) seq) = task {
+    use sourceEnumerator = headers.GetEnumerator()
+    while sourceEnumerator.MoveNext() do
+      let x,y = sourceEnumerator.Current
       if not (List.exists (fun y -> x.ToLower().Equals(y)) exclusions) then
         do! connection.asyncWriteLn (String.Concat [| x; ": "; y |])
     }
 
-  member this.writePreamble (response:HttpResult) = socket {
+  member this.writePreamble (response:HttpResult) = task {
 
     let r = response
     let preamble = [| ByteConstants.httpVersionBytes; ASCII.bytes (r.status.code.ToString());
@@ -75,8 +74,8 @@ type HttpOutput(connection: Connection, runtime: HttpRuntime) =
     }
 
   member (*inline*) this.writeContent writePreamble context = function
-    | Bytes b -> socket {
-      let! (encoding, content : byte []) = Compression.transform b context
+    | Bytes b -> task {
+      let! (encoding, content : byte []) = Compression.transform b context 
       match encoding with
       | Some n ->
         do! connection.asyncWriteLn (String.Concat [| "Content-Encoding: "; n.ToString() |])
@@ -98,10 +97,10 @@ type HttpOutput(connection: Connection, runtime: HttpRuntime) =
         else
           do! connection.flush()
       }
-    | SocketTask f -> socket{
+    | SocketTask f -> task{
       do! f (connection, context.response)
       }
-    | NullContent -> socket {
+    | NullContent -> task {
         if writePreamble then
           do! this.writeContentLengthHeader [||] context
           do! connection.flush()
@@ -118,7 +117,7 @@ type HttpOutput(connection: Connection, runtime: HttpRuntime) =
   }
 
   member this.writeResponse (newCtx:HttpContext) =
-    socket{
+    task{
       if newCtx.response.writePreamble then
         do! this.writePreamble newCtx.response
         do! this.writeContent true newCtx newCtx.response.content
@@ -133,30 +132,19 @@ type HttpOutput(connection: Connection, runtime: HttpRuntime) =
       try
         freshContext.request <- request
         freshContext.userState.Clear()
-        //Console.WriteLine "before calling webpart"
         let task = webPart freshContext
-        //Console.WriteLine "after calling webpart"
-        //Console.WriteLine "before Execute task"
         match! this.executeTask task with 
         | Some ctx ->
-          //Console.WriteLine "before writeresponse"
-          match! this.writeResponse ctx with
-          | Ok () ->
-            //Console.WriteLine "after writeresponse"
-            let keepAlive =
-              match ctx.request.header "connection" with
-              | Choice1Of2 conn ->
-                String.equalsOrdinalCI conn "keep-alive"
-              | Choice2Of2 _ ->
-                ctx.request.httpVersion.Equals("HTTP/1.1")
-            //Console.WriteLine "exiting httpOutput.run"
-            return Ok (keepAlive)
-          | Result.Error err ->
-            ctx.runtime.logger.error (eventX "Socket error while writing response {error}" >> setFieldValue "error" err)
-            return Result.Error err
+          let! _ = this.writeResponse ctx
+          let keepAlive =
+            match ctx.request.header "connection" with
+            | Choice1Of2 conn ->
+              String.equalsOrdinalCI conn "keep-alive"
+            | Choice2Of2 _ ->
+              ctx.request.httpVersion.Equals("HTTP/1.1")
+          return Ok (keepAlive)
         | None ->
           return Ok (false)
       with ex ->
-        //Console.WriteLine "nother one bytes the doost"
         return Result.Error(Error.ConnectionError ex.Message)
   }

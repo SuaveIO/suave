@@ -3,11 +3,8 @@ namespace Suave
 module Cookie =
 
   open System
-  open System.Text
   open System.Globalization
   open Suave.Operators
-  open Suave.Logging
-  open Suave.Logging.Message
   open Suave.Utils
 
   type CookieLife =
@@ -123,13 +120,6 @@ module Cookie =
           (Headers.Fields.Response.setCookie, header) :: headers)
           (ctx.response.headers |> List.filter notSetCookie)
 
-    if cookie.value.Length > 4096 then
-      ctx.runtime.logger.warn (
-        eventX "Cookie {cookieName} has {cookieBytes} which is too large! Lengths over 4 096 bytes risk corruption in some browsers; consider alternate storage"
-        >> setFieldValue "cookieName" cookie.name
-        >> setFieldValue "cookieBytes" cookie.value.Length)
-
-
     succeed { ctx with response = { ctx.response with headers = headers' } }
 
 
@@ -139,15 +129,7 @@ module Cookie =
     Writers.addHeader Headers.Fields.Response.setCookie stringValue
 
   let setPair (httpCookie : HttpCookie) (clientCookie : HttpCookie) : WebPart =
-    context (fun ctx ->
-      ctx.runtime.logger.debug (
-        eventX "Setting {cookieName} to value of {cookieBytes}"
-        >> setFieldValue "cookieName" httpCookie.name
-        >> setFieldValue "cookieBytes" httpCookie.value.Length
-        >> setSingleName "Suave.Cookie.setPair")
-
-      succeed)
-    >=> setCookie httpCookie
+    setCookie httpCookie
     >=> setCookie clientCookie
 
   let unsetPair httpCookieName : WebPart =
@@ -209,19 +191,14 @@ module Cookie =
 
   let updateCookies (csctx : CookiesState) fPlainText : WebPart =
     context (fun ctx ->
-      let debug message =
-        ctx.runtime.logger.debug (
-          eventX message
-          >> setSingleName "Suave.Cookie.updateCookies")
-
       let plainText =
         match readCookies csctx.serverKey csctx.cookieName ctx.response.cookies with
         | Choice1Of2 (_, plainText) ->
-          debug "Existing cookie"
+          //debug "Existing cookie"
           fPlainText (Some plainText)
 
         | Choice2Of2 _ ->
-          debug "First time"
+          //debug "First time"
           fPlainText None
 
       // Since the contents will completely change every write, we simply re-generate the cookie
@@ -238,9 +215,6 @@ module Cookie =
                    (fSuccess : WebPart)
                    : WebPart =
     context (fun ctx ->
-      let debug message =
-        ctx.runtime.logger.debug (eventX message >> setSingleName "Suave.Cookie.cookieState")
-
       let setCookies plainText =
         let httpCookie, clientCookie =
           generateCookies csctx.serverKey csctx.cookieName
@@ -252,7 +226,6 @@ module Cookie =
 
       match readCookies csctx.serverKey csctx.cookieName ctx.request.cookies with
       | Choice1Of2 (httpCookie, plainText) ->
-        debug "Existing cookie"
         refreshCookies csctx.relativeExpiry httpCookie
           >=> Writers.setUserData csctx.userStateKey plainText
           >=> fSuccess
@@ -260,19 +233,14 @@ module Cookie =
       | Choice2Of2 (NoCookieFound _) ->
         match noCookie () with
         | Choice1Of2 plainText ->
-          debug "No existing cookie, setting text"
           setCookies plainText >=> fSuccess
 
         | Choice2Of2 wp_kont ->
-          debug "No existing cookie, calling WebPart continuation"
           wp_kont
 
       | Choice2Of2 (DecryptionError err) ->
-        debug ("decryption error: "  + err.ToString())
         match decryptionFailure err with
         | Choice1Of2 plainText ->
-          debug "Existing, broken cookie, setting cookie text anew"
           setCookies plainText >=> fSuccess
         | Choice2Of2 wpKont    ->
-          debug "Existing, broken cookie, unsetting it, forwarding to given failure web part"
           wpKont >=> unsetPair csctx.cookieName)

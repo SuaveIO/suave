@@ -25,29 +25,29 @@ type Connection =
     x.socketBinding.port
 
   /// Flush out whatever is in the lineBuffer
-  member inline this.flush () : SocketOp<unit> =
-    socket {
+  member inline this.flush () =
+    task {
       if this.lineBufferCount> 0  then
-        do! this.transport.write (new Memory<_>(this.lineBuffer,0,this.lineBufferCount))
+        let! _ = this.transport.write (new Memory<_>(this.lineBuffer,0,this.lineBufferCount))
         this.lineBufferCount <- 0
     }
 
-  member inline this.asyncWrite (str: string) : SocketOp<unit> =
-    socket {
+  member inline this.asyncWrite (str: string) =
+    task {
       if str.Length = 0 then
         return ()
       else
         let maxByteCount = Encoding.UTF8.GetMaxByteCount(str.Length)
         if maxByteCount > this.lineBuffer.Length then
-          do! this.transport.write (new Memory<_>(this.lineBuffer, 0, this.lineBufferCount))
+          let! _ = this.transport.write (new Memory<_>(this.lineBuffer, 0, this.lineBufferCount))
           let byteCount = Encoding.UTF8.GetBytes(str, 0, str.Length, this.lineBuffer, 0)
           // don't waste time buffering here
-          do! this.transport.write (new Memory<_>(this.lineBuffer, 0, byteCount))
+          let! _ = this.transport.write (new Memory<_>(this.lineBuffer, 0, byteCount))
           this.lineBufferCount <- 0
           return ()
 
         elif this.lineBufferCount + maxByteCount > this.lineBuffer.Length then
-          do! this.transport.write (new Memory<_>(this.lineBuffer, 0, this.lineBufferCount))
+          let! _ = this.transport.write (new Memory<_>(this.lineBuffer, 0, this.lineBufferCount))
           // the string, char index, char count, bytes, byte index
           let c = Encoding.UTF8.GetBytes(str, 0, str.Length, this.lineBuffer, 0)
           this.lineBufferCount <- 0
@@ -59,37 +59,34 @@ type Connection =
           return ()
     }
 
-  member inline this.asyncWriteLn (s : string) : SocketOp<unit> =
-    socket {
-      return! this.asyncWrite (s + Bytes.eol)
-    }
+  member inline this.asyncWriteLn (s : string) = this.asyncWrite (s + Bytes.eol)
 
   /// Write the string s to the stream asynchronously from a byte array
-  member inline this.asyncWriteBytes (b : byte[]) : SocketOp<unit> =
+  member inline this.asyncWriteBytes (b : byte[]) =
     task {
     if b.Length > 0 then
-      return! this.transport.write (new Memory<_>(b, 0, b.Length))
-    else
-      return Ok ()
+      let! _ = this.transport.write (new Memory<_>(b, 0, b.Length))
+      ()
   }
 
-  member inline this.asyncWriteBufferedBytes (b : byte[])  : SocketOp<unit> =
-    socket {
+  member inline this.asyncWriteBufferedBytes (b : byte[]) =
+    task {
       if this.lineBufferCount + b.Length > this.lineBuffer.Length then
         // flush lineBuffer
         if this.lineBufferCount > 0 then
-          do! this.transport.write (new Memory<_>(this.lineBuffer, 0, this.lineBufferCount))
+          let! _ = this.transport.write (new Memory<_>(this.lineBuffer, 0, this.lineBufferCount))
+          ()
         // don't waste time buffering here
-        do! this.transport.write (new Memory<_>(b, 0, b.Length))
+        let! _ =  this.transport.write (new Memory<_>(b, 0, b.Length))
         this.lineBufferCount <- 0
       else
         Buffer.BlockCopy(b, 0, this.lineBuffer,this.lineBufferCount, b.Length)
         this.lineBufferCount <- this.lineBufferCount + b.Length
     }
 
-  member inline this.asyncWriteBufferedArrayBytes (xxs:(byte[])[]) : SocketOp<unit> =
+  member inline this.asyncWriteBufferedArrayBytes (xxs:(byte[])[])  =
     let rec loop index =
-      socket{
+      task{
         if index >= xxs.Length then
           return ()
         else
@@ -98,7 +95,7 @@ type Connection =
           }
     loop 0
 
-  member inline this.writeChunk (chunk : byte []) = socket {
+  member inline this.writeChunk (chunk : byte []) = task {
     let chunkLength = chunk.Length.ToString("X")
     do! this.asyncWriteLn chunkLength
     do! this.asyncWriteLn (System.Text.Encoding.UTF8.GetString(chunk))

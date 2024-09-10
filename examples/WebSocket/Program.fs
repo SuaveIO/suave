@@ -1,4 +1,3 @@
-
 open Suave
 open Suave.Http
 open Suave.Operators
@@ -89,7 +88,7 @@ let app : WebPart =
 
 [<EntryPoint>]
 let main _ =
-  startWebServer { defaultConfig with logger = Targets.create Verbose [||] } app
+  startWebServer defaultConfig app
   0
 
 //

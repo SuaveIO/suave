@@ -1,11 +1,8 @@
 module Program
 
 open System
-open System.Net
 
 open Suave
-open Suave.Sockets.Control
-open Suave.Logging
 open Suave.Operators
 open Suave.EventSource
 open Suave.Filters
@@ -16,31 +13,6 @@ open Suave.State.CookieStateStore
 
 let basicAuth =
   Authentication.authenticateBasic ((=) ("foo", "bar"))
-
-// This demonstrates how to customise the console logger output.
-// In most cases you wont need this. Instead you can use the more succinct:
-// `let logger = Targets.create Verbose [||]`
-let loggingOptions =
-  { Literate.LiterateOptions.create() with
-      getLogLevelText = function Verbose->"V" | Debug->"D" | Info->"I" | Warn->"W" | Error->"E" | Fatal->"F" }
-
-let logger = LiterateConsoleTarget(
-                name = [|"Suave";"Examples";"Example"|],
-                minLevel = Verbose,
-                options = loggingOptions,
-                outputTemplate = "[{level}] {timestampUtc:o} {message} [{source}]{exceptions}"
-              ) :> Logger
-
-///  With this workflow you can write WebParts like this
-let task : WebPart =
-  fun ctx -> WebPart.asyncOption {
-    let! ctx = GET ctx
-    let! ctx = Writers.setHeader "foo" "bar" ctx
-    return ctx
-  }
-
-///  we can still use the old symbol but now has a new meaning
-let foo : WebPart = fun ctx -> GET ctx >>= OK "hello"
 
 let myApp =
   choose [
@@ -57,7 +29,6 @@ let myApp =
 // typed routes
 let testApp =
   choose [
-    logStructured logger logFormatStructured >=> never
     pathScan "/add/%d/%d"   (fun (a,b) -> OK((a + b).ToString()))
     pathScan "/minus/%d/%d" (fun (a,b) -> OK((a - b).ToString()))
     pathScan "/divide/%d/%d" (fun (a,b) -> OK((a / b).ToString()))
@@ -86,9 +57,20 @@ let unzipBody : WebPart =
     else
       return ctx }
 
-open System.IO
 open Suave.Sockets
-open Suave.Sockets.Control
+open System.IO
+
+let write (conn:Connection, _) =
+  task {
+    use ms = new MemoryStream()
+    ms.Write([| 1uy; 2uy; 3uy |], 0, 3)
+    ms.Seek(0L, SeekOrigin.Begin) |> ignore
+    // do things here
+    do! conn.asyncWriteLn (sprintf "Content-Length: %d\r\n" ms.Length) 
+    do! conn.flush()
+    do! transferStream conn ms
+    return ()
+}
 
 let app =
   choose [
@@ -99,15 +81,7 @@ let app =
     path "/hello" >=> OK "Hello World"
     path "/byte-stream" >=> (fun ctx ->
 
-      let write (conn:Connection, _) = socket {
-        use ms = new MemoryStream()
-        ms.Write([| 1uy; 2uy; 3uy |], 0, 3)
-        ms.Seek(0L, SeekOrigin.Begin) |> ignore
-        // do things here
-        do! conn.asyncWriteLn (sprintf "Content-Length: %d\r\n" ms.Length) 
-        do! conn.flush()
-        do! transferStream conn ms
-      }
+      
 
       { ctx with
           response =
@@ -145,11 +119,12 @@ let app =
     basicAuth <| choose [ // from here on it will require authentication
         // surf to: http://localhost:8082/es.html to view the ES
         GET >=> path "/events2" >=> request (fun _ -> EventSource.handShake (fun out ->
-          socket {
+          task {
             let msg = { id = "1"; data = "First Message"; ``type`` = None }
-            do! msg |> send out
+            let! _ = send out msg
             let msg = { id = "2"; data = "Second Message"; ``type`` = None }
-            do! msg |> send out
+            let! _ = send out msg
+            ()
           }))
         GET >=> path "/events" >=> request (fun r -> EventSource.handShake (CounterDemo.counterDemo r))
         GET >=> browseHome //serves file if exists
@@ -177,7 +152,7 @@ let app =
           >=> OK "Doooooge"
         RequestErrors.NOT_FOUND "Found no handlers"
       ]
-    ] >=> logStructured logger logFormatStructured
+    ] //>=> logStructured logger logFormatStructured
 
 open System.Security.Cryptography.X509Certificates
 
@@ -195,7 +170,7 @@ let main argv =
       mimeTypesMap          = mimeTypes
       homeFolder            = None
       compressedFilesFolder = None
-      logger                = logger
+      //logger                = logger
       cookieSerialiser      = new BinaryFormatterSerialiser()
       hideHeader            = false
       maxContentLength      = 1000000 }

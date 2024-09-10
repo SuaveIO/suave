@@ -7,7 +7,6 @@ open Suave.Utils
 open Suave.Operators
 open Suave.Successful
 open Suave.Sockets
-open Suave.Sockets.Control
 
 let private (?) headers (name : string)  =
   headers
@@ -25,7 +24,7 @@ let private httpWebResponseToHttpContext (ctx : HttpContext) (response : HttpWeb
     |> Seq.map (fun k -> k, response.Headers.Get k)
     |> Seq.toList
 
-  let writeContentLengthHeader (conn:Connection) = socket {
+  let writeContentLengthHeader (conn:Connection) = task {
     match headers ? ("Content-Length") with
     | Some x ->
       do! conn.asyncWriteLn (sprintf "Content-Length: %s" x)
@@ -36,7 +35,7 @@ let private httpWebResponseToHttpContext (ctx : HttpContext) (response : HttpWeb
 
   let content =
     SocketTask
-      (fun (conn, _) -> socket {
+      (fun (conn, _) -> task {
           do! writeContentLengthHeader conn
           do! conn.asyncWriteLn ""
           do! conn.flush()
@@ -103,12 +102,6 @@ let proxy (newHost : Uri) : WebPart =
 
         return httpWebResponseToHttpContext ctx response |> Some
       | exn ->
-        ctx.runtime.logger.log
-          Logging.Error
-          (fun lvl ->
-            Logging.Message.event lvl (sprintf "Unable to proxy the request %A %A. " ctx.request.rawMethod remappedAddress)
-            |> Logging.Message.addExn exn)
-
         return!
           (
             OK "Unable to proxy the request. "

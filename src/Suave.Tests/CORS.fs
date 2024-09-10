@@ -1,17 +1,12 @@
-﻿module Suave.Tests.CORS
+module Suave.Tests.CORS
 
-open System
 open System.Net
 open System.Net.Http
 open Expecto
-open Suave.Tests.TestUtilities
 open Suave
 open Suave.Successful
 open Suave.Operators
 open Suave.Filters
-open Suave.Logging
-open Suave.Cookie
-open Suave.State.CookieStateStore
 open Suave.CORS
 open Suave.Testing
 
@@ -39,7 +34,7 @@ let corsWithDefaultConfig = cors defaultCORSConfig
 
 [<Tests>]
 let tests cfg =
-  let runWithConfig = runWith { cfg with logger = Targets.create LogLevel.Warn [| "Suave"; "Tests"; "CORS" |] }
+  let runWithConfig = runWith cfg //{ cfg with logger = Targets.create LogLevel.Warn [| "Suave"; "Tests"; "CORS" |] }
 
   let origin = "http://someorigin.com"
 

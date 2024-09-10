@@ -31,8 +31,8 @@ open System.Net.Http
 open System.Net.Http.Headers
 open Expecto
 open Suave
-open Suave.Logging
-open Suave.Logging.Message
+//open Suave.Logging
+//open Suave.Logging.Message
 open Suave.Http
 
 [<AutoOpen>]
@@ -105,7 +105,7 @@ let runWithFactory factory config webParts : SuaveTestCtx =
 
   let config2 = { config with cancellationToken = cts.Token; bufferSize = 128; maxOps = 10 }
 
-  let listening, (server) = factory { config with cancellationToken = cts .Token; logger = Targets.create Warn [||] } webParts
+  let listening, (server) = factory { config with cancellationToken = cts .Token(*; logger = Targets.create Warn [||]*) } webParts
   listening |> Async.RunSynchronously |> ignore // wait for the server to start listening
 
   { cts = cts
@@ -143,10 +143,10 @@ let createClient handler =
 
 /// Send the request with the client - returning the result of the request
 let send (client : HttpClient) (timeout : TimeSpan) (ctx : SuaveTestCtx) (request : HttpRequestMessage) =
-  ctx.suaveConfig.logger.verbose (
-    eventX "Send"
-    >> setFieldValue "method" request.Method.Method
-    >> setFieldValue "uri" request.RequestUri)
+  //ctx.suaveConfig.logger.verbose (
+   // eventX "Send"
+    //>> setFieldValue "method" request.Method.Method
+   // >> setFieldValue "uri" request.RequestUri)
 
   let send = client.SendAsync(request, HttpCompletionOption.ResponseContentRead, ctx.cts.Token)
 

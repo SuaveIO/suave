@@ -1,6 +1,5 @@
 namespace Suave
 
-open Suave.Logging
 open System
 
 /// The core configuration of suave. See also Suave.Web.default_config which
@@ -41,14 +40,6 @@ type SuaveConfig =
     /// Folder for temporary compressed files
     compressedFilesFolder : string option
 
-    /// Suave's logger. You can override the default instance if you wish to
-    /// ship your logs, e.g. using https://www.nuget.org/packages/Logary.Adapters.Suave/
-    /// Also, this logger will be configured by default for Suave unless you
-    /// explicitly use `Suave.Logging.Global.initialise` before starting the
-    /// web server (the first time – the second time, the static will already
-    /// have been initialised).
-    logger                : Logger
-
     /// The cookie serialiser to use for converting the data you save in cookies
     /// from your application into a byte array.
     cookieSerialiser      : CookieSerialiser
@@ -70,7 +61,6 @@ type SuaveConfig =
   member x.withMimeTypesMap(v)          = { x with mimeTypesMap = v }
   member x.withHomeFolder(v)            = { x with homeFolder = v }
   member x.withCompressedFilesFolder(v) = { x with compressedFilesFolder = v }
-  member x.withLogger(v)                = { x with logger = v }
   member x.withHiddenHeader(v)          = { x with hideHeader = v }
   member x.withMaxContentLength(v)      = { x with maxContentLength = v }
 
@@ -87,7 +77,6 @@ module SuaveConfig =
                        config.mimeTypesMap
                        contentFolder
                        compressionFolder
-                       config.logger
                        config.cookieSerialiser
                        config.hideHeader
                        config.maxContentLength

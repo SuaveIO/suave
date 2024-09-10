@@ -1,5 +1,6 @@
 namespace Suave
 
+open System.Threading.Tasks
 open Suave.Sockets
 
 /// <summary><para>
@@ -1153,12 +1154,12 @@ module Filters =
   /// message formatter that can inspect the context and produce a message to
   /// send to the logger, along with the structured fields as a name*obj map.
   /// </para></summary>
-  val logWithLevelStructured :  level:LogLevel -> logger:Logger -> messageFun:(HttpContext -> string * Map<string,obj>) -> WebPart
+  //val logWithLevelStructured :  level:LogLevel -> logger:Logger -> messageFun:(HttpContext -> string * Map<string,obj>) -> WebPart
 
   /// <summary><para>
   /// The function log is equivalent to `logWithLevel LogLevel.Debug`.
   /// </para></summary>
-  val logStructured : logger:Logger -> messageFun:(HttpContext -> string * Map<string,obj>) -> WebPart
+  //val logStructured : logger:Logger -> messageFun:(HttpContext -> string * Map<string,obj>) -> WebPart
 
   /// <summary><para>
   /// The default log format for <see cref="log" />.  NCSA Common log format
@@ -1182,12 +1183,12 @@ module Filters =
   /// message formatter that can inspect the context and produce a message to
   /// send to the logger.
   /// </para></summary>
-  val logWithLevel :  level:LogLevel -> logger:Logger -> messageFun:(HttpContext -> string) -> WebPart
+  //val logWithLevel :  level:LogLevel -> logger:Logger -> messageFun:(HttpContext -> string) -> WebPart
 
   /// <summary><para>
   /// The function log is equivalent to `logWithLevel LogLevel.Debug`.
   /// </para></summary>
-  val log : logger:Logger -> messageFun:(HttpContext -> string) -> WebPart
+  //val log : logger:Logger -> messageFun:(HttpContext -> string) -> WebPart
 
   /// <summary><para>
   /// Strongly typed route matching! Matching the uri can be used with the 'parsers'
@@ -1603,36 +1604,36 @@ module EventSource =
   /// the proper framing is used. However, if you have a desire to write raw
   /// data, this function overrides the Socket.async_write function so that
   /// you will be writing UTF8 data only, as per the specification.
-  val asyncWrite : out:Connection -> data:string -> SocketOp<unit>
+  val asyncWrite : out:Connection -> data:string -> Task<unit>
 
   /// Same as `async_write`; convenience function.
-  val (<<.) : out:Connection -> data:string -> SocketOp<unit>
+  val (<<.) : out:Connection -> data:string -> Task<unit>
 
   /// "If the line is empty (a blank line) - dispatch the event."
   /// Dispatches the event properly to the browser.
-  val dispatch : out:Connection -> SocketOp<unit>
+  val dispatch : out:Connection -> ValueTask<int>
 
   /// "If the line starts with a U+003A COLON character (:) - Ignore the line."
   /// Writes a comment to the stream
-  val comment : out:Connection -> cmt:string -> SocketOp<unit>
+  val comment : out:Connection -> cmt:string -> Task<unit>
 
   /// "If the field name is 'event' - Set the event type buffer to field value."
   /// Writes the event type to the stream
-  val eventType : out:Connection -> eventType:string -> SocketOp<unit>
+  val eventType : out:Connection -> eventType:string -> Task<unit>
 
   /// "If the field name is 'data' -
   /// Append the field value to the data buffer, then append a single
   /// U+000A LINE FEED (LF) character to the data buffer."
   /// Write a piece of data as part of the event
-  val data : out:Connection -> data:string -> SocketOp<unit>
+  val data : out:Connection -> data:string -> Task<unit>
 
   /// "If the field name is 'id' - Set the last event ID buffer to the field value."
   /// Sets the last event id in the stream.
-  val esId : out:Connection -> lastEventId:string -> SocketOp<unit>
+  val esId : out:Connection -> lastEventId:string -> Task<unit>
 
   /// Sets the option for the EventSource instance, of how long to wait in ms
   /// until a new connection is spawned as a retry.
-  val retry : out:Connection -> retry:uint32 -> SocketOp<unit>
+  val retry : out:Connection -> retry:uint32 -> Task<unit>
 
   /// A container data type for the output events
   type Message =
@@ -1647,14 +1648,14 @@ module EventSource =
     static member createType : id:string -> data:string -> typ:string -> Message
 
   /// send a message containing data to the output stream
-  val send : out:Connection -> msg:Message -> SocketOp<unit>
+  val send : out:Connection -> msg:Message -> Task<int  >
 
   /// This function composes the passed function f with the hand-shake required
   /// to start a new event-stream protocol session with the browser.
-  val handShake : fCont:(Connection -> SocketOp<unit>) -> WebPart
+  val handShake : fCont:(Connection -> Task<unit>) -> WebPart
 
 module TransferEncoding =
-  val chunked: (Connection -> SocketOp<unit>) -> WebPart
+  val chunked: (Connection -> Task<unit>) -> WebPart
 
 module Control =
 

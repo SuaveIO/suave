@@ -1,4 +1,4 @@
-﻿module Suave.Tests.Auth
+module Suave.Tests.Auth
 
 
 open System
@@ -6,8 +6,6 @@ open System.Net
 open System.Net.Http
 open Expecto
 open Suave
-open Suave.Logging
-open Suave.Logging.Message
 open Suave.Cookie
 open Suave.State.CookieStateStore
 open Suave.Operators
@@ -38,29 +36,12 @@ let reqResp
   fResult
   (ctx : SuaveTestCtx) =
 
-  let event message =
-    eventX message >> setSingleName "Suave.Tests"
-
-  let logger =
-    ctx.suaveConfig.logger
-
-  logger.debug (
-    event "{method} {resource}"
-    >> setFieldValue "method" methd
-    >> setFieldValue "resource" resource)
-
   let defaultTimeout = TimeSpan.FromSeconds 5.
 
   use handler = createHandler DecompressionMethods.None cookies
   use client = createClient handler
   use request = createRequest methd resource "" None (endpointUri ctx.suaveConfig) |> fRequest
 
-  for h in request.Headers do
-    logger.debug (event "{headerName}: {headerValue}"
-                  >> setFieldValue "headerName" h.Key
-                  >> setFieldValue "headerValue" (String.Join(", ", h.Value)))
-
-  // use -> let!!!
   let result = request |> send client defaultTimeout ctx
   fResult result
 
@@ -95,7 +76,7 @@ let sessionState f =
 
 [<Tests>]
 let authTests cfg =
-  let runWithConfig = runWith { cfg with logger = Targets.create Warn [||] }
+  let runWithConfig = runWith cfg //{ cfg with logger = Targets.create Warn [||] }
   testList "auth tests" [
     testCase "baseline, no auth cookie" <| fun _ ->
       let ctx = runWithConfig (OK "ACK")

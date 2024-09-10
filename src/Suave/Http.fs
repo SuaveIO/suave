@@ -369,7 +369,7 @@ module Http =
   type HttpContent =
     | NullContent
     | Bytes of byte []
-    | SocketTask of (Connection * HttpResult -> SocketOp<unit>)
+    | SocketTask of (Connection * HttpResult -> Threading.Tasks.Task<unit>)
 
   and [<Struct>] HttpResult =
     { status        : HttpStatus
@@ -383,7 +383,6 @@ module Http =
       mimeTypesMap      : MimeTypesMap
       homeDirectory     : string
       compressionFolder : string
-      logger            : Logger
       matchedBinding    : HttpBinding
       cookieSerialiser  : CookieSerialiser
       hideHeader        : bool
@@ -476,20 +475,18 @@ module Http =
         mimeTypesMap      = fun _ -> None
         homeDirectory     = "."
         compressionFolder = "."
-        logger            = Targets.create Debug [| "Suave" |]
         matchedBinding    = HttpBinding.defaults
         cookieSerialiser  = new BinaryFormatterSerialiser()
         hideHeader        = false
         maxContentLength  = 1024 }
 
     let create serverKey errorHandler mimeTypes homeDirectory compressionFolder
-           logger cookieSerialiser hideHeader maxContentLength binding =
+           (*logger*) cookieSerialiser hideHeader maxContentLength binding =
       { serverKey         = serverKey
         errorHandler      = errorHandler
         mimeTypesMap      = mimeTypes
         homeDirectory     = homeDirectory
         compressionFolder = compressionFolder
-        logger            = logger
         matchedBinding    = binding
         cookieSerialiser  = cookieSerialiser
         hideHeader        = hideHeader

@@ -1,14 +1,11 @@
-﻿module Program
+module Program
 
 open System.IO
 
 open Suave
-open Suave.Logging
 open Suave.Filters
 open Suave.Stream
 open Suave.Operators
-
-let logger = Targets.create Verbose [||]
 
 let makeStream =
     async {
@@ -20,7 +17,7 @@ let makeStream =
 let app =
     choose [
         GET >=> path "/art" >=> Writers.setMimeType "image/jpeg" >=> okStream makeStream
-    ] >=> logStructured logger logFormatStructured
+    ]
 
 [<EntryPoint>]
 let main argv =

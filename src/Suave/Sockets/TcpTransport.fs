@@ -4,6 +4,7 @@ open System.Net
 open System.Net.Sockets
 open System.Threading
 open Suave
+open System
 
 [<AllowNullLiteral>]
 type TcpTransport(listenSocket : Socket, cancellationToken:CancellationToken) =
@@ -12,13 +13,13 @@ type TcpTransport(listenSocket : Socket, cancellationToken:CancellationToken) =
   val mutable acceptSocket :  Socket
 
   let shutdownSocket (acceptSocket:Socket) =
-    try
-      if acceptSocket <> null then
-        try
-          acceptSocket.Shutdown(SocketShutdown.Both)
-        with _ ->
+    // do not like this if here
+    if acceptSocket <> null then
+      try
+        acceptSocket.Shutdown(SocketShutdown.Both)
+        //Console.WriteLine("Socket shutdown smoothly")
+      finally
         acceptSocket.Dispose ()
-    with _ -> ()
 
   let remoteBinding (socket : Socket) : SocketBinding =
     let rep = socket.RemoteEndPoint :?> IPEndPoint
@@ -32,16 +33,18 @@ type TcpTransport(listenSocket : Socket, cancellationToken:CancellationToken) =
     }
 
   member this.read (buf : ByteSegment) =
-    task{
-      let! result = this.acceptSocket.ReceiveAsync(buf,cancellationToken)
-      return Ok(result)
-      }
+    this.acceptSocket.ReceiveAsync(buf,cancellationToken)
+    //task{
+      //let! result = this.acceptSocket.ReceiveAsync(buf,cancellationToken)
+      //return Ok(result)
+      //}
 
   member this.write (buf : ByteSegment) =
-    task{
-      let! result = this.acceptSocket.SendAsync(buf,cancellationToken)
-      return Ok()
-    }
+    this.acceptSocket.SendAsync(buf,cancellationToken)
+    //task{
+      //let! result = this.acceptSocket.SendAsync(buf,cancellationToken)
+      //return Ok()
+    //}
 
   member this.shutdown() =
       shutdownSocket (this.acceptSocket)

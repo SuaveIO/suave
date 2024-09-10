@@ -27,10 +27,26 @@ let SuaveVersion = Assembly.GetExecutingAssembly().GetName().Version.ToString()
 /// This is the server header
 let ServerHeader = "Server: Suave (https://suave.io)"
 
+let mutable verbose = false
+
+open System.Diagnostics
+
+[<AbstractClass; Sealed>]
+type Logger =
+
+    [<Conditional("DEBUG")>]
+    static member debug (s:string) : unit =
+      Console.WriteLine s
+
+    static member info (s:string) : unit =
+      Console.WriteLine s
+
+
 [<assembly:System.Runtime.CompilerServices.InternalsVisibleToAttribute("Suave.LibUv")>]
 [<assembly:System.Runtime.CompilerServices.InternalsVisibleToAttribute("Suave.Experimental")>]
 [<assembly:System.Runtime.CompilerServices.InternalsVisibleToAttribute("Suave.DotLiquid")>]
 [<assembly:System.Runtime.CompilerServices.InternalsVisibleToAttribute("Suave.Razor")>]
 [<assembly:System.Runtime.CompilerServices.InternalsVisibleToAttribute("Suave.Xsp")>]
 [<assembly:System.Runtime.CompilerServices.InternalsVisibleToAttribute("Suave.Tests")>]
+
 do ()

@@ -3,6 +3,7 @@ namespace Suave
 open System
 open System.Collections.Generic
 open System.Text
+open System.Threading.Tasks
 
 open Suave.Sockets
 open Suave.Sockets.Control
@@ -52,22 +53,24 @@ module Aux =
 type HttpReader(transport : TcpTransport, lineBuffer : byte array, pipe: Pipe, cancellationToken) =
 
   let mutable running : bool = true
+  let mutable dirty : bool = false
 
   member this.stop () =
+    pipe.Writer.Complete()
+    pipe.Reader.Complete()
+    pipe.Reset()
     running <- false
+    dirty <- false
 
   member (*inline*) x.readMoreData () = task {
     let buff = pipe.Writer.GetMemory()
-    match! transport.read buff with
-    | Ok x ->
-      if x > 0 then
-        pipe.Writer.Advance(x)
-        let! flushResult = pipe.Writer.FlushAsync(cancellationToken)
-        return Ok()
-      else
-        return Result.Error (Error.ConnectionError "no more data")
-    | Result.Error error ->
-      return Result.Error error
+    let! x = transport.read buff
+    if x > 0 then
+      pipe.Writer.Advance(x)
+      let! flushResult = pipe.Writer.FlushAsync(cancellationToken)
+      return Ok()
+    else
+      return Result.Error (Error.ConnectionError "no more data")
     }
 
   member (*inline*) x.getData () = task{
@@ -183,7 +186,7 @@ type HttpReader(transport : TcpTransport, lineBuffer : byte array, pipe: Pipe, c
       let flag = ref true
       let error = ref false
       let result = ref (Ok ([]))
-      while !flag && (not !error) && (not cancellationToken.IsCancellationRequested) do
+      while !flag && (not cancellationToken.IsCancellationRequested) do
         let! _line = x.readLine ()
         match _line with
         | Ok line ->
@@ -204,11 +207,11 @@ type HttpReader(transport : TcpTransport, lineBuffer : byte array, pipe: Pipe, c
     }
 
   /// Read the post data from the stream, given the number of bytes that makes up the post data.
-  member (*inline*) x.readPostData (bytes : int) (select:ReadOnlyMemory<byte> -> int -> unit)  : SocketOp<unit> =
-    let rec loop (n:int) : SocketOp<unit> =
+  member (*inline*) x.readPostData (bytes : int) (select:ReadOnlyMemory<byte> -> int -> unit) : Task<unit> =
+    let rec loop (n:int) : Task<unit> =
       task {
         if n = 0 then
-          return Result.Ok()
+          return ()
         else
           let! result = x.getData()
           let bufferSequence = result.Buffer
@@ -217,18 +220,22 @@ type HttpReader(transport : TcpTransport, lineBuffer : byte array, pipe: Pipe, c
             if segment.Length > n then
               select segment n
               pipe.Reader.AdvanceTo(bufferSequence.GetPosition(int64(n)))
-              return Result.Ok()
+              return ()
             else
               select segment segment.Length
               pipe.Reader.AdvanceTo(bufferSequence.GetPosition(int64(segment.Length)))
               return! loop (n - segment.Length)
           else
-            return Result.Ok()
+            return ()
       }
     loop bytes
 
+  member this.isDirty = dirty 
+
   member this.readLoop() = task{
+    dirty <- true
     let reading = ref true
+    running <- true
     let result = ref (Ok())
     while running && !reading && not(cancellationToken.IsCancellationRequested) do
       let! a = this.readMoreData()
@@ -237,6 +244,7 @@ type HttpReader(transport : TcpTransport, lineBuffer : byte array, pipe: Pipe, c
       | a ->
         reading := false
         result := a
+        this.stop()
     return result
   }
 

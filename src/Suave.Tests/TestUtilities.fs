@@ -1,4 +1,4 @@
-﻿module Suave.Tests.TestUtilities
+module Suave.Tests.TestUtilities
 
 #nowarn "25"
 
@@ -164,7 +164,7 @@ module Expect =
 
 module Assert =
   let Equal(msg, exp, act) = Expect.equal act exp msg
-
+  (*
 type LogMethod =
   | Factory of (LogLevel -> Message)
   | Plain of Message
@@ -190,3 +190,4 @@ type InspectableLog() =
     member x.logWithAck level msgFactory : Async<unit> =
       x.logs <- { level = level; value = Factory msgFactory } :: x.logs
       async.Return ()
+      *)
