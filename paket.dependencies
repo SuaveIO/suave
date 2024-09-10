@@ -20,6 +20,8 @@ group Examples
   nuget FSharp.Core
   nuget Topshelf.FSharp
   nuget Topshelf
+  nuget Microsoft.Extensions.Logging
+  nuget Microsoft.Extensions.Logging.Console
 
 group Docs
   source https://api.nuget.org/v3/index.json
@@ -28,6 +30,8 @@ group Docs
   nuget Argu
   nuget FSharp.Core
   nuget FsLibTool
+  nuget Microsoft.Extensions.Logging
+  nuget Microsoft.Extensions.Logging.Console
 
 group SourceLink
   source https://api.nuget.org/v3/index.json

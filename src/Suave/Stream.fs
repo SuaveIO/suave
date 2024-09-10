@@ -3,7 +3,6 @@ module Suave.Stream
 open System.IO
 open Suave
 open Suave.Sockets
-open Suave.Sockets.Control
 
 /// Send a stream back in the response with 200 status.
 /// A new stream will be created for every request and it will be disposed after the request completes.
@@ -12,8 +11,8 @@ open Suave.Sockets.Control
 let okStream (makeStream : Async<Stream>) : WebPart =
   fun ctx ->
     let write (conn: Connection, _) =
-      socket {
-        use! stream = SocketOp.ofAsync makeStream
+      task {
+        use! stream = makeStream
 
         do! conn.asyncWriteLn $"Content-Length: %i{stream.Length}\r\n" 
         do! conn.flush()
@@ -39,8 +38,8 @@ let okStream (makeStream : Async<Stream>) : WebPart =
 let okStreamChunked (makeStream : Async<Stream>) : WebPart =
   fun ctx ->
     let write (conn:Connection, _) =
-      socket {
-        use! stream = SocketOp.ofAsync makeStream
+      task {
+        use! stream = makeStream
 
         do! conn.asyncWriteLn ""
         do! conn.flush()

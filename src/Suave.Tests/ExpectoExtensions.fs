@@ -1,10 +1,9 @@
-﻿module Suave.Tests.ExpectoExtensions
+module Suave.Tests.ExpectoExtensions
 
 open Expecto
-open Expecto.Tests
+open Expecto.Logging
 open Expecto.Impl
 open System
-open System.Linq
 open System.Reflection
 
 type MemberInfo with
@@ -68,5 +67,5 @@ let defaultMainThisAssemblyWithParam param args =
       | None -> failwith "Found no tests."
 
   match ExpectoConfig.fillFromArgs defaultConfig args with
-  | ArgsRun cfg -> runTests cfg tests
+  | ArgsRun cfg -> runTestsWithCLIArgs [ Verbosity Verbose; Sequenced ] [| |] tests
   | _ -> 1

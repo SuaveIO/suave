@@ -6,13 +6,8 @@ open Suave
 open Suave.Operators
 open Suave.Logging
 open Suave.Testing
-open Suave.Sockets.Control
-open Suave.Sockets.AsyncSocket
 open System
 open System.Net
-open System.Net.Http
-open System.Threading
-open Suave.Http
 
 let private (=>) a b = a, b
 
@@ -42,12 +37,11 @@ let parsing_tests (_: SuaveConfig) =
       Expect.equal (TraceHeader.parseTraceHeaders headers).traceId expected.traceId "should parse trace id"
       Expect.equal (TraceHeader.parseTraceHeaders headers).reqParentId expected.reqParentId "should parse span id to parent span id"
     ]
-open Suave
 open Suave.Sockets
 
 [<Tests>]
 let transferEncodingChunkedTests (cfg : SuaveConfig) =
-  let writeChunks (conn:Connection) = socket {
+  let writeChunks (conn:Connection) = task {
 
     do! conn.writeChunk "h"B
     do! conn.writeChunk "e"B

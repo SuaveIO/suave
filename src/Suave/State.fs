@@ -1,8 +1,6 @@
 module Suave.State
 
 open Suave.Cookie
-open Suave.Logging
-open Suave.Logging.Message
 
 /// A session store is a reader and a writer function pair keyed on strings.
 type StateStore =
@@ -25,13 +23,6 @@ module CookieStateStore =
 
   let write relativeExpiry (cookieName : string) (value : 'T) =
     context (fun ctx ->
-      let event message =
-        eventX message
-        >> setFieldValue "cookieName" cookieName
-        >> setSingleName "Suave.State.CookieStateStore.write"
-
-      let debug eventFactory =
-        ctx.runtime.logger.debug eventFactory
 
       let cookieState =
         { serverKey      = ctx.runtime.serverKey
@@ -40,11 +31,8 @@ module CookieStateStore =
           relativeExpiry = relativeExpiry
           secure         = false }
 
-      debug (event "Writing to {cookieName}")
       updateCookies cookieState (function
          | None ->
-           debug (event "In fPlainText, no existing cookie")
-
            Map.empty
            |> Map.add cookieName (box value)
            |> ctx.runtime.cookieSerialiser.serialise
@@ -52,13 +40,11 @@ module CookieStateStore =
          | Some data ->
            try
              let m = ctx.runtime.cookieSerialiser.deserialise data
-             debug (event "In fPlainText, has existing {cookie}" >> setFieldValue "cookie" m)
 
              m
              |> Map.add cookieName (box value)
              |> ctx.runtime.cookieSerialiser.serialise
            with ex ->
-             debug (event "In fPlainText, couldn't deserialize cookie data")
              Map.empty
              |> Map.add cookieName (box value)
              |> ctx.runtime.cookieSerialiser.serialise))
@@ -66,13 +52,6 @@ module CookieStateStore =
 
   let remove relativeExpiry (cookieName : string) =
     context (fun ctx ->
-      let event message =
-        eventX message
-        >> setFieldValue "cookieName" cookieName
-        >> setSingleName "Suave.State.CookieStateStore.remove"
-
-      let debug eventFactory =
-        ctx.runtime.logger.debug eventFactory
 
       let cookieState =
         { serverKey      = ctx.runtime.serverKey
@@ -81,11 +60,8 @@ module CookieStateStore =
           relativeExpiry = relativeExpiry
           secure         = false }
 
-      debug (event "Removing {cookieName}")
       updateCookies cookieState (function
         | None ->          
-            debug (event "In fPlainText, no existing cookie")
-
             Map.empty
             |> ctx.runtime.cookieSerialiser.serialise
           
@@ -95,22 +71,16 @@ module CookieStateStore =
                     ctx.runtime.cookieSerialiser.deserialise data
 
                 with _ ->
-                    debug (event "In fPlainText, couldn't deserialize cookie data")
-
                     Map.empty
 
             // Although not strictly needed, this allows us to avoid unnecessarily
             // re-serialising the same data if the key is not present.
             if m |> Map.containsKey cookieName then
-                debug (event "In fPlainText, has existing {cookie}" >> setFieldValue "cookie" m)
-
                 try
                     m
                     |> Map.remove cookieName   // Remove the key if we have gotten this far.
                     |> ctx.runtime.cookieSerialiser.serialise
                 with _ ->
-                    debug (event "In fPlainText, couldn't serialize cookie data")
-
                     // Return the original data on failure.
                     data
             else
@@ -119,9 +89,6 @@ module CookieStateStore =
 
   let stateful relativeExpiry secure : WebPart =
     context (fun ctx ->
-      ctx.runtime.logger.debug (
-        eventX "Ensuring cookie state"
-        >> setSingleName "Suave.State.CookieStateStore.stateful")
 
       let cipherTextCorrupt =
         (fun s -> s.ToString()) >> RequestErrors.BAD_REQUEST >> Choice2Of2

@@ -1,13 +1,9 @@
-﻿module Suave.Tests.Cookie
+module Suave.Tests.Cookie
 
 open Suave
 open Suave.Cookie
-open Suave.Logging
-open Suave.Testing
 
 open Expecto
-
-open FsCheck
 
 open Tests.TestUtilities
 
@@ -69,11 +65,6 @@ let parseResultCookie (_:SuaveConfig) =
       let parsed = Cookie.parseResultCookie (HttpCookie.toHeader cookie)
       Expect.equal parsed cookie "eq"
 
-// FsCheck character gen from RFC slightly painful; let's do that when merging Freya
-//    testPropertyWithConfig fscheck_config "anything generated" <| fun (cookie : HttpCookie) ->
-//      let parsed = Cookie.parse_cookie (HttpCookie.to_header cookie)
-//      Expect.equal parsed cookie "eq"
-
     testCase "set cookie (same name) twice keeps last" <| fun _ ->
       let force = Async.RunSynchronously >> Option.get
       let c1 = HttpCookie.createKV "a" "aa"
@@ -105,50 +96,4 @@ let parseRequestCookies (_ : SuaveConfig) =
         Expect.equal result [] "cookies should be ignored"
     ]
 
-[<Tests>]
-let setCookie (_ : SuaveConfig) =
-  testList "set cookie" [
-    testCase "set cookie - no warning when < 4k" <| fun _ ->
-      let log = InspectableLog()
-      let cookie =
-        { name      = "test cookie"
-          value     = String.replicate 4095 "x"
-          expires   = None
-          path      = Some "/"
-          domain    = None
-          secure    = true
-          httpOnly  = false
-          sameSite  = None }
-      let ctx = Cookie.setCookie cookie { HttpContext.empty with runtime = { HttpRuntime.empty with logger = log }}
-      Expect.isTrue (List.isEmpty log.logs) "Should be no logs generated"
-    testCase "set cookie - no warning when = 4k" <| fun _ ->
-      let log = InspectableLog()
-      let cookie =
-        { name      = "test cookie"
-          value     = String.replicate 4096 "x"
-          expires   = None
-          path      = Some "/"
-          domain    = None
-          secure    = true
-          httpOnly  = false
-          sameSite  = None }
-      let ctx = Cookie.setCookie cookie { HttpContext.empty with runtime = { HttpRuntime.empty with logger = log }}
-      Expect.isTrue (List.isEmpty log.logs) "Should be no logs generated"
 
-    testCase "set cookie - warning when > 4k" <| fun _ ->
-      let log = InspectableLog()
-      let cookie =
-        { name      = "test cookie"
-          value     = String.replicate 4097 "x"
-          expires   = None
-          path      = Some "/"
-          domain    = None
-          secure    = true
-          httpOnly  = false
-          sameSite  = None }
-      let ctx =
-        let input = { HttpContext.empty with runtime = { HttpRuntime.empty with logger = log }}
-        Cookie.setCookie cookie input |> Async.RunSynchronously
-      Expect.equal (List.length log.logs) 1 "Should be 1 log generated"
-      Expect.equal (List.head log.logs).level LogLevel.Warn "should be a warning"
-  ]

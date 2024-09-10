@@ -11,13 +11,10 @@ module Web =
   open System.IO
   open System.Text
   open Suave.Utils
-  open Suave.Logging
-  open Suave.Logging.Message
 
   /// The default error handler returns a 500 Internal Error in response to
   /// thrown exceptions.
   let defaultErrorHandler (ex : Exception) msg (ctx : HttpContext) =
-    ctx.runtime.logger.error (eventX msg >> setSingleName "Suave.Web.defaultErrorHandler" >> addExn ex)
     if ctx.isLocalTrustProxy then
       Response.response HTTP_500 (Encoding.UTF8.GetBytes("<h1>" + ex.Message + "</h1><br/>" + ex.ToString())) ctx
     else
@@ -48,10 +45,6 @@ module Web =
 
     // spawn tcp listeners/web workers
     let toRuntime = SuaveConfig.toRuntime config homeFolder compressionFolder
-
-    // If noone has already touched the logging configuration, initialise it to
-    // that of Suave's configuration.
-    Global.initialiseIfDefault { Global.defaultConfig with getLogger = fun _ -> config.logger }
 
     let startWebWorker runtime =
       let tcpServer =
@@ -86,7 +79,6 @@ module Web =
       mimeTypesMap          = Writers.defaultMimeTypesMap
       homeFolder            = None
       compressedFilesFolder = None
-      logger                = Targets.create Info [| "Suave" |]
       cookieSerialiser      = new BinaryFormatterSerialiser()
       hideHeader            = false
       maxContentLength      = 10000000 // 10 megabytes

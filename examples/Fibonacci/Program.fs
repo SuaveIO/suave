@@ -1,5 +1,4 @@
-﻿open Suave
-open Suave.Http
+open Suave
 open Suave.Filters
 open Suave.Successful
 

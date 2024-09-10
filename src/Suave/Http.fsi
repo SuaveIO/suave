@@ -230,7 +230,7 @@ module Http =
     /// control the flow of bytes by using a `SocketOp`. Contrasting with `Bytes`,
     /// setting the `HttpContent` as this discriminated union type lets you stream
     /// data back to the client through Suave.
-    | SocketTask of (Connection * HttpResult -> SocketOp<unit>)
+    | SocketTask of (Connection * HttpResult -> Threading.Tasks.Task<unit>)
 
 
   /// The `HttpResult` is the structure that you work with to tell Suave how to
@@ -257,7 +257,7 @@ module Http =
       mimeTypesMap      : MimeTypesMap
       homeDirectory     : string
       compressionFolder : string
-      logger            : Logger
+      //logger            : Logger
       matchedBinding    : HttpBinding
       cookieSerialiser  : CookieSerialiser
       hideHeader        : bool
@@ -337,7 +337,7 @@ module Http =
     /// make a new `HttpRuntime` from the given parameters
     val create : serverKey:ServerKey -> errorHandler:ErrorHandler
                -> mimeTypes:MimeTypesMap -> homeDirectory:string
-               -> compressionFolder:string -> logger:Logger
+               -> compressionFolder:string (*-> logger:Logger*)
                -> cookieSerialiser:CookieSerialiser
                -> hideHeader:bool -> maxContentLength:int
                -> binding:HttpBinding

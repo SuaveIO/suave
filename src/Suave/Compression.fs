@@ -4,8 +4,6 @@ module Compression =
 
   open Suave.Utils
   open Suave.Sockets
-  open Suave.Sockets.Control
-
 
   open System
   open System.IO
@@ -57,8 +55,8 @@ module Compression =
          | _         -> None)
     | _ -> None
 
-  let transform (content : byte []) (ctx : HttpContext) : SocketOp<Algorithm option * byte []> =
-    socket {
+  let transform (content : byte []) (ctx : HttpContext) : Threading.Tasks.Task<Algorithm option * byte []> =
+    task {
       if content.Length > MIN_BYTES_TO_COMPRESS && content.Length < MAX_BYTES_TO_COMPRESS then
         let request = ctx.request
         let enconding = getEncoder request
