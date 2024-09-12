@@ -44,7 +44,7 @@ let main argv =
   listening |> Async.RunSynchronously |> printfn "start stats: %A"
 
   // launch httperf
-  let output = execute "httperf" (sprintf "--hog --server=localhost --port=%d --uri=/ --rate=100 --num-conns=1000 --num-calls=1000 --burst-length=20" port)
+  let output = execute "httperf" (sprintf "--hog --server=localhost --port=%d --uri=/ --rate=20 --num-conns=100 --num-calls=1000 --burst-length=10" port)
 
   Console.WriteLine output
 
