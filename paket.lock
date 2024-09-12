@@ -1,5 +1,5 @@
 STORAGE: NONE
-RESTRICTION: == net7.0
+RESTRICTION: == net8.0
 NUGET
   remote: https://api.nuget.org/v3/index.json
     BenchmarkDotNet (0.13.12)
@@ -80,6 +80,9 @@ NUGET
     System.Runtime.CompilerServices.Unsafe (6.0)
     System.Security.AccessControl (6.0.1)
     System.Security.Principal.Windows (5.0)
+    System.Text.Encodings.Web (8.0)
+    System.Text.Json (8.0.4)
+      System.Text.Encodings.Web (>= 8.0)
     System.Threading.Channels (8.0)
     Websocket.Client (5.1.2)
       Microsoft.Extensions.Logging.Abstractions (>= 8.0)
@@ -88,7 +91,7 @@ NUGET
       System.Threading.Channels (>= 8.0)
 
 GROUP Docs
-RESTRICTION: == net7.0
+RESTRICTION: == net8.0
 NUGET
   remote: https://api.nuget.org/v3/index.json
     Argu (6.2.4)
@@ -152,7 +155,7 @@ NUGET
       System.Text.Encodings.Web (>= 8.0)
 
 GROUP Examples
-RESTRICTION: == net7.0
+RESTRICTION: == net8.0
 NUGET
   remote: https://api.nuget.org/v3/index.json
     FSharp.Core (8.0.400)

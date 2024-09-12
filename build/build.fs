@@ -47,7 +47,7 @@ let initTargets () =
 
   Target.create "Tests" <| fun _ ->
     let path = "src" </> "Suave.Tests"
-    let res = DotNet.exec id "run" (sprintf "-c Release --framework net7.0 --project %s -- --summary --sequenced" path)
+    let res = DotNet.exec id "run" (sprintf "-c Release --framework net8.0 --project %s -- --summary --sequenced" path)
     if not res.OK then
       res.Errors |> Seq.iter (eprintfn "%s")
       failwith "Tests failed."
@@ -55,7 +55,7 @@ let initTargets () =
   // Requires `httperf` installed on the server (only linux atm)
   Target.create "Load" <| fun _ ->
     let path = "examples" </> "Pong"
-    let res = DotNet.exec id "run" (sprintf "-c Release --framework net7.0 --project %s" path)
+    let res = DotNet.exec id "run" (sprintf "-c Release --framework net8.0 --project %s" path)
     if not res.OK then
       res.Errors |> Seq.iter (eprintfn "%s")
       failwith "Tests failed."

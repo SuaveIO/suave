@@ -2,6 +2,8 @@ module Suave.State
 
 open Suave.Cookie
 
+open System.Text.Json
+
 /// A session store is a reader and a writer function pair keyed on strings.
 type StateStore =
   /// Get an item from the state store
@@ -69,7 +71,6 @@ module CookieStateStore =
             let m =
                 try
                     ctx.runtime.cookieSerialiser.deserialise data
-
                 with _ ->
                     Map.empty
 
@@ -123,9 +124,10 @@ module CookieStateStore =
                 serialiser.deserialise (ss :?> byte [])
               with ex ->
                 Map.empty
+
             map
             |> Map.tryFind key
-            |> Option.map unbox
+            |> Option.map (fun z -> JsonSerializer.Deserialize(z :?> JsonElement))
           member x.set key value =
             let expiry = userState.[(StateStoreType + "-expiry")] :?> CookieLife
             write expiry key value
@@ -139,71 +141,3 @@ module CookieStateStore =
       match ctx.userState.TryGetValue StateStoreType with
       | true, x -> Some (createStateStore ctx.runtime.cookieSerialiser ctx.userState x)
       | _, _ -> None
-
-#if SYSTEM_RUNTIME_CACHING
-/// This module contains the implementation for the memory-cache backed session
-/// state store, when the memory cache is global for the server.
-module MemoryCacheStateStore =
-  open System
-  open System.Runtime.Caching
-  open System.Collections.Concurrent
-
-  /// This key will be present in HttpContext.userState and will contain the
-  /// MemoryCache instance.
-  [<Literal>]
-  let StateStoreType = "Suave.State.MemoryCacheStateStore"
-
-  [<Literal>]
-  let UserStateIdKey = "Suave.State.MemoryCacheStateStore-id"
-
-  [<Literal>]
-  let StateCookie = "mc-st"
-
-  module HttpContext =
-
-    /// Try to find the state id of the HttpContext.
-    let stateId ctx =
-      ctx.userState
-      |> Map.tryFind UserStateIdKey
-      |> Option.map (fun x -> x :?> string)
-      |> Option.get
-
-    /// Read the session store from the HttpContext.
-    let state (ctx : HttpContext) =
-      ctx.userState
-      |> Map.tryFind StateStoreType
-      |> Option.map (fun ss -> ss :?> StateStore)
-      |> Option.get
-
-  let private wrap (sessionMap : MemoryCache) relativeExpiry sessionId =
-    let exp = function
-      | Session   -> CacheItemPolicy()
-      | MaxAge ts -> CacheItemPolicy(SlidingExpiration = ts)
-
-    let stateBag =
-      lock sessionMap (fun _->
-        if sessionMap.Contains sessionId then
-          sessionMap.Get sessionId
-          :?> ConcurrentDictionary<string, obj>
-        else
-          let cd = new ConcurrentDictionary<string, obj>()
-          sessionMap.Set(CacheItem(sessionId, cd), exp relativeExpiry)
-          cd)
-
-    { new StateStore with
-        member x.get key =
-          if stateBag.ContainsKey key then
-            Some (stateBag.[key] :?> 'T)
-          else None
-        member x.set key value =
-          stateBag.[key] <- value
-          succeed }
-
-  let stateful relativeExpiry : WebPart =
-    let stateStore = wrap (MemoryCache.Default) relativeExpiry
-    context (fun ctx ->
-      let stateId = ctx |> HttpContext.stateId
-      Writers.setUserData StateStoreType (stateStore stateId))
-
-  let DefaultExpiry = TimeSpan.FromMinutes 30. |> MaxAge
-#endif

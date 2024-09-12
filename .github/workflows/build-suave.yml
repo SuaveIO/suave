@@ -21,6 +21,6 @@ jobs:
     - name: Setup .NET
       uses: actions/setup-dotnet@v3
       with:
-        dotnet-version: 7.0.200
+        dotnet-version: 8.0.401
     - name: Build
       run: ./build.sh

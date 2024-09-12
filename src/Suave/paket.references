@@ -1,2 +1,3 @@
 FSharp.Core
 System.IO.Pipelines
+System.Text.Json
