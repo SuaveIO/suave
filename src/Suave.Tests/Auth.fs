@@ -68,15 +68,9 @@ let interact methd resource container ctx =
   | true, values -> values |> Seq.iter (fun cookie -> container.SetCookies(endpointUri ctx.suaveConfig, cookie))
   response
 
-let sessionState f =
-  context( fun r ->
-    match HttpContext.state r with
-    | None ->  RequestErrors.BAD_REQUEST "damn it"
-    | Some store -> f store )
-
 [<Tests>]
 let authTests cfg =
-  let runWithConfig = runWith cfg //{ cfg with logger = Targets.create Warn [||] }
+  let runWithConfig = runWith cfg
   testList "auth tests" [
     testCase "baseline, no auth cookie" <| fun _ ->
       let ctx = runWithConfig (OK "ACK")
@@ -154,7 +148,18 @@ let authTests cfg =
 
         use res''''' = interact HttpMethod.GET "/protected"
         Expect.equal (contentString res''''') "please authenticate" "should not have access to protected after logout"
+        ]
 
+let sessionState f =
+  context(fun r ->
+    match HttpContext.state r with
+    | None ->  RequestErrors.BAD_REQUEST "damn it"
+    | Some store -> f store )
+
+[<Tests>]
+let sessionTests cfg =
+  let runWithConfig = runWith cfg 
+  testList "session tests" [
     testCase "test session is maintained across requests" <| fun _ ->
       // given
       let ctx =
