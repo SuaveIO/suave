@@ -119,10 +119,9 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
           (headerParams.TryLookup "form-data" |> Choice.map (String.trimc '"'))
           @|! (None, "Key 'form-data' was not present in 'content-disposition'")
 
-        let fieldName =
-          match headerParams.TryLookup "name" |> Choice.map (String.trimc '"') with
-          | Choice1Of2 s -> s
-          | _ -> failwith "Key 'name' was not present in 'content-disposition'"
+        let! fieldName =
+          (headerParams.TryLookup "name" |> Choice.map (String.trimc '"'))
+          @|! (None, "Key 'name' was not present in 'content-disposition'")
 
         match partHeaders %% "content-type" with
         | Choice1Of2 x when String.startsWith "multipart/mixed" x ->
@@ -148,29 +147,25 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
           return ()
       }
 
-    let something () = socket{
+    let nexPart () = socket{
         do! parsePart ()
-        let! line = reader.readLine()
+        let! line = reader.readLine ()
         return line
     }
 
-    let firstPart(boundary) = socket{
-      let! firstLine = reader.readLine()
-      if firstLine<>boundary then
-        failwithf "Invalid multipart format: expected boundary '%s' got '%s'" boundary firstLine
-    }
-
-    let secondPart () = task{
+    let parsePartLoop () = task{
       let mutable parsing = true
       let mutable error = false
       let result = ref (Ok())
       while parsing && not error && not(cancellationToken.IsCancellationRequested) do
-        match! something () with
+        match! nexPart() with
         | Ok line ->
           if line.StartsWith("--") then
+            // reached end boundary
             parsing <- false
           else if line <> String.Empty then
-            failwith "Invalid multipart format"
+            result := Result.Error(InputDataError (Some 413, "Invalid multipart format"))
+            error <- true
         | Result.Error e ->
           result := Result.Error e
           error <- true
@@ -181,9 +176,11 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
     }
 
     socket {
-      do! firstPart (boundary)
-      do! secondPart ()
-      return ()
+      let! firstLine = reader.readLine()
+      if firstLine<>boundary then
+        return! SocketOp.abort (InputDataError (Some 413, "Invalid multipart format"))
+      else
+        return! parsePartLoop ()
     }
 
   /// Reads raw POST data
