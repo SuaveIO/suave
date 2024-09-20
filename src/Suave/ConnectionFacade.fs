@@ -322,8 +322,7 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
         | Result.Error e ->
           flag := false
           result := Result.Error e
-      reader.stop()
-      return result
+      return result.Value
       }
 
   member this.accept(binding) = task{
@@ -334,13 +333,15 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
     connection.socketBinding <- binding
     try
       let task = Task.Factory.StartNew(reader.readLoop,cancellationToken)
-      let! a = this.requestLoop()
-      ()
+      match! this.requestLoop() with
+      | Ok () -> ()
+      | Result.Error err ->
+        do Console.WriteLine(sprintf "Error: %A" err)
     with
       | ex ->
-        if reader.isDirty then
-          reader.stop()
         do Console.WriteLine("Error: " + ex.Message)
+    if reader.isDirty then
+          reader.stop()
     Interlocked.Decrement(Globals.numberOfClients) |> ignore
     if Globals.verbose then
       do Console.WriteLine("Disconnected {0}. {1} connected.", clientIp,(!Globals.numberOfClients))
