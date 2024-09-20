@@ -4,7 +4,6 @@ namespace Suave
 module Runtime =
   open System
   open System.Net
-  open Suave.Logging
 
   /// A port is an unsigned short (uint16) structure
   type Port = uint16

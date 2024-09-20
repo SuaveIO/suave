@@ -879,6 +879,8 @@ module TransferEncoding =
 
 module Control =
 
+  open System.Collections.Generic
+
   let CLOSE (ctx : HttpContext) =
     { ctx with
         response =
@@ -888,7 +890,7 @@ module Control =
           }
         request =
           { ctx.request with
-              headers = [ "connection", "close" ]
+              headers = List<_>([ "connection", "close" ])
           }
     }
     |> succeed

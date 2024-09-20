@@ -10,7 +10,6 @@ open System.Text
 open Suave
 open Suave.Utils
 open Suave.Utils.Parsing
-open Suave.Logging
 open Suave.Sockets
 open Suave.Sockets.Control
 open Suave.Sockets.SocketOp.Operators
@@ -24,8 +23,8 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
 
   let reader = connection.reader
 
-  let files = List<HttpUpload>()
-  let multiPartFields = List<string*string>()
+  let mutable files = List<HttpUpload>()
+  let mutable multiPartFields = List<string*string>()
   let mutable _rawForm : byte array = [||]
 
   let readFilePart boundary (headerParams : Dictionary<string,string>) fieldName contentType = socket {
@@ -77,10 +76,10 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
         let! partHeaders = reader.readHeaders()
 
         let! (contentDisposition : string) =
-          (partHeaders %% "content-disposition")
+          (partHeaders @@ "content-disposition")
           @|! (None, "Missing 'content-disposition'")
 
-        match partHeaders %% "content-type" with
+        match partHeaders @@ "content-type" with
         | Choice1Of2 contentType ->
           let headerParams = headerParams contentDisposition
           let! res = readFilePart boundary headerParams fieldName contentType
@@ -110,7 +109,7 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
         let! partHeaders = reader.readHeaders()
 
         let! (contentDisposition : string) =
-          (partHeaders %% "content-disposition")
+          (partHeaders @@ "content-disposition")
           @|! (None, "Missing 'content-disposition'")
 
         let headerParams = headerParams contentDisposition
@@ -123,7 +122,7 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
           (headerParams.TryLookup "name" |> Choice.map (String.trimc '"'))
           @|! (None, "Key 'name' was not present in 'content-disposition'")
 
-        match partHeaders %% "content-type" with
+        match partHeaders @@ "content-type" with
         | Choice1Of2 x when String.startsWith "multipart/mixed" x ->
           let subboundary = "--" + parseBoundary x
           do! parseMultipartMixed fieldName subboundary
@@ -237,13 +236,13 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
 
     // Respond with 400 Bad Request as
     // per http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html
-    let! rawHost = headers %% "host" @|! (None, "Missing 'Host' header")
+    let! rawHost = (headers @@ "host") @|! (None, "Missing 'Host' header")
 
-    if headers %% "expect" = Choice1Of2 "100-continue" then
+    if headers @@ "expect" = Choice1Of2 "100-continue" then
       let! _ = httpOutput.run HttpRequest.empty Intermediate.CONTINUE
       ()
 
-    do! this.parsePostData runtime.maxContentLength (headers %% "content-length") (headers %% "content-type")
+    do! this.parsePostData runtime.maxContentLength (headers @@ "content-length") (headers @@ "content-type")
 
     let request =
       { httpVersion      = httpVersion
@@ -254,13 +253,12 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
         headers          = headers
         rawForm          = _rawForm
         rawQuery         = rawQuery
-        files            = Seq.toList files
-        multiPartFields  = Seq.toList multiPartFields
-        trace            = TraceHeader.parseTraceHeaders headers }
+        files            = files
+        multiPartFields  = multiPartFields }
     
     // Clear form data before exit
-    files.Clear()
-    multiPartFields.Clear()
+    files <- List<_>()
+    multiPartFields <- List<_>()
     _rawForm <- [||]
 
     return request

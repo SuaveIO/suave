@@ -6,7 +6,6 @@ module Http =
   open System
   open System.Collections.Generic
   open System.Net
-  open Suave.Logging
   open Suave.Sockets
   open Suave
 
@@ -117,12 +116,11 @@ module Http =
       rawPath         : string
       rawHost         : string
       rawMethod       : string
-      headers         : (string * string) list
+      headers         : List<(string * string)>
       rawForm         : byte []
       rawQuery        : string
-      files           : HttpUpload list
-      multiPartFields : (string * string) list
-      trace           : TraceHeader }
+      files           : List<HttpUpload>
+      multiPartFields : List<string * string>}
 
     /// Gets the query string from the `HttpRequest` as a list of `(key, value option)` tuples.
     /// If a key is present without value, the entry will be `(key, None)`. It will be `(key, Some value)` otherwise.

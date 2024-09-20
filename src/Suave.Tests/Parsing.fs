@@ -1,4 +1,4 @@
-﻿module Suave.Tests.Parsing
+module Suave.Tests.Parsing
 
 open Expecto
 open System
@@ -84,8 +84,6 @@ let parsingMultipart cfg =
 
 open System.Net
 open System.Net.Sockets
-open Suave.Logging
-open Suave.Sockets
 
 [<Tests>]
 let parsingMultipart2 cfg =
@@ -99,14 +97,14 @@ let parsingMultipart2 cfg =
       [ POST
         >=> choose [
             path "/filecount" >=> warbler (fun ctx ->
-              OK (string ctx.request.files.Length))
+              OK (string ctx.request.files.Count))
 
             path "/filenames"
               >=> Writers.setMimeType "application/json"
               >=> warbler (fun ctx ->
                   //printfn "inside suave"
                   ctx.request.files
-                  |> List.map (fun f ->
+                  |> Seq.map (fun f ->
                     "\"" + f.fileName + "\"")
                   |> String.concat ","
                   |> fun files -> "[" + files + "]"
@@ -114,7 +112,7 @@ let parsingMultipart2 cfg =
 
             path "/msgid"
               >=> request (fun r ->
-                match r.multiPartFields |> List.tryFind (fst >> (=) "messageId") with
+                match r.multiPartFields |> Seq.tryFind (fst >> (=) "messageId") with
                 | Some (_, yep) -> OK yep
                 | None -> NOT_FOUND "Nope... Not found"
               )

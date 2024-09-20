@@ -1,13 +1,10 @@
-﻿module Suave.Tests.FormDataParsing
+module Suave.Tests.FormDataParsing
 
 open Expecto
-open System
 open System.IO
 open System.Net.Http
 open System.Reflection
 open Suave
-open Suave.Utils
-open Suave.Logging
 open Suave.Operators
 open Suave.Filters
 open Suave.RequestErrors
@@ -21,7 +18,7 @@ let app =
           path "/gifs/echo"
               >=> Writers.setMimeType "image/gif"
               >=> warbler (fun ctx ->
-                  let file = ctx.request.files.Head
+                  let file = ctx.request.files[0]
                   //printfn "||| in suave, handing over to sendFile, file %s len %d"
                   //        file.tempFilePath (FileInfo(file.tempFilePath).Length)
                   Files.sendFile file.tempFilePath false)

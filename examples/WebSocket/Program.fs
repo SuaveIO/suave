@@ -1,15 +1,10 @@
 open Suave
-open Suave.Http
 open Suave.Operators
 open Suave.Filters
-open Suave.Successful
 open Suave.Files
 open Suave.RequestErrors
-open Suave.Logging
-open Suave.Utils
 
 open System
-open System.Net
 open System.Text
 
 open Suave.Sockets

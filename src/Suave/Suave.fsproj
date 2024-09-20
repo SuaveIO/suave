@@ -23,7 +23,6 @@
     <Compile Include="Utils/RangedStream.fs" />
     <Compile Include="Utils/Parse.fs" />
     <Compile Include="Utils/CultureInfoCache.fs" />
-    <Compile Include="Utils/TraceHeader.fs" />
     <Compile Include="Globals.fs" />
     <Compile Include="CookieSerialiser.fs" />
     <Compile Include="Runtime.fsi" />

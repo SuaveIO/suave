@@ -2,7 +2,6 @@ namespace Suave
 
 open System
 open Suave.Utils
-open Suave.Logging
 open System.Net
 open System.Net.Sockets
 

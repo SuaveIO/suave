@@ -1,5 +1,6 @@
 module Suave.Tests.Model
 
+open System.Collections.Generic
 open System.Text
 open System.Net.Http
 
@@ -25,7 +26,7 @@ let modelTests cfg =
   testList "Suave.Model" [
     testCase "header" <| fun _ ->
       let expected = "application/vnd.lolcatz; version=1.0"
-      let request  = { HttpRequest.empty with headers = [ "Content-Type", expected ] }
+      let request  = { HttpRequest.empty with headers = List<_>([ "Content-Type", expected ]) }
 
       let subject  = Binding.header "Content-Type" Choice1Of2 request
       Assert.Equal("should have bound Content-Type",

@@ -9,7 +9,6 @@ module Http =
   open System.Text
   open Suave.Utils
   open Suave.Sockets
-  open Suave.Logging
 
   open Microsoft.FSharp.Reflection
 
@@ -270,12 +269,11 @@ module Http =
       rawPath         : string
       rawHost         : string
       rawMethod       : string
-      headers         : (string * string) list
+      headers         : List<(string * string)>
       rawForm         : byte []
       rawQuery        : string
-      files           : HttpUpload list
-      multiPartFields : (string * string) list
-      trace           : TraceHeader }
+      files           : List<HttpUpload>
+      multiPartFields : List<(string * string)> }
 
     member x.url = x.binding.uri x.rawPath x.rawQuery
 
@@ -359,12 +357,12 @@ module Http =
         binding = { scheme = HTTP; socketBinding = SocketBinding.create IPAddress.Any 8080us }
         rawHost            = "localhost"
         rawMethod     = "GET"
-        headers         = []
+        headers         = List<_>()
         rawForm         = Array.empty
         rawQuery        = ""
-        files           = []
-        multiPartFields = []
-        trace           = TraceHeader.empty }
+        files           = List<_>()
+        multiPartFields = List<_>()
+        }
 
   type HttpContent =
     | NullContent

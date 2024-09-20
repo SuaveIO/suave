@@ -4,15 +4,8 @@ module Suave.Tests.TestUtilities
 
 open System
 open System.IO
-open System.Threading
-open System.Net
-open System.Net.Http
-open System.Net.Http.Headers
 open System.Reflection
 open System.Text
-open Suave
-open Suave.Web
-open Suave.Logging
 open Expecto
 open FsCheck
 

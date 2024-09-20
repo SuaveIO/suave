@@ -185,7 +185,7 @@ type HttpReader(transport : TcpTransport, lineBuffer : byte array, pipe: Pipe, c
       let headers = new List<string*string>()
       let flag = ref true
       let error = ref false
-      let result = ref (Ok ([]))
+      let result = ref (Ok (headers))
       while !flag && (not cancellationToken.IsCancellationRequested) do
         let! _line = x.readLine ()
         match _line with
@@ -199,11 +199,7 @@ type HttpReader(transport : TcpTransport, lineBuffer : byte array, pipe: Pipe, c
         | Result.Error e ->
           error := true
           result := Result.Error e
-
-      if !error then
-          return !result
-        else
-          return Ok(List.ofSeq headers)
+      return !result
     }
 
   /// Read the post data from the stream, given the number of bytes that makes up the post data.

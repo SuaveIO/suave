@@ -1082,8 +1082,6 @@ module ServerErrors =
 /// Functions have signature f :: params... -> HttpContext -> HttpContext option.
 module Filters =
 
-  open Suave.Logging
-
   /// Match on the path
   val path : pathAfterDomain:string -> WebPart
 

@@ -67,6 +67,7 @@ module Cookie =
     /// Get yourself a dictionary of cookie-name to Cookie.
     member x.cookies =
       x.headers
+      |> Seq.toList
       |> List.filter (fun (name, _) -> name.Equals "cookie")
       |> List.collect (snd >> parseCookies)
       |> List.fold (fun cookies cookie ->

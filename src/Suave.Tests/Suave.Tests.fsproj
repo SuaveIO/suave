@@ -41,7 +41,6 @@
     <Compile Include="Sscanf.fs" />
     <Compile Include="Json.fs" />
     <Compile Include="Auth.fs" />
-    <Compile Include="TraceHeader.fs" />
     <Compile Include="Cookie.fs" />
     <Compile Include="Types.fs" />
     <Compile Include="WebSocket.fs" />

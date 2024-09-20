@@ -62,10 +62,10 @@ let posts cfg =
     request (fun x -> let q = x.fieldData name in OK (get q))
 
   let getFileContent _ =
-    request (fun x -> let q = List.head x.files in OK (IO.File.ReadAllText q.tempFilePath))
+    request (fun x -> let q = x.files[0] in OK (IO.File.ReadAllText q.tempFilePath))
 
   let getFileName _ =
-    request (fun x -> let q = List.head x.files in OK q.fileName)
+    request (fun x -> let q = x.files[0] in OK q.fileName)
 
   let assertion = "eyJhbGciOiJSUzI1NiJ9.eyJwdWJsaWMta2V5Ijp7ImFsZ29yaXRobSI6IkR"+
                   "TIiwieSI6Ijc1MDMyNGRmYzQwNGI0OGQ3ZDg0MDdlOTI0NWMxNGVkZmVlZTY"+

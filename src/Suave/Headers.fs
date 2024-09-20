@@ -87,7 +87,6 @@ module Headers =
         match qVal
               |> Seq.map (fun x -> x.Substring 2)
               |> Seq.choose parseDecimal
-              //|> Seq.tryHead with // TODO: F# 4
               |> Seq.tryFind (fun _ -> true) with
         | Some d -> d
         | None -> 1m
@@ -96,13 +95,13 @@ module Headers =
         Seq.append [mediaRange] others
         |> String.concat ";"
       mediaRange, quality)
-    //|> Seq.sortByDescending snd // TODO: F# 4
     |> Seq.sortBy (fun (_, q) -> -q)
 
-  open Suave.Utils
-
   /// Headers are lowercased, so can use string.Equals
-  let getAll (target : NameValueList) (key : string) =
-    match target |> List.choose (fun (a, b) -> if a.Equals key then Some b else None) with
-    | [] -> Choice2Of2 ("Couldn't find key '" + key + "' in NameValueList")
-    | l  -> Choice1Of2 l
+  open System.Collections.Generic
+  let getAll (target : List<string*string>) (key : string) =
+    let results = target |> Seq.choose (fun (a, b) -> if a.Equals key then Some b else None)
+    if Seq.isEmpty results then
+      Choice2Of2 ("Couldn't find key '" + key + "'")
+    else
+      Choice1Of2 results

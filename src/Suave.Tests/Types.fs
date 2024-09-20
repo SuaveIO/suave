@@ -1,12 +1,10 @@
-﻿module Suave.Tests.Types
+module Suave.Tests.Types
 
-open System
+open System.Collections.Generic
 open System.Net
 open Expecto
-open Suave.Sockets
 open Suave
 open System.Net.Http
-open Suave.Testing
 
 [<Tests>]
 let socketBinding (_ : SuaveConfig) =
@@ -124,9 +122,9 @@ let httpReqIndexedPropertyMultiPartFieldsData (_ : SuaveConfig) =
 
   testList "Http Request Index Property for retrieving multi part fields data" [
     testCase "get multi part fields value for the given key" <| fun _ ->
-      let req = createReq [("name", "bob")]
+      let req = createReq (List<_>([("name", "bob")]))
       Expect.equal req.["name"] (Some "bob") "multi part fields data "
     testCase "get multi part fields value for a key which is absent" <| fun _ ->
-      let req = createReq [("name", "bob")]
+      let req = createReq (List<_>([("name", "bob")]))
       Expect.equal req.["age"] None "multi part fields data "
   ]
