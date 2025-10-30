@@ -29,6 +29,8 @@ type Connection =
     task {
       if this.lineBufferCount> 0  then
         let! _ = this.transport.write (new Memory<_>(this.lineBuffer,0,this.lineBufferCount))
+        // Clear the buffer to prevent information leakage
+        Array.Clear(this.lineBuffer, 0, this.lineBufferCount)
         this.lineBufferCount <- 0
     }
 
@@ -119,4 +121,3 @@ module Connection =
 
   let inline send (cn :Connection) (buf : ByteSegment) =
     cn.transport.write buf
-
