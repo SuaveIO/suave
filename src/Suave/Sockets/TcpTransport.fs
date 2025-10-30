@@ -11,15 +11,22 @@ type TcpTransport(listenSocket : Socket, cancellationToken:CancellationToken) =
 
   [<DefaultValue>]
   val mutable acceptSocket :  Socket
+  
+  let socketLock = obj()
 
   let shutdownSocket (acceptSocket:Socket) =
-    // do not like this if here
     if acceptSocket <> null then
       try
-        acceptSocket.Shutdown(SocketShutdown.Both)
-        //Console.WriteLine("Socket shutdown smoothly")
+        try
+          acceptSocket.Shutdown(SocketShutdown.Both)
+        with
+          | :? SocketException -> () // Socket may already be closed
+          | :? ObjectDisposedException -> () // Socket already disposed
       finally
-        acceptSocket.Dispose ()
+        try
+          acceptSocket.Dispose ()
+        with
+          | :? ObjectDisposedException -> () // Already disposed, ignore
 
   let remoteBinding (socket : Socket) : SocketBinding =
     let rep = socket.RemoteEndPoint :?> IPEndPoint
@@ -33,19 +40,21 @@ type TcpTransport(listenSocket : Socket, cancellationToken:CancellationToken) =
     }
 
   member this.read (buf : ByteSegment) =
-    this.acceptSocket.ReceiveAsync(buf,cancellationToken)
-    //task{
-      //let! result = this.acceptSocket.ReceiveAsync(buf,cancellationToken)
-      //return Ok(result)
-      //}
+    let socket = lock socketLock (fun () -> this.acceptSocket)
+    if socket = null then
+      raise (ObjectDisposedException("Socket has been disposed"))
+    socket.ReceiveAsync(buf,cancellationToken)
 
   member this.write (buf : ByteSegment) =
-    this.acceptSocket.SendAsync(buf,cancellationToken)
-    //task{
-      //let! result = this.acceptSocket.SendAsync(buf,cancellationToken)
-      //return Ok()
-    //}
+    let socket = lock socketLock (fun () -> this.acceptSocket)
+    if socket = null then
+      raise (ObjectDisposedException("Socket has been disposed"))
+    socket.SendAsync(buf,cancellationToken)
 
   member this.shutdown() =
-      shutdownSocket (this.acceptSocket)
-      this.acceptSocket <- null
+    lock socketLock (fun () ->
+      let socket = this.acceptSocket
+      if socket <> null then
+        this.acceptSocket <- null
+        shutdownSocket socket
+    )
