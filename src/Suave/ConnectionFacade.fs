@@ -29,41 +29,52 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
 
   let readFilePart boundary (headerParams : Dictionary<string,string>) fieldName contentType = socket {
     let tempFilePath = Path.GetTempFileName()
-    use tempFile = new FileStream(tempFilePath, FileMode.Truncate)
-    let! a =
-      reader.readUntilPattern (ASCII.bytes (eol + boundary)) (fun x y ->
-          do tempFile.Write(x.Span.Slice(0,y))
-          Continue 0)
-    let fileLength = tempFile.Length
-    tempFile.Dispose()
-    if fileLength > 0L then
-      let! filename =
-        match headerParams.TryLookup "filename*" with
-        | Choice1Of2 _filename ->
-          let ix = _filename.IndexOf "''"
-          if ix > 0 then
-            let enc = _filename.Substring(0,ix).ToLowerInvariant()
-            if enc = "utf-8" then
-              let filename = Net.WebUtility.UrlDecode(_filename.Substring(ix + 2))
-              SocketOp.mreturn (filename)
+    try
+      use tempFile = new FileStream(tempFilePath, FileMode.Truncate)
+      let! a =
+        reader.readUntilPattern (ASCII.bytes (eol + boundary)) (fun x y ->
+            do tempFile.Write(x.Span.Slice(0,y))
+            Continue 0)
+      let fileLength = tempFile.Length
+      // Explicit dispose to ensure file is closed before we check length
+      tempFile.Dispose()
+      
+      if fileLength > 0L then
+        let! filename =
+          match headerParams.TryLookup "filename*" with
+          | Choice1Of2 _filename ->
+            let ix = _filename.IndexOf "''"
+            if ix > 0 then
+              let enc = _filename.Substring(0,ix).ToLowerInvariant()
+              if enc = "utf-8" then
+                let filename = Net.WebUtility.UrlDecode(_filename.Substring(ix + 2))
+                SocketOp.mreturn (filename)
+              else
+                 SocketOp.abort (InputDataError (None, "Unsupported filename encoding: '" + enc + "'"))
             else
-               SocketOp.abort (InputDataError (None, "Unsupported filename encoding: '" + enc + "'"))
-          else
-            SocketOp.abort (InputDataError (None, "Invalid filename encoding"))
-        | Choice2Of2 _ ->
-          (headerParams.TryLookup "filename" |> Choice.map (String.trimc '"'))
-          @|! (None, "Key 'filename' was not present in 'content-disposition'")
+              SocketOp.abort (InputDataError (None, "Invalid filename encoding"))
+          | Choice2Of2 _ ->
+            (headerParams.TryLookup "filename" |> Choice.map (String.trimc '"'))
+            @|! (None, "Key 'filename' was not present in 'content-disposition'")
 
-      let upload =
-        { fieldName    = fieldName
-          fileName     = filename
-          mimeType     = contentType
-          tempFilePath = tempFilePath }
+        let upload =
+          { fieldName    = fieldName
+            fileName     = filename
+            mimeType     = contentType
+            tempFilePath = tempFilePath }
 
-      return Some upload
-    else
-      File.Delete tempFilePath
-      return None
+        return Some upload
+      else
+        try
+          File.Delete tempFilePath
+        with _ -> () // Ignore deletion errors
+        return None
+    with ex ->
+      // Ensure temp file is deleted on any error
+      try
+        File.Delete tempFilePath
+      with _ -> () // Ignore deletion errors
+      return! SocketOp.abort (InputDataError (None, sprintf "Error reading file part: %s" ex.Message))
     }
 
   let parseMultipartMixed fieldName boundary : SocketOp<unit> =
@@ -330,18 +341,21 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
       Console.WriteLine("{0} connected. Now has {1} connected", clientIp,(!Globals.numberOfClients))
     connection.socketBinding <- binding
     try
-      let task = Task.Factory.StartNew(reader.readLoop,cancellationToken)
-      match! this.requestLoop() with
-      | Ok () -> ()
-      | Result.Error err ->
-        do Console.WriteLine(sprintf "Error: %A" err)
-    with
-      | ex ->
-        do Console.WriteLine("Error: " + ex.Message)
-    if reader.isDirty then
-          reader.stop()
-    Interlocked.Decrement(Globals.numberOfClients) |> ignore
-    if Globals.verbose then
-      do Console.WriteLine("Disconnected {0}. {1} connected.", clientIp,(!Globals.numberOfClients))
-    do this.shutdown()
+      try
+        let task = Task.Factory.StartNew(reader.readLoop,cancellationToken)
+        match! this.requestLoop() with
+        | Ok () -> ()
+        | Result.Error err ->
+          do Console.WriteLine(sprintf "Error: %A" err)
+      with
+        | ex ->
+          do Console.WriteLine("Error: " + ex.Message)
+    finally
+      // Always stop the reader before returning connection to pool
+      if reader.isDirty then
+        reader.stop()
+      Interlocked.Decrement(Globals.numberOfClients) |> ignore
+      if Globals.verbose then
+        do Console.WriteLine("Disconnected {0}. {1} connected.", clientIp,(!Globals.numberOfClients))
+      do this.shutdown()
   }
