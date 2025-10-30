@@ -126,6 +126,9 @@ let runServer maxConcurrentOps bufferSize (binding: SocketBinding) (runtime:Http
 
       enableRebinding(listenSocket)
       listenSocket.NoDelay <- true
+      // Set socket timeouts to prevent indefinite hangs
+      listenSocket.SendTimeout <- 30000 // 30 seconds
+      listenSocket.ReceiveTimeout <- 30000 // 30 seconds
 
       let connectionPool = createPools listenSocket maxConcurrentOps runtime cancellationToken bufferSize webpart
 
@@ -153,19 +156,37 @@ let runServer maxConcurrentOps bufferSize (binding: SocketBinding) (runtime:Http
           let connection : ConnectionFacade = connectionPool.Pop()
 
           let continuation (vt: Task<Socket>) =
-            connection.Connection.transport.acceptSocket <- vt.Result
-            ignore(Task.Factory.StartNew(fun () -> connection.accept(remoteBinding vt.Result),cancellationToken))
+            if vt.IsCompletedSuccessfully then
+              connection.Connection.transport.acceptSocket <- vt.Result
+              ignore(Task.Factory.StartNew(fun () -> connection.accept(remoteBinding vt.Result),cancellationToken))
+            else
+              // Return connection to pool if accept failed
+              connectionPool.Push(connection)
 
           let task = listenSocket.AcceptAsync(cancellationToken)
 
           // kestrel uses here  ThreadPool.UnsafeQueueUserWorkItem(kestrelConnection, preferLocal: false);
 
           if task.IsCompleted then
-            connection.Connection.transport.acceptSocket <- task.Result
-            ignore(Task.Factory.StartNew(fun () -> connection.accept(remoteBinding task.Result),cancellationToken))
+            if task.IsCompletedSuccessfully then
+              connection.Connection.transport.acceptSocket <- task.Result
+              ignore(Task.Factory.StartNew(fun () -> connection.accept(remoteBinding task.Result),cancellationToken))
+            else
+              // Return connection to pool if accept failed
+              connectionPool.Push(connection)
           else
-            let task2 = task.AsTask().ContinueWith(new Action<Task<_>>(continuation),cancellationToken)
-            task2.Wait(cancellationToken)
+            try
+              let task2 = task.AsTask().ContinueWith(new Action<Task<_>>(continuation),cancellationToken)
+              task2.Wait(cancellationToken)
+            with
+              | :? OperationCanceledException 
+              | :? TaskCanceledException ->
+                // Return connection to pool on cancellation
+                connectionPool.Push(connection)
+              | ex ->
+                // Return connection to pool on error
+                connectionPool.Push(connection)
+                Console.WriteLine($"Error accepting connection: {ex.Message}")
 
       stopTcp "cancellation requested" listenSocket
     with
