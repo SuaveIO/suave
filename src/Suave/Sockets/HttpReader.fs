@@ -56,11 +56,14 @@ type HttpReader(transport : TcpTransport, lineBuffer : byte array, pipe: Pipe, c
   let mutable dirty : bool = false
 
   member this.stop () =
-    pipe.Writer.Complete()
-    pipe.Reader.Complete()
-    pipe.Reset()
-    running <- false
-    dirty <- false
+    try
+      running <- false
+      // Complete reader first, then writer, then reset
+      try pipe.Reader.Complete() with _ -> ()
+      try pipe.Writer.Complete() with _ -> ()
+      try pipe.Reset() with _ -> ()
+      dirty <- false
+    with _ -> ()
 
   member (*inline*) x.readMoreData () = task {
     let buff = pipe.Writer.GetMemory()
@@ -243,4 +246,3 @@ type HttpReader(transport : TcpTransport, lineBuffer : byte array, pipe: Pipe, c
         this.stop()
     return result
   }
-
