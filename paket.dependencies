@@ -12,7 +12,7 @@ nuget DotLiquid
 nuget Websocket.Client
 nuget FsCheck
 nuget Expecto
-nuget Expecto.FsCheck
+nuget Expecto.FsCheck prerelease
 nuget Expecto.BenchmarkDotNet
 
 group Examples
