@@ -56,7 +56,8 @@ module Web =
        List.map (toRuntime >> startWebWorker) config.bindings
 
     let listening = servers |> Seq.map fst |> Async.Parallel
-    let server    = servers |> Seq.map snd |> Task.WhenAll
+    let serverTasks = servers |> Seq.map snd |> Seq.toArray
+    let server    = Task.WhenAll(serverTasks)
     listening, server
 
   /// Runs the web server and blocks waiting for the asynchronous workflow to be cancelled or

@@ -119,21 +119,17 @@ let enableRebinding (listenSocket: Socket) =
     setsockoptStatus <- setsockopt(listenSocket.Handle, SOL_SOCKET_OSX, SO_REUSEADDR_OSX, NativePtr.toNativeInt<int> &&optionValue, uint32(sizeof<int>))
 
 let runServer maxConcurrentOps bufferSize (binding: SocketBinding) (runtime:HttpRuntime) (cancellationToken: CancellationToken) (webpart: WebPart) startData
-              (acceptingConnections: AsyncResultCell<StartedData>) =
-  Task.Run(fun () ->
+              (acceptingConnections: AsyncResultCell<StartedData>) : Task =
+  Task.Run(Func<Task>(fun () -> task {
     use listenSocket = new Socket(binding.endpoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp)
     try
-
       enableRebinding(listenSocket)
       listenSocket.NoDelay <- true
-      // Set socket timeouts to prevent indefinite hangs
-      listenSocket.SendTimeout <- 30000 // 30 seconds
-      listenSocket.ReceiveTimeout <- 30000 // 30 seconds
-
-      let connectionPool = createPools listenSocket maxConcurrentOps runtime cancellationToken bufferSize webpart
 
       aFewTimesDeterministic (fun () -> listenSocket.Bind binding.endpoint)
       listenSocket.Listen MaxBacklog
+
+      let connectionPool = createPools listenSocket maxConcurrentOps runtime cancellationToken bufferSize webpart
 
       let _binding = { startData.binding with port = uint16((listenSocket.LocalEndPoint :?> IPEndPoint).Port) }
 
@@ -142,8 +138,8 @@ let runServer maxConcurrentOps bufferSize (binding: SocketBinding) (runtime:Http
 
       acceptingConnections.complete startData |> ignore
 
-      let startedListeningMilliseconds = (startData.GetStartedListeningElapsedMilliseconds())
-      let ipAddress = (startData.binding.ip.ToString())
+      let startedListeningMilliseconds = startData.GetStartedListeningElapsedMilliseconds()
+      let ipAddress = startData.binding.ip.ToString()
       let port = startData.binding.port
 
       Console.WriteLine($"Smooth! Suave listener started in {startedListeningMilliseconds} ms with binding {ipAddress}:{port}")
@@ -154,39 +150,19 @@ let runServer maxConcurrentOps bufferSize (binding: SocketBinding) (runtime:Http
 
       while not(cancellationToken.IsCancellationRequested) do
           let connection : ConnectionFacade = connectionPool.Pop()
-
-          let continuation (vt: Task<Socket>) =
-            if vt.IsCompletedSuccessfully then
-              connection.Connection.transport.acceptSocket <- vt.Result
-              ignore(Task.Factory.StartNew(fun () -> connection.accept(remoteBinding vt.Result),cancellationToken))
-            else
-              // Return connection to pool if accept failed
-              connectionPool.Push(connection)
-
-          let task = listenSocket.AcceptAsync(cancellationToken)
-
-          // kestrel uses here  ThreadPool.UnsafeQueueUserWorkItem(kestrelConnection, preferLocal: false);
-
-          if task.IsCompleted then
-            if task.IsCompletedSuccessfully then
-              connection.Connection.transport.acceptSocket <- task.Result
-              ignore(Task.Factory.StartNew(fun () -> connection.accept(remoteBinding task.Result),cancellationToken))
-            else
-              // Return connection to pool if accept failed
-              connectionPool.Push(connection)
-          else
-            try
-              let task2 = task.AsTask().ContinueWith(new Action<Task<_>>(continuation),cancellationToken)
-              task2.Wait(cancellationToken)
-            with
-              | :? OperationCanceledException 
-              | :? TaskCanceledException ->
-                // Return connection to pool on cancellation
-                connectionPool.Push(connection)
-              | ex ->
-                // Return connection to pool on error
-                connectionPool.Push(connection)
-                Console.WriteLine($"Error accepting connection: {ex.Message}")
+          try
+            let! acceptedSocket = listenSocket.AcceptAsync(cancellationToken)
+            connection.Connection.transport.acceptSocket <- acceptedSocket
+            
+            // Fire and forget the connection handling
+            ignore(Task.Factory.StartNew(fun () -> connection.accept(remoteBinding acceptedSocket),cancellationToken))
+          with ex ->
+            // Return connection to pool if accept failed
+            connectionPool.Push(connection)
+            // Re-raise if not a cancellation exception (TaskCanceledException inherits from OperationCanceledException)
+            match ex with
+            | :? OperationCanceledException -> ()
+            | _ -> raise ex
 
       stopTcp "cancellation requested" listenSocket
     with
@@ -196,7 +172,7 @@ let runServer maxConcurrentOps bufferSize (binding: SocketBinding) (runtime:Http
         stopTcp "The operation was canceled" listenSocket
       | ex ->
         stopTcp "runtime exception" listenSocket
-        )
+        }))
 
 /// Start a new TCP server with a specific IP, Port and with a serve_client worker
 /// returning an async workflow whose result can be awaited (for when the tcp server has started
@@ -216,7 +192,6 @@ let startTcpIpServerAsync (binding : SocketBinding) (runServer : TcpServer) =
     , runServer startData acceptingConnections
 
 let startTcpIpServer (binding : SocketBinding) (runServer : TcpServer) =
-
   let acceptingConnections = new AsyncResultCell<StartedData>()
   Globals.numberOfClients := 0
   let startData =
@@ -224,5 +199,6 @@ let startTcpIpServer (binding : SocketBinding) (runServer : TcpServer) =
           socketBoundUtc = None
           binding        = binding }
 
-  acceptingConnections.awaitResult()
-    , runServer startData acceptingConnections
+  let listening = acceptingConnections.awaitResult()
+  let serverTask = runServer startData acceptingConnections
+  listening, serverTask

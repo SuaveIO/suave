@@ -81,12 +81,23 @@ open System.Threading.Tasks
 /// (like the listening socket etc).
 type SuaveTestCtx =
   { cts         : CancellationTokenSource
-    suaveConfig : SuaveConfig }
+    suaveConfig : SuaveConfig
+    serverTask  : Task }
 
 /// Cancels the cancellation token source and disposes the server's
 /// resources.
 let disposeContext (ctx : SuaveTestCtx) =
   ctx.cts.Cancel()
+  // Give the server sufficient time to shut down and release the socket
+  // This is important with async Task-based servers
+  try
+    if not (ctx.serverTask.Wait(TimeSpan.FromSeconds 2.0)) then
+      () // Timeout - server is taking too long to shut down
+  with
+    | :? System.AggregateException -> () // Expected when cancellation occurs
+    | :? System.Threading.Tasks.TaskCanceledException -> ()
+  // Small additional delay to ensure socket is fully released
+  Threading.Thread.Sleep(100)
   ctx.cts.Dispose()
 
 /// Create a new test context from a factory that starts the web
@@ -109,7 +120,8 @@ let runWithFactory factory config webParts : SuaveTestCtx =
   listening |> Async.RunSynchronously |> ignore // wait for the server to start listening
 
   { cts = cts
-    suaveConfig = config2 }
+    suaveConfig = config2
+    serverTask = server }
 
 /// Similar to run_with_factory, but uses the default suave factory.
 let runWith config webParts = runWithFactory startWebServerAsync config webParts
