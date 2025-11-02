@@ -125,7 +125,10 @@ type HttpOutput(connection: Connection, runtime: HttpRuntime) =
     | _ ->
       // Use Span-based formatting to avoid string allocation
       let lengthBytes = ByteConstants.formatIntToBytes content.Length
-      return! connection.asyncWriteBufferedArrayBytes [| ByteConstants.contentLengthBytes; lengthBytes; ByteConstants.EOLEOL |]
+      // Write sequentially to avoid array allocation
+      do! connection.asyncWriteBufferedBytes ByteConstants.contentLengthBytes
+      do! connection.asyncWriteBufferedBytes lengthBytes
+      return! connection.asyncWriteBufferedBytes ByteConstants.EOLEOL
     }
 
   member (*inline*) this.writeHeaders exclusions (headers : (string*string) seq) = task {
@@ -161,10 +164,14 @@ type HttpOutput(connection: Connection, runtime: HttpRuntime) =
       | 503 -> ByteConstants.statusCode503, ByteConstants.reason503
       | code -> ASCII.bytes (code.ToString()), ASCII.bytes (r.status.reason)
     
-    // Use cached date bytes to avoid formatting on every request
-    let preamble = [| ByteConstants.httpVersionBytes; statusCodeBytes;
-      ByteConstants.spaceBytes; reasonBytes; ByteConstants.dateBytes; Globals.DateCache.getHttpDateBytes(); ByteConstants.EOL |]
-    do! connection.asyncWriteBufferedArrayBytes preamble 
+    // Write status line sequentially to avoid array allocation
+    do! connection.asyncWriteBufferedBytes ByteConstants.httpVersionBytes
+    do! connection.asyncWriteBufferedBytes statusCodeBytes
+    do! connection.asyncWriteBufferedBytes ByteConstants.spaceBytes
+    do! connection.asyncWriteBufferedBytes reasonBytes
+    do! connection.asyncWriteBufferedBytes ByteConstants.dateBytes
+    do! connection.asyncWriteBufferedBytes (Globals.DateCache.getHttpDateBytes())
+    do! connection.asyncWriteBufferedBytes ByteConstants.EOL
 
     if runtime.hideHeader then
       do! this.writeHeaders ["date";"content-length"] r.headers
