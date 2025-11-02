@@ -9,8 +9,78 @@ open System
 /// or you will break subsequent unit tests.
 let mutable utcNow = fun () -> System.DateTimeOffset.UtcNow
 
+/// Cached HTTP date string to avoid formatting on every request.
+/// HTTP dates only change once per second, so caching provides significant benefit.
+module DateCache =
+  let mutable private cachedDateString = ""
+  let mutable private cachedDateBytes: byte[] = [||]
+  let mutable private lastSecond = 0L
+  let private lockObj = obj()
+  
+  /// Get the current HTTP date as a formatted string.
+  /// Caches the result and only updates once per second.
+  let getHttpDateString() =
+    let now = utcNow()
+    let currentSecond = now.ToUnixTimeSeconds()
+    
+    if currentSecond <> lastSecond then
+      lock lockObj (fun () ->
+        if currentSecond <> lastSecond then
+          cachedDateString <- now.ToString("R")
+          cachedDateBytes <- System.Text.Encoding.ASCII.GetBytes(cachedDateString)
+          lastSecond <- currentSecond
+      )
+    
+    cachedDateString
+  
+  /// Get the current HTTP date as ASCII bytes.
+  /// Caches the result and only updates once per second.
+  let getHttpDateBytes() =
+    let now = utcNow()
+    let currentSecond = now.ToUnixTimeSeconds()
+    
+    if currentSecond <> lastSecond then
+      lock lockObj (fun () ->
+        if currentSecond <> lastSecond then
+          cachedDateString <- now.ToString("R")
+          cachedDateBytes <- System.Text.Encoding.ASCII.GetBytes(cachedDateString)
+          lastSecond <- currentSecond
+      )
+    
+    cachedDateBytes
+
 /// From the TCP module, keeps track of the number of clients
 let internal numberOfClients = ref 0L
+
+/// StringBuilder pool for dynamic content generation
+module StringBuilderPool =
+  open System.Text
+  open System.Collections.Concurrent
+  open System.Threading
+  
+  let private pool = new ConcurrentBag<StringBuilder>()
+  let private maxPoolSize = 50
+  let private poolSize = ref 0
+  let private defaultCapacity = 256
+  
+  /// Get a StringBuilder from the pool or create a new one
+  let Get() =
+    match pool.TryTake() with
+    | true, sb ->
+      Interlocked.Decrement(poolSize) |> ignore
+      sb
+    | _, _ ->
+      new StringBuilder(defaultCapacity)
+  
+  /// Return a StringBuilder to the pool after clearing it
+  let Return(sb: StringBuilder) =
+    if !poolSize < maxPoolSize then
+      sb.Clear() |> ignore
+      // Only keep reasonably sized StringBuilders
+      if sb.Capacity <= 4096 then
+        pool.Add(sb)
+        Interlocked.Increment(poolSize) |> ignore
+      // If too large, let it be garbage collected
 
 open System.Collections.Concurrent
 

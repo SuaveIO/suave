@@ -64,8 +64,9 @@ type HttpOutput(connection: Connection, runtime: HttpRuntime) =
   member this.writePreamble (response:HttpResult) = task {
 
     let r = response
+    // Use cached date bytes to avoid formatting on every request
     let preamble = [| ByteConstants.httpVersionBytes; ASCII.bytes (r.status.code.ToString());
-      ByteConstants.spaceBytes; ASCII.bytes (r.status.reason); ByteConstants.dateBytes; ASCII.bytes (Globals.utcNow().ToString("R")); ByteConstants.EOL |]
+      ByteConstants.spaceBytes; ASCII.bytes (r.status.reason); ByteConstants.dateBytes; Globals.DateCache.getHttpDateBytes(); ByteConstants.EOL |]
     do! connection.asyncWriteBufferedArrayBytes preamble 
 
     if runtime.hideHeader then
