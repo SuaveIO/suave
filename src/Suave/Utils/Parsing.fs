@@ -21,25 +21,68 @@ let parseData (s : string) =
   let parseArr (d : string array) =
     if d.Length = 2 then (d.[0], Some <| System.Net.WebUtility.UrlDecode(d.[1]))
     else d.[0],None
-  s.Split('&')
-  |> Array.toList
-  |> List.filter (not << String.IsNullOrWhiteSpace)
-  |> List.map (fun (k : string) -> k.Split('=') |> parseArr)
+  
+  if String.IsNullOrWhiteSpace(s) then
+    []
+  else
+    // Use span-based splitting to reduce allocations
+    let span = s.AsSpan()
+    let mutable result = []
+    let mutable start = 0
+    
+    for i = 0 to span.Length - 1 do
+      if span.[i] = '&' then
+        if i > start then
+          let segment = s.Substring(start, i - start)
+          if not (String.IsNullOrWhiteSpace(segment)) then
+            result <- (segment.Split('=') |> parseArr) :: result
+        start <- i + 1
+    
+    // Handle last segment
+    if start < span.Length then
+      let segment = s.Substring(start)
+      if not (String.IsNullOrWhiteSpace(segment)) then
+        result <- (segment.Split('=') |> parseArr) :: result
+    
+    List.rev result
 
 /// parse the url into its constituents and fill out the passed dictionary with
 /// query string key-value pairs
 let inline parseUrl (line : string) =
-  let parts = line.Split(' ')
-  if parts.Length <> 3 then 
+  // Use ReadOnlySpan to reduce allocations from splitting and substring operations
+  let span = line.AsSpan()
+  
+  // Find space positions
+  let mutable firstSpace = -1
+  let mutable secondSpace = -1
+  
+  for i = 0 to span.Length - 1 do
+    if span.[i] = ' ' then
+      if firstSpace = -1 then
+        firstSpace <- i
+      elif secondSpace = -1 then
+        secondSpace <- i
+  
+  if firstSpace = -1 || secondSpace = -1 || firstSpace >= secondSpace then
     Choice2Of2("Invalid url")
   else
-    let indexOfMark = parts.[1].IndexOf('?')
-
-    if indexOfMark > 0 then
-      let rawQuery = parts.[1].Substring(indexOfMark + 1)
-      Choice1Of2(parts.[0], parts.[1].Substring(0,indexOfMark), rawQuery, parts.[2])
+    let method = line.Substring(0, firstSpace)
+    let urlSpan = span.Slice(firstSpace + 1, secondSpace - firstSpace - 1)
+    let version = line.Substring(secondSpace + 1)
+    
+    // Find query string marker
+    let mutable queryIndex = -1
+    for i = 0 to urlSpan.Length - 1 do
+      if urlSpan.[i] = '?' then
+        queryIndex <- i
+    
+    if queryIndex > 0 then
+      let path = line.Substring(firstSpace + 1, queryIndex)
+      let rawQuery = line.Substring(firstSpace + 1 + queryIndex + 1, urlSpan.Length - queryIndex - 1)
+      Choice1Of2(method, path, rawQuery, version)
     else
-      Choice1Of2(parts.[0], parts.[1], String.Empty, parts.[2])
+      let path = line.Substring(firstSpace + 1, secondSpace - firstSpace - 1)
+      Choice1Of2(method, path, String.Empty, version)
 
 /// Parse a string array of key-value-pairs, combined using the equality character '='
 /// into a dictionary
