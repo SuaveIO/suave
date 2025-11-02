@@ -54,7 +54,8 @@ let createConnection listenSocket cancellationToken bufferSize =
       reader = reader;
       pipe = pipe;
       lineBuffer    = lineBuffer;
-      lineBufferCount = 0 }
+      lineBufferCount = 0;
+      utf8Encoder = System.Text.Encoding.UTF8.GetEncoder() }
 
 let createConnectionFacade connectionPool listenSocket (runtime: HttpRuntime) cancellationToken bufferSize webpart =
   let connection = createConnection listenSocket cancellationToken bufferSize

@@ -5,6 +5,7 @@ open System.IO.Pipelines
 open Suave.Sockets.Control
 open System.Text
 open System
+open System.Buffers
 open Suave.Utils
 open Suave
 
@@ -16,7 +17,8 @@ type Connection =
     reader     : HttpReader
     pipe : Pipe
     lineBuffer    : byte array
-    mutable lineBufferCount : int }
+    mutable lineBufferCount : int
+    utf8Encoder   : Encoder }
 
   member x.ipAddr : IPAddress =
     x.socketBinding.ip
@@ -41,27 +43,47 @@ type Connection =
       else
         let maxByteCount = Encoding.UTF8.GetMaxByteCount(str.Length)
         if maxByteCount > this.lineBuffer.Length then
-          let! _ = this.transport.write (new Memory<_>(this.lineBuffer, 0, this.lineBufferCount))
-          let byteCount = Encoding.UTF8.GetBytes(str, 0, str.Length, this.lineBuffer, 0)
-          // don't waste time buffering here
-          let! _ = this.transport.write (new Memory<_>(this.lineBuffer, 0, byteCount))
-          this.lineBufferCount <- 0
-          return ()
+          // Flush current buffer first
+          if this.lineBufferCount > 0 then
+            let! _ = this.transport.write (new Memory<_>(this.lineBuffer, 0, this.lineBufferCount))
+            this.lineBufferCount <- 0
+          
+          // Use ArrayPool for large strings
+          let tempBuffer = ArrayPool<byte>.Shared.Rent(maxByteCount)
+          try
+            let mutable charsUsed = 0
+            let mutable bytesUsed = 0
+            let mutable completed = false
+            this.utf8Encoder.Convert(str.ToCharArray(), 0, str.Length, tempBuffer, 0, maxByteCount, true, &charsUsed, &bytesUsed, &completed)
+            let! _ = this.transport.write (new Memory<_>(tempBuffer, 0, bytesUsed))
+            return ()
+          finally
+            ArrayPool<byte>.Shared.Return(tempBuffer)
 
         elif this.lineBufferCount + maxByteCount > this.lineBuffer.Length then
+          // Flush buffer and encode into it
           let! _ = this.transport.write (new Memory<_>(this.lineBuffer, 0, this.lineBufferCount))
-          // the string, char index, char count, bytes, byte index
-          let c = Encoding.UTF8.GetBytes(str, 0, str.Length, this.lineBuffer, 0)
+          let mutable charsUsed = 0
+          let mutable bytesUsed = 0
+          let mutable completed = false
+          this.utf8Encoder.Convert(str.ToCharArray(), 0, str.Length, this.lineBuffer, 0, this.lineBuffer.Length, true, &charsUsed, &bytesUsed, &completed)
           this.lineBufferCount <- 0
           return ()
 
         else
-          let c = Encoding.UTF8.GetBytes(str, 0, str.Length, this.lineBuffer, this.lineBufferCount )
-          this.lineBufferCount <- this.lineBufferCount + c
+          // Encode directly into the line buffer
+          let mutable charsUsed = 0
+          let mutable bytesUsed = 0
+          let mutable completed = false
+          this.utf8Encoder.Convert(str.ToCharArray(), 0, str.Length, this.lineBuffer, this.lineBufferCount, this.lineBuffer.Length - this.lineBufferCount, true, &charsUsed, &bytesUsed, &completed)
+          this.lineBufferCount <- this.lineBufferCount + bytesUsed
           return ()
     }
 
-  member inline this.asyncWriteLn (s : string) = this.asyncWrite (s + Bytes.eol)
+  member inline this.asyncWriteLn (s : string) = task {
+    do! this.asyncWrite s
+    do! this.asyncWrite Bytes.eol
+  }
 
   /// Write the string s to the stream asynchronously from a byte array
   member inline this.asyncWriteBytes (b : byte[]) =
@@ -114,7 +136,8 @@ module Connection =
       reader     = null
       pipe = null
       lineBuffer    = [||]
-      lineBufferCount = 0 }
+      lineBufferCount = 0
+      utf8Encoder = Encoding.UTF8.GetEncoder() }
 
   let inline receive (cn : Connection) (buf : ByteSegment) =
     cn.transport.read buf
