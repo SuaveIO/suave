@@ -155,8 +155,9 @@ let runServer maxConcurrentOps bufferSize (binding: SocketBinding) (runtime:Http
             let! acceptedSocket = listenSocket.AcceptAsync(cancellationToken)
             connection.Connection.transport.acceptSocket <- acceptedSocket
             
-            // Fire and forget the connection handling
-            ignore(Task.Factory.StartNew(fun () -> connection.accept(remoteBinding acceptedSocket),cancellationToken))
+            // Fire and forget the connection handling using Task.Run (modern API)
+            let _connectionTask = Task.Run<unit>(Func<Task<unit>>(fun () -> connection.accept(remoteBinding acceptedSocket)), cancellationToken)
+            ()
           with ex ->
             // Return connection to pool if accept failed
             connectionPool.Push(connection)

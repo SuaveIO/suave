@@ -342,7 +342,8 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
     connection.socketBinding <- binding
     try
       try
-        let task = Task.Factory.StartNew(reader.readLoop,cancellationToken)
+        // Start read loop in background - use _ignore to suppress async warning
+        let _ = reader.readLoop()
         match! this.requestLoop() with
         | Ok () -> ()
         | Result.Error err ->
