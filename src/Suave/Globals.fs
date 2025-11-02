@@ -52,6 +52,9 @@ module DateCache =
 /// From the TCP module, keeps track of the number of clients
 let internal numberOfClients = ref 0L
 
+/// Cached UTF8 encoding to avoid allocating new instances
+let UTF8 = System.Text.Encoding.UTF8
+
 /// StringBuilder pool for dynamic content generation
 module StringBuilderPool =
   open System.Text

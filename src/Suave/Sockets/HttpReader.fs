@@ -178,7 +178,7 @@ type HttpReader(transport : TcpTransport, lineBuffer : byte array, pipe: Pipe, c
           
           Continue !offset
       )
-    let result = Encoding.UTF8.GetString(lineBuffer, 0, !offset)
+    let result = Globals.UTF8.GetString(lineBuffer, 0, !offset)
     return result
   }
 

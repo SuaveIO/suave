@@ -109,7 +109,7 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
                 Continue 0
               )
           let byts = mem.ToArray()
-          multiPartFields.Add (fieldName, Encoding.UTF8.GetString(byts, 0, byts.Length))
+          multiPartFields.Add (fieldName, Globals.UTF8.GetString(byts, 0, byts.Length))
           return! loop ()
       }
     loop ()
@@ -152,7 +152,7 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
               Continue 0
             )
           let byts = mem.ToArray()
-          let str =  Encoding.UTF8.GetString(byts, 0, byts.Length)
+          let str =  Globals.UTF8.GetString(byts, 0, byts.Length)
           multiPartFields.Add(fieldName,str)
           return ()
       }
@@ -284,7 +284,7 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
       | InputDataError (Some status,msg) ->
         match Http.HttpCode.tryParse status with 
         | (Choice1Of2 statusCode) ->
-          match! httpOutput.run HttpRequest.empty (Response.response statusCode (Encoding.UTF8.GetBytes msg)) with
+          match! httpOutput.run HttpRequest.empty (Response.response statusCode (Globals.UTF8.GetBytes msg)) with
           | _ -> ()
         | (Choice2Of2 err) ->
           match! httpOutput.run HttpRequest.empty (RequestErrors.BAD_REQUEST msg) with
