@@ -16,6 +16,25 @@ module ByteConstants =
   let EOL    =  ASCII.bytes "\r\n"
   let EOLEOL =  ASCII.bytes "\r\n\r\n"
 
+  /// Format an integer to ASCII bytes without allocating a string
+  /// Uses Span<T> for zero-allocation number formatting
+  let formatIntToBytes (value: int) : byte[] =
+    // Allocate buffer on stack for formatting (max 11 chars for int32: "-2147483648")
+    let charBuffer = Array.zeroCreate<char>(11)
+    let charSpan = System.Span<char>(charBuffer)
+    let mutable charsWritten = 0
+    
+    // Use TryFormat for zero-allocation integer formatting
+    if value.TryFormat(charSpan, &charsWritten) then
+      // Convert chars directly to ASCII bytes without intermediate string
+      let result = Array.zeroCreate<byte>(charsWritten)
+      for i = 0 to charsWritten - 1 do
+        result.[i] <- byte charBuffer.[i]
+      result
+    else
+      // Fallback (should never happen for int32)
+      ASCII.bytes (value.ToString())
+
   let httpVersionBytes = ASCII.bytes "HTTP/1.1 "
   let spaceBytes = ASCII.bytes " "
   let dateBytes = ASCII.bytes "\r\nDate: "
@@ -104,7 +123,9 @@ type HttpOutput(connection: Connection, runtime: HttpRuntime) =
     | (HttpMethod.CONNECT, 206) ->
       return! connection.asyncWriteBufferedBytes ByteConstants.EOL
     | _ ->
-      return! connection.asyncWriteBufferedArrayBytes [| ByteConstants.contentLengthBytes; ASCII.bytes (content.Length.ToString()); ByteConstants.EOLEOL |]
+      // Use Span-based formatting to avoid string allocation
+      let lengthBytes = ByteConstants.formatIntToBytes content.Length
+      return! connection.asyncWriteBufferedArrayBytes [| ByteConstants.contentLengthBytes; lengthBytes; ByteConstants.EOLEOL |]
     }
 
   member (*inline*) this.writeHeaders exclusions (headers : (string*string) seq) = task {
