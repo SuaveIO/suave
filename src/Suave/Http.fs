@@ -246,22 +246,38 @@ module Http =
     let empty = createKV "" ""
 
     let toHeader (cookie : HttpCookie) =
-      let app (sb : StringBuilder) (value : string) = sb.Append value |> ignore
-      let sb = new StringBuilder(String.Concat [ cookie.name; "="; cookie.value ])
-      let app value = app sb (String.Concat [";"; value])
-      let appkv k fMap v = v |> Option.iter (fun v -> app (String.Concat [ k; "="; fMap v ]))
-      cookie.domain  |> appkv "Domain" id
-      cookie.path    |> appkv "Path" id
-      cookie.expires |> appkv "Expires" (fun (i : DateTimeOffset) -> i.ToString("R"))
-      if cookie.httpOnly then app "HttpOnly"
-      if cookie.secure    then app "Secure"
-      match cookie.sameSite with
-      | None -> ()
-      | Some(sameSite) ->
-        match sameSite with
-        | Strict ->  Some "Strict" |> appkv "SameSite" id
-        | Lax -> Some "Lax" |> appkv "SameSite" id
-      sb.ToString ()
+      let sb = Globals.StringBuilderPool.Get()
+      try
+        // Build cookie header without string concatenation
+        sb.Append(cookie.name : string) |> ignore
+        sb.Append('=') |> ignore
+        sb.Append(cookie.value : string) |> ignore
+        
+        let appSemi (value : string) =
+          sb.Append(';') |> ignore
+          sb.Append(value : string) |> ignore
+        
+        let appKeyValue (k : string) (value : string) =
+          sb.Append(';') |> ignore
+          sb.Append(k : string) |> ignore
+          sb.Append('=') |> ignore
+          sb.Append(value : string) |> ignore
+        
+        cookie.domain  |> Option.iter (appKeyValue "Domain")
+        cookie.path    |> Option.iter (appKeyValue "Path")
+        cookie.expires |> Option.iter (fun i -> appKeyValue "Expires" (i.ToString("R")))
+        
+        if cookie.httpOnly then appSemi "HttpOnly"
+        if cookie.secure then appSemi "Secure"
+        
+        match cookie.sameSite with
+        | Some Strict -> appKeyValue "SameSite" "Strict"
+        | Some Lax -> appKeyValue "SameSite" "Lax"
+        | None -> ()
+        
+        sb.ToString()
+      finally
+        Globals.StringBuilderPool.Return(sb)
 
   type [<Struct>] HttpRequest =
     { httpVersion     : string
