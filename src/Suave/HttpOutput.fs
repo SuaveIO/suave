@@ -20,6 +20,21 @@ module ByteConstants =
   let spaceBytes = ASCII.bytes " "
   let dateBytes = ASCII.bytes "\r\nDate: "
   let colonBytes = ASCII.bytes ": "
+  
+  // Pre-computed status code bytes for common HTTP status codes
+  let statusCode200 = ASCII.bytes "200"
+  let statusCode201 = ASCII.bytes "201"
+  let statusCode204 = ASCII.bytes "204"
+  let statusCode301 = ASCII.bytes "301"
+  let statusCode302 = ASCII.bytes "302"
+  let statusCode304 = ASCII.bytes "304"
+  let statusCode400 = ASCII.bytes "400"
+  let statusCode401 = ASCII.bytes "401"
+  let statusCode403 = ASCII.bytes "403"
+  let statusCode404 = ASCII.bytes "404"
+  let statusCode500 = ASCII.bytes "500"
+  let statusCode502 = ASCII.bytes "502"
+  let statusCode503 = ASCII.bytes "503"
 
 type HttpOutput(connection: Connection, runtime: HttpRuntime) =
 
@@ -64,8 +79,26 @@ type HttpOutput(connection: Connection, runtime: HttpRuntime) =
   member this.writePreamble (response:HttpResult) = task {
 
     let r = response
+    // Use pre-computed status code bytes for common codes, fallback to dynamic for others
+    let statusCodeBytes =
+      match r.status.code with
+      | 200 -> ByteConstants.statusCode200
+      | 201 -> ByteConstants.statusCode201
+      | 204 -> ByteConstants.statusCode204
+      | 301 -> ByteConstants.statusCode301
+      | 302 -> ByteConstants.statusCode302
+      | 304 -> ByteConstants.statusCode304
+      | 400 -> ByteConstants.statusCode400
+      | 401 -> ByteConstants.statusCode401
+      | 403 -> ByteConstants.statusCode403
+      | 404 -> ByteConstants.statusCode404
+      | 500 -> ByteConstants.statusCode500
+      | 502 -> ByteConstants.statusCode502
+      | 503 -> ByteConstants.statusCode503
+      | code -> ASCII.bytes (code.ToString())
+    
     // Use cached date bytes to avoid formatting on every request
-    let preamble = [| ByteConstants.httpVersionBytes; ASCII.bytes (r.status.code.ToString());
+    let preamble = [| ByteConstants.httpVersionBytes; statusCodeBytes;
       ByteConstants.spaceBytes; ASCII.bytes (r.status.reason); ByteConstants.dateBytes; Globals.DateCache.getHttpDateBytes(); ByteConstants.EOL |]
     do! connection.asyncWriteBufferedArrayBytes preamble 
 
