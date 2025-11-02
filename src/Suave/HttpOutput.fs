@@ -55,7 +55,10 @@ type HttpOutput(connection: Connection, runtime: HttpRuntime) =
     while sourceEnumerator.MoveNext() do
       let x,y = sourceEnumerator.Current
       if not (List.exists (fun y -> x.ToLower().Equals(y)) exclusions) then
-        do! connection.asyncWriteLn (String.Concat [| x; ": "; y |])
+        // Write header name, colon+space, and value separately to avoid string concat
+        do! connection.asyncWrite x
+        do! connection.asyncWrite ": "
+        do! connection.asyncWriteLn y
     }
 
   member this.writePreamble (response:HttpResult) = task {
@@ -78,7 +81,9 @@ type HttpOutput(connection: Connection, runtime: HttpRuntime) =
       let! (encoding, content : byte []) = Compression.transform b context 
       match encoding with
       | Some n ->
-        do! connection.asyncWriteLn (String.Concat [| "Content-Encoding: "; n.ToString() |])
+        // Write Content-Encoding header without string concatenation
+        do! connection.asyncWrite "Content-Encoding: "
+        do! connection.asyncWriteLn (n.ToString())
         // http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.13
         // https://tools.ietf.org/html/rfc7230#section-3.3.2
         do! this.writeContentLengthHeader content context
