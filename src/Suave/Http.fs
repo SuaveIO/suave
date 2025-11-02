@@ -517,7 +517,7 @@ module Http =
 
     let create request runtime connection writePreamble =
       { request    = request
-        userState  = new Dictionary<string,obj>()
+        userState  = Globals.DictionaryPool.Get()
         runtime    = runtime
         connection = connection
         response   = { status = HTTP_404.status

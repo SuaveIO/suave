@@ -35,6 +35,48 @@ module ByteConstants =
   let statusCode500 = ASCII.bytes "500"
   let statusCode502 = ASCII.bytes "502"
   let statusCode503 = ASCII.bytes "503"
+  
+  // Pre-computed reason phrases for common status codes
+  let reason200 = ASCII.bytes "OK"
+  let reason201 = ASCII.bytes "Created"
+  let reason204 = ASCII.bytes "No Content"
+  let reason301 = ASCII.bytes "Moved Permanently"
+  let reason302 = ASCII.bytes "Found"
+  let reason304 = ASCII.bytes "Not Modified"
+  let reason400 = ASCII.bytes "Bad Request"
+  let reason401 = ASCII.bytes "Unauthorized"
+  let reason403 = ASCII.bytes "Forbidden"
+  let reason404 = ASCII.bytes "Not Found"
+  let reason500 = ASCII.bytes "Internal Server Error"
+  let reason502 = ASCII.bytes "Bad Gateway"
+  let reason503 = ASCII.bytes "Service Unavailable"
+  
+  // Pre-computed common header names as bytes
+  let headerContentType = ASCII.bytes "Content-Type"
+  let headerContentLength = ASCII.bytes "Content-Length"
+  let headerConnection = ASCII.bytes "Connection"
+  let headerLocation = ASCII.bytes "Location"
+  let headerCacheControl = ASCII.bytes "Cache-Control"
+  let headerSetCookie = ASCII.bytes "Set-Cookie"
+  let headerAccept = ASCII.bytes "Accept"
+  let headerUserAgent = ASCII.bytes "User-Agent"
+  let headerHost = ASCII.bytes "Host"
+  let headerUpgrade = ASCII.bytes "Upgrade"
+  
+  /// Get pre-computed header name bytes if available, otherwise convert
+  let getHeaderBytes (headerName: string) =
+    match headerName.ToLowerInvariant() with
+    | "content-type" -> headerContentType
+    | "content-length" -> headerContentLength
+    | "connection" -> headerConnection
+    | "location" -> headerLocation
+    | "cache-control" -> headerCacheControl
+    | "set-cookie" -> headerSetCookie
+    | "accept" -> headerAccept
+    | "user-agent" -> headerUserAgent
+    | "host" -> headerHost
+    | "upgrade" -> headerUpgrade
+    | _ -> ASCII.bytes headerName
 
 type HttpOutput(connection: Connection, runtime: HttpRuntime) =
 
@@ -42,7 +84,7 @@ type HttpOutput(connection: Connection, runtime: HttpRuntime) =
         { connection = connection
         ; runtime = runtime
         ; request = HttpRequest.empty
-        ; userState = new Dictionary<string,obj>()
+        ; userState = Globals.DictionaryPool.Get()
         ; response = HttpResult.empty }
        
   member (*inline*) this.writeContentType (headers : (string*string) list) = task {
@@ -70,8 +112,9 @@ type HttpOutput(connection: Connection, runtime: HttpRuntime) =
     while sourceEnumerator.MoveNext() do
       let x,y = sourceEnumerator.Current
       if not (List.exists (fun y -> x.ToLower().Equals(y)) exclusions) then
-        // Write header name, colon+space, and value separately to avoid string concat
-        do! connection.asyncWrite x
+        // Use pre-computed header name bytes when available
+        let headerNameBytes = ByteConstants.getHeaderBytes x
+        do! connection.asyncWriteBufferedBytes headerNameBytes
         do! connection.asyncWrite ": "
         do! connection.asyncWriteLn y
     }
@@ -79,27 +122,27 @@ type HttpOutput(connection: Connection, runtime: HttpRuntime) =
   member this.writePreamble (response:HttpResult) = task {
 
     let r = response
-    // Use pre-computed status code bytes for common codes, fallback to dynamic for others
-    let statusCodeBytes =
+    // Use pre-computed status code and reason bytes for common codes
+    let statusCodeBytes, reasonBytes =
       match r.status.code with
-      | 200 -> ByteConstants.statusCode200
-      | 201 -> ByteConstants.statusCode201
-      | 204 -> ByteConstants.statusCode204
-      | 301 -> ByteConstants.statusCode301
-      | 302 -> ByteConstants.statusCode302
-      | 304 -> ByteConstants.statusCode304
-      | 400 -> ByteConstants.statusCode400
-      | 401 -> ByteConstants.statusCode401
-      | 403 -> ByteConstants.statusCode403
-      | 404 -> ByteConstants.statusCode404
-      | 500 -> ByteConstants.statusCode500
-      | 502 -> ByteConstants.statusCode502
-      | 503 -> ByteConstants.statusCode503
-      | code -> ASCII.bytes (code.ToString())
+      | 200 -> ByteConstants.statusCode200, ByteConstants.reason200
+      | 201 -> ByteConstants.statusCode201, ByteConstants.reason201
+      | 204 -> ByteConstants.statusCode204, ByteConstants.reason204
+      | 301 -> ByteConstants.statusCode301, ByteConstants.reason301
+      | 302 -> ByteConstants.statusCode302, ByteConstants.reason302
+      | 304 -> ByteConstants.statusCode304, ByteConstants.reason304
+      | 400 -> ByteConstants.statusCode400, ByteConstants.reason400
+      | 401 -> ByteConstants.statusCode401, ByteConstants.reason401
+      | 403 -> ByteConstants.statusCode403, ByteConstants.reason403
+      | 404 -> ByteConstants.statusCode404, ByteConstants.reason404
+      | 500 -> ByteConstants.statusCode500, ByteConstants.reason500
+      | 502 -> ByteConstants.statusCode502, ByteConstants.reason502
+      | 503 -> ByteConstants.statusCode503, ByteConstants.reason503
+      | code -> ASCII.bytes (code.ToString()), ASCII.bytes (r.status.reason)
     
     // Use cached date bytes to avoid formatting on every request
     let preamble = [| ByteConstants.httpVersionBytes; statusCodeBytes;
-      ByteConstants.spaceBytes; ASCII.bytes (r.status.reason); ByteConstants.dateBytes; Globals.DateCache.getHttpDateBytes(); ByteConstants.EOL |]
+      ByteConstants.spaceBytes; reasonBytes; ByteConstants.dateBytes; Globals.DateCache.getHttpDateBytes(); ByteConstants.EOL |]
     do! connection.asyncWriteBufferedArrayBytes preamble 
 
     if runtime.hideHeader then

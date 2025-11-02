@@ -82,6 +82,35 @@ module StringBuilderPool =
         Interlocked.Increment(poolSize) |> ignore
       // If too large, let it be garbage collected
 
+/// Dictionary pool for HttpContext userState
+module DictionaryPool =
+  open System.Collections.Generic
+  open System.Collections.Concurrent
+  open System.Threading
+  
+  let private pool = new ConcurrentBag<Dictionary<string, obj>>()
+  let private maxPoolSize = 100
+  let private poolSize = ref 0
+  
+  /// Get a Dictionary from the pool or create a new one
+  let Get() =
+    match pool.TryTake() with
+    | true, dict ->
+      Interlocked.Decrement(poolSize) |> ignore
+      dict
+    | _, _ ->
+      new Dictionary<string, obj>()
+  
+  /// Return a Dictionary to the pool after clearing it
+  let Return(dict: Dictionary<string, obj>) =
+    if !poolSize < maxPoolSize then
+      dict.Clear()
+      // Only keep reasonably sized dictionaries
+      if dict.Count = 0 then  // Ensure it's cleared
+        pool.Add(dict)
+        Interlocked.Increment(poolSize) |> ignore
+      // If something went wrong with clearing, let it be garbage collected
+
 open System.Collections.Concurrent
 
 /// A map of compressed files. The key is the is the name of the file, and value is 
