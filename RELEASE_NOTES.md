@@ -1,3 +1,7 @@
+## New in v3.1.0-beta (Released 2025-11-02)
+* Target net9.0
+* Many optimizations focusing on reducing memory allocations, improving throughput, and lowering latency.
+
 ## New in v2.7.0-beta1 (Released 2023-07-03)
 * Rewrite of internals using Task, Memory and Pipelines. Introduces breaking changes.
 

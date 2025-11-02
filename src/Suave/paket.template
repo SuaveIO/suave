@@ -6,8 +6,8 @@ licenseUrl https://github.com/SuaveIO/Suave/blob/master/LICENSE
 iconUrl https://raw.githubusercontent.com/SuaveIO/resources/master/images/head_trans.png
 includePdb true
 files
-  bin/Release/net7.0/Suave.dll => lib/net7.0
-  bin/Release/net7.0/Suave.xml => lib/net7.0
-  bin/Release/net7.0/Suave.pdb => lib/net7.0
+  bin/Release/net9.0/Suave.dll => lib/net9.0
+  bin/Release/net9.0/Suave.xml => lib/net9.0
+  bin/Release/net9.0/Suave.pdb => lib/net9.0
 dependencies
-  framework: net7.0
+  framework: net9.0
