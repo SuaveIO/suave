@@ -65,7 +65,7 @@ type HttpReader(transport : TcpTransport, lineBuffer : byte array, pipe: Pipe, c
       dirty <- false
     with _ -> ()
 
-  member (*inline*) x.readMoreData () = task {
+  member x.readMoreData () = task {
     let buff = pipe.Writer.GetMemory()
     let! x = transport.read buff
     if x > 0 then
@@ -76,7 +76,7 @@ type HttpReader(transport : TcpTransport, lineBuffer : byte array, pipe: Pipe, c
       return Result.Error (Error.ConnectionError "no more data")
     }
 
-  member (*inline*) x.getData () = task{
+  member x.getData () = task{
       let (success, result) = pipe.Reader.TryRead()
       if success then
         return result
@@ -87,7 +87,7 @@ type HttpReader(transport : TcpTransport, lineBuffer : byte array, pipe: Pipe, c
   /// Iterates over a BufferSegment list looking for a marker, data before the marker
   /// is sent to the function select
   /// Returns the number of bytes read.
-  member (*inline*) x.scanMarker (marker: byte[]) (select : SelectFunction) = 
+  member x.scanMarker (marker: byte[]) (select : SelectFunction) =
     task{
       try
         let! result = x.getData()
@@ -111,7 +111,7 @@ type HttpReader(transport : TcpTransport, lineBuffer : byte array, pipe: Pipe, c
 
   /// Read the passed stream into buff until the EOL (CRLF) has been reached
   /// and returns the number of bytes read and the connection
-  member (*inline*) x.readUntilPattern marker select =
+  member x.readUntilPattern marker select =
     task {
       let reading = ref true
       let error = ref false
@@ -164,7 +164,7 @@ type HttpReader(transport : TcpTransport, lineBuffer : byte array, pipe: Pipe, c
       }
 
   /// Read a line from the stream, calling UTF8.toString on the bytes before the EOL marker
-  member (*inline*) x.readLine () = socket {
+  member x.readLine () = socket {
     let offset = ref 0
     let! count =
       x.readUntilPattern EOL (fun a count ->
@@ -183,7 +183,7 @@ type HttpReader(transport : TcpTransport, lineBuffer : byte array, pipe: Pipe, c
   }
 
   /// Read all headers from the stream, returning a dictionary of the headers found
-  member (*inline*) x.readHeaders() =
+  member x.readHeaders() =
     task {
       let headers = new List<string*string>()
       let flag = ref true
@@ -206,7 +206,7 @@ type HttpReader(transport : TcpTransport, lineBuffer : byte array, pipe: Pipe, c
     }
 
   /// Read the post data from the stream, given the number of bytes that makes up the post data.
-  member (*inline*) x.readPostData (bytes : int) (select:ReadOnlyMemory<byte> -> int -> unit) : Task<unit> =
+  member x.readPostData (bytes : int) (select:ReadOnlyMemory<byte> -> int -> unit) : Task<unit> =
     let rec loop (n:int) : Task<unit> =
       task {
         if n = 0 then

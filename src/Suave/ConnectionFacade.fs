@@ -209,7 +209,7 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
   member val Connection = connection with get,set
   member val Runtime = runtime with get,set
 
-  member (*inline*) this.parsePostData maxContentLength (contentLengthHeader : Choice<string,_>) (contentTypeHeader:Choice<string,_>) : Task<Result<unit,Error>>=
+  member this.parsePostData maxContentLength (contentLengthHeader : Choice<string,_>) (contentTypeHeader:Choice<string,_>) : Task<Result<unit,Error>>=
     socket {
       match contentLengthHeader with
       | Choice1Of2 contentLengthString ->
@@ -235,7 +235,7 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
 
   /// Process the request, reading as it goes from the incoming 'stream', yielding a HttpRequest
   /// when done
-  member (*inline*) this.readRequest () = socket {
+  member this.readRequest () = socket {
 
     let! firstLine = reader.readLine()
 
@@ -319,7 +319,7 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
   /// incoming stream and possibly pass the request to the web parts, a protocol,
   /// a web part, an error handler and a Connection to use for read-write
   /// communication -- getting the initial request stream.
-  member (*inline*) this.requestLoop ()=
+  member this.requestLoop ()=
     task {
       let flag = ref true
       let result = ref (Ok ())

@@ -105,13 +105,16 @@ type HttpOutput(connection: Connection, runtime: HttpRuntime) =
         ; request = HttpRequest.empty
         ; userState = Globals.DictionaryPool.Get()
         ; response = HttpResult.empty }
+  
+  // Expose connection as a property to enable inlining of write methods
+  member val Connection = connection with get
        
-  member (*inline*) this.writeContentType (headers : (string*string) list) = task {
+  member inline this.writeContentType (headers : (string*string) list) = task {
     if not(List.exists(fun (x : string,_) -> x.ToLower().Equals("content-type")) headers )then
-      return! connection.asyncWriteBufferedBytes ByteConstants.defaultContentTypeHeaderBytes
+      return! this.Connection.asyncWriteBufferedBytes ByteConstants.defaultContentTypeHeaderBytes
   }
 
-  member (*inline*) this.writeContentLengthHeader (content : byte[]) (context : HttpContext) = task {
+  member inline this.writeContentLengthHeader (content : byte[]) (context : HttpContext) = task {
     match context.request.``method``, context.response.status.code with
     | (_, 100)
     | (_, 101)
@@ -121,26 +124,26 @@ type HttpOutput(connection: Connection, runtime: HttpRuntime) =
     | (HttpMethod.CONNECT, 203)
     | (HttpMethod.CONNECT, 205)
     | (HttpMethod.CONNECT, 206) ->
-      return! connection.asyncWriteBufferedBytes ByteConstants.EOL
+      return! this.Connection.asyncWriteBufferedBytes ByteConstants.EOL
     | _ ->
       // Use Span-based formatting to avoid string allocation
       let lengthBytes = ByteConstants.formatIntToBytes content.Length
       // Write sequentially to avoid array allocation
-      do! connection.asyncWriteBufferedBytes ByteConstants.contentLengthBytes
-      do! connection.asyncWriteBufferedBytes lengthBytes
-      return! connection.asyncWriteBufferedBytes ByteConstants.EOLEOL
+      do! this.Connection.asyncWriteBufferedBytes ByteConstants.contentLengthBytes
+      do! this.Connection.asyncWriteBufferedBytes lengthBytes
+      return! this.Connection.asyncWriteBufferedBytes ByteConstants.EOLEOL
     }
 
-  member (*inline*) this.writeHeaders exclusions (headers : (string*string) seq) = task {
+  member inline this.writeHeaders exclusions (headers : (string*string) seq) = task {
     use sourceEnumerator = headers.GetEnumerator()
     while sourceEnumerator.MoveNext() do
       let x,y = sourceEnumerator.Current
       if not (List.exists (fun y -> x.ToLower().Equals(y)) exclusions) then
         // Use pre-computed header name bytes when available
         let headerNameBytes = ByteConstants.getHeaderBytes x
-        do! connection.asyncWriteBufferedBytes headerNameBytes
-        do! connection.asyncWrite ": "
-        do! connection.asyncWriteLn y
+        do! this.Connection.asyncWriteBufferedBytes headerNameBytes
+        do! this.Connection.asyncWrite ": "
+        do! this.Connection.asyncWriteLn y
     }
 
   member this.writePreamble (response:HttpResult) = task {
@@ -181,41 +184,41 @@ type HttpOutput(connection: Connection, runtime: HttpRuntime) =
     do! this.writeContentType r.headers
     }
 
-  member (*inline*) this.writeContent writePreamble context = function
+  member inline this.writeContent writePreamble context = function
     | Bytes b -> task {
       let! (encoding, content : byte []) = Compression.transform b context 
       match encoding with
       | Some n ->
         // Write Content-Encoding header without string concatenation
-        do! connection.asyncWrite "Content-Encoding: "
-        do! connection.asyncWriteLn (n.ToString())
+        do! this.Connection.asyncWrite "Content-Encoding: "
+        do! this.Connection.asyncWriteLn (n.ToString())
         // http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.13
         // https://tools.ietf.org/html/rfc7230#section-3.3.2
         do! this.writeContentLengthHeader content context
         if context.request.``method`` <> HttpMethod.HEAD && content.Length > 0 then
-          do! connection.asyncWriteBufferedBytes content
-          do! connection.flush()
+          do! this.Connection.asyncWriteBufferedBytes content
+          do! this.Connection.flush()
         else
-          do! connection.flush()
+          do! this.Connection.flush()
       | None ->
         // http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.13
         // https://tools.ietf.org/html/rfc7230#section-3.3.2
         do! this.writeContentLengthHeader content context
         if context.request.``method`` <> HttpMethod.HEAD && content.Length > 0 then
-          do! connection.asyncWriteBufferedBytes content
-          do! connection.flush()
+          do! this.Connection.asyncWriteBufferedBytes content
+          do! this.Connection.flush()
         else
-          do! connection.flush()
+          do! this.Connection.flush()
       }
     | SocketTask f -> task{
-      do! f (connection, context.response)
+      do! f (this.Connection, context.response)
       }
     | NullContent -> task {
         if writePreamble then
           do! this.writeContentLengthHeader [||] context
-          do! connection.flush()
+          do! this.Connection.flush()
         else
-          do! connection.flush()
+          do! this.Connection.flush()
            }
 
   member this.executeTask task  = async {
