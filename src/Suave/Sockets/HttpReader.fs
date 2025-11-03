@@ -164,22 +164,22 @@ type HttpReader(transport : TcpTransport, lineBuffer : byte array, pipe: Pipe, c
       }
 
   /// Read a line from the stream, calling UTF8.toString on the bytes before the EOL marker
-  member x.readLine () = socket {
+  member x.readLine () = task {
     let offset = ref 0
-    let! count =
-      x.readUntilPattern EOL (fun a count ->
-        if !offset + count > lineBuffer.Length then
+    match! x.readUntilPattern EOL (fun a count ->
+        if offset.Value + count > lineBuffer.Length then
           FailWith (InputDataError (Some 414, "Line Too Long"))
         else
           let source = a.Span.Slice(0,count)
-          let target = new Span<byte>(lineBuffer,!offset,count)
+          let target = new Span<byte>(lineBuffer,offset.Value,count)
           source.CopyTo(target)
-          offset := !offset + count
-          
-          Continue !offset
-      )
-    let result = Globals.UTF8.GetString(lineBuffer, 0, !offset)
-    return result
+          offset.Value <- offset.Value + count
+          Continue offset.Value) with
+    | Result.Error e ->
+      return Result.Error e
+    | Ok _ ->
+      let result = Globals.UTF8.GetString(lineBuffer, 0, offset.Value)
+      return Ok result
   }
 
   /// Read all headers from the stream, returning a dictionary of the headers found
