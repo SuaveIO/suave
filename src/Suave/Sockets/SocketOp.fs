@@ -29,68 +29,62 @@ type SocketOp<'a> = Task<Result<'a,Error>>
 /// The module
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module SocketOp =
-  open Suave.Utils.Async
 
   /// create a new successful value
-  let mreturn (x : 'T) : SocketOp<'T> =
-    (task { return Ok(x) })
+  let inline mreturn (x : 'T) : SocketOp<'T> =
+    task { return Ok(x) }
 
   /// create a new unsuccessful value
-  let abort (x : Error) : SocketOp<_> =
-    //async.Return (Result.Error x)
-    (task { return Result.Error(x) })
+  let inline abort (x : Error) : SocketOp<_> =
+    task { return Result.Error(x) }
 
   /// says that something is wrong with the input on a protocol level and that
   /// it's therefore a bad request (user input error) -- the error already present
   /// is overwritten with the errorMsg parameter.
-  let orInputError errorMsg : _ -> SocketOp<_> = function
+  let inline orInputError errorMsg : _ -> SocketOp<_> = function
     | Choice1Of2 x -> mreturn(x)
     | Choice2Of2 _ -> abort (InputDataError errorMsg)
 
   /// same as the above, but let's you do something with the existing error message
   /// through the callback function passed
-  let orInputErrorf fErrorMsg : _ -> SocketOp<_> = function
+  let inline orInputErrorf fErrorMsg : _ -> SocketOp<_> = function
     | Ok x -> mreturn(x)
     | Error (y : string) -> abort (InputDataError (fErrorMsg y))
 
   /// Bind the result successful result of the SocketOp to fCont
-  let bind (fCont : _ -> SocketOp<_>) (value : SocketOp<_>) : SocketOp<_> =
+  let inline bind (fCont : _ -> SocketOp<_>) (value : SocketOp<_>) : SocketOp<_> =
     task {
-      let! x = value
-      match x with
+      match! value with
       | Ok x -> return! (fCont x)
       | Error (err : Error) -> return Result.Error err
       }
 
   /// Bind the error result of the SocketOp to fCont
-  let bindError (fCont : _ -> SocketOp<_>) (value : SocketOp<_>) : SocketOp<_> =
+  let inline bindError (fCont : _ -> SocketOp<_>) (value : SocketOp<_>) : SocketOp<_> =
     task {
-      let! x = value
-      match x with
+      match! value with
       | Ok x -> return Ok x
       | Error (err : Error) -> return! (fCont err)
       }
 
   /// Map f over the contained successful value in SocketOp
-  let map f (value : SocketOp<_>) : SocketOp<_> =
+  let inline map f (value : SocketOp<_>) : SocketOp<_> =
     task {
-      let! x = value
-      match x with
+      match! value with
       | Ok x -> return Ok (f x)
       | Error (err : Error) -> return Result.Error err
       }
 
   /// Map f over the error value in SocketOp
-  let mapError f (value : SocketOp<_>) : SocketOp<_> =
+  let inline mapError f (value : SocketOp<_>) : SocketOp<_> =
     task {
-      let! x = value
-      match x with
+      match! value with
       | Ok x -> return Ok x
       | Error (err : Error) -> return Result.Error (f err)
       }
 
   /// lift a Async<'a> type to the SocketOp
-  let ofAsync (a : Async<'a>) : SocketOp<'a> =
+  let inline ofAsync (a : Async<'a>) : SocketOp<'a> =
     task {
       let! s = a
       return Ok s
