@@ -45,6 +45,7 @@
     <Compile Include="Types.fs" />
     <Compile Include="WebSocket.fs" />
     <Compile Include="DotLiquid.fs" />
+    <Compile Include="RateLimit.fs" />
     <Compile Include="ServerKey.fs" />
     <Compile Include="ExpectoExtensions.fs" />
     <Compile Include="Program.fs" />

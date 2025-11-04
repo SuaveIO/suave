@@ -54,6 +54,7 @@
     <Compile Include="Authentication.fsi" />
     <Compile Include="Authentication.fs" />
     <Compile Include="SuaveConfig.fs" />
+    <Compile Include="RateLimit.fs" />
     <Compile Include="Tcp.fs" />
     <Compile Include="TcpServerFactory.fs" />
     <Compile Include="Web.fs" />
