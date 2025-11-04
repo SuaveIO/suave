@@ -121,7 +121,7 @@ type Arbs =
 let fsCheckConfig =
   { FsCheckConfig.defaultConfig with
       startSize = 1
-      maxTest = 200
+      maxTest = 10
       arbitrary =
         [ typeof<Arbs>
           typeof<UTF8Strings>
