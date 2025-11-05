@@ -1,3 +1,6 @@
+## New in v3.1.0-beta1 (Released 2025-11-05)
+* Rate limiting, security headers, validation webparts and new router module.
+
 ## New in v3.1.0-beta (Released 2025-11-02)
 * Target net9.0
 * Many optimizations focusing on reducing memory allocations, improving throughput, and lowering latency.
