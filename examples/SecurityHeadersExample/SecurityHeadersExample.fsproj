@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Program.fs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Suave\Suave.fsproj" />
+  </ItemGroup>
+  <Import Project="..\..\paket-files\paket.Main\paket.references" Condition="Exists('..\..\paket-files\paket.Main\paket.references')" />
+</Project>
