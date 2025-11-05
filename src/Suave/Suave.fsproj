@@ -50,6 +50,8 @@
     <Compile Include="Cookie.fsi" />
     <Compile Include="Cookie.fs" />
     <Compile Include="Model.fs" />
+    <Compile Include="Validation.fs" />
+    <Compile Include="ValidationWebParts.fs" />
     <Compile Include="State.fs" />
     <Compile Include="Authentication.fsi" />
     <Compile Include="Authentication.fs" />
