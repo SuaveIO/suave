@@ -784,8 +784,12 @@ module EventSource =
   let (<<.) (out : Connection) (data : string) =
     out.asyncWriteBytes (Encoding.UTF8.GetBytes data)
 
-  let dispatch (out : Connection) : ValueTask<int> =
-    send out ES_EOL_S
+  let dispatch (out : Connection) =
+    task {
+      match! out.transport.write ES_EOL_S with
+      | Ok () -> return ()
+      | Result.Error _ -> return ()
+    }
 
   let comment (out : Connection) (cmt : string) =
     out <<. ": " + cmt + ES_EOL

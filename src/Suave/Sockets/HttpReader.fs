@@ -50,7 +50,14 @@ module Aux =
 
 // this guy can live inside the connection actually
 [<AllowNullLiteral>]
-type HttpReader(transport : TcpTransport, lineBuffer : byte array, pipe: Pipe, cancellationToken) =
+type HttpReader(transportObj : obj, lineBuffer : byte array, pipe: Pipe, cancellationToken) =
+
+  let transport = 
+    match transportObj with
+    | :? ITransport as t -> t
+    | :? TcpTransport as tcp -> tcp :> ITransport
+    | :? SslTransport as ssl -> ssl :> ITransport
+    | _ -> failwith "Invalid transport type"
 
   let mutable running : bool = true
   let mutable dirty : bool = false
@@ -67,13 +74,16 @@ type HttpReader(transport : TcpTransport, lineBuffer : byte array, pipe: Pipe, c
 
   member x.readMoreData () = task {
     let buff = pipe.Writer.GetMemory()
-    let! x = transport.read buff
-    if x > 0 then
-      pipe.Writer.Advance(x)
-      let! flushResult = pipe.Writer.FlushAsync(cancellationToken)
-      return Ok()
-    else
-      return Result.Error (Error.ConnectionError "no more data")
+    match! transport.read buff with
+    | Ok bytesRead ->
+      if bytesRead > 0 then
+        pipe.Writer.Advance(bytesRead)
+        let! flushResult = pipe.Writer.FlushAsync(cancellationToken)
+        return Ok()
+      else
+        return Result.Error (Error.ConnectionError "no more data")
+    | Result.Error e ->
+      return Result.Error e
     }
 
   member x.getData () = task{

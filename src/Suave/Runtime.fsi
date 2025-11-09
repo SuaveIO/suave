@@ -29,7 +29,7 @@ module Runtime =
     /// The HTTP protocol is the core protocol
     | HTTP
     /// The HTTP protocol tunneled in a TLS tunnel
-    | HTTPS of obj
+    | HTTPS of System.Security.Cryptography.X509Certificates.X509Certificate
 
     member secure : bool
 

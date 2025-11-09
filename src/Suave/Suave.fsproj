@@ -29,9 +29,11 @@
     <Compile Include="Runtime.fs" />
     <Compile Include="Sockets/ConcurrentPool.fs" />
     <Compile Include="Sockets/SocketOp.fs" />
+    <Compile Include="Sockets/ITransport.fs" />
     <Compile Include="Sockets/TcpTransport.fs" />
+    <Compile Include="Sockets/SslTransport.fs" />
     <Compile Include="Sockets/SocketMonad.fs" />
-    <Compile Include="Sockets\HttpReader.fs" />
+    <Compile Include="Sockets/HttpReader.fs" />
     <Compile Include="Sockets/Connection.fs" />
     <Compile Include="Sockets/AsyncSocket.fs" />
     <Compile Include="Native.fs" />

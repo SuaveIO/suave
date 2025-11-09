@@ -13,7 +13,7 @@ open Suave
 /// and that can be closed.
 type Connection =
   { mutable socketBinding : SocketBinding
-    transport     : TcpTransport
+    transport     : ITransport
     reader     : HttpReader
     pipe : Pipe
     lineBuffer    : byte array
@@ -30,7 +30,9 @@ type Connection =
   member inline this.flush () =
     task {
       if this.lineBufferCount> 0  then
-        let! _ = this.transport.write (new Memory<_>(this.lineBuffer,0,this.lineBufferCount))
+        match! this.transport.write (new Memory<_>(this.lineBuffer,0,this.lineBufferCount)) with
+        | Ok () -> ()
+        | Result.Error _ -> ()
         // Clear the buffer to prevent information leakage
         Array.Clear(this.lineBuffer, 0, this.lineBufferCount)
         this.lineBufferCount <- 0
@@ -45,7 +47,9 @@ type Connection =
         if maxByteCount > this.lineBuffer.Length then
           // Flush current buffer first
           if this.lineBufferCount > 0 then
-            let! _ = this.transport.write (new Memory<_>(this.lineBuffer, 0, this.lineBufferCount))
+            match! this.transport.write (new Memory<_>(this.lineBuffer, 0, this.lineBufferCount)) with
+            | Ok () -> ()
+            | Result.Error _ -> ()
             this.lineBufferCount <- 0
           
           // Use ArrayPool for large strings
@@ -55,14 +59,18 @@ type Connection =
             let mutable bytesUsed = 0
             let mutable completed = false
             this.utf8Encoder.Convert(str.ToCharArray(), 0, str.Length, tempBuffer, 0, maxByteCount, true, &charsUsed, &bytesUsed, &completed)
-            let! _ = this.transport.write (new Memory<_>(tempBuffer, 0, bytesUsed))
+            match! this.transport.write (new Memory<_>(tempBuffer, 0, bytesUsed)) with
+            | Ok () -> ()
+            | Result.Error _ -> ()
             return ()
           finally
             ArrayPool<byte>.Shared.Return(tempBuffer)
 
         elif this.lineBufferCount + maxByteCount > this.lineBuffer.Length then
           // Flush buffer and encode into it
-          let! _ = this.transport.write (new Memory<_>(this.lineBuffer, 0, this.lineBufferCount))
+          match! this.transport.write (new Memory<_>(this.lineBuffer, 0, this.lineBufferCount)) with
+          | Ok () -> ()
+          | Result.Error _ -> ()
           let mutable charsUsed = 0
           let mutable bytesUsed = 0
           let mutable completed = false
@@ -89,8 +97,9 @@ type Connection =
   member inline this.asyncWriteBytes (b : byte[]) =
     task {
     if b.Length > 0 then
-      let! _ = this.transport.write (new Memory<_>(b, 0, b.Length))
-      ()
+      match! this.transport.write (new Memory<_>(b, 0, b.Length)) with
+      | Ok () -> ()
+      | Result.Error _ -> ()
   }
 
   member inline this.asyncWriteBufferedBytes (b : byte[]) =
@@ -98,10 +107,13 @@ type Connection =
       if this.lineBufferCount + b.Length > this.lineBuffer.Length then
         // flush lineBuffer
         if this.lineBufferCount > 0 then
-          let! _ = this.transport.write (new Memory<_>(this.lineBuffer, 0, this.lineBufferCount))
-          ()
+          match! this.transport.write (new Memory<_>(this.lineBuffer, 0, this.lineBufferCount)) with
+          | Ok () -> ()
+          | Result.Error _ -> ()
         // don't waste time buffering here
-        let! _ =  this.transport.write (new Memory<_>(b, 0, b.Length))
+        match! this.transport.write (new Memory<_>(b, 0, b.Length)) with
+        | Ok () -> ()
+        | Result.Error _ -> ()
         this.lineBufferCount <- 0
       else
         Buffer.BlockCopy(b, 0, this.lineBuffer,this.lineBufferCount, b.Length)
@@ -143,4 +155,15 @@ module Connection =
     cn.transport.read buf
 
   let inline send (cn :Connection) (buf : ByteSegment) =
-    cn.transport.write buf
+    task {
+      match! cn.transport.write buf with
+      | Ok () -> return Ok ()
+      | Result.Error e -> return Result.Error e
+    }
+
+  let inline shutdown (cn : Connection) =
+    task {
+      match! cn.transport.shutdown() with
+      | Ok () -> ()
+      | Result.Error _ -> ()
+    }

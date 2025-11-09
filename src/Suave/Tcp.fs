@@ -4,6 +4,8 @@ open System
 open System.Threading
 open System.Net
 open System.Net.Sockets
+open System.Net.Security
+open System.Security.Authentication
 open Suave.Sockets
 open Suave.Utils
 open System.Threading.Tasks
@@ -38,17 +40,21 @@ open System.Runtime.InteropServices
 open Native
 open Microsoft.FSharp.NativeInterop
 
-let createTransport listenSocket cancellationToken =
-  new TcpTransport(listenSocket,cancellationToken)
+let createTransport listenSocket binding cancellationToken : ITransport =
+  match binding.scheme with
+  | HTTP -> 
+      new TcpTransport(listenSocket, cancellationToken) :> ITransport
+  | HTTPS certificate ->
+      new SslTransport(listenSocket, certificate, cancellationToken) :> ITransport
 
-let createReader transport lineBuffer pipe cancellationToken =
+let createReader (transport: obj) lineBuffer pipe cancellationToken =
   new HttpReader(transport, lineBuffer, pipe, cancellationToken)
 
-let createConnection listenSocket cancellationToken bufferSize =
-  let transport = createTransport listenSocket cancellationToken
+let createConnection listenSocket binding cancellationToken bufferSize =
+  let transport = createTransport listenSocket binding cancellationToken
   let lineBuffer = Array.zeroCreate bufferSize
   let pipe = new Pipe()
-  let reader = createReader transport lineBuffer pipe cancellationToken
+  let reader = createReader (box transport) lineBuffer pipe cancellationToken
   { socketBinding = SocketBinding.create IPAddress.IPv6Loopback 8080us;
       transport     = transport;
       reader = reader;
@@ -57,19 +63,19 @@ let createConnection listenSocket cancellationToken bufferSize =
       lineBufferCount = 0;
       utf8Encoder = System.Text.Encoding.UTF8.GetEncoder() }
 
-let createConnectionFacade connectionPool listenSocket (runtime: HttpRuntime) cancellationToken bufferSize webpart =
-  let connection = createConnection listenSocket cancellationToken bufferSize
+let createConnectionFacade connectionPool listenSocket binding (runtime: HttpRuntime) cancellationToken bufferSize webpart =
+  let connection = createConnection listenSocket binding cancellationToken bufferSize
   let facade = new ConnectionFacade(connection, runtime, connectionPool,cancellationToken,webpart)
   facade
 
-let createPools listenSocket maxOps runtime cancellationToken bufferSize (webpart:WebPart) =
+let createPools listenSocket binding maxOps runtime cancellationToken bufferSize (webpart:WebPart) =
 
   let connectionPool = new ConcurrentPool<ConnectionFacade>()
-  connectionPool.ObjectGenerator <- (fun _ -> createConnectionFacade connectionPool listenSocket runtime cancellationToken bufferSize webpart)
+  connectionPool.ObjectGenerator <- (fun _ -> createConnectionFacade connectionPool listenSocket binding runtime cancellationToken bufferSize webpart)
 
   //Pre-allocate a set of reusable transportObjects
   for x = 0 to maxOps - 1 do
-    let connection = createConnectionFacade connectionPool listenSocket runtime cancellationToken bufferSize webpart
+    let connection = createConnectionFacade connectionPool listenSocket binding runtime cancellationToken bufferSize webpart
     connectionPool.Push connection
 
   connectionPool
@@ -130,7 +136,7 @@ let runServer maxConcurrentOps bufferSize (binding: SocketBinding) (runtime:Http
       aFewTimesDeterministic (fun () -> listenSocket.Bind binding.endpoint)
       listenSocket.Listen MaxBacklog
 
-      let connectionPool = createPools listenSocket maxConcurrentOps runtime cancellationToken bufferSize webpart
+      let connectionPool = createPools listenSocket runtime.matchedBinding maxConcurrentOps runtime cancellationToken bufferSize webpart
 
       let _binding = { startData.binding with port = uint16((listenSocket.LocalEndPoint :?> IPEndPoint).Port) }
 
@@ -153,15 +159,49 @@ let runServer maxConcurrentOps bufferSize (binding: SocketBinding) (runtime:Http
           let connection : ConnectionFacade = connectionPool.Pop()
           try
             let! acceptedSocket = listenSocket.AcceptAsync(cancellationToken)
-            connection.Connection.transport.acceptSocket <- acceptedSocket
             
-            // Fire and forget the connection handling using Task.Run (modern API)
-            let _connectionTask = Task.Run<unit>(Func<Task<unit>>(fun () -> connection.accept(remoteBinding acceptedSocket)), cancellationToken)
-            ()
+            // Set the accepted socket and perform SSL handshake if needed
+            let! remoteBindingResult = task {
+              match connection.Connection.transport with
+              | :? TcpTransport as tcpTransport ->
+                  tcpTransport.acceptSocket <- acceptedSocket
+                  return Ok(remoteBinding acceptedSocket)
+              | :? SslTransport as sslTransport ->
+                  sslTransport.acceptSocket <- acceptedSocket
+                  sslTransport.networkStream <- new NetworkStream(acceptedSocket, true)
+                  sslTransport.sslStream <- new SslStream(sslTransport.networkStream, false)
+                  
+                  // Perform SSL handshake
+                  try
+                    let certificate = 
+                      match runtime.matchedBinding.scheme with
+                      | HTTPS cert -> cert
+                      | HTTP -> failwith "Expected HTTPS binding for SSL transport"
+                    
+                    do! sslTransport.sslStream.AuthenticateAsServerAsync(
+                      certificate,
+                      clientCertificateRequired = false,
+                      enabledSslProtocols = (SslProtocols.Tls12 ||| SslProtocols.Tls13),
+                      checkCertificateRevocation = false)
+                    return Ok(remoteBinding acceptedSocket)
+                  with ex ->
+                    return Result.Error(Error.ConnectionError(sprintf "SSL handshake failed: %s" ex.Message))
+              | _ -> 
+                  return Ok(remoteBinding acceptedSocket)
+            }
+            
+            match remoteBindingResult with
+            | Ok binding ->
+                // Fire and forget the connection handling using Task.Run
+                let _connectionTask = Task.Run<unit>(Func<Task<unit>>(fun () -> connection.accept(binding)), cancellationToken)
+                ()
+            | Result.Error error ->
+                // SSL handshake failed, return connection to pool
+                connectionPool.Push(connection)
           with ex ->
             // Return connection to pool if accept failed
             connectionPool.Push(connection)
-            // Re-raise if not a cancellation exception (TaskCanceledException inherits from OperationCanceledException)
+            // Re-raise if not a cancellation exception
             match ex with
             | :? OperationCanceledException -> ()
             | _ -> raise ex

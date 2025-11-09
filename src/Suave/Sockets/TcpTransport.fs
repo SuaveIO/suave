@@ -39,13 +39,13 @@ type TcpTransport(listenSocket : Socket, cancellationToken:CancellationToken) =
       return Ok(remoteBinding a)
     }
 
-  member this.read (buf : ByteSegment) =
+  member this.readInternal (buf : ByteSegment) =
     let socket = lock socketLock (fun () -> this.acceptSocket)
     if socket = null then
       raise (ObjectDisposedException("Socket has been disposed"))
     socket.ReceiveAsync(buf,cancellationToken)
 
-  member this.write (buf : ByteSegment) =
+  member this.writeInternal (buf : ByteSegment) =
     let socket = lock socketLock (fun () -> this.acceptSocket)
     if socket = null then
       raise (ObjectDisposedException("Socket has been disposed"))
@@ -58,3 +58,34 @@ type TcpTransport(listenSocket : Socket, cancellationToken:CancellationToken) =
         this.acceptSocket <- null
         shutdownSocket socket
     )
+
+  interface ITransport with
+    member this.read (buf : Memory<byte>) : SocketOp<int> =
+      task {
+        try
+          let! bytesRead = this.readInternal buf
+          return Ok bytesRead
+        with
+        | :? SocketException as ex ->
+          return Result.Error(Error.SocketError(ex.SocketErrorCode))
+        | ex ->
+          return Result.Error(Error.ConnectionError(ex.Message))
+      }
+
+    member this.write (buf : Memory<byte>) : SocketOp<unit> =
+      task {
+        try
+          let! _ = this.writeInternal buf
+          return Ok()
+        with
+        | :? SocketException as ex ->
+          return Result.Error(Error.SocketError(ex.SocketErrorCode))
+        | ex ->
+          return Result.Error(Error.ConnectionError(ex.Message))
+      }
+
+    member this.shutdown() : SocketOp<unit> =
+      task {
+        this.shutdown()
+        return Ok()
+      }

@@ -1609,7 +1609,7 @@ module EventSource =
 
   /// "If the line is empty (a blank line) - dispatch the event."
   /// Dispatches the event properly to the browser.
-  val dispatch : out:Connection -> ValueTask<int>
+  val dispatch : out:Connection -> Task<unit>
 
   /// "If the line starts with a U+003A COLON character (:) - Ignore the line."
   /// Writes a comment to the stream
@@ -1646,7 +1646,7 @@ module EventSource =
     static member createType : id:string -> data:string -> typ:string -> Message
 
   /// send a message containing data to the output stream
-  val send : out:Connection -> msg:Message -> Task<int  >
+  val send : out:Connection -> msg:Message -> Task<unit>
 
   /// This function composes the passed function f with the hand-shake required
   /// to start a new event-stream protocol session with the browser.

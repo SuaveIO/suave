@@ -37,7 +37,7 @@ module Runtime =
 
   type Protocol =
     | HTTP
-    | HTTPS of obj
+    | HTTPS of System.Security.Cryptography.X509Certificates.X509Certificate
 
     member x.secure =
       match x with

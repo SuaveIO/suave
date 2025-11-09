@@ -312,7 +312,7 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
 
   member this.shutdown() =
     connection.lineBufferCount <- 0
-    connection.transport.shutdown()
+    Connection.shutdown connection
     connectionPool.Push(this)
 
   /// The request loop initialises a request with a processor to handle the
