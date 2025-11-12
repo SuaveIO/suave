@@ -26,11 +26,8 @@ let private httpWebResponseToHttpContext (ctx : HttpContext) (response : HttpWeb
 
   let writeContentLengthHeader (conn:Connection) = task {
     match headers ? ("Content-Length") with
-    | Some x ->
-      do! conn.asyncWriteLn (sprintf "Content-Length: %s" x)
-      return ()
-    | None ->
-      return ()
+    | Some x -> do! conn.asyncWriteLn (sprintf "Content-Length: %s" x)
+    | None -> ()
     }
 
   let content =
@@ -41,7 +38,6 @@ let private httpWebResponseToHttpContext (ctx : HttpContext) (response : HttpWeb
           do! conn.flush()
           let stream = response.GetResponseStream ()
           do! transferStream conn stream
-          return ()
        })
 
   {

@@ -3,6 +3,7 @@
     <TargetFrameworks>net9.0</TargetFrameworks>
     <AssemblyName>Suave</AssemblyName>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  <OtherFlags>--warn:3 </OtherFlags>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" Condition="Exists('AssemblyInfo.fs')" />

@@ -12,6 +12,7 @@ module WebSocket =
   open System.Security.Cryptography
   open System.Text
   open System.Threading
+  open System.Threading.Tasks
 
   let magicGUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
@@ -109,12 +110,13 @@ module WebSocket =
   let internal bytesToNetworkOrder (bytes : byte[]) =
     if BitConverter.IsLittleEndian then bytes |> Array.rev else bytes
 
-  let writeFrame (connection: Connection) (f: Frame) = task {
+  let writeFrame (connection: Connection) (f: Frame) : SocketOp<unit> = 
+    socket {
       let! _ = connection.transport.write (Memory([| f.OpcodeByte |], 0, 1))
       let! _ = connection.transport.write (Memory(f.EncodedLength, 0, f.EncodedLength.Length))
       let! _ = connection.transport.write f.Data
-      return Ok()
-      }
+      return ()
+    }
 
   let internal frame (opcode : Opcode) (data : ByteSegment)  (fin : bool) =
 
@@ -134,20 +136,21 @@ module WebSocket =
 
     { Frame.OpcodeByte = firstByte; EncodedLength = encodedLength; Data = data }
 
-  let readBytes (connection : Connection) (n : int) =
-    task {
-      let arr = Array.zeroCreate n
-      let offset = ref 0
-      let reader = connection.reader
-      do! reader.readPostData n (fun a count ->
-          let source = a.Span.Slice(0,count)
-          let target = new Span<byte>(arr,!offset,count)
-          source.CopyTo(target)
-          offset := !offset + count)
-      return Ok(arr)
-    }
+  let readBytes (connection : Connection) (n : int) : SocketOp<byte[]> =
+    ValueTask<Result<byte[],Error>>(
+      task {
+        let arr = Array.zeroCreate n
+        let offset = ref 0
+        let reader = connection.reader
+        do! reader.readPostData n (fun a count ->
+            let source = a.Span.Slice(0,count)
+            let target = new Span<byte>(arr,!offset,count)
+            source.CopyTo(target)
+            offset := !offset + count)
+        return Ok(arr)
+      })
 
-  let readBytesIntoByteSegment retrieveByteSegment (connection : Connection) (n : int) =
+  let readBytesIntoByteSegment retrieveByteSegment (connection : Connection) (n : int) : SocketOp<ByteSegment> =
     let byteSegmentRetrieved: ByteSegment = retrieveByteSegment n
 
     let byteSegment =
@@ -158,14 +161,15 @@ module WebSocket =
 
     let offset = ref 0
     let reader = connection.reader
-    task{
-      do! reader.readPostData n (fun a count ->
-        let source = a.Span.Slice(0,count)
-        let target = byteSegment.Span.Slice(!offset,count)
-        source.CopyTo(target)
-        offset := !offset + count)
-      return Ok(byteSegment)
-    }
+    ValueTask<Result<ByteSegment,Error>>(
+      task{
+        do! reader.readPostData n (fun a count ->
+          let source = a.Span.Slice(0,count)
+          let target = byteSegment.Span.Slice(!offset,count)
+          source.CopyTo(target)
+          offset := !offset + count)
+        return Ok(byteSegment)
+      })
 
   type internal Cont<'t> = 't -> unit
 
@@ -205,7 +209,7 @@ module WebSocket =
 
     let sendFrame opcode bs fin =
       let frame = frame opcode bs fin
-      runAsyncWithSemaphore writeSemaphore (writeFrame connection frame)
+      SocketOp.ofTask (runAsyncWithSemaphore writeSemaphore ((writeFrame connection frame).AsTask()))
 
     let readFrameIntoSegment (byteSegmentForLengthFunc: int -> ByteSegment) = socket {
       //assert (Seq.length connection.segments = 0)
@@ -236,12 +240,13 @@ module WebSocket =
       }
 
     member this.read () = socket {
-      return! runAsyncWithSemaphore readSemaphore (readFrameIntoSegment (Array.zeroCreate >> Memory))
+      return! SocketOp.ofTask (runAsyncWithSemaphore readSemaphore ((readFrameIntoSegment (Array.zeroCreate >> Memory)).AsTask()))
       }
 
     /// Reads from the websocket and puts the data into a ByteSegment selected by the byteSegmentForLengthFunc parameter
     /// <param name="byteSegmentForLengthFunc">A function that takes in the message length in bytes required to hold the next websocket message and returns an appropriately sized ArraySegment of bytes</param>
-    member this.readIntoByteSegment byteSegmentForLengthFunc = runAsyncWithSemaphore readSemaphore (readFrameIntoSegment byteSegmentForLengthFunc)
+    member this.readIntoByteSegment byteSegmentForLengthFunc = 
+      SocketOp.ofTask (runAsyncWithSemaphore readSemaphore ((readFrameIntoSegment byteSegmentForLengthFunc).AsTask()))
 
     member this.send opcode bs fin = sendFrame opcode bs fin
 
@@ -253,10 +258,10 @@ module WebSocket =
       let handShakeToken = Convert.ToBase64String webSocketHash
       match webSocketProtocol with
       | Some subprotocol ->
-        let! a = (new HttpOutput(ctx.connection,ctx.runtime)).run ctx.request (handShakeWithSubprotocolResponse subprotocol handShakeToken)
+        let! a = SocketOp.ofTask ((new HttpOutput(ctx.connection,ctx.runtime)).run ctx.request (handShakeWithSubprotocolResponse subprotocol handShakeToken))
         ()
       | None ->
-        let! a = (new HttpOutput(ctx.connection,ctx.runtime)).run ctx.request (handShakeResponse handShakeToken)
+        let! a = SocketOp.ofTask ((new HttpOutput(ctx.connection,ctx.runtime)).run ctx.request (handShakeResponse handShakeToken))
         ()
       let webSocket = new WebSocket(ctx.connection, webSocketProtocol)
       do! continuation webSocket ctx
@@ -303,7 +308,7 @@ module WebSocket =
           | Choice1Of2 webSocketProtocol -> choose (webSocketProtocol.Split [|','|]) ctx
           | _ -> async.Return None
 
-        let! a = handShakeAux subprotocol webSocketKey continuation ctx
+        let! a = (handShakeAux subprotocol webSocketKey continuation ctx).AsTask()
         match a with
         | Ok _ ->
           do ()
@@ -317,7 +322,7 @@ module WebSocket =
   let handShakeTask (continuation : WebSocket -> HttpContext -> SocketOp<unit>) (ctx : HttpContext) = task {
     match validateHandShake ctx with
     | Choice1Of2 webSocketKey ->
-      let! a = handShakeAux None webSocketKey continuation ctx
+      let! a = (handShakeAux None webSocketKey continuation ctx).AsTask()
       match a with
       | Ok _ ->
         do ()

@@ -72,19 +72,39 @@ type HttpReader(transportObj : obj, lineBuffer : byte array, pipe: Pipe, cancell
       dirty <- false
     with _ -> ()
 
-  member x.readMoreData () = task {
+  member x.readMoreData () = 
     let buff = pipe.Writer.GetMemory()
-    match! transport.read buff with
-    | Ok bytesRead ->
-      if bytesRead > 0 then
-        pipe.Writer.Advance(bytesRead)
-        let! flushResult = pipe.Writer.FlushAsync(cancellationToken)
-        return Ok()
-      else
-        return Result.Error (Error.ConnectionError "no more data")
-    | Result.Error e ->
-      return Result.Error e
-    }
+    let readResult = transport.read buff
+    if readResult.IsCompletedSuccessfully then
+      // Synchronous read completion
+      match readResult.Result with
+      | Ok bytesRead ->
+        if bytesRead > 0 then
+          pipe.Writer.Advance(bytesRead)
+          ValueTask<Result<unit,Error>>(
+            task {
+              let! flushResult = pipe.Writer.FlushAsync(cancellationToken)
+              return Ok()
+            })
+        else
+          ValueTask<Result<unit,Error>>(Result.Error (Error.ConnectionError "no more data"))
+      | Result.Error e ->
+        ValueTask<Result<unit,Error>>(Result.Error e)
+    else
+      // Async path
+      ValueTask<Result<unit,Error>>(
+        task {
+          match! readResult with
+          | Ok bytesRead ->
+            if bytesRead > 0 then
+              pipe.Writer.Advance(bytesRead)
+              let! flushResult = pipe.Writer.FlushAsync(cancellationToken)
+              return Ok()
+            else
+              return Result.Error (Error.ConnectionError "no more data")
+          | Result.Error e ->
+            return Result.Error e
+        })
 
   member x.getData () = task{
       let (success, result) = pipe.Reader.TryRead()
@@ -121,29 +141,30 @@ type HttpReader(transportObj : obj, lineBuffer : byte array, pipe: Pipe, cancell
 
   /// Read the passed stream into buff until the EOL (CRLF) has been reached
   /// and returns the number of bytes read and the connection
-  member x.readUntilPattern marker select =
-    task {
-      let reading = ref true
-      let error = ref false
-      let result = ref 0
-      let errorResult = ref (Ok(0))
-      while !reading && not !error && not(cancellationToken.IsCancellationRequested) do
-        let! res = x.scanMarker marker select
-        match res with
-        | Ok(Found a) ->
-          reading := false
-          result := a
-        | Ok(NeedMore) ->
-          ()
-        | Result.Error s
-        | Ok(Error s) ->
-          error := true
-          errorResult := Result.Error s
-      if !error then
-        return !errorResult
-      else
-        return Ok (!result)
-    }
+  member x.readUntilPattern marker select : SocketOp<int> =
+    ValueTask<Result<int,Error>>(
+      task {
+        let reading = ref true
+        let error = ref false
+        let result = ref 0
+        let errorResult = ref (Ok(0))
+        while !reading && not !error && not(cancellationToken.IsCancellationRequested) do
+          let! res = x.scanMarker marker select
+          match res with
+          | Ok(Found a) ->
+            reading := false
+            result := a
+          | Ok(NeedMore) ->
+            ()
+          | Result.Error s
+          | Ok(Error s) ->
+            error := true
+            errorResult := Result.Error s
+        if !error then
+          return !errorResult
+        else
+          return Ok (!result)
+      })
 
   member x.skip n =
      task{
@@ -174,46 +195,49 @@ type HttpReader(transportObj : obj, lineBuffer : byte array, pipe: Pipe, cancell
       }
 
   /// Read a line from the stream, calling UTF8.toString on the bytes before the EOL marker
-  member x.readLine () = task {
-    let offset = ref 0
-    match! x.readUntilPattern EOL (fun a count ->
-        if offset.Value + count > lineBuffer.Length then
-          FailWith (InputDataError (Some 414, "Line Too Long"))
-        else
-          let source = a.Span.Slice(0,count)
-          let target = new Span<byte>(lineBuffer,offset.Value,count)
-          source.CopyTo(target)
-          offset.Value <- offset.Value + count
-          Continue offset.Value) with
-    | Result.Error e ->
-      return Result.Error e
-    | Ok _ ->
-      let result = Globals.UTF8.GetString(lineBuffer, 0, offset.Value)
-      return Ok result
-  }
+  member x.readLine () : SocketOp<string> = 
+    ValueTask<Result<string,Error>>(
+      task {
+        let offset = ref 0
+        match! x.readUntilPattern EOL (fun a count ->
+            if offset.Value + count > lineBuffer.Length then
+              FailWith (InputDataError (Some 414, "Line Too Long"))
+            else
+              let source = a.Span.Slice(0,count)
+              let target = new Span<byte>(lineBuffer,offset.Value,count)
+              source.CopyTo(target)
+              offset.Value <- offset.Value + count
+              Continue offset.Value) with
+        | Result.Error e ->
+          return Result.Error e
+        | Ok _ ->
+          let result = Globals.UTF8.GetString(lineBuffer, 0, offset.Value)
+          return Ok result
+      })
 
   /// Read all headers from the stream, returning a dictionary of the headers found
-  member x.readHeaders() =
-    task {
-      let headers = new List<string*string>()
-      let flag = ref true
-      let error = ref false
-      let result = ref (Ok (headers))
-      while !flag && (not cancellationToken.IsCancellationRequested) do
-        let! _line = x.readLine ()
-        match _line with
-        | Ok line ->
-          if line <> String.Empty then
-            let indexOfColon = line.IndexOf(':')
-            let header = (line.Substring(0, indexOfColon).ToLower(), line.Substring(indexOfColon+1).TrimStart())
-            headers.Add header
-          else
-            flag := false
-        | Result.Error e ->
-          error := true
-          result := Result.Error e
-      return !result
-    }
+  member x.readHeaders() : SocketOp<List<string*string>> =
+    ValueTask<Result<List<string*string>,Error>>(
+      task {
+        let headers = new List<string*string>()
+        let flag = ref true
+        let error = ref false
+        let result = ref (Ok (headers))
+        while !flag && (not cancellationToken.IsCancellationRequested) do
+          let! _line = x.readLine ()
+          match _line with
+          | Ok line ->
+            if line <> String.Empty then
+              let indexOfColon = line.IndexOf(':')
+              let header = (line.Substring(0, indexOfColon).ToLower(), line.Substring(indexOfColon+1).TrimStart())
+              headers.Add header
+            else
+              flag := false
+          | Result.Error e ->
+            error := true
+            result := Result.Error e
+        return !result
+      })
 
   /// Read the post data from the stream, given the number of bytes that makes up the post data.
   member x.readPostData (bytes : int) (select:ReadOnlyMemory<byte> -> int -> unit) : Task<unit> =

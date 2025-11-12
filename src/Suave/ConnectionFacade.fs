@@ -27,58 +27,81 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
   let mutable multiPartFields = List<string*string>()
   let mutable _rawForm : byte array = [||]
 
-  let readFilePart boundary (headerParams : Dictionary<string,string>) fieldName contentType = socket {
-    let tempFilePath = Path.GetTempFileName()
-    try
-      use tempFile = new FileStream(tempFilePath, FileMode.Truncate)
-      let! a =
-        reader.readUntilPattern (ASCII.bytes (eol + boundary)) (fun x y ->
-            do tempFile.Write(x.Span.Slice(0,y))
-            Continue 0)
-      let fileLength = tempFile.Length
-      // Explicit dispose to ensure file is closed before we check length
-      tempFile.Dispose()
+  let readFilePart boundary (headerParams : Dictionary<string,string>) fieldName contentType : SocketOp<HttpUpload option> =
+    // Split the file-reading work into a separate minimal task so the main task only awaits once
+    let readFileDataHelper () =
+      let tempFilePath = Path.GetTempFileName()
+      let tempFile = new FileStream(tempFilePath, FileMode.Truncate)
+      // Convert the SocketOp to a Task and handle it without nested task CE
+      let readOp = reader.readUntilPattern (ASCII.bytes (eol + boundary)) (fun x y ->
+        do tempFile.Write(x.Span.Slice(0,y))
+        Continue 0)
+      let readTask = readOp.AsTask()
       
-      if fileLength > 0L then
-        let! filename =
-          match headerParams.TryLookup "filename*" with
-          | Choice1Of2 _filename ->
-            let ix = _filename.IndexOf "''"
-            if ix > 0 then
-              let enc = _filename.Substring(0,ix).ToLowerInvariant()
-              if enc = "utf-8" then
-                let filename = Net.WebUtility.UrlDecode(_filename.Substring(ix + 2))
-                SocketOp.mreturn (filename)
-              else
-                 SocketOp.abort (InputDataError (None, "Unsupported filename encoding: '" + enc + "'"))
-            else
-              SocketOp.abort (InputDataError (None, "Invalid filename encoding"))
-          | Choice2Of2 _ ->
-            (headerParams.TryLookup "filename" |> Choice.map (String.trimc '"'))
-            @|! (None, "Key 'filename' was not present in 'content-disposition'")
-
-        let upload =
-          { fieldName    = fieldName
-            fileName     = filename
-            mimeType     = contentType
-            tempFilePath = tempFilePath }
-
-        return Some upload
-      else
+      // Use Task.ContinueWith to avoid complex resumable state machine in a task CE
+      readTask.ContinueWith(fun (ante: System.Threading.Tasks.Task<_>) ->
         try
-          File.Delete tempFilePath
-        with _ -> () // Ignore deletion errors
-        return None
-    with ex ->
-      // Ensure temp file is deleted on any error
-      try
-        File.Delete tempFilePath
-      with _ -> () // Ignore deletion errors
-      return! SocketOp.abort (InputDataError (None, sprintf "Error reading file part: %s" ex.Message))
-    }
+          let result = ante.Result
+          let fileLength = tempFile.Length
+          tempFile.Dispose()
+          (tempFilePath, result, fileLength, false, "")
+        with ex ->
+          tempFile.Dispose()
+          (tempFilePath, Unchecked.defaultof<_>, 0L, true, ex.Message)
+      ) : Task<_>
+
+    // Main task: convert to continuation to avoid complex resumable state machine
+    let mainTask =
+      readFileDataHelper().ContinueWith(fun (ante: System.Threading.Tasks.Task<_>) ->
+        let (tempFilePath, readResult, fileLength, exceptionOccurred, exceptionMsg) = ante.Result
+        
+        // Convert result to Task for synchronous processing
+        if exceptionOccurred then
+          try File.Delete tempFilePath with _ -> ()
+          Task.FromResult(Result.Error (InputDataError (None, sprintf "Error reading file part: %s" exceptionMsg)))
+        else
+          match readResult with
+          | Result.Error e ->
+            try File.Delete tempFilePath with _ -> ()
+            Task.FromResult(Result.Error e)
+          | Ok _ ->
+            if fileLength > 0L then
+              let filename =
+                match headerParams.TryLookup "filename*" with
+                | Choice1Of2 _filename ->
+                  let ix = _filename.IndexOf "''"
+                  if ix > 0 then
+                    let enc = _filename.Substring(0,ix).ToLowerInvariant()
+                    if enc = "utf-8" then
+                      let filename = Net.WebUtility.UrlDecode(_filename.Substring(ix + 2))
+                      Ok filename
+                    else
+                      Result.Error (InputDataError (None, "Unsupported filename encoding: '" + enc + "'"))
+                  else
+                    Result.Error (InputDataError (None, "Invalid filename encoding"))
+                | Choice2Of2 _ ->
+                  match headerParams.TryLookup "filename" |> Choice.map (String.trimc '"') with
+                  | Choice1Of2 fn -> Ok fn
+                  | Choice2Of2 _ -> Result.Error (InputDataError (None, "Key 'filename' was not present in 'content-disposition'"))
+
+              match filename with
+              | Result.Error e -> Task.FromResult(Result.Error e)
+              | Ok fn ->
+                let upload =
+                  { fieldName    = fieldName
+                    fileName     = fn
+                    mimeType     = contentType
+                    tempFilePath = tempFilePath }
+                Task.FromResult(Ok (Some upload))
+            else
+              try File.Delete tempFilePath with _ -> ()
+              Task.FromResult(Ok None)
+      ).Unwrap()
+    
+    ValueTask<Result<HttpUpload option,Error>>(mainTask)
 
   let parseMultipartMixed fieldName boundary : SocketOp<unit> =
-    let rec loop () = socket {
+    let rec loop () : SocketOp<unit> = socket {
       let! firstLine = reader.readLine()
 
       if firstLine.Equals("--") then
@@ -168,7 +191,8 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
       let mutable error = false
       let result = ref (Ok())
       while parsing && not error && not(cancellationToken.IsCancellationRequested) do
-        match! nexPart() with
+        let! nextPartResult = (nexPart()).AsTask()
+        match nextPartResult with
         | Ok line ->
           if line.StartsWith("--") then
             // reached end boundary
@@ -190,26 +214,27 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
       if firstLine<>boundary then
         return! SocketOp.abort (InputDataError (Some 413, "Invalid multipart format"))
       else
-        return! parsePartLoop ()
+        return! SocketOp.ofTask (parsePartLoop ())
     }
 
   /// Reads raw POST data
   let getRawPostData contentLength =
-    task {
-      let offset = ref 0
-      let rawForm = Array.zeroCreate contentLength
-      do! reader.readPostData contentLength (fun a count ->
-          let source = a.Span.Slice(0,count)
-          let target = new Span<byte>(rawForm,!offset,count)
-          source.CopyTo(target)
-          offset := !offset + count)
-      return Ok (rawForm)
-    }
+    ValueTask<Result<byte[],Error>>(
+      task {
+        let offset = ref 0
+        let rawForm = Array.zeroCreate contentLength
+        do! reader.readPostData contentLength (fun a count ->
+            let source = a.Span.Slice(0,count)
+            let target = new Span<byte>(rawForm,!offset,count)
+            source.CopyTo(target)
+            offset := !offset + count)
+        return Ok (rawForm)
+      })
 
   member val Connection = connection with get,set
   member val Runtime = runtime with get,set
 
-  member this.parsePostData maxContentLength (contentLengthHeader : Choice<string,_>) (contentTypeHeader:Choice<string,_>) : Task<Result<unit,Error>>=
+  member this.parsePostData maxContentLength (contentLengthHeader : Choice<string,_>) (contentTypeHeader:Choice<string,_>) : SocketOp<unit> =
     socket {
       match contentLengthHeader with
       | Choice1Of2 contentLengthString ->
@@ -250,7 +275,7 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
     let! rawHost = (headers @@ "host") @|! (None, "Missing 'Host' header")
 
     if headers @@ "expect" = Choice1Of2 "100-continue" then
-      let! _ = httpOutput.run HttpRequest.empty Intermediate.CONTINUE
+      let! _ = SocketOp.ofTask (httpOutput.run HttpRequest.empty Intermediate.CONTINUE)
       ()
 
     do! this.parsePostData runtime.maxContentLength (headers @@ "content-length") (headers @@ "content-type")
@@ -278,34 +303,34 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
   member this.exitHttpLoopWithError (err:Error) = task{
       match err with
       | InputDataError (None, msg) ->
-        match! httpOutput.run HttpRequest.empty (RequestErrors.BAD_REQUEST msg) with
-        | _ -> ()
+        let! _ = httpOutput.run HttpRequest.empty (RequestErrors.BAD_REQUEST msg)
+        ()
 
       | InputDataError (Some status,msg) ->
         match Http.HttpCode.tryParse status with 
         | (Choice1Of2 statusCode) ->
-          match! httpOutput.run HttpRequest.empty (Response.response statusCode (Globals.UTF8.GetBytes msg)) with
-          | _ -> ()
-        | (Choice2Of2 err) ->
-          match! httpOutput.run HttpRequest.empty (RequestErrors.BAD_REQUEST msg) with
-          | _ -> ()
-      | err -> ()
+          let! _ = httpOutput.run HttpRequest.empty (Response.response statusCode (Globals.UTF8.GetBytes msg))
+          ()
+        | (Choice2Of2 _err) ->
+          let! _ = httpOutput.run HttpRequest.empty (RequestErrors.BAD_REQUEST msg)
+          ()
+      | _ -> ()
       return Ok(false)
     }
 
   member this.processRequest () =
     task {
-      match! this.readRequest () with
+      let! reqRes = (this.readRequest()).AsTask()
+      match reqRes with
       | Result.Error err ->
         // Couldn't parse HTTP request; answering with BAD_REQUEST and closing the connection.
         return! this.exitHttpLoopWithError err
       | Ok request ->
         try
-          match! httpOutput.run request webpart  with
-          | Result.Error err ->
-            return Result.Error err 
-          | Ok keepAlive ->
-            return Ok (keepAlive)
+          let! runRes = httpOutput.run request webpart
+          match runRes with
+          | Result.Error err -> return Result.Error err
+          | Ok keepAlive -> return Ok keepAlive
         with ex ->
           return Result.Error (Error.ConnectionError ex.Message)
     }
@@ -344,7 +369,8 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
       try
         // Start read loop in background - use _ignore to suppress async warning
         let _ = reader.readLoop()
-        match! this.requestLoop() with
+        let! loopRes = this.requestLoop()
+        match loopRes with
         | Ok () -> ()
         | Result.Error err ->
           do Console.WriteLine(sprintf "Error: %A" err)

@@ -1,10 +1,11 @@
 namespace Suave.Sockets
 
+open System
 open System.Net
 open System.IO.Pipelines
+open System.Threading.Tasks
 open Suave.Sockets.Control
 open System.Text
-open System
 open System.Buffers
 open Suave.Utils
 open Suave
@@ -26,17 +27,30 @@ type Connection =
   member x.port : Port =
     x.socketBinding.port
 
-  /// Flush out whatever is in the lineBuffer
+  /// Flush out whatever is in the lineBuffer - returns ValueTask for allocation-free synchronous completions
   member inline this.flush () =
-    task {
-      if this.lineBufferCount> 0  then
-        match! this.transport.write (new Memory<_>(this.lineBuffer,0,this.lineBufferCount)) with
-        | Ok () -> ()
-        | Result.Error _ -> ()
-        // Clear the buffer to prevent information leakage
+    if this.lineBufferCount = 0 then
+      // Buffer empty - synchronous completion with zero allocations
+      ValueTask.CompletedTask
+    else
+      // Buffer has data - write it
+      let vt = this.transport.write (new Memory<_>(this.lineBuffer,0,this.lineBufferCount))
+      if vt.IsCompletedSuccessfully then
+        // Write completed synchronously - clear buffer and return
         Array.Clear(this.lineBuffer, 0, this.lineBufferCount)
         this.lineBufferCount <- 0
-    }
+        ValueTask.CompletedTask
+      else
+        // Async path
+        ValueTask(task {
+            let! writeRes = vt
+            match writeRes with
+            | Ok () -> ()
+            | Result.Error _ -> ()
+            // Clear the buffer to prevent information leakage
+            Array.Clear(this.lineBuffer, 0, this.lineBufferCount)
+            this.lineBufferCount <- 0
+        })
 
   member inline this.asyncWrite (str: string) =
     task {
@@ -47,11 +61,12 @@ type Connection =
         if maxByteCount > this.lineBuffer.Length then
           // Flush current buffer first
           if this.lineBufferCount > 0 then
-            match! this.transport.write (new Memory<_>(this.lineBuffer, 0, this.lineBufferCount)) with
+            let! r1 = this.transport.write (new Memory<_>(this.lineBuffer, 0, this.lineBufferCount))
+            match r1 with
             | Ok () -> ()
             | Result.Error _ -> ()
             this.lineBufferCount <- 0
-          
+
           // Use ArrayPool for large strings
           let tempBuffer = ArrayPool<byte>.Shared.Rent(maxByteCount)
           try
@@ -59,7 +74,8 @@ type Connection =
             let mutable bytesUsed = 0
             let mutable completed = false
             this.utf8Encoder.Convert(str.ToCharArray(), 0, str.Length, tempBuffer, 0, maxByteCount, true, &charsUsed, &bytesUsed, &completed)
-            match! this.transport.write (new Memory<_>(tempBuffer, 0, bytesUsed)) with
+            let! r2 = this.transport.write (new Memory<_>(tempBuffer, 0, bytesUsed))
+            match r2 with
             | Ok () -> ()
             | Result.Error _ -> ()
             return ()
@@ -68,7 +84,8 @@ type Connection =
 
         elif this.lineBufferCount + maxByteCount > this.lineBuffer.Length then
           // Flush buffer and encode into it
-          match! this.transport.write (new Memory<_>(this.lineBuffer, 0, this.lineBufferCount)) with
+          let! r3 = this.transport.write (new Memory<_>(this.lineBuffer, 0, this.lineBufferCount))
+          match r3 with
           | Ok () -> ()
           | Result.Error _ -> ()
           let mutable charsUsed = 0
@@ -97,7 +114,8 @@ type Connection =
   member inline this.asyncWriteBytes (b : byte[]) =
     task {
     if b.Length > 0 then
-      match! this.transport.write (new Memory<_>(b, 0, b.Length)) with
+      let! r4 = this.transport.write (new Memory<_>(b, 0, b.Length))
+      match r4 with
       | Ok () -> ()
       | Result.Error _ -> ()
   }
@@ -107,11 +125,13 @@ type Connection =
       if this.lineBufferCount + b.Length > this.lineBuffer.Length then
         // flush lineBuffer
         if this.lineBufferCount > 0 then
-          match! this.transport.write (new Memory<_>(this.lineBuffer, 0, this.lineBufferCount)) with
+          let! r5 = this.transport.write (new Memory<_>(this.lineBuffer, 0, this.lineBufferCount))
+          match r5 with
           | Ok () -> ()
           | Result.Error _ -> ()
         // don't waste time buffering here
-        match! this.transport.write (new Memory<_>(b, 0, b.Length)) with
+        let! r6 = this.transport.write (new Memory<_>(b, 0, b.Length))
+        match r6 with
         | Ok () -> ()
         | Result.Error _ -> ()
         this.lineBufferCount <- 0
@@ -156,14 +176,16 @@ module Connection =
 
   let inline send (cn :Connection) (buf : ByteSegment) =
     task {
-      match! cn.transport.write buf with
+      let! r8 = cn.transport.write buf
+      match r8 with
       | Ok () -> return Ok ()
       | Result.Error e -> return Result.Error e
     }
 
   let inline shutdown (cn : Connection) =
     task {
-      match! cn.transport.shutdown() with
+      let! r9 = cn.transport.shutdown()
+      match r9 with
       | Ok () -> ()
       | Result.Error _ -> ()
     }
