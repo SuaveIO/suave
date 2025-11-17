@@ -10,6 +10,8 @@ open System
 open System.IO
 open System.Text
 
+open System.Buffers
+
 let transferStreamWithBuffer (buf: ArraySegment<_>) (toStream : Connection) (from : Stream) =
   task {
       let reading = ref true
@@ -18,37 +20,44 @@ let transferStreamWithBuffer (buf: ArraySegment<_>) (toStream : Connection) (fro
         if read <= 0 then
           reading := false
         else
-          let! a = send toStream (new Memory<_>(buf.Array, 0, read))
+          let! a = send toStream (new Memory<byte>(buf.Array, 0, read))
           ()
     }
 
 /// Asynchronously write from the 'from' stream to the 'to' stream.
 let transferStream (toStream : Connection) (from : Stream) =
   task {
-    let buf = new ArraySegment<_>(Array.zeroCreate 8192)
-    do! transferStreamWithBuffer buf toStream from
+    let buf = ArrayPool<byte>.Shared.Rent(8192)
+    try
+      do! transferStreamWithBuffer (new ArraySegment<_>(buf, 0, 8192)) toStream from
+    finally
+      ArrayPool<byte>.Shared.Return(buf)
   }
 
 let internal zeroCharMemory = new Memory<byte>(Encoding.ASCII.GetBytes "0")
 
 let transferStreamChunked (conn : Connection) (from : Stream) =
-    task {
-      let buf = new ArraySegment<_>(Array.zeroCreate 1024)
-      let reading = ref true
-      while !reading do
-        let! read = from.AsyncRead (buf.Array, buf.Offset, buf.Count)
+  task {
+    let buf = ArrayPool<byte>.Shared.Rent(1024)
+    try
+      let mutable reading = true
+      while reading do
+        let! read = from.AsyncRead (buf, 0, 1024)
         if read <= 0 then
           let! _ = send conn zeroCharMemory
           let! _ = send conn Bytes.eolMemory
           let! _ = send conn Bytes.eolMemory
-          reading := false
+          reading <- false
         else
           let readHex = read.ToString("X")
 
-          let! _ = send conn (Memory<_>(Encoding.ASCII.GetBytes readHex))
+          let bytes = Encoding.ASCII.GetBytes readHex
+          let! _ = send conn (new Memory<byte>(bytes))
           let! _ = send conn Bytes.eolMemory
 
-          let! _ = send conn (Memory<_>(buf.Array, buf.Offset, read))
+          let! _ = send conn (new Memory<byte>(buf, 0, read))
           let! _ = send conn Bytes.eolMemory
           ()
-    }
+    finally
+      ArrayPool<byte>.Shared.Return(buf)
+  }
