@@ -340,6 +340,11 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
     Connection.shutdown connection
     connectionPool.Push(this)
 
+  // Return the lineBuffer to the ArrayPool when the connection is disposed
+  interface IDisposable with
+    member this.Dispose() =
+      System.Buffers.ArrayPool<byte>.Shared.Return(connection.lineBuffer)
+
   /// The request loop initialises a request with a processor to handle the
   /// incoming stream and possibly pass the request to the web parts, a protocol,
   /// a web part, an error handler and a Connection to use for read-write

@@ -52,7 +52,8 @@ let createReader (transport: obj) lineBuffer pipe cancellationToken =
 
 let createConnection listenSocket binding cancellationToken bufferSize =
   let transport = createTransport listenSocket binding cancellationToken
-  let lineBuffer = Array.zeroCreate bufferSize
+  // Rent from ArrayPool instead of allocating fresh buffer
+  let lineBuffer = System.Buffers.ArrayPool<byte>.Shared.Rent(bufferSize)
   let pipe = new Pipe()
   let reader = createReader (box transport) lineBuffer pipe cancellationToken
   { socketBinding = SocketBinding.create IPAddress.IPv6Loopback 8080us;
