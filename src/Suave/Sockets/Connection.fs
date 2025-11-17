@@ -7,6 +7,7 @@ open System.Threading.Tasks
 open Suave.Sockets.Control
 open System.Text
 open System.Buffers
+open System.Runtime.InteropServices
 open Suave.Utils
 open Suave
 
@@ -33,8 +34,8 @@ type Connection =
       // Buffer empty - synchronous completion with zero allocations
       ValueTask.CompletedTask
     else
-      // Buffer has data - write it
-      let vt = this.transport.write (new Memory<_>(this.lineBuffer,0,this.lineBufferCount))
+      // Buffer has data - write it asynchronously
+      let vt = this.transport.write (new Memory<byte>(this.lineBuffer, 0, this.lineBufferCount))
       if vt.IsCompletedSuccessfully then
         // Write completed synchronously - clear buffer and return
         Array.Clear(this.lineBuffer, 0, this.lineBufferCount)
@@ -57,54 +58,42 @@ type Connection =
       if str.Length = 0 then
         return ()
       else
-        let maxByteCount = Encoding.UTF8.GetMaxByteCount(str.Length)
-        if maxByteCount > this.lineBuffer.Length then
+        // Use UTF8.GetBytes directly on string instead of ToCharArray to avoid intermediate allocation
+        let strBytes = Encoding.UTF8.GetBytes str
+        if strBytes.Length > this.lineBuffer.Length then
           // Flush current buffer first
           if this.lineBufferCount > 0 then
-            let! r1 = this.transport.write (new Memory<_>(this.lineBuffer, 0, this.lineBufferCount))
+            let! r1 = this.transport.write (new Memory<byte>(this.lineBuffer, 0, this.lineBufferCount))
             match r1 with
             | Ok () -> ()
             | Result.Error _ -> ()
             this.lineBufferCount <- 0
+          
+          // Write the bytes directly
+          let! r2 = this.transport.write (new Memory<byte>(strBytes, 0, strBytes.Length))
+          match r2 with
+          | Ok () -> ()
+          | Result.Error _ -> ()
+          return ()
 
-          // Use ArrayPool for large strings
-          let tempBuffer = ArrayPool<byte>.Shared.Rent(maxByteCount)
-          try
-            let mutable charsUsed = 0
-            let mutable bytesUsed = 0
-            let mutable completed = false
-            this.utf8Encoder.Convert(str.ToCharArray(), 0, str.Length, tempBuffer, 0, maxByteCount, true, &charsUsed, &bytesUsed, &completed)
-            let! r2 = this.transport.write (new Memory<_>(tempBuffer, 0, bytesUsed))
-            match r2 with
-            | Ok () -> ()
-            | Result.Error _ -> ()
-            return ()
-          finally
-            ArrayPool<byte>.Shared.Return(tempBuffer)
-
-        elif this.lineBufferCount + maxByteCount > this.lineBuffer.Length then
-          // Flush buffer and encode into it
-          let! r3 = this.transport.write (new Memory<_>(this.lineBuffer, 0, this.lineBufferCount))
+        elif this.lineBufferCount + strBytes.Length > this.lineBuffer.Length then
+          // Flush buffer first
+          let! r3 = this.transport.write (new Memory<byte>(this.lineBuffer, 0, this.lineBufferCount))
           match r3 with
           | Ok () -> ()
           | Result.Error _ -> ()
-          let mutable charsUsed = 0
-          let mutable bytesUsed = 0
-          let mutable completed = false
-          this.utf8Encoder.Convert(str.ToCharArray(), 0, str.Length, this.lineBuffer, 0, this.lineBuffer.Length, true, &charsUsed, &bytesUsed, &completed)
-          this.lineBufferCount <- 0
+          // Copy bytes into line buffer
+          Buffer.BlockCopy(strBytes, 0, this.lineBuffer, 0, strBytes.Length)
+          this.lineBufferCount <- strBytes.Length
           return ()
 
         else
-          // Encode directly into the line buffer
-          let mutable charsUsed = 0
-          let mutable bytesUsed = 0
-          let mutable completed = false
-          this.utf8Encoder.Convert(str.ToCharArray(), 0, str.Length, this.lineBuffer, this.lineBufferCount, this.lineBuffer.Length - this.lineBufferCount, true, &charsUsed, &bytesUsed, &completed)
-          this.lineBufferCount <- this.lineBufferCount + bytesUsed
+          // Copy directly into the line buffer
+          Buffer.BlockCopy(strBytes, 0, this.lineBuffer, this.lineBufferCount, strBytes.Length)
+          this.lineBufferCount <- this.lineBufferCount + strBytes.Length
           return ()
-    }
-
+    }  
+    
   member inline this.asyncWriteLn (s : string) = task {
     do! this.asyncWrite s
     do! this.asyncWrite Bytes.eol
@@ -136,7 +125,52 @@ type Connection =
         | Result.Error _ -> ()
         this.lineBufferCount <- 0
       else
-        Buffer.BlockCopy(b, 0, this.lineBuffer,this.lineBufferCount, b.Length)
+        Buffer.BlockCopy(b, 0, this.lineBuffer, this.lineBufferCount, b.Length)
+        this.lineBufferCount <- this.lineBufferCount + b.Length
+    }
+
+  /// Overload to accept Memory<byte> directly, avoiding wrapper allocation
+  member inline this.asyncWriteBufferedBytes (b : Memory<byte>) =
+    task {
+      if this.lineBufferCount + b.Length > this.lineBuffer.Length then
+        // flush lineBuffer using Memory wrapper
+        if this.lineBufferCount > 0 then
+          let! r5 = this.transport.write (new Memory<byte>(this.lineBuffer, 0, this.lineBufferCount))
+          match r5 with
+          | Ok () -> ()
+          | Result.Error _ -> ()
+        // don't waste time buffering here
+        let! r6 = this.transport.write b
+        match r6 with
+        | Ok () -> ()
+        | Result.Error _ -> ()
+        this.lineBufferCount <- 0
+      else
+        // Copy from Memory<byte> into line buffer using span
+        b.Span.CopyTo(new Span<_>(this.lineBuffer, this.lineBufferCount, b.Length))
+        this.lineBufferCount <- this.lineBufferCount + b.Length
+    }
+
+  /// Overload to accept ReadOnlyMemory<byte> directly, avoiding wrapper allocation
+  member inline this.asyncWriteBufferedBytes (b : ReadOnlyMemory<byte>) =
+    task {
+      if this.lineBufferCount + b.Length > this.lineBuffer.Length then
+        // flush lineBuffer using Memory wrapper
+        if this.lineBufferCount > 0 then
+          let! r5 = this.transport.write (new Memory<byte>(this.lineBuffer, 0, this.lineBufferCount))
+          match r5 with
+          | Ok () -> ()
+          | Result.Error _ -> ()
+        // don't waste time buffering here - convert ReadOnlyMemory to Memory once and write
+        let memB = MemoryMarshal.AsMemory(b)
+        let! r6 = this.transport.write memB
+        match r6 with
+        | Ok () -> ()
+        | Result.Error _ -> ()
+        this.lineBufferCount <- 0
+      else
+        // Copy from ReadOnlyMemory<byte> into line buffer using span
+        b.Span.CopyTo(new Span<_>(this.lineBuffer, this.lineBufferCount, b.Length))
         this.lineBufferCount <- this.lineBufferCount + b.Length
     }
 
@@ -183,9 +217,4 @@ module Connection =
     }
 
   let inline shutdown (cn : Connection) =
-    task {
-      let! r9 = cn.transport.shutdown()
-      match r9 with
-      | Ok () -> ()
-      | Result.Error _ -> ()
-    }
+    cn.transport.shutdown()
