@@ -101,6 +101,5 @@ type TcpTransport(listenSocket : Socket, cancellationToken:CancellationToken) =
               return Result.Error(Error.ConnectionError(ex.Message))
           })
 
-    member this.shutdown() : SocketOp<unit> =
+    member this.shutdown()  =
       this.shutdown()
-      ValueTask<Result<unit,Error>>(Ok())

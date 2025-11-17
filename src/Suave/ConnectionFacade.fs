@@ -336,9 +336,9 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
     }
 
   member this.shutdown() =
-    connection.lineBufferCount <- 0
-    let! _ : Task<unit> = Connection.shutdown connection
-    connectionPool.Push(this)
+      connection.lineBufferCount <- 0
+      Connection.shutdown connection
+      connectionPool.Push(this)
 
   // Return the lineBuffer to the ArrayPool when the connection is disposed
   interface IDisposable with

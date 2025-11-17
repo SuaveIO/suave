@@ -149,6 +149,5 @@ type SslTransport(listenSocket: Socket, certificate: X509Certificate, cancellati
               return Result.Error(Error.ConnectionError(sprintf "Unexpected SSL write error: %s" ex.Message))
           })
 
-    member this.shutdown() : SocketOp<unit> =
+    member this.shutdown() =
       this.shutdown()
-      ValueTask<Result<unit,Error>>(Ok())
