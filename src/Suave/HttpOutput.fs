@@ -6,15 +6,18 @@ open Suave.Sockets
 
 open System
 
+#nowarn "3391"
+
 module ByteConstants =
 
-  let defaultContentTypeHeaderBytes = ASCII.bytes "Content-Type: text/html\r\n"
-  let serverHeaderBytes = ASCII.bytes (Globals.ServerHeader + "\r\n")
+  // Pre-compute byte arrays as ReadOnlyMemory<byte> to avoid wrapping allocations
+  let defaultContentTypeHeaderBytes = ReadOnlyMemory<byte>(ASCII.bytes "Content-Type: text/html\r\n")
+  let serverHeaderBytes = ReadOnlyMemory<byte>(ASCII.bytes (Globals.ServerHeader + "\r\n"))
 
-  let contentEncodingBytes = ASCII.bytes "Content-Encoding: "
-  let contentLengthBytes = ASCII.bytes "Content-Length: "
-  let EOL    =  ASCII.bytes "\r\n"
-  let EOLEOL =  ASCII.bytes "\r\n\r\n"
+  let contentEncodingBytes = ReadOnlyMemory<byte>(ASCII.bytes "Content-Encoding: ")
+  let contentLengthBytes = ReadOnlyMemory<byte>(ASCII.bytes "Content-Length: ")
+  let EOL    =  ReadOnlyMemory<byte>(ASCII.bytes "\r\n")
+  let EOLEOL =  ReadOnlyMemory<byte>(ASCII.bytes "\r\n\r\n")
 
   /// Format an integer to ASCII bytes without allocating a string
   /// Uses Span<T> for zero-allocation number formatting
@@ -35,52 +38,52 @@ module ByteConstants =
       // Fallback (should never happen for int32)
       ASCII.bytes (value.ToString())
 
-  let httpVersionBytes = ASCII.bytes "HTTP/1.1 "
-  let spaceBytes = ASCII.bytes " "
-  let dateBytes = ASCII.bytes "\r\nDate: "
-  let colonBytes = ASCII.bytes ": "
+  let httpVersionBytes = ReadOnlyMemory<byte>(ASCII.bytes "HTTP/1.1 ")
+  let spaceBytes = ReadOnlyMemory<byte>(ASCII.bytes " ")
+  let dateBytes = ReadOnlyMemory<byte>(ASCII.bytes "\r\nDate: ")
+  let colonBytes = ReadOnlyMemory<byte>(ASCII.bytes ": ")
   
   // Pre-computed status code bytes for common HTTP status codes
-  let statusCode200 = ASCII.bytes "200"
-  let statusCode201 = ASCII.bytes "201"
-  let statusCode204 = ASCII.bytes "204"
-  let statusCode301 = ASCII.bytes "301"
-  let statusCode302 = ASCII.bytes "302"
-  let statusCode304 = ASCII.bytes "304"
-  let statusCode400 = ASCII.bytes "400"
-  let statusCode401 = ASCII.bytes "401"
-  let statusCode403 = ASCII.bytes "403"
-  let statusCode404 = ASCII.bytes "404"
-  let statusCode500 = ASCII.bytes "500"
-  let statusCode502 = ASCII.bytes "502"
-  let statusCode503 = ASCII.bytes "503"
+  let statusCode200 = ReadOnlyMemory<byte>(ASCII.bytes "200")
+  let statusCode201 = ReadOnlyMemory<byte>(ASCII.bytes "201")
+  let statusCode204 = ReadOnlyMemory<byte>(ASCII.bytes "204")
+  let statusCode301 = ReadOnlyMemory<byte>(ASCII.bytes "301")
+  let statusCode302 = ReadOnlyMemory<byte>(ASCII.bytes "302")
+  let statusCode304 = ReadOnlyMemory<byte>(ASCII.bytes "304")
+  let statusCode400 = ReadOnlyMemory<byte>(ASCII.bytes "400")
+  let statusCode401 = ReadOnlyMemory<byte>(ASCII.bytes "401")
+  let statusCode403 = ReadOnlyMemory<byte>(ASCII.bytes "403")
+  let statusCode404 = ReadOnlyMemory<byte>(ASCII.bytes "404")
+  let statusCode500 = ReadOnlyMemory<byte>(ASCII.bytes "500")
+  let statusCode502 = ReadOnlyMemory<byte>(ASCII.bytes "502")
+  let statusCode503 = ReadOnlyMemory<byte>(ASCII.bytes "503")
   
   // Pre-computed reason phrases for common status codes
-  let reason200 = ASCII.bytes "OK"
-  let reason201 = ASCII.bytes "Created"
-  let reason204 = ASCII.bytes "No Content"
-  let reason301 = ASCII.bytes "Moved Permanently"
-  let reason302 = ASCII.bytes "Found"
-  let reason304 = ASCII.bytes "Not Modified"
-  let reason400 = ASCII.bytes "Bad Request"
-  let reason401 = ASCII.bytes "Unauthorized"
-  let reason403 = ASCII.bytes "Forbidden"
-  let reason404 = ASCII.bytes "Not Found"
-  let reason500 = ASCII.bytes "Internal Server Error"
-  let reason502 = ASCII.bytes "Bad Gateway"
-  let reason503 = ASCII.bytes "Service Unavailable"
+  let reason200 = ReadOnlyMemory<byte>(ASCII.bytes "OK")
+  let reason201 = ReadOnlyMemory<byte>(ASCII.bytes "Created")
+  let reason204 = ReadOnlyMemory<byte>(ASCII.bytes "No Content")
+  let reason301 = ReadOnlyMemory<byte>(ASCII.bytes "Moved Permanently")
+  let reason302 = ReadOnlyMemory<byte>(ASCII.bytes "Found")
+  let reason304 = ReadOnlyMemory<byte>(ASCII.bytes "Not Modified")
+  let reason400 = ReadOnlyMemory<byte>(ASCII.bytes "Bad Request")
+  let reason401 = ReadOnlyMemory<byte>(ASCII.bytes "Unauthorized")
+  let reason403 = ReadOnlyMemory<byte>(ASCII.bytes "Forbidden")
+  let reason404 = ReadOnlyMemory<byte>(ASCII.bytes "Not Found")
+  let reason500 = ReadOnlyMemory<byte>(ASCII.bytes "Internal Server Error")
+  let reason502 = ReadOnlyMemory<byte>(ASCII.bytes "Bad Gateway")
+  let reason503 = ReadOnlyMemory<byte>(ASCII.bytes "Service Unavailable")
   
   // Pre-computed common header names as bytes
-  let headerContentType = ASCII.bytes "Content-Type"
-  let headerContentLength = ASCII.bytes "Content-Length"
-  let headerConnection = ASCII.bytes "Connection"
-  let headerLocation = ASCII.bytes "Location"
-  let headerCacheControl = ASCII.bytes "Cache-Control"
-  let headerSetCookie = ASCII.bytes "Set-Cookie"
-  let headerAccept = ASCII.bytes "Accept"
-  let headerUserAgent = ASCII.bytes "User-Agent"
-  let headerHost = ASCII.bytes "Host"
-  let headerUpgrade = ASCII.bytes "Upgrade"
+  let headerContentType = ReadOnlyMemory<byte>(ASCII.bytes "Content-Type")
+  let headerContentLength = ReadOnlyMemory<byte>(ASCII.bytes "Content-Length")
+  let headerConnection = ReadOnlyMemory<byte>(ASCII.bytes "Connection")
+  let headerLocation = ReadOnlyMemory<byte>(ASCII.bytes "Location")
+  let headerCacheControl = ReadOnlyMemory<byte>(ASCII.bytes "Cache-Control")
+  let headerSetCookie = ReadOnlyMemory<byte>(ASCII.bytes "Set-Cookie")
+  let headerAccept = ReadOnlyMemory<byte>(ASCII.bytes "Accept")
+  let headerUserAgent = ReadOnlyMemory<byte>(ASCII.bytes "User-Agent")
+  let headerHost = ReadOnlyMemory<byte>(ASCII.bytes "Host")
+  let headerUpgrade = ReadOnlyMemory<byte>(ASCII.bytes "Upgrade")
   
   /// Get pre-computed header name bytes if available, otherwise convert
   let getHeaderBytes (headerName: string) =
