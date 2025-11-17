@@ -337,7 +337,7 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
 
   member this.shutdown() =
       connection.lineBufferCount <- 0
-      Connection.shutdown connection
+      connection.transport.shutdown()
       connectionPool.Push(this)
 
   // Return the lineBuffer to the ArrayPool when the connection is disposed
@@ -349,20 +349,28 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
   /// incoming stream and possibly pass the request to the web parts, a protocol,
   /// a web part, an error handler and a Connection to use for read-write
   /// communication -- getting the initial request stream.
-  member this.requestLoop ()=
+  /// Configured idle timeout in milliseconds (0 = no timeout)
+  member this.requestLoop (idleTimeoutMs : int) =
     task {
       let flag = ref true
       let result = ref (Ok ())
       while !flag && not (cancellationToken.IsCancellationRequested) do
-        let! b = this.processRequest ()
-        match b with
-        | Ok b ->
-          flag := b
-        | Result.Error e ->
+        // Check connection health before processing request
+        if not (connection.isHealthy idleTimeoutMs) then
+          // Connection timeout - close it gracefully
           flag := false
-          result := Result.Error e
+        else
+          let! b = this.processRequest ()
+          // Record activity after each request
+          connection.recordActivity()
+          match b with
+          | Ok b ->
+            flag := b
+          | Result.Error e ->
+            flag := false
+            result := Result.Error e
       return result.Value
-      }
+    }
 
   member this.accept(binding) = task{
     Interlocked.Increment Globals.numberOfClients |> ignore
@@ -374,7 +382,9 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
       try
         // Start read loop in background - use _ignore to suppress async warning
         let _ = reader.readLoop()
-        let! loopRes = this.requestLoop()
+        // Use 60 second idle timeout by default (0 = no timeout)
+        let idleTimeoutMs = 60000
+        let! loopRes = this.requestLoop(idleTimeoutMs)
         match loopRes with
         | Ok () -> ()
         | Result.Error err ->

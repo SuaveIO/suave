@@ -56,13 +56,16 @@ let createConnection listenSocket binding cancellationToken bufferSize =
   let lineBuffer = System.Buffers.ArrayPool<byte>.Shared.Rent(bufferSize)
   let pipe = new Pipe()
   let reader = createReader (box transport) lineBuffer pipe cancellationToken
+  let now = DateTime.UtcNow
   { socketBinding = SocketBinding.create IPAddress.IPv6Loopback 8080us;
       transport     = transport;
       reader = reader;
       pipe = pipe;
       lineBuffer    = lineBuffer;
       lineBufferCount = 0;
-      utf8Encoder = System.Text.Encoding.UTF8.GetEncoder() }
+      utf8Encoder = System.Text.Encoding.UTF8.GetEncoder();
+      createdAtUtc = now;
+      lastActivityUtc = now }
 
 let createConnectionFacade connectionPool listenSocket binding (runtime: HttpRuntime) cancellationToken bufferSize webpart =
   let connection = createConnection listenSocket binding cancellationToken bufferSize
