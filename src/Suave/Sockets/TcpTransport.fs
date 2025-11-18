@@ -37,6 +37,9 @@ type TcpTransport(listenSocket : Socket, cancellationToken:CancellationToken) =
     task{
       let! a = listenSocket.AcceptAsync(cancellationToken)
       this.acceptSocket <- a
+      // Set socket receive timeout at TCP level (60 seconds = 60000 ms)
+      // This ensures that if no data arrives within this period, the read will timeout
+      a.ReceiveTimeout <- 60000
       return Ok(remoteBinding a)
     }
 

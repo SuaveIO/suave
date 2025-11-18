@@ -20,28 +20,13 @@ type Connection =
     pipe : Pipe
     lineBuffer    : byte array
     mutable lineBufferCount : int
-    utf8Encoder   : Encoder
-    createdAtUtc  : DateTime  // Track when connection was created
-    mutable lastActivityUtc : DateTime  // Track last read/write activity
-  }
+    utf8Encoder   : Encoder }
 
   member x.ipAddr : IPAddress =
     x.socketBinding.ip
 
   member x.port : Port =
     x.socketBinding.port
-
-  /// Check if connection is still healthy (not timed out)
-  member inline this.isHealthy (idleTimeoutMs : int) : bool =
-    if idleTimeoutMs <= 0 then true  // No timeout configured
-    else
-      let now = DateTime.UtcNow
-      let idleDuration = (now - this.lastActivityUtc).TotalMilliseconds
-      idleDuration < (float idleTimeoutMs)
-
-  /// Update last activity timestamp
-  member inline this.recordActivity() =
-    this.lastActivityUtc <- DateTime.UtcNow
 
   /// Flush out whatever is in the lineBuffer - returns ValueTask for allocation-free synchronous completions
   member inline this.flush () =
@@ -212,16 +197,13 @@ type Connection =
 module Connection =
 
   let empty : Connection =
-    let now = DateTime.UtcNow
     { socketBinding = SocketBinding.create IPAddress.IPv6Loopback 8080us
       transport     = null
       reader     = null
       pipe = null
       lineBuffer    = [||]
       lineBufferCount = 0
-      utf8Encoder = Encoding.UTF8.GetEncoder()
-      createdAtUtc = now
-      lastActivityUtc = now }
+      utf8Encoder = Encoding.UTF8.GetEncoder() }
 
   let inline receive (cn : Connection) (buf : ByteSegment) =
     cn.transport.read buf
