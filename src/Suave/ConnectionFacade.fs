@@ -351,17 +351,17 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
   /// communication -- getting the initial request stream.
   member this.requestLoop () =
     task {
-      let flag = ref true
-      let result = ref (Ok ())
-      while !flag && not (cancellationToken.IsCancellationRequested) do
+      let mutable flag = true
+      let mutable result = Ok ()
+      while flag && not (cancellationToken.IsCancellationRequested) do
         let! b = this.processRequest ()
         match b with
         | Ok b ->
-          flag := b
+          flag <- b
         | Result.Error e ->
-          flag := false
-          result := Result.Error e
-      return result.Value
+          flag <- false
+          result <- Result.Error e
+      return result
     }
 
   member this.accept(binding) = task{

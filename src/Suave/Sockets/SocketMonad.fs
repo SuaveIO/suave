@@ -28,17 +28,17 @@ type SocketMonad() =
   member this.While(guard, body : SocketOp<unit>) : SocketOp<unit> =
     ValueTask<Result<unit,Error>>(
       task{
-        let error = ref false
-        let errorResult = ref (Ok())
-        while not !error && guard () do
+        let mutable error = false
+        let mutable errorResult = Ok()
+        while not error && guard () do
           let! a = body.AsTask()
           match a with
           | Ok () -> ()
           | Result.Error e as a ->
-            error := true
-            errorResult := a
-        if !error then
-          return !errorResult
+            error <- true
+            errorResult <- a
+        if error then
+          return errorResult
         else
           return Ok()
       })
@@ -72,16 +72,16 @@ type SocketMonad() =
     (fun (enum : IEnumerator<'a>) -> 
       ValueTask<Result<unit,Error>>(
         task {
-          let good = ref true
-          let result = ref (Ok ())
-          while !good && enum.MoveNext() do
+          let mutable good = true
+          let mutable result = Ok ()
+          while good && enum.MoveNext() do
             let! a = (body enum.Current).AsTask()
             match a with
             | Ok _ -> ()
             | Result.Error e ->
-              good := false
-              result := Result.Error e
-          return !result 
+              good <- false
+              result <- Result.Error e
+          return result 
         })) (sequence.GetEnumerator())
 
 [<AutoOpen>]

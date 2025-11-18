@@ -144,26 +144,26 @@ type HttpReader(transportObj : obj, lineBuffer : byte array, pipe: Pipe, cancell
   member x.readUntilPattern marker select : SocketOp<int> =
     ValueTask<Result<int,Error>>(
       task {
-        let reading = ref true
-        let error = ref false
-        let result = ref 0
-        let errorResult = ref (Ok(0))
-        while !reading && not !error && not(cancellationToken.IsCancellationRequested) do
+        let mutable reading = true
+        let mutable error = false
+        let mutable result = 0
+        let mutable errorResult = Ok(0)
+        while reading && not error && not(cancellationToken.IsCancellationRequested) do
           let! res = x.scanMarker marker select
           match res with
           | Ok(Found a) ->
-            reading := false
-            result := a
+            reading <- false
+            result <- a
           | Ok(NeedMore) ->
             ()
           | Result.Error s
           | Ok(Error s) ->
-            error := true
-            errorResult := Result.Error s
-        if !error then
-          return !errorResult
+            error <- true
+            errorResult <- Result.Error s
+        if error then
+          return errorResult
         else
-          return Ok (!result)
+          return Ok (result)
       })
 
   member x.skip n =
@@ -198,20 +198,20 @@ type HttpReader(transportObj : obj, lineBuffer : byte array, pipe: Pipe, cancell
   member x.readLine () : SocketOp<string> = 
     ValueTask<Result<string,Error>>(
       task {
-        let offset = ref 0
+        let mutable offset = 0
         match! x.readUntilPattern EOL (fun a count ->
-            if offset.Value + count > lineBuffer.Length then
+            if offset + count > lineBuffer.Length then
               FailWith (InputDataError (Some 414, "Line Too Long"))
             else
               let source = a.Span.Slice(0,count)
-              let target = new Span<byte>(lineBuffer,offset.Value,count)
+              let target = new Span<byte>(lineBuffer,offset,count)
               source.CopyTo(target)
-              offset.Value <- offset.Value + count
-              Continue offset.Value) with
+              offset <- offset + count
+              Continue offset) with
         | Result.Error e ->
           return Result.Error e
         | Ok _ ->
-          let result = Globals.UTF8.GetString(lineBuffer, 0, offset.Value)
+          let result = Globals.UTF8.GetString(lineBuffer, 0, offset)
           return Ok result
       })
 
@@ -220,10 +220,10 @@ type HttpReader(transportObj : obj, lineBuffer : byte array, pipe: Pipe, cancell
     ValueTask<Result<List<string*string>,Error>>(
       task {
         let headers = new List<string*string>()
-        let flag = ref true
-        let error = ref false
-        let result = ref (Ok (headers))
-        while !flag && (not cancellationToken.IsCancellationRequested) do
+        let mutable flag = true
+        let mutable error = false
+        let mutable result = Ok (headers)
+        while flag && (not cancellationToken.IsCancellationRequested) do
           let! _line = x.readLine ()
           match _line with
           | Ok line ->
@@ -232,11 +232,11 @@ type HttpReader(transportObj : obj, lineBuffer : byte array, pipe: Pipe, cancell
               let header = (line.Substring(0, indexOfColon).ToLower(), line.Substring(indexOfColon+1).TrimStart())
               headers.Add header
             else
-              flag := false
+              flag <- false
           | Result.Error e ->
-            error := true
-            result := Result.Error e
-        return !result
+            error <- true
+            result <- Result.Error e
+        return result
       })
 
   /// Read the post data from the stream, given the number of bytes that makes up the post data.
@@ -267,16 +267,16 @@ type HttpReader(transportObj : obj, lineBuffer : byte array, pipe: Pipe, cancell
 
   member this.readLoop() = task{
     dirty <- true
-    let reading = ref true
+    let mutable reading = true
     running <- true
-    let result = ref (Ok())
-    while running && !reading && not(cancellationToken.IsCancellationRequested) do
+    let mutable result = Ok()
+    while running && reading && not(cancellationToken.IsCancellationRequested) do
       let! a = this.readMoreData()
       match a with
       | Ok () -> ()
       | a ->
-        reading := false
-        result := a
+        reading <- false
+        result <- a
         this.stop()
     return result
   }

@@ -14,11 +14,11 @@ open System.Buffers
 
 let transferStreamWithBuffer (buf: ArraySegment<_>) (toStream : Connection) (from : Stream) =
   task {
-      let reading = ref true
-      while !reading do
+      let mutable reading = true
+      while reading do
         let! read = from.ReadAsync (buf.Array, 0, buf.Array.Length)
         if read <= 0 then
-          reading := false
+          reading <- false
         else
           let! a = send toStream (new Memory<byte>(buf.Array, 0, read))
           ()
