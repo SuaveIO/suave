@@ -31,7 +31,7 @@ let websocketTests cfg =
 
   let websocketAppUrl = "/websocket"
   let websocketApp (webSocket : WebSocket) =
-    fun cx -> task {
+    fun cx -> SocketOp.ofTask(task {
       let mutable continueLoop = true
       while continueLoop do
         let! msgResult = webSocket.read()
@@ -58,11 +58,11 @@ let websocketTests cfg =
         | Result.Error _ ->
           continueLoop <- false
       return Ok()
-      }
+      })
   
   let websocketAppReusingBuffersUrl = "/websocketAppReusingBuffers"
   let websocketAppReusingBuffers (webSocket : WebSocket) =
-    fun cx -> task {
+    fun cx -> SocketOp.ofTask(task {
       let mutable continueLoop = true
       while continueLoop do
         let! msgResult = webSocket.readIntoByteSegment (fun lengthRequired -> Memory<_>(reuseableBuffer, 0, lengthRequired))
@@ -89,12 +89,12 @@ let websocketTests cfg =
         | Result.Error _ ->
           continueLoop <- false
       return Ok()
-      }
+      })
 
   let websocketAppSubprotocolUrl = "/websocketAppSubprotocolUrl"
   let websocketAppSupportSubprotocol = "support.suave.io"
   let websocketAppSubprotocol (webSocket: WebSocket) =
-    fun cx -> task {
+    fun cx -> SocketOp.ofTask(task {
       let mutable continueLoop = true
       while continueLoop do
         let! msgResult = webSocket.readIntoByteSegment (fun lengthRequired -> Memory<_>(reuseableBuffer, 0, lengthRequired))
@@ -125,7 +125,7 @@ let websocketTests cfg =
         | Result.Error _ ->
           continueLoop <- false
       return Ok()
-    }
+    })
 
   let webPart = 
     choose 

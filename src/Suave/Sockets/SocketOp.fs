@@ -24,7 +24,8 @@ type Error =
 
 type ByteSegment = Memory<byte>
 
-type SocketOp<'a> = Task<Result<'a,Error>>
+/// ValueTask-based socket operation for allocation-free synchronous completions
+type SocketOp<'a> = ValueTask<Result<'a,Error>>
 
 /// The module
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
@@ -32,11 +33,11 @@ module SocketOp =
 
   /// create a new successful value
   let inline mreturn (x : 'T) : SocketOp<'T> =
-    task { return Ok(x) }
+    ValueTask<Result<'T,Error>>(Ok(x))
 
   /// create a new unsuccessful value
   let inline abort (x : Error) : SocketOp<_> =
-    task { return Result.Error(x) }
+    ValueTask<Result<_,Error>>(Result.Error(x))
 
   /// says that something is wrong with the input on a protocol level and that
   /// it's therefore a bad request (user input error) -- the error already present
@@ -53,42 +54,55 @@ module SocketOp =
 
   /// Bind the result successful result of the SocketOp to fCont
   let inline bind (fCont : _ -> SocketOp<_>) (value : SocketOp<_>) : SocketOp<_> =
-    task {
-      match! value with
-      | Ok x -> return! (fCont x)
-      | Error (err : Error) -> return Result.Error err
-      }
+    ValueTask<Result<_,Error>>(
+      task {
+        match! value with
+        | Ok x -> return! fCont x
+        | Error (err : Error) -> return Result.Error err
+      })
 
   /// Bind the error result of the SocketOp to fCont
   let inline bindError (fCont : _ -> SocketOp<_>) (value : SocketOp<_>) : SocketOp<_> =
-    task {
-      match! value with
-      | Ok x -> return Ok x
-      | Error (err : Error) -> return! (fCont err)
-      }
+    ValueTask<Result<_,Error>>(
+      task {
+        match! value with
+        | Ok x -> return Ok x
+        | Error (err : Error) -> return! fCont err
+      })
 
   /// Map f over the contained successful value in SocketOp
   let inline map f (value : SocketOp<_>) : SocketOp<_> =
-    task {
-      match! value with
-      | Ok x -> return Ok (f x)
-      | Error (err : Error) -> return Result.Error err
-      }
+    ValueTask<Result<_,Error>>(
+      task {
+        match! value with
+        | Ok x -> return Ok (f x)
+        | Error (err : Error) -> return Result.Error err
+      })
 
   /// Map f over the error value in SocketOp
   let inline mapError f (value : SocketOp<_>) : SocketOp<_> =
-    task {
-      match! value with
-      | Ok x -> return Ok x
-      | Error (err : Error) -> return Result.Error (f err)
-      }
+    ValueTask<Result<_,Error>>(
+      task {
+        match! value with
+        | Ok x -> return Ok x
+        | Error (err : Error) -> return Result.Error (f err)
+      })
 
   /// lift a Async<'a> type to the SocketOp
   let inline ofAsync (a : Async<'a>) : SocketOp<'a> =
-    task {
-      let! s = a
-      return Ok s
-      }
+    ValueTask<Result<'a,Error>>(
+      task {
+        let! s = a
+        return Ok s
+      })
+
+  /// Convert ValueTask-based SocketOp to Task-based for compatibility
+  let inline toTask (value : SocketOp<'a>) : Task<Result<'a,Error>> =
+    value.AsTask()
+
+  /// Convert Task-based to ValueTask-based SocketOp
+  let inline ofTask (value : Task<Result<'a,Error>>) : SocketOp<'a> =
+    ValueTask<Result<'a,Error>>(value)
 
   module Operators =
 

@@ -10,15 +10,21 @@ open Suave.Sockets
 /// The stream must support the `Length` property.
 let okStream (makeStream : Async<Stream>) : WebPart =
   fun ctx ->
+    // Start the F# Async as a Task up-front so the inner task only awaits a Task<Stream>.
+    // This keeps the resumable state machine for the inner task simple.
+    let streamTask = Async.StartAsTask makeStream
+
     let write (conn: Connection, _) =
       task {
-        use! stream = makeStream
+        let! stream = streamTask
+        try
+          do! conn.asyncWriteLn $"Content-Length: %i{stream.Length}\r\n" 
+          do! conn.flush()
 
-        do! conn.asyncWriteLn $"Content-Length: %i{stream.Length}\r\n" 
-        do! conn.flush()
-
-        if ctx.request.``method`` <> HttpMethod.HEAD then
-          do! transferStream conn stream
+          if ctx.request.``method`` <> HttpMethod.HEAD then
+            do! transferStream conn stream
+        finally
+          stream.Dispose()
       }
 
     {
@@ -37,15 +43,20 @@ let okStream (makeStream : Async<Stream>) : WebPart =
 /// You are responsible for setting the MIME type.
 let okStreamChunked (makeStream : Async<Stream>) : WebPart =
   fun ctx ->
+    // Convert the Async<Stream> to a Task<Stream> before creating the inner task.
+    let streamTask = Async.StartAsTask makeStream
+
     let write (conn:Connection, _) =
       task {
-        use! stream = makeStream
+        let! stream = streamTask
+        try
+          do! conn.asyncWriteLn ""
+          do! conn.flush()
 
-        do! conn.asyncWriteLn ""
-        do! conn.flush()
-
-        if ctx.request.``method`` <> HttpMethod.HEAD then
-          do! transferStreamChunked conn stream
+          if ctx.request.``method`` <> HttpMethod.HEAD then
+            do! transferStreamChunked conn stream
+        finally
+          stream.Dispose()
       }
 
     {
