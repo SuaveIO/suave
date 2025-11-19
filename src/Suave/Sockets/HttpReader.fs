@@ -48,16 +48,8 @@ module Aux =
 
     loop bufferSequence 0
 
-// this guy can live inside the connection actually
 [<AllowNullLiteral>]
-type HttpReader(transportObj : obj, lineBuffer : byte array, pipe: Pipe, cancellationToken) =
-
-  let transport = 
-    match transportObj with
-    | :? ITransport as t -> t
-    | :? TcpTransport as tcp -> tcp :> ITransport
-    | :? SslTransport as ssl -> ssl :> ITransport
-    | _ -> failwith "Invalid transport type"
+type HttpReader(transport : ITransport, lineBuffer : byte array, pipe: Pipe, cancellationToken) =
 
   let mutable running : bool = true
   let mutable dirty : bool = false
