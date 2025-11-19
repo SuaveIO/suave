@@ -1,3 +1,8 @@
+## New in v3.1.0-beta2 (Released 2025-11-19)
+* Enable SSL/TLS support.
+* Adopting ValueTask<T> to achieve allocation-free synchronous completions
+* Plus many more performance optimizations.
+
 ## New in v3.1.0-beta1 (Released 2025-11-05)
 * Rate limiting, security headers, validation webparts and new router module.
 
