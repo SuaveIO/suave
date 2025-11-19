@@ -112,8 +112,8 @@ module WebSocket =
 
   let writeFrame (connection: Connection) (f: Frame) : SocketOp<unit> = 
     socket {
-      let! _ = connection.transport.write (Memory([| f.OpcodeByte |], 0, 1))
-      let! _ = connection.transport.write (Memory(f.EncodedLength, 0, f.EncodedLength.Length))
+      let! _ = connection.transport.write (new Memory<byte>([| f.OpcodeByte |]))
+      let! _ = connection.transport.write (new Memory<byte>(f.EncodedLength))
       let! _ = connection.transport.write f.Data
       return ()
     }
@@ -140,13 +140,13 @@ module WebSocket =
     ValueTask<Result<byte[],Error>>(
       task {
         let arr = Array.zeroCreate n
-        let offset = ref 0
+        let mutable offset = 0
         let reader = connection.reader
         do! reader.readPostData n (fun a count ->
             let source = a.Span.Slice(0,count)
-            let target = new Span<byte>(arr,!offset,count)
+            let target = new Span<byte>(arr,offset,count)
             source.CopyTo(target)
-            offset := !offset + count)
+            offset <- offset + count)
         return Ok(arr)
       })
 
@@ -159,15 +159,15 @@ module WebSocket =
         | count when count < n -> raise (ByteSegmentCapacityException(n, byteSegmentRetrieved.Length))
         | _ -> byteSegmentRetrieved.Slice(0,n)
 
-    let offset = ref 0
+    let mutable offset = 0
     let reader = connection.reader
     ValueTask<Result<ByteSegment,Error>>(
       task{
         do! reader.readPostData n (fun a count ->
           let source = a.Span.Slice(0,count)
-          let target = byteSegment.Span.Slice(!offset,count)
+          let target = byteSegment.Span.Slice(offset,count)
           source.CopyTo(target)
-          offset := !offset + count)
+          offset <- offset + count)
         return Ok(byteSegment)
       })
 
@@ -199,12 +199,12 @@ module WebSocket =
     let writeSemaphore = new SemaphoreSlim(1, 1)
     let readSemaphore  = new SemaphoreSlim(1, 1)
 
-    let releaseSemaphoreDisposable (semaphore: SemaphoreSlim) = { new IDisposable with member __.Dispose() = semaphore.Release() |> ignore }
-
-    let runAsyncWithSemaphore semaphore asyncAction = task {
-      use releaseSemaphoreDisposable = releaseSemaphoreDisposable semaphore
-      do! semaphore.WaitAsync()
-      return! asyncAction
+    let runAsyncWithSemaphore (semaphore: SemaphoreSlim) asyncAction = task {
+      let! _ = semaphore.WaitAsync() |> Async.AwaitTask
+      try
+        return! asyncAction
+      finally
+        semaphore.Release() |> ignore
       }
 
     let sendFrame opcode bs fin =
