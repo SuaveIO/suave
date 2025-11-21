@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Suave Deployment Guide - Production deployment strategies and hosting options">
+  <title>Deployment - Suave</title>
+  <link rel="shortcut icon" href="/images/favicon.ico" type="image/x-icon">
+  <link rel="icon" href="/images/favicon-32x32.png" sizes="32x32" type="image/png">
+  <link rel="icon" href="/images/favicon-96x96.png" sizes="96x96" type="image/png">
+  <link rel="apple-touch-icon" href="/images/apple-touch-icon-57x57.png" sizes="57x57">
+  <link rel="apple-touch-icon" href="/images/apple-touch-icon-114x114.png" sizes="114x114">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header>
+    <div class="container">
+      <nav>
+        <div class="logo">
+          <img src="/images/head_600_trans.png" alt="Suave Logo" width="40" height="40" style="vertical-align: middle; margin-right: 12px; background: white; padding: 2px; border-radius: 4px;">
+          Suave
+        </div>
+        <button id="hamburger" class="hamburger" aria-label="Toggle menu">
+          <span></span><span></span><span></span>
+        </button>
+        <ul id="nav-links" class="nav-links">
+          <li><a href="/">Home</a></li>
+          <li><a href="/docs/">Documentation</a></li>
+          <li><a href="/docs/performance.html">Performance</a></li>
+          <li><a href="https://github.com/SuaveIO/suave" target="_blank">GitHub</a></li>
+          <li><a href="https://www.nuget.org/packages/Suave/" target="_blank">NuGet</a></li>
+          <li><button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme">🌙</button></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <div class="container">
+      <h1>Deployment</h1>
+      <p>Deploy Suave applications to production with various hosting strategies.</p>
+
+      <h2>Building for Production</h2>
+      <p>Prepare your Suave application for production deployment:</p>
+      <div class="code-block">
+        <pre><code>// Build in Release mode
+dotnet build -c Release
+
+// Publish for standalone deployment
+dotnet publish -c Release -o ./publish
+
+// Create self-contained deployment
+dotnet publish -c Release -o ./publish \
+  --self-contained true \
+  -r linux-x64</code></pre>
+      </div>
+
+      <h2>Docker Deployment</h2>
+      <p>Deploy Suave in Docker containers:</p>
+      <div class="code-block">
+        <pre><code># Dockerfile
+FROM mcr.microsoft.com/dotnet/sdk:9.0 AS builder
+WORKDIR /build
+COPY . .
+RUN dotnet publish -c Release -o /app/publish
+
+FROM mcr.microsoft.com/dotnet/runtime:9.0
+WORKDIR /app
+COPY --from=builder /app/publish .
+EXPOSE 8080
+ENTRYPOINT ["dotnet", "Suave.Website.dll"]</code></pre>
+      </div>
+
+      <h2>Docker Compose Setup</h2>
+      <p>Manage Suave with Docker Compose:</p>
+      <div class="code-block">
+        <pre><code>version: '3.8'
+services:
+  suave:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      SUAVE_PORT: 8080
+      SUAVE_IP: 0.0.0.0
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+  
+  nginx:
+    image: nginx:latest
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./certs:/etc/nginx/certs:ro
+    depends_on:
+      - suave</code></pre>
+      </div>
+
+      <h2>Linux Systemd Service</h2>
+      <p>Run Suave as a systemd service:</p>
+      <div class="code-block">
+        <pre><code"># /etc/systemd/system/suave.service
+[Unit]
+Description=Suave Web Application
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/opt/suave
+ExecStart=/usr/bin/dotnet /opt/suave/Suave.Website.dll
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+
+# Commands to manage the service
+sudo systemctl enable suave
+sudo systemctl start suave
+sudo systemctl status suave
+sudo systemctl restart suave</code></pre>
+      </div>
+
+      <h2>IIS Hosting</h2>
+      <p>Host Suave on IIS with ASP.NET Core Module:</p>
+      <div class="code-block">
+        <pre><code>&lt;?xml version="1.0" encoding="utf-8"?&gt;
+&lt;configuration&gt;
+  &lt;location path="." inheritInChildApplications="false"&gt;
+    &lt;system.webServer&gt;
+      &lt;handlers&gt;
+        &lt;add name="aspNetCore" path="*" verb="*" modules="AspNetCoreModuleV2" resourceType="Unspecified" /&gt;
+      &lt;/handlers&gt;
+      &lt;aspNetCore processPath="dotnet" arguments=".\Suave.Website.dll" 
+                   stdoutLogEnabled="true" 
+                   stdoutLogFile=".\logs\stdout" /&gt;
+    &lt;/system.webServer&gt;
+  &lt;/location&gt;
+&lt;/configuration&gt;</code></pre>
+      </div>
+
+      <h2>Nginx Reverse Proxy</h2>
+      <p>Use Nginx as a reverse proxy for Suave:</p>
+      <div class="code-block">
+        <pre><code">upstream suave {
+  server localhost:8080;
+  server localhost:8081;
+  server localhost:8082;
+}
+
+server {
+  listen 80;
+  server_name example.com;
+
+  location / {
+    proxy_pass http://suave;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection keep-alive;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_cache_bypass $http_upgrade;
+  }
+
+  # WebSocket support
+  location /ws {
+    proxy_pass http://suave;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_read_timeout 86400;
+  }
+}</code></pre>
+      </div>
+
+      <h2>HTTPS/SSL Configuration</h2>
+      <p>Configure HTTPS in Suave for production:</p>
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.Operators
+open Suave.Successful
+
+let httpsConfig =
+  { defaultConfig with
+      bindings = [
+        HttpBinding.createSimple ProtocolType.HTTP "0.0.0.0" 80
+        HttpBinding.mk ProtocolType.HTTPS "0.0.0.0" 443 
+          (CertificateFromFilePath "/etc/ssl/certs/cert.pem" 
+                                   "/etc/ssl/private/key.pem")
+      ]
+      logger = Logging.defaultLogger
+  }
+
+let app =
+  choose [
+    path "/" >=> OK "Hello World"
+  ]
+
+[&lt;EntryPoint&gt;]
+let main argv =
+  startWebServer httpsConfig app
+  0</code></pre>
+      </div>
+
+      <h2>Environment Configuration</h2>
+      <p>Configure Suave for different environments:</p>
+      <div class="code-block">
+        <pre><code">open Suave
+open Suave.Operators
+open System
+
+let getConfig () =
+  let env = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")
+  let port = 
+    match Environment.GetEnvironmentVariable("SUAVE_PORT") with
+    | null -> 8080
+    | p -> int p
+
+  let config =
+    { defaultConfig with
+        bindings = [HttpBinding.createSimple ProtocolType.HTTP "0.0.0.0" port]
+        logger = Logging.defaultLogger
+    }
+  
+  match env with
+  | "Production" ->
+    { config with bufferSize = 4096; maxOps = 10000 }
+  | "Development" ->
+    { config with bufferSize = 2048 }
+  | _ -> config
+
+[&lt;EntryPoint&gt;]
+let main argv =
+  startWebServer (getConfig ()) app
+  0</code></pre>
+      </div>
+
+      <h2>Load Balancing</h2>
+      <p>Scale Suave with multiple instances:</p>
+      <div class="code-block">
+        <pre><code"># docker-compose with load balancing
+version: '3.8'
+services:
+  suave1:
+    build: .
+    ports:
+      - "8081:8080"
+    environment:
+      SUAVE_PORT: 8080
+
+  suave2:
+    build: .
+    ports:
+      - "8082:8080"
+    environment:
+      SUAVE_PORT: 8080
+
+  suave3:
+    build: .
+    ports:
+      - "8083:8080"
+    environment:
+      SUAVE_PORT: 8080
+
+  nginx:
+    image: nginx:latest
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx-lb.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - suave1
+      - suave2
+      - suave3</code></pre>
+      </div>
+
+      <h2>Monitoring and Logging</h2>
+      <p>Monitor Suave applications in production:</p>
+      <div class="code-block">
+        <pre><code">open Suave
+open Suave.Operators
+open System
+
+let monitoredConfig =
+  { defaultConfig with
+      bindings = [HttpBinding.createSimple ProtocolType.HTTP "0.0.0.0" 8080]
+      logger = Logging.defaultLogger
+      maxOps = 1000
+  }
+
+let loggingMiddleware =
+  fun (ctx: HttpContext) ->
+    async {
+      let startTime = System.DateTime.UtcNow
+      printfn "[%s] %s %s" 
+        (startTime.ToString("yyyy-MM-dd HH:mm:ss"))
+        ctx.request.method
+        ctx.request.path
+      
+      let! result = ctx.request.rawForm |> Async.AwaitTask
+      let duration = System.DateTime.UtcNow - startTime
+      printfn "[Response] %s %s - %dms" 
+        ctx.request.method
+        ctx.request.path
+        (int duration.TotalMilliseconds)
+      return result
+    }
+
+let app =
+  choose [
+    path "/" >=> OK "Hello World"
+  ]
+
+[&lt;EntryPoint&gt;]
+let main argv =
+  startWebServer monitoredConfig (loggingMiddleware >=> app)
+  0</code></pre>
+      </div>
+
+      <h2>Performance Tuning</h2>
+      <p>Optimize Suave for high performance:</p>
+      <div class="code-block">
+        <pre><code">open Suave
+
+// Production-optimized configuration
+let productionConfig =
+  { defaultConfig with
+      bindings = [HttpBinding.createSimple ProtocolType.HTTP "0.0.0.0" 8080]
+      
+      // Increase concurrent operations
+      maxOps = 10000
+      
+      // Optimize buffer sizes
+      bufferSize = 8192
+      
+      // Connection settings
+      exposeServerHeader = false
+      
+      // Keep-alive timeout
+      homeFolder = Some (System.IO.Directory.GetCurrentDirectory())
+      
+      // Cancellation token timeout
+      cancellationToken = System.Threading.CancellationToken.None
+  }
+
+[&lt;EntryPoint&gt;]
+let main argv =
+  let config = productionConfig
+  startWebServer config app
+  0</code></pre>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <div class="container">
+      <div class="footer-links">
+        <a href="/docs/">Documentation</a>
+        <a href="https://github.com/SuaveIO/suave" target="_blank">GitHub</a>
+        <a href="https://www.nuget.org/packages/Suave/" target="_blank">NuGet</a>
+        <a href="https://x.com/SuaveIO" target="_blank">X</a>
+        <a href="https://github.com/SuaveIO/suave/blob/master/LICENSE" target="_blank">License</a>
+      </div>
+      <p>&copy; 2025 Suave. Open source, MIT licensed.</p>
+      <p>Suave is a project created and maintained by Ademar Gonzalez.</p>
+    </div>
+  </footer>
+
+  <script src="/js/main.js"></script>
+</body>
+</html>

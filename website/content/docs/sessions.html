@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Suave Sessions - User session management and state handling">
+  <title>Sessions - Suave</title>
+  <link rel="shortcut icon" href="/images/favicon.ico" type="image/x-icon">
+  <link rel="icon" href="/images/favicon-32x32.png" sizes="32x32" type="image/png">
+  <link rel="icon" href="/images/favicon-96x96.png" sizes="96x96" type="image/png">
+  <link rel="apple-touch-icon" href="/images/apple-touch-icon-57x57.png" sizes="57x57">
+  <link rel="apple-touch-icon" href="/images/apple-touch-icon-114x114.png" sizes="114x114">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header>
+    <div class="container">
+      <nav>
+        <div class="logo">
+          <img src="/images/head_600_trans.png" alt="Suave Logo" width="40" height="40" style="vertical-align: middle; margin-right: 12px; background: white; padding: 2px; border-radius: 4px;">
+          Suave
+        </div>
+        <button id="hamburger" class="hamburger" aria-label="Toggle menu">
+          <span></span><span></span><span></span>
+        </button>
+        <ul id="nav-links" class="nav-links">
+          <li><a href="/">Home</a></li>
+          <li><a href="/docs/">Documentation</a></li>
+          <li><a href="/docs/performance.html">Performance</a></li>
+          <li><a href="https://github.com/SuaveIO/suave" target="_blank">GitHub</a></li>
+          <li><a href="https://www.nuget.org/packages/Suave/" target="_blank">NuGet</a></li>
+          <li><button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme">🌙</button></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <div class="container">
+      <h1>Sessions</h1>
+      <p>Learn how to manage user sessions and maintain state in Suave applications.</p>
+
+      <h2>Cookie-Based Sessions</h2>
+      <p>Use cookies to maintain session state:</p>
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.Operators
+open Suave.Filters
+open Suave.Successful
+open Suave.Writers
+
+let app =
+  choose [
+    path "/set-session" >=>
+      setHeader "Set-Cookie" "session=user123; Path=/; HttpOnly" >=>
+      OK "Session set"
+    
+    path "/get-session" >=> fun ctx ->
+      match ctx.request.header "Cookie" with
+      | Choice1Of2 cookies ->
+          OK (sprintf "Cookies: %s" cookies) ctx
+      | Choice2Of2 _ ->
+          OK "No session" ctx
+  ]</code></pre>
+      </div>
+
+      <h2>Session Storage Patterns</h2>
+      <p>Store session data with in-memory or database backends:</p>
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.Operators
+open System.Collections.Concurrent
+
+// In-memory session store
+let sessions = new ConcurrentDictionary&lt;string, obj&gt;()
+
+let app =
+  choose [
+    POST >=> path "/login" >=> fun ctx ->
+      async {
+        let sessionId = System.Guid.NewGuid().ToString()
+        let sessionData = box { userId = 1; username = "john" }
+        sessions.TryAdd(sessionId, sessionData) |> ignore
+        
+        return! 
+          setHeader "Set-Cookie" 
+            (sprintf "sessionId=%s; Path=/; HttpOnly" sessionId) >=>
+          OK "Session created" ctx
+      }
+    
+    path "/profile" >=> fun ctx ->
+      match ctx.request.header "Cookie" with
+      | Choice1Of2 cookie ->
+          let sessionId = cookie.Split('=').[1]
+          match sessions.TryGetValue(sessionId) with
+          | true, sessionData ->
+              OK (sprintf "Session data: %O" sessionData) ctx
+          | false, _ ->
+              RequestErrors.UNAUTHORIZED "Invalid session" ctx
+      | Choice2Of2 _ ->
+          RequestErrors.UNAUTHORIZED "No session" ctx
+  ]</code></pre>
+      </div>
+
+      <h2>Session Timeout</h2>
+      <p>Implement session expiration:</p>
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.Operators
+open System
+
+let sessionTimeout = TimeSpan.FromMinutes(30.0)
+
+let app =
+  choose [
+    path "/login" >=>
+      setHeader "Set-Cookie" 
+        (sprintf "session=xyz; Path=/; Max-Age=%d; HttpOnly" 
+          (int sessionTimeout.TotalSeconds)) >=>
+      OK "Session created with 30 minute timeout"
+  ]</code></pre>
+      </div>
+
+      <h2>Secure Session Cookies</h2>
+      <p>Create secure session cookies for production:</p>
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.Operators
+open Suave.Writers
+
+let createSecureSessionCookie (sessionId: string) =
+  sprintf "session=%s; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=1800" sessionId
+
+let app =
+  choose [
+    path "/secure-login" >=>
+      setHeader "Set-Cookie" (createSecureSessionCookie "session-xyz") >=>
+      OK "Secure session created"
+  ]</code></pre>
+      </div>
+
+      <h2>Session Cleanup</h2>
+      <p>Clean up expired sessions:</p>
+      <div class="code-block">
+        <pre><code>open Suave
+open System
+open System.Collections.Concurrent
+
+let sessions = new ConcurrentDictionary&lt;string, (obj * DateTime)&gt;()
+
+let cleanupExpiredSessions () =
+  async {
+    while true do
+      do! Async.Sleep(60000) // Every minute
+      let now = DateTime.UtcNow
+      let expired = 
+        sessions 
+        |> Seq.filter (fun kvp -> (snd kvp.Value - now).TotalMinutes > 30.0)
+        |> Seq.map (fun kvp -> kvp.Key)
+        |> Seq.toList
+      
+      expired |> List.iter (fun key -> sessions.TryRemove(key) |> ignore)
+      printfn "Cleaned up %d expired sessions" expired.Length
+  }
+
+[&lt;EntryPoint&gt;]
+let main argv =
+  // Start cleanup task
+  Async.Start (cleanupExpiredSessions())
+  
+  let app = OK "Sessions with cleanup"
+  startWebServer defaultConfig app
+  0</code></pre>
+      </div>
+
+      <h2>CSRF Token Sessions</h2>
+      <p>Protect forms with CSRF tokens in sessions:</p>
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.Operators
+open System.Collections.Concurrent
+
+let csrfTokens = new ConcurrentDictionary&lt;string, string&gt;()
+
+let generateCSRFToken sessionId =
+  let token = System.Guid.NewGuid().ToString()
+  csrfTokens.AddOrUpdate(sessionId, token, fun _ _ -> token) |> ignore
+  token
+
+let validateCSRFToken sessionId token =
+  match csrfTokens.TryGetValue(sessionId) with
+  | true, storedToken -> storedToken = token
+  | false, _ -> false
+
+let app =
+  choose [
+    GET >=> path "/form" >=> fun ctx ->
+      let sessionId = "session-123"
+      let token = generateCSRFToken sessionId
+      let html = sprintf "&lt;input type='hidden' name='csrf_token' value='%s'&gt;" token
+      OK html ctx
+    
+    POST >=> path "/form" >=> fun ctx ->
+      match ctx.request.formData "csrf_token" with
+      | Choice1Of2 token when validateCSRFToken "session-123" token ->
+          OK "Form submitted safely" ctx
+      | _ ->
+          RequestErrors.FORBIDDEN "CSRF token invalid" ctx
+  ]</code></pre>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <div class="container">
+      <div class="footer-links">
+        <a href="/docs/">Documentation</a>
+        <a href="https://github.com/SuaveIO/suave" target="_blank">GitHub</a>
+        <a href="https://www.nuget.org/packages/Suave/" target="_blank">NuGet</a>
+        <a href="https://x.com/SuaveIO" target="_blank">X</a>
+        <a href="https://github.com/SuaveIO/suave/blob/master/LICENSE" target="_blank">License</a>
+      </div>
+      <p>&copy; 2025 Suave. Open source, MIT licensed.</p>
+      <p>Suave is a project created and maintained by Ademar Gonzalez.</p>
+    </div>
+  </footer>
+
+  <script src="/js/main.js"></script>
+</body>
+</html>

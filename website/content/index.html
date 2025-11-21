@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Suave - A fast, non-blocking web server for F#. Type-safe, async-native, and production-ready.">
+  <title>Suave - Fast Web Server for F#</title>
+  <link rel="shortcut icon" href="/images/favicon.ico" type="image/x-icon">
+  <link rel="icon" href="/images/favicon-32x32.png" sizes="32x32" type="image/png">
+  <link rel="icon" href="/images/favicon-96x96.png" sizes="96x96" type="image/png">
+  <link rel="apple-touch-icon" href="/images/apple-touch-icon-57x57.png" sizes="57x57">
+  <link rel="apple-touch-icon" href="/images/apple-touch-icon-114x114.png" sizes="114x114">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <!-- Header -->
+  <header>
+    <div class="container">
+      <nav>
+        <div class="logo">
+          <img src="/images/head_600_trans.png" alt="Suave Logo" width="40" height="40" style="vertical-align: middle; margin-right: 12px; background: white; padding: 2px; border-radius: 4px;">
+          Suave
+        </div>
+        <button id="hamburger" class="hamburger" aria-label="Toggle menu">
+          <span></span>
+          <span></span>
+          <span></span>
+        </button>
+        <ul id="nav-links" class="nav-links">
+          <li><a href="/">Home</a></li>
+          <li><a href="/docs/">Documentation</a></li>
+          <li><a href="/docs/performance.html">Performance</a></li>
+          <li><a href="https://github.com/SuaveIO/suave" target="_blank">GitHub</a></li>
+          <li><a href="https://www.nuget.org/packages/Suave/" target="_blank">NuGet</a></li>
+          <li><button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme">🌙</button></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Main content -->
+  <main>
+    <div class="container">
+      <!-- Hero Section -->
+      <section class="hero">
+        <h1>Fast. Non-Blocking. Type-Safe.</h1>
+        <p>Suave is a lightweight, high-performance web server written in F#. Async from the ground up with modern optimizations for production workloads.</p>
+        <div class="cta-buttons">
+          <a href="/docs/getting-started.html" class="btn btn-primary">Get Started</a>
+          <a href="/docs/" class="btn btn-secondary">Documentation</a>
+        </div>
+      </section>
+
+      <!-- Features Section -->
+      <section>
+        <h2>Why Suave?</h2>
+        <div class="features">
+          <div class="feature-card">
+            <div class="feature-icon">⚡</div>
+            <h3>High Performance</h3>
+            <p>65-75% fewer allocations per request with modern .NET optimizations. Built for throughput and low latency.</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">🔒</div>
+            <h3>Type-Safe</h3>
+            <p>Leverage F#'s powerful type system. Catch errors at compile time. Domain modeling with discriminated unions and records.</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">⚙️</div>
+            <h3>Async Native</h3>
+            <p>Completely non-blocking I/O throughout. Native async/await with task computation expressions. Scales to thousands of concurrent connections.</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">🔧</div>
+            <h3>Easy to Use</h3>
+            <p>Simple, composable API. Build REST APIs, WebSockets, and microservices with minimal code. No magic, just pure F#.</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">📦</div>
+            <h3>Production Ready</h3>
+            <p>HTTPS/TLS support, keep-alive connections, HTTP compression, rate limiting, and comprehensive logging built-in.</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">🌍</div>
+            <h3>Cross-Platform</h3>
+            <p>Runs on Linux, macOS, and Windows. .NET 8+ support. Deploy as executable or container.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Quick Start -->
+      <section>
+        <h2>Hello World - 30 Seconds</h2>
+        <p>The simplest Suave application:</p>
+        <div class="code-block">
+          <pre><code>open Suave
+open Suave.Successful
+
+let app = OK "Hello, Suave!"
+
+startWebServer defaultConfig app</code></pre>
+        </div>
+        <p>That's it! Your web server is running on <code>http://localhost:8080</code>.</p>
+        <p><a href="/docs/getting-started.html">→ Read the getting started guide</a></p>
+      </section>
+
+      <!-- Performance Showcase -->
+      <section>
+        <h2>Performance Optimizations</h2>
+        <p>Suave has undergone comprehensive performance optimization using modern .NET best practices:</p>
+        <div class="features">
+          <div class="feature-card">
+            <div class="feature-icon">📉</div>
+            <h3>65-75% Fewer Allocations</h3>
+            <p>ArrayPool integration, encoder caching, Span&lt;T&gt; parsing, and pre-computed constants eliminate GC pressure.</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">🚀</div>
+            <h3>40-70% Higher Throughput</h3>
+            <p>Optimized hot paths with ref-to-mutable conversions and zero-allocation integer formatting.</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">⏱️</div>
+            <h3>35-55% Lower P99 Latency</h3>
+            <p>Reduced GC pauses through systematic allocation elimination. Smooth, predictable performance under load.</p>
+          </div>
+        </div>
+        <p><a href="/docs/performance.html">→ See detailed performance analysis</a></p>
+      </section>
+
+      <!-- Use Cases -->
+      <section>
+        <h2>What Can You Build?</h2>
+        <ul>
+          <li><strong>REST APIs</strong> - Fast, type-safe REST backends</li>
+          <li><strong>Microservices</strong> - Lightweight services with minimal overhead</li>
+          <li><strong>Real-time Apps</strong> - WebSocket support for live features</li>
+          <li><strong>GraphQL Servers</strong> - Built on top of Suave's composition model</li>
+          <li><strong>Static File Server</strong> - Efficient static content delivery</li>
+          <li><strong>Embedded Web Servers</strong> - Add web capabilities to any F# application</li>
+        </ul>
+      </section>
+
+      <!-- Installation -->
+      <section>
+        <h2>Installation</h2>
+        <p>Add Suave to your F# project via NuGet:</p>
+        <div class="code-block">
+          <pre><code>dotnet add package Suave</code></pre>
+        </div>
+        <p>Or add to paket.dependencies:</p>
+        <div class="code-block">
+          <pre><code>nuget Suave</code></pre>
+        </div>
+        <p><a href="/docs/getting-started.html">→ Get started with your first project</a></p>
+      </section>
+
+      <!-- Call to Action -->
+      <section style="text-align: center; padding: 3rem 0;">
+        <h2>Ready to build something fast?</h2>
+        <div class="cta-buttons">
+          <a href="/docs/getting-started.html" class="btn btn-primary">Get Started Now</a>
+          <a href="https://github.com/SuaveIO/suave" class="btn btn-secondary" target="_blank">View on GitHub</a>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer>
+    <div class="container">
+      <div class="footer-links">
+        <a href="/docs/">Documentation</a>
+        <a href="https://github.com/SuaveIO/suave" target="_blank">GitHub</a>
+        <a href="https://www.nuget.org/packages/Suave/" target="_blank">NuGet</a>
+        <a href="https://x.com/SuaveIO" target="_blank">X</a>
+        <a href="https://github.com/SuaveIO/suave/blob/master/LICENSE" target="_blank">License</a>
+      </div>
+      <p>&copy; 2025 Suave. Open source, MIT licensed.</p>
+      <p>Suave is a project created and maintained by Ademar Gonzalez.</p>
+    </div>
+  </footer>
+
+  <script src="/js/main.js"></script>
+</body>
+</html>

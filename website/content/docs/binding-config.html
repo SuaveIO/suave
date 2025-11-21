@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Suave Binding & Configuration - Configure ports, HTTPS, and server settings">
+  <title>Bindings & Configuration - Suave</title>
+  <link rel="shortcut icon" href="/images/favicon.ico" type="image/x-icon">
+  <link rel="icon" href="/images/favicon-32x32.png" sizes="32x32" type="image/png">
+  <link rel="icon" href="/images/favicon-96x96.png" sizes="96x96" type="image/png">
+  <link rel="apple-touch-icon" href="/images/apple-touch-icon-57x57.png" sizes="57x57">
+  <link rel="apple-touch-icon" href="/images/apple-touch-icon-114x114.png" sizes="114x114">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header>
+    <div class="container">
+      <nav>
+        <div class="logo">
+          <img src="/images/head_600_trans.png" alt="Suave Logo" width="40" height="40" style="vertical-align: middle; margin-right: 12px; background: white; padding: 2px; border-radius: 4px;">
+          Suave
+        </div>
+        <button id="hamburger" class="hamburger" aria-label="Toggle menu">
+          <span></span><span></span><span></span>
+        </button>
+        <ul id="nav-links" class="nav-links">
+          <li><a href="/">Home</a></li>
+          <li><a href="/docs/">Documentation</a></li>
+          <li><a href="/docs/performance.html">Performance</a></li>
+          <li><a href="https://github.com/SuaveIO/suave" target="_blank">GitHub</a></li>
+          <li><a href="https://www.nuget.org/packages/Suave/" target="_blank">NuGet</a></li>
+          <li><button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme">🌙</button></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <div class="container">
+      <h1>Bindings & Configuration</h1>
+      <p>Configure Suave server bindings, ports, HTTPS, and server behavior.</p>
+
+      <h2>Default Configuration</h2>
+      <p>Start with the default configuration:</p>
+      <div class="code-block">
+        <pre><code>open Suave
+
+let app = OK "Hello World"
+
+[&lt;EntryPoint&gt;]
+let main argv =
+  startWebServer defaultConfig app
+  0
+  
+// Starts server on http://localhost:8080</code></pre>
+      </div>
+
+      <h2>Custom Port</h2>
+      <p>Configure the server to listen on a specific port:</p>
+      <div class="code-block">
+        <pre><code>open Suave
+
+let config =
+  { defaultConfig with
+      bindings = [ HttpBinding.createSimple HTTP "0.0.0.0" 3000 ] }
+
+let app = OK "Hello on port 3000"
+
+[&lt;EntryPoint&gt;]
+let main argv =
+  startWebServer config app
+  0</code></pre>
+      </div>
+
+      <h2>HTTPS / TLS</h2>
+      <p>Enable HTTPS with a certificate:</p>
+      <div class="code-block">
+        <pre><code>open Suave
+open System.Net
+open System.Security.Cryptography.X509Certificates
+
+let cert = new X509Certificate2("./server.pfx", "password")
+
+let config =
+  { defaultConfig with
+      bindings = 
+        [ HttpBinding.createSimple HTTPS "0.0.0.0" 8443 ]
+      certificateChainFilePath = Some "./server.pfx"
+      certificatePassword = Some "password" }
+
+let app = OK "Secure connection"
+
+[&lt;EntryPoint&gt;]
+let main argv =
+  startWebServer config app
+  0</code></pre>
+      </div>
+
+      <h2>Multiple Bindings</h2>
+      <p>Listen on multiple ports and protocols:</p>
+      <div class="code-block">
+        <pre><code>open Suave
+
+let config =
+  { defaultConfig with
+      bindings = 
+        [ HttpBinding.createSimple HTTP "0.0.0.0" 8080
+          HttpBinding.createSimple HTTP "127.0.0.1" 3000 ] }
+
+let app = OK "Listening on multiple ports"
+
+[&lt;EntryPoint&gt;]
+let main argv =
+  startWebServer config app
+  0</code></pre>
+      </div>
+
+      <h2>Server Settings</h2>
+      <p>Configure server behavior:</p>
+      <div class="code-block">
+        <pre><code>open Suave
+
+let config =
+  { defaultConfig with
+      bindings = [ HttpBinding.createSimple HTTP "0.0.0.0" 8080 ]
+      maxContentLength = 1024 * 1024 * 100  // 100 MB
+      requestTimeout = System.TimeSpan.FromSeconds(60.0)
+      cancellationToken = System.Threading.CancellationToken.None
+      logger = Logging.Targets.create Logging.LogLevel.Debug [||] }
+
+let app = OK "Custom server settings"
+
+[&lt;EntryPoint&gt;]
+let main argv =
+  startWebServer config app
+  0</code></pre>
+      </div>
+
+      <h2>Environment-Based Configuration</h2>
+      <p>Configure differently based on environment:</p>
+      <div class="code-block">
+        <pre><code>open Suave
+open System
+
+let getConfig () =
+  let isDev = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") = "Development"
+  let port = if isDev then 5000 else 8080
+  let host = if isDev then "127.0.0.1" else "0.0.0.0"
+  
+  { defaultConfig with
+      bindings = [ HttpBinding.createSimple HTTP host port ]
+      // More dev-specific settings
+  }
+
+let app = OK "Environment-aware configuration"
+
+[&lt;EntryPoint&gt;]
+let main argv =
+  let config = getConfig()
+  startWebServer config app
+  0</code></pre>
+      </div>
+
+      <h2>Graceful Shutdown</h2>
+      <p>Handle server shutdown gracefully:</p>
+      <div class="code-block">
+        <pre><code>open Suave
+open System.Threading
+
+let app = OK "Graceful shutdown demo"
+
+[&lt;EntryPoint&gt;]
+let main argv =
+  let cts = new CancellationTokenSource()
+  
+  // Cancel on Ctrl+C
+  System.Console.CancelKeyPress.Add(fun _ ->
+    printfn "Shutting down gracefully..."
+    cts.Cancel()
+  )
+  
+  let config =
+    { defaultConfig with
+        cancellationToken = cts.Token }
+  
+  let _, shutdown = startWebServerAsync config app
+  
+  Async.RunSynchronously shutdown
+  0</code></pre>
+      </div>
+
+      <h2>Compression Configuration</h2>
+      <p>Enable gzip compression for responses:</p>
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.Operators
+open Suave.Writers
+
+let config =
+  { defaultConfig with
+      bindings = [ HttpBinding.createSimple HTTP "0.0.0.0" 8080] }
+
+let app =
+  setHeader "Content-Encoding" "gzip" >=>
+  OK "Compressed response"
+
+[&lt;EntryPoint&gt;]
+let main argv =
+  startWebServer config app
+  0</code></pre>
+      </div>
+
+      <h2>Custom Mime Types</h2>
+      <p>Add custom MIME types:</p>
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.Writers
+
+let mimeTypes =
+  Writers.defaultMimeTypesMap
+    @@ (function 
+        | ".webp" -> Writers.createMimeType "image/webp" false
+        | ".woff2" -> Writers.createMimeType "font/woff2" false
+        | _ -> None)
+
+let config =
+  { defaultConfig with
+      bindings = [ HttpBinding.createSimple HTTP "0.0.0.0" 8080 ]
+      mimeTypesMap = mimeTypes }
+
+let app = OK "Custom MIME types configured"
+
+[&lt;EntryPoint&gt;]
+let main argv =
+  startWebServer config app
+  0</code></pre>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <div class="container">
+      <div class="footer-links">
+        <a href="/docs/">Documentation</a>
+        <a href="https://github.com/SuaveIO/suave" target="_blank">GitHub</a>
+        <a href="https://www.nuget.org/packages/Suave/" target="_blank">NuGet</a>
+        <a href="https://x.com/SuaveIO" target="_blank">X</a>
+        <a href="https://github.com/SuaveIO/suave/blob/master/LICENSE" target="_blank">License</a>
+      </div>
+      <p>&copy; 2025 Suave. Open source, MIT licensed.</p>
+      <p>Suave is a project created and maintained by Ademar Gonzalez.</p>
+    </div>
+  </footer>
+
+  <script src="/js/main.js"></script>
+</body>
+</html>

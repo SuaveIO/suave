@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Suave Validation & Security - Input validation, CORS, authentication, and rate limiting">
+  <title>Validation & Security - Suave</title>
+  <link rel="shortcut icon" href="/images/favicon.ico" type="image/x-icon">
+  <link rel="icon" href="/images/favicon-32x32.png" sizes="32x32" type="image/png">
+  <link rel="icon" href="/images/favicon-96x96.png" sizes="96x96" type="image/png">
+  <link rel="apple-touch-icon" href="/images/apple-touch-icon-57x57.png" sizes="57x57">
+  <link rel="apple-touch-icon" href="/images/apple-touch-icon-114x114.png" sizes="114x114">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header>
+    <div class="container">
+      <nav>
+        <div class="logo">
+          <img src="/images/head_600_trans.png" alt="Suave Logo" width="40" height="40" style="vertical-align: middle; margin-right: 12px; background: white; padding: 2px; border-radius: 4px;">
+          Suave
+        </div>
+        <button id="hamburger" class="hamburger" aria-label="Toggle menu">
+          <span></span><span></span><span></span>
+        </button>
+        <ul id="nav-links" class="nav-links">
+          <li><a href="/">Home</a></li>
+          <li><a href="/docs/">Documentation</a></li>
+          <li><a href="/docs/performance.html">Performance</a></li>
+          <li><a href="https://github.com/SuaveIO/suave" target="_blank">GitHub</a></li>
+          <li><a href="https://www.nuget.org/packages/Suave/" target="_blank">NuGet</a></li>
+          <li><button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme">🌙</button></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <div class="container">
+      <h1>Validation & Security</h1>
+      <p>Learn how to validate input, implement CORS, authentication, rate limiting, and security headers.</p>
+
+      <h2>Basic Input Validation</h2>
+      <p>Validate request data before processing:</p>
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.Operators
+open Suave.Filters
+open Suave.Successful
+open Suave.RequestErrors
+
+let validateEmail email =
+  email.Contains("@") && email.Contains(".")
+
+let app =
+  choose [
+    POST >=> path "/subscribe" >=> fun ctx ->
+      match ctx.request.formData "email" with
+      | Choice1Of2 email when validateEmail email ->
+          OK (sprintf "Subscribed: %s" email) ctx
+      | Choice1Of2 _ ->
+          BAD_REQUEST "Invalid email address" ctx
+      | Choice2Of2 _ ->
+          BAD_REQUEST "Missing email field" ctx
+  ]</code></pre>
+      </div>
+
+      <h2>CORS (Cross-Origin Resource Sharing)</h2>
+      <p>Enable CORS for specific domains:</p>
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.Operators
+open Suave.Filters
+open Suave.Successful
+open Suave.CORS
+
+let corsConfig = 
+  { defaultCORSConfig with 
+      allowedUris = InclusiveOption.Some ["http://localhost:3000"; "https://example.com"] }
+
+let app =
+  choose [
+    GET >=> path "/api/data" >=> cors corsConfig >=> OK "CORS enabled"
+  ]</code></pre>
+      </div>
+
+      <h2>Security Headers</h2>
+      <p>Add important security headers to responses:</p>
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.Operators
+open Suave.Writers
+
+let setSecurityHeaders =
+  setHeader "X-Content-Type-Options" "nosniff" >=>
+  setHeader "X-Frame-Options" "SAMEORIGIN" >=>
+  setHeader "X-XSS-Protection" "1; mode=block" >=>
+  setHeader "Strict-Transport-Security" "max-age=31536000; includeSubDomains"
+
+let app =
+  choose [
+    path "/" >=> setSecurityHeaders >=> OK "Secure content"
+  ]</code></pre>
+      </div>
+
+      <h2>Basic Authentication</h2>
+      <p>Implement basic HTTP authentication:</p>
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.Operators
+open Suave.Filters
+open Suave.Successful
+open Suave.Authentication
+
+let basicAuth =
+  Authentication.authenticateBasic (fun (username, password) ->
+    username = "admin" && password = "secret"
+  )
+
+let app =
+  choose [
+    GET >=> path "/admin" >=> basicAuth >=> OK "Admin area"
+  ]</code></pre>
+      </div>
+
+      <h2>Rate Limiting</h2>
+      <p>Implement rate limiting to protect against abuse:</p>
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.Operators
+open Suave.Filters
+open Suave.Successful
+open Suave.RateLimit
+
+// Simple rate limit: 10 requests per minute
+let rateLimit10PerMin =
+  rateLimit (perMinute 10) (OK "Request successful")
+
+// By user (using header)
+let limitByUser =
+  rateLimit 
+    (perMinute 100 
+     |> withKeyExtractor (headerKeyExtractor "X-User-Id"))
+    (OK "User request successful")
+
+let app =
+  choose [
+    path "/api/public" >=> rateLimit10PerMin
+    path "/api/private" >=> limitByUser
+  ]</code></pre>
+      </div>
+
+      <h2>Request Size Limits</h2>
+      <p>Limit request body size to prevent abuse:</p>
+      <div class="code-block">
+        <pre><code>open Suave
+
+let config =
+  { defaultConfig with
+      bindings = [ HttpBinding.createSimple HTTP "0.0.0.0" 8080 ]
+      maxContentLength = 1024 * 1024  // 1 MB limit
+  }
+
+[&lt;EntryPoint&gt;]
+let main argv =
+  startWebServer config (OK "Size limited")
+  0</code></pre>
+      </div>
+
+      <h2>Request Timeout</h2>
+      <p>Set timeout for long-running requests:</p>
+      <div class="code-block">
+        <pre><code>open Suave
+open System
+
+let config =
+  { defaultConfig with
+      bindings = [ HttpBinding.createSimple HTTP "0.0.0.0" 8080 ]
+      requestTimeout = TimeSpan.FromSeconds(30.0)
+  }
+
+[&lt;EntryPoint&gt;]
+let main argv =
+  startWebServer config (OK "Timeout configured")
+  0</code></pre>
+      </div>
+
+      <h2>Input Sanitization</h2>
+      <p>Sanitize user input to prevent injection attacks:</p>
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.Operators
+open Suave.Filters
+open Suave.Successful
+
+let sanitize (input: string) =
+  input
+    .Replace("&", "&amp;")
+    .Replace("<", "&lt;")
+    .Replace(">", "&gt;")
+    .Replace("\"", "&quot;")
+    .Replace("'", "&#39;")
+
+let app =
+  choose [
+    POST >=> path "/comment" >=> fun ctx ->
+      match ctx.request.formData "text" with
+      | Choice1Of2 text ->
+          let safe = sanitize text
+          OK (sprintf "Comment: %s" safe) ctx
+      | Choice2Of2 _ ->
+          RequestErrors.BAD_REQUEST "Missing text" ctx
+  ]</code></pre>
+      </div>
+
+      <h2>HTTPS Only</h2>
+      <p>Enforce HTTPS and redirect HTTP requests:</p>
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.Operators
+open Suave.Filters
+open Suave.Writers
+
+let enforceHttps : WebPart =
+  fun ctx ->
+    match ctx.request.header "x-forwarded-proto" with
+    | Choice1Of2 "https" -> None // Continue
+    | _ -> Some (ctx |> setStatus HTTP_307 >=> setHeader "Location" ("https://" + ctx.request.host + ctx.request.path))
+
+let app =
+  choose [
+    enforceHttps
+    path "/" >=> OK "Secure connection"
+  ]</code></pre>
+      </div>
+
+      <h2>Request Validation Pattern</h2>
+      <p>Complete validation pattern for common scenarios:</p>
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.Operators
+open Suave.Filters
+open Suave.Successful
+open Suave.RequestErrors
+
+type CreateUserRequest = { name: string; email: string; age: int }
+
+let validateUser (req: CreateUserRequest) =
+  match req with
+  | _ when req.name.Length < 2 -> Error "Name too short"
+  | _ when not (req.email.Contains "@") -> Error "Invalid email"
+  | _ when req.age < 18 -> Error "Must be 18+"
+  | _ -> Ok req
+
+let app =
+  choose [
+    POST >=> path "/users" >=> fun ctx ->
+      async {
+        try
+          // Parse JSON
+          let! body = ctx.request.rawForm |> Async.ofTask
+          let json = System.Text.UTF8Encoding.UTF8.GetString(body)
+          let req = System.Text.Json.JsonSerializer.Deserialize&lt;CreateUserRequest&gt;(json)
+          
+          // Validate
+          match validateUser req with
+          | Ok validReq -> 
+              return! OK (sprintf "User created: %s" validReq.name) ctx
+          | Error msg -> 
+              return! BAD_REQUEST msg ctx
+        with _ ->
+          return! BAD_REQUEST "Invalid request" ctx
+      }
+  ]</code></pre>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <div class="container">
+      <div class="footer-links">
+        <a href="/docs/">Documentation</a>
+        <a href="https://github.com/SuaveIO/suave" target="_blank">GitHub</a>
+        <a href="https://www.nuget.org/packages/Suave/" target="_blank">NuGet</a>
+        <a href="https://x.com/SuaveIO" target="_blank">X</a>
+        <a href="https://github.com/SuaveIO/suave/blob/master/LICENSE" target="_blank">License</a>
+      </div>
+      <p>&copy; 2025 Suave. Open source, MIT licensed.</p>
+      <p>Suave is a project created and maintained by Ademar Gonzalez.</p>
+    </div>
+  </footer>
+
+  <script src="/js/main.js"></script>
+</body>
+</html>
