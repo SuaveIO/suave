@@ -213,7 +213,6 @@ type HttpReader(transport : ITransport, lineBuffer : byte array, pipe: Pipe, can
       task {
         let headers = new List<string*string>()
         let mutable flag = true
-        let mutable error = false
         let mutable result = Ok (headers)
         while flag && (not cancellationToken.IsCancellationRequested) do
           let! _line = x.readLine ()
@@ -221,12 +220,16 @@ type HttpReader(transport : ITransport, lineBuffer : byte array, pipe: Pipe, can
           | Ok line ->
             if line <> String.Empty then
               let indexOfColon = line.IndexOf(':')
+              if indexOfColon = -1 then
+                flag <- false
+                result <- Result.Error (InputDataError (Some 400, "Bad Request: Malformed Header"))
+              else
               let header = (line.Substring(0, indexOfColon).ToLower(), line.Substring(indexOfColon+1).TrimStart())
               headers.Add header
             else
               flag <- false
           | Result.Error e ->
-            error <- true
+            flag <- true
             result <- Result.Error e
         return result
       })
