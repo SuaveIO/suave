@@ -49,7 +49,16 @@ type SuaveConfig =
     hideHeader            : bool
 
     /// Maximun upload size in bytes
-    maxContentLength      : int }
+    maxContentLength      : int
+
+    /// Enable background connection health monitoring
+    healthCheckEnabled    : bool
+
+    /// Interval for connection health checks in milliseconds
+    healthCheckIntervalMs : int
+
+    /// Maximum age for an active connection before it's considered stuck (seconds)
+    maxConnectionAgeSeconds : int }
 
   member x.withBindings(v)              = { x with bindings = v }
   member x.withServerKey(v)             = { x with serverKey = v }
@@ -63,6 +72,9 @@ type SuaveConfig =
   member x.withCompressedFilesFolder(v) = { x with compressedFilesFolder = v }
   member x.withHiddenHeader(v)          = { x with hideHeader = v }
   member x.withMaxContentLength(v)      = { x with maxContentLength = v }
+  member x.withHealthCheckEnabled(v)    = { x with healthCheckEnabled = v }
+  member x.withHealthCheckIntervalMs(v) = { x with healthCheckIntervalMs = v }
+  member x.withMaxConnectionAgeSeconds(v) = { x with maxConnectionAgeSeconds = v }
 
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]

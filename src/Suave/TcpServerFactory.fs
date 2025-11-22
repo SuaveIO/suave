@@ -13,13 +13,16 @@ module TcpServerFactory =
                            * binding : SocketBinding
                            * runtime : HttpRuntime
                            * cancellationToken : CancellationToken
+                           * healthCheckEnabled : bool
+                           * healthCheckIntervalMs : int
+                           * maxConnectionAgeSeconds : int
                            * webPart : WebPart
                           -> TcpServer
 
   type DefaultTcpServerFactory() =
     interface TcpServerFactory with
-      member this.create (maxOps, bufferSize, binding, runtime,cancellationToken,webPart) =
-        Tcp.runServer maxOps bufferSize binding runtime cancellationToken webPart
+      member this.create (maxOps, bufferSize, binding, runtime, cancellationToken, healthCheckEnabled, healthCheckIntervalMs, maxConnectionAgeSeconds, webPart) =
+        Tcp.runServer maxOps bufferSize binding runtime cancellationToken webPart healthCheckEnabled healthCheckIntervalMs maxConnectionAgeSeconds
 
   let tcpServerFactory = new DefaultTcpServerFactory()
 

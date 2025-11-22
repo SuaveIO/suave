@@ -20,7 +20,8 @@ type Connection =
     pipe : Pipe
     lineBuffer    : byte array
     mutable lineBufferCount : int
-    utf8Encoder   : Encoder }
+    utf8Encoder   : Encoder
+    mutable isLongLived : bool }  // Flag for long-lived protocols (WebSocket, SSE, etc.)
 
   member x.ipAddr : IPAddress =
     x.socketBinding.ip
@@ -203,7 +204,8 @@ module Connection =
       pipe = null
       lineBuffer    = [||]
       lineBufferCount = 0
-      utf8Encoder = Encoding.UTF8.GetEncoder() }
+      utf8Encoder = Encoding.UTF8.GetEncoder()
+      isLongLived = false }
 
   let inline receive (cn : Connection) (buf : ByteSegment) =
     cn.transport.read buf

@@ -48,6 +48,8 @@ type SslTransport(listenSocket: Socket, certificate: X509Certificate, cancellati
       try
         let! socket = listenSocket.AcceptAsync(cancellationToken)
         this.acceptSocket <- socket
+        socket.ReceiveTimeout <- 60000  // Receive timeout
+        socket.SendTimeout <- 60000     // Send timeout
         this.networkStream <- new NetworkStream(socket, true)
         this.sslStream <- new SslStream(this.networkStream, false)
         

@@ -338,6 +338,7 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
   member this.shutdown() =
       connection.lineBufferCount <- 0
       connection.transport.shutdown()
+      // Note: Push() now notifies the tracker that connection is being returned
       connectionPool.Push(this)
 
   // Return the lineBuffer to the ArrayPool when the connection is disposed

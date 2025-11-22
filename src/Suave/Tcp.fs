@@ -8,6 +8,7 @@ open System.Net.Security
 open System.Security.Authentication
 open Suave.Sockets
 open Suave.Utils
+open Suave
 open System.Threading.Tasks
 
 /// The max backlog of number of requests
@@ -62,22 +63,68 @@ let createConnection listenSocket binding cancellationToken bufferSize =
       pipe = pipe;
       lineBuffer    = lineBuffer;
       lineBufferCount = 0;
-      utf8Encoder = System.Text.Encoding.UTF8.GetEncoder() }
+      utf8Encoder = System.Text.Encoding.UTF8.GetEncoder();
+      isLongLived = false }
 
 let createConnectionFacade connectionPool listenSocket binding (runtime: HttpRuntime) cancellationToken bufferSize webpart =
   let connection = createConnection listenSocket binding cancellationToken bufferSize
   let facade = new ConnectionFacade(connection, runtime, connectionPool,cancellationToken,webpart)
   facade
 
-let createPools listenSocket binding maxOps runtime cancellationToken bufferSize (webpart:WebPart) =
+let createPools listenSocket binding maxOps runtime cancellationToken bufferSize (webpart:WebPart) healthCheckEnabled healthCheckIntervalMs maxConnectionAgeSeconds =
 
   let connectionPool = new ConcurrentPool<ConnectionFacade>()
   connectionPool.ObjectGenerator <- (fun _ -> createConnectionFacade connectionPool listenSocket binding runtime cancellationToken bufferSize webpart)
+
+  // Create active connection tracker for health checking
+  let tracker = new Suave.ConnectionHealthChecker.ActiveConnectionTracker<ConnectionFacade>()
+  
+  // Set up pool callbacks to track connection lifecycle
+  connectionPool.OnConnectionAcquired <- Some (fun conn -> tracker.TrackConnection(conn))
+  connectionPool.OnConnectionReturned <- Some (fun conn -> tracker.UntrackConnection(conn))
+  connectionPool.OnConnectionReset <- Some (fun conn -> conn.Connection.isLongLived <- false)
+
+  // Configure health checking on the pool
+  connectionPool.HealthCheckEnabled <- healthCheckEnabled
+  connectionPool.HealthCheckIntervalMs <- healthCheckIntervalMs
 
   //Pre-allocate a set of reusable transportObjects
   for x = 0 to maxOps - 1 do
     let connection = createConnectionFacade connectionPool listenSocket binding runtime cancellationToken bufferSize webpart
     connectionPool.Push connection
+
+  // Launch background health checker if enabled
+  if healthCheckEnabled then
+    let healthCheckerConfig : Suave.ConnectionHealthChecker.HealthCheckerConfig = {
+      checkIntervalMs = healthCheckIntervalMs
+      enabled = true
+      verbose = false
+      maxConnectionAgeSeconds = maxConnectionAgeSeconds
+    }
+    
+    let getSocket (conn: ConnectionFacade) : Socket option =
+      try
+        match conn.Connection.transport with
+        | :? Suave.Sockets.TcpTransport as tcp -> 
+          if tcp.acceptSocket <> null then Some (tcp.acceptSocket) else None
+        | :? Suave.Sockets.SslTransport as ssl -> 
+          if ssl.acceptSocket <> null then Some (ssl.acceptSocket) else None
+        | _ -> None
+      with _ -> None
+    
+    let isLongLived (conn: ConnectionFacade) : bool =
+      conn.Connection.isLongLived
+    
+    let closeConnection (conn: ConnectionFacade) : unit =
+      try
+        conn.Connection.transport.shutdown()
+        connectionPool.Push(conn)
+      with _ -> ()
+    
+    let healthCheckerTask = 
+      Suave.ConnectionHealthChecker.startHealthChecker tracker healthCheckerConfig getSocket isLongLived closeConnection
+    
+    connectionPool.HealthCheckTask <- Some healthCheckerTask
 
   connectionPool
 
@@ -126,7 +173,7 @@ let enableRebinding (listenSocket: Socket) =
   else if RuntimeInformation.IsOSPlatform(OSPlatform.OSX) then
     setsockoptStatus <- setsockopt(listenSocket.Handle, SOL_SOCKET_OSX, SO_REUSEADDR_OSX, NativePtr.toNativeInt<int> &&optionValue, uint32(sizeof<int>))
 
-let runServer maxConcurrentOps bufferSize (binding: SocketBinding) (runtime:HttpRuntime) (cancellationToken: CancellationToken) (webpart: WebPart) startData
+let runServer maxConcurrentOps bufferSize (binding: SocketBinding) (runtime:HttpRuntime) (cancellationToken: CancellationToken) (webpart: WebPart) healthCheckEnabled healthCheckIntervalMs maxConnectionAgeSeconds startData
               (acceptingConnections: AsyncResultCell<StartedData>) : Task =
   Task.Run(Func<Task>(fun () -> task {
     use listenSocket = new Socket(binding.endpoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp)
@@ -137,7 +184,8 @@ let runServer maxConcurrentOps bufferSize (binding: SocketBinding) (runtime:Http
       aFewTimesDeterministic (fun () -> listenSocket.Bind binding.endpoint)
       listenSocket.Listen MaxBacklog
 
-      let connectionPool = createPools listenSocket runtime.matchedBinding maxConcurrentOps runtime cancellationToken bufferSize webpart
+      // Create connection pool with health checking configuration
+      let connectionPool = createPools listenSocket runtime.matchedBinding maxConcurrentOps runtime cancellationToken bufferSize webpart healthCheckEnabled healthCheckIntervalMs maxConnectionAgeSeconds
 
       let _binding = { startData.binding with port = uint16((listenSocket.LocalEndPoint :?> IPEndPoint).Port) }
 

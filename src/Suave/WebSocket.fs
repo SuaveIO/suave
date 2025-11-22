@@ -263,6 +263,10 @@ module WebSocket =
       | None ->
         let! a = SocketOp.ofTask ((new HttpOutput(ctx.connection,ctx.runtime)).run ctx.request (handShakeResponse handShakeToken))
         ()
+      
+      // Mark connection as long-lived (WebSocket) to prevent health checker from closing it
+      ctx.connection.isLongLived <- true
+      
       let webSocket = new WebSocket(ctx.connection, webSocketProtocol)
       do! continuation webSocket ctx
     }

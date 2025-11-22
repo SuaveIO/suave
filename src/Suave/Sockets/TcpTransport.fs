@@ -40,6 +40,7 @@ type TcpTransport(listenSocket : Socket, cancellationToken:CancellationToken) =
       // Set socket receive timeout at TCP level (60 seconds = 60000 ms)
       // This ensures that if no data arrives within this period, the read will timeout
       a.ReceiveTimeout <- 60000
+      a.SendTimeout <- 60000  // Also set send timeout for symmetry
       return Ok(remoteBinding a)
     }
 

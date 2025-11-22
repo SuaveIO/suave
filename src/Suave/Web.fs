@@ -48,7 +48,7 @@ module Web =
 
     let startWebWorker runtime =
       let tcpServer =
-        (tcpServerFactory :> TcpServerFactory).create(config.maxOps, config.bufferSize, runtime.matchedBinding.socketBinding,runtime,config.cancellationToken,webpart)
+        (tcpServerFactory :> TcpServerFactory).create(config.maxOps, config.bufferSize, runtime.matchedBinding.socketBinding, runtime, config.cancellationToken, config.healthCheckEnabled, config.healthCheckIntervalMs, config.maxConnectionAgeSeconds, webpart)
 
       startTcpIpServer runtime.matchedBinding.socketBinding tcpServer
 
@@ -83,4 +83,7 @@ module Web =
       cookieSerialiser      = new BinaryFormatterSerialiser()
       hideHeader            = false
       maxContentLength      = 10000000 // 10 megabytes
+      healthCheckEnabled    = true   // Enable connection health monitoring
+      healthCheckIntervalMs = 30000  // Check every 30 seconds
+      maxConnectionAgeSeconds = 300  // Kill connections after 5 minutes (300 seconds)
       }
