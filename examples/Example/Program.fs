@@ -73,16 +73,13 @@ let write (conn:Connection, _) =
 }
 
 let app =
-  choose [
+    Writers.setMimeType "text/html; charset=utf-8" >=> choose [
     GET >=> path "/hello" >=> never
     pathRegex "(.*?)\.(dll|mdb|log)$" >=> RequestErrors.FORBIDDEN "Access denied."
     path "/neverme" >=> never >=> OK (Guid.NewGuid().ToString())
     path "/guid" >=> OK (Guid.NewGuid().ToString())
     path "/hello" >=> OK "Hello World"
     path "/byte-stream" >=> (fun ctx ->
-
-      
-
       { ctx with
           response =
             { ctx.response with
@@ -152,8 +149,7 @@ let app =
           >=> OK "Doooooge"
         RequestErrors.NOT_FOUND "Found no handlers"
       ]
-    ] //>=> logStructured logger logFormatStructured
-
+    ]
 open System.Security.Cryptography.X509Certificates
 let cert = X509CertificateLoader.LoadPkcs12FromFile("suave.p12", "easy")
 
@@ -173,6 +169,9 @@ let main argv =
       compressedFilesFolder = None
       cookieSerialiser      = new BinaryFormatterSerialiser()
       hideHeader            = false
-      maxContentLength      = 1000000 }
+      maxContentLength      = 1000000
+      healthCheckEnabled    = true
+      healthCheckIntervalMs = 30000
+      maxConnectionAgeSeconds = 300 }
     app
   0
