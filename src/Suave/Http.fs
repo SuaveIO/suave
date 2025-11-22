@@ -359,10 +359,11 @@ module Http =
     member x.method = HttpMethod.parse x.rawMethod
 
     member x.host =
-      match x.rawHost with
-      | s when System.Text.RegularExpressions.Regex.IsMatch(s, ":\d+$") ->
-        s.Substring(0, s.LastIndexOf(':'))
-      | s -> s
+      let indexOfColon = x.rawHost.LastIndexOf(':')
+      if indexOfColon = -1 then
+        x.rawHost
+      else
+        x.rawHost.Substring(0, indexOfColon)
 
   [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
   module HttpRequest =
