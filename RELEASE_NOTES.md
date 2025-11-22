@@ -1,3 +1,6 @@
+## New in v3.1.0-beta3 (Released 2025-11-22)
+* Implements a connection health monitor.
+
 ## New in v3.1.0-beta2 (Released 2025-11-19)
 * Enable SSL/TLS support.
 * Adopting ValueTask<T> to achieve allocation-free synchronous completions
