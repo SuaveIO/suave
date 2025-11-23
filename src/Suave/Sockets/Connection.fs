@@ -68,6 +68,8 @@ type Connection =
             match r1 with
             | Ok () -> ()
             | Result.Error _ -> ()
+            // Clear flushed data from buffer to prevent leakage
+            Array.Clear(this.lineBuffer, 0, this.lineBufferCount)
             this.lineBufferCount <- 0
           
           // Write the bytes directly
@@ -83,6 +85,8 @@ type Connection =
           match r3 with
           | Ok () -> ()
           | Result.Error _ -> ()
+          // Clear flushed data from buffer to prevent leakage
+          Array.Clear(this.lineBuffer, 0, this.lineBufferCount)
           // Copy bytes into line buffer
           Buffer.BlockCopy(strBytes, 0, this.lineBuffer, 0, strBytes.Length)
           this.lineBufferCount <- strBytes.Length
@@ -119,12 +123,14 @@ type Connection =
           match r5 with
           | Ok () -> ()
           | Result.Error _ -> ()
+          // Clear flushed data from buffer to prevent leakage
+          Array.Clear(this.lineBuffer, 0, this.lineBufferCount)
+          this.lineBufferCount <- 0
         // don't waste time buffering here
         let! r6 = this.transport.write (new Memory<_>(b, 0, b.Length))
         match r6 with
         | Ok () -> ()
         | Result.Error _ -> ()
-        this.lineBufferCount <- 0
       else
         Buffer.BlockCopy(b, 0, this.lineBuffer, this.lineBufferCount, b.Length)
         this.lineBufferCount <- this.lineBufferCount + b.Length
@@ -140,12 +146,14 @@ type Connection =
           match r5 with
           | Ok () -> ()
           | Result.Error _ -> ()
+          // Clear flushed data from buffer to prevent leakage
+          Array.Clear(this.lineBuffer, 0, this.lineBufferCount)
+          this.lineBufferCount <- 0
         // don't waste time buffering here
         let! r6 = this.transport.write b
         match r6 with
         | Ok () -> ()
         | Result.Error _ -> ()
-        this.lineBufferCount <- 0
       else
         // Copy from Memory<byte> into line buffer using span
         b.Span.CopyTo(new Span<_>(this.lineBuffer, this.lineBufferCount, b.Length))
@@ -162,13 +170,15 @@ type Connection =
           match r5 with
           | Ok () -> ()
           | Result.Error _ -> ()
+          // Clear flushed data from buffer to prevent leakage
+          Array.Clear(this.lineBuffer, 0, this.lineBufferCount)
+          this.lineBufferCount <- 0
         // don't waste time buffering here - convert ReadOnlyMemory to Memory once and write
         let memB = MemoryMarshal.AsMemory(b)
         let! r6 = this.transport.write memB
         match r6 with
         | Ok () -> ()
         | Result.Error _ -> ()
-        this.lineBufferCount <- 0
       else
         // Copy from ReadOnlyMemory<byte> into line buffer using span
         b.Span.CopyTo(new Span<_>(this.lineBuffer, this.lineBufferCount, b.Length))
