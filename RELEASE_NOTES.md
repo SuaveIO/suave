@@ -1,3 +1,7 @@
+## New in v3.1.0-beta4 (Released 2025-11-23)
+* Security fix: clear buffers for reuse.
+* Handle malformed HTTP headers.
+
 ## New in v3.1.0-beta3 (Released 2025-11-22)
 * Implements a connection health monitor.
 
