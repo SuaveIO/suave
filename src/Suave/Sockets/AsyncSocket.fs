@@ -31,7 +31,7 @@ let transferStream (toStream : Connection) (from : Stream) =
     try
       do! transferStreamWithBuffer (new ArraySegment<_>(buf, 0, 8192)) toStream from
     finally
-      ArrayPool<byte>.Shared.Return(buf)
+      ArrayPool<byte>.Shared.Return(buf, true)
   }
 
 let internal zeroCharMemory = new Memory<byte>(Encoding.ASCII.GetBytes "0")
@@ -59,5 +59,5 @@ let transferStreamChunked (conn : Connection) (from : Stream) =
           let! _ = send conn Bytes.eolMemory
           ()
     finally
-      ArrayPool<byte>.Shared.Return(buf)
+      ArrayPool<byte>.Shared.Return(buf, true)
   }
