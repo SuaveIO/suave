@@ -205,9 +205,11 @@ let runServer maxConcurrentOps bufferSize (binding: SocketBinding) (runtime:Http
         { ip = rep.Address; port = uint16 rep.Port }
 
       while not(cancellationToken.IsCancellationRequested) do
-          let connection : ConnectionFacade = connectionPool.Pop()
           try
             let! acceptedSocket = listenSocket.AcceptAsync(cancellationToken)
+            
+            // Only pop a connection AFTER we have an accepted socket
+            let connection : ConnectionFacade = connectionPool.Pop()
             
             // Set the accepted socket and perform SSL handshake if needed
             let! remoteBindingResult = task {
@@ -248,8 +250,6 @@ let runServer maxConcurrentOps bufferSize (binding: SocketBinding) (runtime:Http
                 // SSL handshake failed, return connection to pool
                 connectionPool.Push(connection)
           with ex ->
-            // Return connection to pool if accept failed
-            connectionPool.Push(connection)
             // Re-raise if not a cancellation exception
             match ex with
             | :? OperationCanceledException -> ()
