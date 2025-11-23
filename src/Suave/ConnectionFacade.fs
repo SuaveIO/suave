@@ -336,6 +336,8 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
     }
 
   member this.shutdown() =
+      // Clear the line buffer to prevent data leakage and ensure clean state for reuse
+      Array.Clear(connection.lineBuffer)
       connection.lineBufferCount <- 0
       connection.transport.shutdown()
       // Note: Push() now notifies the tracker that connection is being returned
