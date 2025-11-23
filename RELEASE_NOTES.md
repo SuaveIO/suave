@@ -1,3 +1,6 @@
+## New in v3.1.0-beta5 (Released 2025-11-23)
+* FIX: HTTP response data bleeding between requests during stress load
+
 ## New in v3.1.0-beta4 (Released 2025-11-23)
 * Security fix: clear buffers for reuse.
 * Handle malformed HTTP headers.
