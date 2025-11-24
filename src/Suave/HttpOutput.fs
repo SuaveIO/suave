@@ -215,6 +215,9 @@ type HttpOutput(connection: Connection, runtime: HttpRuntime) =
       }
     | SocketTask f -> task{
       do! f (this.Connection, context.response)
+      // CRITICAL: Must flush lineBuffer after SocketTask to prevent data bleeding
+      // in keep-alive scenarios. SocketTask is used for file transfers.
+      do! this.Connection.flush()
       }
     | NullContent -> task {
         if writePreamble then

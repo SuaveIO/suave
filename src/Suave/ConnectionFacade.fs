@@ -337,6 +337,8 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
     }
 
   member this.shutdown() =
+      if reader.isDirty then
+        reader.stop()
       // Clear the line buffer to prevent data leakage and ensure clean state for reuse
       Array.Clear(connection.lineBuffer)
       connection.lineBufferCount <- 0
@@ -386,10 +388,7 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
         | ex ->
           do Console.WriteLine("Error: " + ex.Message)
     finally
-      // Always stop the reader before returning connection to pool
-      if reader.isDirty then
-        reader.stop()
+      do this.shutdown()
       if Globals.verbose then
         do Console.WriteLine("Disconnected {0}. {1} connected.", clientIp, tracker.ActiveConnectionCount)
-      do this.shutdown()
   }
