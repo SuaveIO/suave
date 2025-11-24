@@ -49,9 +49,6 @@ module DateCache =
     
     cachedDateBytes
 
-/// From the TCP module, keeps track of the number of clients
-let internal numberOfClients = ref 0L
-
 /// Cached UTF8 encoding to avoid allocating new instances
 let UTF8 = System.Text.Encoding.UTF8
 

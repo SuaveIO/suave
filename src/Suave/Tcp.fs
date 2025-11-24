@@ -66,18 +66,19 @@ let createConnection listenSocket binding cancellationToken bufferSize =
       utf8Encoder = System.Text.Encoding.UTF8.GetEncoder();
       isLongLived = false }
 
-let createConnectionFacade connectionPool listenSocket binding (runtime: HttpRuntime) cancellationToken bufferSize webpart =
+let createConnectionFacade tracker connectionPool listenSocket binding (runtime: HttpRuntime) cancellationToken bufferSize webpart =
   let connection = createConnection listenSocket binding cancellationToken bufferSize
-  let facade = new ConnectionFacade(connection, runtime, connectionPool,cancellationToken,webpart)
+  let facade = new ConnectionFacade(connection, runtime, connectionPool, tracker, cancellationToken, webpart)
   facade
 
 let createPools listenSocket binding maxOps runtime cancellationToken bufferSize (webpart:WebPart) healthCheckEnabled healthCheckIntervalMs maxConnectionAgeSeconds =
 
   let connectionPool = new ConcurrentPool<ConnectionFacade>()
-  connectionPool.ObjectGenerator <- (fun _ -> createConnectionFacade connectionPool listenSocket binding runtime cancellationToken bufferSize webpart)
-
+  
   // Create active connection tracker for health checking
   let tracker = new Suave.ConnectionHealthChecker.ActiveConnectionTracker<ConnectionFacade>()
+  
+  connectionPool.ObjectGenerator <- (fun _ -> createConnectionFacade tracker connectionPool listenSocket binding runtime cancellationToken bufferSize webpart)
   
   // Set up pool callbacks to track connection lifecycle
   connectionPool.OnConnectionAcquired <- Some (fun conn -> tracker.TrackConnection(conn))
@@ -90,7 +91,7 @@ let createPools listenSocket binding maxOps runtime cancellationToken bufferSize
 
   //Pre-allocate a set of reusable transportObjects
   for x = 0 to maxOps - 1 do
-    let connection = createConnectionFacade connectionPool listenSocket binding runtime cancellationToken bufferSize webpart
+    let connection = createConnectionFacade tracker connectionPool listenSocket binding runtime cancellationToken bufferSize webpart
     connectionPool.Push connection
 
   // Launch background health checker if enabled
@@ -271,9 +272,7 @@ let runServer maxConcurrentOps bufferSize (binding: SocketBinding) (runtime:Http
 /// yields when the full server is cancelled. If the 'has started listening' workflow
 /// returns None, then the start timeout expired.
 let startTcpIpServerAsync (binding : SocketBinding) (runServer : TcpServer) =
-
   let acceptingConnections = new AsyncResultCell<StartedData>()
-  Globals.numberOfClients := 0
   let startData =
         { startCalledUtc = Globals.utcNow ()
           socketBoundUtc = None
@@ -284,7 +283,6 @@ let startTcpIpServerAsync (binding : SocketBinding) (runServer : TcpServer) =
 
 let startTcpIpServer (binding : SocketBinding) (runServer : TcpServer) =
   let acceptingConnections = new AsyncResultCell<StartedData>()
-  Globals.numberOfClients := 0
   let startData =
         { startCalledUtc = Globals.utcNow ()
           socketBoundUtc = None

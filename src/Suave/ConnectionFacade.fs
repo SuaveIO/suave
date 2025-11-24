@@ -16,8 +16,9 @@ open Suave.Sockets.SocketOp.Operators
 open Suave.Utils.Bytes
 open System.Threading
 open System.Threading.Tasks
+open ConnectionHealthChecker
 
-type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPool: ConcurrentPool<ConnectionFacade>, cancellationToken: CancellationToken,webpart:WebPart) =
+type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPool: ConcurrentPool<ConnectionFacade>, tracker: ActiveConnectionTracker<ConnectionFacade>, cancellationToken: CancellationToken, webpart: WebPart) =
 
   let httpOutput = new HttpOutput(connection,runtime)
 
@@ -368,10 +369,9 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
     }
 
   member this.accept(binding) = task{
-    Interlocked.Increment Globals.numberOfClients |> ignore
     let clientIp = (binding.ip.ToString())
     if Globals.verbose then
-      Console.WriteLine("{0} connected. Now has {1} connected", clientIp,(!Globals.numberOfClients))
+      Console.WriteLine("{0} connected. Now has {1} connected", clientIp, tracker.ActiveConnectionCount)
     connection.socketBinding <- binding
     try
       try
@@ -389,8 +389,7 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
       // Always stop the reader before returning connection to pool
       if reader.isDirty then
         reader.stop()
-      Interlocked.Decrement(Globals.numberOfClients) |> ignore
       if Globals.verbose then
-        do Console.WriteLine("Disconnected {0}. {1} connected.", clientIp,(!Globals.numberOfClients))
+        do Console.WriteLine("Disconnected {0}. {1} connected.", clientIp, tracker.ActiveConnectionCount)
       do this.shutdown()
   }
