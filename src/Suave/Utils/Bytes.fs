@@ -42,30 +42,51 @@ module internal Bytes =
   let inline initNext p =
     let m = Array.length p
     let next = Array.create m 0
-    let i = ref 1
-    let j = ref 0
-    while !i < m - 1 do
-      if p.[!i] = p.[!j] then begin incr i; incr j; next.[!i] <- !j end else
-      if !j = 0 then begin incr i; next.[!i] <- 0 end else j := next.[!j]
+    let mutable i =  1
+    let mutable j = 0
+    while i < m - 1 do
+      if p.[i] = p.[j] then
+        i <- i + 1
+        j <- j + 1 
+        next.[i] <- j
+      else
+        if j = 0 then
+          i <- i + 1
+          next.[i] <- 0
+        else 
+          j <- next.[j]
     next
 
   let inline _kmpW (p: byte []) (next: int []) m (xs : ReadOnlySequence<byte>) =
-      let n = xs.Length
       let mutable i = 0L
-      let mutable j = 0L
-      let a (x) =
-        xs.Slice(xs.GetPosition(x)).First.Span[0]
-      while j < m && i < n do
-        if a(i) = p.[int j] then
+      let mutable j = 0
+      let mutable found = false
+      let mutable result = ValueNone
+      // Iterate through segments
+      let mutable enumerator = xs.GetEnumerator()
+      while not found && enumerator.MoveNext() do
+        let span = enumerator.Current.Span
+        let mutable byteIdx = 0
+        while not found && byteIdx < span.Length do
+          // Current byte in the sequence
+          let b = span.[byteIdx]
+          
+          // KMP failure function: back up j until we have a match or j is 0
+          while j > 0 && b <> p.[j] do
+            j <- next.[j]
+          
+          // Check if current byte matches pattern[j]
+          if b = p.[j] then j <- j + 1
+          
+          // Found complete match - exit early
+          if j = m then
+            result <- ValueSome(i - int64(m - 1))
+            found <- true
+          
           i <- i + 1L
-          j <- j + 1L
-        else
-          if j = 0 then
-            i <- i + 1L
-          else
-            j <- next.[int j]
-      done;
-      if j >= m then ValueSome(i - m) else ValueNone
+          byteIdx <- byteIdx + 1
+      
+      result
 
   let inline kmpW p (xs : ReadOnlySequence<byte>) =
     let next = initNext p
