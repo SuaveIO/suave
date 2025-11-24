@@ -190,7 +190,7 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
     let parsePartLoop () = task{
       let mutable parsing = true
       let mutable error = false
-      let result = ref (Ok())
+      let mutable result =  Ok()
       while parsing && not error && not(cancellationToken.IsCancellationRequested) do
         let! nextPartResult = (nexPart()).AsTask()
         match nextPartResult with
@@ -199,13 +199,13 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
             // reached end boundary
             parsing <- false
           else if line <> String.Empty then
-            result := Result.Error(InputDataError (Some 413, "Invalid multipart format"))
+            result <- Result.Error(InputDataError (Some 413, "Invalid multipart format"))
             error <- true
         | Result.Error e ->
-          result := Result.Error e
+          result <- Result.Error e
           error <- true
       if error then
-        return !result
+        return result
       else
         return Ok()
     }
@@ -222,13 +222,13 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
   let getRawPostData contentLength =
     ValueTask<Result<byte[],Error>>(
       task {
-        let offset = ref 0
+        let mutable offset = 0
         let rawForm = Array.zeroCreate contentLength
         do! reader.readPostData contentLength (fun a count ->
             let source = a.Span.Slice(0,count)
-            let target = new Span<byte>(rawForm,!offset,count)
+            let target = new Span<byte>(rawForm, offset, count)
             source.CopyTo(target)
-            offset := !offset + count)
+            offset <- offset + count)
         return Ok (rawForm)
       })
 
