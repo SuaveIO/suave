@@ -1,3 +1,7 @@
+## New in v3.1.0-beta6 (Released 2025-11-24)
+* Improved KMP string matching algorithm
+* Get rid of Globals.numberOfClients
+
 ## New in v3.1.0-beta5 (Released 2025-11-23)
 * FIX: HTTP response data bleeding between requests during stress load
 
