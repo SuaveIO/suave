@@ -163,11 +163,11 @@ module RateLimit =
 
   /// Start cleanup timer lazily on first use
   let private ensureCleanupTimer() =
-    match !cleanupTimer with
+    match cleanupTimer.Value with
     | Some _ -> () // Already started
     | None ->
         lock timerLock (fun () ->
-          match !cleanupTimer with
+          match cleanupTimer.Value with
           | Some _ -> () // Another thread started it
           | None ->
               let interval = TimeSpan.FromMinutes(5.0)
