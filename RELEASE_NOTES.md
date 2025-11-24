@@ -1,3 +1,6 @@
+## New in v3.1.0-beta7 (Released 2025-11-24)
+* FIX: Flush after serving a file.
+
 ## New in v3.1.0-beta6 (Released 2025-11-24)
 * Improved KMP string matching algorithm
 * Get rid of Globals.numberOfClients
