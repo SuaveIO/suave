@@ -21,13 +21,12 @@ type TcpTransport(listenSocket : Socket, cancellationToken:CancellationToken) =
         try
           acceptSocket.Shutdown(SocketShutdown.Both)
         with
-          | :? SocketException -> () // Socket may already be closed
-          | :? ObjectDisposedException -> () // Socket already disposed
+          _ -> () // Socket may already be closed
       finally
         try
           acceptSocket.Dispose ()
         with
-          | :? ObjectDisposedException -> () // Already disposed, ignore
+          _ -> () // Already disposed, ignore
 
   let remoteBinding (socket : Socket) : SocketBinding =
     let rep = socket.RemoteEndPoint :?> IPEndPoint
