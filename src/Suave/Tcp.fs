@@ -118,8 +118,7 @@ let createPools listenSocket binding maxOps runtime cancellationToken bufferSize
     
     let closeConnection (conn: ConnectionFacade) : unit =
       try
-        conn.Connection.transport.shutdown()
-        connectionPool.Push(conn)
+        conn.shutdown()
       with _ -> ()
     
     let healthCheckerTask = 
