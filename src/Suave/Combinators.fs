@@ -520,7 +520,9 @@ module Files =
         do! transferStream conn fs
       }
     else
-      writeHeaders()
+      task {
+        do! writeHeaders()
+      }
 
   let private sendEncodedStreamPlain (conn:Connection) (ctx:HttpContext) (fs:Stream) (start:int64) (finish:int64) (total:int64) =
     let writeHeaders () = task {
@@ -535,7 +537,9 @@ module Files =
         do! transferStream conn fs
       }
     else
-      writeHeaders()
+      task {
+        do! writeHeaders()
+      }
 
   let sendEncodedStream (conn:Connection) (ctx:HttpContext) (fs:Stream) (start:int64) (finish:int64) (encodingOpt:Compression.Algorithm option) (total:int64) =
     match encodingOpt with
@@ -568,6 +572,7 @@ module Files =
     let writeFile file =
       let fs, start, total, status = getFileStream ctx file
       makeWriteFileTask file fs start total, status
+
     let task, status = writeFile fileName
     { ctx with
         response =
