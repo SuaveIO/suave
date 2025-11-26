@@ -505,74 +505,37 @@ module Files =
   open ServeResource
   open ContentRange
 
-  // Split the encoded and plain stream send paths so the outer match is synchronous
-  let private sendEncodedStreamWithEncoding (conn:Connection) (ctx:HttpContext) (fs:Stream) (start:int64) (finish:int64) (n:Compression.Algorithm) (total:int64) =
-    let writeHeaders () = task {
-      do! conn.asyncWriteLn ("Content-Range: bytes " + start.ToString() + "-" + finish.ToString() + "/*")
-      do! conn.asyncWriteLn (String.Concat [| "Content-Encoding: "; n.ToString() |])
-      do! conn.asyncWriteLn ("Content-Length: " + (fs : Stream).Length.ToString() + "\r\n")
-      do! conn.flush ()
-    }
-
-    if ctx.request.``method`` <> HttpMethod.HEAD && fs.Length > 0L then
-      task {
-        do! writeHeaders()
-        do! transferStream conn fs
-      }
-    else
-      task {
-        do! writeHeaders()
-      }
-
-  let private sendEncodedStreamPlain (conn:Connection) (ctx:HttpContext) (fs:Stream) (start:int64) (finish:int64) (total:int64) =
-    let writeHeaders () = task {
-      do! conn.asyncWriteLn ("Content-Range: bytes " + start.ToString() + "-" + finish.ToString() + "/" + total.ToString())
-      do! conn.asyncWriteLn ("Content-Length: " + (fs : Stream).Length.ToString() + "\r\n")
-      do! conn.flush()
-    }
-
-    if ctx.request.``method`` <> HttpMethod.HEAD && fs.Length > 0L then
-      task {
-        do! writeHeaders()
-        do! transferStream conn fs
-      }
-    else
-      task {
-        do! writeHeaders()
-      }
-
-  let sendEncodedStream (conn:Connection) (ctx:HttpContext) (fs:Stream) (start:int64) (finish:int64) (encodingOpt:Compression.Algorithm option) (total:int64) =
-    match encodingOpt with
-    | Some n -> sendEncodedStreamWithEncoding conn ctx fs start finish n total
-    | None -> sendEncodedStreamPlain conn ctx fs start finish total
-
   let sendFile fileName (compression : bool) (ctx : HttpContext) =
-    let doSendStream (conn:Connection) (ctx:HttpContext) (start:int64) (total:int64) (encoding:Compression.Algorithm option) (fs:Stream) : Task<unit> =
-      task {
-        let finish = start + fs.Length - 1L
-        try
-          do! sendEncodedStream conn ctx fs start finish encoding total
-        finally
-          fs.Dispose()
-      }
-
-    let doCompressAndSend (file:string) (fs:Stream) (start:int64) (total:int64) (ctx:HttpContext) (conn:Connection) : Task<unit> =
-      let getLm = fun path -> FileInfo(path).LastWriteTime
-      // Use task-based continuation to avoid creating a complex resumable state machine
-      let t = Compression.transformStream file fs getLm compression ctx.runtime.compressionFolder ctx
-      t.ContinueWith(fun (ante: System.Threading.Tasks.Task<_>) ->
-        match ante.Result with
-        | Result.Error e -> System.Threading.Tasks.Task.FromException<unit>(System.Exception("error"))
-        | Ok (encoding, fsCompressed) -> doSendStream conn ctx start total encoding fsCompressed
-      ).Unwrap()
-
-    let makeWriteFileTask (file:string) (fs:Stream) (start:int64) (total:int64) =
-      fun (conn:Connection, _) -> doCompressAndSend file fs start total ctx conn
-
     let writeFile file =
       let fs, start, total, status = getFileStream ctx file
-      makeWriteFileTask file fs start total, status
-
+      fun (conn:Connection, _) -> task {
+        let getLm = fun path -> FileInfo(path).LastWriteTime
+        match! Compression.transformStream file fs getLm compression ctx.runtime.compressionFolder ctx with
+        | Ok(encoding,fs) ->
+          let finish = start + fs.Length - 1L
+          try
+            try
+              match encoding with
+              | Some n ->
+                do! conn.asyncWriteLn ("Content-Range: bytes " + start.ToString() + "-" + finish.ToString() + "/*")
+                do! conn.asyncWriteLn (String.Concat [| "Content-Encoding: "; n.ToString() |])
+                do! conn.asyncWriteLn ("Content-Length: " + (fs : Stream).Length.ToString() + "\r\n")
+                do! conn.flush ()
+                if ctx.request.``method`` <> HttpMethod.HEAD && fs.Length > 0L then
+                  do! transferStream conn fs
+              | None ->
+                do! conn.asyncWriteLn ("Content-Range: bytes " + start.ToString() + "-" + finish.ToString() + "/" + total.ToString())
+                do! conn.asyncWriteLn ("Content-Length: " + (fs : Stream).Length.ToString() + "\r\n")
+                do! conn.flush()
+                if ctx.request.``method`` <> HttpMethod.HEAD && fs.Length > 0L then
+                  do! transferStream conn fs
+            with ex ->
+              raise ex
+          finally
+            fs.Dispose()
+        | Result.Error error ->
+          return failwith "error"
+      }, status
     let task, status = writeFile fileName
     { ctx with
         response =
@@ -580,6 +543,7 @@ module Files =
               status = status
               content = SocketTask task } }
     |> succeed
+
 
   let file fileName : WebPart =
     resource
@@ -673,33 +637,35 @@ module Embedded =
                     resourceName
                     (compression : bool)
                     (ctx : HttpContext) =
-    let doSendResourceStream (conn:Connection) (ctx:HttpContext) (encoding:Compression.Algorithm option) (fs:Stream) : Task<unit> =
-      task {
-        let finish = fs.Length - 1L
-        try
-          do! Files.sendEncodedStream conn ctx fs 0L finish encoding fs.Length
-        finally
-          fs.Dispose()
-      }
-
-    let doCompressResourceAndSend (source:Assembly) (name:string) (ctx:HttpContext) (conn:Connection) : Task<unit> =
+    let writeResource name (conn:Connection, _) = task {
       let fs = source.GetManifestResourceStream(name)
       let getLm = fun _ -> lastModified source
-      let t = Compression.transformStream name fs getLm compression ctx.runtime.compressionFolder ctx
-      t.ContinueWith(fun (ante: System.Threading.Tasks.Task<_>) ->
-        match ante.Result with
-        | Result.Error e -> System.Threading.Tasks.Task.FromException<unit>(System.Exception("error"))
-        | Ok (encoding, fsCompressed) -> doSendResourceStream conn ctx encoding fsCompressed
-      ).Unwrap()
-
-    let makeWriteResourceTask (source:Assembly) (name:string) =
-      fun (conn:Connection, _) -> doCompressResourceAndSend source name ctx conn
-
+      match! Compression.transformStream name fs getLm compression ctx.runtime.compressionFolder ctx with
+      | Ok (encoding,fs) ->
+        match encoding with
+        | Some n ->
+          do! conn.asyncWriteLn (String.Concat [| "Content-Encoding: "; n.ToString() |])
+          do! conn.asyncWriteLn ("Content-Length: " + (fs: Stream).Length.ToString() + "\r\n")
+          do! conn.flush()
+          if ctx.request.``method`` <> HttpMethod.HEAD && fs.Length > 0L then
+            do! transferStream conn fs
+          fs.Dispose()
+          return ()
+        | None ->
+          do! conn.asyncWriteLn ("Content-Length: " + (fs: Stream).Length.ToString() + "\r\n")
+          do! conn.flush ()
+          if ctx.request.``method`` <> HttpMethod.HEAD && fs.Length > 0L then
+            do! transferStream conn fs
+          fs.Dispose()
+          return ()
+      | Result.Error error ->
+        return failwith "error"
+    }
     { ctx with
         response =
           { ctx.response with
               status = HTTP_200.status
-              content = SocketTask (makeWriteResourceTask source resourceName) }}
+              content = SocketTask (writeResource resourceName) }}
     |> succeed
 
   let sendResourceFromDefaultAssembly resourceName compression =
