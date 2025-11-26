@@ -48,15 +48,15 @@ let createTransport listenSocket binding cancellationToken : ITransport =
   | HTTPS certificate ->
       new SslTransport(listenSocket, certificate, cancellationToken) :> ITransport
 
-let createReader (transport: ITransport) lineBuffer pipe cancellationToken =
-  new HttpReader(transport, lineBuffer, pipe, cancellationToken)
+let createReader (transport: ITransport) pipe cancellationToken =
+  new HttpReader(transport, pipe, cancellationToken)
 
 let createConnection listenSocket binding cancellationToken bufferSize =
   let transport = createTransport listenSocket binding cancellationToken
   // Rent from ArrayPool instead of allocating fresh buffer
   let lineBuffer = System.Buffers.ArrayPool<byte>.Shared.Rent(bufferSize)
   let pipe = new Pipe()
-  let reader = createReader transport lineBuffer pipe cancellationToken
+  let reader = createReader transport pipe cancellationToken
   { socketBinding = SocketBinding.create IPAddress.IPv6Loopback 8080us;
       transport     = transport;
       reader = reader;

@@ -49,10 +49,11 @@ module Aux =
     loop bufferSequence 0
 
 [<AllowNullLiteral>]
-type HttpReader(transport : ITransport, lineBuffer : byte array, pipe: Pipe, cancellationToken) =
+type HttpReader(transport : ITransport, pipe: Pipe, cancellationToken) =
 
   let mutable running : bool = true
   let mutable dirty : bool = false
+  let readLineBuffer = System.Buffers.ArrayPool<byte>.Shared.Rent(8192)
 
   member this.stop () =
     try
@@ -192,18 +193,18 @@ type HttpReader(transport : ITransport, lineBuffer : byte array, pipe: Pipe, can
       task {
         let mutable offset = 0
         match! x.readUntilPattern EOL (fun a count ->
-            if offset + count > lineBuffer.Length then
+            if offset + count > readLineBuffer.Length then
               FailWith (InputDataError (Some 414, "Line Too Long"))
             else
               let source = a.Span.Slice(0,count)
-              let target = new Span<byte>(lineBuffer,offset,count)
+              let target = new Span<byte>(readLineBuffer,offset,count)
               source.CopyTo(target)
               offset <- offset + count
               Continue offset) with
         | Result.Error e ->
           return Result.Error e
         | Ok _ ->
-          let result = Globals.UTF8.GetString(lineBuffer, 0, offset)
+          let result = Globals.UTF8.GetString(readLineBuffer, 0, offset)
           return Ok result
       })
 
@@ -275,3 +276,8 @@ type HttpReader(transport : ITransport, lineBuffer : byte array, pipe: Pipe, can
         this.stop()
     return result
   }
+
+  // Return readLineBuffer to the ArrayPool when the reader is disposed
+  interface IDisposable with
+    member this.Dispose() =
+      System.Buffers.ArrayPool<byte>.Shared.Return(readLineBuffer, true)
