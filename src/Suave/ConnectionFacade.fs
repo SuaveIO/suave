@@ -321,7 +321,7 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
 
   member this.processRequest () =
     task {
-      let! reqRes = (this.readRequest()).AsTask()
+      let! reqRes = this.readRequest()
       match reqRes with
       | Result.Error err ->
         // Couldn't parse HTTP request; answering with BAD_REQUEST and closing the connection.
@@ -337,18 +337,16 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
     }
 
   member this.shutdown() =
+      connection.pipe.Reader.CancelPendingRead()
       // Shutdown transport FIRST to unblock any waiting reads in readLoop
       // This prevents the readLoop from being stuck in transport.read() when we set running=false
       connection.transport.shutdown()
-      
-      // Now stop the reader - the transport shutdown will have unblocked any pending reads
-      if reader.isDirty then
-        reader.stop()
-      
+      reader.stop()
       // Clear the line buffer to prevent data leakage and ensure clean state for reuse
       Array.Clear(connection.lineBuffer)
       connection.lineBufferCount <- 0
-      
+      try connection.pipe.Reader.Complete() with _ -> ()
+      try connection.pipe.Reset() with _ -> ()
       // Note: Push() now notifies the tracker that connection is being returned
       connectionPool.Push(this)
 
@@ -384,15 +382,18 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
     try
       try
         // Start read loop in background - use _ignore to suppress async warning
+        reader.init()
         let readTask = reader.readLoop()
         let! loopRes = this.requestLoop()
         match loopRes with
         | Ok () -> ()
         | Result.Error err ->
-          do Console.WriteLine(sprintf "Error: %A" err)
+          if Globals.verbose then
+            do Console.WriteLine(sprintf "Error: %A" err)
       with
         | ex ->
-          do Console.WriteLine("Error: " + ex.Message)
+          if Globals.verbose then
+            do Console.WriteLine("Error: " + ex.Message)
     finally
       do this.shutdown()
       if Globals.verbose then

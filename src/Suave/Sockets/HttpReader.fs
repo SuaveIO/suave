@@ -2,11 +2,9 @@ namespace Suave
 
 open System
 open System.Collections.Generic
-open System.Text
 open System.Threading.Tasks
 
 open Suave.Sockets
-open Suave.Sockets.Control
 open Suave.Utils.Bytes
 open System.IO.Pipelines
 open System.Buffers
@@ -53,19 +51,26 @@ type HttpReader(transport : ITransport, pipe: Pipe, cancellationToken) =
 
   let mutable running : bool = true
   let mutable dirty : bool = false
+  let dirtyLock = new obj()
   let readLineBuffer = System.Buffers.ArrayPool<byte>.Shared.Rent(8192)
+
+  let mutable readerCancellationTokenSource : Threading.CancellationTokenSource = null
 
   member this.stop () =
     try
-      running <- false
-      // Complete reader first, then writer, then reset
-      try pipe.Reader.Complete() with _ -> ()
-      try pipe.Writer.Complete() with _ -> ()
-      try pipe.Reset() with _ -> ()
-      dirty <- false
+      lock dirtyLock (fun () ->
+        if dirty then
+          running <- false
+          // Cancel any pending reads with the token BEFORE completing writer
+          try
+            if readerCancellationTokenSource <> null && not readerCancellationTokenSource.IsCancellationRequested then
+              readerCancellationTokenSource.Cancel()
+          with _ -> ()
+          try pipe.Writer.Complete() with _ -> ()
+          dirty <- false)
     with _ -> ()
 
-  member x.readMoreData () = 
+  member x.readMoreData () =
     let buff = pipe.Writer.GetMemory()
     let readResult = transport.read buff
     if readResult.IsCompletedSuccessfully then
@@ -76,7 +81,7 @@ type HttpReader(transport : ITransport, pipe: Pipe, cancellationToken) =
           pipe.Writer.Advance(bytesRead)
           ValueTask<Result<unit,Error>>(
             task {
-              let! flushResult = pipe.Writer.FlushAsync(cancellationToken)
+              let! _ = pipe.Writer.FlushAsync(cancellationToken)
               return Ok()
             })
         else
@@ -91,7 +96,7 @@ type HttpReader(transport : ITransport, pipe: Pipe, cancellationToken) =
           | Ok bytesRead ->
             if bytesRead > 0 then
               pipe.Writer.Advance(bytesRead)
-              let! flushResult = pipe.Writer.FlushAsync(cancellationToken)
+              let! _ = pipe.Writer.FlushAsync(cancellationToken)
               return Ok()
             else
               return Result.Error (Error.ConnectionError "no more data")
@@ -99,35 +104,42 @@ type HttpReader(transport : ITransport, pipe: Pipe, cancellationToken) =
             return Result.Error e
         })
 
-  member x.getData () = task{
-      let (success, result) = pipe.Reader.TryRead()
-      if success then
-        return result
-      else
-        let! result= pipe.Reader.ReadAsync(cancellationToken)
-        return result
-  }
+  member x.getData () =
+    task{
+      let! result = pipe.Reader.ReadAsync(readerCancellationTokenSource.Token)
+      return result
+      }
+
   /// Iterates over a BufferSegment list looking for a marker, data before the marker
   /// is sent to the function select
   /// Returns the number of bytes read.
   member x.scanMarker (marker: byte[]) (select : SelectFunction) =
     task{
       try
-        let! result = x.getData()
-        let bufferSequence = result.Buffer
-        match kmpW marker bufferSequence with
-        | ValueSome x ->
-          let res = Aux.split bufferSequence (int x) select
-          match res with
-          | Continue n ->
-            pipe.Reader.AdvanceTo(bufferSequence.GetPosition(int64(n + marker.Length)))
-            return Result.Ok(Found n)
-          | FailWith s ->
-            return Result.Ok(Error s)
-        | ValueNone ->
-          let r = Aux.split bufferSequence (int(bufferSequence.Length - int64 marker.Length)) select
-          pipe.Reader.AdvanceTo(bufferSequence.GetPosition(bufferSequence.Length - int64 marker.Length))
-          return Result.Ok(NeedMore)
+        if not running then
+          return Result.Error(Error.ConnectionError "No more data")
+        else
+          let! result = x.getData()
+          if result.IsCanceled then
+            return Result.Error(Error.ConnectionError "ReadAsync was canceled")
+          else
+            let bufferSequence = result.Buffer
+            if result.IsCompleted && bufferSequence.Length = 0L then
+              return Result.Error(Error.ConnectionError "no more data")
+            else
+              match kmpW marker bufferSequence with
+              | ValueSome x ->
+                let res = Aux.split bufferSequence (int x) select
+                match res with
+                | Continue n ->
+                  pipe.Reader.AdvanceTo(bufferSequence.GetPosition(int64(n + marker.Length)))
+                  return Result.Ok(Found n)
+                | FailWith s ->
+                  return Result.Ok(Error s)
+              | ValueNone ->
+                let r = Aux.split bufferSequence (int(bufferSequence.Length - int64 marker.Length)) select
+                pipe.Reader.AdvanceTo(bufferSequence.GetPosition(bufferSequence.Length - marker.LongLength))
+                return Result.Ok(NeedMore)
       with ex ->
         return Result.Error(Error.ConnectionError ex.Message)
   }
@@ -160,32 +172,12 @@ type HttpReader(transport : ITransport, pipe: Pipe, cancellationToken) =
       })
 
   member x.skip n =
-     task{
-      let! result= pipe.Reader.ReadAsync()
+    task{
+      let! result= x.getData()
       let bufferSequence = result.Buffer
-      // we really do not calling split because we are not doing anything with it
-      //let res = Aux.split bufferSequence n (fun a b -> Continue 0 )
-      //match res with
-        //| Continue n ->
       pipe.Reader.AdvanceTo(bufferSequence.GetPosition(int64 n))
       return Found n
-       // | FailWith s ->
-         // return Error s
-      }
-
-    /// Read n bytes (dont' we need to iterate ?)
-    member x.read n select =
-     task{
-      let! result= pipe.Reader.ReadAsync()
-      let bufferSequence = result.Buffer
-      let res = Aux.split bufferSequence n select
-      match res with
-      | Continue n ->
-        pipe.Reader.AdvanceTo(bufferSequence.GetPosition(int64 n))
-        return Found n
-      | FailWith s ->
-        return Error s
-      }
+    }
 
   /// Read a line from the stream, calling UTF8.toString on the bytes before the EOL marker
   member x.readLine () : SocketOp<string> = 
@@ -259,22 +251,31 @@ type HttpReader(transport : ITransport, pipe: Pipe, cancellationToken) =
       }
     loop bytes
 
-  member this.isDirty = dirty 
+  member this.isDirty = 
+    lock dirtyLock (fun () -> dirty)
+
+  member this.init() =
+    lock dirtyLock (fun () ->
+      dirty <- true
+      running <- true
+    )
+    readerCancellationTokenSource <- new Threading.CancellationTokenSource()
 
   member this.readLoop() = task{
-    dirty <- true
-    let mutable reading = true
-    running <- true
-    let mutable result = Ok()
-    while running && reading && not(cancellationToken.IsCancellationRequested) do
-      let! a = this.readMoreData()
-      match a with
-      | Ok () -> ()
-      | a ->
-        reading <- false
-        result <- a
-        this.stop()
-    return result
+    try
+      let mutable reading = true
+      let mutable result = Ok()
+      while running && reading && not(cancellationToken.IsCancellationRequested) do
+        let! a = this.readMoreData()
+        match a with
+        | Ok () -> ()
+        | Result.Error b as a->
+          reading <- false
+          result <- a
+          this.stop()
+      return result
+    with ex ->
+      return Result.Error(Error.ConnectionError ex.Message)
   }
 
   // Return readLineBuffer to the ArrayPool when the reader is disposed
