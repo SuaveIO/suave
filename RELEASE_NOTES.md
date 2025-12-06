@@ -1,3 +1,6 @@
+## New in v3.1.0-beta8 (Released 2025-12-6)
+* Correct the connection shutdown sequence.
+
 ## New in v3.1.0-beta7 (Released 2025-11-24)
 * FIX: Flush after serving a file.
 
