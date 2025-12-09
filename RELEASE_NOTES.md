@@ -1,3 +1,9 @@
+## New in v3.1.0 (Released 2025-12-9)
+* Target .NET 9
+* Rewrite of internals using Task, Memory and Pipelines.
+* Many optimizations focusing on reducing memory allocations, improving throughput, and lowering latency.
+* Rate limiting, security headers, validation webparts and new router module.
+
 ## New in v3.1.0-beta8 (Released 2025-12-6)
 * Correct the connection shutdown sequence.
 
