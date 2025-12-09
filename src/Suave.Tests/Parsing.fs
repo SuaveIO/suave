@@ -31,6 +31,85 @@ let parseQuery =
       let subject =
         Parsing.parseData ""
       Expect.equal subject.Length 0 "Should be empty list"
+
+    testCase "can parse equal signs in query" <| fun _ ->
+
+      let subject =
+        Parsing.parseData "q=a=b"
+      Expect.equal subject.Length 1 "Should have one value"
+      let actual = subject.[0] |> snd |> Option.get
+      Expect.equal actual "a=b" "Should contain a=b"
+
+    testCase "can parse query with missing values" <| fun _ ->
+      let subject =
+        Parsing.parseData "a=1&b=&c=3&d"
+      Expect.equal subject.Length 4 "Should have four values"
+
+      let actualB = subject.[1] |> snd |> Option.get
+      Expect.equal actualB "" "b should be empty string"
+
+      let actualD = subject.[3] |> snd
+      Expect.equal actualD (Some("")) "d should be Some(\"\")"
+
+    testCase "can parse query with multiple =" <| fun _ ->
+      let subject =
+        Parsing.parseData "a==1==&b===2==="
+      Expect.equal subject.Length 2 "Should have two values"
+      let actualA = subject.[0] |> snd |> Option.get
+      Expect.equal actualA "=1==" "a should be '=1=='"
+      let actualB = subject.[1] |> snd |> Option.get
+      Expect.equal actualB "==2===" "b should be '==2==='"
+
+    testCase "can parse query with empty values only" <| fun _ ->
+      let subject =
+        Parsing.parseData "a=&b=&c="
+      Expect.equal subject.Length 3 "Should have three values"
+      let actualA = subject.[0] |> snd |> Option.get
+      Expect.equal actualA "" "a should be empty string"
+      let actualB = subject.[1] |> snd |> Option.get
+      Expect.equal actualB "" "b should be empty string"
+      let actualC = subject.[2] |> snd |> Option.get
+      Expect.equal actualC "" "c should be empty string"
+
+    testCase "can parse query with no keys only values" <| fun _ ->
+      let subject =
+        Parsing.parseData "=1&=2&=3"
+      Expect.equal subject.Length 3 "Should have three values"
+      let actual1 = subject.[0] |> snd |> Option.get
+      Expect.equal actual1 "1" "first value should be '1'"
+      let actual2 = subject.[1] |> snd |> Option.get
+      Expect.equal actual2 "2" "second value should be '2'"
+      let actual3 = subject.[2] |> snd |> Option.get
+      Expect.equal actual3 "3" "third value should be '3'"
+
+    testCase "can parse query with only keys no values" <| fun _ ->
+      let subject =
+        Parsing.parseData "a&b&c"
+      Expect.equal subject.Length 3 "Should have three values"
+      let actualA = subject.[0] |> snd |> Option.get
+      Expect.equal actualA "" "a should be empty string"
+      let actualB = subject.[1] |> snd |> Option.get
+      Expect.equal actualB "" "b should be empty string"
+      let actualC = subject.[2] |> snd |> Option.get
+      Expect.equal actualC "" "c should be empty string"  
+
+    testCase "can parse query with mixed cases" <| fun _ ->
+      let subject =
+        Parsing.parseData "a=1&b&c=&=4&=&&d==5=="
+      Expect.equal subject.Length 6 "Should have six values"
+      let actualA = subject.[0] |> snd |> Option.get
+      Expect.equal actualA "1" "a should be '1'"
+      let actualB = subject.[1] |> snd |> Option.get
+      Expect.equal actualB "" "b should be empty string"
+      let actualC = subject.[2] |> snd |> Option.get
+      Expect.equal actualC "" "c should be empty string"
+      let actualFirstEmptyKey = subject.[3] |> snd |> Option.get
+      Expect.equal actualFirstEmptyKey "4" "first empty key should be '4'"
+      let actualSecondEmptyKey = subject.[4] |> snd |> Option.get
+      Expect.equal actualSecondEmptyKey "" "second empty key should be empty string"
+      let actualD = subject.[5] |> snd |> Option.get
+      Expect.equal actualD "=5==" "d should be '=5=='"
+
     ]
 
 [<Tests>]
