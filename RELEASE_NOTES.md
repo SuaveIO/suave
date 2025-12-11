@@ -1,3 +1,6 @@
+## New in v3.1.1 (Released 2025-12-11)
+* FIX: Equal signs in query parameter values are not parsed correctly (#774)
+
 ## New in v3.1.0 (Released 2025-12-9)
 * Target .NET 9
 * Rewrite of internals using Task, Memory and Pipelines.
