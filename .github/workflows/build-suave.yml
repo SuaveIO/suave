@@ -23,6 +23,6 @@ jobs:
       with:
         dotnet-version: |
             6.0.x
-            9.0.306
+            10.0.101
     - name: Build
       run: ./build.sh
