@@ -1,3 +1,6 @@
+## New in v3.2.0-beta (Released 2025-12-11)
+* Target .NET 10
+
 ## New in v3.1.1 (Released 2025-12-11)
 * FIX: Equal signs in query parameter values are not parsed correctly (#774)
 
