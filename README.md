@@ -36,37 +36,6 @@ startWebServer defaultConfig (Successful.OK "Hello World!")
 Now that you've discovered how to do "Hello World!", go read the
 [rest of the documentation](https://suave.io/) – editable in the `docs` folder.
 
-# Suave.Testing
-
-We have a NuGet ready for your testing needs; Suave is an excellent server for
-running in-process integration tests, as it's very fast to spawn. On an ordinary
-laptop, running hundreds of randomized tests and micro-benchmarks as well as all
-Suave unit tests, take about 5 seconds on mono.
-
-Start by installing:
-
-```
-paket add nuget suave.testing
-```
-
-You can now use it:
-
-``` fsharp
-open Suave
-open Suave.Testing
-open Expecto
-
-testCase "parsing a large multipart form" <| fun _ ->
-
-  let res =
-    runWithConfig (OK "hi")
-    |> req HttpMethod.POST "/" (Some byteArrayContent)
-
-  Expect.equal res "hi" "Should get the correct result"
-```
-
-All of our tests use this assembly; you can do too.
-
 # How to Build
 
 To execute the build script, invoke following command on the Linux or MacOs console:
