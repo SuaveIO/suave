@@ -20,6 +20,9 @@ open ConnectionHealthChecker
 
 type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPool: ConcurrentPool<ConnectionFacade>, tracker: ActiveConnectionTracker<ConnectionFacade>, cancellationToken: CancellationToken, webpart: WebPart) =
 
+  static let mutable connectionIdCounter = 0L
+  let connectionId = Interlocked.Increment(&connectionIdCounter)
+
   let httpOutput = new HttpOutput(connection,runtime)
 
   let reader = connection.reader
@@ -234,6 +237,7 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
 
   member val Connection = connection with get,set
   member val Runtime = runtime with get,set
+  member val ConnectionId = connectionId with get
 
   member this.parsePostData maxContentLength (contentLengthHeader : Choice<string,_>) (contentTypeHeader:Choice<string,_>) : SocketOp<unit> =
     socket {
@@ -259,8 +263,6 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
       | Choice2Of2 _ -> return ()
     }
 
-  /// Process the request, reading as it goes from the incoming 'stream', yielding a HttpRequest
-  /// when done
   member this.readRequest () = socket {
 
     let! firstLine = reader.readLine()
@@ -337,14 +339,17 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
     }
 
   member this.shutdown() =
-      connection.pipe.Reader.CancelPendingRead()
+      reader.cancelPendingReads()
       // Shutdown transport FIRST to unblock any waiting reads in readLoop
       // This prevents the readLoop from being stuck in transport.read() when we set running=false
       connection.transport.shutdown()
       reader.stop()
+
+  member private this.recycleConnection() =
       // Clear the line buffer to prevent data leakage and ensure clean state for reuse
       Array.Clear(connection.lineBuffer)
       connection.lineBufferCount <- 0
+      try connection.pipe.Writer.Complete() with _ -> ()
       try connection.pipe.Reader.Complete() with _ -> ()
       try connection.pipe.Reset() with _ -> ()
       // Note: Push() now notifies the tracker that connection is being returned
@@ -377,25 +382,39 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
   member this.accept(binding) = task{
     let clientIp = (binding.ip.ToString())
     if Globals.verbose then
-      Console.WriteLine("{0} connected. Now has {1} connected", clientIp, tracker.ActiveConnectionCount)
+      Console.WriteLine("[Conn:{0}] accept: {1} connected. Now has {2} connected", connectionId, clientIp, tracker.ActiveConnectionCount)
     connection.socketBinding <- binding
+    // Set the connection ID on the reader for consistent logging
+    let mutable readTask : Task<Result<unit,Error>> = null
     try
-      try
-        // Start read loop in background - use _ignore to suppress async warning
         reader.init()
-        let readTask = reader.readLoop()
+        readTask <- reader.readLoop()
         let! loopRes = this.requestLoop()
         match loopRes with
         | Ok () -> ()
         | Result.Error err ->
           if Globals.verbose then
-            do Console.WriteLine(sprintf "Error: %A" err)
-      with
-        | ex ->
-          if Globals.verbose then
-            do Console.WriteLine("Error: " + ex.Message)
+            do Console.WriteLine(sprintf "[Conn:%d] accept: Error: %A" connectionId err)
     finally
-      do this.shutdown()
-      if Globals.verbose then
-        do Console.WriteLine("Disconnected {0}. {1} connected.", clientIp, tracker.ActiveConnectionCount)
+      // First phase: stop reader and transport (this unblocks readTask)
+      this.shutdown()
+    
+    // Wait for readTask to complete BEFORE recycling the connection
+    // This is critical: we must ensure readLoop has finished (and called pipe.Writer.Complete())
+    // before we reset the pipe and push the connection back to the pool
+    if readTask <> null then
+      try
+        // Use a timeout to avoid hanging forever if something goes wrong
+        let! completed = Task.WhenAny(readTask, Task.Delay(1000))
+        if not (Object.ReferenceEquals(completed, readTask)) then
+          if Globals.verbose then
+            Console.WriteLine("[Conn:{0}] accept: readTask did not complete within timeout", connectionId)
+      with ex ->
+        if Globals.verbose then
+          Console.WriteLine("[Conn:{0}] accept: error waiting for readTask: {1}", connectionId, ex.Message)
+    
+    // Second phase: reset pipe and recycle connection (only after readTask is done)
+    this.recycleConnection()
+    if Globals.verbose then
+        do Console.WriteLine("[Conn:{0}] accept:Disconnected {1}. {2} connected.", connectionId, clientIp, tracker.ActiveConnectionCount)
   }
