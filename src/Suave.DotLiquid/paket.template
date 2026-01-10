@@ -1,7 +1,7 @@
 type project
 authors Ademar Gonzalez
 owners Ademar Gonzalez
-description Suave is a simple web development F# library providing a lightweight web server and a set of combinators to manipulate route flow and task composition.
+description Suave.DotLiquid provides Liquid templates for Suave web server.
 licenseUrl https://github.com/SuaveIO/Suave/blob/master/LICENSE
 iconUrl https://raw.githubusercontent.com/SuaveIO/resources/master/images/head_trans.png
 files
@@ -10,4 +10,4 @@ files
   bin/Release/net10.0/Suave.DotLiquid.pdb => lib/net10.0
 dependencies
   framework: net10.0
-    Suave ~> 3.1
+    Suave ~> 3.2

@@ -1,3 +1,6 @@
+## New in v3.2.1 (Released 2026-01-04)
+* Rewrite connection shutdown sequence to avoid race conditions under high concurrency load.
+
 ## New in v3.2.0 (Released 2025-12-11)
 * Target .NET 10
 
