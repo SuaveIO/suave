@@ -35,8 +35,6 @@ let testApp =
     RequestErrors.NOT_FOUND "Found no handlers"
   ]
 
-System.Net.ServicePointManager.DefaultConnectionLimit <- Int32.MaxValue
-
 // How to write a new primitive WebPart
 let sleep (milliseconds:int) message: WebPart =
   fun (x : HttpContext) ->
@@ -72,6 +70,19 @@ let write (conn:Connection, _) =
     return ()
 }
 
+type LiquidModel =
+  { name : string
+    date : DateTimeOffset
+    items : string list }
+
+let liquidSample : WebPart =
+  let a  =
+    { name = "Liquid";
+      date = DateTimeOffset.UtcNow;
+      items =  [ "Apples"; "Bananas"; "Cherries" ]
+    }
+  Suave.DotLiquid.page "liquidTemplate.txt" a
+
 let app =
     Writers.setMimeType "text/html; charset=utf-8" >=> choose [
     GET >=> path "/hello" >=> never
@@ -79,6 +90,7 @@ let app =
     path "/neverme" >=> never >=> OK (Guid.NewGuid().ToString())
     path "/guid" >=> OK (Guid.NewGuid().ToString())
     path "/hello" >=> OK "Hello World"
+    path "/liquid" >=> liquidSample
     path "/byte-stream" >=> (fun ctx ->
       { ctx with
           response =

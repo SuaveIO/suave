@@ -7,9 +7,16 @@
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
   </PropertyGroup>
   <ItemGroup>
+    <Content Include="liquidTemplate.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <None Include="suave.p12">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <Compile Include="CounterDemo.fs" />
     <Compile Include="Program.fs" />
     <ProjectReference Include="../../src/Suave/Suave.fsproj" />
+    <ProjectReference Include="..\..\src\Suave.DotLiquid\Suave.DotLiquid.fsproj" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="paket-files\" />
