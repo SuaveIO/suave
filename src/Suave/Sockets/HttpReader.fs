@@ -314,17 +314,21 @@ type HttpReader(transport : ITransport, pipe: Pipe, cancellationToken: Threading
     let mutable reading = true
     let mutable result = Ok()
     let mutable iterationCount = 0
-    while running && reading && not(readerCancellationTokenSource.IsCancellationRequested) do
-      iterationCount <- iterationCount + 1
-      let! a = this.readMoreData()
-      match a with
-      | Ok () -> ()
-      | Result.Error b as a ->
-        reading <- false
-        result <- a
-        this.stop()
-    try pipe.Writer.Complete() with _ -> ()
-    return result
+    try
+      while running && reading && not(readerCancellationTokenSource.IsCancellationRequested) do
+        iterationCount <- iterationCount + 1
+        let! a = this.readMoreData()
+        match a with
+        | Ok () -> ()
+        | Result.Error b as a ->
+          reading <- false
+          result <- a
+          this.stop()
+      try pipe.Writer.Complete() with _ -> ()
+      return result
+    with ex ->
+      try pipe.Writer.Complete() with _ -> ()
+      return Result.Error(Error.ConnectionError ex.Message)
   }
 
   // Return readLineBuffer to the ArrayPool when the reader is disposed

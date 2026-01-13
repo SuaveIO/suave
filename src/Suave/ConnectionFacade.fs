@@ -387,6 +387,7 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
     // Set the connection ID on the reader for consistent logging
     let mutable readTask : Task<Result<unit,Error>> = null
     try
+      try
         reader.init()
         readTask <- reader.readLoop()
         let! loopRes = this.requestLoop()
@@ -395,6 +396,9 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
         | Result.Error err ->
           if Globals.verbose then
             do Console.WriteLine(sprintf "[Conn:%d] accept: Error: %A" connectionId err)
+      with ex ->
+        if Globals.verbose then
+          do Console.WriteLine(sprintf "[Conn:%d] accept: Exception: %s" connectionId ex.Message)
     finally
       // First phase: stop reader and transport (this unblocks readTask)
       this.shutdown()

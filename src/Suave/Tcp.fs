@@ -30,7 +30,8 @@ type StartedData =
     (x.GetStartedListeningElapsedMilliseconds()).ToString() + " ms with binding " + x.binding.ip.ToString() + ":"  + x.binding.port.ToString()
 
 /// Stop the TCP listener server
-let stopTcp reason (socket : Socket) =
+let stopTcp (reason:string) (socket : Socket) =
+  Console.WriteLine("Stopping TCP server due to {0}", reason)
   try
     socket.Dispose()
   with ex ->
@@ -198,7 +199,7 @@ let runServer maxConcurrentOps bufferSize (binding: SocketBinding) (runtime:Http
       let ipAddress = startData.binding.ip.ToString()
       let port = startData.binding.port
 
-      Console.WriteLine($"Smooth! Suave listener started in {startedListeningMilliseconds} ms with binding {ipAddress}:{port}")
+      Console.WriteLine($"Smooth! Suave v{Globals.SuaveVersion} listener started in {startedListeningMilliseconds} ms with binding {ipAddress}:{port}")
 
       let remoteBinding (socket : Socket) =
         let rep = socket.RemoteEndPoint :?> IPEndPoint
@@ -250,10 +251,8 @@ let runServer maxConcurrentOps bufferSize (binding: SocketBinding) (runtime:Http
                 // SSL handshake failed, return connection to pool
                 connectionPool.Push(connection)
           with ex ->
-            // Re-raise if not a cancellation exception
-            match ex with
-            | :? OperationCanceledException -> ()
-            | _ -> raise ex
+            if Globals.verbose then
+              Console.WriteLine("TCP server accept exception: {0}", ex)
 
       stopTcp "cancellation requested" listenSocket
     with
@@ -262,6 +261,7 @@ let runServer maxConcurrentOps bufferSize (binding: SocketBinding) (runtime:Http
       | :? TaskCanceledException ->
         stopTcp "The operation was canceled" listenSocket
       | ex ->
+        Console.WriteLine("TCP server runtime exception: {0}", ex)
         stopTcp "runtime exception" listenSocket
         }))
 
