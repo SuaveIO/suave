@@ -1,3 +1,6 @@
+## New in v3.2.2 (Released 2026-01-13)
+* FIX: Remove incorrect raise exception within accept loop leading to premature exit.
+
 ## New in v3.2.1 (Released 2026-01-04)
 * Rewrite connection shutdown sequence to avoid race conditions under high concurrency load.
 
