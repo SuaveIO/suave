@@ -1,3 +1,6 @@
+## New in v3.2.3 (Released 2026-01-16)
+* Update dependencies.
+
 ## New in v3.2.2 (Released 2026-01-13)
 * FIX: Remove incorrect raise exception within accept loop leading to premature exit.
 
