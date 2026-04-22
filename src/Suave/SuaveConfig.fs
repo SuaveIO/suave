@@ -58,7 +58,12 @@ type SuaveConfig =
     healthCheckIntervalMs : int
 
     /// Maximum age for an active connection before it's considered stuck (seconds)
-    maxConnectionAgeSeconds : int }
+    maxConnectionAgeSeconds : int
+
+    /// Optional sink factory for streaming multipart file parts without a temp file.
+    /// When <c>None</c> (the default), each file part is buffered to a temporary file
+    /// on disk, matching the pre-existing behaviour.
+    filePartSink : FilePartSink option }
 
   member x.withBindings(v)              = { x with bindings = v }
   member x.withServerKey(v)             = { x with serverKey = v }
@@ -75,6 +80,7 @@ type SuaveConfig =
   member x.withHealthCheckEnabled(v)    = { x with healthCheckEnabled = v }
   member x.withHealthCheckIntervalMs(v) = { x with healthCheckIntervalMs = v }
   member x.withMaxConnectionAgeSeconds(v) = { x with maxConnectionAgeSeconds = v }
+  member x.withFilePartSink(v)          = { x with filePartSink = v }
 
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
@@ -84,14 +90,16 @@ module SuaveConfig =
   /// You will normally not have to use this function as a consumer from the
   /// library, but it may be useful for unit testing with the HttpRuntime record.
   let toRuntime config contentFolder compressionFolder =
-    HttpRuntime.create config.serverKey
-                       config.errorHandler
-                       config.mimeTypesMap
-                       contentFolder
-                       compressionFolder
-                       config.cookieSerialiser
-                       config.hideHeader
-                       config.maxContentLength
+    let createRuntime =
+      HttpRuntime.create config.serverKey
+                         config.errorHandler
+                         config.mimeTypesMap
+                         contentFolder
+                         compressionFolder
+                         config.cookieSerialiser
+                         config.hideHeader
+                         config.maxContentLength
+    fun binding -> { createRuntime binding with filePartSink = config.filePartSink }
 
   /// Finds an endpoint that is configured from the given configuration. Throws
   /// an exception if the configuration has no bindings. Useful if you make

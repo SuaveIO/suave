@@ -259,7 +259,10 @@ module Http =
       matchedBinding    : HttpBinding
       cookieSerialiser  : CookieSerialiser
       hideHeader        : bool
-      maxContentLength  : int }
+      maxContentLength  : int
+      /// Optional sink factory for streaming multipart file parts without a temp file.
+      /// When <c>None</c> (the default), each file part is buffered to a temporary file on disk.
+      filePartSink      : FilePartSink option }
 
   /// The `HttpContext` is the container of the request, runtime, user-state and
   /// response.

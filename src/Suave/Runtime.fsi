@@ -88,3 +88,16 @@ module Runtime =
       fileName     : string
       mimeType     : string
       tempFilePath : string }
+
+  /// Holds the stream and completion callbacks for a single multipart file part.
+  type FilePartWriter =
+    { /// The stream into which incoming bytes are written.
+      stream    : IO.Stream
+      /// Called after the stream is disposed on successful completion; returns the HttpUpload to add to the request.
+      onSuccess : unit -> HttpUpload
+      /// Called after the stream is disposed when the part is empty or an error occurs; use this to clean up partial state.
+      onError   : unit -> unit }
+
+  /// A factory invoked once per incoming multipart file part to obtain a FilePartWriter.
+  /// Receives the field name, file name, and MIME type extracted from the part headers.
+  type FilePartSink = string -> string -> string -> FilePartWriter

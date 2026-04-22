@@ -32,76 +32,88 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
   let mutable _rawForm : byte array = [||]
 
   let readFilePart boundary (headerParams : Dictionary<string,string>) fieldName contentType : SocketOp<HttpUpload option> =
-    // Split the file-reading work into a separate minimal task so the main task only awaits once
+    // Extract the filename from header params BEFORE opening any stream so that sink
+    // implementations receive the final file name when their factory is called.
+    let filenameResult =
+      match headerParams.TryLookup "filename*" with
+      | Choice1Of2 _filename ->
+        let ix = _filename.IndexOf "''"
+        if ix > 0 then
+          let enc = _filename.Substring(0,ix).ToLowerInvariant()
+          if enc = "utf-8" then
+            let filename = Net.WebUtility.UrlDecode(_filename.Substring(ix + 2))
+            Ok filename
+          else
+            Result.Error (InputDataError (None, "Unsupported filename encoding: '" + enc + "'"))
+        else
+          Result.Error (InputDataError (None, "Invalid filename encoding"))
+      | Choice2Of2 _ ->
+        match headerParams.TryLookup "filename" |> Choice.map (String.trimc '"') with
+        | Choice1Of2 fn -> Ok fn
+        | Choice2Of2 _ -> Result.Error (InputDataError (None, "Key 'filename' was not present in 'content-disposition'"))
+
+    match filenameResult with
+    | Result.Error e ->
+      ValueTask<Result<HttpUpload option,Error>>(Task.FromResult(Result.Error e))
+    | Ok filename ->
+
+    // Build a FilePartWriter: either from the user-supplied sink or the built-in temp-file writer.
+    let writer =
+      match runtime.filePartSink with
+      | Some sink ->
+        sink fieldName filename contentType
+      | None ->
+        let tempFilePath = Path.GetTempFileName()
+        let tempFile = new FileStream(tempFilePath, FileMode.Truncate) :> IO.Stream
+        { stream    = tempFile
+          onSuccess = fun () ->
+            { fieldName    = fieldName
+              fileName     = filename
+              mimeType     = contentType
+              tempFilePath = tempFilePath }
+          onError   = fun () ->
+            try File.Delete tempFilePath with _ -> () }
+
+    // Read the part body into the writer's stream, tracking the number of bytes written.
     let readFileDataHelper () =
-      let tempFilePath = Path.GetTempFileName()
-      let tempFile = new FileStream(tempFilePath, FileMode.Truncate)
-      // Convert the SocketOp to a Task and handle it without nested task CE
+      let mutable bytesWritten = 0L
       let readOp = reader.readUntilPattern (ASCII.bytes (eol + boundary)) (fun x y ->
-        do tempFile.Write(x.Span.Slice(0,y))
+        do writer.stream.Write(x.Span.Slice(0,y))
+        bytesWritten <- bytesWritten + int64 y
         Continue 0)
       let readTask = readOp.AsTask()
-      
-      // Use Task.ContinueWith to avoid complex resumable state machine in a task CE
+
       readTask.ContinueWith(fun (ante: System.Threading.Tasks.Task<_>) ->
         try
           let result = ante.Result
-          let fileLength = tempFile.Length
-          tempFile.Dispose()
-          (tempFilePath, result, fileLength, false, "")
+          writer.stream.Dispose()
+          (result, bytesWritten, false, "")
         with ex ->
-          tempFile.Dispose()
-          (tempFilePath, Unchecked.defaultof<_>, 0L, true, ex.Message)
+          writer.stream.Dispose()
+          (Unchecked.defaultof<_>, 0L, true, ex.Message)
       ) : Task<_>
 
-    // Main task: convert to continuation to avoid complex resumable state machine
     let mainTask =
       readFileDataHelper().ContinueWith(fun (ante: System.Threading.Tasks.Task<_>) ->
-        let (tempFilePath, readResult, fileLength, exceptionOccurred, exceptionMsg) = ante.Result
-        
-        // Convert result to Task for synchronous processing
+        let (readResult, bytesWritten, exceptionOccurred, exceptionMsg) = ante.Result
+
         if exceptionOccurred then
-          try File.Delete tempFilePath with _ -> ()
+          writer.onError()
           Task.FromResult(Result.Error (InputDataError (None, sprintf "Error reading file part: %s" exceptionMsg)))
         else
           match readResult with
           | Result.Error e ->
-            try File.Delete tempFilePath with _ -> ()
+            writer.onError()
             Task.FromResult(Result.Error e)
           | Ok _ ->
-            if fileLength > 0L then
-              let filename =
-                match headerParams.TryLookup "filename*" with
-                | Choice1Of2 _filename ->
-                  let ix = _filename.IndexOf "''"
-                  if ix > 0 then
-                    let enc = _filename.Substring(0,ix).ToLowerInvariant()
-                    if enc = "utf-8" then
-                      let filename = Net.WebUtility.UrlDecode(_filename.Substring(ix + 2))
-                      Ok filename
-                    else
-                      Result.Error (InputDataError (None, "Unsupported filename encoding: '" + enc + "'"))
-                  else
-                    Result.Error (InputDataError (None, "Invalid filename encoding"))
-                | Choice2Of2 _ ->
-                  match headerParams.TryLookup "filename" |> Choice.map (String.trimc '"') with
-                  | Choice1Of2 fn -> Ok fn
-                  | Choice2Of2 _ -> Result.Error (InputDataError (None, "Key 'filename' was not present in 'content-disposition'"))
-
-              match filename with
-              | Result.Error e -> Task.FromResult(Result.Error e)
-              | Ok fn ->
-                let upload =
-                  { fieldName    = fieldName
-                    fileName     = fn
-                    mimeType     = contentType
-                    tempFilePath = tempFilePath }
-                Task.FromResult(Ok (Some upload))
+            if bytesWritten > 0L then
+              let upload = writer.onSuccess()
+              Task.FromResult(Ok (Some upload))
             else
-              try File.Delete tempFilePath with _ -> ()
+              writer.onError()
               Task.FromResult(Ok None)
       ).Unwrap()
-    
+
     ValueTask<Result<HttpUpload option,Error>>(mainTask)
 
   let parseMultipartMixed fieldName boundary : SocketOp<unit> =
