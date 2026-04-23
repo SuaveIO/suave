@@ -184,6 +184,7 @@ let main argv =
       maxContentLength      = 1000000
       healthCheckEnabled    = true
       healthCheckIntervalMs = 30000
-      maxConnectionAgeSeconds = 300 }
+      maxConnectionAgeSeconds = 300
+      filePartSink          = None }
     app
   0

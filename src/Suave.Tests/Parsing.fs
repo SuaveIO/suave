@@ -325,3 +325,91 @@ let testParseBoundary =
            |> ignore
       ]
 
+[<Tests>]
+let filePartSinkTests cfg =
+  /// Build a minimal multipart/form-data body as a byte array.
+  let buildMultipartBody (boundary: string) fileName mimeType (fileContent: byte[]) =
+    let crlf = "\r\n"
+    let header =
+      sprintf "--%s%sContent-Disposition: form-data; name=\"file\"; filename=\"%s\"%sContent-Type: %s%s%s"
+        boundary crlf fileName crlf mimeType crlf crlf
+    let footer = sprintf "%s--%s--%s" crlf boundary crlf
+    Array.concat
+      [ Encoding.ASCII.GetBytes header
+        fileContent
+        Encoding.ASCII.GetBytes footer ]
+
+  let makeMultipartContent boundary body =
+    let content = new ByteArrayContent(body)
+    content.Headers.TryAddWithoutValidation(
+      "Content-Type", sprintf "multipart/form-data; boundary=%s" boundary) |> ignore
+    content
+
+  let webpart =
+    request (fun r ->
+      if r.files.Count = 1 then
+        let f = r.files.[0]
+        OK (sprintf "%s|%s|%s" f.fieldName f.fileName f.mimeType)
+      else
+        RequestErrors.BAD_REQUEST "unexpected file count")
+
+  testList "file-part sink" [
+
+    testCase "custom sink receives file bytes and onSuccess produces HttpUpload" <| fun _ ->
+      let boundary     = "test-boundary-123"
+      let fileName     = "hello.bin"
+      let mimeType     = "application/octet-stream"
+      let fileContent  = [| 10uy; 20uy; 30uy; 40uy; 50uy |]
+
+      let mutable capturedBytes : byte[] = [||]
+      let mutable successCalled = false
+      let mutable errorCalled   = false
+
+      let sink : FilePartSink = fun fieldName fn mt ->
+        let ms = new MemoryStream()
+        { stream    = ms
+          onSuccess = fun () ->
+            capturedBytes <- ms.ToArray()
+            successCalled <- true
+            { fieldName = fieldName; fileName = fn; mimeType = mt; tempFilePath = "" }
+          onError   = fun () ->
+            errorCalled <- true }
+
+      let sinkConfig : SuaveConfig = { cfg with filePartSink = Some sink }
+      let body = buildMultipartBody boundary fileName mimeType fileContent
+
+      let actual = runWith sinkConfig webpart |> req HttpMethod.POST "/" (Some (makeMultipartContent boundary body))
+
+      Expect.equal actual "file|hello.bin|application/octet-stream" "response should reflect upload metadata"
+      Expect.isTrue  successCalled "onSuccess should have been called"
+      Expect.isFalse errorCalled   "onError should not have been called"
+      Expect.equal   capturedBytes fileContent "sink stream should contain the exact file bytes"
+
+    testCase "custom sink onError is called for empty file part" <| fun _ ->
+      let boundary    = "test-boundary-456"
+      let fileName    = "empty.txt"
+      let mimeType    = "text/plain"
+      let fileContent = [||]   // zero bytes
+
+      let mutable errorCalled   = false
+      let mutable successCalled = false
+
+      let sink : FilePartSink = fun _fieldName _fn _mt ->
+        let ms = new MemoryStream()
+        { stream    = ms
+          onSuccess = fun () ->
+            successCalled <- true
+            { fieldName = ""; fileName = ""; mimeType = ""; tempFilePath = "" }
+          onError   = fun () ->
+            errorCalled <- true }
+
+      let sinkConfig : SuaveConfig = { cfg with filePartSink = Some sink }
+      let body = buildMultipartBody boundary fileName mimeType fileContent
+
+      // Empty file → request returns no upload; server responds with the "unexpected file count" branch
+      let _ = runWith sinkConfig webpart |> req HttpMethod.POST "/" (Some (makeMultipartContent boundary body))
+
+      Expect.isTrue  errorCalled   "onError should have been called for empty part"
+      Expect.isFalse successCalled "onSuccess should not have been called for empty part"
+  ]
+

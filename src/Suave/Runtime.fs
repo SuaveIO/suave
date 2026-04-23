@@ -112,3 +112,23 @@ module Runtime =
       fileName     : string
       mimeType     : string
       tempFilePath : string }
+
+  /// Holds the stream and completion callbacks for a single multipart file part.
+  /// The framework writes incoming bytes to <c>stream</c>, disposes it, then calls
+  /// either <c>onSuccess</c> (to obtain the <see cref="HttpUpload"/> to attach to the
+  /// request) or <c>onError</c> (to clean up any partial state).
+  type FilePartWriter =
+    { /// The stream into which incoming bytes are written.
+      stream    : IO.Stream
+      /// Called after the stream is disposed on successful completion.
+      /// Returns the <see cref="HttpUpload"/> to add to the request.
+      onSuccess : unit -> HttpUpload
+      /// Called after the stream is disposed when the part is empty or an error occurs.
+      /// Use this callback to clean up any partial state (e.g. delete a partial file).
+      onError   : unit -> unit }
+
+  /// A factory invoked once per incoming multipart file part to obtain a
+  /// <see cref="FilePartWriter"/>.  Receives the field name, file name, and MIME type
+  /// extracted from the part headers.  When not configured, Suave uses its built-in
+  /// temp-file writer.
+  type FilePartSink = string -> string -> string -> FilePartWriter

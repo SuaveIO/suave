@@ -401,7 +401,10 @@ module Http =
       matchedBinding    : HttpBinding
       cookieSerialiser  : CookieSerialiser
       hideHeader        : bool
-      maxContentLength  : int }
+      maxContentLength  : int
+      /// Optional sink factory for streaming multipart file parts.
+      /// When <c>None</c> (the default), each file part is buffered to a temp file on disk.
+      filePartSink      : FilePartSink option }
   and [<Struct>] HttpContext =
     { mutable request    : HttpRequest
       runtime    : HttpRuntime
@@ -493,7 +496,8 @@ module Http =
         matchedBinding    = HttpBinding.defaults
         cookieSerialiser  = new BinaryFormatterSerialiser()
         hideHeader        = false
-        maxContentLength  = 1024 }
+        maxContentLength  = 1024
+        filePartSink      = None }
 
     let create serverKey errorHandler mimeTypes homeDirectory compressionFolder
            (*logger*) cookieSerialiser hideHeader maxContentLength binding =
@@ -505,7 +509,8 @@ module Http =
         matchedBinding    = binding
         cookieSerialiser  = cookieSerialiser
         hideHeader        = hideHeader
-        maxContentLength  = maxContentLength }
+        maxContentLength  = maxContentLength
+        filePartSink      = None }
 
   [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
   module HttpContext =
