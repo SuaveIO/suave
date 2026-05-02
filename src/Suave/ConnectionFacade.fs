@@ -99,7 +99,7 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
 
         if exceptionOccurred then
           writer.onError()
-          Task.FromResult(Result.Error (InputDataError (None, sprintf "Error reading file part: %s" exceptionMsg)))
+          Task.FromResult(Result.Error (InputDataError (None, $"Error reading file part: {exceptionMsg}")))
         else
           match readResult with
           | Result.Error e ->
@@ -407,10 +407,10 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
         | Ok () -> ()
         | Result.Error err ->
           if Globals.verbose then
-            do Console.WriteLine(sprintf "[Conn:%d] accept: Error: %A" connectionId err)
+            do Console.WriteLine($"[Conn:{connectionId}] accept: Error: {err}")
       with ex ->
         if Globals.verbose then
-          do Console.WriteLine(sprintf "[Conn:%d] accept: Exception: %s" connectionId ex.Message)
+          do Console.WriteLine($"[Conn:{connectionId}] accept: Exception: {ex.Message}")
     finally
       // First phase: stop reader and transport (this unblocks readTask)
       this.shutdown()

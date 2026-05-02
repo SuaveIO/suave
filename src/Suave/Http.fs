@@ -10,8 +10,6 @@ module Http =
   open Suave.Utils
   open Suave.Sockets
 
-  open Microsoft.FSharp.Reflection
-
   [<RequireQualifiedAccess>]
   type HttpMethod =
     | GET
@@ -188,23 +186,33 @@ module Http =
     member x.status = { code = x.code; reason = x.reason }
 
     static member tryParse (code : int) =
-      let found =
-        HttpCodeStatics.mapCases.Force()
-        |> Map.tryFind ("HTTP_" + string code)
-
-      match found with
-      | Some x ->
-        Choice1Of2 x
-
-      | None ->
+      match code with
+      | 100 -> Choice1Of2 HTTP_100 | 101 -> Choice1Of2 HTTP_101
+      | 200 -> Choice1Of2 HTTP_200 | 201 -> Choice1Of2 HTTP_201
+      | 202 -> Choice1Of2 HTTP_202 | 203 -> Choice1Of2 HTTP_203
+      | 204 -> Choice1Of2 HTTP_204 | 205 -> Choice1Of2 HTTP_205
+      | 206 -> Choice1Of2 HTTP_206
+      | 300 -> Choice1Of2 HTTP_300 | 301 -> Choice1Of2 HTTP_301
+      | 302 -> Choice1Of2 HTTP_302 | 303 -> Choice1Of2 HTTP_303
+      | 304 -> Choice1Of2 HTTP_304 | 305 -> Choice1Of2 HTTP_305
+      | 306 -> Choice1Of2 HTTP_306 | 307 -> Choice1Of2 HTTP_307
+      | 400 -> Choice1Of2 HTTP_400 | 401 -> Choice1Of2 HTTP_401
+      | 402 -> Choice1Of2 HTTP_402 | 403 -> Choice1Of2 HTTP_403
+      | 404 -> Choice1Of2 HTTP_404 | 405 -> Choice1Of2 HTTP_405
+      | 406 -> Choice1Of2 HTTP_406 | 407 -> Choice1Of2 HTTP_407
+      | 408 -> Choice1Of2 HTTP_408 | 409 -> Choice1Of2 HTTP_409
+      | 410 -> Choice1Of2 HTTP_410 | 411 -> Choice1Of2 HTTP_411
+      | 412 -> Choice1Of2 HTTP_412 | 413 -> Choice1Of2 HTTP_413
+      | 414 -> Choice1Of2 HTTP_414 | 415 -> Choice1Of2 HTTP_415
+      | 416 -> Choice1Of2 HTTP_416 | 417 -> Choice1Of2 HTTP_417
+      | 422 -> Choice1Of2 HTTP_422 | 426 -> Choice1Of2 HTTP_426
+      | 428 -> Choice1Of2 HTTP_428 | 429 -> Choice1Of2 HTTP_429
+      | 451 -> Choice1Of2 HTTP_451
+      | 500 -> Choice1Of2 HTTP_500 | 501 -> Choice1Of2 HTTP_501
+      | 502 -> Choice1Of2 HTTP_502 | 503 -> Choice1Of2 HTTP_503
+      | 504 -> Choice1Of2 HTTP_504 | 505 -> Choice1Of2 HTTP_505
+      | _ ->
         Choice2Of2 ("Couldn't convert " + code.ToString() + " to HttpCode. Please send a PR to https://github.com/suaveio/suave if you want it")
-
-  and private HttpCodeStatics() =
-    static member val mapCases : Lazy<Map<string,HttpCode>> =
-      lazy
-        FSharpType.GetUnionCases(typeof<HttpCode>)
-        |> Array.map (fun case -> case.Name, FSharpValue.MakeUnion(case, [||]) :?> HttpCode)
-        |> Map.ofArray
 
   type SameSite =
       | Strict

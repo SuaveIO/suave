@@ -414,7 +414,12 @@ module Filters =
         fail
     part
 
+  [<System.Diagnostics.CodeAnalysis.RequiresDynamicCode(
+    "urlScan delegates to pathScan / Suave.Sscanf. Use Suave.Router for AOT.")>]
   let urlScan s x = pathScan s x
+
+  [<System.Diagnostics.CodeAnalysis.RequiresDynamicCode(
+    "urlScanCi delegates to pathScanCi / Suave.Sscanf. Use Suave.Router for AOT.")>]
   let urlScanCi s x = pathScanCi s x
 
   let timeoutWebPart (timeout : TimeSpan) (child : WebPart) : WebPart =
@@ -626,6 +631,9 @@ module Embedded =
   let resources (assembly : Assembly) =
     assembly.GetManifestResourceNames()
 
+  [<System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage(
+    "SingleFile", "IL3000",
+    Justification = "The Assembly.Location empty-string case is explicitly handled and falls back to the process start time.")>]
   let lastModified (assembly : Assembly) =
     // Assembly.Location might not be available, such as in single-file deployments.
     if String.IsNullOrEmpty assembly.Location then

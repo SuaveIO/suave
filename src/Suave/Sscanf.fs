@@ -1,11 +1,18 @@
 module Suave.Sscanf
 
 open System
+open System.Diagnostics.CodeAnalysis
 open System.Text.RegularExpressions
 open Microsoft.FSharp.Reflection
 
+[<Literal>]
+let private DynamicCodeMessage =
+  "Suave.Sscanf reconstructs tuples via FSharp.Reflection (FSharpType.GetTupleElements / FSharpValue.MakeTuple). \
+This requires runtime code generation and is not compatible with .NET Native AOT. \
+Use Suave.Router for AOT scenarios."
+
 /// Verify that f x, and then return x, otherwise fail witha 'format failure' message
-let private check f x = if f x then x else failwithf "format failure \"%s\"" x
+let private check f x = if f x then x else failwith $"format failure \"{x}\""
 
 let private parseDecimal (x: string) = Decimal.Parse(x, System.Globalization.CultureInfo.InvariantCulture)
 
@@ -43,7 +50,7 @@ let rec getFormatters xs =
   | '%' :: '%' :: xr -> getFormatters xr
   | '%' :: x :: xr   ->
     if parsers.ContainsKey x then x :: getFormatters xr
-    else failwithf "Unknown formatter %%%c" x
+    else failwith $"Unknown formatter %%{x}"
   | x :: xr          -> getFormatters xr
   | []               -> []
 
@@ -68,6 +75,7 @@ let coerce o (v: Type) =
 
 /// Parse the format in 'pf' from the string 's', failing and raising an exception
 /// otherwise
+[<RequiresDynamicCode(DynamicCodeMessage)>]
 let sscanf (pf:PrintfFormat<_,_,_,_,'t>) s : 't =
   let formatStr  = pf.Value
   let constants  = formatStr.Split([|"%%"|], StringSplitOptions.None)
@@ -100,6 +108,7 @@ let sscanf (pf:PrintfFormat<_,_,_,_,'t>) s : 't =
 
 /// Parse the format in 'pf' from the string 's' regardless of casing, failing and raising an exception
 /// otherwise
+[<RequiresDynamicCode(DynamicCodeMessage)>]
 let sscanfci (pf:PrintfFormat<_,_,_,_,'t>) s : 't =
   let formatStr  = pf.Value
   let constants  = formatStr.Split([|"%%"|], StringSplitOptions.None)
@@ -128,23 +137,3 @@ let sscanfci (pf:PrintfFormat<_,_,_,_,'t>) s : 't =
       (matches,tupleTypes)
       ||> Array.map2 ( fun a b -> coerce a b)
     FSharpValue.MakeTuple(matches, typeof<'t>) :?> 't
-
-module private BasicTesting =
-  // some basic testing
-  let a, b = sscanf "(%%%s,%M)" "(%hello, 4.53)"
-  let i16a: int16 = sscanf "aaaa%d" "aaaa4"
-  let i32a: int32 = sscanf "aaaa%d" "aaaa4"
-  let i64a : int64 = sscanf "aaaa%d" "aaaa4"
-  let i16b: int16 = sscanf "aaaa%i" "aaaa4"
-  let i32b: int32 = sscanf "aaaa%i" "aaaa4"
-  let i64b : int64 = sscanf "aaaa%i" "aaaa4"
-  let ui16: uint16 = sscanf "aaaa%u" "aaaa4"
-  let ui32: uint32 = sscanf "aaaa%u" "aaaa4"
-  let ui64: uint64 = sscanf "aaaa%u" "aaaa4"
-
-  let x,y,z = sscanf "%s-%s-%s" "test-this-string"
-
-  let c, d, (e: int), (f: uint32), (g: int16), h, (i: int64) = sscanf "%b-%d-%i,%u,%x,%X,%o" "false-42--31,13,ff,FF,42"
-
-  let j, k, l, m, n, o, p = sscanf "%f %F %g %G %e %E %c" "1 2.1 3.4 .3 43.2e32 0 f"
-  let aa              = sscanf "(%s)" "(45.33)"

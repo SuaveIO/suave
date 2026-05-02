@@ -19,7 +19,7 @@ module ValidationWebParts =
               let errorMsg = errors |> List.map (fun e -> e.message) |> String.concat "; "
               return! RequestErrors.BAD_REQUEST errorMsg ctx
       | Choice2Of2 _ ->
-          return! RequestErrors.BAD_REQUEST (sprintf "Missing form field: %s" fieldName) ctx
+          return! RequestErrors.BAD_REQUEST ($"Missing form field: {fieldName}") ctx
     }
 
   /// Extract and validate a query parameter
@@ -35,7 +35,7 @@ module ValidationWebParts =
               let errorMsg = errors |> List.map (fun e -> e.message) |> String.concat "; "
               return! RequestErrors.BAD_REQUEST errorMsg ctx
       | Choice2Of2 _ ->
-          return! RequestErrors.BAD_REQUEST (sprintf "Missing query parameter: %s" paramName) ctx
+          return! RequestErrors.BAD_REQUEST ($"Missing query parameter: {paramName}") ctx
     }
 
   /// Extract and validate a header
@@ -51,7 +51,7 @@ module ValidationWebParts =
               let errorMsg = errors |> List.map (fun e -> e.message) |> String.concat "; "
               return! RequestErrors.BAD_REQUEST errorMsg ctx
       | Choice2Of2 _ ->
-          return! RequestErrors.BAD_REQUEST (sprintf "Missing header: %s" headerName) ctx
+          return! RequestErrors.BAD_REQUEST ($"Missing header: {headerName}") ctx
     }
 
   /// Validate multiple form fields
@@ -72,7 +72,7 @@ module ValidationWebParts =
               | Valid result -> Choice1Of2 (box result)
               | Invalid errors -> Choice2Of2 (fieldName, errors)
           | Choice2Of2 _ ->
-              Choice2Of2 (fieldName, [errorSimple fieldName (sprintf "Missing field: %s" fieldName)]))
+              Choice2Of2 (fieldName, [errorSimple fieldName ($"Missing field: {fieldName}")]))
       
       let errors =
         results
@@ -87,7 +87,7 @@ module ValidationWebParts =
         let errorMsg =
           errors
           |> List.collect (fun (field, errs) ->
-            errs |> List.map (fun e -> sprintf "%s: %s" field e.message))
+            errs |> List.map (fun e -> $"{field}: {e.message}"))
           |> String.concat "; "
         return! RequestErrors.BAD_REQUEST errorMsg ctx
     }
@@ -108,13 +108,14 @@ module ValidationWebParts =
 
   /// Format validation errors as JSON
   let validationErrorsToJson (errors: ValidationError list) : string =
+    let q = "\""
     let errorObjects =
       errors
       |> List.map (fun e ->
-        let code = match e.code with Some c -> sprintf "\"code\": \"%s\"," c | None -> ""
-        sprintf "{%s \"field\": \"%s\", \"message\": \"%s\"}" code e.field e.message)
+        let code = match e.code with Some c -> q + "code" + q + ": " + q + c + q + "," | None -> ""
+        "{" + code + " " + q + "field" + q + ": " + q + e.field + q + ", " + q + "message" + q + ": " + q + e.message + q + "}")
       |> String.concat ","
-    sprintf "{\"errors\": [%s]}" errorObjects
+    "{" + q + "errors" + q + ": [" + errorObjects + "]}"
 
   // === Helper Functions ===
 
@@ -142,7 +143,7 @@ module ValidationWebParts =
             | Valid result -> Choice1Of2 (key, result)
             | Invalid errors -> Choice2Of2 errors
         | None ->
-            Choice2Of2 [errorSimple key (sprintf "Missing field: %s" key)])
+            Choice2Of2 [errorSimple key ($"Missing field: {key}")])
     
     let errors =
       results
@@ -166,7 +167,7 @@ module ValidationWebParts =
       | Invalid errors ->
           let errorMsg =
             errors
-            |> List.map (fun e -> sprintf "%s: %s" e.field e.message)
+            |> List.map (fun e -> $"{e.field}: {e.message}")
             |> String.concat "; "
           return! RequestErrors.BAD_REQUEST errorMsg ctx
     }
@@ -194,7 +195,7 @@ module ValidationWebParts =
       else
         let errorMsg =
           errors
-          |> List.map (fun e -> sprintf "%s: %s" e.field e.message)
+          |> List.map (fun e -> $"{e.field}: {e.message}")
           |> String.concat "; "
         return! RequestErrors.BAD_REQUEST errorMsg ctx
     }

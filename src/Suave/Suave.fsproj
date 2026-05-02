@@ -4,6 +4,8 @@
     <AssemblyName>Suave</AssemblyName>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <IsAotCompatible>true</IsAotCompatible>
+    <IsTrimmable>true</IsTrimmable>
   <OtherFlags>--warn:3 </OtherFlags>
   </PropertyGroup>
   <ItemGroup>
@@ -68,7 +70,6 @@
     <Compile Include="TcpServerFactory.fs" />
     <Compile Include="Web.fs" />
     <Compile Include="WebSocket.fs" />
-    <Compile Include="Json.fs" />
     <Compile Include="Stream.fs" />
     <Compile Include="Proxy.fs" />
   </ItemGroup>

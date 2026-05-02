@@ -111,7 +111,7 @@ module Router =
                   | Some parameters ->
                       // Store parameters in userState for retrieval
                       for (key, value) in parameters do
-                        ctx.userState.[sprintf "route_%s" key] <- value
+                        ctx.userState.[$"route_{key}"] <- value
                       let! result = entry.handler ctx
                       match result with
                       | Some _ as res -> return res
@@ -127,7 +127,7 @@ module Router =
 
   /// Get a route parameter from context
   let routeParam (name: string) (ctx: HttpContext) : string option =
-    let key = sprintf "route_%s" name
+    let key = $"route_{name}"
     match ctx.userState.TryGetValue(key) with
     | true, value -> Some (value :?> string)
     | false, _ -> None

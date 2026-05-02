@@ -96,7 +96,7 @@ module Validation =
           match validator item with
           | Valid v -> Valid v
           | Invalid errs ->
-              Invalid (errs |> List.map (fun e -> { e with field = sprintf "%s[%d]" e.field i })))
+              Invalid (errs |> List.map (fun e -> { e with field = $"{e.field}[{i}]" })))
       
       let errors =
         results
@@ -141,7 +141,7 @@ module Validation =
     let minLength (min: int) field : Validator<string, string> =
       fun input ->
         if input.Length < min then
-          Invalid [errorSimple field (sprintf "Value must be at least %d characters" min)]
+          Invalid [errorSimple field ($"Value must be at least {min} characters")]
         else
           Valid input
 
@@ -149,7 +149,7 @@ module Validation =
     let maxLength (max: int) field : Validator<string, string> =
       fun input ->
         if input.Length > max then
-          Invalid [errorSimple field (sprintf "Value must be at most %d characters" max)]
+          Invalid [errorSimple field ($"Value must be at most {max} characters")]
         else
           Valid input
 
@@ -157,7 +157,7 @@ module Validation =
     let exactLength (length: int) field : Validator<string, string> =
       fun input ->
         if input.Length <> length then
-          Invalid [errorSimple field (sprintf "Value must be exactly %d characters" length)]
+          Invalid [errorSimple field ($"Value must be exactly {length} characters")]
         else
           Valid input
 
@@ -208,7 +208,7 @@ module Validation =
         if input.Contains(substring) then
           Valid input
         else
-          Invalid [errorSimple field (sprintf "Value must contain '%s'" substring)]
+          Invalid [errorSimple field ($"Value must contain '{substring}'")]
 
     /// Validate that string starts with a prefix
     let startsWith (prefix: string) field : Validator<string, string> =
@@ -216,7 +216,7 @@ module Validation =
         if input.StartsWith(prefix) then
           Valid input
         else
-          Invalid [errorSimple field (sprintf "Value must start with '%s'" prefix)]
+          Invalid [errorSimple field ($"Value must start with '{prefix}'")]
 
     /// Validate that string ends with a suffix
     let endsWith (suffix: string) field : Validator<string, string> =
@@ -224,7 +224,7 @@ module Validation =
         if input.EndsWith(suffix) then
           Valid input
         else
-          Invalid [errorSimple field (sprintf "Value must end with '%s'" suffix)]
+          Invalid [errorSimple field ($"Value must end with '{suffix}'")]
 
   // === Numeric Validators ===
 
@@ -234,7 +234,7 @@ module Validation =
     let min (minValue: 'T) field : Validator<'T, 'T> when 'T : comparison =
       fun input ->
         if input < minValue then
-          Invalid [errorSimple field (sprintf "Value must be at least %A" minValue)]
+          Invalid [errorSimple field ($"Value must be at least {minValue}")]
         else
           Valid input
 
@@ -242,7 +242,7 @@ module Validation =
     let max (maxValue: 'T) field : Validator<'T, 'T> when 'T : comparison =
       fun input ->
         if input > maxValue then
-          Invalid [errorSimple field (sprintf "Value must be at most %A" maxValue)]
+          Invalid [errorSimple field ($"Value must be at most {maxValue}")]
         else
           Valid input
 
@@ -305,7 +305,7 @@ module Validation =
     let minCount (min: int) field : Validator<'T list, 'T list> =
       fun input ->
         if input.Length < min then
-          Invalid [errorSimple field (sprintf "Collection must have at least %d items" min)]
+          Invalid [errorSimple field ($"Collection must have at least {min} items")]
         else
           Valid input
 
@@ -313,7 +313,7 @@ module Validation =
     let maxCount (max: int) field : Validator<'T list, 'T list> =
       fun input ->
         if input.Length > max then
-          Invalid [errorSimple field (sprintf "Collection must have at most %d items" max)]
+          Invalid [errorSimple field ($"Collection must have at most {max} items")]
         else
           Valid input
 
@@ -321,7 +321,7 @@ module Validation =
     let exactCount (count: int) field : Validator<'T list, 'T list> =
       fun input ->
         if input.Length <> count then
-          Invalid [errorSimple field (sprintf "Collection must have exactly %d items" count)]
+          Invalid [errorSimple field ($"Collection must have exactly {count} items")]
         else
           Valid input
 
@@ -344,7 +344,7 @@ module Validation =
         if input = expected then
           Valid input
         else
-          Invalid [errorSimple field (sprintf "Value must equal %A" expected)]
+          Invalid [errorSimple field ($"Value must equal {expected}")]
 
     /// Validate inequality
     let notEquals (forbidden: 'T) field : Validator<'T, 'T> when 'T : equality =
@@ -352,7 +352,7 @@ module Validation =
         if input <> forbidden then
           Valid input
         else
-          Invalid [errorSimple field (sprintf "Value must not equal %A" forbidden)]
+          Invalid [errorSimple field ($"Value must not equal {forbidden}")]
 
     /// Validate value is in a list
     let oneOf (values: 'T list) field : Validator<'T, 'T> when 'T : equality =
@@ -396,7 +396,8 @@ module Validation =
         if input < maxDate then
           Valid input
         else
-          Invalid [errorSimple field (sprintf "Date must be before %s" (maxDate.ToString("yyyy-MM-dd")))]
+          let max = maxDate.ToString("yyyy-MM-dd")
+          Invalid [errorSimple field ($"Date must be before {max}")]
 
     /// Validate date is after another date
     let after (minDate: DateTime) field : Validator<DateTime, DateTime> =
@@ -404,7 +405,8 @@ module Validation =
         if input > minDate then
           Valid input
         else
-          Invalid [errorSimple field (sprintf "Date must be after %s" (minDate.ToString("yyyy-MM-dd")))]
+          let min = minDate.ToString("yyyy-MM-dd")
+          Invalid [errorSimple field ($"Date must be after {min}")]
 
     /// Validate date is within range
     let between (minDate: DateTime) (maxDate: DateTime) field : Validator<DateTime, DateTime> =

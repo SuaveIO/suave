@@ -237,7 +237,7 @@ let runServer maxConcurrentOps bufferSize (binding: SocketBinding) (runtime:Http
                       checkCertificateRevocation = false)
                     return Ok(remoteBinding acceptedSocket)
                   with ex ->
-                    return Result.Error(Error.ConnectionError(sprintf "SSL handshake failed: %s" ex.Message))
+                    return Result.Error(Error.ConnectionError($"SSL handshake failed: {ex.Message}"))
               | _ -> 
                   return Ok(remoteBinding acceptedSocket)
             }
