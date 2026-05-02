@@ -187,11 +187,22 @@ type HttpReader(transport : ITransport, pipe: Pipe, cancellationToken: Threading
       | Ok bytesRead ->
         if bytesRead > 0 then
           pipe.Writer.Advance(bytesRead)
-          ValueTask<Result<unit,Error>>(
-            task {
-              let! _ = pipe.Writer.FlushAsync(readerCancellationTokenSource.Token)
-              return Ok()
-            })
+          // Try to also complete the flush synchronously. PipeWriter.FlushAsync returns
+          // ValueTask<FlushResult>; in steady state on a localhost benchmark this is the
+          // overwhelmingly common case, so bypass the F# task builder entirely when it does.
+          let flush = pipe.Writer.FlushAsync(readerCancellationTokenSource.Token)
+          if flush.IsCompletedSuccessfully then
+            // Touch .Result so any synchronously-thrown exception still surfaces; we don't
+            // care about the FlushResult fields on the success path.
+            let _ = flush.Result
+            ValueTask<Result<unit,Error>>(Ok())
+          else
+            // Fall back to the task builder only when the flush actually went async.
+            ValueTask<Result<unit,Error>>(
+              task {
+                let! _ = flush
+                return Ok()
+              })
         else
           ValueTask<Result<unit,Error>>(Result.Error (Error.ConnectionError "no more data"))
       | Result.Error e ->
@@ -204,8 +215,13 @@ type HttpReader(transport : ITransport, pipe: Pipe, cancellationToken: Threading
           | Ok bytesRead -> 
             if bytesRead > 0 then
               pipe.Writer.Advance(bytesRead)
-              let! _ = pipe.Writer.FlushAsync(readerCancellationTokenSource.Token)
-              return Ok()
+              let flush = pipe.Writer.FlushAsync(readerCancellationTokenSource.Token)
+              if flush.IsCompletedSuccessfully then
+                let _ = flush.Result
+                return Ok()
+              else
+                let! _ = flush
+                return Ok()
             else
               return Result.Error (Error.ConnectionError "no more data")
           | Result.Error e ->
