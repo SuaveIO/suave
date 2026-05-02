@@ -377,9 +377,15 @@ type HttpReader(transport : ITransport, pipe: Pipe, cancellationToken: Threading
   ///  - For unknown names, lowercases ASCII in a scratch buffer and allocates exactly one string.
   ///  - Allocates exactly one string for the value.
   member x.readHeaders() : SocketOp<List<string*string>> =
+    let dest = new List<string*string>()
+    x.readHeadersInto(dest)
+
+  /// Read all headers into the supplied list. The caller is responsible for clearing
+  /// the list before the call. This avoids allocating a new List per request when the
+  /// caller is reusing a per-connection list.
+  member x.readHeadersInto(headers: List<string*string>) : SocketOp<List<string*string>> =
     ValueTask<Result<List<string*string>,Error>>(
       task {
-        let headers = new List<string*string>()
         let mutable flag = true
         let mutable result : Result<List<string*string>,Error> = Ok headers
         while flag && (not cancellationToken.IsCancellationRequested) do

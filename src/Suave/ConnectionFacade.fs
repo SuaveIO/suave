@@ -27,8 +27,14 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
 
   let reader = connection.reader
 
-  let mutable files = List<HttpUpload>()
-  let mutable multiPartFields = List<string*string>()
+  // Per-connection pooled collections. These are allocated once when the ConnectionFacade
+  // is created and then cleared (not reallocated) at the start of every request. Because a
+  // ConnectionFacade processes one request at a time on its connection, this is safe.
+  // Webparts must not retain references to a request's collections beyond the request's
+  // own task — Suave never has and never did promise that.
+  let files = List<HttpUpload>()
+  let multiPartFields = List<string*string>()
+  let requestHeaders = List<string*string>()
   let mutable _rawForm : byte array = [||]
 
   let readFilePart boundary (headerParams : Dictionary<string,string>) fieldName contentType : SocketOp<HttpUpload option> =
@@ -277,13 +283,21 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
 
   member this.readRequest () = socket {
 
+    // Clear pooled per-connection collections at the start of every request rather than
+    // allocating fresh ones. The collections live on the ConnectionFacade and are reset
+    // here, before the new request is parsed in.
+    requestHeaders.Clear()
+    files.Clear()
+    multiPartFields.Clear()
+    _rawForm <- [||]
+
     let! firstLine = reader.readLine()
 
     let! (rawMethod, path, rawQuery, httpVersion) =
       parseUrl firstLine
       @|! (None, "Invalid first line")
 
-    let! headers = reader.readHeaders()
+    let! headers = reader.readHeadersInto(requestHeaders)
 
     // Respond with 400 Bad Request as
     // per http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html
@@ -306,11 +320,6 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
         rawQuery         = rawQuery
         files            = files
         multiPartFields  = multiPartFields }
-    
-    // Clear form data before exit
-    files <- List<_>()
-    multiPartFields <- List<_>()
-    _rawForm <- [||]
 
     return request
   }
