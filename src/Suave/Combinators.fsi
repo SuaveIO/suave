@@ -1209,6 +1209,8 @@ module Filters =
   /// 'M', decimal</para><para>
   /// 'c', char
   /// </para></summary>
+  [<System.Diagnostics.CodeAnalysis.RequiresDynamicCode(
+    "pathScan relies on Suave.Sscanf which uses FSharp.Reflection. Not compatible with .NET Native AOT; use Suave.Router instead.")>]
   val pathScan : pf:PrintfFormat<'a,'b,'c,'d,'t> -> h:('t -> WebPart) -> WebPart
 
 
@@ -1233,6 +1235,8 @@ module Filters =
   /// 'M', parse_decimal</para><para>
   /// 'c', char
   /// </para></summary>
+  [<System.Diagnostics.CodeAnalysis.RequiresDynamicCode(
+    "pathScanCi relies on Suave.Sscanf which uses FSharp.Reflection. Not compatible with .NET Native AOT; use Suave.Router instead.")>]
   val pathScanCi : format:PrintfFormat<'a,'b,'c,'d,'t> -> handler:('t -> WebPart) -> WebPart
 
   /// <summary> Fails the WebPart after x seconds</summary>

@@ -1,4 +1,4 @@
-﻿module Suave.Json
+module Suave.Json
 
 open System.IO
 open System.Runtime.Serialization.Json

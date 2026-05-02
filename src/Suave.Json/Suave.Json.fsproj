@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net10.0</TargetFrameworks>
+    <AssemblyName>Suave.Json</AssemblyName>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <!--
+      Suave.Json uses DataContractJsonSerializer which relies on runtime
+      reflection. The package is therefore explicitly NOT AOT compatible.
+      Consumers targeting Native AOT should provide their own JSON layer
+      (e.g. System.Text.Json with a JsonSerializerContext) on top of Suave
+      core, which is AOT compatible.
+    -->
+    <IsAotCompatible>false</IsAotCompatible>
+    <IsTrimmable>false</IsTrimmable>
+    <OtherFlags>--warn:3 </OtherFlags>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="AssemblyInfo.fs" Condition="Exists('AssemblyInfo.fs')" />
+    <Compile Include="Json.fs" />
+    <ProjectReference Include="..\Suave\Suave.fsproj" />
+  </ItemGroup>
+  <Import Project="..\..\.paket\Paket.Restore.targets" />
+</Project>

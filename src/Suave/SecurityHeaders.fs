@@ -87,9 +87,9 @@ module SecurityHeaders =
       | UnsafeHashes -> "'unsafe-hashes'"
       | StrictDynamic -> "'strict-dynamic'"
       | ReportSample -> "'report-sample'"
-      | Nonce n -> sprintf "'nonce-%s'" n
-      | Hash (alg, value) -> sprintf "'%s-%s'" alg value
-      | Scheme s -> sprintf "%s:" s
+      | Nonce n -> $"'nonce-{n}'"
+      | Hash (alg, value) -> $"'{alg}-{value}'"
+      | Scheme s -> $"{s}:"
       | Host h -> h
       | Custom c -> c
 
@@ -115,7 +115,7 @@ module SecurityHeaders =
       match this with
       | Deny -> "DENY"
       | SameOrigin -> "SAMEORIGIN"
-      | AllowFrom uri -> sprintf "ALLOW-FROM %s" uri
+      | AllowFrom uri -> $"ALLOW-FROM {uri}"
 
   /// Referrer-Policy values
   type ReferrerPolicy =
@@ -201,7 +201,9 @@ module SecurityHeaders =
       | AllOrigins -> "*"
       | SelfOnly -> "self"
       | NoOrigins -> "()"
-      | Origins origins -> sprintf "(%s)" (String.concat " " origins)
+      | Origins origins ->
+          let joined = String.concat " " origins
+          $"({joined})"
 
   /// Permissions-Policy rule
   type PermissionsRule =
@@ -265,15 +267,14 @@ module SecurityHeaders =
           // Directives without sources (like upgrade-insecure-requests)
           rule.directive.Name
       | sources ->
-          sprintf "%s %s" 
-            rule.directive.Name 
-            (sources |> List.map (fun s -> s.Value) |> String.concat " "))
+          let joined = sources |> List.map (fun s -> s.Value) |> String.concat " "
+          $"{rule.directive.Name} {joined}")
     |> String.concat "; "
 
   /// Build HSTS header value
   let private buildHSTSHeader (config: HSTSConfig) : string =
     let parts = [
-      sprintf "max-age=%d" config.maxAge
+      $"max-age={config.maxAge}"
       if config.includeSubDomains then "includeSubDomains"
       if config.preload then "preload"
     ]
@@ -283,7 +284,7 @@ module SecurityHeaders =
   let private buildPermissionsPolicyHeader (rules: PermissionsRule list) : string =
     rules
     |> List.map (fun rule -> 
-      sprintf "%s=%s" rule.directive.Name rule.allowlist.Value)
+      $"{rule.directive.Name}={rule.allowlist.Value}")
     |> String.concat ", "
 
   /// Generate a cryptographically random nonce for CSP

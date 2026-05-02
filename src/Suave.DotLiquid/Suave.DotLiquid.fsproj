@@ -3,6 +3,13 @@
     <TargetFrameworks>net10.0</TargetFrameworks>
     <AssemblyName>Suave.DotLiquid</AssemblyName>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!--
+      DotLiquid relies heavily on runtime reflection (FSharpType.GetRecordFields,
+      typedefof, Assembly.GetTypes) to discover view-model shapes at render time.
+      This package is therefore explicitly NOT compatible with .NET Native AOT.
+    -->
+    <IsAotCompatible>false</IsAotCompatible>
+    <IsTrimmable>false</IsTrimmable>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" Condition="Exists('AssemblyInfo.fs')" />

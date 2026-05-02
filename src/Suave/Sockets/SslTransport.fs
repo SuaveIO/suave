@@ -63,11 +63,11 @@ type SslTransport(listenSocket: Socket, certificate: X509Certificate, cancellati
         return Ok(remoteBinding socket)
       with
         | :? AuthenticationException as ex ->
-          return Result.Error(ConnectionError(sprintf "SSL authentication failed: %s" ex.Message))
+          return Result.Error(ConnectionError($"SSL authentication failed: {ex.Message}"))
         | :? IOException as ex ->
-          return Result.Error(ConnectionError(sprintf "SSL IO error: %s" ex.Message))
+          return Result.Error(ConnectionError($"SSL IO error: {ex.Message}"))
         | ex ->
-          return Result.Error(ConnectionError(sprintf "SSL error: %s" ex.Message))
+          return Result.Error(ConnectionError($"SSL error: {ex.Message}"))
     }
 
   member this.readInternal(buf: ByteSegment) =
@@ -118,13 +118,13 @@ type SslTransport(listenSocket: Socket, certificate: X509Certificate, cancellati
               return Ok bytesRead
             with
             | :? IOException as ex ->
-              return Result.Error(Error.ConnectionError(sprintf "SSL read error: %s" ex.Message))
+              return Result.Error(Error.ConnectionError($"SSL read error: {ex.Message}"))
             | :? SocketException as ex ->
               return Result.Error(Error.SocketError(ex.SocketErrorCode))
             | :? ObjectDisposedException ->
               return Result.Error(Error.ConnectionError("SSL stream has been disposed"))
             | ex ->
-              return Result.Error(Error.ConnectionError(sprintf "Unexpected SSL read error: %s" ex.Message))
+              return Result.Error(Error.ConnectionError($"Unexpected SSL read error: {ex.Message}"))
           })
 
     member this.write (buf : Memory<byte>) : SocketOp<unit> =
@@ -142,13 +142,13 @@ type SslTransport(listenSocket: Socket, certificate: X509Certificate, cancellati
               return Ok()
             with
             | :? IOException as ex ->
-              return Result.Error(Error.ConnectionError(sprintf "SSL write error: %s" ex.Message))
+              return Result.Error(Error.ConnectionError($"SSL write error: {ex.Message}"))
             | :? SocketException as ex ->
               return Result.Error(Error.SocketError(ex.SocketErrorCode))
             | :? ObjectDisposedException ->
               return Result.Error(Error.ConnectionError("SSL stream has been disposed"))
             | ex ->
-              return Result.Error(Error.ConnectionError(sprintf "Unexpected SSL write error: %s" ex.Message))
+              return Result.Error(Error.ConnectionError($"Unexpected SSL write error: {ex.Message}"))
           })
 
     member this.shutdown() =

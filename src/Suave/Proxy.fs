@@ -26,7 +26,7 @@ let private httpWebResponseToHttpContext (ctx : HttpContext) (response : HttpWeb
 
   let writeContentLengthHeader (conn:Connection) = task {
     match headers ? ("Content-Length") with
-    | Some x -> do! conn.asyncWriteLn (sprintf "Content-Length: %s" x)
+    | Some x -> do! conn.asyncWriteLn ($"Content-Length: {x}")
     | None -> ()
     }
 
@@ -57,9 +57,9 @@ let proxy (newHost : Uri) : WebPart =
       let remappedAddress =
         if [ 80; 443 ] |> Seq.contains newHost.Port
         then
-          sprintf "%s://%s%s" newHost.Scheme newHost.Host ctx.request.path
+          $"{newHost.Scheme}://{newHost.Host}{ctx.request.path}"
         else
-          sprintf "%s://%s:%i%s" newHost.Scheme newHost.Host newHost.Port ctx.request.path
+          $"{newHost.Scheme}://{newHost.Host}:{newHost.Port}{ctx.request.path}"
 
       let request = WebRequest.Create remappedAddress :?> HttpWebRequest
 

@@ -70,8 +70,8 @@ module ConnectionHealthChecker =
           Healthy
     with
     | :? ObjectDisposedException -> Unhealthy "Socket disposed"
-    | :? SocketException as ex -> Unhealthy (sprintf "Socket exception: %s" ex.Message)
-    | ex -> Unhealthy (sprintf "Exception: %s" ex.Message)
+    | :? SocketException as ex -> Unhealthy ($"Socket exception: {ex.Message}")
+    | ex -> Unhealthy ($"Exception: {ex.Message}")
 
   /// Configuration for health checker behavior
   type HealthCheckerConfig = {

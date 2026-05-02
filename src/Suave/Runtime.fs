@@ -78,7 +78,7 @@ module Runtime =
 
     let validate (key : ServerKey) =
       if key.Length <> int Crypto.KeyLength then
-        failwithf "Invalid server key length - should be %i, but was %i" Crypto.KeyLength key.Length
+        failwith $"Invalid server key length - should be {Crypto.KeyLength}, but was {key.Length}"
       key
 
     let fromBase64 =
