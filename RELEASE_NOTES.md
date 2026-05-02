@@ -1,3 +1,6 @@
+## New in v3.3.0 (Released 2026-05-02)
+* Add optional FilePartSink to configuration record to stream uploads without temp files. (#796)
+
 ## New in v3.2.3 (Released 2026-01-16)
 * Update dependencies.
 
