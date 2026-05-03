@@ -401,10 +401,10 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
       // Note: Push() now notifies the tracker that connection is being returned
       connectionPool.Push(this)
 
-  // Return the lineBuffer to the ArrayPool when the connection is disposed
+  // Return the lineBuffer to Suave's private BufferPool when the connection is disposed.
   interface IDisposable with
     member this.Dispose() =
-      System.Buffers.ArrayPool<byte>.Shared.Return(connection.lineBuffer, true)
+      Suave.Globals.BufferPool.returnArray connection.lineBuffer true
 
   /// The request loop initialises a request with a processor to handle the
   /// incoming stream and possibly pass the request to the web parts, a protocol,

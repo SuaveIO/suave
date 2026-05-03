@@ -54,8 +54,9 @@ let createReader (transport: ITransport) pipe cancellationToken =
 
 let createConnection listenSocket binding cancellationToken bufferSize =
   let transport = createTransport listenSocket binding cancellationToken
-  // Rent from ArrayPool instead of allocating fresh buffer
-  let lineBuffer = System.Buffers.ArrayPool<byte>.Shared.Rent(bufferSize)
+  // Rent from Suave's private BufferPool to avoid contention on the process-wide
+  // ArrayPool<byte>.Shared (used by the BCL, JSON, gzip, ASP.NET, etc.).
+  let lineBuffer = Globals.BufferPool.rent bufferSize
   let pipe = new Pipe()
   let reader = createReader transport pipe cancellationToken
   { socketBinding = SocketBinding.create IPAddress.IPv6Loopback 8080us;

@@ -155,9 +155,10 @@ type HttpReader(transport : ITransport, pipe: Pipe, cancellationToken: Threading
   let mutable running : bool = true
   let mutable dirty : bool = false
   let dirtyLock = new obj()
-  let readLineBuffer = System.Buffers.ArrayPool<byte>.Shared.Rent(8192)
-  // Scratch buffer for ASCII-lowercasing unknown header names without re-renting from the shared pool.
-  let nameLowerBuffer = System.Buffers.ArrayPool<byte>.Shared.Rent(256)
+  // Rent from Suave's private BufferPool — see Suave.Globals.BufferPool for rationale.
+  let readLineBuffer = Suave.Globals.BufferPool.rent 8192
+  // Scratch buffer for ASCII-lowercasing unknown header names.
+  let nameLowerBuffer = Suave.Globals.BufferPool.rent 256
 
   // Use SemaphoreSlim instead of lock to allow async waiting
   let pipeReaderSemaphore = new Threading.SemaphoreSlim(1, 1)
@@ -499,9 +500,9 @@ type HttpReader(transport : ITransport, pipe: Pipe, cancellationToken: Threading
       return Result.Error(Error.ConnectionError ex.Message)
   }
 
-  // Return readLineBuffer to the ArrayPool when the reader is disposed
+  // Return per-connection buffers to Suave's private pool when the reader is disposed.
   interface IDisposable with
     member this.Dispose() =
-      System.Buffers.ArrayPool<byte>.Shared.Return(readLineBuffer, true)
-      System.Buffers.ArrayPool<byte>.Shared.Return(nameLowerBuffer, true)
+      Suave.Globals.BufferPool.returnArray readLineBuffer true
+      Suave.Globals.BufferPool.returnArray nameLowerBuffer true
       pipeReaderSemaphore.Dispose()
