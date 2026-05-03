@@ -176,41 +176,64 @@ type HttpOutput(connection: Connection, runtime: HttpRuntime) =
   static member inline private headerNameEqualsCI (a : string) (lowerB : string) : bool =
     System.String.Equals(a, lowerB, System.StringComparison.OrdinalIgnoreCase)
 
-  member inline this.writeHeaders (exclusions : string list) (headers : (string*string) seq) = task {
-    use sourceEnumerator = headers.GetEnumerator()
-    while sourceEnumerator.MoveNext() do
-      let x,y = sourceEnumerator.Current
-      let mutable excluded = false
-      // List.exists allocates a closure; use an explicit loop to keep this allocation-free.
-      let mutable rest = exclusions
-      while not excluded && not (List.isEmpty rest) do
-        if System.String.Equals(x, List.head rest, System.StringComparison.OrdinalIgnoreCase) then
-          excluded <- true
-        rest <- List.tail rest
-      if not excluded then
-        // Use pre-computed header name bytes when available
-        let headerNameBytes = ByteConstants.getHeaderBytes x
-        do! this.appendOrFlush headerNameBytes
-        do! this.appendOrFlush ByteConstants.colonBytes
-        // Header value: encode UTF-8 directly into lineBuffer when it fits in ASCII range.
-        // Fast path: detect pure-ASCII header value (very common) and bytewise copy.
-        let conn = this.Connection
-        let mutable allAscii = true
-        let mutable i = 0
-        while allAscii && i < y.Length do
-          if int y.[i] > 0x7F then allAscii <- false
-          i <- i + 1
-        if allAscii && conn.lineBufferCount + y.Length + 2 <= conn.lineBuffer.Length then
-          // Single synchronous block: value + CRLF
-          let baseIdx = conn.lineBufferCount
-          for j = 0 to y.Length - 1 do
-            conn.lineBuffer.[baseIdx + j] <- byte y.[j]
-          conn.lineBuffer.[baseIdx + y.Length] <- 0x0Duy
-          conn.lineBuffer.[baseIdx + y.Length + 1] <- 0x0Auy
-          conn.lineBufferCount <- baseIdx + y.Length + 2
-        else
-          do! conn.asyncWrite y
-          do! this.appendOrFlush ByteConstants.EOL
+  /// Returns true if the given header name matches any name in the exclusion list (case-insensitive).
+  /// Walks the list directly with pattern matching — no closure allocation, no enumerator.
+  static member inline private isExcluded (name : string) (exclusions : string list) : bool =
+    let mutable rest = exclusions
+    let mutable found = false
+    while not found && not (List.isEmpty rest) do
+      match rest with
+      | [] -> ()
+      | h :: t ->
+        if System.String.Equals(name, h, System.StringComparison.OrdinalIgnoreCase) then
+          found <- true
+        rest <- t
+    found
+
+  /// Write a single header (name + value) into the response buffer. Inlined into the
+  /// list-walking loop to keep that loop allocation-free on the hot path.
+  member private this.writeOneHeader (name : string) (value : string) = task {
+    // Use pre-computed header name bytes when available
+    let headerNameBytes = ByteConstants.getHeaderBytes name
+    do! this.appendOrFlush headerNameBytes
+    do! this.appendOrFlush ByteConstants.colonBytes
+    // Fast path: detect pure-ASCII header value (very common) and bytewise copy directly
+    // into lineBuffer along with the trailing CRLF — single synchronous block.
+    let conn = this.Connection
+    let mutable allAscii = true
+    let mutable i = 0
+    while allAscii && i < value.Length do
+      if int value.[i] > 0x7F then allAscii <- false
+      i <- i + 1
+    if allAscii && conn.lineBufferCount + value.Length + 2 <= conn.lineBuffer.Length then
+      let baseIdx = conn.lineBufferCount
+      for j = 0 to value.Length - 1 do
+        conn.lineBuffer.[baseIdx + j] <- byte value.[j]
+      conn.lineBuffer.[baseIdx + value.Length] <- 0x0Duy
+      conn.lineBuffer.[baseIdx + value.Length + 1] <- 0x0Auy
+      conn.lineBufferCount <- baseIdx + value.Length + 2
+    else
+      do! conn.asyncWrite value
+      do! this.appendOrFlush ByteConstants.EOL
+  }
+
+  /// Walk the response headers list directly via pattern matching. Compared to the previous
+  /// implementation which iterated through the `seq<_>` interface and called `GetEnumerator()`,
+  /// this avoids:
+  ///   - enumerator allocation per response,
+  ///   - boxing the list into IEnumerable on the call site,
+  ///   - per-iteration closure allocations from `List.exists`.
+  /// The cons cells of the input list already exist (the caller built them); we simply
+  /// traverse them with no extra allocation.
+  member this.writeHeaders (exclusions : string list) (headers : (string*string) list) = task {
+    let mutable rest = headers
+    while not (List.isEmpty rest) do
+      match rest with
+      | [] -> ()
+      | (name, value) :: tail ->
+        if not (HttpOutput.isExcluded name exclusions) then
+          do! this.writeOneHeader name value
+        rest <- tail
     }
 
   member this.writePreamble (response:HttpResult) = task {
