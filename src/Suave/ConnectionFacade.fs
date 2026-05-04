@@ -27,8 +27,14 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
 
   let reader = connection.reader
 
-  let mutable files = List<HttpUpload>()
-  let mutable multiPartFields = List<string*string>()
+  // Per-connection pooled collections. These are allocated once when the ConnectionFacade
+  // is created and then cleared (not reallocated) at the start of every request. Because a
+  // ConnectionFacade processes one request at a time on its connection, this is safe.
+  // Webparts must not retain references to a request's collections beyond the request's
+  // own task — Suave never has and never did promise that.
+  let files = List<HttpUpload>()
+  let multiPartFields = List<string*string>()
+  let requestHeaders = List<string*string>()
   let mutable _rawForm : byte array = [||]
 
   let readFilePart boundary (headerParams : Dictionary<string,string>) fieldName contentType : SocketOp<HttpUpload option> =
@@ -252,68 +258,96 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
   member val ConnectionId = connectionId with get
 
   member this.parsePostData maxContentLength (contentLengthHeader : Choice<string,_>) (contentTypeHeader:Choice<string,_>) : SocketOp<unit> =
-    socket {
-      match contentLengthHeader with
-      | Choice1Of2 contentLengthString ->
-        let contentLength = Convert.ToInt32 contentLengthString
+    // Hot-path version: a direct task { } that hand-binds Result values instead of routing
+    // through the socket { } CE. Only the cold multipart path still uses socket { }.
+    ValueTask<Result<unit,Error>>(
+      task {
+        match contentLengthHeader with
+        | Choice2Of2 _ -> return Ok ()
+        | Choice1Of2 contentLengthString ->
+          let contentLength = Convert.ToInt32 contentLengthString
+          if contentLength > maxContentLength then
+            return Result.Error (InputDataError (Some 413, "Payload too large"))
+          else
+            match contentTypeHeader with
+            | Choice1Of2 ce when String.startsWith "multipart/form-data" ce ->
+              let boundary = "--" + parseBoundary ce
+              // Cold path: keep the socket { } CE for multipart; we don't try to optimize it here.
+              let! mp = (parseMultipart boundary).AsTask()
+              return mp
+            | _ ->
+              // application/x-www-form-urlencoded and everything else read raw bytes.
+              let! raw = (getRawPostData contentLength).AsTask()
+              match raw with
+              | Ok rawForm ->
+                _rawForm <- rawForm
+                return Ok ()
+              | Result.Error e ->
+                return Result.Error e
+      })
 
-        if contentLength > maxContentLength then
-          return! SocketOp.abort(InputDataError (Some 413, "Payload too large"))
-        else
-          match contentTypeHeader with
-          | Choice1Of2 ce when String.startsWith "application/x-www-form-urlencoded" ce ->
-            let! rawForm = getRawPostData contentLength
-            _rawForm <- rawForm
-          | Choice1Of2 ce when String.startsWith "multipart/form-data" ce ->
-            let boundary = "--" + parseBoundary ce
-            do! parseMultipart boundary
-          | Choice1Of2 _ | Choice2Of2 _ ->
-            let! rawForm = getRawPostData contentLength
-            _rawForm <- rawForm
+  member this.readRequest () : SocketOp<HttpRequest> =
+    // Steady-state hot path. We deliberately avoid the socket { } CE here because each
+    // of its binds wraps a task in a ValueTask and forces .AsTask() boxing on every let!.
+    // Instead we run a single task { } and hand-bind the Result returned by each step.
+    ValueTask<Result<HttpRequest,Error>>(
+      task {
+        // Clear pooled per-connection collections at the start of every request rather than
+        // allocating fresh ones. The collections live on the ConnectionFacade and are reset
+        // here, before the new request is parsed in.
+        requestHeaders.Clear()
+        files.Clear()
+        multiPartFields.Clear()
+        _rawForm <- [||]
 
-          return ()
-      | Choice2Of2 _ -> return ()
-    }
+        let! firstLineRes = reader.readLine()
+        match firstLineRes with
+        | Result.Error e -> return Result.Error e
+        | Ok firstLine ->
 
-  member this.readRequest () = socket {
+        match parseUrl firstLine with
+        | Choice2Of2 _ ->
+          return Result.Error (InputDataError (None, "Invalid first line"))
+        | Choice1Of2 (rawMethod, path, rawQuery, httpVersion) ->
 
-    let! firstLine = reader.readLine()
+        let! headersRes = reader.readHeadersInto(requestHeaders)
+        match headersRes with
+        | Result.Error e -> return Result.Error e
+        | Ok headers ->
 
-    let! (rawMethod, path, rawQuery, httpVersion) =
-      parseUrl firstLine
-      @|! (None, "Invalid first line")
+        match headers @@ "host" with
+        | Choice2Of2 _ ->
+          return Result.Error (InputDataError (None, "Missing 'Host' header"))
+        | Choice1Of2 rawHost ->
 
-    let! headers = reader.readHeaders()
+        // 100-continue handling
+        if headers @@ "expect" = Choice1Of2 "100-continue" then
+          let! _ = httpOutput.run HttpRequest.empty Intermediate.CONTINUE
+          ()
 
-    // Respond with 400 Bad Request as
-    // per http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html
-    let! rawHost = (headers @@ "host") @|! (None, "Missing 'Host' header")
+        let! postRes =
+          this.parsePostData
+            runtime.maxContentLength
+            (headers @@ "content-length")
+            (headers @@ "content-type")
+        match postRes with
+        | Result.Error e -> return Result.Error e
+        | Ok () ->
 
-    if headers @@ "expect" = Choice1Of2 "100-continue" then
-      let! _ = SocketOp.ofTask (httpOutput.run HttpRequest.empty Intermediate.CONTINUE)
-      ()
+        let request =
+          { httpVersion      = httpVersion
+            binding          = runtime.matchedBinding
+            rawPath          = path
+            rawHost          = rawHost
+            rawMethod        = rawMethod
+            headers          = headers
+            rawForm          = _rawForm
+            rawQuery         = rawQuery
+            files            = files
+            multiPartFields  = multiPartFields }
 
-    do! this.parsePostData runtime.maxContentLength (headers @@ "content-length") (headers @@ "content-type")
-
-    let request =
-      { httpVersion      = httpVersion
-        binding          = runtime.matchedBinding
-        rawPath          = path
-        rawHost          = rawHost
-        rawMethod        = rawMethod
-        headers          = headers
-        rawForm          = _rawForm
-        rawQuery         = rawQuery
-        files            = files
-        multiPartFields  = multiPartFields }
-    
-    // Clear form data before exit
-    files <- List<_>()
-    multiPartFields <- List<_>()
-    _rawForm <- [||]
-
-    return request
-  }
+        return Ok request
+      })
 
   member this.exitHttpLoopWithError (err:Error) = task{
       match err with
@@ -367,10 +401,10 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
       // Note: Push() now notifies the tracker that connection is being returned
       connectionPool.Push(this)
 
-  // Return the lineBuffer to the ArrayPool when the connection is disposed
+  // Return the lineBuffer to Suave's private BufferPool when the connection is disposed.
   interface IDisposable with
     member this.Dispose() =
-      System.Buffers.ArrayPool<byte>.Shared.Return(connection.lineBuffer, true)
+      Suave.Globals.BufferPool.returnArray connection.lineBuffer true
 
   /// The request loop initialises a request with a processor to handle the
   /// incoming stream and possibly pass the request to the web parts, a protocol,

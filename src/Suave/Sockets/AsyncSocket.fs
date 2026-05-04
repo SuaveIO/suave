@@ -27,18 +27,18 @@ let transferStreamWithBuffer (buf: ArraySegment<_>) (toStream : Connection) (fro
 /// Asynchronously write from the 'from' stream to the 'to' stream.
 let transferStream (toStream : Connection) (from : Stream) =
   task {
-    let buf = ArrayPool<byte>.Shared.Rent(8192)
+    let buf = Suave.Globals.BufferPool.rent 8192
     try
       do! transferStreamWithBuffer (new ArraySegment<_>(buf, 0, 8192)) toStream from
     finally
-      ArrayPool<byte>.Shared.Return(buf, true)
+      Suave.Globals.BufferPool.returnArray buf true
   }
 
 let internal zeroCharMemory = new Memory<byte>(Encoding.ASCII.GetBytes "0")
 
 let transferStreamChunked (conn : Connection) (from : Stream) =
   task {
-    let buf = ArrayPool<byte>.Shared.Rent(1024)
+    let buf = Suave.Globals.BufferPool.rent 1024
     try
       let mutable reading = true
       while reading do
@@ -59,5 +59,5 @@ let transferStreamChunked (conn : Connection) (from : Stream) =
           let! _ = send conn Bytes.eolMemory
           ()
     finally
-      ArrayPool<byte>.Shared.Return(buf, true)
+      Suave.Globals.BufferPool.returnArray buf true
   }

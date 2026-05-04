@@ -52,6 +52,30 @@ module DateCache =
 /// Cached UTF8 encoding to avoid allocating new instances
 let UTF8 = System.Text.Encoding.UTF8
 
+/// Dedicated byte ArrayPool isolated from System.Buffers.ArrayPool.Shared.
+///
+/// Rationale: ArrayPool.Shared is process-wide and contended by every library
+/// running in the host (the BCL itself, ASP.NET if hosted side-by-side,
+/// JSON serialisers, gzip streams, …). Under high concurrency, even though
+/// Shared has thread-local caches, the cross-bucket fall-through paths take
+/// locks that show up in profiles. By renting Suave's per-connection buffers
+/// (line buffer, header read buffer, header-name lowercase scratch) from a
+/// pool we own, we keep our hot-path rentals out of that shared contention
+/// surface entirely.
+///
+/// Tuning: ArrayPool.Create defaults are 1MB max length, 50 arrays per bucket.
+/// Suave's typical rentals are 8KiB and 256B; the defaults are appropriate.
+module BufferPool =
+  open System.Buffers
+  let pool : ArrayPool<byte> = ArrayPool<byte>.Create()
+
+  /// Rent a byte array of at least the requested size from Suave's private pool.
+  let inline rent (size: int) : byte[] = pool.Rent size
+
+  /// Return a byte array to Suave's private pool.
+  /// `clearArray = true` zeroes the contents to prevent any data bleed between connections.
+  let inline returnArray (buf: byte[]) (clearArray: bool) = pool.Return(buf, clearArray)
+
 /// StringBuilder pool for dynamic content generation
 module StringBuilderPool =
   open System.Text

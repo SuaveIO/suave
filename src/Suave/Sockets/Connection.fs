@@ -196,6 +196,43 @@ type Connection =
           }
     loop 0
 
+  /// Synchronous append into lineBuffer. Returns true if the bytes fit and were
+  /// appended; false if there is not enough room. Does not call into the transport.
+  /// This is the zero-allocation hot-path used by the response preamble assembly.
+  member inline this.tryAppendSpan (b : ReadOnlySpan<byte>) : bool =
+    if this.lineBufferCount + b.Length <= this.lineBuffer.Length then
+      b.CopyTo(Span<byte>(this.lineBuffer, this.lineBufferCount, b.Length))
+      this.lineBufferCount <- this.lineBufferCount + b.Length
+      true
+    else
+      false
+
+  /// Synchronous append into lineBuffer assuming room exists. Caller must guarantee capacity.
+  member inline this.appendSpanUnsafe (b : ReadOnlySpan<byte>) =
+    b.CopyTo(Span<byte>(this.lineBuffer, this.lineBufferCount, b.Length))
+    this.lineBufferCount <- this.lineBufferCount + b.Length
+
+  /// Format an int32 directly into lineBuffer as ASCII digits. Returns true on success,
+  /// false if there is not enough room. Avoids allocating an intermediate byte[]/string.
+  member inline this.tryAppendInt (value : int) : bool =
+    // Max 11 chars for int32 (sign + 10 digits)
+    let mutable charBuf = System.Span<char>(Array.zeroCreate<char> 11)
+    let mutable charsWritten = 0
+    if value.TryFormat(charBuf, &charsWritten) then
+      if this.lineBufferCount + charsWritten > this.lineBuffer.Length then
+        false
+      else
+        let dst = this.lineBuffer
+        let mutable i = 0
+        let baseIdx = this.lineBufferCount
+        while i < charsWritten do
+          dst.[baseIdx + i] <- byte charBuf.[i]
+          i <- i + 1
+        this.lineBufferCount <- this.lineBufferCount + charsWritten
+        true
+    else
+      false
+
   member inline this.writeChunk (chunk : byte []) = task {
     let chunkLength = chunk.Length.ToString("X")
     do! this.asyncWriteLn chunkLength

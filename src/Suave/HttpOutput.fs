@@ -111,11 +111,47 @@ type HttpOutput(connection: Connection, runtime: HttpRuntime) =
   
   // Expose connection as a property to enable inlining of write methods
   member val Connection = connection with get
-       
-  member inline this.writeContentType (headers : (string*string) list) = task {
-    if not(List.exists(fun (x : string,_) -> x.ToLower().Equals("content-type")) headers )then
-      return! this.Connection.asyncWriteBufferedBytes ByteConstants.defaultContentTypeHeaderBytes
-  }
+
+  /// Append a small ROM into the lineBuffer. Stays synchronous (no allocation) when the
+  /// chunk fits; otherwise flushes and either re-appends or falls back to a direct write.
+  /// This is the workhorse used by the response preamble assembly path.
+  member inline private this.appendOrFlush (b : ReadOnlyMemory<byte>) : System.Threading.Tasks.ValueTask =
+    let conn = this.Connection
+    if conn.tryAppendSpan b.Span then
+      System.Threading.Tasks.ValueTask.CompletedTask
+    else
+      System.Threading.Tasks.ValueTask(task {
+        do! conn.flush()
+        // After flush the buffer is empty; if the chunk fits, copy it; else write directly.
+        if b.Length <= conn.lineBuffer.Length then
+          b.Span.CopyTo(System.Span<byte>(conn.lineBuffer, 0, b.Length))
+          conn.lineBufferCount <- b.Length
+        else
+          do! conn.asyncWriteBufferedBytes b
+      })
+
+  /// Append an int32 (formatted as decimal ASCII) into lineBuffer with auto-flush on overflow.
+  member inline private this.appendIntOrFlush (value : int) : System.Threading.Tasks.ValueTask =
+    let conn = this.Connection
+    if conn.tryAppendInt value then
+      System.Threading.Tasks.ValueTask.CompletedTask
+    else
+      System.Threading.Tasks.ValueTask(task {
+        do! conn.flush()
+        if not (conn.tryAppendInt value) then
+          // Should never happen for int32 (max 11 bytes vs >=8KiB buffer) but be safe.
+          do! conn.asyncWriteBufferedBytes (ByteConstants.formatIntToBytes value)
+      })
+
+  member inline this.writeContentType (headers : (string*string) list) =
+    let mutable hasContentType = false
+    for (x, _) in headers do
+      if not hasContentType && System.String.Equals(x, "content-type", System.StringComparison.OrdinalIgnoreCase) then
+        hasContentType <- true
+    if hasContentType then
+      System.Threading.Tasks.ValueTask.CompletedTask
+    else
+      this.appendOrFlush ByteConstants.defaultContentTypeHeaderBytes
 
   member inline this.writeContentLengthHeader (content : byte[]) (context : HttpContext) = task {
     match context.request.``method``, context.response.status.code with
@@ -127,26 +163,77 @@ type HttpOutput(connection: Connection, runtime: HttpRuntime) =
     | (HttpMethod.CONNECT, 203)
     | (HttpMethod.CONNECT, 205)
     | (HttpMethod.CONNECT, 206) ->
-      return! this.Connection.asyncWriteBufferedBytes ByteConstants.EOL
+      do! this.appendOrFlush ByteConstants.EOL
     | _ ->
-      // Use Span-based formatting to avoid string allocation
-      let lengthBytes = ByteConstants.formatIntToBytes content.Length
-      // Write sequentially to avoid array allocation
-      do! this.Connection.asyncWriteBufferedBytes ByteConstants.contentLengthBytes
-      do! this.Connection.asyncWriteBufferedBytes lengthBytes
-      return! this.Connection.asyncWriteBufferedBytes ByteConstants.EOLEOL
+      // Build "Content-Length: N\r\n\r\n" directly into lineBuffer. The whole sequence is
+      // small (~24 bytes) and almost always fits, so we expect a single sync path.
+      do! this.appendOrFlush ByteConstants.contentLengthBytes
+      do! this.appendIntOrFlush content.Length
+      do! this.appendOrFlush ByteConstants.EOLEOL
     }
 
-  member inline this.writeHeaders exclusions (headers : (string*string) seq) = task {
-    use sourceEnumerator = headers.GetEnumerator()
-    while sourceEnumerator.MoveNext() do
-      let x,y = sourceEnumerator.Current
-      if not (List.exists (fun y -> x.ToLower().Equals(y)) exclusions) then
-        // Use pre-computed header name bytes when available
-        let headerNameBytes = ByteConstants.getHeaderBytes x
-        do! this.Connection.asyncWriteBufferedBytes headerNameBytes
-        do! this.Connection.asyncWrite ": "
-        do! this.Connection.asyncWriteLn y
+  /// Compare a header name against a lowercase-ASCII excluded name without allocating.
+  static member inline private headerNameEqualsCI (a : string) (lowerB : string) : bool =
+    System.String.Equals(a, lowerB, System.StringComparison.OrdinalIgnoreCase)
+
+  /// Returns true if the given header name matches any name in the exclusion list (case-insensitive).
+  /// Walks the list directly with pattern matching — no closure allocation, no enumerator.
+  static member inline private isExcluded (name : string) (exclusions : string list) : bool =
+    let mutable rest = exclusions
+    let mutable found = false
+    while not found && not (List.isEmpty rest) do
+      match rest with
+      | [] -> ()
+      | h :: t ->
+        if System.String.Equals(name, h, System.StringComparison.OrdinalIgnoreCase) then
+          found <- true
+        rest <- t
+    found
+
+  /// Write a single header (name + value) into the response buffer. Inlined into the
+  /// list-walking loop to keep that loop allocation-free on the hot path.
+  member private this.writeOneHeader (name : string) (value : string) = task {
+    // Use pre-computed header name bytes when available
+    let headerNameBytes = ByteConstants.getHeaderBytes name
+    do! this.appendOrFlush headerNameBytes
+    do! this.appendOrFlush ByteConstants.colonBytes
+    // Fast path: detect pure-ASCII header value (very common) and bytewise copy directly
+    // into lineBuffer along with the trailing CRLF — single synchronous block.
+    let conn = this.Connection
+    let mutable allAscii = true
+    let mutable i = 0
+    while allAscii && i < value.Length do
+      if int value.[i] > 0x7F then allAscii <- false
+      i <- i + 1
+    if allAscii && conn.lineBufferCount + value.Length + 2 <= conn.lineBuffer.Length then
+      let baseIdx = conn.lineBufferCount
+      for j = 0 to value.Length - 1 do
+        conn.lineBuffer.[baseIdx + j] <- byte value.[j]
+      conn.lineBuffer.[baseIdx + value.Length] <- 0x0Duy
+      conn.lineBuffer.[baseIdx + value.Length + 1] <- 0x0Auy
+      conn.lineBufferCount <- baseIdx + value.Length + 2
+    else
+      do! conn.asyncWrite value
+      do! this.appendOrFlush ByteConstants.EOL
+  }
+
+  /// Walk the response headers list directly via pattern matching. Compared to the previous
+  /// implementation which iterated through the `seq<_>` interface and called `GetEnumerator()`,
+  /// this avoids:
+  ///   - enumerator allocation per response,
+  ///   - boxing the list into IEnumerable on the call site,
+  ///   - per-iteration closure allocations from `List.exists`.
+  /// The cons cells of the input list already exist (the caller built them); we simply
+  /// traverse them with no extra allocation.
+  member this.writeHeaders (exclusions : string list) (headers : (string*string) list) = task {
+    let mutable rest = headers
+    while not (List.isEmpty rest) do
+      match rest with
+      | [] -> ()
+      | (name, value) :: tail ->
+        if not (HttpOutput.isExcluded name exclusions) then
+          do! this.writeOneHeader name value
+        rest <- tail
     }
 
   member this.writePreamble (response:HttpResult) = task {
@@ -168,21 +255,50 @@ type HttpOutput(connection: Connection, runtime: HttpRuntime) =
       | 500 -> ByteConstants.statusCode500, ByteConstants.reason500
       | 502 -> ByteConstants.statusCode502, ByteConstants.reason502
       | 503 -> ByteConstants.statusCode503, ByteConstants.reason503
-      | code -> ASCII.bytes (code.ToString()), ASCII.bytes (r.status.reason)
-    
-    // Write status line sequentially to avoid array allocation
-    do! connection.asyncWriteBufferedBytes ByteConstants.httpVersionBytes
-    do! connection.asyncWriteBufferedBytes statusCodeBytes
-    do! connection.asyncWriteBufferedBytes ByteConstants.spaceBytes
-    do! connection.asyncWriteBufferedBytes reasonBytes
-    do! connection.asyncWriteBufferedBytes ByteConstants.dateBytes
-    do! connection.asyncWriteBufferedBytes (Globals.DateCache.getHttpDateBytes())
-    do! connection.asyncWriteBufferedBytes ByteConstants.EOL
+      | code -> ReadOnlyMemory(ASCII.bytes (code.ToString())), ReadOnlyMemory(ASCII.bytes (r.status.reason))
+
+    // Status line + Date header + (optional) Server header is a small, fixed-shape block.
+    // Try to write it all synchronously into lineBuffer in a single shot to avoid
+    // multiple state-machine MoveNext calls through the F# task CE.
+    let conn = this.Connection
+    let dateBytes = Globals.DateCache.getHttpDateBytes()
+    let serverBytes = ByteConstants.serverHeaderBytes
+    // Worst-case fixed bytes:
+    //   "HTTP/1.1 " (9) + status (3) + " " (1) + reason (<=24) + "\r\nDate: " (8)
+    //   + date (~30) + "\r\n" (2) + server (~30 if present) ~= < 128 bytes
+    let estimated =
+      ByteConstants.httpVersionBytes.Length
+      + statusCodeBytes.Length + ByteConstants.spaceBytes.Length + reasonBytes.Length
+      + ByteConstants.dateBytes.Length + dateBytes.Length + ByteConstants.EOL.Length
+      + (if runtime.hideHeader then 0 else serverBytes.Length)
+    if conn.lineBufferCount + estimated > conn.lineBuffer.Length then
+      do! conn.flush()
+    if conn.lineBufferCount + estimated <= conn.lineBuffer.Length then
+      // Hot path: everything fits, do all copies synchronously without further awaits.
+      conn.appendSpanUnsafe ByteConstants.httpVersionBytes.Span
+      conn.appendSpanUnsafe statusCodeBytes.Span
+      conn.appendSpanUnsafe ByteConstants.spaceBytes.Span
+      conn.appendSpanUnsafe reasonBytes.Span
+      conn.appendSpanUnsafe ByteConstants.dateBytes.Span
+      conn.appendSpanUnsafe (System.ReadOnlySpan<byte>(dateBytes))
+      conn.appendSpanUnsafe ByteConstants.EOL.Span
+      if not runtime.hideHeader then
+        conn.appendSpanUnsafe serverBytes.Span
+    else
+      // Cold path: flushed buffer still can't hold the prefix (extremely small lineBuffer).
+      do! this.appendOrFlush ByteConstants.httpVersionBytes
+      do! this.appendOrFlush statusCodeBytes
+      do! this.appendOrFlush ByteConstants.spaceBytes
+      do! this.appendOrFlush reasonBytes
+      do! this.appendOrFlush ByteConstants.dateBytes
+      do! this.appendOrFlush (ReadOnlyMemory(dateBytes))
+      do! this.appendOrFlush ByteConstants.EOL
+      if not runtime.hideHeader then
+        do! this.appendOrFlush serverBytes
 
     if runtime.hideHeader then
       do! this.writeHeaders ["date";"content-length"] r.headers
     else
-      do! connection.asyncWriteBufferedBytes ByteConstants.serverHeaderBytes
       do! this.writeHeaders ["server";"date";"content-length"] r.headers
     do! this.writeContentType r.headers
     }
