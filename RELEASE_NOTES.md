@@ -1,3 +1,6 @@
+## New in v3.3.1-beta2 (Released 2026-05-05)
+* Remove unneeded pipe lock, optimize write response.
+
 ## New in v3.3.1-beta1 (Released 2026-05-05)
 * Reduce string allocations, vectorized line-marker scanning.
 
