@@ -52,12 +52,25 @@ let createTransport listenSocket binding cancellationToken : ITransport =
 let createReader (transport: ITransport) pipe cancellationToken =
   new HttpReader(transport, pipe, cancellationToken)
 
+// Per-connection inbound Pipe options.
+// - Inline schedulers eliminate threadpool hops between the readLoop (writer side)
+//   and the request processor (reader side); since each connection is logically a
+//   single async sequence on a HTTP/1.1 keep-alive socket, running continuations
+//   inline on the completing thread avoids both a context switch and the Pipe's
+//   internal monitor contention that arises when two threads race on the lock.
+// - useSynchronizationContext=false avoids capturing/posting back to a SyncContext.
+let private pipeOptions =
+  new PipeOptions(
+    readerScheduler = PipeScheduler.Inline,
+    writerScheduler = PipeScheduler.Inline,
+    useSynchronizationContext = false)
+
 let createConnection listenSocket binding cancellationToken bufferSize =
   let transport = createTransport listenSocket binding cancellationToken
   // Rent from Suave's private BufferPool to avoid contention on the process-wide
   // ArrayPool<byte>.Shared (used by the BCL, JSON, gzip, ASP.NET, etc.).
   let lineBuffer = Globals.BufferPool.rent bufferSize
-  let pipe = new Pipe()
+  let pipe = new Pipe(pipeOptions)
   let reader = createReader transport pipe cancellationToken
   { socketBinding = SocketBinding.create IPAddress.IPv6Loopback 8080us;
       transport     = transport;
