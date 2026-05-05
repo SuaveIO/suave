@@ -149,6 +149,59 @@ module internal KnownHeaders =
         i <- i + 1
       result
 
+/// Interned ASCII byte-string lookups for HTTP request-line tokens.
+/// The request line ("GET /foo HTTP/1.1") only ever contains a small finite
+/// set of method and version tokens; recognising them by byte comparison and
+/// returning a pre-allocated `string` constant avoids a `UTF8.GetString`
+/// allocation per request for the method and per request for the version.
+module internal KnownMethods =
+
+  // Methods are case-sensitive in HTTP/1.1 (RFC 7230 §3.1.1) — no folding needed.
+  let private all : string[] =
+    [| "GET"; "POST"; "PUT"; "DELETE"; "HEAD"; "OPTIONS"; "PATCH"; "CONNECT"; "TRACE" |]
+
+  let private bytesEqual (span: System.ReadOnlySpan<byte>) (s: string) : bool =
+    if span.Length <> s.Length then false
+    else
+      let mutable i = 0
+      let mutable ok = true
+      while ok && i < s.Length do
+        if span.[i] <> byte s.[i] then ok <- false
+        i <- i + 1
+      ok
+
+  /// Return the interned method string, or `null` for an unknown method.
+  let tryMatch (span: System.ReadOnlySpan<byte>) : string =
+    let mutable i = 0
+    let mutable result : string = null
+    while isNull result && i < all.Length do
+      if bytesEqual span all.[i] then result <- all.[i]
+      i <- i + 1
+    result
+
+module internal KnownVersions =
+
+  let v11 = "HTTP/1.1"
+  let v10 = "HTTP/1.0"
+  let v20 = "HTTP/2.0"
+
+  let private bytesEqual (span: System.ReadOnlySpan<byte>) (s: string) : bool =
+    if span.Length <> s.Length then false
+    else
+      let mutable i = 0
+      let mutable ok = true
+      while ok && i < s.Length do
+        if span.[i] <> byte s.[i] then ok <- false
+        i <- i + 1
+      ok
+
+  /// Return the interned version string, or `null` if unrecognised.
+  let tryMatch (span: System.ReadOnlySpan<byte>) : string =
+    if bytesEqual span v11 then v11
+    elif bytesEqual span v10 then v10
+    elif bytesEqual span v20 then v20
+    else null
+
 [<AllowNullLiteral>]
 type HttpReader(transport : ITransport, pipe: Pipe, cancellationToken: Threading.CancellationToken) =
 
@@ -346,6 +399,71 @@ type HttpReader(transport : ITransport, pipe: Pipe, cancellationToken: Threading
         | Ok _ ->
           let result = Globals.UTF8.GetString(readLineBuffer, 0, offset)
           return Ok result
+      })
+
+  /// Read the HTTP request line directly from the byte buffer and decompose it
+  /// into (method, path, rawQuery, version).
+  ///
+  /// Allocation profile vs. the previous `readLine` + `parseUrl` pipeline:
+  ///   - method: 0 allocations on the common path (interned via `KnownMethods.tryMatch`)
+  ///   - version: 0 allocations on the common path (interned via `KnownVersions.tryMatch`)
+  ///   - path: 1 string allocation (sliced directly from `readLineBuffer`)
+  ///   - rawQuery: 1 string allocation only when '?' is present, otherwise `String.Empty`
+  /// Previously the same data cost: 1 full-line UTF-8 string + 4 `Substring` allocations.
+  member x.readRequestLine () : SocketOp<string * string * string * string> =
+    ValueTask<Result<string * string * string * string, Error>>(
+      task {
+        let mutable offset = 0
+        match! x.readUntilPattern EOL (fun a count ->
+            if offset + count > readLineBuffer.Length then
+              FailWith (InputDataError (Some 414, "Line Too Long"))
+            else
+              let source = a.Span.Slice(0, int count)
+              let target = new Span<byte>(readLineBuffer, offset, int count)
+              source.CopyTo(target)
+              offset <- offset + int count
+              Continue offset) with
+        | Result.Error e ->
+          return Result.Error e
+        | Ok _ ->
+          // Walk the captured bytes once, locating the two ASCII spaces.
+          let lineSpan = System.ReadOnlySpan<byte>(readLineBuffer, 0, offset)
+          let firstSpace = lineSpan.IndexOf(0x20uy)
+          if firstSpace <= 0 then
+            return Result.Error (InputDataError (Some 400, "Invalid first line"))
+          else
+            let afterMethod = lineSpan.Slice(firstSpace + 1)
+            let secondSpaceRel = afterMethod.IndexOf(0x20uy)
+            if secondSpaceRel <= 0 then
+              return Result.Error (InputDataError (Some 400, "Invalid first line"))
+            else
+              let methodSpan = lineSpan.Slice(0, firstSpace)
+              let urlSpan = afterMethod.Slice(0, secondSpaceRel)
+              let versionSpan = afterMethod.Slice(secondSpaceRel + 1)
+
+              // Method: prefer interned; fall back to allocation only for unknowns.
+              let knownMethod = KnownMethods.tryMatch methodSpan
+              let methodStr =
+                if not (isNull knownMethod) then knownMethod
+                else System.Text.Encoding.ASCII.GetString(methodSpan)
+
+              // Version: prefer interned; fall back to allocation only for unknowns.
+              let knownVersion = KnownVersions.tryMatch versionSpan
+              let versionStr =
+                if not (isNull knownVersion) then knownVersion
+                else System.Text.Encoding.ASCII.GetString(versionSpan)
+
+              // Path / rawQuery: split on '?'. Path is materialised directly from
+              // the byte buffer (one allocation). rawQuery only allocates when
+              // the URL actually contains '?'.
+              let queryRel = urlSpan.IndexOf(0x3Fuy)  // '?'
+              if queryRel >= 0 then
+                let pathStr = Globals.UTF8.GetString(urlSpan.Slice(0, queryRel))
+                let queryStr = Globals.UTF8.GetString(urlSpan.Slice(queryRel + 1))
+                return Ok (methodStr, pathStr, queryStr, versionStr)
+              else
+                let pathStr = Globals.UTF8.GetString(urlSpan)
+                return Ok (methodStr, pathStr, System.String.Empty, versionStr)
       })
 
   /// Parse a single header line out of the first `offset` bytes of `readLineBuffer`.

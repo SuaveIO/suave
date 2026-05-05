@@ -300,15 +300,10 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
         multiPartFields.Clear()
         _rawForm <- [||]
 
-        let! firstLineRes = reader.readLine()
+        let! firstLineRes = reader.readRequestLine()
         match firstLineRes with
         | Result.Error e -> return Result.Error e
-        | Ok firstLine ->
-
-        match parseUrl firstLine with
-        | Choice2Of2 _ ->
-          return Result.Error (InputDataError (None, "Invalid first line"))
-        | Choice1Of2 (rawMethod, path, rawQuery, httpVersion) ->
+        | Ok (rawMethod, path, rawQuery, httpVersion) ->
 
         let! headersRes = reader.readHeadersInto(requestHeaders)
         match headersRes with
