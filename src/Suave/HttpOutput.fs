@@ -306,7 +306,52 @@ type HttpOutput(connection: Connection, runtime: HttpRuntime) =
     do! this.writeContentType r.headers
     }
 
-  member inline this.writeContent writePreamble context = function
+  /// Synchronous fast path: assemble "Content-Length: N\r\n\r\n" plus the response body
+  /// directly into `lineBuffer` in one shot. Returns true on success; the caller is
+  /// responsible for flushing afterwards. Returns false (and leaves the buffer untouched)
+  /// when the request is HEAD, the status code mandates a no-content-length form
+  /// (100/101/204 and CONNECT 2xx), or the entire trailing block does not fit in the
+  /// remaining `lineBuffer` capacity.
+  ///
+  /// The win over the generic `writeContentLengthHeader + asyncWriteBufferedBytes + flush`
+  /// path is the elimination of three intervening `do!` checkpoints (each a
+  /// state-machine MoveNext) for responses that already fit in `lineBuffer` \u2014 the
+  /// overwhelmingly common case for plain-text/JSON API responses.
+  [<MethodImpl(MethodImplOptions.AggressiveInlining)>]
+  member internal this.tryWriteContentLengthAndBodyFast (content : byte[]) (context : HttpContext) : bool =
+    let conn = this.Connection
+    // Method/status gating mirrors writeContentLengthHeader's slow-path branch logic.
+    let eligible =
+      if context.request.``method`` = HttpMethod.HEAD then false
+      else
+        match context.request.``method``, context.response.status.code with
+        | (_, 100) | (_, 101) | (_, 204) -> false
+        | (HttpMethod.CONNECT, 201)
+        | (HttpMethod.CONNECT, 202)
+        | (HttpMethod.CONNECT, 203)
+        | (HttpMethod.CONNECT, 205)
+        | (HttpMethod.CONNECT, 206) -> false
+        | _ -> true
+    if not eligible then false
+    else
+      // Reserve worst-case 11 ASCII digits for int32 to avoid a separate length check
+      // on the formatted Content-Length value.
+      let needed =
+        ByteConstants.contentLengthBytes.Length
+        + 11
+        + ByteConstants.EOLEOL.Length
+        + content.Length
+      if conn.lineBufferCount + needed > conn.lineBuffer.Length then false
+      else
+        conn.appendSpanUnsafe ByteConstants.contentLengthBytes.Span
+        // Capacity already reserved above; ignore the bool result.
+        conn.tryAppendInt content.Length |> ignore
+        conn.appendSpanUnsafe ByteConstants.EOLEOL.Span
+        if content.Length > 0 then
+          conn.appendSpanUnsafe (System.ReadOnlySpan<byte>(content))
+        true
+
+  member this.writeContent writePreamble context = function
     | Bytes b -> task {
       // Compression decision is fully synchronous; no Task allocation, no
       // accept-encoding parsing on the hot path when the body is too small or
@@ -326,14 +371,22 @@ type HttpOutput(connection: Connection, runtime: HttpRuntime) =
         else
           do! this.Connection.flush()
       | None ->
-        // http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.13
-        // https://tools.ietf.org/html/rfc7230#section-3.3.2
-        do! this.writeContentLengthHeader content context
-        if context.request.``method`` <> HttpMethod.HEAD && content.Length > 0 then
-          do! this.Connection.asyncWriteBufferedBytes content
+        // Hot path: try to assemble "Content-Length: N\r\n\r\n" + body into lineBuffer
+        // synchronously in one shot, bypassing the multiple `do!` checkpoints that the
+        // appendOrFlush/asyncWriteBufferedBytes/flush sequence would otherwise generate.
+        // Falls through to the generic path when the body doesn't fit, the status code
+        // requires a no-content-length variant, or the request is HEAD.
+        if this.tryWriteContentLengthAndBodyFast content context then
           do! this.Connection.flush()
         else
-          do! this.Connection.flush()
+          // http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.13
+          // https://tools.ietf.org/html/rfc7230#section-3.3.2
+          do! this.writeContentLengthHeader content context
+          if context.request.``method`` <> HttpMethod.HEAD && content.Length > 0 then
+            do! this.Connection.asyncWriteBufferedBytes content
+            do! this.Connection.flush()
+          else
+            do! this.Connection.flush()
       }
     | SocketTask f -> task{
       do! f (this.Connection, context.response)
@@ -389,3 +442,4 @@ type HttpOutput(connection: Connection, runtime: HttpRuntime) =
       with ex ->
         return Result.Error(Error.ConnectionError ex.Message)
   }
+
