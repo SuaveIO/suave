@@ -213,9 +213,6 @@ type HttpReader(transport : ITransport, pipe: Pipe, cancellationToken: Threading
   // Scratch buffer for ASCII-lowercasing unknown header names.
   let nameLowerBuffer = Suave.Globals.BufferPool.rent 256
 
-  // Use SemaphoreSlim instead of lock to allow async waiting
-  let pipeReaderSemaphore = new Threading.SemaphoreSlim(1, 1)
-
   let mutable readerCancellationTokenSource : Threading.CancellationTokenSource = null
 
   member this.cancelPendingReads() =
@@ -287,45 +284,37 @@ type HttpReader(transport : ITransport, pipe: Pipe, cancellationToken: Threading
   /// Returns the number of bytes read.
   member x.scanMarker (marker: byte[]) (select : SelectFunction) =
     task {
-      let mutable semaphoreAcquired = false
       try
-        try
-          do! pipeReaderSemaphore.WaitAsync(readerCancellationTokenSource.Token)
-          semaphoreAcquired <- true
-          
-          let! result = pipe.Reader.ReadAsync(readerCancellationTokenSource.Token)
-          
-          if result.IsCanceled then
-            return Result.Error(Error.ConnectionError "ReadAsync was canceled")
+        let! result = pipe.Reader.ReadAsync(readerCancellationTokenSource.Token)
+
+        if result.IsCanceled then
+          return Result.Error(Error.ConnectionError "ReadAsync was canceled")
+        else
+          let bufferSequence = result.Buffer
+          if result.IsCompleted && bufferSequence.Length = 0L then
+            pipe.Reader.AdvanceTo(bufferSequence.End)
+            return Result.Error(Error.ConnectionError "no more data")
           else
-            let bufferSequence = result.Buffer
-            if result.IsCompleted && bufferSequence.Length = 0L then
-              pipe.Reader.AdvanceTo(bufferSequence.End)
-              return Result.Error(Error.ConnectionError "no more data")
-            else
-              // Vectorized marker search via SequenceReader<byte>.TryReadTo
-              // (replaces the per-byte Knuth-Morris-Pratt walk in `kmpW`).
-              match findMarker marker bufferSequence with
-              | ValueSome x ->
-                let res = Aux.split bufferSequence x select
-                match res with
-                | Continue n ->
-                  pipe.Reader.AdvanceTo(bufferSequence.GetPosition(n + int64 marker.Length))
-                  return Result.Ok(Found n)
-                | FailWith s ->
-                  pipe.Reader.AdvanceTo(bufferSequence.Start, bufferSequence.End)
-                  return Result.Ok(Error s)
-              | ValueNone ->
-                let examinePosition = bufferSequence.Length - marker.LongLength
-                if examinePosition > 0L then
-                  let _ = Aux.split bufferSequence examinePosition select
-                  pipe.Reader.AdvanceTo(bufferSequence.GetPosition(examinePosition), bufferSequence.End)
-                else
-                  pipe.Reader.AdvanceTo(bufferSequence.Start, bufferSequence.End)
-                return Result.Ok(NeedMore)
-        finally
-          if semaphoreAcquired then
-            pipeReaderSemaphore.Release() |> ignore
+            // Vectorized marker search via SequenceReader<byte>.TryReadTo
+            // (replaces the per-byte Knuth-Morris-Pratt walk in `kmpW`).
+            match findMarker marker bufferSequence with
+            | ValueSome x ->
+              let res = Aux.split bufferSequence x select
+              match res with
+              | Continue n ->
+                pipe.Reader.AdvanceTo(bufferSequence.GetPosition(n + int64 marker.Length))
+                return Result.Ok(Found n)
+              | FailWith s ->
+                pipe.Reader.AdvanceTo(bufferSequence.Start, bufferSequence.End)
+                return Result.Ok(Error s)
+            | ValueNone ->
+              let examinePosition = bufferSequence.Length - marker.LongLength
+              if examinePosition > 0L then
+                let _ = Aux.split bufferSequence examinePosition select
+                pipe.Reader.AdvanceTo(bufferSequence.GetPosition(examinePosition), bufferSequence.End)
+              else
+                pipe.Reader.AdvanceTo(bufferSequence.Start, bufferSequence.End)
+              return Result.Ok(NeedMore)
       with ex ->
         return Result.Error(Error.ConnectionError ex.Message)
     }
@@ -363,21 +352,13 @@ type HttpReader(transport : ITransport, pipe: Pipe, cancellationToken: Threading
 
   member x.skip n =
     task {
-      let mutable semaphoreAcquired = false
-      try
-        do! pipeReaderSemaphore.WaitAsync(readerCancellationTokenSource.Token)
-        semaphoreAcquired <- true
-        
-        let! result = pipe.Reader.ReadAsync(readerCancellationTokenSource.Token)
-        if result.IsCanceled then
-          return ScanResult.Error(Error.ConnectionError "ReadAsync was canceled")
-        else
-          let bufferSequence = result.Buffer
-          pipe.Reader.AdvanceTo(bufferSequence.GetPosition(int64 n))
-          return Found n
-      finally
-        if semaphoreAcquired then
-          pipeReaderSemaphore.Release() |> ignore
+      let! result = pipe.Reader.ReadAsync(readerCancellationTokenSource.Token)
+      if result.IsCanceled then
+        return ScanResult.Error(Error.ConnectionError "ReadAsync was canceled")
+      else
+        let bufferSequence = result.Buffer
+        pipe.Reader.AdvanceTo(bufferSequence.GetPosition(int64 n))
+        return Found n
     }
 
   /// Read a line from the stream, calling UTF8.toString on the bytes before the EOL marker
@@ -562,31 +543,23 @@ type HttpReader(transport : ITransport, pipe: Pipe, cancellationToken: Threading
       let mutable iterationCount = 0
       while remaining > 0 do
         iterationCount <- iterationCount + 1
-        let mutable semaphoreAcquired = false
-        try
-          do! pipeReaderSemaphore.WaitAsync(readerCancellationTokenSource.Token)
-          semaphoreAcquired <- true
-          
-          let! result = pipe.Reader.ReadAsync(readerCancellationTokenSource.Token)
-          if result.IsCanceled then
-            remaining <- 0  // Exit loop
-          else
-            let bufferSequence = result.Buffer
-            if bufferSequence.Length > 0L then
-              let segment = bufferSequence.First
-              if segment.Length > remaining then
-                select segment remaining
-                pipe.Reader.AdvanceTo(bufferSequence.GetPosition(int64 remaining))
-                remaining <- 0
-              else
-                select segment segment.Length
-                pipe.Reader.AdvanceTo(bufferSequence.GetPosition(int64 segment.Length))
-                remaining <- remaining - segment.Length
+        let! result = pipe.Reader.ReadAsync(readerCancellationTokenSource.Token)
+        if result.IsCanceled then
+          remaining <- 0  // Exit loop
+        else
+          let bufferSequence = result.Buffer
+          if bufferSequence.Length > 0L then
+            let segment = bufferSequence.First
+            if segment.Length > remaining then
+              select segment remaining
+              pipe.Reader.AdvanceTo(bufferSequence.GetPosition(int64 remaining))
+              remaining <- 0
             else
-              remaining <- 0  // No data, exit loop
-        finally
-          if semaphoreAcquired then
-            pipeReaderSemaphore.Release() |> ignore
+              select segment segment.Length
+              pipe.Reader.AdvanceTo(bufferSequence.GetPosition(int64 segment.Length))
+              remaining <- remaining - segment.Length
+          else
+            remaining <- 0  // No data, exit loop
     }
 
   member this.isDirty = 
@@ -625,4 +598,3 @@ type HttpReader(transport : ITransport, pipe: Pipe, cancellationToken: Threading
     member this.Dispose() =
       Suave.Globals.BufferPool.returnArray readLineBuffer true
       Suave.Globals.BufferPool.returnArray nameLowerBuffer true
-      pipeReaderSemaphore.Dispose()
