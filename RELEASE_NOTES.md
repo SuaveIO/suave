@@ -1,3 +1,6 @@
+## New in v3.3.1-beta1 (Released 2026-05-05)
+* Reduce string allocations, vectorized line-marker scanning.
+
 ## New in v3.3.1-beta (Released 2026-05-04)
 * Several performance optimizations (#798)
 
