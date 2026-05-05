@@ -279,86 +279,127 @@ type HttpReader(transport : ITransport, pipe: Pipe, cancellationToken: Threading
             return Result.Error e
         })
 
-  /// Iterates over a BufferSegment list looking for a marker, data before the marker
-  /// is sent to the function select
-  /// Returns the number of bytes read.
-  member x.scanMarker (marker: byte[]) (select : SelectFunction) =
+  /// Inspect an already-available `ReadResult` for the marker and advance the
+  /// pipe reader. Returns `ValueSome r` when the scan is terminal (marker found,
+  /// failure, or end-of-stream) and `ValueNone` when more data is required.
+  /// Pure with respect to async \u2014 no awaits, no allocations.
+  member private x.tryScanRead (marker: byte[]) (select: SelectFunction) (rr: ReadResult)
+      : ValueOption<Result<ScanResult,Error>> =
+    if rr.IsCanceled then
+      ValueSome(Result.Error(Error.ConnectionError "ReadAsync was canceled"))
+    else
+      let bufferSequence = rr.Buffer
+      if rr.IsCompleted && bufferSequence.Length = 0L then
+        pipe.Reader.AdvanceTo(bufferSequence.End)
+        ValueSome(Result.Error(Error.ConnectionError "no more data"))
+      else
+        match findMarker marker bufferSequence with
+        | ValueSome p ->
+          let res = Aux.split bufferSequence p select
+          match res with
+          | Continue n ->
+            pipe.Reader.AdvanceTo(bufferSequence.GetPosition(n + int64 marker.Length))
+            ValueSome(Result.Ok(Found n))
+          | FailWith s ->
+            pipe.Reader.AdvanceTo(bufferSequence.Start, bufferSequence.End)
+            ValueSome(Result.Ok(Error s))
+        | ValueNone ->
+          let examinePosition = bufferSequence.Length - marker.LongLength
+          if examinePosition > 0L then
+            let _ = Aux.split bufferSequence examinePosition select
+            pipe.Reader.AdvanceTo(bufferSequence.GetPosition(examinePosition), bufferSequence.End)
+          else
+            pipe.Reader.AdvanceTo(bufferSequence.Start, bufferSequence.End)
+          ValueNone
+
+  /// Async fallback: pump the transport until `tryScanRead` produces a terminal
+  /// result, an error occurs, or cancellation is requested.
+  member private x.scanMarkerAsync (marker: byte[]) (select: SelectFunction)
+      : Task<Result<ScanResult,Error>> =
     task {
       try
-        let! result = pipe.Reader.ReadAsync(readerCancellationTokenSource.Token)
-
-        if result.IsCanceled then
-          return Result.Error(Error.ConnectionError "ReadAsync was canceled")
-        else
-          let bufferSequence = result.Buffer
-          if result.IsCompleted && bufferSequence.Length = 0L then
-            pipe.Reader.AdvanceTo(bufferSequence.End)
-            return Result.Error(Error.ConnectionError "no more data")
-          else
-            // Vectorized marker search via SequenceReader<byte>.TryReadTo
-            // (replaces the per-byte Knuth-Morris-Pratt walk in `kmpW`).
-            match findMarker marker bufferSequence with
-            | ValueSome x ->
-              let res = Aux.split bufferSequence x select
-              match res with
-              | Continue n ->
-                pipe.Reader.AdvanceTo(bufferSequence.GetPosition(n + int64 marker.Length))
-                return Result.Ok(Found n)
-              | FailWith s ->
-                pipe.Reader.AdvanceTo(bufferSequence.Start, bufferSequence.End)
-                return Result.Ok(Error s)
-            | ValueNone ->
-              let examinePosition = bufferSequence.Length - marker.LongLength
-              if examinePosition > 0L then
-                let _ = Aux.split bufferSequence examinePosition select
-                pipe.Reader.AdvanceTo(bufferSequence.GetPosition(examinePosition), bufferSequence.End)
-              else
-                pipe.Reader.AdvanceTo(bufferSequence.Start, bufferSequence.End)
-              return Result.Ok(NeedMore)
+        let mutable scanResult = Result.Error(Error.ConnectionError "scanMarker: unreachable")
+        let mutable keepGoing = true
+        while keepGoing do
+          match! x.readMoreData() with
+          | Result.Error e ->
+            scanResult <- Result.Error e
+            keepGoing <- false
+          | Ok () ->
+            let mutable rr = Unchecked.defaultof<ReadResult>
+            if pipe.Reader.TryRead(&rr) then
+              match x.tryScanRead marker select rr with
+              | ValueSome r ->
+                scanResult <- r
+                keepGoing <- false
+              | ValueNone -> ()  // marker not yet present; pump again
+        return scanResult
       with ex ->
         return Result.Error(Error.ConnectionError ex.Message)
     }
 
-  /// Read the passed stream into buff until the EOL (CRLF) has been reached
-  /// and returns the number of bytes read and the connection
+  /// Iterates over a BufferSegment list looking for a marker, data before the marker
+  /// is sent to the function select. Returns synchronously when the marker is
+  /// already present in the buffered data \u2014 the common case for HTTP/1.1 keep-alive
+  /// where the next request's headers typically arrive in a single recv().
+  member x.scanMarker (marker: byte[]) (select : SelectFunction)
+      : ValueTask<Result<ScanResult,Error>> =
+    let mutable rr = Unchecked.defaultof<ReadResult>
+    if pipe.Reader.TryRead(&rr) then
+      match x.tryScanRead marker select rr with
+      | ValueSome r -> ValueTask<Result<ScanResult,Error>>(r)
+      | ValueNone -> ValueTask<Result<ScanResult,Error>>(x.scanMarkerAsync marker select)
+    else
+      ValueTask<Result<ScanResult,Error>>(x.scanMarkerAsync marker select)
+
+  /// Read the passed stream into buff until the marker (e.g. CRLF) is reached
+  /// and returns the number of bytes consumed before the marker.
+  ///
+  /// This is now a thin adapter over `scanMarker`: since `scanMarker` no longer
+  /// returns `NeedMore` to its caller (the internal async fallback pumps until
+  /// the scan is terminal), we just translate `ScanResult` into an `int64`.
+  /// When `scanMarker` completes synchronously \u2014 the common case for HTTP/1.1
+  /// keep-alive where the next request's headers arrive in a single `recv()` \u2014
+  /// the entire `readUntilPattern` call also completes synchronously without
+  /// allocating a state-machine box.
   member x.readUntilPattern marker select : SocketOp<int64> =
-    ValueTask<Result<int64,Error>>(
-      task {
-        let mutable reading = true
-        let mutable error = false
-        let mutable result = 0L
-        let mutable errorResult = Ok(0L)
-        let mutable iterationCount = 0
-        while reading && not error && not(cancellationToken.IsCancellationRequested) do
-          iterationCount <- iterationCount + 1
-          let! res = x.scanMarker marker select
-          match res with
-          | Ok(Found a) ->
-            reading <- false
-            result <- a
-          | Ok(NeedMore) ->
-            ()
-          | Result.Error s ->
-            error <- true
-            errorResult <- Result.Error s
-          | Ok(Error s) ->
-            error <- true
-            errorResult <- Result.Error s
-        if error then
-          return errorResult
-        else
-          return Ok (result)
-      })
+    let scan = x.scanMarker marker select
+    if scan.IsCompletedSuccessfully then
+      match scan.Result with
+      | Ok(Found a) -> ValueTask<Result<int64,Error>>(Ok a)
+      | Ok(Error s) -> ValueTask<Result<int64,Error>>(Result.Error s)
+      | Ok NeedMore -> ValueTask<Result<int64,Error>>(Ok 0L)  // unreachable: scanMarker pumps internally
+      | Result.Error e -> ValueTask<Result<int64,Error>>(Result.Error e)
+    else
+      ValueTask<Result<int64,Error>>(
+        task {
+          match! scan with
+          | Ok(Found a) -> return Ok a
+          | Ok(Error s) -> return Result.Error s
+          | Ok NeedMore -> return Ok 0L  // unreachable
+          | Result.Error e -> return Result.Error e
+        })
 
   member x.skip n =
     task {
-      let! result = pipe.Reader.ReadAsync(readerCancellationTokenSource.Token)
-      if result.IsCanceled then
-        return ScanResult.Error(Error.ConnectionError "ReadAsync was canceled")
-      else
-        let bufferSequence = result.Buffer
-        pipe.Reader.AdvanceTo(bufferSequence.GetPosition(int64 n))
-        return Found n
+      let mutable rr = Unchecked.defaultof<ReadResult>
+      let mutable scanResult = Found n
+      let mutable proceed = true
+      if not (pipe.Reader.TryRead(&rr)) then
+        match! x.readMoreData() with
+        | Result.Error e ->
+          scanResult <- ScanResult.Error e
+          proceed <- false
+        | Ok () ->
+          let! r = pipe.Reader.ReadAsync(readerCancellationTokenSource.Token)
+          rr <- r
+      if proceed then
+        if rr.IsCanceled then
+          scanResult <- ScanResult.Error(Error.ConnectionError "ReadAsync was canceled")
+        else
+          let bufferSequence = rr.Buffer
+          pipe.Reader.AdvanceTo(bufferSequence.GetPosition(int64 n))
+      return scanResult
     }
 
   /// Read a line from the stream, calling UTF8.toString on the bytes before the EOL marker
@@ -541,25 +582,34 @@ type HttpReader(transport : ITransport, pipe: Pipe, cancellationToken: Threading
     task {
       let mutable remaining = bytes
       let mutable iterationCount = 0
-      while remaining > 0 do
+      let mutable abort = false
+      while remaining > 0 && not abort do
         iterationCount <- iterationCount + 1
-        let! result = pipe.Reader.ReadAsync(readerCancellationTokenSource.Token)
-        if result.IsCanceled then
-          remaining <- 0  // Exit loop
-        else
-          let bufferSequence = result.Buffer
-          if bufferSequence.Length > 0L then
-            let segment = bufferSequence.First
-            if segment.Length > remaining then
-              select segment remaining
-              pipe.Reader.AdvanceTo(bufferSequence.GetPosition(int64 remaining))
-              remaining <- 0
-            else
-              select segment segment.Length
-              pipe.Reader.AdvanceTo(bufferSequence.GetPosition(int64 segment.Length))
-              remaining <- remaining - segment.Length
+        let mutable rr = Unchecked.defaultof<ReadResult>
+        if not (pipe.Reader.TryRead(&rr)) then
+          match! x.readMoreData() with
+          | Result.Error _ ->
+            abort <- true
+          | Ok () ->
+            let! r = pipe.Reader.ReadAsync(readerCancellationTokenSource.Token)
+            rr <- r
+        if not abort then
+          if rr.IsCanceled then
+            abort <- true
           else
-            remaining <- 0  // No data, exit loop
+            let bufferSequence = rr.Buffer
+            if bufferSequence.Length > 0L then
+              let segment = bufferSequence.First
+              if segment.Length > remaining then
+                select segment remaining
+                pipe.Reader.AdvanceTo(bufferSequence.GetPosition(int64 remaining))
+                remaining <- 0
+              else
+                select segment segment.Length
+                pipe.Reader.AdvanceTo(bufferSequence.GetPosition(int64 segment.Length))
+                remaining <- remaining - segment.Length
+            else
+              abort <- true  // No data, exit loop
     }
 
   member this.isDirty = 
@@ -571,27 +621,6 @@ type HttpReader(transport : ITransport, pipe: Pipe, cancellationToken: Threading
       running <- true
     )
     readerCancellationTokenSource <- new Threading.CancellationTokenSource()
-
-  member this.readLoop() = task{
-    let mutable reading = true
-    let mutable result = Ok()
-    let mutable iterationCount = 0
-    try
-      while running && reading && not(readerCancellationTokenSource.IsCancellationRequested) do
-        iterationCount <- iterationCount + 1
-        let! a = this.readMoreData()
-        match a with
-        | Ok () -> ()
-        | Result.Error b as a ->
-          reading <- false
-          result <- a
-          this.stop()
-      try pipe.Writer.Complete() with _ -> ()
-      return result
-    with ex ->
-      try pipe.Writer.Complete() with _ -> ()
-      return Result.Error(Error.ConnectionError ex.Message)
-  }
 
   // Return per-connection buffers to Suave's private pool when the reader is disposed.
   interface IDisposable with

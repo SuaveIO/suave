@@ -425,12 +425,9 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
     if Globals.verbose then
       Console.WriteLine("[Conn:{0}] accept: {1} connected. Now has {2} connected", connectionId, clientIp, tracker.ActiveConnectionCount)
     connection.socketBinding <- binding
-    // Set the connection ID on the reader for consistent logging
-    let mutable readTask : Task<Result<unit,Error>> = null
     try
       try
         reader.init()
-        readTask <- reader.readLoop()
         let! loopRes = this.requestLoop()
         match loopRes with
         | Ok () -> ()
@@ -441,24 +438,11 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
         if Globals.verbose then
           do Console.WriteLine($"[Conn:{connectionId}] accept: Exception: {ex.Message}")
     finally
-      // First phase: stop reader and transport (this unblocks readTask)
+      // The reader pumps the inbound transport on demand from inside the request
+      // loop, so by the time requestLoop has returned there is no background
+      // reader task to await \u2014 just shut the transport down and recycle.
       this.shutdown()
-    
-    // Wait for readTask to complete BEFORE recycling the connection
-    // This is critical: we must ensure readLoop has finished (and called pipe.Writer.Complete())
-    // before we reset the pipe and push the connection back to the pool
-    if readTask <> null then
-      try
-        // Use a timeout to avoid hanging forever if something goes wrong
-        let! completed = Task.WhenAny(readTask, Task.Delay(1000))
-        if not (Object.ReferenceEquals(completed, readTask)) then
-          if Globals.verbose then
-            Console.WriteLine("[Conn:{0}] accept: readTask did not complete within timeout", connectionId)
-      with ex ->
-        if Globals.verbose then
-          Console.WriteLine("[Conn:{0}] accept: error waiting for readTask: {1}", connectionId, ex.Message)
-    
-    // Second phase: reset pipe and recycle connection (only after readTask is done)
+
     this.recycleConnection()
     if Globals.verbose then
         do Console.WriteLine("[Conn:{0}] accept:Disconnected {1}. {2} connected.", connectionId, clientIp, tracker.ActiveConnectionCount)
