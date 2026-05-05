@@ -250,7 +250,9 @@ type HttpReader(transport : ITransport, pipe: Pipe, cancellationToken: Threading
               pipe.Reader.AdvanceTo(bufferSequence.End)
               return Result.Error(Error.ConnectionError "no more data")
             else
-              match kmpW marker bufferSequence with
+              // Vectorized marker search via SequenceReader<byte>.TryReadTo
+              // (replaces the per-byte Knuth-Morris-Pratt walk in `kmpW`).
+              match findMarker marker bufferSequence with
               | ValueSome x ->
                 let res = Aux.split bufferSequence x select
                 match res with

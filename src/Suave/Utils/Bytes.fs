@@ -93,3 +93,27 @@ module internal Bytes =
     let m = Array.length p
     _kmpW p next m xs
 
+  /// Vectorized substring search across a `ReadOnlySequence<byte>`.
+  ///
+  /// Returns the byte offset (from the start of `xs`) of the first occurrence
+  /// of `marker`, or `ValueNone` if not found.
+  ///
+  /// Implementation notes:
+  ///   - Uses `SequenceReader<byte>.TryReadTo` which (in the BCL) is
+  ///     implemented with a vectorized `Span<byte>.IndexOf(byte)` to locate
+  ///     candidate first-byte positions, plus a short verify loop for the
+  ///     remaining bytes. This is dramatically faster than the manual
+  ///     Knuth-Morris-Pratt walk in `kmpW` for short patterns (e.g. `\r\n`,
+  ///     `\r\n\r\n`, multipart boundaries) which are the only patterns this
+  ///     function ever sees in practice.
+  ///   - `advancePastDelimiter = false` leaves the reader sitting on the
+  ///     start of the delimiter, so `consumed.Length` is exactly the offset
+  ///     callers want (matches the semantics of the previous `kmpW`).
+  let findMarker (marker : byte[]) (xs : ReadOnlySequence<byte>) : int64 voption =
+    let mutable reader = SequenceReader<byte>(xs)
+    let mutable consumed = ReadOnlySequence<byte>()
+    if reader.TryReadTo(&consumed, ReadOnlySpan<byte>(marker), advancePastDelimiter = false) then
+      ValueSome consumed.Length
+    else
+      ValueNone
+
