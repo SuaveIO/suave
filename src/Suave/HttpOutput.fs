@@ -1,6 +1,7 @@
 namespace Suave
 
 open System.Collections.Generic
+open System.Runtime.CompilerServices
 open Suave.Utils
 open Suave.Sockets
 
@@ -115,6 +116,7 @@ type HttpOutput(connection: Connection, runtime: HttpRuntime) =
   /// Append a small ROM into the lineBuffer. Stays synchronous (no allocation) when the
   /// chunk fits; otherwise flushes and either re-appends or falls back to a direct write.
   /// This is the workhorse used by the response preamble assembly path.
+  [<MethodImpl(MethodImplOptions.AggressiveInlining)>]
   member inline private this.appendOrFlush (b : ReadOnlyMemory<byte>) : System.Threading.Tasks.ValueTask =
     let conn = this.Connection
     if conn.tryAppendSpan b.Span then
@@ -131,6 +133,7 @@ type HttpOutput(connection: Connection, runtime: HttpRuntime) =
       })
 
   /// Append an int32 (formatted as decimal ASCII) into lineBuffer with auto-flush on overflow.
+  [<MethodImpl(MethodImplOptions.AggressiveInlining)>]
   member inline private this.appendIntOrFlush (value : int) : System.Threading.Tasks.ValueTask =
     let conn = this.Connection
     if conn.tryAppendInt value then

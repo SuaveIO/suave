@@ -4,6 +4,7 @@ open System
 open System.Net
 open System.IO.Pipelines
 open System.Threading.Tasks
+open System.Runtime.CompilerServices
 open Suave.Sockets.Control
 open System.Text
 open System.Buffers
@@ -199,6 +200,7 @@ type Connection =
   /// Synchronous append into lineBuffer. Returns true if the bytes fit and were
   /// appended; false if there is not enough room. Does not call into the transport.
   /// This is the zero-allocation hot-path used by the response preamble assembly.
+  [<MethodImpl(MethodImplOptions.AggressiveInlining)>]
   member inline this.tryAppendSpan (b : ReadOnlySpan<byte>) : bool =
     if this.lineBufferCount + b.Length <= this.lineBuffer.Length then
       b.CopyTo(Span<byte>(this.lineBuffer, this.lineBufferCount, b.Length))
@@ -208,12 +210,14 @@ type Connection =
       false
 
   /// Synchronous append into lineBuffer assuming room exists. Caller must guarantee capacity.
+  [<MethodImpl(MethodImplOptions.AggressiveInlining)>]
   member inline this.appendSpanUnsafe (b : ReadOnlySpan<byte>) =
     b.CopyTo(Span<byte>(this.lineBuffer, this.lineBufferCount, b.Length))
     this.lineBufferCount <- this.lineBufferCount + b.Length
 
   /// Format an int32 directly into lineBuffer as ASCII digits. Returns true on success,
   /// false if there is not enough room. Avoids allocating an intermediate byte[]/string.
+  [<MethodImpl(MethodImplOptions.AggressiveInlining)>]
   member inline this.tryAppendInt (value : int) : bool =
     // Max 11 chars for int32 (sign + 10 digits)
     let mutable charBuf = System.Span<char>(Array.zeroCreate<char> 11)
