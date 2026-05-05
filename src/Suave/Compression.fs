@@ -55,19 +55,31 @@ module Compression =
          | _         -> None)
     | _ -> None
 
+  /// Synchronous compression decision + transform.
+  ///
+  /// Hot-path-aware:
+  ///   1. If `content.Length` is outside the compressible range, returns immediately
+  ///      with no allocation and without inspecting any request headers.
+  ///   2. Otherwise checks for `accept-encoding`; if absent or unmatched, returns
+  ///      `(None, content)` without allocating a Task.
+  ///   3. Only when we are actually going to compress do we allocate the encoded
+  ///      byte array.
+  ///
+  /// This replaces the previous `task { }`-wrapped version that paid for a state
+  /// machine + Task box + header lookup + comma-split + Array.map/tryPick on
+  /// every `Bytes` response, even when no compression was possible.
+  let transformSync (content : byte []) (ctx : HttpContext) : Algorithm option * byte [] =
+    let len = content.Length
+    if len <= MIN_BYTES_TO_COMPRESS || len >= MAX_BYTES_TO_COMPRESS then
+      None, content
+    else
+      match getEncoder ctx.request with
+      | Some (n, encoder) -> Some n, encoder content
+      | None -> None, content
+
+  /// Backwards-compatible task wrapper; new call sites should prefer `transformSync`.
   let transform (content : byte []) (ctx : HttpContext) : Threading.Tasks.Task<Algorithm option * byte []> =
-    task {
-      if content.Length > MIN_BYTES_TO_COMPRESS && content.Length < MAX_BYTES_TO_COMPRESS then
-        let request = ctx.request
-        let enconding = getEncoder request
-        match enconding with
-        | Some (n,encoder) ->
-          return Some n, encoder content
-        | None ->
-          return None, content
-      else
-        return None, content
-    }
+    Threading.Tasks.Task.FromResult(transformSync content ctx)
 
   let compress encoding path (fs : Stream) = task {
     use newFileStream = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.Write)

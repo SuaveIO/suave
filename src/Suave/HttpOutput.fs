@@ -305,7 +305,10 @@ type HttpOutput(connection: Connection, runtime: HttpRuntime) =
 
   member inline this.writeContent writePreamble context = function
     | Bytes b -> task {
-      let! (encoding, content : byte []) = Compression.transform b context 
+      // Compression decision is fully synchronous; no Task allocation, no
+      // accept-encoding parsing on the hot path when the body is too small or
+      // the client did not negotiate an encoding.
+      let (encoding, content : byte []) = Compression.transformSync b context
       match encoding with
       | Some n ->
         // Write Content-Encoding header without string concatenation
