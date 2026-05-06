@@ -1,3 +1,6 @@
+## New in v3.3.1-beta3 (Released 2026-05-06)
+* Multiple listening sockets / SO_REUSEPORT support on Linux/BSD.
+
 ## New in v3.3.1-beta2 (Released 2026-05-05)
 * Remove unneeded pipe lock, optimize write response.
 
