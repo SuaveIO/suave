@@ -66,12 +66,17 @@ type SuaveConfig =
     filePartSink : FilePartSink option
 
     /// Number of independent accept loops (and listening sockets) per binding.
-    /// Values &gt; 1 require kernel <c>SO_REUSEPORT</c> support (Linux 3.9+, macOS/BSD)
-    /// and let the kernel load-balance incoming connections across multiple
-    /// accept threads, which removes the single-listener accept bottleneck on
-    /// many-core machines. On platforms without <c>SO_REUSEPORT</c> (e.g. Windows)
-    /// this falls back to a single acceptor regardless of the configured value.
-    /// Defaults to 1 to preserve historical behaviour.
+    /// <list type="bullet">
+    /// <item><description><c>1</c> (default): single acceptor, historical behaviour.</description></item>
+    /// <item><description><c>0</c>: auto. On platforms with kernel <c>SO_REUSEPORT</c>
+    /// (Linux 3.9+, macOS/BSD), use <c>min(Environment.ProcessorCount, 16)</c> acceptors;
+    /// on platforms without it (e.g. Windows), fall back to a single acceptor.</description></item>
+    /// <item><description><c>&gt;1</c>: explicit count. Requires <c>SO_REUSEPORT</c>; falls back
+    /// to 1 on platforms that don't support it.</description></item>
+    /// </list>
+    /// Multiple acceptors let the kernel load-balance incoming connections across
+    /// independent accept threads, removing the single-listener accept bottleneck
+    /// on many-core machines.
     acceptorCount : int }
 
   member x.withBindings(v)              = { x with bindings = v }

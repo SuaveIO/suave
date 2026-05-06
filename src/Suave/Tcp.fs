@@ -275,17 +275,24 @@ let private runAcceptor
 let runServerEx acceptorCount maxConcurrentOps bufferSize (binding: SocketBinding) (runtime:HttpRuntime) (cancellationToken: CancellationToken) (webpart: WebPart) healthCheckEnabled healthCheckIntervalMs maxConnectionAgeSeconds startData
               (acceptingConnections: AsyncResultCell<StartedData>) : Task =
   Task.Run(Func<Task>(fun () -> task {
-    // Decide effective acceptor count. Values > 1 require kernel SO_REUSEPORT,
-    // which is not available on Windows; fall back to 1 there.
-    let requested = max 1 acceptorCount
-    let multiAcceptor = requested > 1
+    // Decide effective acceptor count.
+    //   acceptorCount = 0  -> auto: min(Environment.ProcessorCount, 16) on platforms
+    //                        with SO_REUSEPORT, otherwise 1
+    //   acceptorCount > 1  -> requires SO_REUSEPORT (Linux/macOS/BSD); falls back to 1
+    //                        on platforms without it (notably Windows)
+    let autoAcceptorCap = 16
     let canReusePort =
       RuntimeInformation.IsOSPlatform(OSPlatform.Linux)
       || RuntimeInformation.IsOSPlatform(OSPlatform.OSX)
       || RuntimeInformation.IsOSPlatform(OSPlatform.FreeBSD)
     let effective =
-      if multiAcceptor && not canReusePort then 1
-      else requested
+      if acceptorCount = 0 then
+        if canReusePort then min Environment.ProcessorCount autoAcceptorCap
+        else 1
+      else
+        let requested = max 1 acceptorCount
+        if requested > 1 && not canReusePort then 1
+        else requested
 
     // Open all listen sockets first so we can fail fast if any bind fails.
     let listenSockets = Array.zeroCreate<Socket> effective
