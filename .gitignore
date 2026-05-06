@@ -39,3 +39,4 @@ tools/dotnet-install.*
 .vs/
 .vscode/
 .ionide
+profile-output/
