@@ -48,7 +48,7 @@ module Web =
 
     let startWebWorker runtime =
       let tcpServer =
-        (tcpServerFactory :> TcpServerFactory).create(config.maxOps, config.bufferSize, runtime.matchedBinding.socketBinding, runtime, config.cancellationToken, config.healthCheckEnabled, config.healthCheckIntervalMs, config.maxConnectionAgeSeconds, webpart)
+        (tcpServerFactory :> TcpServerFactory).create(config.maxOps, config.bufferSize, runtime.matchedBinding.socketBinding, runtime, config.cancellationToken, config.healthCheckEnabled, config.healthCheckIntervalMs, config.maxConnectionAgeSeconds, config.acceptorCount, webpart)
 
       startTcpIpServer runtime.matchedBinding.socketBinding tcpServer
 
@@ -87,4 +87,5 @@ module Web =
       healthCheckIntervalMs = 30000  // Check every 30 seconds
       maxConnectionAgeSeconds = 300  // Kill connections after 5 minutes (300 seconds)
       filePartSink          = None
+      acceptorCount         = 1
       }

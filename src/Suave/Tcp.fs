@@ -188,44 +188,43 @@ let enableRebinding (listenSocket: Socket) =
   else if RuntimeInformation.IsOSPlatform(OSPlatform.OSX) then
     setsockoptStatus <- setsockopt(listenSocket.Handle, SOL_SOCKET_OSX, SO_REUSEADDR_OSX, NativePtr.toNativeInt<int> &&optionValue, uint32(sizeof<int>))
 
-let runServer maxConcurrentOps bufferSize (binding: SocketBinding) (runtime:HttpRuntime) (cancellationToken: CancellationToken) (webpart: WebPart) healthCheckEnabled healthCheckIntervalMs maxConnectionAgeSeconds startData
-              (acceptingConnections: AsyncResultCell<StartedData>) : Task =
-  Task.Run(Func<Task>(fun () -> task {
-    use listenSocket = new Socket(binding.endpoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp)
+/// Enable SO_REUSEPORT on the listen socket so that multiple sockets can be
+/// bound to the same address+port and the kernel will load-balance incoming
+/// connections across them. Returns true on platforms that support it (Linux
+/// 3.9+, macOS, BSD) and on which setsockopt succeeded; false otherwise
+/// (notably Windows, where the semantically-similar SO_REUSEADDR is not a
+/// safe substitute and we fall back to a single acceptor).
+let tryEnableReusePort (listenSocket: Socket) : bool =
+  let mutable optionValue = 1
+  if RuntimeInformation.IsOSPlatform(OSPlatform.Linux) then
+    setsockopt(listenSocket.Handle, SOL_SOCKET_LINUX, SO_REUSEPORT_LINUX, NativePtr.toNativeInt<int> &&optionValue, uint32(sizeof<int>)) = 0
+  elif RuntimeInformation.IsOSPlatform(OSPlatform.OSX)
+       || RuntimeInformation.IsOSPlatform(OSPlatform.FreeBSD) then
+    setsockopt(listenSocket.Handle, SOL_SOCKET_OSX, SO_REUSEPORT_OSX, NativePtr.toNativeInt<int> &&optionValue, uint32(sizeof<int>)) = 0
+  else
+    false
+
+/// Run a single accept loop on an already-bound, already-listening socket.
+/// `announce` is invoked once at start to report the bound endpoint to the
+/// orchestrator (only the first acceptor's announcement is forwarded to the
+/// caller via `acceptingConnections`).
+let private runAcceptor
+      (listenSocket: Socket)
+      (connectionPool: Suave.Sockets.ConcurrentPool<ConnectionFacade>)
+      (runtime: HttpRuntime)
+      (cancellationToken: CancellationToken) : Task =
+  task {
+    let remoteBinding (socket : Socket) =
+      let rep = socket.RemoteEndPoint :?> IPEndPoint
+      { ip = rep.Address; port = uint16 rep.Port }
     try
-      enableRebinding(listenSocket)
-      listenSocket.NoDelay <- true
-
-      aFewTimesDeterministic (fun () -> listenSocket.Bind binding.endpoint)
-      listenSocket.Listen MaxBacklog
-
-      // Create connection pool with health checking configuration
-      let connectionPool = createPools listenSocket runtime.matchedBinding maxConcurrentOps runtime cancellationToken bufferSize webpart healthCheckEnabled healthCheckIntervalMs maxConnectionAgeSeconds
-
-      let _binding = { startData.binding with port = uint16((listenSocket.LocalEndPoint :?> IPEndPoint).Port) }
-
-      let startData =
-        { startData with socketBoundUtc = Some (Globals.utcNow()); binding = _binding }
-
-      acceptingConnections.complete startData |> ignore
-
-      let startedListeningMilliseconds = startData.GetStartedListeningElapsedMilliseconds()
-      let ipAddress = startData.binding.ip.ToString()
-      let port = startData.binding.port
-
-      Console.WriteLine($"Smooth! Suave v{Globals.SuaveVersion} listener started in {startedListeningMilliseconds} ms with binding {ipAddress}:{port}")
-
-      let remoteBinding (socket : Socket) =
-        let rep = socket.RemoteEndPoint :?> IPEndPoint
-        { ip = rep.Address; port = uint16 rep.Port }
-
       while not(cancellationToken.IsCancellationRequested) do
           try
             let! acceptedSocket = listenSocket.AcceptAsync(cancellationToken)
-            
+
             // Only pop a connection AFTER we have an accepted socket
             let connection : ConnectionFacade = connectionPool.Pop()
-            
+
             // Set the accepted socket and perform SSL handshake if needed
             let! remoteBindingResult = task {
               match connection.Connection.transport with
@@ -236,14 +235,14 @@ let runServer maxConcurrentOps bufferSize (binding: SocketBinding) (runtime:Http
                   sslTransport.acceptSocket <- acceptedSocket
                   sslTransport.networkStream <- new NetworkStream(acceptedSocket, true)
                   sslTransport.sslStream <- new SslStream(sslTransport.networkStream, false)
-                  
+
                   // Perform SSL handshake
                   try
-                    let certificate = 
+                    let certificate =
                       match runtime.matchedBinding.scheme with
                       | HTTPS cert -> cert
                       | HTTP -> failwith "Expected HTTPS binding for SSL transport"
-                    
+
                     do! sslTransport.sslStream.AuthenticateAsServerAsync(
                       certificate,
                       clientCertificateRequired = false,
@@ -252,10 +251,10 @@ let runServer maxConcurrentOps bufferSize (binding: SocketBinding) (runtime:Http
                     return Ok(remoteBinding acceptedSocket)
                   with ex ->
                     return Result.Error(Error.ConnectionError($"SSL handshake failed: {ex.Message}"))
-              | _ -> 
+              | _ ->
                   return Ok(remoteBinding acceptedSocket)
             }
-            
+
             match remoteBindingResult with
             | Ok binding ->
                 // Fire and forget the connection handling using Task.Run
@@ -267,17 +266,100 @@ let runServer maxConcurrentOps bufferSize (binding: SocketBinding) (runtime:Http
           with ex ->
             if Globals.verbose then
               Console.WriteLine("TCP server accept exception: {0}", ex)
+    with
+      | :? AggregateException
+      | :? OperationCanceledException
+      | :? TaskCanceledException -> ()
+  } :> Task
 
-      stopTcp "cancellation requested" listenSocket
+let runServerEx acceptorCount maxConcurrentOps bufferSize (binding: SocketBinding) (runtime:HttpRuntime) (cancellationToken: CancellationToken) (webpart: WebPart) healthCheckEnabled healthCheckIntervalMs maxConnectionAgeSeconds startData
+              (acceptingConnections: AsyncResultCell<StartedData>) : Task =
+  Task.Run(Func<Task>(fun () -> task {
+    // Decide effective acceptor count. Values > 1 require kernel SO_REUSEPORT,
+    // which is not available on Windows; fall back to 1 there.
+    let requested = max 1 acceptorCount
+    let multiAcceptor = requested > 1
+    let canReusePort =
+      RuntimeInformation.IsOSPlatform(OSPlatform.Linux)
+      || RuntimeInformation.IsOSPlatform(OSPlatform.OSX)
+      || RuntimeInformation.IsOSPlatform(OSPlatform.FreeBSD)
+    let effective =
+      if multiAcceptor && not canReusePort then 1
+      else requested
+
+    // Open all listen sockets first so we can fail fast if any bind fails.
+    let listenSockets = Array.zeroCreate<Socket> effective
+    try
+      for i = 0 to effective - 1 do
+        let s = new Socket(binding.endpoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp)
+        listenSockets.[i] <- s
+        enableRebinding(s)
+        s.NoDelay <- true
+        if effective > 1 then
+          // Best-effort. If this fails we abort: bind would otherwise succeed
+          // only on the first socket and the rest would EADDRINUSE.
+          if not (tryEnableReusePort s) then
+            failwith "SO_REUSEPORT setsockopt failed; cannot run multiple acceptors"
+        aFewTimesDeterministic (fun () -> s.Bind binding.endpoint)
+        s.Listen MaxBacklog
+
+      let leader = listenSockets.[0]
+      let _binding = { startData.binding with port = uint16((leader.LocalEndPoint :?> IPEndPoint).Port) }
+
+      let startData =
+        { startData with socketBoundUtc = Some (Globals.utcNow()); binding = _binding }
+
+      acceptingConnections.complete startData |> ignore
+
+      let startedListeningMilliseconds = startData.GetStartedListeningElapsedMilliseconds()
+      let ipAddress = startData.binding.ip.ToString()
+      let port = startData.binding.port
+
+      if effective > 1 then
+        Console.WriteLine($"Smooth! Suave v{Globals.SuaveVersion} listener started in {startedListeningMilliseconds} ms with binding {ipAddress}:{port} ({effective} acceptors)")
+      else
+        Console.WriteLine($"Smooth! Suave v{Globals.SuaveVersion} listener started in {startedListeningMilliseconds} ms with binding {ipAddress}:{port}")
+
+      // Create one connection pool per acceptor so each accept loop pops from
+      // its own thread-local-ish pool, removing cross-acceptor contention.
+      let pools =
+        listenSockets
+        |> Array.map (fun s ->
+            createPools s runtime.matchedBinding maxConcurrentOps runtime cancellationToken bufferSize webpart healthCheckEnabled healthCheckIntervalMs maxConnectionAgeSeconds)
+
+      let acceptorTasks =
+        Array.init effective (fun i ->
+          let s = listenSockets.[i]
+          let pool = pools.[i]
+          // Spin each acceptor on the threadpool independently so they don't
+          // serialise on the orchestrator's thread.
+          Task.Run(Func<Task>(fun () -> runAcceptor s pool runtime cancellationToken)))
+
+      try
+        do! Task.WhenAll(acceptorTasks)
+      with
+        | :? AggregateException
+        | :? OperationCanceledException
+        | :? TaskCanceledException -> ()
+
+      for s in listenSockets do
+        stopTcp "cancellation requested" s
     with
       | :? AggregateException
       | :? OperationCanceledException
       | :? TaskCanceledException ->
-        stopTcp "The operation was canceled" listenSocket
+        for s in listenSockets do
+          if not (isNull (box s)) then stopTcp "The operation was canceled" s
       | ex ->
         Console.WriteLine("TCP server runtime exception: {0}", ex)
-        stopTcp "runtime exception" listenSocket
+        for s in listenSockets do
+          if not (isNull (box s)) then stopTcp "runtime exception" s
         }))
+
+/// Backwards-compatible single-acceptor entry point.
+let runServer maxConcurrentOps bufferSize (binding: SocketBinding) (runtime:HttpRuntime) (cancellationToken: CancellationToken) (webpart: WebPart) healthCheckEnabled healthCheckIntervalMs maxConnectionAgeSeconds startData
+              (acceptingConnections: AsyncResultCell<StartedData>) : Task =
+  runServerEx 1 maxConcurrentOps bufferSize binding runtime cancellationToken webpart healthCheckEnabled healthCheckIntervalMs maxConnectionAgeSeconds startData acceptingConnections
 
 /// Start a new TCP server with a specific IP, Port and with a serve_client worker
 /// returning an async workflow whose result can be awaited (for when the tcp server has started

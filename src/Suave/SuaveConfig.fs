@@ -63,7 +63,16 @@ type SuaveConfig =
     /// Optional sink factory for streaming multipart file parts without a temp file.
     /// When <c>None</c> (the default), each file part is buffered to a temporary file
     /// on disk, matching the pre-existing behaviour.
-    filePartSink : FilePartSink option }
+    filePartSink : FilePartSink option
+
+    /// Number of independent accept loops (and listening sockets) per binding.
+    /// Values &gt; 1 require kernel <c>SO_REUSEPORT</c> support (Linux 3.9+, macOS/BSD)
+    /// and let the kernel load-balance incoming connections across multiple
+    /// accept threads, which removes the single-listener accept bottleneck on
+    /// many-core machines. On platforms without <c>SO_REUSEPORT</c> (e.g. Windows)
+    /// this falls back to a single acceptor regardless of the configured value.
+    /// Defaults to 1 to preserve historical behaviour.
+    acceptorCount : int }
 
   member x.withBindings(v)              = { x with bindings = v }
   member x.withServerKey(v)             = { x with serverKey = v }
@@ -81,6 +90,7 @@ type SuaveConfig =
   member x.withHealthCheckIntervalMs(v) = { x with healthCheckIntervalMs = v }
   member x.withMaxConnectionAgeSeconds(v) = { x with maxConnectionAgeSeconds = v }
   member x.withFilePartSink(v)          = { x with filePartSink = v }
+  member x.withAcceptorCount(v)         = { x with acceptorCount = v }
 
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
