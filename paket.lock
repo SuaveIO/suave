@@ -66,7 +66,6 @@ NUGET
       System.Memory (>= 4.5.3)
     System.CodeDom (10.0.2)
     System.Collections.Immutable (10.0.2)
-    System.IO.Pipelines (10.0.2)
     System.Management (10.0.2)
       System.CodeDom (>= 10.0.2)
     System.Memory (4.6.3)

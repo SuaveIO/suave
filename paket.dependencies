@@ -4,10 +4,8 @@ source https://api.nuget.org/v3/index.json
 framework net10.0
 storage none
 
-nuget FSharp.Core ~> 10.0.102
+nuget FSharp.Core
 nuget Microsoft.Extensions.FileProviders.Embedded
-nuget System.IO.Pipelines ~> 10.0.2
-nuget System.Text.Json ~> 10.0.2
 nuget DotLiquid
 nuget Websocket.Client
 nuget FsCheck
