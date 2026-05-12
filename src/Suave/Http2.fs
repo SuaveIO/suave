@@ -121,6 +121,10 @@ module Http2 =
   /// Read exactly `n` bytes from the connection's pipe reader into a fresh array.
   /// Replaces the legacy `ConnectionFacade.readBytesToArray` helper that no longer
   /// exists on the current facade. Used by the HTTP/2 frame reader.
+  ///
+  /// Returns an `Error` if fewer than `n` bytes are available before the pipe
+  /// stops yielding data (e.g. peer closed the connection mid-frame), since
+  /// short reads on HTTP/2 frames are protocol errors per RFC 7540 §5.4.1.
   let readBytes (facade: ConnectionFacade) (n: int) : SocketOp<byte[]> =
     ValueTask<Result<byte[], Error>>(
       task {
@@ -131,7 +135,10 @@ module Http2 =
               let target = Span<byte>(buf, offset, count)
               source.CopyTo target
               offset <- offset + count)
-        return Ok buf
+        if offset = n then
+          return Ok buf
+        else
+          return Result.Error (ConnectionError (sprintf "short read: expected %d bytes, got %d" n offset))
       })
 
   let checkEndianness (b : byte []) =
