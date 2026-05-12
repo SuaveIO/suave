@@ -531,6 +531,230 @@ module Http2 =
   open Suave.Utils
   open System.Threading
 
+  // ---------------------------------------------------------------------------
+  // HTTP/2 stream state machine (RFC 7540 §5.1)
+  //
+  // Stream states and the transitions between them. Suave is server-side, so a
+  // number of transitions (e.g. ReservedRemote ↔ a pushed response we receive)
+  // never occur in normal operation; they're still encoded for completeness so
+  // that the state machine can flag protocol errors when peers misbehave.
+  // ---------------------------------------------------------------------------
+
+  /// State of a single HTTP/2 stream. Mirrors the diagram in RFC 7540 §5.1.
+  type StreamState =
+    | Idle
+    | ReservedLocal
+    | ReservedRemote
+    | StreamOpen
+    | HalfClosedLocal
+    | HalfClosedRemote
+    | StreamClosedState
+
+  /// Events that may transition a stream's state. `endStream` is the value of
+  /// the END_STREAM flag on the frame that triggered the event.
+  type StreamEvent =
+    | RecvHeaders of endStream: bool
+    | SendHeaders of endStream: bool
+    | RecvData of endStream: bool
+    | SendData of endStream: bool
+    | RecvPushPromise
+    | SendPushPromise
+    | RecvRstStream
+    | SendRstStream
+
+  /// Apply a state event. Returns the new state on success, or an error code on
+  /// protocol violation (per RFC 7540 §5.1 the listed responses are PROTOCOL_ERROR
+  /// or STREAM_CLOSED). RST_STREAM and END_STREAM transitions to Closed are
+  /// always permitted.
+  let transitionStream (state: StreamState) (event: StreamEvent) : Result<StreamState, ErrorCode> =
+    // RST_STREAM is permitted in every state except Idle; it always closes the
+    // stream.
+    match state, event with
+    | Idle, RecvRstStream
+    | Idle, SendRstStream ->
+      // RFC 7540 §6.4: RST_STREAM on an idle stream is a connection PROTOCOL_ERROR.
+      Result.Error ProtocolError
+    | _, RecvRstStream
+    | _, SendRstStream ->
+      Ok StreamClosedState
+
+    // Idle: only HEADERS or PUSH_PROMISE move us out.
+    | Idle, RecvHeaders true  -> Ok HalfClosedRemote
+    | Idle, RecvHeaders false -> Ok StreamOpen
+    | Idle, SendHeaders true  -> Ok HalfClosedLocal
+    | Idle, SendHeaders false -> Ok StreamOpen
+    | Idle, SendPushPromise   -> Ok ReservedLocal
+    | Idle, RecvPushPromise   ->
+      // Servers don't accept PUSH_PROMISE from clients; clients don't expect
+      // a promise to reserve a stream that's already past Idle. In either
+      // direction this is a PROTOCOL_ERROR.
+      Result.Error ProtocolError
+    | Idle, _ ->
+      // DATA on an idle stream is a PROTOCOL_ERROR.
+      Result.Error ProtocolError
+
+    // ReservedLocal (we promised to push this; we are about to send headers).
+    | ReservedLocal, SendHeaders _ -> Ok HalfClosedRemote
+    | ReservedLocal, _             -> Result.Error ProtocolError
+
+    // ReservedRemote (the peer promised us a push). Client-side only — we
+    // (the server) never enter this state in practice. Encoded for symmetry.
+    | ReservedRemote, RecvHeaders _ -> Ok HalfClosedLocal
+    | ReservedRemote, _             -> Result.Error ProtocolError
+
+    // Open: any END_STREAM half-closes; otherwise no state change.
+    | StreamOpen, RecvHeaders true | StreamOpen, RecvData true -> Ok HalfClosedRemote
+    | StreamOpen, SendHeaders true | StreamOpen, SendData true -> Ok HalfClosedLocal
+    | StreamOpen, _ -> Ok StreamOpen
+
+    // HalfClosedLocal: we've sent END_STREAM. We may still receive DATA/HEADERS.
+    // Receiving END_STREAM closes the stream.
+    | HalfClosedLocal, RecvHeaders true | HalfClosedLocal, RecvData true -> Ok StreamClosedState
+    | HalfClosedLocal, RecvHeaders false | HalfClosedLocal, RecvData false -> Ok HalfClosedLocal
+    | HalfClosedLocal, SendData _ | HalfClosedLocal, SendHeaders _ ->
+      // We've already half-closed locally — sending more data/headers is illegal.
+      Result.Error StreamClosed
+    | HalfClosedLocal, _ -> Result.Error ProtocolError
+
+    // HalfClosedRemote: peer has sent END_STREAM. We may continue to send.
+    | HalfClosedRemote, SendHeaders true | HalfClosedRemote, SendData true -> Ok StreamClosedState
+    | HalfClosedRemote, SendHeaders false | HalfClosedRemote, SendData false -> Ok HalfClosedRemote
+    | HalfClosedRemote, RecvData _ | HalfClosedRemote, RecvHeaders _ ->
+      // The peer promised END_STREAM and is now sending more. STREAM_CLOSED.
+      Result.Error StreamClosed
+    | HalfClosedRemote, _ -> Result.Error ProtocolError
+
+    // Closed: receiving more is STREAM_CLOSED; sending more is a local bug.
+    | StreamClosedState, RecvHeaders _ | StreamClosedState, RecvData _ ->
+      Result.Error StreamClosed
+    | StreamClosedState, _ ->
+      Result.Error ProtocolError
+
+  // ---------------------------------------------------------------------------
+  // HEADERS / CONTINUATION reassembly (RFC 7540 §6.10)
+  //
+  // A header block is a HEADERS or PUSH_PROMISE frame followed by zero or more
+  // CONTINUATION frames on the same stream. END_HEADERS terminates. No other
+  // frames may interleave; doing so is a connection PROTOCOL_ERROR.
+  // ---------------------------------------------------------------------------
+
+  let testEndHeaderFlag (flags: byte) = (flags &&& 0x4uy) = 0x4uy
+
+  /// In-progress reassembly of a header block. `pending` accumulates the
+  /// header-block fragments concatenated in receive order; `streamId` is the
+  /// stream that owns it; `isPushPromise` records the origin (so the
+  /// downstream HPACK consumer knows whether it's processing a request or
+  /// a server-pushed response promise).
+  type HeaderBlockReassembly =
+    { streamId : int32
+      isPushPromise : bool
+      pending : byte[]
+      endStream : bool }
+
+  /// Result of feeding one frame into the reassembler.
+  type ReassemblyResult =
+    /// Header block is incomplete; keep collecting CONTINUATION frames.
+    | NeedMore of HeaderBlockReassembly
+    /// Header block is complete; the concatenated fragment is returned together
+    /// with whether the originating frame had END_STREAM set.
+    | Complete of streamId: int32 * isPushPromise: bool * fragment: byte[] * endStream: bool
+    /// Reassembly failed; the connection MUST send GOAWAY with this code.
+    | ReassemblyAbort of ErrorCode
+
+  let private concat (a: byte[]) (b: byte[]) =
+    let out = Array.zeroCreate (a.Length + b.Length)
+    Array.Copy(a, 0, out, 0, a.Length)
+    Array.Copy(b, 0, out, a.Length, b.Length)
+    out
+
+  /// Begin reassembly with a HEADERS or PUSH_PROMISE frame.
+  let startHeaderBlock (h: FrameHeader) (fragment: byte[]) (isPushPromise: bool) (endStream: bool) : ReassemblyResult =
+    if testEndHeaderFlag h.flags then
+      Complete (h.streamIdentifier, isPushPromise, fragment, endStream)
+    else
+      NeedMore { streamId = h.streamIdentifier
+                 isPushPromise = isPushPromise
+                 pending = fragment
+                 endStream = endStream }
+
+  /// Feed a CONTINUATION frame (or any other frame, to detect interleaving).
+  let feedContinuation (acc: HeaderBlockReassembly) (h: FrameHeader) (fragment: byte[]) : ReassemblyResult =
+    if h.``type`` <> 9uy then
+      // RFC 7540 §6.10: any frame other than CONTINUATION while a header block
+      // is in flight is a connection PROTOCOL_ERROR.
+      ReassemblyAbort ProtocolError
+    elif h.streamIdentifier <> acc.streamId then
+      // CONTINUATION must be on the same stream as the originating HEADERS.
+      ReassemblyAbort ProtocolError
+    else
+      let combined = concat acc.pending fragment
+      if testEndHeaderFlag h.flags then
+        Complete (acc.streamId, acc.isPushPromise, combined, acc.endStream)
+      else
+        NeedMore { acc with pending = combined }
+
+  // ---------------------------------------------------------------------------
+  // Flow-control accounting (RFC 7540 §6.9)
+  //
+  // Each direction of every stream — and the connection as a whole — has a
+  // receive window. Senders may not transmit more DATA octets than the smaller
+  // of the connection window and the relevant stream window. WINDOW_UPDATE
+  // frames replenish a window; the maximum window size is 2^31 − 1.
+  // ---------------------------------------------------------------------------
+
+  /// Maximum legal flow-control window size per RFC 7540 §6.9.1.
+  let maxFlowControlWindow = 0x7fffffff
+
+  /// A mutable flow-control window. `available` is the number of DATA octets
+  /// the holder may still send (for an outbound window) or receive (for an
+  /// inbound window).
+  type FlowControlWindow = { mutable available : int32 }
+
+  let newFlowControlWindow (initial: int32) =
+    { available = initial }
+
+  /// Attempt to consume `n` octets from the window. Returns `true` on success
+  /// (the window was decremented) or `false` if the window is too small.
+  /// Callers that get `false` must block / queue the data until WINDOW_UPDATE
+  /// arrives.
+  let tryConsume (window: FlowControlWindow) (n: int32) : bool =
+    if n < 0 then false
+    elif window.available >= n then
+      window.available <- window.available - n
+      true
+    else false
+
+  /// Apply a WINDOW_UPDATE delta to a window. Per RFC 7540 §6.9.1:
+  /// - a delta of 0 is a stream-level PROTOCOL_ERROR
+  /// - causing the window to exceed 2^31 − 1 is FLOW_CONTROL_ERROR
+  /// - a negative delta is illegal (WINDOW_UPDATE.windowSizeIncrement is unsigned 31-bit)
+  let increment (window: FlowControlWindow) (delta: int32) : Result<unit, ErrorCode> =
+    if delta < 0 then
+      Result.Error ProtocolError
+    elif delta = 0 then
+      Result.Error ProtocolError
+    else
+      // Use int64 to detect overflow before assigning back to the int32 field.
+      let next = int64 window.available + int64 delta
+      if next > int64 maxFlowControlWindow then
+        Result.Error FlowControlError
+      else
+        window.available <- int32 next
+        Ok ()
+
+  /// Apply the effect of a SETTINGS_INITIAL_WINDOW_SIZE change to a window.
+  /// Per RFC 7540 §6.9.2: every active stream's window is adjusted by the
+  /// signed difference between the old and new settings. If the resulting
+  /// window would exceed the maximum, FLOW_CONTROL_ERROR.
+  let applyInitialWindowSizeChange (window: FlowControlWindow) (oldInitial: int32) (newInitial: int32) : Result<unit, ErrorCode> =
+    let delta = int64 newInitial - int64 oldInitial
+    let next = int64 window.available + delta
+    if next > int64 maxFlowControlWindow then
+      Result.Error FlowControlError
+    else
+      window.available <- int32 next
+      Ok ()
+
   type Message<'a> = Request of 'a | Stop
 
   type Http2Connection(facade: ConnectionFacade) =

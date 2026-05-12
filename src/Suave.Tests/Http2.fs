@@ -250,3 +250,246 @@ let huffmanTests (_ : SuaveConfig) =
       let decodedBytes = decoder (new MemoryStream(encoded, false)) encoded.Length
       Expect.equal (System.Text.Encoding.UTF8.GetString decodedBytes) original "huffman round-trip"
   ]
+
+// ---------------------------------------------------------------------------
+// Step 2 — stream state machine, CONTINUATION reassembly, flow control.
+// These pieces are pure data-structure tests; they exercise the new HTTP/2
+// scaffolding before it gets wired into the connection lifecycle.
+// ---------------------------------------------------------------------------
+
+[<Tests>]
+let streamStateTests (_ : SuaveConfig) =
+  let ok = function
+    | Ok s -> s
+    | Result.Error e -> failtestf "expected Ok, got Error %A" e
+  let err = function
+    | Result.Error e -> e
+    | Ok s -> failtestf "expected Error, got Ok %A" s
+
+  testList "Http2 stream state machine" [
+    testCase "Idle + RecvHeaders endStream=false -> Open" <| fun _ ->
+      Expect.equal (ok (transitionStream Idle (RecvHeaders false))) StreamOpen "Open"
+
+    testCase "Idle + RecvHeaders endStream=true -> HalfClosedRemote" <| fun _ ->
+      Expect.equal (ok (transitionStream Idle (RecvHeaders true))) HalfClosedRemote "HalfClosedRemote"
+
+    testCase "Idle + SendHeaders endStream=true -> HalfClosedLocal" <| fun _ ->
+      Expect.equal (ok (transitionStream Idle (SendHeaders true))) HalfClosedLocal "HalfClosedLocal"
+
+    testCase "Idle + RecvData is a PROTOCOL_ERROR" <| fun _ ->
+      Expect.equal (err (transitionStream Idle (RecvData false))) ProtocolError "PROTOCOL_ERROR"
+
+    testCase "Idle + RST_STREAM is a PROTOCOL_ERROR (RFC 7540 §6.4)" <| fun _ ->
+      // RST_STREAM on an idle stream is illegal; the catch-all 'RST always closes'
+      // rule must not swallow this case.
+      Expect.equal (err (transitionStream Idle RecvRstStream)) ProtocolError "PROTOCOL_ERROR"
+
+    testCase "Idle + SendPushPromise -> ReservedLocal" <| fun _ ->
+      Expect.equal (ok (transitionStream Idle SendPushPromise)) ReservedLocal "ReservedLocal"
+
+    testCase "ReservedLocal + SendHeaders -> HalfClosedRemote" <| fun _ ->
+      // We promised a push; once we send the headers the peer can't send anything
+      // back on this stream.
+      Expect.equal (ok (transitionStream ReservedLocal (SendHeaders false))) HalfClosedRemote "HalfClosedRemote"
+
+    testCase "Open + RecvData endStream=false stays Open" <| fun _ ->
+      Expect.equal (ok (transitionStream StreamOpen (RecvData false))) StreamOpen "Open"
+
+    testCase "Open + RecvData endStream=true -> HalfClosedRemote" <| fun _ ->
+      Expect.equal (ok (transitionStream StreamOpen (RecvData true))) HalfClosedRemote "HalfClosedRemote"
+
+    testCase "Open + SendData endStream=true -> HalfClosedLocal" <| fun _ ->
+      Expect.equal (ok (transitionStream StreamOpen (SendData true))) HalfClosedLocal "HalfClosedLocal"
+
+    testCase "Open + RecvRstStream -> Closed" <| fun _ ->
+      Expect.equal (ok (transitionStream StreamOpen RecvRstStream)) StreamClosedState "Closed"
+
+    testCase "HalfClosedRemote + SendData endStream=true -> Closed" <| fun _ ->
+      Expect.equal (ok (transitionStream HalfClosedRemote (SendData true))) StreamClosedState "Closed"
+
+    testCase "HalfClosedRemote + RecvData is STREAM_CLOSED" <| fun _ ->
+      // Peer already announced END_STREAM; sending more is illegal.
+      Expect.equal (err (transitionStream HalfClosedRemote (RecvData false))) StreamClosed "STREAM_CLOSED"
+
+    testCase "HalfClosedLocal + RecvData endStream=true -> Closed" <| fun _ ->
+      Expect.equal (ok (transitionStream HalfClosedLocal (RecvData true))) StreamClosedState "Closed"
+
+    testCase "HalfClosedLocal + SendData is STREAM_CLOSED" <| fun _ ->
+      // We've already sent END_STREAM; sending more is a local bug.
+      Expect.equal (err (transitionStream HalfClosedLocal (SendData false))) StreamClosed "STREAM_CLOSED"
+
+    testCase "Closed + RecvData is STREAM_CLOSED" <| fun _ ->
+      Expect.equal (err (transitionStream StreamClosedState (RecvData false))) StreamClosed "STREAM_CLOSED"
+
+    testCase "Closed + RecvRstStream is allowed and stays Closed" <| fun _ ->
+      // RST_STREAM is idempotent in Closed (within the brief window the peer
+      // may still be in flight); accepting it is harmless.
+      Expect.equal (ok (transitionStream StreamClosedState RecvRstStream)) StreamClosedState "Closed"
+  ]
+
+[<Tests>]
+let headerBlockReassemblyTests (_ : SuaveConfig) =
+  let hdrFlags (endHeaders: bool) (endStream: bool) =
+    let mutable f = 0uy
+    if endHeaders then f <- f ||| 0x4uy
+    if endStream then f <- f ||| 0x1uy
+    f
+  let mkHeaders (endHeaders: bool) (endStream: bool) streamId =
+    { length = 0; ``type`` = 1uy; flags = hdrFlags endHeaders endStream; streamIdentifier = streamId }
+  let mkContinuation (endHeaders: bool) streamId =
+    let f = if endHeaders then 0x4uy else 0uy
+    { length = 0; ``type`` = 9uy; flags = f; streamIdentifier = streamId }
+
+  testList "Http2 HEADERS/CONTINUATION reassembly" [
+    testCase "single HEADERS with END_HEADERS completes immediately" <| fun _ ->
+      let h = mkHeaders true false 3
+      let fragment = [| 1uy; 2uy; 3uy |]
+      match startHeaderBlock h fragment false false with
+      | Complete (sid, push, frag, es) ->
+        Expect.equal sid 3 "stream id"
+        Expect.isFalse push "not push promise"
+        Expect.sequenceEqual frag fragment "fragment preserved"
+        Expect.isFalse es "end_stream preserved"
+      | other -> failtestf "expected Complete, got %A" other
+
+    testCase "HEADERS without END_HEADERS asks for more" <| fun _ ->
+      let h = mkHeaders false false 5
+      match startHeaderBlock h [| 0xaauy |] false false with
+      | NeedMore acc ->
+        Expect.equal acc.streamId 5 "stream id"
+        Expect.equal acc.pending.Length 1 "buffered 1 byte"
+      | other -> failtestf "expected NeedMore, got %A" other
+
+    testCase "CONTINUATION on the same stream concatenates and completes" <| fun _ ->
+      let h1 = mkHeaders false true 7
+      let acc =
+        match startHeaderBlock h1 [| 1uy; 2uy |] false true with
+        | NeedMore a -> a
+        | other -> failtestf "expected NeedMore, got %A" other
+      let h2 = mkContinuation true 7
+      match feedContinuation acc h2 [| 3uy; 4uy; 5uy |] with
+      | Complete (sid, _, frag, es) ->
+        Expect.equal sid 7 "stream id"
+        Expect.sequenceEqual frag [| 1uy; 2uy; 3uy; 4uy; 5uy |] "fragments concatenated"
+        Expect.isTrue es "end_stream propagates from the originating HEADERS"
+      | other -> failtestf "expected Complete, got %A" other
+
+    testCase "interleaved non-CONTINUATION frame is a PROTOCOL_ERROR" <| fun _ ->
+      let h1 = mkHeaders false false 9
+      let acc =
+        match startHeaderBlock h1 [| 1uy |] false false with
+        | NeedMore a -> a
+        | other -> failtestf "expected NeedMore, got %A" other
+      let dataFrame = { length = 0; ``type`` = 0uy; flags = 0uy; streamIdentifier = 9 }
+      match feedContinuation acc dataFrame [||] with
+      | ReassemblyAbort ProtocolError -> ()
+      | other -> failtestf "expected ReassemblyAbort ProtocolError, got %A" other
+
+    testCase "CONTINUATION on a different stream is a PROTOCOL_ERROR" <| fun _ ->
+      let h1 = mkHeaders false false 11
+      let acc =
+        match startHeaderBlock h1 [| 1uy |] false false with
+        | NeedMore a -> a
+        | other -> failtestf "expected NeedMore, got %A" other
+      let cont = mkContinuation true 13 // wrong stream
+      match feedContinuation acc cont [| 2uy |] with
+      | ReassemblyAbort ProtocolError -> ()
+      | other -> failtestf "expected ReassemblyAbort ProtocolError, got %A" other
+
+    testCase "multiple CONTINUATION frames concatenate in order" <| fun _ ->
+      let h1 = mkHeaders false false 1
+      let acc1 =
+        match startHeaderBlock h1 [| 1uy |] false false with
+        | NeedMore a -> a | _ -> failtest "need more"
+      let acc2 =
+        match feedContinuation acc1 (mkContinuation false 1) [| 2uy; 3uy |] with
+        | NeedMore a -> a | _ -> failtest "need more"
+      match feedContinuation acc2 (mkContinuation true 1) [| 4uy |] with
+      | Complete (_, _, frag, _) ->
+        Expect.sequenceEqual frag [| 1uy; 2uy; 3uy; 4uy |] "all fragments concatenated in order"
+      | other -> failtestf "expected Complete, got %A" other
+
+    testCase "PUSH_PROMISE origin is preserved through CONTINUATION" <| fun _ ->
+      let h = mkHeaders false false 2
+      let acc =
+        match startHeaderBlock h [| 9uy |] true false with
+        | NeedMore a -> a | _ -> failtest "need more"
+      Expect.isTrue acc.isPushPromise "starts as push promise"
+      match feedContinuation acc (mkContinuation true 2) [||] with
+      | Complete (_, isPush, _, _) -> Expect.isTrue isPush "stays push promise"
+      | other -> failtestf "expected Complete, got %A" other
+  ]
+
+[<Tests>]
+let flowControlTests (_ : SuaveConfig) =
+  testList "Http2 flow control" [
+    testCase "newFlowControlWindow uses the configured initial value" <| fun _ ->
+      let w = newFlowControlWindow 65535
+      Expect.equal w.available 65535 "initial available"
+
+    testCase "tryConsume succeeds and decrements" <| fun _ ->
+      let w = newFlowControlWindow 100
+      Expect.isTrue (tryConsume w 30) "consume 30 of 100"
+      Expect.equal w.available 70 "available is 70"
+
+    testCase "tryConsume of exactly the available amount succeeds and leaves 0" <| fun _ ->
+      let w = newFlowControlWindow 50
+      Expect.isTrue (tryConsume w 50) "consume 50 of 50"
+      Expect.equal w.available 0 "available is 0"
+
+    testCase "tryConsume larger than the window fails without mutating" <| fun _ ->
+      let w = newFlowControlWindow 10
+      Expect.isFalse (tryConsume w 11) "cannot consume 11 of 10"
+      Expect.equal w.available 10 "window unchanged on failure"
+
+    testCase "tryConsume of a negative value fails" <| fun _ ->
+      let w = newFlowControlWindow 100
+      Expect.isFalse (tryConsume w -5) "negative consume rejected"
+      Expect.equal w.available 100 "window unchanged"
+
+    testCase "increment adds and reports Ok" <| fun _ ->
+      let w = newFlowControlWindow 0
+      match increment w 1000 with
+      | Ok () -> Expect.equal w.available 1000 "available now 1000"
+      | Result.Error e -> failtestf "expected Ok, got %A" e
+
+    testCase "increment of 0 is a PROTOCOL_ERROR (RFC 7540 §6.9.1)" <| fun _ ->
+      let w = newFlowControlWindow 100
+      match increment w 0 with
+      | Result.Error ProtocolError -> Expect.equal w.available 100 "window unchanged"
+      | other -> failtestf "expected ProtocolError, got %A" other
+
+    testCase "increment with negative delta is a PROTOCOL_ERROR" <| fun _ ->
+      let w = newFlowControlWindow 100
+      match increment w -1 with
+      | Result.Error ProtocolError -> Expect.equal w.available 100 "window unchanged"
+      | other -> failtestf "expected ProtocolError, got %A" other
+
+    testCase "increment that overflows the max is a FLOW_CONTROL_ERROR" <| fun _ ->
+      // 2^31 - 1 is the max legal window per RFC 7540 §6.9.1.
+      let w = newFlowControlWindow (maxFlowControlWindow - 100)
+      match increment w 200 with
+      | Result.Error FlowControlError -> Expect.equal w.available (maxFlowControlWindow - 100) "window unchanged on overflow"
+      | other -> failtestf "expected FlowControlError, got %A" other
+
+    testCase "applyInitialWindowSizeChange shifts the window by the signed delta" <| fun _ ->
+      // RFC 7540 §6.9.2: SETTINGS_INITIAL_WINDOW_SIZE adjustments are signed.
+      let w = newFlowControlWindow 100
+      match applyInitialWindowSizeChange w 65535 70000 with
+      | Ok () -> Expect.equal w.available (100 + (70000 - 65535)) "window shifted up"
+      | Result.Error e -> failtestf "expected Ok, got %A" e
+
+    testCase "applyInitialWindowSizeChange allows the window to go negative on shrink" <| fun _ ->
+      // RFC 7540 §6.9.2: a negative window is legal and indicates the sender
+      // must block until the next WINDOW_UPDATE.
+      let w = newFlowControlWindow 10
+      match applyInitialWindowSizeChange w 65535 5 with
+      | Ok () -> Expect.equal w.available (10 + (5 - 65535)) "window went negative"
+      | Result.Error e -> failtestf "expected Ok, got %A" e
+
+    testCase "applyInitialWindowSizeChange that overflows is FLOW_CONTROL_ERROR" <| fun _ ->
+      let w = newFlowControlWindow (maxFlowControlWindow - 5)
+      match applyInitialWindowSizeChange w 0 1000 with
+      | Result.Error FlowControlError -> ()
+      | other -> failtestf "expected FlowControlError, got %A" other
+  ]
