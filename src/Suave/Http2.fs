@@ -545,10 +545,10 @@ module Http2 =
     | Idle
     | ReservedLocal
     | ReservedRemote
-    | StreamOpen
+    | Open
     | HalfClosedLocal
     | HalfClosedRemote
-    | StreamClosedState
+    | Closed
 
   /// Events that may transition a stream's state. `endStream` is the value of
   /// the END_STREAM flag on the frame that triggered the event.
@@ -576,13 +576,13 @@ module Http2 =
       Result.Error ProtocolError
     | _, RecvRstStream
     | _, SendRstStream ->
-      Ok StreamClosedState
+      Ok Closed
 
     // Idle: only HEADERS or PUSH_PROMISE move us out.
     | Idle, RecvHeaders true  -> Ok HalfClosedRemote
-    | Idle, RecvHeaders false -> Ok StreamOpen
+    | Idle, RecvHeaders false -> Ok Open
     | Idle, SendHeaders true  -> Ok HalfClosedLocal
-    | Idle, SendHeaders false -> Ok StreamOpen
+    | Idle, SendHeaders false -> Ok Open
     | Idle, SendPushPromise   -> Ok ReservedLocal
     | Idle, RecvPushPromise   ->
       // Servers don't accept PUSH_PROMISE from clients; clients don't expect
@@ -603,13 +603,13 @@ module Http2 =
     | ReservedRemote, _             -> Result.Error ProtocolError
 
     // Open: any END_STREAM half-closes; otherwise no state change.
-    | StreamOpen, RecvHeaders true | StreamOpen, RecvData true -> Ok HalfClosedRemote
-    | StreamOpen, SendHeaders true | StreamOpen, SendData true -> Ok HalfClosedLocal
-    | StreamOpen, _ -> Ok StreamOpen
+    | Open, RecvHeaders true | Open, RecvData true -> Ok HalfClosedRemote
+    | Open, SendHeaders true | Open, SendData true -> Ok HalfClosedLocal
+    | Open, _ -> Ok Open
 
     // HalfClosedLocal: we've sent END_STREAM. We may still receive DATA/HEADERS.
     // Receiving END_STREAM closes the stream.
-    | HalfClosedLocal, RecvHeaders true | HalfClosedLocal, RecvData true -> Ok StreamClosedState
+    | HalfClosedLocal, RecvHeaders true | HalfClosedLocal, RecvData true -> Ok Closed
     | HalfClosedLocal, RecvHeaders false | HalfClosedLocal, RecvData false -> Ok HalfClosedLocal
     | HalfClosedLocal, SendData _ | HalfClosedLocal, SendHeaders _ ->
       // We've already half-closed locally — sending more data/headers is illegal.
@@ -617,7 +617,7 @@ module Http2 =
     | HalfClosedLocal, _ -> Result.Error ProtocolError
 
     // HalfClosedRemote: peer has sent END_STREAM. We may continue to send.
-    | HalfClosedRemote, SendHeaders true | HalfClosedRemote, SendData true -> Ok StreamClosedState
+    | HalfClosedRemote, SendHeaders true | HalfClosedRemote, SendData true -> Ok Closed
     | HalfClosedRemote, SendHeaders false | HalfClosedRemote, SendData false -> Ok HalfClosedRemote
     | HalfClosedRemote, RecvData _ | HalfClosedRemote, RecvHeaders _ ->
       // The peer promised END_STREAM and is now sending more. STREAM_CLOSED.
@@ -625,9 +625,9 @@ module Http2 =
     | HalfClosedRemote, _ -> Result.Error ProtocolError
 
     // Closed: receiving more is STREAM_CLOSED; sending more is a local bug.
-    | StreamClosedState, RecvHeaders _ | StreamClosedState, RecvData _ ->
+    | Closed, RecvHeaders _ | Closed, RecvData _ ->
       Result.Error StreamClosed
-    | StreamClosedState, _ ->
+    | Closed, _ ->
       Result.Error ProtocolError
 
   // ---------------------------------------------------------------------------
@@ -717,6 +717,11 @@ module Http2 =
   /// (the window was decremented) or `false` if the window is too small.
   /// Callers that get `false` must block / queue the data until WINDOW_UPDATE
   /// arrives.
+  ///
+  /// A negative `n` is treated as a caller bug and returns `false` without
+  /// mutating the window. Frame-level validation (parseFrameHeader, etc.)
+  /// should already have rejected anything that could produce a negative
+  /// length; this is defence in depth.
   let tryConsume (window: FlowControlWindow) (n: int32) : bool =
     if n < 0 then false
     elif window.available >= n then
@@ -729,9 +734,10 @@ module Http2 =
   /// - causing the window to exceed 2^31 − 1 is FLOW_CONTROL_ERROR
   /// - a negative delta is illegal (WINDOW_UPDATE.windowSizeIncrement is unsigned 31-bit)
   let increment (window: FlowControlWindow) (delta: int32) : Result<unit, ErrorCode> =
-    if delta < 0 then
-      Result.Error ProtocolError
-    elif delta = 0 then
+    if delta <= 0 then
+      // Combines RFC 7540 §6.9.1's two PROTOCOL_ERROR cases: delta = 0 is
+      // explicitly illegal, and a negative delta can only arise from a peer
+      // ignoring the unsigned-31-bit wire format.
       Result.Error ProtocolError
     else
       // Use int64 to detect overflow before assigning back to the int32 field.

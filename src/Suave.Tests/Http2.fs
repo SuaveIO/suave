@@ -268,7 +268,7 @@ let streamStateTests (_ : SuaveConfig) =
 
   testList "Http2 stream state machine" [
     testCase "Idle + RecvHeaders endStream=false -> Open" <| fun _ ->
-      Expect.equal (ok (transitionStream Idle (RecvHeaders false))) StreamOpen "Open"
+      Expect.equal (ok (transitionStream Idle (RecvHeaders false))) Open "Open"
 
     testCase "Idle + RecvHeaders endStream=true -> HalfClosedRemote" <| fun _ ->
       Expect.equal (ok (transitionStream Idle (RecvHeaders true))) HalfClosedRemote "HalfClosedRemote"
@@ -293,38 +293,38 @@ let streamStateTests (_ : SuaveConfig) =
       Expect.equal (ok (transitionStream ReservedLocal (SendHeaders false))) HalfClosedRemote "HalfClosedRemote"
 
     testCase "Open + RecvData endStream=false stays Open" <| fun _ ->
-      Expect.equal (ok (transitionStream StreamOpen (RecvData false))) StreamOpen "Open"
+      Expect.equal (ok (transitionStream Open (RecvData false))) Open "Open"
 
     testCase "Open + RecvData endStream=true -> HalfClosedRemote" <| fun _ ->
-      Expect.equal (ok (transitionStream StreamOpen (RecvData true))) HalfClosedRemote "HalfClosedRemote"
+      Expect.equal (ok (transitionStream Open (RecvData true))) HalfClosedRemote "HalfClosedRemote"
 
     testCase "Open + SendData endStream=true -> HalfClosedLocal" <| fun _ ->
-      Expect.equal (ok (transitionStream StreamOpen (SendData true))) HalfClosedLocal "HalfClosedLocal"
+      Expect.equal (ok (transitionStream Open (SendData true))) HalfClosedLocal "HalfClosedLocal"
 
     testCase "Open + RecvRstStream -> Closed" <| fun _ ->
-      Expect.equal (ok (transitionStream StreamOpen RecvRstStream)) StreamClosedState "Closed"
+      Expect.equal (ok (transitionStream Open RecvRstStream)) Closed "Closed"
 
     testCase "HalfClosedRemote + SendData endStream=true -> Closed" <| fun _ ->
-      Expect.equal (ok (transitionStream HalfClosedRemote (SendData true))) StreamClosedState "Closed"
+      Expect.equal (ok (transitionStream HalfClosedRemote (SendData true))) Closed "Closed"
 
     testCase "HalfClosedRemote + RecvData is STREAM_CLOSED" <| fun _ ->
       // Peer already announced END_STREAM; sending more is illegal.
       Expect.equal (err (transitionStream HalfClosedRemote (RecvData false))) StreamClosed "STREAM_CLOSED"
 
     testCase "HalfClosedLocal + RecvData endStream=true -> Closed" <| fun _ ->
-      Expect.equal (ok (transitionStream HalfClosedLocal (RecvData true))) StreamClosedState "Closed"
+      Expect.equal (ok (transitionStream HalfClosedLocal (RecvData true))) Closed "Closed"
 
     testCase "HalfClosedLocal + SendData is STREAM_CLOSED" <| fun _ ->
       // We've already sent END_STREAM; sending more is a local bug.
       Expect.equal (err (transitionStream HalfClosedLocal (SendData false))) StreamClosed "STREAM_CLOSED"
 
     testCase "Closed + RecvData is STREAM_CLOSED" <| fun _ ->
-      Expect.equal (err (transitionStream StreamClosedState (RecvData false))) StreamClosed "STREAM_CLOSED"
+      Expect.equal (err (transitionStream Closed (RecvData false))) StreamClosed "STREAM_CLOSED"
 
     testCase "Closed + RecvRstStream is allowed and stays Closed" <| fun _ ->
       // RST_STREAM is idempotent in Closed (within the brief window the peer
       // may still be in flight); accepting it is harmless.
-      Expect.equal (ok (transitionStream StreamClosedState RecvRstStream)) StreamClosedState "Closed"
+      Expect.equal (ok (transitionStream Closed RecvRstStream)) Closed "Closed"
   ]
 
 [<Tests>]
