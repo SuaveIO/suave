@@ -89,7 +89,7 @@ module Http2 =
     { headerTableSize = 4096
     ; enablePush = true
     ; maxConcurrentStreams = None
-    ; initialWindowSize = 4096
+    ; initialWindowSize = 65535
     ; maxFrameSize = 16384
     ; maxHeaderBlockSize = None
     }
@@ -113,8 +113,26 @@ module Http2 =
     { settings with maxHeaderBlockSize = s }
 
   open System
+  open System.Threading.Tasks
   open Suave.Sockets
+  open Suave.Sockets.Control
   open Suave.Sockets.Control.SocketMonad
+
+  /// Read exactly `n` bytes from the connection's pipe reader into a fresh array.
+  /// Replaces the legacy `ConnectionFacade.readBytesToArray` helper that no longer
+  /// exists on the current facade. Used by the HTTP/2 frame reader.
+  let readBytes (facade: ConnectionFacade) (n: int) : SocketOp<byte[]> =
+    ValueTask<Result<byte[], Error>>(
+      task {
+        let buf = Array.zeroCreate n
+        let mutable offset = 0
+        do! facade.Connection.reader.readPostData n (fun mem count ->
+              let source = mem.Span.Slice(0, count)
+              let target = Span<byte>(buf, offset, count)
+              source.CopyTo target
+              offset <- offset + count)
+        return Ok buf
+      })
 
   let checkEndianness (b : byte []) =
     if (BitConverter.IsLittleEndian) then
@@ -176,7 +194,7 @@ module Http2 =
     bytes
 
   let readFrameHeader (facade:ConnectionFacade) = socket{
-    let! bytes = facade.readBytesToArray 9
+    let! bytes = readBytes facade 9
     return parseFrameHeader bytes
     }
 
@@ -227,10 +245,12 @@ module Http2 =
     if priority then
       let dependecyData = Array.zeroCreate 4
       Array.Copy(payload, 0, dependecyData, 0, 4)
+      let exclusive = (payload.[0] &&& 0x80uy) <> 0uy
       let dependency = get31Bit dependecyData
-      let weight = payload.[4]
+      // RFC 7540 §6.3: wire weight is one less than the logical weight.
+      let weight = payload.[4] + 1uy
 
-      Some ({ exclusive = true; streamIdentifier = dependency;weight = weight})
+      Some ({ exclusive = exclusive; streamIdentifier = dependency;weight = weight})
     else
       None
 
@@ -240,43 +260,65 @@ module Http2 =
 
     match priority header data with
     | Some p ->
+      // Skip the 5-byte stream-dependency + weight prefix; the remainder is the
+      // header block fragment.
       let headerBlockFragment = Array.zeroCreate (data.Length - 5)
-      Array.Copy(data,headerBlockFragment,data.Length - 5)
+      Array.Copy(data, 5, headerBlockFragment, 0, data.Length - 5)
       Headers (Some p, headerBlockFragment)
     | None ->
       Headers (None, data)
 
   let parsePriority (header: FrameHeader) (payload: byte[]) =
     assert(header.``type`` = 2uy)
-    Priority (priority header payload)
+    // A PRIORITY frame always carries a 5-byte payload (stream dependency + weight);
+    // it does not gate on the PRIORITY flag the way HEADERS does.
+    if payload.Length >= 5 then
+      let dependencyData = Array.zeroCreate 4
+      Array.Copy(payload, 0, dependencyData, 0, 4)
+      let exclusive = (payload.[0] &&& 0x80uy) <> 0uy
+      let dependency = get31Bit dependencyData
+      // RFC 7540 §6.3: wire weight is one less than the logical weight.
+      let weight = payload.[4] + 1uy
+      Priority (Some { exclusive = exclusive; streamIdentifier = dependency; weight = weight })
+    else
+      Priority None
 
   let parseRstStream (header: FrameHeader) (payload: byte[]) =
     assert(header.``type`` = 3uy)
-    RstStream (toErrorCode (int payload.[0]))
+    // RFC 7540 §6.4: payload is a 32-bit error code (big-endian).
+    let codeData = Array.zeroCreate<byte> 4
+    Array.Copy(payload, 0, codeData, 0, 4)
+    let code = BitConverter.ToUInt32(checkEndianness codeData, 0)
+    RstStream (toErrorCode (int code))
 
   let parseSettings (header: FrameHeader) (payload: byte[]) =
     assert(header.``type`` = 4uy)
     // Receipt of a SETTINGS frame with the ACK flag set and a length field value other
     // than 0 MUST be treated as a connection error
     let ack = header.flags &&& 0x1uy = 0x1uy
-    let settings = ref defaultSetting
-    Console.WriteLine payload.Length
-    if payload.Length > 0 then
-      for i in 0 .. 6 .. payload.Length do
-        Console.WriteLine i
-        let settingIdentifier = BitConverter.ToUInt16 (payload, i)
-        let value = (BitConverter.ToInt32 (payload, i + 2))
-        settings :=
-          match settingIdentifier with
-          | 1us -> setHeaderTableSize !settings value
-          | 2us -> setEnablePush !settings (value=1)
-          | 3us -> setMaxConcurrentStreams !settings (Some value)
-          | 4us -> setInitialWindowSize !settings value
-          | 5us -> setMaxFrameSize !settings value
-          | 6us -> setMaxHeaderBlockSize !settings (Some value)
-          | _ -> failwith "invalid setting identifier"
+    // RFC 7540 §6.5: SETTINGS payload length MUST be a multiple of 6 octets.
+    if payload.Length % 6 <> 0 then
+      failwithf "Invalid SETTINGS frame length: %d (must be a multiple of 6)" payload.Length
+    let mutable settings = defaultSetting
+    let mutable i = 0
+    while i + 6 <= payload.Length do
+      let idBytes = [| payload.[i + 1]; payload.[i] |] // network order -> host
+      let settingIdentifier = BitConverter.ToUInt16(idBytes, 0)
+      let valBytes = [| payload.[i + 5]; payload.[i + 4]; payload.[i + 3]; payload.[i + 2] |]
+      let value = BitConverter.ToInt32(valBytes, 0)
+      settings <-
+        match settingIdentifier with
+        | 1us -> setHeaderTableSize settings value
+        | 2us -> setEnablePush settings (value = 1)
+        | 3us -> setMaxConcurrentStreams settings (Some value)
+        | 4us -> setInitialWindowSize settings value
+        | 5us -> setMaxFrameSize settings value
+        | 6us -> setMaxHeaderBlockSize settings (Some value)
+        // RFC 7540 §6.5.2: unknown identifiers MUST be ignored.
+        | _ -> settings
+      i <- i + 6
 
-    Settings (ack, !settings)
+    Settings (ack, settings)
 
   let parsePushPromise (header: FrameHeader) (payload: byte[]) =
     assert(header.``type`` = 5uy)
@@ -284,8 +326,10 @@ module Http2 =
     let frameStreamIdData = Array.zeroCreate<byte> 4
     Array.Copy (data, 0, frameStreamIdData, 0, 4)
     let streamIdentifier = get31Bit frameStreamIdData
-    let headerBlockFragment = Array.zeroCreate (data.Length - 5)
-    Array.Copy(data,headerBlockFragment,data.Length - 5)
+    // Skip the 4-byte promised-stream-id prefix; the remainder is the header
+    // block fragment.
+    let headerBlockFragment = Array.zeroCreate (data.Length - 4)
+    Array.Copy(data, 4, headerBlockFragment, 0, data.Length - 4)
     PushPromise (streamIdentifier,headerBlockFragment)
 
   let parsePing (header: FrameHeader) (payload: byte[]) =
@@ -311,7 +355,7 @@ module Http2 =
     WindowUpdate windowSizeIncrement
 
   let parseContinuation (header: FrameHeader) (payload: byte[]) =
-    assert(header.``type`` = 8uy)
+    assert(header.``type`` = 9uy)
     Continuation payload
 
   let payloadDecoders : PayloadDecoder [] =
@@ -320,7 +364,7 @@ module Http2 =
 
   let readFrame (facade:ConnectionFacade) = socket {
     let! header = readFrameHeader facade
-    let! payload = facade.readBytesToArray (int header.length)
+    let! payload = readBytes facade (int header.length)
     let payload = payloadDecoders.[int header.``type``] header payload
     return header, payload
     }
@@ -345,6 +389,10 @@ module Http2 =
   let encodePriority priority =
     let arr = Array.zeroCreate<byte> 5
     poke32 arr 0 priority.streamIdentifier
+    // RFC 7540 §6.3: the high bit of the stream-dependency field carries the
+    // E (exclusive) flag.
+    if priority.exclusive then
+      arr.[0] <- arr.[0] ||| 0x80uy
     arr.[4] <- priority.weight - 1uy
     arr
 
@@ -372,37 +420,45 @@ module Http2 =
       { length = 4; ``type`` = 3uy ; flags = encodeInfo.flags; streamIdentifier = encodeInfo.streamIdentifier } ,
       [ b4 ]
     | Settings (flag,settings) ->
-      { length = 36; ``type`` = 4uy ; flags = encodeInfo.flags; streamIdentifier = encodeInfo.streamIdentifier } ,
-      [
-        for settingIdentifier in [ 1 .. 6 ] do
-          let arr = Array.zeroCreate<byte> 6
-          poke16 arr 0 settingIdentifier
-          match settingIdentifier  with
-          | 1 ->
+      // Emit only settings that differ from the spec defaults and have an
+      // actual value. Optional settings (None) are skipped entirely.
+      let entries =
+        [ if settings.headerTableSize <> 4096 then
+            let arr = Array.zeroCreate<byte> 6
+            poke16 arr 0 1
             poke32 arr 2 settings.headerTableSize
-          | 2 ->
-            if settings.enablePush then
-              poke32 arr 2 1
-          | 3 ->
-            match settings.maxConcurrentStreams with
-            | Some v ->
-              poke32 arr 2 v
-            | None ->
-              ()
-          | 4 ->
+            yield arr
+          if not settings.enablePush then
+            let arr = Array.zeroCreate<byte> 6
+            poke16 arr 0 2
+            poke32 arr 2 0
+            yield arr
+          match settings.maxConcurrentStreams with
+          | Some v ->
+            let arr = Array.zeroCreate<byte> 6
+            poke16 arr 0 3
+            poke32 arr 2 v
+            yield arr
+          | None -> ()
+          if settings.initialWindowSize <> 65535 then
+            let arr = Array.zeroCreate<byte> 6
+            poke16 arr 0 4
             poke32 arr 2 settings.initialWindowSize
-          | 5 ->
+            yield arr
+          if settings.maxFrameSize <> 16384 then
+            let arr = Array.zeroCreate<byte> 6
+            poke16 arr 0 5
             poke32 arr 2 settings.maxFrameSize
-          | 6 ->
-            match settings.maxHeaderBlockSize with
-            | Some v ->
-              poke32 arr 2 v
-            | None ->
-              ()
-          | _ ->
-            failwith "invalid setting identifier"
-          yield arr
-      ]
+            yield arr
+          match settings.maxHeaderBlockSize with
+          | Some v ->
+            let arr = Array.zeroCreate<byte> 6
+            poke16 arr 0 6
+            poke32 arr 2 v
+            yield arr
+          | None -> () ]
+      { length = entries.Length * 6; ``type`` = 4uy ; flags = encodeInfo.flags; streamIdentifier = encodeInfo.streamIdentifier } ,
+      entries
     | PushPromise (i,bytes) ->
       let b4 = Array.zeroCreate 4
       poke32 b4 0 i
@@ -485,18 +541,18 @@ module Http2 =
       readFrame facade
 
     member x.write(encInfo,p:FramePayload) : SocketOp<unit> =
-      writeFrame encInfo p (facade.GetCurrentContext().connection.transport)
+      writeFrame encInfo p facade.Connection.transport
 
     member x.writeResponseToFrame (response: HttpResult) = async {
         let headersFrame = encodeHeader { algorithm = CompressionAlgorithm.Naive; useHuffman = true} 4096 x.encodeDynamicTable  ((":status",response.status.code.ToString())::response.headers)
         let encInfo = { flags = BitOperations.set 0uy 2; streamIdentifier = 11;  padding = None}
-        let! a = x.write (encInfo, Headers(None, headersFrame))
-        Console.WriteLine "Send HEADERS"
+        let! _ = Async.AwaitTask ((x.write (encInfo, Headers(None, headersFrame))).AsTask())
         match response.content with
         | Bytes bs ->
           let encInfo = { flags = BitOperations.set 0uy 0; streamIdentifier = 11;  padding = None}
-          let! a = x.write (encInfo, Data(bs,true))
-          Console.WriteLine "Send DATA"
+          let! _ = Async.AwaitTask ((x.write (encInfo, Data(bs,true))).AsTask())
+          ()
+        | _ -> ()
         return ()
         }
 
@@ -514,8 +570,7 @@ module Http2 =
      async {
        // send an empty SETTINGS frame
        let encInfo = { flags = 1uy (*ack*); streamIdentifier = 0;  padding = None}
-       let! a = x.write (encInfo,Settings(true,defaultSetting))
-       Console.WriteLine "Send SETTINGS"
+       let! _ = Async.AwaitTask ((x.write (encInfo,Settings(true,defaultSetting))).AsTask())
        while !alive do
          let! a = x.get ()
          match a with
@@ -527,10 +582,8 @@ module Http2 =
              | None ->
                return ()
          | Stop ->
-           Console.WriteLine "Exiting"
            let encInfo = { flags = 0uy; streamIdentifier = 0;  padding = None}
-           let! a = x.write (encInfo, GoAway(11,ErrorCode.NoError,[||]))
-           Console.WriteLine "Send GOAWAY"
+           let! _ = Async.AwaitTask ((x.write (encInfo, GoAway(11,ErrorCode.NoError,[||]))).AsTask())
            alive := false
            closeEvent.Set() |> ignore
        }
