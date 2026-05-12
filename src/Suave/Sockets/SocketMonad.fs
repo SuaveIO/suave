@@ -1,95 +1,91 @@
-﻿namespace Suave.Sockets.Control
+namespace Suave.Sockets.Control
 
 open System
 open System.Collections.Generic
+open System.Threading.Tasks
 open Suave.Sockets
 
 /// Workflow builder to read/write to async sockets with fail/success semantics
 type SocketMonad() =
-  member this.Return(x:'a) : SocketOp<'a> = async { return Choice1Of2 x }
+  member this.Return(x:'a) : SocketOp<'a> = ValueTask<Result<'a,Error>>(Ok x)
   member this.Zero() : SocketOp<unit> = this.Return()
   member this.ReturnFrom(x : SocketOp<'a>) : SocketOp<'a> = x
-  member this.Delay(f: unit ->  SocketOp<'a>) = async { return! f () }
+  member this.Delay(f: unit ->  SocketOp<'a>) = ValueTask<Result<'a,Error>>(task { return! (f ()).AsTask() })
 
-  member this.Bind(x : SocketOp<'a>,f : 'a -> SocketOp<'b>) : SocketOp<'b> = async {
-    let! result = x
-    match result with
-    | Choice1Of2 a -> return! f a
-    | Choice2Of2 b -> return Choice2Of2 b
-    }
+  member this.Bind(x : SocketOp<'a>,f : 'a -> SocketOp<'b>) : SocketOp<'b> =
+    ValueTask<Result<'b,Error>>(
+      task {
+        let! result = x.AsTask()
+        match result with
+        | Ok a -> return! (f a).AsTask()
+        | Error b -> return Result.Error b
+      })
+ 
+  member this.Combine(v, f) =
+    this.Bind(v, fun () -> f)
 
-  member this.Combine(v, f) = this.Bind(v, fun () -> f)
+  // This is buggy avoid using
+  member this.While(guard, body : SocketOp<unit>) : SocketOp<unit> =
+    ValueTask<Result<unit,Error>>(
+      task{
+        let mutable error = false
+        let mutable errorResult = Ok()
+        while not error && guard () do
+          let! a = body.AsTask()
+          match a with
+          | Ok () -> ()
+          | Result.Error e as a ->
+            error <- true
+            errorResult <- a
+        if error then
+          return errorResult
+        else
+          return Ok()
+      })
 
-  member this.While(guard, body : SocketOp<unit>) : SocketOp<unit> = async {
-    if guard() then
-      let! result = body
-      match result with
-      | Choice1Of2 a ->
-        return! this.While(guard, body)
-      | Choice2Of2 _ ->
-        return result
-    else
-      return! this.Zero()
-    }
+  member this.TryWith(body : SocketOp<'a>, handler : exn -> SocketOp<'a>) : SocketOp<'a> =
+    ValueTask<Result<'a,Error>>(
+      task {
+        try
+          return! body.AsTask()
+        with e ->
+          return! (handler e).AsTask()
+      })
 
-  member this.TryWith(body, handler) = async {
-    try
-      return! body
-    with e ->
-      return! handler e
-    }
+  member this.TryFinally(body : SocketOp<'a>, compensation : unit -> unit) : SocketOp<'a> =
+    ValueTask<Result<'a,Error>>(
+      task {
+         try
+           return! body.AsTask()
+         finally
+           compensation()
+      })
 
-  member this.TryFinally(body, compensation) = async {
-     try
-       return! body
-     finally
-       compensation()
-    }
-
-  member this.Using(disposable : #System.IDisposable, body) = async {
-    use _ = disposable
-    return! body disposable
-    }
+  member this.Using(disposable : 'a, body : 'a -> SocketOp<'b>) : SocketOp<'b> when 'a :> IDisposable =
+    ValueTask<Result<'b,Error>>(
+      task {
+        use _ = disposable
+        return! (body disposable).AsTask()
+      })
 
   member this.For(sequence : seq<_>, body : 'a -> SocketOp<unit>) =
-    this.Using(sequence.GetEnumerator(),
-      fun (enum : IEnumerator<'a>) -> this.While(enum.MoveNext, this.Delay(fun _-> body enum.Current)))
-
+    (fun (enum : IEnumerator<'a>) -> 
+      ValueTask<Result<unit,Error>>(
+        task {
+          let mutable good = true
+          let mutable result = Ok ()
+          while good && enum.MoveNext() do
+            let! a = (body enum.Current).AsTask()
+            match a with
+            | Ok _ -> ()
+            | Result.Error e ->
+              good <- false
+              result <- Result.Error e
+          return result 
+        })) (sequence.GetEnumerator())
 
 [<AutoOpen>]
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module SocketMonad =
-  /// The socket monad   
+  /// The socket monad
   let socket = SocketMonad()
-
-
-  type SocketState<'s,'a> = 's -> SocketOp<'a * 's>
-
-  type SocketStateBuilder<'s>() =
-    member x.Return v : SocketState<'s,_> = fun s -> socket{ return v,s }
-    member x.Bind(v, f) : SocketState<'s,_> =
-      fun s -> socket {
-        let! (a,s) = v s
-        let v' = f a
-        return! v' s }
-    member x.Zero() = x.Return()
-    member x.Combine(v, f) = x.Bind(v, fun () -> f)
-    member x.Delay(f: unit ->  SocketState<'s,'a>) : SocketState<'s,'a> = fun s -> f () s
-    member x.Using(disposable : #System.IDisposable, body : 'a -> SocketState<'s,_>) = fun s -> socket {
-      use _ = disposable
-     return! body disposable s
-    }
-    member x.While(guard, body : SocketState<'s,_>) : SocketState<'s,_> = fun s -> socket {
-      if guard() then
-        let! (_,s') = body s
-        return! x.While(guard, body) s'
-      else
-        return! x.Zero() s
-      }
-    member x.For(sequence : seq<_>, body : 'a -> SocketState<'s,unit>) =
-      fun s ->
-        x.Using(sequence.GetEnumerator(),
-          fun (enum : IEnumerator<'a>) -> x.While(enum.MoveNext, x.Delay(fun _-> body enum.Current))) s
-
-  let withConnection = SocketStateBuilder<Connection>()
-

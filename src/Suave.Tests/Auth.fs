@@ -1,13 +1,11 @@
-﻿module Suave.Tests.Auth
+module Suave.Tests.Auth
 
 
 open System
 open System.Net
 open System.Net.Http
-open Fuchu
+open Expecto
 open Suave
-open Suave.Logging
-open Suave.Logging.Message
 open Suave.Cookie
 open Suave.State.CookieStateStore
 open Suave.Operators
@@ -17,12 +15,12 @@ open Suave.RequestErrors
 open Suave.Authentication
 open Suave.Testing
 
-type Assert with
-  static member Null (msg : string, o : obj) =
+module Assert =
+  let Null (msg : string, o : obj) =
     if o <> null then Tests.failtest msg
     else ()
 
-  static member Contains (msg : string, fExpected : 'a -> bool, xs : seq<'a>) =
+  let Contains (msg : string, fExpected : 'a -> bool, xs : seq<'a>) =
     if Seq.isEmpty xs then Tests.failtest "empty seq"
     match Seq.tryFind fExpected xs with
     | None -> Tests.failtest msg
@@ -38,29 +36,12 @@ let reqResp
   fResult
   (ctx : SuaveTestCtx) =
 
-  let event message =
-    eventX message >> setSingleName "Suave.Tests"
-
-  let logger =
-    ctx.suaveConfig.logger
-
-  logger.debug (
-    event "{method} {resource}"
-    >> setFieldValue "method" methd
-    >> setFieldValue "resource" resource)
-
   let defaultTimeout = TimeSpan.FromSeconds 5.
 
   use handler = createHandler DecompressionMethods.None cookies
   use client = createClient handler
   use request = createRequest methd resource "" None (endpointUri ctx.suaveConfig) |> fRequest
 
-  for h in request.Headers do
-    logger.debug (event "{headerName}: {headerValue}"
-                  >> setFieldValue "headerName" h.Key
-                  >> setFieldValue "headerValue" (String.Join(", ", h.Value)))
-
-  // use -> let!!!
   let result = request |> send client defaultTimeout ctx
   fResult result
 
@@ -87,15 +68,9 @@ let interact methd resource container ctx =
   | true, values -> values |> Seq.iter (fun cookie -> container.SetCookies(endpointUri ctx.suaveConfig, cookie))
   response
 
-let sessionState f =
-  context( fun r ->
-    match HttpContext.state r with
-    | None ->  RequestErrors.BAD_REQUEST "damn it"
-    | Some store -> f store )
-
 [<Tests>]
 let authTests cfg =
-  let runWithConfig = runWith { cfg with logger = Targets.create Warn }
+  let runWithConfig = runWith cfg
   testList "auth tests" [
     testCase "baseline, no auth cookie" <| fun _ ->
       let ctx = runWithConfig (OK "ACK")
@@ -105,14 +80,23 @@ let authTests cfg =
     testCase "can set cookie" <| fun _ ->
       let ctx = runWithConfig (authenticated Session false >=> OK "ACK")
       let cookies = ctx |> reqCookies' HttpMethod.GET "/"  None
-      Assert.NotNull("should have auth cookie", cookies.[SessionAuthCookie])
+      Expect.isNotNull cookies.[SessionAuthCookie] "Should have auth cookie"
 
     testCase "can set MaxAge cookie" <| fun _ ->
       let timespan = System.TimeSpan.FromDays(13.0)
       let maxAge = Cookie.CookieLife.MaxAge timespan
       let ctx = runWithConfig (authenticated maxAge false >=> OK "ACK")
       let cookies = ctx |> reqCookies' HttpMethod.GET "/"  None
-      Assert.NotNull("should have auth cookie", cookies.[SessionAuthCookie])
+      Expect.isNotNull cookies.[SessionAuthCookie] "should have auth cookie"
+
+    testCase "can access session id when authenticate" <| fun _ ->
+      let readSessionId = context (HttpContext.sessionId >> function
+        | None -> OK "no session id"
+        | Some _ -> OK "session id found")
+      let res =
+        runWithConfig (authenticated Session false >=> readSessionId)
+        |> req HttpMethod.GET "/" None
+      Expect.equal res "session id found" "should find session id"
 
     testCase "can access authenticated contents when authenticate, and not after deauthenticate" <| fun _ ->
       // given
@@ -139,31 +123,43 @@ let authTests cfg =
       // when
       interaction ctx <| fun _ ->
         use res = interact HttpMethod.GET "/"
-        Assert.Equal("should allow root request", "root", contentString res)
+        let actual = contentString res
+        Expect.equal actual "root" "should allow root request"
 
         match cookies.[SessionAuthCookie] with
         | null -> ()
         | cookie -> Tests.failtestf "should not have auth cookie, but was %A" cookie
 
         use res' = interact HttpMethod.GET "/protected"
-        Assert.Equal("should not have access to protected", "please authenticate", contentString res')
-        Assert.Equal("code 403 FORBIDDEN", HttpStatusCode.Forbidden, statusCode res')
+        Expect.equal (contentString res') "please authenticate" "should not have access to protected"
+        Expect.equal (statusCode res') HttpStatusCode.Forbidden "code 403 FORBIDDEN"
 
         use res'' = interact HttpMethod.GET "/auth"
         Assert.Contains("after authentication", (fun (str : string) -> str.Contains("auth=")),
                                                 res''.Headers.GetValues "Set-Cookie")
-        Assert.Equal("after authentication", "authed", contentString res'')
+        Expect.equal (contentString res'') "authed" "after authentication"
 
         use res''' = interact HttpMethod.GET "/protected"
-        Assert.Equal("should have access to protected", "You have reached the place of your dreams!", contentString res''')
-        Assert.Equal("code 200 OK", HttpStatusCode.OK, statusCode res''')
+        Expect.equal (contentString res''') "You have reached the place of your dreams!" "should have access to protected"
+        Expect.equal (statusCode res''') HttpStatusCode.OK "code 200 OK"
 
         use res'''' = interact HttpMethod.GET "/deauth"
-        Assert.Equal("should have logged out now", "deauthed", contentString res'''')
+        Expect.equal (contentString res'''') "deauthed" "should have logged out now"
 
         use res''''' = interact HttpMethod.GET "/protected"
-        Assert.Equal("should not have access to protected after logout","please authenticate", contentString res''''')
+        Expect.equal (contentString res''''') "please authenticate" "should not have access to protected after logout"
+        ]
 
+let sessionState f =
+  context(fun r ->
+    match HttpContext.state r with
+    | None ->  RequestErrors.BAD_REQUEST "damn it"
+    | Some store -> f store )
+
+[<Tests>]
+let sessionTests cfg =
+  let runWithConfig = runWith cfg 
+  testList "session tests" [
     testCase "test session is maintained across requests" <| fun _ ->
       // given
       let ctx =
@@ -183,13 +179,13 @@ let authTests cfg =
 
       interaction ctx  (fun _ ->
         use res = interact HttpMethod.GET "/"
-        Assert.Equal("should return number zero", "0", contentString res)
+        Expect.equal (contentString res) "0" "should return number zero"
 
         use res' = interact HttpMethod.GET "/"
-        Assert.Equal("should return number one", "1", contentString res')
+        Expect.equal (contentString res') "1" "should return number one"
 
         use res'' = interact HttpMethod.GET "/"
-        Assert.Equal("should return number two", "2", contentString res''))
+        Expect.equal (contentString res'') "2" "should return number two")
 
     testCase "set more than one variable in the session" <| fun _ ->
       // given
@@ -208,16 +204,16 @@ let authTests cfg =
 
       interaction ctx  (fun _ ->
         use res = interact HttpMethod.GET "/a"
-        Assert.Equal("should return a", "a", contentString res)
+        Expect.equal (contentString res) "a" "should return a"
 
         use res' = interact HttpMethod.GET "/b"
-        Assert.Equal("should return b", "b", contentString res')
+        Expect.equal (contentString res') "b" "should return b"
 
         use res'' = interact HttpMethod.GET "/get_a"
-        Assert.Equal("should return a", "a", contentString res'')
+        Expect.equal (contentString res'') "a" "should return a"
 
         use res''' = interact HttpMethod.GET "/get_b"
-        Assert.Equal("should return b", "b", contentString res'''))
+        Expect.equal (contentString res''') "b" "should return b")
 
     testCase "set two session values on the same request" <| fun _ ->
       // given
@@ -234,11 +230,11 @@ let authTests cfg =
 
       interaction ctx  (fun _ ->
         use res = interact HttpMethod.GET "/ab"
-        Assert.Equal("should return a", "a", contentString res)
+        Expect.equal (contentString res) "a" "should return a"
 
         use res''' = interact HttpMethod.GET "/get_b"
-        Assert.Equal("should return b", "b", contentString res''')
+        Expect.equal (contentString res''') "b" "should return b"
 
         use res'' = interact HttpMethod.GET "/get_a"
-        Assert.Equal("should return a", "a", contentString res''))
+        Expect.equal (contentString res'') "a" "should return a")
     ]

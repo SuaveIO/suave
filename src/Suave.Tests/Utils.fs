@@ -8,7 +8,7 @@ open Suave.Utils
 open Suave.Utils.Compression
 open Suave.Utils.Parsing
 
-open Fuchu
+open Expecto
 open TestUtilities
 
 #nowarn "25"
@@ -17,10 +17,10 @@ open TestUtilities
 let utilities (_: SuaveConfig) =
   testList "trying some utility functions" [
     testCase "loopback ipv4" <| fun _ ->
-      Assert.Equal("127.0.0.1 is a local address", true, isLocalAddress "127.0.0.1")
+      Expect.isTrue (isLocalAddress "127.0.0.1") "127.0.0.1 is a local address"
 
     testCase "loopback ipv6" <| fun _ ->
-      Assert.Equal("::0 is a local address", true, isLocalAddress "::1")
+      Expect.isTrue (isLocalAddress "::1") "::1 is a local address"
 
     testPropertyWithConfig fsCheckConfig "gzipEncode/gzipDecode" <| fun str ->
       let get_bytes  = Encoding.UTF8.GetBytes  : string -> byte []
@@ -48,7 +48,7 @@ let utilities (_: SuaveConfig) =
       let key = Crypto.generateStdKey ()
       let (Choice1Of2 cipher) = Crypto.secretboxOfText key str
       let (Choice1Of2 plain) = Crypto.secretboxOpenAsString key cipher
-      Assert.Equal(sprintf "'%s':%s = D(k, E(k, '%s':%s))" plain (ca plain) str (ca str), str, plain)
+      Expect.equal plain str (sprintf "'%s':%s = D(k, E(k, '%s':%s))" plain (ca plain) str (ca str))
 
     testCase "crypto hello world - avoid padding oracle" <| fun _ ->
       let str = "Hello World"
@@ -76,9 +76,9 @@ let utilities (_: SuaveConfig) =
         let key = Crypto.generateStdKey ()
         let (Choice1Of2 cipher) = Crypto.secretboxOfText key str
         let (Choice1Of2 plain) = Crypto.secretboxOpenAsString key cipher
-        Assert.Equal(sprintf "'%s':%s = D(k, E(k, '%s':%s))" plain (ca plain) str (ca str), str, plain)
+        Expect.equal plain str (sprintf "'%s':%s = D(k, E(k, '%s':%s))" plain (ca plain) str (ca str))
 
     testPropertyWithConfig fsCheckConfig "Bytes.encode_safe_base64 encoded <-> decoded" <| fun (str : string) ->
       let enc, dec = Bytes.cookieEncoding
-      Assert.Equal("roundtrip", str, Encoding.UTF8.GetString (dec (enc (Encoding.UTF8.GetBytes str))))
+      Expect.equal (Encoding.UTF8.GetString (dec (enc (Encoding.UTF8.GetBytes str)))) str "roundtrip"
   ]

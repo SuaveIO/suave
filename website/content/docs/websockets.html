@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Suave WebSockets - Real-time bidirectional communication">
+  <title>WebSockets - Suave</title>
+  <link rel="shortcut icon" href="/images/favicon.ico" type="image/x-icon">
+  <link rel="icon" href="/images/favicon-32x32.png" sizes="32x32" type="image/png">
+  <link rel="icon" href="/images/favicon-96x96.png" sizes="96x96" type="image/png">
+  <link rel="apple-touch-icon" href="/images/apple-touch-icon-57x57.png" sizes="57x57">
+  <link rel="apple-touch-icon" href="/images/apple-touch-icon-114x114.png" sizes="114x114">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header>
+    <div class="container">
+      <nav>
+        <div class="logo">
+          <img src="/images/head_600_trans.png" alt="Suave Logo" width="40" height="40" style="vertical-align: middle; margin-right: 12px; background: white; padding: 2px; border-radius: 4px;">
+          Suave
+        </div>
+        <button id="hamburger" class="hamburger" aria-label="Toggle menu">
+          <span></span><span></span><span></span>
+        </button>
+        <ul id="nav-links" class="nav-links">
+          <li><a href="/">Home</a></li>
+          <li><a href="/docs/">Documentation</a></li>
+          <li><a href="/docs/performance.html">Performance</a></li>
+          <li><a href="https://github.com/SuaveIO/suave" target="_blank">GitHub</a></li>
+          <li><a href="https://www.nuget.org/packages/Suave/" target="_blank">NuGet</a></li>
+          <li><button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme">🌙</button></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <div class="container">
+      <h1>WebSockets</h1>
+      <p>Implement real-time bidirectional communication with WebSocket support in Suave.</p>
+
+      <h2>Basic WebSocket Handler</h2>
+      <p>Create a simple WebSocket echo server:</p>
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.WebSocket
+open Suave.Sockets
+open Suave.Sockets.Control
+open System.Text
+
+let echo (webSocket: WebSocket) (context: HttpContext) =
+  socket {
+    let mutable loop = true
+
+    while loop do
+      let! msg = webSocket.read()
+
+      match msg with
+      | (Text, data, true) ->
+          let str = Encoding.UTF8.GetString data.Span
+          let response = sprintf "Echo: %s" str
+          let byteResponse =
+            response
+            |> Encoding.ASCII.GetBytes
+            |> ByteSegment
+          do! webSocket.send Text byteResponse true
+
+      | (Close, _, _) ->
+          do! webSocket.send Close (ByteSegment [||]) true
+          loop <- false
+
+      | _ -> ()
+  }
+
+let app =
+  choose [
+    path "/ws" >=> handShake echo
+  ]</code></pre>
+      </div>
+
+      <h2>Broadcasting Messages</h2>
+      <p>Broadcast messages to multiple WebSocket clients:</p>
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.WebSocket
+open System.Collections.Concurrent
+open System.Text
+
+let clients = new ConcurrentDictionary&lt;string, WebSocket&gt;()
+
+let broadcast (message: string) =
+  let bytes = Encoding.UTF8.GetBytes(message) |> ByteSegment
+  for client in clients.Values do
+    async {
+      do! client.send Text bytes true
+    } |> Async.Start
+
+let chatHandler (webSocket: WebSocket) (context: HttpContext) =
+  socket {
+    let clientId = System.Guid.NewGuid().ToString()
+    clients.TryAdd(clientId, webSocket) |> ignore
+    
+    let mutable loop = true
+    while loop do
+      let! msg = webSocket.read()
+
+      match msg with
+      | (Text, data, true) ->
+          let str = Encoding.UTF8.GetString data.Span
+          broadcast (sprintf "%s: %s" clientId str)
+
+      | (Close, _, _) ->
+          broadcast (sprintf "%s left" clientId)
+          clients.TryRemove(clientId) |> ignore
+          do! webSocket.send Close (ByteSegment [||]) true
+          loop <- false
+
+      | _ -> ()
+  }
+
+let app =
+  choose [
+    path "/chat" >=> handShake chatHandler
+  ]</code></pre>
+      </div>
+
+      <h2>WebSocket with JSON Messages</h2>
+      <p>Exchange structured JSON messages:</p>
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.WebSocket
+open System.Text
+open System.Text.Json
+
+type Message = { user: string; text: string; timestamp: System.DateTime }
+
+let jsonWebSocket (webSocket: WebSocket) (context: HttpContext) =
+  socket {
+    let mutable loop = true
+
+    while loop do
+      let! msg = webSocket.read()
+
+      match msg with
+      | (Text, data, true) ->
+          try
+            let json = Encoding.UTF8.GetString data.Span
+            let message = JsonSerializer.Deserialize&lt;Message&gt;(json)
+            
+            let response = { message with timestamp = System.DateTime.UtcNow }
+            let responseJson = JsonSerializer.Serialize(response)
+            let responseBytes = Encoding.UTF8.GetBytes(responseJson) |> ByteSegment
+            
+            do! webSocket.send Text responseBytes true
+          with _ -> ()
+
+      | (Close, _, _) ->
+          do! webSocket.send Close (ByteSegment [||]) true
+          loop <- false
+
+      | _ -> ()
+  }
+
+let app =
+  choose [
+    path "/json-ws" >=> handShake jsonWebSocket
+  ]</code></pre>
+      </div>
+
+      <h2>Binary Data Transfer</h2>
+      <p>Send and receive binary data over WebSocket:</p>
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.WebSocket
+
+let binaryEcho (webSocket: WebSocket) (context: HttpContext) =
+  socket {
+    let mutable loop = true
+
+    while loop do
+      let! msg = webSocket.read()
+
+      match msg with
+      | (Binary, data, true) ->
+          // Echo binary data back
+          do! webSocket.send Binary data true
+
+      | (Close, _, _) ->
+          do! webSocket.send Close (ByteSegment [||]) true
+          loop <- false
+
+      | _ -> ()
+  }
+
+let app =
+  choose [
+    path "/binary" >=> handShake binaryEcho
+  ]</code></pre>
+      </div>
+
+      <h2>Client-Side WebSocket Example</h2>
+      <p>HTML/JavaScript client for WebSocket communication:</p>
+      <div class="code-block">
+        <pre><code>&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+&lt;body&gt;
+  &lt;h1&gt;WebSocket Chat&lt;/h1&gt;
+  &lt;input type="text" id="message" placeholder="Type a message"&gt;
+  &lt;button onclick="sendMessage()"&gt;Send&lt;/button&gt;
+  &lt;div id="messages"&gt;&lt;/div&gt;
+
+  &lt;script&gt;
+    const ws = new WebSocket('ws://localhost:8080/chat');
+
+    ws.onopen = () => {
+      console.log('Connected');
+    };
+
+    ws.onmessage = (event) => {
+      const div = document.createElement('div');
+      div.textContent = event.data;
+      document.getElementById('messages').appendChild(div);
+    };
+
+    ws.onerror = (error) => {
+      console.error('WebSocket error:', error);
+    };
+
+    ws.onclose = () => {
+      console.log('Disconnected');
+    };
+
+    function sendMessage() {
+      const input = document.getElementById('message');
+      ws.send(input.value);
+      input.value = '';
+    }
+  &lt;/script&gt;
+&lt;/body&gt;
+&lt;/html&gt;</code></pre>
+      </div>
+
+      <h2>Error Handling</h2>
+      <p>Handle WebSocket errors gracefully:</p>
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.WebSocket
+
+let safeWebSocket (webSocket: WebSocket) (context: HttpContext) =
+  socket {
+    try
+      let mutable loop = true
+
+      while loop do
+        try
+          let! msg = webSocket.read()
+
+          match msg with
+          | (Text, data, true) ->
+              let str = System.Text.Encoding.UTF8.GetString data.Span
+              let response = sprintf "OK: %s" str |> System.Text.Encoding.ASCII.GetBytes |> ByteSegment
+              do! webSocket.send Text response true
+
+          | (Close, _, _) ->
+              do! webSocket.send Close (ByteSegment [||]) true
+              loop <- false
+
+          | _ -> ()
+        with
+        | ex ->
+            printfn "WebSocket error: %s" ex.Message
+            loop <- false
+
+    with ex ->
+      printfn "Fatal WebSocket error: %s" ex.Message
+  }
+
+let app =
+  choose [
+    path "/safe-ws" >=> handShake safeWebSocket
+  ]</code></pre>
+      </div>
+
+      <h2>Real-Time Notifications</h2>
+      <p>Push real-time notifications to connected clients:</p>
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.WebSocket
+open System.Collections.Concurrent
+open System.Text
+
+let notificationClients = new ConcurrentBag&lt;WebSocket&gt;()
+
+let notificationHandler (webSocket: WebSocket) (context: HttpContext) =
+  socket {
+    notificationClients.Add(webSocket)
+    
+    let mutable loop = true
+    while loop do
+      let! msg = webSocket.read()
+
+      match msg with
+      | (Close, _, _) ->
+          do! webSocket.send Close (ByteSegment [||]) true
+          loop <- false
+
+      | _ -> ()
+  }
+
+let sendNotification (notification: string) =
+  let bytes = Encoding.UTF8.GetBytes(notification) |> ByteSegment
+  for client in notificationClients do
+    async {
+      try
+        do! client.send Text bytes true
+      with _ -> ()
+    } |> Async.Start
+
+let app =
+  choose [
+    path "/notifications" >=> handShake notificationHandler
+    POST >=> path "/notify" >=> fun ctx ->
+      match ctx.request.formData "message" with
+      | Choice1Of2 msg ->
+          sendNotification msg
+          OK "Notification sent" ctx
+      | _ -> RequestErrors.BAD_REQUEST "Missing message" ctx
+  ]</code></pre>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <div class="container">
+      <div class="footer-links">
+        <a href="/docs/">Documentation</a>
+        <a href="https://github.com/SuaveIO/suave" target="_blank">GitHub</a>
+        <a href="https://www.nuget.org/packages/Suave/" target="_blank">NuGet</a>
+        <a href="https://x.com/SuaveIO" target="_blank">X</a>
+        <a href="https://github.com/SuaveIO/suave/blob/master/LICENSE" target="_blank">License</a>
+      </div>
+      <p>&copy; 2025 Suave. Open source, MIT licensed.</p>
+      <p>Suave is a project created and maintained by Ademar Gonzalez.</p>
+    </div>
+  </footer>
+
+  <script src="/js/main.js"></script>
+</body>
+</html>

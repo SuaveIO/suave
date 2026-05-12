@@ -1,5 +1,6 @@
-﻿open Suave
-open Suave.Http
+module Pong.Program
+
+open Suave
 open Suave.Successful
 open System
 open System.Net
@@ -30,23 +31,20 @@ let execute cmd args =
   proc.StartInfo.Arguments        <- args
   proc.StartInfo.CreateNoWindow   <- true
 
-  let r = proc.Start()
+  let _ = proc.Start()
   proc.WaitForExit()
   proc.StandardOutput.ReadToEnd()
 
-open System.Text.RegularExpressions
-
 [<EntryPoint>]
-let main _ =
+let main argv =
   let cts = new CancellationTokenSource()
   let listening, server = startWebServerAsync config app
-  Async.Start(server, cts.Token)
 
   // wait for the server to start listening
-  listening |> Async.RunSynchronously |> printfn "start stats: %A"
+  listening |> Async.RunSynchronously |> (fun s -> printfn $"start stats: {s}")
 
   // launch httperf
-  let output = execute "httperf" (sprintf "--hog --server=localhost --port=%d --uri=/ --rate=1000 --num-conns=1000 --num-calls=1000 --burst-length=20" port)
+  let output = execute "httperf" ($"--hog --server=localhost --port={port} --uri=/ --rate=20 --num-conns=100 --num-calls=1000 --burst-length=10")
 
   Console.WriteLine output
 

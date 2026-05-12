@@ -1,13 +1,10 @@
-﻿namespace Suave
+namespace Suave
 
 module Cookie =
 
   open System
-  open System.Text
   open System.Globalization
   open Suave.Operators
-  open Suave.Logging
-  open Suave.Logging.Message
   open Suave.Utils
 
   type CookieLife =
@@ -18,8 +15,8 @@ module Cookie =
     | NoCookieFound of cookieName:string
     | DecryptionError of error:Crypto.SecretboxDecryptionError
 
-  let parseCookies (s : string) : HttpCookie list =
-    s.Split([|';'|], StringSplitOptions.RemoveEmptyEntries)
+  let parseCookies (cookieString : string) : HttpCookie list =
+    cookieString.Split([|';'|], StringSplitOptions.RemoveEmptyEntries)
     |> Array.toList
     |> List.map (String.trim)
     |> List.map (fun (cookie : string) ->
@@ -37,10 +34,15 @@ module Cookie =
           None)
     |> List.choose id
 
-  let parseResultCookie (s : string) : HttpCookie =
+  let parseResultCookie (cookieString : string) : HttpCookie =
     let parseExpires (str : string) =
       DateTimeOffset.ParseExact(str, "R", CultureInfo.InvariantCulture)
-    s.Split(';')
+    let parseSameSite (str : string) =
+      match str with
+      | "Strict" -> Some Strict
+      | "Lax" -> Some Lax
+      | _ -> None
+    cookieString.Split(';')
     |> Array.map (fun (x : string) ->
         let parts = x.Split('=')
         if parts.Length > 1 then
@@ -55,14 +57,17 @@ module Cookie =
         | "Expires", expires        -> iter + 1, { cookie with expires = Some (parseExpires expires) }
         | "HttpOnly", _             -> iter + 1, { cookie with httpOnly = true }
         | "Secure", _               -> iter + 1, { cookie with secure = true }
+        | "SameSite", sameSite      -> iter + 1, { cookie with sameSite = parseSameSite sameSite}
         | _                         -> iter + 1, cookie)
         (0, { HttpCookie.empty with httpOnly = false }) // default when parsing
     |> snd
 
   type HttpRequest with
 
+    /// Get yourself a dictionary of cookie-name to Cookie.
     member x.cookies =
       x.headers
+      |> Seq.toList
       |> List.filter (fun (name, _) -> name.Equals "cookie")
       |> List.collect (snd >> parseCookies)
       |> List.fold (fun cookies cookie ->
@@ -105,7 +110,7 @@ module Cookie =
 
     let cookieHeaders =
       ctx.response.cookies
-      |> Map.put cookie.name cookie // possibly overwrite
+      |> Map.add cookie.name cookie // possibly overwrite
       |> Map.toList
       |> List.map snd // get HttpCookie-s
       |> List.map HttpCookie.toHeader
@@ -116,30 +121,16 @@ module Cookie =
           (Headers.Fields.Response.setCookie, header) :: headers)
           (ctx.response.headers |> List.filter notSetCookie)
 
-    if cookie.value.Length > 4096 then
-      ctx.runtime.logger.warn (
-        eventX "Cookie {cookieName} has {cookieBytes} which is too large! Lengths over 4 096 bytes risk corruption in some browsers; consider alternate storage"
-        >> setFieldValue "cookieName" cookie.name
-        >> setFieldValue "cookieBytes" cookie.value.Length)
+    succeed { ctx with response = { ctx.response with headers = headers' } }
 
-    { ctx with response = { ctx.response with headers = headers' } }
-    |> succeed
 
-  let unsetCookie (cookieName : string) =
+  let unsetCookie (name : string) =
     let startEpoch = DateTimeOffset(1970, 1, 1, 0, 0, 1, TimeSpan.Zero) |> Some
-    let stringValue = HttpCookie.toHeader { HttpCookie.createKV cookieName "x" with expires = startEpoch }
+    let stringValue = HttpCookie.toHeader { HttpCookie.createKV name "x" with expires = startEpoch }
     Writers.addHeader Headers.Fields.Response.setCookie stringValue
 
   let setPair (httpCookie : HttpCookie) (clientCookie : HttpCookie) : WebPart =
-    context (fun ctx ->
-      ctx.runtime.logger.debug (
-        eventX "Setting {cookieName} to value of {cookieBytes}"
-        >> setFieldValue "cookieName" httpCookie.name
-        >> setFieldValue "cookieBytes" httpCookie.value.Length
-        >> setSingleName "Suave.Cookie.setPair")
-
-      succeed)
-    >=> setCookie httpCookie
+    setCookie httpCookie
     >=> setCookie clientCookie
 
   let unsetPair httpCookieName : WebPart =
@@ -173,12 +164,12 @@ module Cookie =
                secure   = secure }
       |> slidingExpiry relativeExpiry
 
-    | err ->
-      failwithf "Suave internal error on encryption %A" err
+    | Choice2Of2 err ->
+      failwith $"Suave internal error on encryption {err}"
 
   /// Tries to read the cookie by `cookieName` from the mapping of cookie-name
   /// to cookie. If it exists, it is decrypted with the `cryptoKey`.
-  let readCookies cryptoKey cookieName (cookies : Map<string, HttpCookie>) =
+  let readCookies key cookieName (cookies : Map<string, HttpCookie>) =
     let _, dec = Bytes.cookieEncoding
     let found =
       cookies
@@ -189,34 +180,29 @@ module Cookie =
     match found with
     | Choice1Of2 (cookie, cipherData) ->
       cipherData
-      |> Crypto.secretboxOpen cryptoKey
+      |> Crypto.secretboxOpen key
       |> Choice.mapSnd DecryptionError
       |> Choice.map (fun plainText -> cookie, plainText)
 
     | Choice2Of2 x ->
       Choice2Of2 x
 
-  let refreshCookies relativeExpiry httpCookie : WebPart =
-    slidingExpiry relativeExpiry httpCookie ||> setPair
+  let refreshCookies expiry cookie : WebPart =
+    slidingExpiry expiry cookie ||> setPair
 
   let updateCookies (csctx : CookiesState) fPlainText : WebPart =
     context (fun ctx ->
-      let debug message =
-        ctx.runtime.logger.debug (
-          eventX message
-          >> setSingleName "Suave.Cookie.updateCookies")
-
       let plainText =
         match readCookies csctx.serverKey csctx.cookieName ctx.response.cookies with
         | Choice1Of2 (_, plainText) ->
-          debug "Existing cookie"
+          //debug "Existing cookie"
           fPlainText (Some plainText)
 
         | Choice2Of2 _ ->
-          debug "First time"
+          //debug "First time"
           fPlainText None
 
-      /// Since the contents will completely change every write, we simply re-generate the cookie
+      // Since the contents will completely change every write, we simply re-generate the cookie
       generateCookies csctx.serverKey csctx.cookieName
                        csctx.relativeExpiry csctx.secure
                        plainText
@@ -230,11 +216,6 @@ module Cookie =
                    (fSuccess : WebPart)
                    : WebPart =
     context (fun ctx ->
-      let debug message =
-        ctx.runtime.logger.debug (
-          eventX message
-          >> setSingleName "Suave.Cookie.cookieState")
-
       let setCookies plainText =
         let httpCookie, clientCookie =
           generateCookies csctx.serverKey csctx.cookieName
@@ -246,7 +227,6 @@ module Cookie =
 
       match readCookies csctx.serverKey csctx.cookieName ctx.request.cookies with
       | Choice1Of2 (httpCookie, plainText) ->
-        debug "Existing cookie"
         refreshCookies csctx.relativeExpiry httpCookie
           >=> Writers.setUserData csctx.userStateKey plainText
           >=> fSuccess
@@ -254,19 +234,14 @@ module Cookie =
       | Choice2Of2 (NoCookieFound _) ->
         match noCookie () with
         | Choice1Of2 plainText ->
-          debug "No existing cookie, setting text"
           setCookies plainText >=> fSuccess
 
         | Choice2Of2 wp_kont ->
-          debug "No existing cookie, calling WebPart continuation"
           wp_kont
 
       | Choice2Of2 (DecryptionError err) ->
-        debug (sprintf "decryption error: %A" err)
         match decryptionFailure err with
         | Choice1Of2 plainText ->
-          debug "Existing, broken cookie, setting cookie text anew"
           setCookies plainText >=> fSuccess
         | Choice2Of2 wpKont    ->
-          debug "Existing, broken cookie, unsetting it, forwarding to given failure web part"
           wpKont >=> unsetPair csctx.cookieName)

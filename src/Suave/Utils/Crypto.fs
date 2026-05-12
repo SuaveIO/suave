@@ -1,4 +1,4 @@
-﻿/// Small crypto module that can do HMACs and generate random strings to use
+/// Small crypto module that can do HMACs and generate random strings to use
 /// as keys, as well as create a 'cryptobox'; i.e. a AES256+HMACSHA256 box with
 /// compressed plaintext contents so that they can be easily stored in cookies.
 module Suave.Utils.Crypto
@@ -19,11 +19,7 @@ let HMACLength = 32us // = 256 / 8
 
 /// Calculate the HMAC of the passed data given a private key
 let hmacAtOffset (key : byte []) offset count (data : byte[]) =
-#if NETSTANDARD1_5
-  use hmac = new HMACSHA256()
-#else
   use hmac = HMAC.Create(HMACAlgorithm)
-#endif
   hmac.Key <- key
   hmac.ComputeHash (data, offset, count)
 
@@ -33,7 +29,7 @@ let hmacOfBytes key (data : byte []) =
 /// Calculate the HMAC value given the key
 /// and a seq of string-data which will be concatenated in its order and hmac-ed.
 let hmacOfText (key : byte []) (data : seq<string>) =
-  hmacOfBytes key (String.Concat data |> UTF8.bytes)
+  hmacOfBytes key (String.Concat data |> Encoding.UTF8.GetBytes)
 
 /// # bits in key
 let KeySize   = 256us
@@ -84,11 +80,8 @@ type SecretboxDecryptionError =
   | AlteredOrCorruptMessage of string
 
 let private secretboxInit key iv =
-#if NETSTANDARD1_5
   let aes = Aes.Create()
-#else
-  let aes = new AesManaged()
-#endif
+
   aes.KeySize   <- int KeySize
   aes.BlockSize <- int BlockSize
   aes.Mode      <- CipherMode.CBC
@@ -99,7 +92,7 @@ let private secretboxInit key iv =
 
 let secretbox (key : byte []) (msg : byte []) =
   if key.Length <> int KeyLength then
-    Choice2Of2 (InvalidKeyLength (sprintf "key should be %d bytes but was %d bytes" KeyLength (key.Length)))
+    Choice2Of2 (InvalidKeyLength ("key should be " + (KeyLength.ToString()) + " bytes but was " + (key.Length.ToString()) + " bytes"  ))
   elif msg.Length = 0 then
     Choice2Of2 EmptyMessageGiven
   else
@@ -129,7 +122,17 @@ let secretbox (key : byte []) (msg : byte []) =
     Choice1Of2 (cipherText.ToArray())
 
 let secretboxOfText (key : byte []) (msg : string) =
-  secretbox key (msg |> UTF8.bytes)
+  secretbox key (Encoding.UTF8.GetBytes msg)
+
+/// Compare two byte arrays in constant time, bounded by the length of the
+/// longest byte array.
+let equalsConstantTime (bits: byte []) (bobs: byte []) =
+  let mutable xx = uint32 bits.Length ^^^ uint32 bobs.Length
+  let mutable i = 0
+  while i < bits.Length && i < bobs.Length do
+    xx <- xx ||| uint32 (bits.[i] ^^^ bobs.[i])
+    i <- i + 1
+  xx = 0u
 
 let secretboxOpen (key : byte []) (cipherText : byte []) =
   let hmacCalc = hmacAtOffset key 0 (cipherText.Length - int HMACLength) cipherText
@@ -140,10 +143,8 @@ let secretboxOpen (key : byte []) (cipherText : byte []) =
 
   if cipherText.Length < int (HMACLength + IVLength) then
     Choice2Of2 (
-      TruncatedMessage (
-        sprintf "cipher text length was %d but expected >= %d"
-                cipherText.Length (HMACLength + IVLength)))
-  elif not (Bytes.equalsConstantTime hmacCalc hmacGiven) then
+      TruncatedMessage ("cipher text length was " + (cipherText.Length.ToString()) + " but expected >= " + (HMACLength + IVLength).ToString()))
+  elif not (equalsConstantTime hmacCalc hmacGiven) then
     Choice2Of2 (AlteredOrCorruptMessage "calculated HMAC does not match expected/given")
   else
     let iv = Array.zeroCreate<byte> (int IVLength)
@@ -159,4 +160,4 @@ let secretboxOpen (key : byte []) (cipherText : byte []) =
     Choice1Of2 (plain.ToArray() |> Compression.gzipDecode)
 
 let secretboxOpenAsString keyText cipherText =
-  secretboxOpen keyText cipherText |> Choice.map UTF8.toString
+  secretboxOpen keyText cipherText |> Choice.map Encoding.UTF8.GetString

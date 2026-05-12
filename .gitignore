@@ -1,7 +1,9 @@
 bin/
 obj/
+pkg/
+.fake/
+.idea/
 packages/
-build/
 gh-pages/
 docs/output/
 miTLS/
@@ -12,12 +14,13 @@ Suave.sln.DotSettings.user
 *.userprefs
 *.swp
 *.suo
+*.orig
 
 _UpgradeReport_Files/
 Backup/
 test-results/
 
-AssemblyVersionInfo.fs
+AssemblyInfo.fs
 paket.exe
 *.lock
 !paket.lock
@@ -32,4 +35,8 @@ project.lock.json
 *.project.lock.json
 dotnet-dev-*
 tools/coreclr/
-dotnet_cli_install.ps1
+tools/dotnet-install.*
+.vs/
+.vscode/
+.ionide
+profile-output/

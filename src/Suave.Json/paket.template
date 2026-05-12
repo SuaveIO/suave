@@ -1,0 +1,14 @@
+type project
+authors Ademar Gonzalez
+owners Ademar Gonzalez
+description Suave.Json provides a small JSON serialization layer for Suave, backed by DataContractJsonSerializer. This package relies on runtime reflection and is NOT compatible with .NET Native AOT.
+licenseUrl https://github.com/SuaveIO/Suave/blob/master/LICENSE
+iconUrl https://raw.githubusercontent.com/SuaveIO/resources/master/images/head_trans.png
+includePdb true
+files
+  bin/Release/net10.0/Suave.Json.dll => lib/net10.0
+  bin/Release/net10.0/Suave.Json.xml => lib/net10.0
+  bin/Release/net10.0/Suave.Json.pdb => lib/net10.0
+dependencies
+  framework: net10.0
+  Suave >= LOCKEDVERSION

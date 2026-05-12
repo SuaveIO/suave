@@ -1,32 +1,7 @@
-﻿namespace Suave.Utils
+namespace Suave.Utils
 
 open System
-open System.IO
-open System.Text
-
-type BufferSegment = struct
-  val public buffer : ArraySegment<byte>
-  val public offset : int
-  val public length : int
-
-  new (buffer, offset, length) = {
-    buffer = buffer
-    offset = offset
-    length = length
-    }
-end
-
-[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
-module BufferSegment =
-
-  let inline create buffer offset length =
-    #if DEBUG
-    if length < 0 then failwithf "BufferSegment.create: length = %d < 0" length
-    #endif
-    new BufferSegment(buffer, offset, length)
-
-  let inline toArraySegment (b: BufferSegment) =
-    ArraySegment(b.buffer.Array, b.offset, b.length)
+open System.Buffers
 
 module internal Bytes =
 
@@ -60,145 +35,85 @@ module internal Bytes =
   /// The corresponding EOL array segment
   let eolArraySegment = new ArraySegment<_>(EOL, 0, 2)
 
+  let eolMemory = new Memory<byte>(EOL)
+
   /// Knuth-Morris-Pratt algorithm
   /// http://caml.inria.fr/pub/old_caml_site/Examples/oc/basics/kmp.ml
   let inline initNext p =
     let m = Array.length p
     let next = Array.create m 0
-    let i = ref 1
-    let j = ref 0
-    while !i < m - 1 do
-      if p.[!i] = p.[!j] then begin incr i; incr j; next.[!i] <- !j end else
-      if !j = 0 then begin incr i; next.[!i] <- 0 end else j := next.[!j]
+    let mutable i =  1
+    let mutable j = 0
+    while i < m - 1 do
+      if p.[i] = p.[j] then
+        i <- i + 1
+        j <- j + 1 
+        next.[i] <- j
+      else
+        if j = 0 then
+          i <- i + 1
+          next.[i] <- 0
+        else 
+          j <- next.[j]
     next
 
-  let kmp p =
-    let next = initNext p
-    let m = Array.length p
-    fun s ->
-      let n = Array.length s
-      let  i = ref 0
-      let j = ref 0 in
-      while !j < m && !i < n do
-        if s.[!i] = p.[!j] then begin incr i; incr j end else
-        if !j = 0 then incr i else j := next.[!j]
-      done;
-      if !j >= m then Some(!i - m) else None
+  let inline _kmpW (p: byte []) (next: int []) m (xs : ReadOnlySequence<byte>) =
+      let mutable i = 0L
+      let mutable j = 0
+      let mutable found = false
+      let mutable result = ValueNone
+      // Iterate through segments
+      let mutable enumerator = xs.GetEnumerator()
+      while not found && enumerator.MoveNext() do
+        let span = enumerator.Current.Span
+        let mutable byteIdx = 0
+        while not found && byteIdx < span.Length do
+          // Current byte in the sequence
+          let b = span.[byteIdx]
+          
+          // KMP failure function: back up j until we have a match or j is 0
+          while j > 0 && b <> p.[j] do
+            j <- next.[j]
+          
+          // Check if current byte matches pattern[j]
+          if b = p.[j] then j <- j + 1
+          
+          // Found complete match - exit early
+          if j = m then
+            result <- ValueSome(i - int64(m - 1))
+            found <- true
+          
+          i <- i + 1L
+          byteIdx <- byteIdx + 1
+      
+      result
 
-  let kmpX p =
-    let next = initNext p
-    let m = Array.length p
-    fun (s:ArraySegment<_>) ->
-      let n = s.Count
-      let  i = ref 0
-      let j = ref 0 in
-      while !j < m && !i < n do
-        if s.Array.[s.Offset + !i] = p.[!j] then begin incr i; incr j end else
-        if !j = 0 then incr i else j := next.[!j]
-      done;
-      if !j >= m then Some(!i - m) else None
-
-  let inline uniteArraySegment (aas : ArraySegment<byte> list) =
-    fun (i : int) ->
-      if   i < 0 then failwith "invalid args"
-      let rec loop k acc =
-        let a = aas.[k]
-        if i < acc + a.Count then
-          a.Array.[a.Offset + (i - acc)]
-        else loop (k + 1) (acc + a.Count)
-      loop 0 0
-
-  let inline uniteArrayBufferSegment (aas : BufferSegment list) =
-    fun (i : int) ->
-      if   i < 0 then failwith "invalid args"
-      let rec loop k acc =
-        let a = aas.[k]
-        if i < acc + a.length then
-          a.buffer.Array.[a.offset + (i - acc)]
-        else loop (k + 1) (acc + a.length)
-      loop 0 0
-
-  let kmpY p =
-    let next = initNext p
-    let m = Array.length p
-    fun (xs : ArraySegment<byte> list) ->
-      let a = uniteArraySegment xs
-      let n = List.fold (fun acc (x :  ArraySegment<byte>) -> acc + x.Count) 0 xs
-      let  i = ref 0
-      let j = ref 0 in
-      while !j < m && !i < n do
-        if a(!i) = p.[!j] then begin incr i; incr j end else
-        if !j = 0 then incr i else j := next.[!j]
-      done;
-      if !j >= m then Some(!i - m) else None
-
-  let inline _kmpZ (p: byte []) (next: int []) m (xs : BufferSegment list) =
-      let a = uniteArrayBufferSegment xs
-      let n = List.fold (fun acc (x :  BufferSegment) -> acc + x.length) 0 xs
-      let  i = ref 0
-      let j = ref 0 in
-      while !j < m && !i < n do
-        if a(!i) = p.[!j] then begin incr i; incr j end else
-        if !j = 0 then incr i else j := next.[!j]
-      done;
-      if !j >= m then Some(!i - m) else None
-
-  let kmpZ p (xs : BufferSegment list) =
-    let next = initNext p
-    let m = Array.length p
-    _kmpZ p next m xs
-
-  let inline _kmpW (p: byte []) (next: int []) m (xs : BufferSegment seq) =
-      let a = uniteArrayBufferSegment (Seq.toList xs)
-      let n = Seq.fold (fun acc (x :  BufferSegment) -> acc + x.length) 0 xs
-      let  i = ref 0
-      let j = ref 0 in
-      while !j < m && !i < n do
-        if a(!i) = p.[!j] then begin incr i; incr j end else
-        if !j = 0 then incr i else j := next.[!j]
-      done;
-      if !j >= m then Some(!i - m) else None
-
-  let kmpW p (xs : BufferSegment seq) =
+  let inline kmpW p (xs : ReadOnlySequence<byte>) =
     let next = initNext p
     let m = Array.length p
     _kmpW p next m xs
 
-  let inline unite (a : ArraySegment<_>) (b : ArraySegment<_>) =
-    fun (i : int) ->
-      if   i < 0       then failwith "invalid args"
-      elif i < a.Count then a.Array.[a.Offset + i]
-      elif i < a.Count + b.Count then b.Array.[b.Offset + (i - a.Count)]
-      else failwith "invalid args"
+  /// Vectorized substring search across a `ReadOnlySequence<byte>`.
+  ///
+  /// Returns the byte offset (from the start of `xs`) of the first occurrence
+  /// of `marker`, or `ValueNone` if not found.
+  ///
+  /// Implementation notes:
+  ///   - Uses `SequenceReader<byte>.TryReadTo` which (in the BCL) is
+  ///     implemented with a vectorized `Span<byte>.IndexOf(byte)` to locate
+  ///     candidate first-byte positions, plus a short verify loop for the
+  ///     remaining bytes. This is dramatically faster than the manual
+  ///     Knuth-Morris-Pratt walk in `kmpW` for short patterns (e.g. `\r\n`,
+  ///     `\r\n\r\n`, multipart boundaries) which are the only patterns this
+  ///     function ever sees in practice.
+  ///   - `advancePastDelimiter = false` leaves the reader sitting on the
+  ///     start of the delimiter, so `consumed.Length` is exactly the offset
+  ///     callers want (matches the semantics of the previous `kmpW`).
+  let findMarker (marker : byte[]) (xs : ReadOnlySequence<byte>) : int64 voption =
+    let mutable reader = SequenceReader<byte>(xs)
+    let mutable consumed = ReadOnlySequence<byte>()
+    if reader.TryReadTo(&consumed, ReadOnlySpan<byte>(marker), advancePastDelimiter = false) then
+      ValueSome consumed.Length
+    else
+      ValueNone
 
-  let kmpXX p =
-    let next = initNext p
-    let m = Array.length p
-    fun (v:ArraySegment<_>) (w:ArraySegment<_>) ->
-      let n = v.Count + w.Count
-      let s = unite v w
-      let  i = ref 0
-      let j = ref 0 in
-      while !j < m && !i < n do
-        if s !i = p.[!j] then begin incr i; incr j end else
-        if !j = 0 then incr i else j := next.[!j]
-      done;
-      if !j >= m then Some(!i - m) else None
-
-  /// Returns the index of the first CRLF in the buffer
-  let inline scanCrlf (b : ArraySegment<byte>) =
-    let a = b.Array
-    let rec loop i =
-      if i > b.Offset + b.Count - 1 then None
-      elif i > 0 && a.[i - 1] = EOL.[0] && a.[i] = EOL.[1] then Some (i - 1)
-      else loop (i + 1)
-    loop b.Offset
-
-  /// Returns the index of the first CRLF in the union of two ArraySegment
-  let inline scanCrlfX (c : ArraySegment<byte>) (d : ArraySegment<byte>) =
-    let a = unite c d
-    let rec loop i =
-      if i > c.Count + d.Count - 1 then None
-      elif i > 0 && a (i - 1) = EOL.[0] && a i = EOL.[1] then Some (i - 1)
-      else loop (i + 1)
-    loop 0

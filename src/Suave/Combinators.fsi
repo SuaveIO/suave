@@ -1,5 +1,6 @@
-﻿namespace Suave
+namespace Suave
 
+open System.Threading.Tasks
 open Suave.Sockets
 
 /// <summary><para>
@@ -27,9 +28,6 @@ open Suave.Sockets
 
 /// general response functions
 module Response =
-
-  /// Respond with a given status code, http message, content in the body to a http request.
-  // val response_f : status_code:HttpCode -> ( Connection -> SocketOp<unit>) -> request:HttpContext -> (Connection -> SocketOp<unit>)
 
   /// Respond with a given status code, http reason phrase, content in the body to a http request.
   val response : statusCode:HttpCode -> content:byte [] -> WebPart
@@ -441,6 +439,28 @@ module Redirection =
   /// Sets the Location header and returns 302 Content Moved status-code/reason phrase.
   /// </para></summary>
   val redirect : location:string -> WebPart
+
+  /// <summary><para>
+  /// Composite:
+  /// </para><para>
+  /// HTTP/1.1 303 See Other
+  /// </para><para>
+  /// Location: 'location'
+  /// </para><para>
+  /// Content-Type: text/html; charset=utf-8
+  /// </para><para>
+  /// &lt;html&gt;
+  ///   &lt;body&gt;
+  ///    &lt;a href=&quot;'location'&quot;&gt;See Other&lt;/a&gt;
+  ///   &lt;/body&gt;
+  /// &lt;/html&gt;
+  /// </para><para>
+  /// The 303 (See Other) status code indicates that the server is
+  /// redirecting the user agent to a different resource, as indicated by a
+  /// URI in the Location header field, which is intended to provide an
+  /// indirect response to the original request.  
+  /// </para></summary>
+  val see_other : location:string -> WebPart
 
   /// <summary><para>
   /// If the client has performed a conditional GET request and access is
@@ -1016,7 +1036,23 @@ module ServerErrors =
   /// from fulfilling the request.
   /// </para></summary>
   val INTERNAL_ERROR : body:string -> WebPart
-
+  
+  /// <summary><para>
+  /// 501
+  /// </para><para>
+  /// The server does not recognize the request method and can not support
+  /// it for any resource.
+  /// </para></summary>
+  val not_implemented : bytes:byte [] -> WebPart
+  
+  /// <summary><para>
+  /// 501
+  /// </para><para>
+  /// The server does not recognize the request method and can not support
+  /// it for any resource.
+  /// </para></summary>
+  val NOT_IMPLEMENTED : body:string -> WebPart
+  
   /// An upstream server that suave communicated with did not respond in a timely fashion
   val bad_gateway : bytes:byte [] -> WebPart
 
@@ -1046,13 +1082,17 @@ module ServerErrors =
 /// Functions have signature f :: params... -> HttpContext -> HttpContext option.
 module Filters =
 
-  open Suave.Logging
-
   /// Match on the path
   val path : pathAfterDomain:string -> WebPart
 
+  /// Match on the path regardless of casing
+  val pathCi : pathAfterDomain:string -> WebPart
+
   /// Match on the initial path
   val pathStarts : pathAfterDomainSubstr:string -> WebPart
+
+  /// Match on the initial path regardless of casing
+  val pathStartsCi : pathAfterDomainSubstr:string -> WebPart
 
   /// Match on the method
   val ``method`` : ``method``:HttpMethod -> WebPart
@@ -1112,12 +1152,12 @@ module Filters =
   /// message formatter that can inspect the context and produce a message to
   /// send to the logger, along with the structured fields as a name*obj map.
   /// </para></summary>
-  val logWithLevelStructured :  level:LogLevel -> logger:Logger -> messageFun:(HttpContext -> string * Map<string,obj>) -> WebPart
+  //val logWithLevelStructured :  level:LogLevel -> logger:Logger -> messageFun:(HttpContext -> string * Map<string,obj>) -> WebPart
 
   /// <summary><para>
   /// The function log is equivalent to `logWithLevel LogLevel.Debug`.
   /// </para></summary>
-  val logStructured : logger:Logger -> messageFun:(HttpContext -> string * Map<string,obj>) -> WebPart
+  //val logStructured : logger:Logger -> messageFun:(HttpContext -> string * Map<string,obj>) -> WebPart
 
   /// <summary><para>
   /// The default log format for <see cref="log" />.  NCSA Common log format
@@ -1141,15 +1181,41 @@ module Filters =
   /// message formatter that can inspect the context and produce a message to
   /// send to the logger.
   /// </para></summary>
-  val logWithLevel :  level:LogLevel -> logger:Logger -> messageFun:(HttpContext -> string) -> WebPart
+  //val logWithLevel :  level:LogLevel -> logger:Logger -> messageFun:(HttpContext -> string) -> WebPart
 
   /// <summary><para>
   /// The function log is equivalent to `logWithLevel LogLevel.Debug`.
   /// </para></summary>
-  val log : logger:Logger -> messageFun:(HttpContext -> string) -> WebPart
+  //val log : logger:Logger -> messageFun:(HttpContext -> string) -> WebPart
 
   /// <summary><para>
   /// Strongly typed route matching! Matching the uri can be used with the 'parsers'
+  /// characters specified in Sscanf.
+  /// </para><para>The supported characters for the formatter:</para><para>
+  /// 'b', bool</para><para>
+  /// 'd', int64</para><para>
+  /// 'i', int64</para><para>
+  /// 's', string</para><para>
+  /// 'u', uint64</para><para>
+  /// 'x', check (String.forall Char.IsLower) &gt;&gt; ((+) "0x") &gt;&gt; int64</para><para>
+  /// 'X', check (String.forall Char.IsUpper) &gt;&gt; ((+) "0x") &gt;&gt; int64</para><para>
+  /// 'o', ((+) "0o") &gt;&gt; int64. Base8 numbers; e.g. "1" = 0o1 = 1, "7" = 0o7 = 7, "10" = 0o10 = 8.</para><para>
+  /// 'e', float</para><para>
+  /// 'E', float</para><para>
+  /// 'f', float</para><para>
+  /// 'F', float</para><para>
+  /// 'g', float</para><para>
+  /// 'G', float</para><para>
+  /// 'M', decimal</para><para>
+  /// 'c', char
+  /// </para></summary>
+  [<System.Diagnostics.CodeAnalysis.RequiresDynamicCode(
+    "pathScan relies on Suave.Sscanf which uses FSharp.Reflection. Not compatible with .NET Native AOT; use Suave.Router instead.")>]
+  val pathScan : pf:PrintfFormat<'a,'b,'c,'d,'t> -> h:('t -> WebPart) -> WebPart
+
+
+  /// <summary><para>
+  /// Strongly typed route matching regardless of casing! Matching the uri can be used with the 'parsers'
   /// characters specified in Sscanf.
   /// </para><para>The supported characters for the formatter:</para><para>
   /// 'b', Boolean.Parse</para><para>
@@ -1169,7 +1235,9 @@ module Filters =
   /// 'M', parse_decimal</para><para>
   /// 'c', char
   /// </para></summary>
-  val pathScan : pf:PrintfFormat<'a,'b,'c,'d,'t> -> h:('t -> WebPart) -> WebPart
+  [<System.Diagnostics.CodeAnalysis.RequiresDynamicCode(
+    "pathScanCi relies on Suave.Sscanf which uses FSharp.Reflection. Not compatible with .NET Native AOT; use Suave.Router instead.")>]
+  val pathScanCi : format:PrintfFormat<'a,'b,'c,'d,'t> -> handler:('t -> WebPart) -> WebPart
 
   /// <summary> Fails the WebPart after x seconds</summary>
   val timeoutWebPart : timeout:System.TimeSpan -> child:WebPart -> WebPart
@@ -1470,7 +1538,6 @@ module Embedded =
   /// </remarks>
   val sendResource : source:Assembly -> resourceName:string -> compression:bool -> WebPart
 
-  #if !NETSTANDARD1_5
   /// <summary><para>
   /// Send an embedded resource as a response to the request
   /// </para><para>
@@ -1479,7 +1546,6 @@ module Embedded =
   /// <remarks>
   /// </remarks>
   val sendResourceFromDefaultAssembly : resourceName:string -> compression:bool -> WebPart
-  #endif
 
   /// <summary><para>
   /// Send the resource by the name given.
@@ -1489,7 +1555,6 @@ module Embedded =
   /// </remarks>
   val resource : source:Assembly -> name:string -> WebPart
 
-  #if !NETSTANDARD1_5
   /// <summary><para>
   /// Send the resource by the name given.
   /// Will also set the MIME type based on the file extension.
@@ -1497,7 +1562,6 @@ module Embedded =
   /// <remarks>
   /// </remarks>
   val resourceFromDefaultAssembly : name:string -> WebPart
-  #endif
 
   /// <summary><para>
   /// 'browse' the file in the sense that the contents of the file are sent based on the
@@ -1507,7 +1571,6 @@ module Embedded =
   /// </remarks>
   val browse : source:Assembly -> WebPart
 
-  #if !NETSTANDARD1_5
   /// <summary><para>
   /// 'browse' the file in the sense that the contents of the file are sent based on the
   /// request's Url property. Will serve from the executing assemblies resources.
@@ -1515,7 +1578,24 @@ module Embedded =
   /// <remarks>
   /// </remarks>
   val browseDefaultAsssembly : WebPart
-  #endif
+
+  /// <summary><para>
+  /// 'browse' files that were embedded in an assembly,
+  /// using the manifest generated by `Microsoft.Extensions.FileProviders.Embedded`
+  /// to resolve resource names.
+  /// </para></summary>
+  /// <remarks>
+  /// </remarks>
+  val browseManifest : source: Assembly -> manifestFile: string option -> root: string option -> WebPart
+
+  /// <summary><para>
+  /// 'browse' files that were embedded in an assembly,
+  /// using the manifest generated by `Microsoft.Extensions.FileProviders.Embedded`
+  /// to resolve resource names.
+  /// </para></summary>
+  /// <remarks>
+  /// </remarks>
+  val browseDefaultAsssemblyManifest : manifestFile: string option -> root: string option -> WebPart
 
 /// A module that implements the Server-Sent Event specification, which can be
 /// read at www.w3.org/TR/eventsource.
@@ -1526,36 +1606,36 @@ module EventSource =
   /// the proper framing is used. However, if you have a desire to write raw
   /// data, this function overrides the Socket.async_write function so that
   /// you will be writing UTF8 data only, as per the specification.
-  val asyncWrite : out:Connection -> data:string -> SocketOp<unit>
+  val asyncWrite : out:Connection -> data:string -> Task<unit>
 
   /// Same as `async_write`; convenience function.
-  val (<<.) : out:Connection -> data:string -> SocketOp<unit>
+  val (<<.) : out:Connection -> data:string -> Task<unit>
 
   /// "If the line is empty (a blank line) - dispatch the event."
   /// Dispatches the event properly to the browser.
-  val dispatch : out:Connection -> SocketOp<unit>
+  val dispatch : out:Connection -> Task<unit>
 
   /// "If the line starts with a U+003A COLON character (:) - Ignore the line."
   /// Writes a comment to the stream
-  val comment : out:Connection -> cmt:string -> SocketOp<unit>
+  val comment : out:Connection -> cmt:string -> Task<unit>
 
   /// "If the field name is 'event' - Set the event type buffer to field value."
   /// Writes the event type to the stream
-  val eventType : out:Connection -> eventType:string -> SocketOp<unit>
+  val eventType : out:Connection -> eventType:string -> Task<unit>
 
   /// "If the field name is 'data' -
   /// Append the field value to the data buffer, then append a single
   /// U+000A LINE FEED (LF) character to the data buffer."
   /// Write a piece of data as part of the event
-  val data : out:Connection -> data:string -> SocketOp<unit>
+  val data : out:Connection -> data:string -> Task<unit>
 
   /// "If the field name is 'id' - Set the last event ID buffer to the field value."
   /// Sets the last event id in the stream.
-  val esId : out:Connection -> lastEventId:string -> SocketOp<unit>
+  val esId : out:Connection -> lastEventId:string -> Task<unit>
 
   /// Sets the option for the EventSource instance, of how long to wait in ms
   /// until a new connection is spawned as a retry.
-  val retry : out:Connection -> retry:uint32 -> SocketOp<unit>
+  val retry : out:Connection -> retry:uint32 -> Task<unit>
 
   /// A container data type for the output events
   type Message =
@@ -1570,11 +1650,14 @@ module EventSource =
     static member createType : id:string -> data:string -> typ:string -> Message
 
   /// send a message containing data to the output stream
-  val send : out:Connection -> msg:Message -> SocketOp<unit>
+  val send : out:Connection -> msg:Message -> Task<unit>
 
   /// This function composes the passed function f with the hand-shake required
   /// to start a new event-stream protocol session with the browser.
-  val handShake : fCont:(Connection -> SocketOp<Connection>) -> WebPart
+  val handShake : fCont:(Connection -> Task<unit>) -> WebPart
+
+module TransferEncoding =
+  val chunked: (Connection -> Task<unit>) -> WebPart
 
 module Control =
 
@@ -1588,8 +1671,6 @@ module Control =
   val CLOSE : WebPart
 
 module CORS =
-
-  open Utils
 
   [<RequireQualifiedAccess>]
   type InclusiveOption<'T> =
@@ -1609,19 +1690,11 @@ module CORS =
       /// Allow cookies? This is sent in the AccessControlAllowCredentials header.
       allowCookies            : bool
 
-      /// Should response headers be exposed to the client? This is sent in AccessControlExposeHeaders header.
-      exposeHeaders           : bool
+      /// The list of response headers exposed to client. This is sent in AccessControlExposeHeaders header.
+      exposeHeaders           : InclusiveOption<string list>
 
       /// Max age in seconds the user agent is allowed to cache the result of the request.
       maxAge                  : int option }
-
-    static member allowedUris_           : Property<CORSConfig, InclusiveOption<string list>>
-    static member allowedMethods_        : Property<CORSConfig, InclusiveOption<HttpMethod list>>
-    static member allowCookies_          : Property<CORSConfig, bool>
-    static member exposeHeaders_         : Property<CORSConfig, bool>
-    static member maxAge_                : Property<CORSConfig, int option>
-
-
 
   /// <summary><para>
   /// This WebPart handles CORS requests.
@@ -1630,6 +1703,6 @@ module CORS =
   /// </para></summary>
   /// <remarks>
   /// </remarks>
-  val cors : CORSConfig:(CORSConfig) -> WebPart
+  val cors : config:(CORSConfig) -> WebPart
 
   val defaultCORSConfig : CORSConfig

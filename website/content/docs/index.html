@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Suave Documentation - Learn how to build fast, async web applications with F#">
+  <title>Documentation - Suave</title>
+  <link rel="shortcut icon" href="/images/favicon.ico" type="image/x-icon">
+  <link rel="icon" href="/images/favicon-32x32.png" sizes="32x32" type="image/png">
+  <link rel="icon" href="/images/favicon-96x96.png" sizes="96x96" type="image/png">
+  <link rel="apple-touch-icon" href="/images/apple-touch-icon-57x57.png" sizes="57x57">
+  <link rel="apple-touch-icon" href="/images/apple-touch-icon-114x114.png" sizes="114x114">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <!-- Header -->
+  <header>
+    <div class="container">
+      <nav>
+        <div class="logo">
+          <img src="/images/head_600_trans.png" alt="Suave Logo" width="40" height="40" style="vertical-align: middle; margin-right: 12px; background: white; padding: 2px; border-radius: 4px;">
+          Suave
+        </div>
+        <button id="hamburger" class="hamburger" aria-label="Toggle menu">
+          <span></span>
+          <span></span>
+          <span></span>
+        </button>
+        <ul id="nav-links" class="nav-links">
+          <li><a href="/">Home</a></li>
+          <li><a href="/docs/">Documentation</a></li>
+          <li><a href="/docs/performance.html">Performance</a></li>
+          <li><a href="https://github.com/SuaveIO/suave" target="_blank">GitHub</a></li>
+          <li><a href="https://www.nuget.org/packages/Suave/" target="_blank">NuGet</a></li>
+          <li><button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme">🌙</button></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Main content -->
+  <main>
+    <div class="container">
+      <h1>Documentation</h1>
+      <p>Learn how to build fast, type-safe web applications with Suave. Everything you need from basic routing to advanced patterns.</p>
+
+      <section>
+        <h2>Getting Started</h2>
+        <div class="features">
+          <div class="feature-card">
+            <h3>📦 <a href="getting-started.html">Getting Started</a></h3>
+            <p>Installation, your first project, and building a "Hello World" web server with Suave.</p>
+          </div>
+          <div class="feature-card">
+            <h3>🛣️ <a href="routing.html">Routing & Handlers</a></h3>
+            <p>Define URL patterns, path matching, HTTP methods, and build REST APIs with typed routes.</p>
+          </div>
+          <div class="feature-card">
+            <h3>⚙️ <a href="request-response.html">Requests & Responses</a></h3>
+            <p>Handle query strings, form data, headers, JSON bodies, and build type-safe responses.</p>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Core Features</h2>
+        <div class="features">
+          <div class="feature-card">
+            <h3>🧭 <a href="router.html">Router Module</a></h3>
+            <p>Advanced routing with path parameters, scopes, wildcards, and efficient pattern matching.</p>
+          </div>
+          <div class="feature-card">
+            <h3>🔗 <a href="binding-config.html">Bindings & Configuration</a></h3>
+            <p>Configure ports, HTTPS/TLS, server settings, and deployment options.</p>
+          </div>
+          <div class="feature-card">
+            <h3>📁 <a href="file-handling.html">File Handling & Static Files</a></h3>
+            <p>Serve static files, handle file uploads, stream large files, and manage static content.</p>
+          </div>
+          <div class="feature-card">
+            <h3>🔄 <a href="composition.html">Composition & Middleware</a></h3>
+            <p>Combine handlers, build middleware pipelines, and compose complex applications.</p>
+          </div>
+          <div class="feature-card">
+            <h3>✅ <a href="validation.html">Validation & Security</a></h3>
+            <p>Input validation, CORS, security headers, authentication, and rate limiting.</p>
+          </div>
+          <div class="feature-card">
+            <h3>🔌 <a href="websockets.html">WebSockets</a></h3>
+            <p>Real-time bidirectional communication with full WebSocket support.</p>
+          </div>
+          <div class="feature-card">
+            <h3>⚡ <a href="performance.html">Performance</a></h3>
+            <p>Optimization techniques and performance benchmarks.</p>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Community & Resources</h2>
+        <ul>
+          <li><strong><a href="https://github.com/SuaveIO/suave" target="_blank">GitHub Repository</a></strong> - Source code and issue tracker</li>
+          <li><strong><a href="https://nuget.org/packages/suave" target="_blank">NuGet Package</a></strong> - Install Suave via NuGet</li>
+          <li><strong><a href="https://github.com/SuaveIO/suave/discussions" target="_blank">Discussions</a></strong> - Ask questions and share ideas</li>
+          <li><strong><a href="https://github.com/SuaveIO/suave/blob/master/CONTRIBUTING.md" target="_blank">Contributing</a></strong> - Help improve Suave</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Troubleshooting</h2>
+        <ul>
+          <li><strong>Port already in use?</strong> Change the port in <code>defaultConfig</code> or use a different binding.</li>
+          <li><strong>HTTPS not working?</strong> See the <a href="binding.html">Bindings & Configuration</a> guide.</li>
+          <li><strong>Looking for more examples?</strong> Check the <a href="https://github.com/SuaveIO/suave/tree/master/examples" target="_blank">examples folder</a> on GitHub.</li>
+        </ul>
+      </section>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer>
+    <div class="container">
+      <div class="footer-links">
+        <a href="/docs/">Documentation</a>
+        <a href="https://github.com/SuaveIO/suave" target="_blank">GitHub</a>
+        <a href="https://www.nuget.org/packages/Suave/" target="_blank">NuGet</a>
+        <a href="https://x.com/SuaveIO" target="_blank">X</a>
+        <a href="https://github.com/SuaveIO/suave/blob/master/LICENSE" target="_blank">License</a>
+      </div>
+      <p>&copy; 2025 Suave. Open source, MIT licensed.</p>
+      <p>Suave is a project created and maintained by Ademar Gonzalez.</p>
+    </div>
+  </footer>
+
+  <script src="/js/main.js"></script>
+</body>
+</html>

@@ -1,6 +1,6 @@
 module Suave.Tests.HttpWriters
 
-open Fuchu
+open Expecto
 
 open System
 open System.IO
@@ -27,7 +27,8 @@ let cookies cfg =
       domain   = None
       path     = Some "/"
       httpOnly = false
-      secure   = false }
+      secure   = false
+      sameSite = None }
 
   let ip, port =
     let binding = SuaveConfig.firstBinding cfg
@@ -187,5 +188,16 @@ let headers cfg =
             "vary", "Accept-Language"
           ],
           hdrs |> getRespHeaders "Vary"))
+        ctx
+
+    testCase "setHeader adds Server header with hideHeader = true" <| fun _ ->
+      let ctx = runWith { cfg with hideHeader = true } (Writers.setHeader "Server" "My custom value" >=> OK "test")
+
+      withContext (fun _ ->
+        let hdrs = requestHeaders ()
+        Assert.Equal(
+          "expecting Server header value",
+          [ "Server", "My custom value" ],
+          hdrs |> getRespHeaders "Server"))
         ctx
   ]

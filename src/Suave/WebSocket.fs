@@ -6,22 +6,18 @@ module WebSocket =
   open Suave.Sockets.Control
   open Suave.Operators
   open Suave.Utils
-  open Suave.Logging
-  open Suave.Logging.Message
+  open Suave.Utils.AsyncExtensions
 
   open System
-  open System.Collections.Concurrent
   open System.Security.Cryptography
   open System.Text
+  open System.Threading
+  open System.Threading.Tasks
 
   let magicGUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
   let internal sha1 (x : string) =
-#if NETSTANDARD1_5
     let crpto = SHA1.Create()
-#else
-    let crpto = new SHA1Managed()
-#endif
     let bytes = Encoding.ASCII.GetBytes x
     let hash = crpto.ComputeHash bytes
     hash
@@ -31,6 +27,10 @@ module WebSocket =
     >=> Writers.setHeader "Connection" "Upgrade"
     >=> Writers.setHeader "Sec-WebSocket-Accept" handShakeToken
     >=> Response.response HTTP_101 [||] // HTTP 1xx responses  MUST NOT contain a body
+
+  let handShakeWithSubprotocolResponse (subprotocol : string) (handShakeToken : string) =
+    Writers.setHeader "Sec-WebSocket-Protocol" subprotocol
+    >=> handShakeResponse handShakeToken
 
   type Opcode = Continuation | Text | Binary | Reserved | Close | Ping | Pong
 
@@ -87,6 +87,10 @@ module WebSocket =
     Data: ByteSegment
     }
 
+  type ByteSegmentCapacityException(requiredCapacity: int, actualCapacity: int) =
+    inherit Exception(
+      "Byte segment provided to read websocket message does not have enough capacity [Required Capacity: " + requiredCapacity.ToString() + ", Actual Capacity: " + actualCapacity.ToString() + "]")
+
   let internal exctractHeader (arr: byte []) =
     let bytes x = arr.[x]
     let firstByte = bytes 0
@@ -103,11 +107,16 @@ module WebSocket =
       }
     header
 
-  let writeFrame (connection: Connection) (f: Frame) = socket {
-      do! connection.transport.write (ArraySegment([| f.OpcodeByte |], 0, 1))
-      do! connection.transport.write (ArraySegment(f.EncodedLength, 0, f.EncodedLength.Length))
-      do! connection.transport.write f.Data
-      }
+  let internal bytesToNetworkOrder (bytes : byte[]) =
+    if BitConverter.IsLittleEndian then bytes |> Array.rev else bytes
+
+  let writeFrame (connection: Connection) (f: Frame) : SocketOp<unit> = 
+    socket {
+      let! _ = connection.transport.write (new Memory<byte>([| f.OpcodeByte |]))
+      let! _ = connection.transport.write (new Memory<byte>(f.EncodedLength))
+      let! _ = connection.transport.write f.Data
+      return ()
+    }
 
   let internal frame (opcode : Opcode) (data : ByteSegment)  (fin : bool) =
 
@@ -115,47 +124,66 @@ module WebSocket =
 
     let firstByte = if fin then firstByte ||| 128uy else firstByte
 
-    let encodedLength = 
-        match data.Count with
+    let encodedLength =
+        match data.Length with
         | l when l >= 65536 ->
           [| yield 127uy
-             yield! BitConverter.GetBytes(uint64 data.Count) |> Array.rev |]
+             yield! BitConverter.GetBytes(uint64 data.Length) |> bytesToNetworkOrder |]
         | l when l >= 126 ->
           [| yield 126uy
-             yield! BitConverter.GetBytes(uint16 data.Count) |> Array.rev |]
-        | _ -> [| byte (data.Count) |]
-    
+             yield! BitConverter.GetBytes(uint16 data.Length) |> bytesToNetworkOrder |]
+        | _ -> [| byte (data.Length) |]
+
     { Frame.OpcodeByte = firstByte; EncodedLength = encodedLength; Data = data }
 
-  let readBytes (transport : ITransport) (n : int) =
-    let arr = Array.zeroCreate n
-    let rec loop i = socket {
-      if i = n then
-        return arr
-      else
-        let! read = transport.read <| ArraySegment(arr,i,n - i)
-        return! loop (i+read)
-      }
-    loop 0
+  let readBytes (connection : Connection) (n : int) : SocketOp<byte[]> =
+    ValueTask<Result<byte[],Error>>(
+      task {
+        let arr = Array.zeroCreate n
+        let mutable offset = 0
+        let reader = connection.reader
+        do! reader.readPostData n (fun a count ->
+            let source = a.Span.Slice(0,count)
+            let target = new Span<byte>(arr,offset,count)
+            source.CopyTo(target)
+            offset <- offset + count)
+        return Ok(arr)
+      })
+
+  let readBytesIntoByteSegment retrieveByteSegment (connection : Connection) (n : int) : SocketOp<ByteSegment> =
+    let byteSegmentRetrieved: ByteSegment = retrieveByteSegment n
+
+    let byteSegment =
+        match byteSegmentRetrieved.Length with
+        | count when count = n -> byteSegmentRetrieved
+        | count when count < n -> raise (ByteSegmentCapacityException(n, byteSegmentRetrieved.Length))
+        | _ -> byteSegmentRetrieved.Slice(0,n)
+
+    let mutable offset = 0
+    let reader = connection.reader
+    ValueTask<Result<ByteSegment,Error>>(
+      task{
+        do! reader.readPostData n (fun a count ->
+          let source = a.Span.Slice(0,count)
+          let target = byteSegment.Span.Slice(offset,count)
+          source.CopyTo(target)
+          offset <- offset + count)
+        return Ok(byteSegment)
+      })
 
   type internal Cont<'t> = 't -> unit
-
-  open System.Threading
 
   let fork f = ThreadPool.QueueUserWorkItem(WaitCallback(f)) |> ignore
 
   /// This class represents a WebSocket connection, it provides an interface to read and write to a WebSocket.
-  type WebSocket(connection : Connection) =
-    
-    let mutable writing = false
-    let mutable reading = false
+  type WebSocket(connection : Connection, subprotocol: string option) =
 
     let readExtendedLength header = socket {
       if header.length = 126 then
-          let! bytes = readBytes connection.transport 2
+          let! bytes = readBytes connection 2
           return uint64(bytes.[0]) * 256UL + uint64(bytes.[1])
         elif header.length = 127 then
-          let! bytes = readBytes connection.transport 8
+          let! bytes = readBytes connection 8
           return uint64(bytes.[0]) * 65536UL * 65536UL * 65536UL * 256UL +
           uint64(bytes.[1]) * 65536UL * 65536UL * 65536UL +
           uint64(bytes.[2]) * 65536UL * 65536UL * 256UL +
@@ -168,116 +196,148 @@ module WebSocket =
           return uint64(header.length)
       }
 
-    let writeQueue = new ConcurrentQueue<Frame*Cont<Choice<unit,Error>>>()
-    let readQueue  = new ConcurrentQueue<Cont<Choice<Opcode*byte[]*bool,Error>>>()
+    let writeSemaphore = new SemaphoreSlim(1, 1)
+    let readSemaphore  = new SemaphoreSlim(1, 1)
 
-    let rec writeloop _ =
-      async{
-        try
-          match writeQueue.TryDequeue() with
-          | true, (frame, ok) ->
-            let! res = writeFrame connection frame 
-            fork (fun _ -> ok res)
-            do! writeloop ()
-          | false, _ ->
-            lock writeQueue (fun _ -> writing <- false)
-        with ex ->
-          lock writeQueue (fun _ -> writing <- false)
+    let runAsyncWithSemaphore (semaphore: SemaphoreSlim) asyncAction = task {
+      let! _ = semaphore.WaitAsync() |> Async.AwaitTask
+      try
+        return! asyncAction
+      finally
+        semaphore.Release() |> ignore
       }
 
     let sendFrame opcode bs fin =
       let frame = frame opcode bs fin
-      Async.FromContinuations <| fun (ok,ex,cn) ->
-        writeQueue.Enqueue (frame,ok)
-        lock(writeQueue) (fun _ -> 
-          if not writing then
-            writing <- true
-            Async.Start <| writeloop ())
+      SocketOp.ofTask (runAsyncWithSemaphore writeSemaphore ((writeFrame connection frame).AsTask()))
 
-    let readFrame () = socket {
-      assert (List.length connection.segments = 0)
-      let! arr = readBytes connection.transport 2
+    let readFrameIntoSegment (byteSegmentForLengthFunc: int -> ByteSegment) = socket {
+      //assert (Seq.length connection.segments = 0)
+      let! arr = readBytes connection 2
       let header = exctractHeader arr
       let! extendedLength = readExtendedLength header
 
       assert(header.hasMask)
-      let! mask = readBytes connection.transport 4
+      let! mask = readBytes connection 4
 
       if extendedLength > uint64 Int32.MaxValue then
-        let reason = sprintf "Frame size of %d bytes exceeds maximum accepted frame size (2 GB)" extendedLength
+        let reason = "Frame size of " + extendedLength.ToString() + " bytes exceeds maximum accepted frame size (2 GB)"
         let data =
-          [| yield! BitConverter.GetBytes (CloseCode.CLOSE_TOO_LARGE.code)
-             yield! UTF8.bytes reason |]
-        do! sendFrame Close (ArraySegment(data)) true
-        return! SocketOp.abort (InputDataError reason)
+            [| yield! BitConverter.GetBytes (CloseCode.CLOSE_TOO_LARGE.code) |> bytesToNetworkOrder
+               yield! Encoding.UTF8.GetBytes reason |]
+        do! sendFrame Close (Memory(data)) true
+        return! SocketOp.abort (InputDataError(None, reason))
       else
-        let! frame = readBytes connection.transport (int extendedLength)
+        let! frame = readBytesIntoByteSegment byteSegmentForLengthFunc connection (int extendedLength)
+
         // Messages from the client MUST be masked
-        let data = if header.hasMask then frame |> Array.mapi (fun i x -> x ^^^ mask.[i % 4]) else frame
-        return (header.opcode, data, header.fin)
+        if header.hasMask
+        then
+          for i = 0 to (int extendedLength) - 1 do
+            frame.Span.[i] <- frame.Span.[i] ^^^ mask.[i % 4]
+
+        return header.opcode, frame, header.fin
       }
 
-    let rec readloop _ =
-      async{
-        try
-          match readQueue.TryDequeue() with
-          | true, ok ->
-            let! res = readFrame ()
-            fork (fun _ -> ok res)
-            do! readloop ()
-          | false, _ ->
-            lock readQueue (fun _ -> reading <- false)
-        with ex ->
-          lock readQueue (fun _ -> reading <- false)
+    member this.read () = socket {
+      return! SocketOp.ofTask (runAsyncWithSemaphore readSemaphore ((readFrameIntoSegment (Array.zeroCreate >> Memory)).AsTask()))
       }
 
-    member this.read () =
-       Async.FromContinuations <| fun (ok,ex,cn) ->
-        readQueue.Enqueue (ok)
-        lock(readQueue) (fun _ -> 
-          if not reading then
-            reading <- true
-            Async.Start <| readloop ())
+    /// Reads from the websocket and puts the data into a ByteSegment selected by the byteSegmentForLengthFunc parameter
+    /// <param name="byteSegmentForLengthFunc">A function that takes in the message length in bytes required to hold the next websocket message and returns an appropriately sized ArraySegment of bytes</param>
+    member this.readIntoByteSegment byteSegmentForLengthFunc = 
+      SocketOp.ofTask (runAsyncWithSemaphore readSemaphore ((readFrameIntoSegment byteSegmentForLengthFunc).AsTask()))
 
     member this.send opcode bs fin = sendFrame opcode bs fin
 
-  let internal handShakeAux webSocketKey continuation (ctx : HttpContext) =
+    member this.subprotocol = subprotocol
+
+  let internal handShakeAux webSocketProtocol webSocketKey continuation (ctx : HttpContext) =
     socket {
       let webSocketHash = sha1 <| webSocketKey + magicGUID
       let handShakeToken = Convert.ToBase64String webSocketHash
-      let! something = HttpOutput.run (handShakeResponse handShakeToken) ctx
-      let webSocket = new WebSocket(ctx.connection)
+      match webSocketProtocol with
+      | Some subprotocol ->
+        let! a = SocketOp.ofTask ((new HttpOutput(ctx.connection,ctx.runtime)).run ctx.request (handShakeWithSubprotocolResponse subprotocol handShakeToken))
+        ()
+      | None ->
+        let! a = SocketOp.ofTask ((new HttpOutput(ctx.connection,ctx.runtime)).run ctx.request (handShakeResponse handShakeToken))
+        ()
+      
+      // Mark connection as long-lived (WebSocket) to prevent health checker from closing it
+      ctx.connection.isLongLived <- true
+      
+      let webSocket = new WebSocket(ctx.connection, webSocketProtocol)
       do! continuation webSocket ctx
     }
 
-  /// The handShake combinator captures a WebSocket and pass it to the provided `continuation`
-  let handShake (continuation : WebSocket -> HttpContext -> SocketOp<unit>) (ctx : HttpContext) = async {
+  let chooseSubprotocol (subprotocol : string) (requestSubprotocols : string []) (ctx : HttpContext) = async {
+    if Array.exists ((=) subprotocol) requestSubprotocols then
+      return Some subprotocol
+    else
+      return None
+  }
+
+  let validateConnectionHeader (header:Choice<string,string>) =
+    match header with
+    | Choice1Of2 s ->
+      let parts =
+        s.ToLower().Split([|','|],StringSplitOptions.RemoveEmptyEntries)
+        |> Array.map (fun (s:string) -> s.Trim())
+      Array.contains "upgrade" parts
+    | _ ->
+      false
+
+  let validateHandShake (ctx : HttpContext) =
     let r = ctx.request
     if r.``method`` <> HttpMethod.GET then
-      return! RequestErrors.METHOD_NOT_ALLOWED "Method not allowed" ctx
-    elif r.header "upgrade"  |> Choice.map (fun s -> s.ToLower()) <> Choice1Of2 "websocket" then
-      return! RequestErrors.BAD_REQUEST "Bad Request" ctx
+      Choice2Of2 (RequestErrors.METHOD_NOT_ALLOWED "Method not allowed" ctx)
+    elif r.header "upgrade" |> Choice.map (fun s -> s.ToLower()) <> Choice1Of2 "websocket" then
+      Choice2Of2 (RequestErrors.BAD_REQUEST "Bad Request" ctx)
     else
-      match r.header "connection" with
-      // rfc 6455 - Section 4.1.6 : The request MUST contain a |Connection| header field whose value
-      // MUST include the "Upgrade" token.
-      | Choice1Of2 str when String.contains "Upgrade" str ->
+      if validateConnectionHeader (r.header "connection") then
         match r.header "sec-websocket-key" with
-        | Choice1Of2 webSocketKey ->
-          let! a = handShakeAux webSocketKey continuation ctx
-          match a with
-          | Choice1Of2 _ ->
-            do ()
+        | Choice1Of2 webSocketKey -> Choice1Of2 webSocketKey
+        | _ -> Choice2Of2 (RequestErrors.BAD_REQUEST "Missing 'sec-websocket-key' header" ctx)
+      else
+        Choice2Of2 (RequestErrors.BAD_REQUEST "Bad Request" ctx)
 
-          | Choice2Of2 err ->
-            ctx.runtime.logger.info (
-              eventX "WebSocket disconnected"
-              >> setSingleName "Suave.Websocket.handShake"
-              >> setFieldValue "error" err)
+  /// The handShakeWithSubprotocol combinator captures a WebSocket and pass it to the provided `continuation`
+  let handShakeWithSubprotocol (choose : string [] -> HttpContext -> Async<string option>) (continuation : WebSocket -> HttpContext -> SocketOp<unit>) (ctx : HttpContext) =
+    async {
+      match validateHandShake ctx with
+      | Choice1Of2 webSocketKey ->
+        let! subprotocol =
+          match ctx.request.header "sec-websocket-protocol" with
+          | Choice1Of2 webSocketProtocol -> choose (webSocketProtocol.Split [|','|]) ctx
+          | _ -> async.Return None
 
-          return! Control.CLOSE ctx
-        | _ ->
-          return! RequestErrors.BAD_REQUEST "Missing 'sec-websocket-key' header" ctx
-      | _ ->
-        return! RequestErrors.BAD_REQUEST "Bad Request" ctx
+        let! a = (handShakeAux subprotocol webSocketKey continuation ctx).AsTask()
+        match a with
+        | Ok _ ->
+          do ()
+        | Result.Error err ->
+          do ()
+        return! Control.CLOSE ctx
+      | Choice2Of2 response -> return! response
     }
+
+  /// The handShake combinator captures a WebSocket and pass it to the provided `continuation`
+  let handShakeTask (continuation : WebSocket -> HttpContext -> SocketOp<unit>) (ctx : HttpContext) = task {
+    match validateHandShake ctx with
+    | Choice1Of2 webSocketKey ->
+      let! a = (handShakeAux None webSocketKey continuation ctx).AsTask()
+      match a with
+      | Ok _ ->
+        do ()
+      | Result.Error err ->
+        Console.WriteLine($"WebSocket disconnected {err}",err)
+      return! Control.CLOSE ctx
+    | Choice2Of2 response ->
+      return! response
+  }
+
+  let handShake (continuation : WebSocket -> HttpContext -> SocketOp<unit>) (ctx : HttpContext) = async {
+    do! handShakeTask continuation ctx
+    return Some ctx
+  }

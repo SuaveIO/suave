@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Suave Request & Response - Handle forms, JSON, query strings, and build type-safe responses">
+  <title>Requests & Responses - Suave</title>
+  <link rel="shortcut icon" href="/images/favicon.ico" type="image/x-icon">
+  <link rel="icon" href="/images/favicon-32x32.png" sizes="32x32" type="image/png">
+  <link rel="icon" href="/images/favicon-96x96.png" sizes="96x96" type="image/png">
+  <link rel="apple-touch-icon" href="/images/apple-touch-icon-57x57.png" sizes="57x57">
+  <link rel="apple-touch-icon" href="/images/apple-touch-icon-114x114.png" sizes="114x114">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header>
+    <div class="container">
+      <nav>
+        <div class="logo">
+          <img src="/images/head_600_trans.png" alt="Suave Logo" width="40" height="40" style="vertical-align: middle; margin-right: 12px; background: white; padding: 2px; border-radius: 4px;">
+          Suave
+        </div>
+        <button id="hamburger" class="hamburger" aria-label="Toggle menu">
+          <span></span><span></span><span></span>
+        </button>
+        <ul id="nav-links" class="nav-links">
+          <li><a href="/">Home</a></li>
+          <li><a href="/docs/">Documentation</a></li>
+          <li><a href="/docs/performance.html">Performance</a></li>
+          <li><a href="https://github.com/SuaveIO/suave" target="_blank">GitHub</a></li>
+          <li><a href="https://www.nuget.org/packages/Suave/" target="_blank">NuGet</a></li>
+          <li><button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme">🌙</button></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <div class="container">
+      <h1>Requests & Responses</h1>
+      <p>Learn how to handle different request types and build proper responses in Suave.</p>
+
+      <h2>HTTP Response Types</h2>
+      <p>Suave provides helpers for common HTTP responses:</p>
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.Successful
+open Suave.RequestErrors
+open Suave.ServerErrors
+
+let app =
+  choose [
+    path "/ok" >=> OK "200 OK"
+    path "/created" >=> CREATED "201 Created"
+    path "/accepted" >=> ACCEPTED "202 Accepted"
+    
+    path "/bad-request" >=> BAD_REQUEST "400 Bad Request"
+    path "/unauthorized" >=> UNAUTHORIZED "401 Unauthorized"
+    path "/forbidden" >=> FORBIDDEN "403 Forbidden"
+    path "/not-found" >=> NOT_FOUND "404 Not Found"
+    path "/conflict" >=> CONFLICT "409 Conflict"
+    
+    path "/server-error" >=> INTERNAL_ERROR "500 Server Error"
+    path "/not-implemented" >=> NOT_IMPLEMENTED "501 Not Implemented"
+  ]</code></pre>
+      </div>
+
+      <h2>Reading Request Headers</h2>
+      <p>Access HTTP headers from the request:</p>
+      <div class="code-block">
+        <pre><code>let app =
+  choose [
+    path "/headers" >=> fun ctx ->
+      let userAgent = 
+        match ctx.request.header "user-agent" with
+        | Choice1Of2 ua -> sprintf "User-Agent: %s" ua
+        | Choice2Of2 _ -> "User-Agent not provided"
+      
+      let contentType =
+        match ctx.request.header "content-type" with
+        | Choice1Of2 ct -> sprintf "Content-Type: %s" ct
+        | Choice2Of2 _ -> "Content-Type not provided"
+      
+      let response = sprintf "%s\n%s" userAgent contentType
+      OK response ctx
+  ]</code></pre>
+      </div>
+
+      <h2>Query String Parameters</h2>
+      <p>Extract and parse query parameters:</p>
+      <div class="code-block">
+        <pre><code>let app =
+  choose [
+    path "/search" >=> fun ctx ->
+      match ctx.request.queryParam "q" with
+      | Choice1Of2 query -> 
+          OK (sprintf "Search results for: %s" query) ctx
+      | Choice2Of2 _ -> 
+          BAD_REQUEST "Missing 'q' parameter" ctx
+    
+    path "/page" >=> fun ctx ->
+      match ctx.request.queryParam "n" with
+      | Choice1Of2 nStr when System.Int32.TryParse(nStr) |> fst ->
+          let page = System.Int32.Parse(nStr)
+          OK (sprintf "Page: %d" page) ctx
+      | _ -> 
+          BAD_REQUEST "Invalid page number" ctx
+  ]</code></pre>
+      </div>
+
+      <h2>Request Body (Form Data)</h2>
+      <p>Read form data from POST requests:</p>
+      <div class="code-block">
+        <pre><code>let app =
+  choose [
+    POST >=> path "/form" >=> fun ctx ->
+      async {
+        match ctx.request.formData "name" with
+        | Choice1Of2 name ->
+            let response = sprintf "Hello, %s!" name
+            return! OK response ctx
+        | Choice2Of2 _ ->
+            return! BAD_REQUEST "Missing 'name' field" ctx
+      }
+  ]</code></pre>
+      </div>
+
+      <h2>JSON Request/Response</h2>
+      <p>Work with JSON using Suave's JSON support:</p>
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.Json
+
+type User = { id: int; name: string; email: string }
+
+let app =
+  choose [
+    POST >=> path "/api/users" >=> fun ctx ->
+      async {
+        try
+          let! user = ctx.request.rawForm |> UTF8.toString |> JSON.parse&lt;User&gt;
+          let response = sprintf "Created user: %s" user.name
+          return! OK response ctx
+        with
+        | _ -> return! BAD_REQUEST "Invalid JSON" ctx
+      }
+    
+    GET >=> path "/api/users" >=> fun ctx ->
+      let users = 
+        [ { id = 1; name = "Alice"; email = "alice@example.com" }
+          { id = 2; name = "Bob"; email = "bob@example.com" } ]
+      JSON.toJson users |> OK |> (fun f -> f ctx)
+  ]</code></pre>
+      </div>
+
+      <h2>Setting Response Headers</h2>
+      <p>Add custom headers to responses:</p>
+      <div class="code-block">
+        <pre><code>open Suave.Writers
+
+let app =
+  choose [
+    path "/custom-headers" =>
+      setHeader "X-Custom-Header" "CustomValue" >=>
+      setHeader "Cache-Control" "no-cache" >=>
+      OK "Response with custom headers"
+    
+    path "/json-api" =>
+      setHeader "Content-Type" "application/json" >=>
+      OK "{\"message\":\"Hello\"}"
+  ]</code></pre>
+      </div>
+
+      <h2>Setting Response Cookies</h2>
+      <p>Add cookies to responses:</p>
+      <div class="code-block">
+        <pre><code>open Suave.Writers
+
+let app =
+  choose [
+    path "/set-cookie" >=>
+      setHeader "Set-Cookie" "session=abc123; Path=/" >=>
+      OK "Cookie set"
+  ]</code></pre>
+      </div>
+
+      <h2>Complete CRUD Example</h2>
+      <p>A complete example with multiple request types:</p>
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.Operators
+open Suave.Filters
+open Suave.Successful
+open Suave.RequestErrors
+
+type Product = { id: int; name: string; price: float }
+
+let mutable products = 
+  [ { id = 1; name = "Widget"; price = 9.99 }
+    { id = 2; name = "Gadget"; price = 19.99 } ]
+
+let app =
+  choose [
+    // GET /products - List all
+    GET >=> path "/products" >=> 
+      OK (sprintf "Products: %A" products)
+    
+    // GET /products/:id - Get one
+    GET >=> pathScan "/products/%d" (fun id ->
+      match products |> List.tryFind (fun p -> p.id = id) with
+      | Some p -> OK (sprintf "Product: %s - $%.2f" p.name p.price)
+      | None -> NOT_FOUND "Product not found"
+    )
+    
+    // POST /products - Create
+    POST >=> path "/products" >=> fun ctx ->
+      match ctx.request.formData "name", ctx.request.formData "price" with
+      | Choice1Of2 name, Choice1Of2 priceStr when System.Double.TryParse(priceStr) |> fst ->
+          let price = System.Double.Parse(priceStr)
+          let id = products |> List.maxBy (fun p -> p.id) |> fun p -> p.id + 1
+          let product = { id = id; name = name; price = price }
+          products <- products @ [product]
+          CREATED (sprintf "Created: %s" name) ctx
+      | _ -> BAD_REQUEST "Invalid data" ctx
+  ]</code></pre>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <div class="container">
+      <div class="footer-links">
+        <a href="/docs/">Documentation</a>
+        <a href="https://github.com/SuaveIO/suave" target="_blank">GitHub</a>
+        <a href="https://www.nuget.org/packages/Suave/" target="_blank">NuGet</a>
+        <a href="https://x.com/SuaveIO" target="_blank">X</a>
+        <a href="https://github.com/SuaveIO/suave/blob/master/LICENSE" target="_blank">License</a>
+      </div>
+      <p>&copy; 2025 Suave. Open source, MIT licensed.</p>
+      <p>Suave is a project created and maintained by Ademar Gonzalez.</p>
+    </div>
+  </footer>
+
+  <script src="/js/main.js"></script>
+</body>
+</html>
