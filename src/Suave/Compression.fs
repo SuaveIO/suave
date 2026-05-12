@@ -1,11 +1,9 @@
-﻿namespace Suave
+namespace Suave
 
 module Compression =
 
   open Suave.Utils
   open Suave.Sockets
-  open Suave.Sockets.Control
-
 
   open System
   open System.IO
@@ -57,64 +55,112 @@ module Compression =
          | _         -> None)
     | _ -> None
 
-  let transform (content : byte []) (ctx : HttpContext) connection : SocketOp<Algorithm option * byte []> =
-    socket {
-      if content.Length > MIN_BYTES_TO_COMPRESS && content.Length < MAX_BYTES_TO_COMPRESS then
-        let request = ctx.request
-        let enconding = getEncoder request
-        match enconding with
-        | Some (n,encoder) ->
-          return Some n, encoder content
-        | None ->
-          return None, content
-      else
-        return None, content
-    }
+  /// Synchronous compression decision + transform.
+  ///
+  /// Hot-path-aware:
+  ///   1. If `content.Length` is outside the compressible range, returns immediately
+  ///      with no allocation and without inspecting any request headers.
+  ///   2. Otherwise checks for `accept-encoding`; if absent or unmatched, returns
+  ///      `(None, content)` without allocating a Task.
+  ///   3. Only when we are actually going to compress do we allocate the encoded
+  ///      byte array.
+  ///
+  /// This replaces the previous `task { }`-wrapped version that paid for a state
+  /// machine + Task box + header lookup + comma-split + Array.map/tryPick on
+  /// every `Bytes` response, even when no compression was possible.
+  let transformSync (content : byte []) (ctx : HttpContext) : Algorithm option * byte [] =
+    let len = content.Length
+    if len <= MIN_BYTES_TO_COMPRESS || len >= MAX_BYTES_TO_COMPRESS then
+      None, content
+    else
+      match getEncoder ctx.request with
+      | Some (n, encoder) -> Some n, encoder content
+      | None -> None, content
 
-  let compress encoding path (fs : Stream) = socket {
+  /// Backwards-compatible task wrapper; new call sites should prefer `transformSync`.
+  let transform (content : byte []) (ctx : HttpContext) : Threading.Tasks.Task<Algorithm option * byte []> =
+    Threading.Tasks.Task.FromResult(transformSync content ctx)
+
+  let compress encoding path (fs : Stream) = task {
     use newFileStream = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.Write)
     match encoding with
     | GZIP ->
       use gzip = new GZipStream(newFileStream, CompressionMode.Compress)
-      do! SocketOp.ofTask (fs.CopyToAsync gzip)
+      do! (fs.CopyToAsync gzip)
+      return Ok ()
     | Deflate ->
       use deflate = new DeflateStream(newFileStream, CompressionMode.Compress)
-      do! SocketOp.ofTask (fs.CopyToAsync deflate)
+      do! (fs.CopyToAsync deflate)
+      return Ok ()
     | _ ->
       return failwith "invalid case."
   }
 
-  let compressFile n (stream : Stream) compressionFolder = socket {
-    let tempFileName = Path.GetRandomFileName()
-    if not (Directory.Exists compressionFolder) then Directory.CreateDirectory compressionFolder |> ignore
-    let newPath = Path.Combine(compressionFolder,tempFileName)
-    do! compress n newPath stream
-    return newPath
-  }
+  let compressFile n (stream : Stream) compressionFolder : SocketOp<string> = 
+    System.Threading.Tasks.ValueTask<Result<string,Error>>(
+      task {
+        let tempFileName = Path.GetRandomFileName()
+        if not (Directory.Exists compressionFolder) then Directory.CreateDirectory compressionFolder |> ignore
+        let newPath = Path.Combine(compressionFolder,tempFileName)
+        let! a = compress n newPath stream
+        match a with
+        | Ok () ->
+          return Ok (newPath)
+        | Result.Error e ->
+          return Result.Error e
+      })
 
-  let transformStream (key : string) (getData : string -> Stream) (getLast : string -> DateTime)
+  let transformStream (key : string) (stream : Stream) (getLast : string -> DateTime)
                       compression compressionFolder ctx =
-    socket {
-      let stream = getData key
+    let syncCheckForExisting (key:string) (getLast: string -> DateTime) =
+      let map = Globals.compressedFilesMap
+      let lastModified = getLast key
+      match map.TryGetValue key with
+      | true, (existingPath, prevLastModified) when lastModified <= prevLastModified ->
+          Choice1Of2 existingPath
+      | _ ->
+          Choice2Of2 lastModified
+
+    let compressAndStoreAsync (key:string) (stream:Stream) (n:Algorithm) (lastModified:DateTime) (compressionFolder:string) =
+      task {
+        try
+          let! newPathResult = compressFile n stream compressionFolder
+          match newPathResult with
+          | Ok newPath ->
+              let map = Globals.compressedFilesMap
+              map.[key] <- (newPath, lastModified)
+              return Ok newPath
+          | Result.Error e ->
+              return Result.Error e
+        with ex ->
+          return Result.Error (Error.ConnectionError ex.Message)
+      }
+
+    task {
       if compression && stream.Length > int64(MIN_BYTES_TO_COMPRESS) && stream.Length < int64(MAX_BYTES_TO_COMPRESS) then
-        let enconding = parseEncoder ctx.request
-        match enconding with
+        match parseEncoder ctx.request with
         | Some n ->
-          try
-            if Globals.compressedFilesMap.ContainsKey key then
-              let lastModified = getLast key
-              let cmprInfo = new FileInfo(Globals.compressedFilesMap.[key])
-              if lastModified > cmprInfo.CreationTime then
-                let! newPath = compressFile n stream compressionFolder
-                Globals.compressedFilesMap.[key] <- newPath
-            else
-              let! newPath =  compressFile n stream compressionFolder
-              Globals.compressedFilesMap.TryAdd(key,newPath) |> ignore
-            return Some n, new FileStream(Globals.compressedFilesMap.[key], FileMode.Open, FileAccess.Read, FileShare.Read) :> Stream
-          finally
+          // First check synchronously if we already have a compressed file that is up-to-date
+          match syncCheckForExisting key getLast with
+          | Choice1Of2 existingPath ->
+            // existing compressed file is current; dispose original stream and return file stream
             stream.Dispose()
+            let fs = new FileStream(existingPath, FileMode.Open, FileAccess.Read, FileShare.Read) :> Stream
+            return Ok(Some n, fs)
+          | Choice2Of2 lastModified ->
+            // Need to compress — do the minimal awaited work here
+            let! pathResult = compressAndStoreAsync key stream n lastModified compressionFolder
+            match pathResult with
+            | Result.Error e ->
+              stream.Dispose()
+              return Result.Error e
+            | Ok path ->
+              stream.Dispose()
+              let fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read) :> Stream
+              return Ok(Some n, fs)
+
         | None ->
-          return None, stream
+          return Ok(None, stream)
       else
-        return None, stream
+        return Ok(None, stream)
     }

@@ -1,0 +1,12 @@
+<html>
+    <head><title>Liquid Sample</title></head>
+    <body>
+      <h1>Hello {{model.name}}!</h1>
+      <p>Today is {{model.date}}</p>
+      <ul>
+      {% for item in model.items %}
+        <li>{{item}}</li>
+      {% endfor %}
+      </ul>
+    </body>
+  </html>

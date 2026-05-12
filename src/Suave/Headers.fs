@@ -1,4 +1,4 @@
-﻿namespace Suave
+namespace Suave
 
 /// Inspired by https://github.com/NancyFx/Nancy/blob/45860c82e4df8e2d380997ddf1d19d61400fb145/src/Nancy/RequestHeaders.cs
 module Headers =
@@ -16,23 +16,17 @@ module Headers =
     | _ -> None
 
   /// Parse a decimal as given in a header field.
-  let parseDecimal s =
+  let parseDecimal(s: string) =
     match System.Decimal.TryParse(s, System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture) with
     | true, d -> Some d
     | _ -> None
-  
+
   /// Parse a culture info as given in the 'Accept-Language' Header field.
   let parseCultureInfo =
-
-  #if NETSTANDARD1_5
-    let cultureNames =
-      new System.Collections.Generic.HashSet<string>(Utils.CultureInfoCache.allCulturesList, System.StringComparer.OrdinalIgnoreCase)
-  #else
     let cultureNames =
       new System.Collections.Generic.HashSet<string>(
         System.Globalization.CultureInfo.GetCultures(System.Globalization.CultureTypes.AllCultures)
         |> Seq.map (fun c -> c.Name), System.StringComparer.OrdinalIgnoreCase)
-  #endif
 
     let isValidCulture s =
       System.String.IsNullOrWhiteSpace s |> not &&
@@ -59,11 +53,11 @@ module Headers =
     |> Seq.filter (fst >> (=) lowerName)
     |> Seq.map snd
 
-  /// group headers by name and collect all headers in a dictionary.
+  /// group headers by name and collect all headers in a dictionary with format String<label>:Seq<String<values>>
   let getHeaders ctx =
     ctx.request.headers
     |> Seq.groupBy fst
-    |> Seq.map (fun (k,v) -> k, Seq.map fst v)
+    |> Seq.map (fun (k,v) -> k, Seq.map snd v)
     |> dict
     |> fun d -> new System.Collections.Generic.Dictionary<_,_>(d, System.StringComparer.OrdinalIgnoreCase)
     :> System.Collections.Generic.IDictionary<_,_>
@@ -93,7 +87,6 @@ module Headers =
         match qVal
               |> Seq.map (fun x -> x.Substring 2)
               |> Seq.choose parseDecimal
-              //|> Seq.tryHead with // TODO: F# 4
               |> Seq.tryFind (fun _ -> true) with
         | Some d -> d
         | None -> 1m
@@ -102,13 +95,13 @@ module Headers =
         Seq.append [mediaRange] others
         |> String.concat ";"
       mediaRange, quality)
-    //|> Seq.sortByDescending snd // TODO: F# 4
     |> Seq.sortBy (fun (_, q) -> -q)
 
-  open Suave.Utils
-
   /// Headers are lowercased, so can use string.Equals
-  let getAll (target : NameValueList) (key : string) =
-    match target |> List.choose (fun (a, b) -> if a.Equals key then Some b else None) with
-    | [] -> Choice2Of2 (sprintf "Couldn't find key '%s' in NameValueList" key)
-    | l  -> Choice1Of2 l
+  open System.Collections.Generic
+  let getAll (target : List<string*string>) (key : string) =
+    let results = target |> Seq.choose (fun (a, b) -> if a.Equals key then Some b else None)
+    if Seq.isEmpty results then
+      Choice2Of2 ("Couldn't find key '" + key + "'")
+    else
+      Choice1Of2 results

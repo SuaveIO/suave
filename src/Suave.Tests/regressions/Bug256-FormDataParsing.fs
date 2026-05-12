@@ -1,20 +1,15 @@
-﻿module Suave.Tests.FormDataParsing 
+module Suave.Tests.FormDataParsing
 
-open HttpFs
-open HttpFs.Client
-open Fuchu
-open System
+open Expecto
 open System.IO
+open System.Net.Http
 open System.Reflection
-open Hopac
 open Suave
-open Suave.Utils
-open Suave.Logging
 open Suave.Operators
 open Suave.Filters
 open Suave.RequestErrors
 open Suave.Testing
-open Suave.Tests.TestUtilities  
+open Suave.Tests.TestUtilities
 
 let app =
   choose
@@ -23,7 +18,7 @@ let app =
           path "/gifs/echo"
               >=> Writers.setMimeType "image/gif"
               >=> warbler (fun ctx ->
-                  let file = ctx.request.files.Head
+                  let file = ctx.request.files[0]
                   //printfn "||| in suave, handing over to sendFile, file %s len %d"
                   //        file.tempFilePath (FileInfo(file.tempFilePath).Length)
                   Files.sendFile file.tempFilePath false)
@@ -41,27 +36,25 @@ let tests (cfg : SuaveConfig) =
   let uriFor (res : string) =
     SuaveConfig.firstBindingUri cfg res ""
 
-  let postTo res = Request.create Post (uriFor res) |> Request.keepAlive false
-
   testCase "can send/receive" <| fun _ ->
     let ctx = runWithConfig app
     try
       use fs = File.OpenRead (pathOf "regressions/pix.gif")
-      let file = "pix.gif", ContentType.create("image", "gif"), StreamData fs
+      use formdata = new MultipartFormDataContent()
+      let upload = new StreamContent(fs)
+      upload.Headers.ContentType <- Headers.MediaTypeHeaderValue("image/gif")
+      formdata.Add(upload,"file","pix.gif")
+      use client = new HttpClient()
+      let response =
+        client.PostAsync(uriFor "gifs/echo",formdata).Result
 
-      //printfn "--- get response"
-      let data =
-        postTo "gifs/echo"
-        |> Request.body (BodyForm [ FormFile ("img", file) ])
-        |> Request.responseAsBytes
-        |> run
-
+      let data = response.Content.ReadAsByteArrayAsync().Result
       fs.Seek(0L, SeekOrigin.Begin) |> ignore
 
       use ms = new MemoryStream()
       ms.Write(data, 0, data.Length)
       ms.Seek(0L, SeekOrigin.Begin) |> ignore
-      Assert.StreamsEqual("the input should eq the echoed data", ms, fs)
+      Expect.streamsEqual ms fs "the input should eq the echoed data"
     finally
       disposeContext ctx
       ()

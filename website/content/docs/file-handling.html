@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Suave File Handling - Serve static files, uploads, and streaming">
+  <title>File Handling & Static Files - Suave</title>
+  <link rel="shortcut icon" href="/images/favicon.ico" type="image/x-icon">
+  <link rel="icon" href="/images/favicon-32x32.png" sizes="32x32" type="image/png">
+  <link rel="icon" href="/images/favicon-96x96.png" sizes="96x96" type="image/png">
+  <link rel="apple-touch-icon" href="/images/apple-touch-icon-57x57.png" sizes="57x57">
+  <link rel="apple-touch-icon" href="/images/apple-touch-icon-114x114.png" sizes="114x114">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header>
+    <div class="container">
+      <nav>
+        <div class="logo">
+          <img src="/images/head_600_trans.png" alt="Suave Logo" width="40" height="40" style="vertical-align: middle; margin-right: 12px; background: white; padding: 2px; border-radius: 4px;">
+          Suave
+        </div>
+        <button id="hamburger" class="hamburger" aria-label="Toggle menu">
+          <span></span><span></span><span></span>
+        </button>
+        <ul id="nav-links" class="nav-links">
+          <li><a href="/">Home</a></li>
+          <li><a href="/docs/">Documentation</a></li>
+          <li><a href="/docs/performance.html">Performance</a></li>
+          <li><a href="https://github.com/SuaveIO/suave" target="_blank">GitHub</a></li>
+          <li><a href="https://www.nuget.org/packages/Suave/" target="_blank">NuGet</a></li>
+          <li><button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme">🌙</button></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <div class="container">
+      <h1>File Handling & Static Files</h1>
+      <p>Serve static files, handle uploads, and stream large files with Suave.</p>
+
+      <h2>Serving Static Files</h2>
+      <p>Serve files from a directory:</p>
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.Files
+open Suave.Operators
+open Suave.Filters
+
+let app =
+  choose [
+    path "/" >=> Files.browseFileHome "index.html"
+    Files.browseHome  // Serve all files from current directory
+  ]</code></pre>
+      </div>
+
+      <h2>Serving from Specific Directory</h2>
+      <p>Serve files from a specific folder:</p>
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.Files
+
+let app =
+  choose [
+    Files.browse "./public"  // Serve from ./public directory
+    RequestErrors.NOT_FOUND "Not found"
+  ]</code></pre>
+      </div>
+
+      <h2>Directory Listing</h2>
+      <p>Allow directory browsing:</p>
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.Files
+open Suave.Operators
+
+let app =
+  choose [
+    browseFileHome "index.html"
+    browseHome  // Allows directory listing
+  ]</code></pre>
+      </div>
+
+      <h2>File Downloads</h2>
+      <p>Serve files for download with appropriate headers:</p>
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.Operators
+open Suave.Writers
+
+let app =
+  choose [
+    path "/download/file.pdf" >=>
+      setHeader "Content-Disposition" "attachment; filename=file.pdf" >=>
+      Files.file "./files/file.pdf"
+  ]</code></pre>
+      </div>
+
+      <h2>File Upload Handling</h2>
+      <p>Handle file uploads from forms:</p>
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.Operators
+open Suave.Filters
+open Suave.Successful
+open System.IO
+
+let app =
+  choose [
+    POST >=> path "/upload" >=> fun ctx ->
+      async {
+        try
+          let files = ctx.request.files
+          match files |> List.tryHead with
+          | Some file ->
+              let uploadDir = "./uploads"
+              Directory.CreateDirectory(uploadDir) |> ignore
+              let savePath = Path.Combine(uploadDir, file.fileName)
+              File.WriteAllBytes(savePath, file.fileData)
+              return! OK (sprintf "File uploaded: %s" file.fileName) ctx
+          | None ->
+              return! RequestErrors.BAD_REQUEST "No file provided" ctx
+        with ex ->
+          return! RequestErrors.INTERNAL_ERROR (sprintf "Upload failed: %s" ex.Message) ctx
+      }
+  ]</code></pre>
+      </div>
+
+      <h2>Streaming Large Files</h2>
+      <p>Stream large files without loading entire content to memory:</p>
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.Operators
+open Suave.Writers
+open System.IO
+
+let streamFile filePath =
+  fun (ctx: HttpContext) ->
+    async {
+      try
+        let fileInfo = FileInfo(filePath)
+        let! result = ctx.response.asyncWriteLn(sprintf "Content-Length: %d" fileInfo.Length)
+        use file = File.OpenRead(filePath)
+        do! Suave.Sockets.Control.transferStream ctx.connection.socket file
+        return Some ctx
+      with _ ->
+        return! RequestErrors.INTERNAL_ERROR "Stream error" ctx
+    }
+
+let app =
+  choose [
+    path "/large-file" >=> streamFile "./data/large-file.bin"
+  ]</code></pre>
+      </div>
+
+      <h2>Serving Specific File Types</h2>
+      <p>Serve specific file types with correct MIME types:</p>
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.Files
+open Suave.Operators
+open Suave.Writers
+
+let app =
+  choose [
+    pathRegex @".*\.pdf$" >=>
+      setHeader "Content-Type" "application/pdf" >=>
+      Files.file
+
+    pathRegex @".*\.txt$" >=>
+      setHeader "Content-Type" "text/plain" >=>
+      Files.file
+
+    pathRegex @".*\.json$" >=>
+      setHeader "Content-Type" "application/json" >=>
+      Files.file
+
+    Files.browseHome
+  ]</code></pre>
+      </div>
+
+      <h2>Conditional File Serving</h2>
+      <p>Serve files conditionally based on path:</p>
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.Files
+open Suave.Operators
+open Suave.Filters
+
+let app =
+  choose [
+    // API routes
+    path "/api" >=> RequestErrors.NOT_FOUND "API not found"
+    
+    // Static files
+    GET >=> Files.browseHome
+    
+    // Everything else
+    RequestErrors.NOT_FOUND "Not found"
+  ]</code></pre>
+      </div>
+
+      <h2>File Caching</h2>
+      <p>Enable HTTP caching for static files:</p>
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.Files
+open Suave.Operators
+open Suave.Writers
+
+let cacheFor (seconds: int) =
+  setHeader "Cache-Control" (sprintf "public, max-age=%d" seconds)
+
+let app =
+  choose [
+    pathRegex @".*\.(js|css)$" >=>
+      cacheFor 86400 >=>  // 1 day
+      Files.browseHome
+
+    pathRegex @".*\.(jpg|png|gif|svg)$" >=>
+      cacheFor 604800 >=>  // 7 days
+      Files.browseHome
+
+    pathRegex @".*\.html$" >=>
+      cacheFor 3600 >=>   // 1 hour
+      Files.browseHome
+
+    Files.browseHome
+  ]</code></pre>
+      </div>
+
+      <h2>Serving SPA (Single Page Application)</h2>
+      <p>Serve SPA with fallback to index.html:</p>
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.Files
+open Suave.Operators
+open Suave.Filters
+
+let app =
+  choose [
+    // API routes first
+    path "/api" >=> RequestErrors.NOT_FOUND "API not implemented"
+
+    // Static assets with long cache
+    GET >=> pathRegex @"^/(css|js|images)/" >=> Files.browseHome
+
+    // Everything else falls back to index.html for SPA routing
+    GET >=> Files.browseFileHome "index.html"
+    
+    // Default
+    Files.browseHome
+  ]</code></pre>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <div class="container">
+      <div class="footer-links">
+        <a href="/docs/">Documentation</a>
+        <a href="https://github.com/SuaveIO/suave" target="_blank">GitHub</a>
+        <a href="https://www.nuget.org/packages/Suave/" target="_blank">NuGet</a>
+        <a href="https://x.com/SuaveIO" target="_blank">X</a>
+        <a href="https://github.com/SuaveIO/suave/blob/master/LICENSE" target="_blank">License</a>
+      </div>
+      <p>&copy; 2025 Suave. Open source, MIT licensed.</p>
+      <p>Suave is a project created and maintained by Ademar Gonzalez.</p>
+    </div>
+  </footer>
+
+  <script src="/js/main.js"></script>
+</body>
+</html>

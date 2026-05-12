@@ -1,0 +1,18 @@
+group FakeBuild
+FSharp.Core
+Fake.Api.GitHub
+Fake.BuildServer.TeamFoundation
+Fake.Core.Environment
+Fake.Core.Process
+Fake.Core.ReleaseNotes
+Fake.Core.Target
+Fake.Core.Xml
+Fake.DotNet.AssemblyInfoFile
+Fake.DotNet.Cli
+Fake.DotNet.MSBuild
+Fake.Dotnet.NuGet
+Fake.DotNet.Paket
+Fake.DotNet.Testing.XUnit2
+Fake.IO.FileSystem
+Fake.IO.Zip
+Fake.Tools.Git

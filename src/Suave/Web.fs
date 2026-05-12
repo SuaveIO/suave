@@ -1,27 +1,24 @@
 namespace Suave
 
+open TcpServerFactory
+open System.Threading.Tasks
+open Tcp
+
 [<AutoOpen>]
 module Web =
 
   open System
   open System.IO
-  open System.Net
+  open System.Text
   open Suave.Utils
-  open Suave.Logging
-  open Suave.Logging.Message
 
   /// The default error handler returns a 500 Internal Error in response to
   /// thrown exceptions.
   let defaultErrorHandler (ex : Exception) msg (ctx : HttpContext) =
-    ctx.runtime.logger.error (
-      eventX msg
-      >> setSingleName "Suave.Web.defaultErrorHandler"
-      >> addExn ex)
-
-    if ctx.isLocal then
-      Response.response HTTP_500 (UTF8.bytes (sprintf "<h1>%s</h1><br/>%A" ex.Message ex)) ctx
+    if ctx.isLocalTrustProxy then
+      Response.response HTTP_500 (Encoding.UTF8.GetBytes("<h1>" + ex.Message + "</h1><br/>" + ex.ToString())) ctx
     else
-      Response.response HTTP_500 (UTF8.bytes HTTP_500.message) ctx
+      Response.response HTTP_500 (Encoding.UTF8.GetBytes HTTP_500.message) ctx
 
   /// Starts the web server asynchronously.
   ///
@@ -35,42 +32,41 @@ module Web =
   /// The return value from 'listening' (first item in tuple) gives you some metrics on
   /// how quickly suave started.
   let startWebServerAsync (config : SuaveConfig) (webpart : WebPart) =
+    ServerKey.validate config.serverKey |> ignore
+
+    let resolveDirectory homeDirectory =
+      match homeDirectory with
+      | None   -> Path.GetDirectoryName(System.AppContext.BaseDirectory)
+      | Some s -> s
+
     let homeFolder, compressionFolder =
-      ParsingAndControl.resolveDirectory config.homeFolder,
-      Path.Combine(ParsingAndControl.resolveDirectory config.compressedFilesFolder, "_temporary_compressed_files")
+      resolveDirectory config.homeFolder,
+      Path.Combine(resolveDirectory config.compressedFilesFolder, "_temporary_compressed_files")
 
     // spawn tcp listeners/web workers
-    let toRuntime = SuaveConfig.toRuntime config homeFolder compressionFolder true
+    let toRuntime = SuaveConfig.toRuntime config homeFolder compressionFolder
 
-    if config.initialiseLogger then
-      Global.initialise { Global.DefaultConfig with getLogger = fun _ -> config.logger }
-    else
-      ()
-
-    let startWebWorkerAsync runtime =
+    let startWebWorker runtime =
       let tcpServer =
-        config.tcpServerFactory.create(
-          config.maxOps, config.bufferSize, config.autoGrow,
-          runtime.matchedBinding.socketBinding)
+        (tcpServerFactory :> TcpServerFactory).create(config.maxOps, config.bufferSize, runtime.matchedBinding.socketBinding, runtime, config.cancellationToken, config.healthCheckEnabled, config.healthCheckIntervalMs, config.maxConnectionAgeSeconds, config.acceptorCount, webpart)
 
-      ParsingAndControl.startWebWorkerAsync (config.bufferSize, config.maxOps)
-                                            webpart
-                                            runtime
-                                            tcpServer
+      startTcpIpServer runtime.matchedBinding.socketBinding tcpServer
 
     let servers =
-       List.map (toRuntime >> startWebWorkerAsync) config.bindings
+       List.map (toRuntime >> startWebWorker) config.bindings
 
     let listening = servers |> Seq.map fst |> Async.Parallel
-    let server    = servers |> Seq.map snd |> Async.Parallel |> Async.Ignore
+    let serverTasks = servers |> Seq.map snd |> Seq.toArray
+    let server    = Task.WhenAll(serverTasks)
     listening, server
 
   /// Runs the web server and blocks waiting for the asynchronous workflow to be cancelled or
   /// it returning itself.
   let startWebServer (config : SuaveConfig) (webpart : WebPart) =
-    Async.RunSynchronously(startWebServerAsync config webpart |> snd, cancellationToken = config.cancellationToken)
+    let task = startWebServerAsync config webpart |> snd
+    Task.WaitAll task
 
-  /// The default configuration binds on IPv4, 127.0.0.1:8083 with a regular 500 Internal Error handler,
+  /// The default configuration binds on IPv4, 127.0.0.1:8080 with a regular 500 Internal Error handler,
   /// with a timeout of one minute for computations to run. Waiting for 2 seconds for the socket bind
   /// to succeed.
   let defaultConfig =
@@ -81,17 +77,15 @@ module Web =
       cancellationToken     = Async.DefaultCancellationToken
       bufferSize            = 8192 // 8 KiB
       maxOps                = 100
-      autoGrow              = true
       mimeTypesMap          = Writers.defaultMimeTypesMap
       homeFolder            = None
       compressedFilesFolder = None
-      logger                = Targets.create Info
-      initialiseLogger      = true
-      tcpServerFactory      = new DefaultTcpServerFactory()
-      #if NETSTANDARD1_5
-      cookieSerialiser      = new JsonFormatterSerialiser()
-      #else
       cookieSerialiser      = new BinaryFormatterSerialiser()
-      #endif
-      tlsProvider           = new DefaultTlsProvider()
-      hideHeader            = false }
+      hideHeader            = false
+      maxContentLength      = 10000000 // 10 megabytes
+      healthCheckEnabled    = true   // Enable connection health monitoring
+      healthCheckIntervalMs = 30000  // Check every 30 seconds
+      maxConnectionAgeSeconds = 300  // Kill connections after 5 minutes (300 seconds)
+      filePartSink          = None
+      acceptorCount         = 1
+      }

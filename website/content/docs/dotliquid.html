@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Suave Template Engines - DotLiquid templating for dynamic HTML">
+  <title>Template Engines - Suave</title>
+  <link rel="shortcut icon" href="/images/favicon.ico" type="image/x-icon">
+  <link rel="icon" href="/images/favicon-32x32.png" sizes="32x32" type="image/png">
+  <link rel="icon" href="/images/favicon-96x96.png" sizes="96x96" type="image/png">
+  <link rel="apple-touch-icon" href="/images/apple-touch-icon-57x57.png" sizes="57x57">
+  <link rel="apple-touch-icon" href="/images/apple-touch-icon-114x114.png" sizes="114x114">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header>
+    <div class="container">
+      <nav>
+        <div class="logo">
+          <img src="/images/head_600_trans.png" alt="Suave Logo" width="40" height="40" style="vertical-align: middle; margin-right: 12px; background: white; padding: 2px; border-radius: 4px;">
+          Suave
+        </div>
+        <button id="hamburger" class="hamburger" aria-label="Toggle menu">
+          <span></span><span></span><span></span>
+        </button>
+        <ul id="nav-links" class="nav-links">
+          <li><a href="/">Home</a></li>
+          <li><a href="/docs/">Documentation</a></li>
+          <li><a href="/docs/performance.html">Performance</a></li>
+          <li><a href="https://github.com/SuaveIO/suave" target="_blank">GitHub</a></li>
+          <li><a href="https://www.nuget.org/packages/Suave/" target="_blank">NuGet</a></li>
+          <li><button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme">🌙</button></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <div class="container">
+      <h1>Template Engines</h1>
+      <p>Use DotLiquid and other templating engines to generate dynamic HTML with Suave.</p>
+
+      <h2>DotLiquid Basics</h2>
+      <p>Use DotLiquid templates for flexible HTML generation:</p>
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.Operators
+open Suave.Successful
+open DotLiquid
+
+let template = "Hello {{name}}, you are {{age}} years old"
+
+let app =
+  choose [
+    path "/greet" >=> fun ctx ->
+      let template = Template.Parse(template)
+      let data = DotLiquid.Hash.FromDictionary(dict ["name", box "John"; "age", box 30])
+      let result = template.Render(data)
+      OK result ctx
+  ]</code></pre>
+      </div>
+
+      <h2>Loading Templates from Files</h2>
+      <p>Load and render templates from disk:</p>
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.Operators
+open Suave.Successful
+open DotLiquid
+open System.IO
+
+let loadTemplate path =
+  let content = File.ReadAllText(path)
+  Template.Parse(content)
+
+let app =
+  choose [
+    path "/page" >=> fun ctx ->
+      let template = loadTemplate "./templates/page.liquid"
+      let data = DotLiquid.Hash.FromDictionary(
+        dict ["title", box "Welcome"; "content", box "Hello World"]
+      )
+      let result = template.Render(data)
+      OK result ctx
+  ]</code></pre>
+      </div>
+
+      <h2>Template with Loops</h2>
+      <p>Use loops in DotLiquid templates:</p>
+      <div class="code-block">
+        <pre><code>// Template file: list.liquid
+// {% for item in items %}
+//   &lt;li&gt;{{item.name}}&lt;/li&gt;
+// {% endfor %}
+
+open Suave
+open Suave.Operators
+open DotLiquid
+
+let app =
+  choose [
+    path "/items" >=> fun ctx ->
+      let template = Template.Parse("""
+        &lt;ul&gt;
+        {% for item in items %}
+          &lt;li&gt;{{item.name}}&lt;/li&gt;
+        {% endfor %}
+        &lt;/ul&gt;
+      """)
+      
+      let items = [
+        dict ["name", box "Item 1"]
+        dict ["name", box "Item 2"]
+        dict ["name", box "Item 3"]
+      ]
+      
+      let data = DotLiquid.Hash.FromDictionary(
+        dict ["items", box items]
+      )
+      
+      let result = template.Render(data)
+      OK result ctx
+  ]</code></pre>
+      </div>
+
+      <h2>Template Inheritance</h2>
+      <p>Create reusable template layouts:</p>
+      <div class="code-block">
+        <pre><code>// layout.liquid
+// &lt;html&gt;
+//   &lt;body&gt;
+//     {% block content %}{% endblock %}
+//   &lt;/body&gt;
+// &lt;/html&gt;
+
+// page.liquid
+// {% extends layout %}
+// {% block content %}
+//   &lt;h1&gt;{{title}}&lt;/h1&gt;
+//   {{body}}
+// {% endblock %}
+
+open Suave
+open Suave.Operators
+open DotLiquid
+
+let app =
+  choose [
+    path "/page" >=> fun ctx ->
+      let template = Template.Parse("""
+        &lt;html&gt;
+          &lt;body&gt;
+            &lt;h1&gt;{{title}}&lt;/h1&gt;
+            &lt;p&gt;{{content}}&lt;/p&gt;
+          &lt;/body&gt;
+        &lt;/html&gt;
+      """)
+      
+      let data = DotLiquid.Hash.FromDictionary(
+        dict ["title", box "My Page"; "content", box "Welcome!"]
+      )
+      
+      let result = template.Render(data)
+      OK result ctx
+  ]</code></pre>
+      </div>
+
+      <h2>Conditional Rendering</h2>
+      <p>Use conditionals in templates:</p>
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.Operators
+open DotLiquid
+
+let app =
+  choose [
+    path "/user" >=> fun ctx ->
+      let template = Template.Parse("""
+        {% if isLoggedIn %}
+          &lt;p&gt;Welcome back, {{username}}!&lt;/p&gt;
+        {% else %}
+          &lt;p&gt;&lt;a href="/login"&gt;Please log in&lt;/a&gt;&lt;/p&gt;
+        {% endif %}
+      """)
+      
+      let data = DotLiquid.Hash.FromDictionary(
+        dict ["isLoggedIn", box true; "username", box "John"]
+      )
+      
+      let result = template.Render(data)
+      OK result ctx
+  ]</code></pre>
+      </div>
+
+      <h2>Custom Filters</h2>
+      <p>Define custom filters for template rendering:</p>
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.Operators
+open DotLiquid
+
+// Define a custom filter
+Template.NamingConvention <- DotLiquid.NamingConventions.RubyNamingConvention()
+
+Template.RegisterFilter("uppercase", fun (input: obj) ->
+  (input.ToString()).ToUpper()
+)
+
+let app =
+  choose [
+    path "/filtered" >=> fun ctx ->
+      let template = Template.Parse("{{message | uppercase}}")
+      let data = DotLiquid.Hash.FromDictionary(
+        dict ["message", box "hello world"]
+      )
+      let result = template.Render(data)
+      // Output: "HELLO WORLD"
+      OK result ctx
+  ]</code></pre>
+      </div>
+
+      <h2>Complete Example</h2>
+      <p>Full example with layout and data:</p>
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.Operators
+open Suave.Filters
+open DotLiquid
+
+let layoutTemplate = """
+&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+&lt;head&gt;
+  &lt;title&gt;{{title}}&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+  &lt;header&gt;
+    &lt;h1&gt;{{siteTitle}}&lt;/h1&gt;
+  &lt;/header&gt;
+  &lt;main&gt;
+    {{content}}
+  &lt;/main&gt;
+  &lt;footer&gt;
+    &lt;p&gt;{{year}} - All rights reserved&lt;/p&gt;
+  &lt;/footer&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+"""
+
+let renderPage title content =
+  let template = Template.Parse(layoutTemplate)
+  let data = DotLiquid.Hash.FromDictionary(
+    dict [
+      "title", box title
+      "siteTitle", box "My Site"
+      "content", box content
+      "year", box (System.DateTime.Now.Year)
+    ]
+  )
+  template.Render(data)
+
+let app =
+  choose [
+    path "/" >=> 
+      OK (renderPage "Home" "&lt;h2&gt;Welcome!&lt;/h2&gt;")
+    
+    path "/about" >=>
+      OK (renderPage "About" "&lt;h2&gt;About Us&lt;/h2&gt;&lt;p&gt;Learn more...&lt;/p&gt;")
+  ]</code></pre>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <div class="container">
+      <div class="footer-links">
+        <a href="/docs/">Documentation</a>
+        <a href="https://github.com/SuaveIO/suave" target="_blank">GitHub</a>
+        <a href="https://www.nuget.org/packages/Suave/" target="_blank">NuGet</a>
+        <a href="https://x.com/SuaveIO" target="_blank">X</a>
+        <a href="https://github.com/SuaveIO/suave/blob/master/LICENSE" target="_blank">License</a>
+      </div>
+      <p>&copy; 2025 Suave. Open source, MIT licensed.</p>
+      <p>Suave is a project created and maintained by Ademar Gonzalez.</p>
+    </div>
+  </footer>
+
+  <script src="/js/main.js"></script>
+</body>
+</html>

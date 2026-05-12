@@ -1,7 +1,5 @@
-﻿namespace Suave
+namespace Suave
 
-open Suave.Logging
-open Suave.Utils
 open System
 
 /// The core configuration of suave. See also Suave.Web.default_config which
@@ -30,9 +28,6 @@ type SuaveConfig =
     /// buffer size for socket operations
     bufferSize             : int
 
-    /// Buffer manager auto grow
-    autoGrow               : bool
-
     /// max number of concurrent socket operations
     maxOps                 : int
 
@@ -45,47 +40,44 @@ type SuaveConfig =
     /// Folder for temporary compressed files
     compressedFilesFolder : string option
 
-    /// Suave's logger. You can override the default instance if you wish to
-    /// ship your logs, e.g. using https://www.nuget.org/packages/Logary.Adapters.Suave/
-    logger                : Logger
-
-    /// Whether to initialise the global static Suave logger with the passed one when
-    /// you call 'startWebServer' – this is a side effect, but a mostly harmless such.
-    /// Defaults to true, because if you set the 'logger' field, then you'd expect the
-    /// logging of Suave to adapt, whilst without this flag, it would not until
-    /// you call `Suave.Logging.Global.initialise logger`.
-    initialiseLogger      : bool
-
-    /// Pluggable TCP async sockets implementation. You can choose betwee libuv
-    /// and CLR's Async Socket Event Args. Currently defaults to the managed-only
-    /// implementation.
-    tcpServerFactory      : TcpServerFactory
-
     /// The cookie serialiser to use for converting the data you save in cookies
     /// from your application into a byte array.
     cookieSerialiser      : CookieSerialiser
 
-    /// A TLS provider implementation.
-    tlsProvider           : TlsProvider
-
     /// Make this true, if you want Suave not to display its server header in
     /// every response. Defaults to false.
-    hideHeader            : bool }
+    hideHeader            : bool
 
-  static member bindings_              = Property<SuaveConfig,_> (fun x -> x.bindings)              (fun v x -> { x with bindings = v })
-  static member serverKey_             = Property<SuaveConfig,_> (fun x -> x.serverKey)             (fun v x -> { x with serverKey = v })
-  static member errorHandler_          = Property<SuaveConfig,_> (fun x -> x.errorHandler)          (fun v x -> { x with errorHandler = v })
-  static member listenTimeout_         = Property<SuaveConfig,_> (fun x -> x.listenTimeout)         (fun v x -> { x with listenTimeout = v })
-  static member ct_                    = Property<SuaveConfig,_> (fun x -> x.cancellationToken)     (fun v x -> { x with cancellationToken = v })
-  static member bufferSize_            = Property<SuaveConfig,_> (fun x -> x.bufferSize)            (fun v x -> { x with bufferSize = v })
-  static member maxOps_                = Property<SuaveConfig,_> (fun x -> x.maxOps)                (fun v x -> { x with maxOps = v })
-  static member mimeTypesMap_          = Property<SuaveConfig,_> (fun x -> x.mimeTypesMap)          (fun v x -> { x with mimeTypesMap = v })
-  static member homeFolder_            = Property<SuaveConfig,_> (fun x -> x.homeFolder)            (fun v x -> { x with homeFolder = v })
-  static member compressedFilesFolder_ = Property<SuaveConfig,_> (fun x -> x.compressedFilesFolder) (fun v x -> { x with compressedFilesFolder = v })
-  static member logger_                = Property<SuaveConfig,_> (fun x -> x.logger)                (fun v x -> { x with logger = v })
-  static member initialiseLogger_      = Property<SuaveConfig,_> (fun x -> x.initialiseLogger)      (fun v x -> { x with initialiseLogger = v })
-  static member tcpServerFactory_      = Property<SuaveConfig,_> (fun x -> x.tcpServerFactory)      (fun v x -> { x with tcpServerFactory = v })
-  static member hideHeader_            = Property<SuaveConfig,_> (fun x -> x.hideHeader)            (fun v x -> { x with hideHeader = v })
+    /// Maximun upload size in bytes
+    maxContentLength      : int
+
+    /// Enable background connection health monitoring
+    healthCheckEnabled    : bool
+
+    /// Interval for connection health checks in milliseconds
+    healthCheckIntervalMs : int
+
+    /// Maximum age for an active connection before it's considered stuck (seconds)
+    maxConnectionAgeSeconds : int
+
+    /// Optional sink factory for streaming multipart file parts without a temp file.
+    /// When <c>None</c> (the default), each file part is buffered to a temporary file
+    /// on disk, matching the pre-existing behaviour.
+    filePartSink : FilePartSink option
+
+    /// Number of independent accept loops (and listening sockets) per binding.
+    /// <list type="bullet">
+    /// <item><description><c>1</c> (default): single acceptor, historical behaviour.</description></item>
+    /// <item><description><c>0</c>: auto. On platforms with kernel <c>SO_REUSEPORT</c>
+    /// (Linux 3.9+, macOS/BSD), use <c>min(Environment.ProcessorCount, 16)</c> acceptors;
+    /// on platforms without it (e.g. Windows), fall back to a single acceptor.</description></item>
+    /// <item><description><c>&gt;1</c>: explicit count. Requires <c>SO_REUSEPORT</c>; falls back
+    /// to 1 on platforms that don't support it.</description></item>
+    /// </list>
+    /// Multiple acceptors let the kernel load-balance incoming connections across
+    /// independent accept threads, removing the single-listener accept bottleneck
+    /// on many-core machines.
+    acceptorCount : int }
 
   member x.withBindings(v)              = { x with bindings = v }
   member x.withServerKey(v)             = { x with serverKey = v }
@@ -97,10 +89,14 @@ type SuaveConfig =
   member x.withMimeTypesMap(v)          = { x with mimeTypesMap = v }
   member x.withHomeFolder(v)            = { x with homeFolder = v }
   member x.withCompressedFilesFolder(v) = { x with compressedFilesFolder = v }
-  member x.withLogger(v)                = { x with logger = v }
-  member x.withLoggerInitialisation(v)  = { x with initialiseLogger = v }
-  member x.withTcpServerFactory(v)      = { x with tcpServerFactory = v }
-  member x.withHiddenHeader()           = { x with hideHeader = true }
+  member x.withHiddenHeader(v)          = { x with hideHeader = v }
+  member x.withMaxContentLength(v)      = { x with maxContentLength = v }
+  member x.withHealthCheckEnabled(v)    = { x with healthCheckEnabled = v }
+  member x.withHealthCheckIntervalMs(v) = { x with healthCheckIntervalMs = v }
+  member x.withMaxConnectionAgeSeconds(v) = { x with maxConnectionAgeSeconds = v }
+  member x.withFilePartSink(v)          = { x with filePartSink = v }
+  member x.withAcceptorCount(v)         = { x with acceptorCount = v }
+
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module SuaveConfig =
@@ -108,17 +104,17 @@ module SuaveConfig =
   /// Convert the Suave configuration to a runtime that the web server understands.
   /// You will normally not have to use this function as a consumer from the
   /// library, but it may be useful for unit testing with the HttpRuntime record.
-  let toRuntime config contentFolder compressionFolder parsePostData =
-    HttpRuntime.create config.serverKey
-                       config.errorHandler
-                       config.mimeTypesMap
-                       contentFolder
-                       compressionFolder
-                       config.logger
-                       parsePostData
-                       config.cookieSerialiser
-                       config.tlsProvider
-                       config.hideHeader
+  let toRuntime config contentFolder compressionFolder =
+    let createRuntime =
+      HttpRuntime.create config.serverKey
+                         config.errorHandler
+                         config.mimeTypesMap
+                         contentFolder
+                         compressionFolder
+                         config.cookieSerialiser
+                         config.hideHeader
+                         config.maxContentLength
+    fun binding -> { createRuntime binding with filePartSink = config.filePartSink }
 
   /// Finds an endpoint that is configured from the given configuration. Throws
   /// an exception if the configuration has no bindings. Useful if you make

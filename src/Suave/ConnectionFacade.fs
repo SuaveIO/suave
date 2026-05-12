@@ -1,487 +1,449 @@
-﻿
 #nowarn "40"
+#nowarn "3370"
 namespace Suave
 
 open System
 open System.IO
 open System.Collections.Generic
-open System.Net.Sockets
+open System.Text
 
 open Suave
 open Suave.Utils
 open Suave.Utils.Parsing
-open Suave.Logging
-open Suave.Logging.Message
 open Suave.Sockets
-open Suave.Sockets.Connection
 open Suave.Sockets.Control
 open Suave.Sockets.SocketOp.Operators
 open Suave.Utils.Bytes
+open System.Threading
+open System.Threading.Tasks
+open ConnectionHealthChecker
 
-type ScanResult = NeedMore | Found of int
+type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPool: ConcurrentPool<ConnectionFacade>, tracker: ActiveConnectionTracker<ConnectionFacade>, cancellationToken: CancellationToken, webpart: WebPart) =
 
-module internal Aux =
+  static let mutable connectionIdCounter = 0L
+  let connectionId = Interlocked.Increment(&connectionIdCounter)
 
-  let inline skipBuffers (pairs : LinkedList<BufferSegment>) (number : int)  =
-    let rec loop acc =
-      if pairs.Count > 0 then
-        let x = pairs.First.Value
-        pairs.RemoveFirst()
+  let httpOutput = new HttpOutput(connection,runtime)
 
-        if x.length + acc >= number then
-          let segment = BufferSegment.create x.buffer (x.offset  + (number - acc)) (x.length - number + acc)
-          pairs.AddFirst segment |> ignore
-        else loop (acc + x.length)
-    loop 0
+  let reader = connection.reader
 
-  let inline readData (transport:ITransport) buff = socket {
-    let! b = transport.read buff
-    if b > 0 then
-      return BufferSegment(buff, buff.Offset, b)
-    else
-      return! SocketOp.abort (Error.SocketError SocketError.Shutdown)
-    }
-
-type ConnectionFacade(ctx) =
-
-  let BadRequestPrefix = "__suave_BAD_REQUEST"
-
-  let transport = ctx.connection.transport
-  let bufferManager = ctx.connection.bufferManager
-  let lineBuffer = ctx.connection.lineBuffer
-  let logger = ctx.runtime.logger
-  let trace = ctx.request.trace
-  let matchedBinding = ctx.runtime.matchedBinding
-
-  let segments = new LinkedList<BufferSegment>()
+  // Per-connection pooled collections. These are allocated once when the ConnectionFacade
+  // is created and then cleared (not reallocated) at the start of every request. Because a
+  // ConnectionFacade processes one request at a time on its connection, this is safe.
+  // Webparts must not retain references to a request's collections beyond the request's
+  // own task — Suave never has and never did promise that.
   let files = List<HttpUpload>()
   let multiPartFields = List<string*string>()
+  let requestHeaders = List<string*string>()
   let mutable _rawForm : byte array = [||]
 
-  /// Splits the segment list in two lits of ArraySegment; the first one containing a total of index bytes
-  let split index select markerLength : Async<int> =
-    let rec loop acc count =  async {
-      if segments.Count = 0 then
-       return count
-      else
-        let pair = segments.First.Value
-        segments.RemoveFirst()
-        if acc + pair.length < index then
-          do! select (ArraySegment(pair.buffer.Array, pair.offset, pair.length)) pair.length
-          bufferManager.FreeBuffer(pair.buffer, "Suave.Web.split")
-          return! loop (acc + pair.length) (count + acc + pair.length)
-        elif acc + pair.length >= index then
-          let bytesRead = index - acc
-          do! select (ArraySegment(pair.buffer.Array, pair.offset, bytesRead)) bytesRead
-          let remaining = pair.length - bytesRead
-          if remaining = markerLength then
-            bufferManager.FreeBuffer(pair.buffer, "Suave.Web.split")
-            return count + bytesRead
+  let readFilePart boundary (headerParams : Dictionary<string,string>) fieldName contentType : SocketOp<HttpUpload option> =
+    // Extract the filename from header params BEFORE opening any stream so that sink
+    // implementations receive the final file name when their factory is called.
+    let filenameResult =
+      match headerParams.TryLookup "filename*" with
+      | Choice1Of2 _filename ->
+        let ix = _filename.IndexOf "''"
+        if ix > 0 then
+          let enc = _filename.Substring(0,ix).ToLowerInvariant()
+          if enc = "utf-8" then
+            let filename = Net.WebUtility.UrlDecode(_filename.Substring(ix + 2))
+            Ok filename
           else
-            if remaining - markerLength >= 0 then
-              let segment =
-                BufferSegment.create pair.buffer
-                                     (pair.offset  + bytesRead  + markerLength)
-                                     (remaining - markerLength)
-              segments.AddFirst(segment) |> ignore
-              return count + bytesRead
-            else
-              Aux.skipBuffers segments (markerLength - remaining)
-              return count + bytesRead
-        else return failwith "Suave.Web.split: invalid case"
-      }
-    loop 0 0
-
-  let freeArraySegments index select = socket {
-    let mutable n = 0
-    let mutable currentnode = segments.Last
-    while currentnode<>null do
-        let b = currentnode.Value
-        if n > 0 && n + b.length >= index then
-          //procees, free and remove
-          do! SocketOp.ofAsync <| select (ArraySegment(b.buffer.Array, b.offset, b.length)) b.length
-          do bufferManager.FreeBuffer(b.buffer, "Suave.Web.scanMarker")
-          segments.Remove currentnode
-        n <- n + b.length
-        currentnode <- currentnode.Previous
-    }
-
-
-  /// Iterates over a BufferSegment list looking for a marker, data before the marker
-  /// is sent to the function select and the corresponding buffers are released
-  /// Returns the number of bytes read.
-  let scanMarker (marker: byte[]) select = socket {
-
-    match kmpW marker segments with
-    | Some x ->
-      let! res = SocketOp.ofAsync <| split x select marker.Length
-      return Found res
-    | None   ->
-      do! freeArraySegments marker.Length select
-      return NeedMore
-    }
-
-  let readMoreData = async {
-    let buff = bufferManager.PopBuffer("Suave.Web.readMoreData")
-    let! result = Aux.readData transport buff
-    match result with
-    | Choice1Of2 data ->
-      segments.AddLast data |> ignore
-      return Choice1Of2()
-    | Choice2Of2 error ->
-      for b in segments do
-        do bufferManager.FreeBuffer(b.buffer, "Suave.Web.readMoreData")
-      do bufferManager.FreeBuffer(buff, "Suave.Web.readMoreData")
-      return Choice2Of2 error
-    }
-
-  /// Read the passed stream into buff until the EOL (CRLF) has been reached
-  /// and returns the number of bytes read and the connection
-  let readUntilPattern scanData =
-    let rec loop  = socket {
-      let! res = scanData
-      match res with
-      | Found a ->
-        return a
-      | NeedMore ->
-        do! readMoreData
-        return! loop
-    }
-    loop
-
-  /// takes a pick at the next buffer segment in the parser queue
-  let pick =
-    let rec loop = socket {
-      if segments.Count > 0 then
-        return segments.First.Value
-      else
-        do! readMoreData
-        return! loop
-    }
-    loop
-
-  let skip n = socket {
-    return! SocketOp.ofAsync <| split n (fun a b -> async.Return() ) 0
-    }
-
-  /// returns the number of bytes read and the connection
-  let readUntilEOL select =
-    readUntilPattern (scanMarker EOL select)
-
-  /// Read the stream until the marker appears and return the number of bytes
-  /// read.
-  let readUntil (marker : byte []) (select : ArraySegment<_> -> int -> Async<unit>) =
-    readUntilPattern (scanMarker marker select)
-
-  let parseMultipartEncoding partHeaders =
-    partHeaders %% "content-type"
-    |> Choice.map Parsing.headerParams
-    |> Choice.bind (fun x -> x.TryLookup "charset")
-    |> Choice.bind (function
-        | "utf-8" -> Choice1Of2 (UTF8.bytes, UTF8.toStringAtOffset)
-        | x -> Choice2Of2 x)
-    |> Choice.orDefault (ASCII.bytes, ASCII.toStringAtOffset)
-
-  /// Read a line from the stream, calling ASCII.toString on the bytes before the EOL marker
-  member this.readLine = socket {
-    let offset = ref 0
-    let! count =
-      readUntilEOL (fun a count -> async {
-        Array.blit a.Array a.Offset lineBuffer.Array (lineBuffer.Offset + !offset) count
-        offset := !offset + count
-      })
-    let result = ASCII.toStringAtOffset lineBuffer.Array lineBuffer.Offset count
-    return result
-  }
-
-  member this.skipLine = socket {
-    let offset = ref 0
-    let! _ =
-      readUntilEOL (fun a count -> async {
-        offset := !offset + count
-      })
-    return offset
-  }
-
-  /// Read all headers from the stream, returning a dictionary of the headers found
-  member this.readHeaders =
-    let rec loop headers = socket {
-      let offset = ref 0
-      let buf = lineBuffer
-      let! count =
-        readUntilEOL (fun a count -> async {
-          Array.blit a.Array a.Offset buf.Array (buf.Offset + !offset) count
-          offset := !offset + count
-        })
-      if count <> 0 then
-        let line = ASCII.toStringAtOffset buf.Array buf.Offset count
-        let indexOfColon = line.IndexOf(':')
-        let header = (line.Substring(0, indexOfColon).ToLower(), line.Substring(indexOfColon+1).TrimStart())
-        return! loop (header :: headers)
-      else return headers
-    }
-    loop []
-
-  /// Read bytes from the stream passing each ArraySegment to the function `select`
-  member this.readBytes  (numberOfBytes : int) select  : SocketOp<unit> =
-    let rec loop n : SocketOp<unit> =
-      socket {
-        if segments.Count > 0  then
-          let segment = segments.First.Value
-          segments.RemoveFirst() |> ignore
-          if segment.length > n then
-            do! SocketOp.ofAsync <| select (BufferSegment.toArraySegment(BufferSegment(segment.buffer,segment.offset,n))) n
-            segments.AddFirst (BufferSegment(segment.buffer, segment.offset + n, segment.length - n)) |> ignore
-            return ()
-          else
-            do! SocketOp.ofAsync <| select (BufferSegment.toArraySegment segment) segment.length
-            do bufferManager.FreeBuffer(segment.buffer, "Suave.Web.readPostData.loop")
-            return! loop (n - segment.length)
+            Result.Error (InputDataError (None, "Unsupported filename encoding: '" + enc + "'"))
         else
-          if n = 0 then
-            return ()
-          else
-            do! readMoreData
-            return! loop n
-      }
-    loop numberOfBytes
+          Result.Error (InputDataError (None, "Invalid filename encoding"))
+      | Choice2Of2 _ ->
+        match headerParams.TryLookup "filename" |> Choice.map (String.trimc '"') with
+        | Choice1Of2 fn -> Ok fn
+        | Choice2Of2 _ -> Result.Error (InputDataError (None, "Key 'filename' was not present in 'content-disposition'"))
 
-  member this.readFilePart boundary (headerParams : Dictionary<string,string>) fieldName contentType = socket {
-    let tempFilePath = Path.GetTempFileName()
-    use tempFile = new FileStream(tempFilePath, FileMode.Truncate)
-    let! a =
-      readUntil (ASCII.bytes (eol + boundary)) (fun x y -> async {
-          do! tempFile.AsyncWrite(x.Array, x.Offset, y)
-          })
-    let fileLength = tempFile.Length
-    tempFile.Dispose()
+    match filenameResult with
+    | Result.Error e ->
+      ValueTask<Result<HttpUpload option,Error>>(Task.FromResult(Result.Error e))
+    | Ok filename ->
 
-    if fileLength > 0L then
-      let! filename =
-        (headerParams.TryLookup "filename" |> Choice.map (String.trimc '"'))
-        @|! "Key 'filename' was not present in 'content-disposition'"
+    // Build a FilePartWriter: either from the user-supplied sink or the built-in temp-file writer.
+    let writer =
+      match runtime.filePartSink with
+      | Some sink ->
+        sink fieldName filename contentType
+      | None ->
+        let tempFilePath = Path.GetTempFileName()
+        let tempFile = new FileStream(tempFilePath, FileMode.Truncate) :> IO.Stream
+        { stream    = tempFile
+          onSuccess = fun () ->
+            { fieldName    = fieldName
+              fileName     = filename
+              mimeType     = contentType
+              tempFilePath = tempFilePath }
+          onError   = fun () ->
+            try File.Delete tempFilePath with _ -> () }
 
-      let upload =
-        { fieldName    = fieldName
-          fileName     = filename
-          mimeType     = contentType
-          tempFilePath = tempFilePath }
+    // Read the part body into the writer's stream, tracking the number of bytes written.
+    let readFileDataHelper () =
+      let mutable bytesWritten = 0L
+      let readOp = reader.readUntilPattern (ASCII.bytes (eol + boundary)) (fun x y ->
+        do writer.stream.Write(x.Span.Slice(0,y))
+        bytesWritten <- bytesWritten + int64 y
+        Continue 0)
+      let readTask = readOp.AsTask()
 
-      return Some upload
-    else
-      File.Delete tempFilePath
-      return None
-    }
+      readTask.ContinueWith(fun (ante: System.Threading.Tasks.Task<_>) ->
+        try
+          let result = ante.Result
+          writer.stream.Dispose()
+          (result, bytesWritten, false, "")
+        with ex ->
+          writer.stream.Dispose()
+          (Unchecked.defaultof<_>, 0L, true, ex.Message)
+      ) : Task<_>
 
-  member this.parseMultipartMixed fieldName boundary : SocketOp<unit> =
+    let mainTask =
+      readFileDataHelper().ContinueWith(fun (ante: System.Threading.Tasks.Task<_>) ->
+        let (readResult, bytesWritten, exceptionOccurred, exceptionMsg) = ante.Result
 
-    let rec loop = socket {
+        if exceptionOccurred then
+          writer.onError()
+          Task.FromResult(Result.Error (InputDataError (None, $"Error reading file part: {exceptionMsg}")))
+        else
+          match readResult with
+          | Result.Error e ->
+            writer.onError()
+            Task.FromResult(Result.Error e)
+          | Ok _ ->
+            if bytesWritten > 0L then
+              let upload = writer.onSuccess()
+              Task.FromResult(Ok (Some upload))
+            else
+              writer.onError()
+              Task.FromResult(Ok None)
+      ).Unwrap()
 
-      let! firstLine = this.readLine
+    ValueTask<Result<HttpUpload option,Error>>(mainTask)
 
+  let parseMultipartMixed fieldName boundary : SocketOp<unit> =
+    let rec loop () : SocketOp<unit> = socket {
+      let! firstLine = reader.readLine()
 
       if firstLine.Equals("--") then
         return ()
       else
-        let! partHeaders = this.readHeaders
+        let! partHeaders = reader.readHeaders()
 
         let! (contentDisposition : string) =
-          (partHeaders %% "content-disposition")
-          @|! "Missing 'content-disposition'"
+          (partHeaders @@ "content-disposition")
+          @|! (None, "Missing 'content-disposition'")
 
-        match partHeaders %% "content-type" with
+        match partHeaders @@ "content-type" with
         | Choice1Of2 contentType ->
           let headerParams = headerParams contentDisposition
-          logger.verbose (
-            eventX "Parsing {contentType}... -> readFilePart"
-            >> setFieldValue "contentType" contentType)
-
-          let! res = this.readFilePart boundary headerParams fieldName contentType
-
-          logger.verbose (
-            eventX "Parsed {contentType} <- readFilePart"
-            >> setFieldValue "contentType" contentType)
-
+          let! res = readFilePart boundary headerParams fieldName contentType
           match res with
           | Some upload ->
             files.Add(upload)
-            return! loop
+            return! loop ()
           | None ->
-            return! loop
+            return! loop ()
 
         | Choice2Of2 _ ->
           use mem = new MemoryStream()
-          let bytes, toStringAtOffset = parseMultipartEncoding partHeaders
           let! a =
-            readUntil (bytes(eol + boundary)) (fun x y -> async {
-                do! mem.AsyncWrite(x.Array, x.Offset, y)
-              })
+            reader.readUntilPattern (ASCII.bytes(eol + boundary)) (fun x y -> 
+                mem.Write(x.Span.Slice(0,y))
+                Continue 0
+              )
           let byts = mem.ToArray()
-          multiPartFields.Add (fieldName, toStringAtOffset byts 0 byts.Length)
-          return! loop
+          multiPartFields.Add (fieldName, Globals.UTF8.GetString(byts, 0, byts.Length))
+          return! loop ()
       }
-    loop
+    loop ()
 
   /// Parses multipart data from the stream, feeding it into the HttpRequest's property Files.
-  member this.parseMultipart (boundary:string) : SocketOp<unit> =
-    let  parsePart  = socket {
-
-        let! partHeaders = this.readHeaders
+  let parseMultipart (boundary:string) : SocketOp<unit> =
+    let parsePart () = socket {
+        let! partHeaders = reader.readHeaders()
 
         let! (contentDisposition : string) =
-          (partHeaders %% "content-disposition")
-          @|! "Missing 'content-disposition'"
+          (partHeaders @@ "content-disposition")
+          @|! (None, "Missing 'content-disposition'")
 
         let headerParams = headerParams contentDisposition
 
         let! _ =
           (headerParams.TryLookup "form-data" |> Choice.map (String.trimc '"'))
-          @|! "Key 'form-data' was not present in 'content-disposition'"
+          @|! (None, "Key 'form-data' was not present in 'content-disposition'")
 
         let! fieldName =
           (headerParams.TryLookup "name" |> Choice.map (String.trimc '"'))
-          @|! "Key 'name' was not present in 'content-disposition'"
+          @|! (None, "Key 'name' was not present in 'content-disposition'")
 
-        match partHeaders %% "content-type" with
+        match partHeaders @@ "content-type" with
         | Choice1Of2 x when String.startsWith "multipart/mixed" x ->
-          let subboundary = "--" + (x.Substring(x.IndexOf('=') + 1) |> String.trimStart |> String.trimc '"')
-          do! this.parseMultipartMixed fieldName subboundary
-          let! a = skip (boundary.Length)
+          let subboundary = "--" + parseBoundary x
+          do! parseMultipartMixed fieldName subboundary
+          let a = reader.skip (boundary.Length)
           return ()
 
-
         | Choice1Of2 contentType when headerParams.ContainsKey "filename" ->
-          logger.verbose (
-            eventX "Parsing {contentType}... -> readFilePart"
-            >> setFieldValue "contentType" contentType
-            >> setSingleName "Suave.Web.parseMultipart")
-
-          let! res = this.readFilePart boundary headerParams fieldName contentType
-
-          logger.verbose (
-            eventX "Parsed {contentType} <- readFilePart"
-            >> setFieldValue "contentType" contentType
-            >> setSingleName "Suave.Web.parseMultipart")
-
+          let! res = readFilePart boundary headerParams fieldName contentType
           res |> Option.iter files.Add
 
         | Choice1Of2 _ | Choice2Of2 _ ->
           use mem = new MemoryStream()
-          let bytes, toStringAtOffset = parseMultipartEncoding partHeaders
           let! a =
-            readUntil (bytes (eol + boundary)) (fun x y -> async {
-              do! mem.AsyncWrite(x.Array, x.Offset, y)
-            })
+            reader.readUntilPattern (ASCII.bytes (eol + boundary)) (fun x y ->
+              mem.Write(x.Span.Slice(0,y))
+              Continue 0
+            )
           let byts = mem.ToArray()
-          multiPartFields.Add(fieldName, toStringAtOffset byts 0 byts.Length)
+          let str =  Globals.UTF8.GetString(byts, 0, byts.Length)
+          multiPartFields.Add(fieldName,str)
           return ()
       }
 
-    socket {
+    let nexPart () = socket{
+        do! parsePart ()
+        let! line = reader.readLine ()
+        return line
+    }
+
+    let parsePartLoop () = task{
       let mutable parsing = true
-      let! firstLine = this.readLine
-
-      assert(firstLine=boundary)
-      while parsing do
-        do! parsePart
-        //pick at the next two bytes and decide where to exit the loop
-        let! b = pick
-        if b.buffer.Array.[b.offset] = 45uy && b.buffer.Array.[b.offset+1] = 45uy then
-          let! a = skip 2
-          parsing <- false
-          return ()
-        elif b.buffer.Array.[b.offset] = EOL.[0] && b.buffer.Array.[b.offset+1] = EOL.[1] then
-          let! a = skip 2
-          return ()
-        else
-          failwith "Invalid multipart format"
+      let mutable error = false
+      let mutable result =  Ok()
+      while parsing && not error && not(cancellationToken.IsCancellationRequested) do
+        let! nextPartResult = (nexPart()).AsTask()
+        match nextPartResult with
+        | Ok line ->
+          if line.StartsWith("--") then
+            // reached end boundary
+            parsing <- false
+          else if line <> String.Empty then
+            result <- Result.Error(InputDataError (Some 413, "Invalid multipart format"))
+            error <- true
+        | Result.Error e ->
+          result <- Result.Error e
+          error <- true
+      if error then
+        return result
+      else
+        return Ok()
     }
 
-  /// Reads contentLength bytes to a new array
-  member this.readBytesToArray contentLength =
     socket {
-      let offset = ref 0
-      let rawForm = Array.zeroCreate contentLength
-      do! this.readBytes contentLength (fun a count -> async {
-          Array.blit a.Array a.Offset rawForm !offset count;
-          offset := !offset + count
-        })
-      return rawForm
+      let! firstLine = reader.readLine()
+      if firstLine<>boundary then
+        return! SocketOp.abort (InputDataError (Some 413, "Invalid multipart format"))
+      else
+        return! SocketOp.ofTask (parsePartLoop ())
     }
 
+  /// Reads raw POST data
+  let getRawPostData contentLength =
+    ValueTask<Result<byte[],Error>>(
+      task {
+        let mutable offset = 0
+        let rawForm = Array.zeroCreate contentLength
+        do! reader.readPostData contentLength (fun a count ->
+            let source = a.Span.Slice(0,count)
+            let target = new Span<byte>(rawForm, offset, count)
+            source.CopyTo(target)
+            offset <- offset + count)
+        return Ok (rawForm)
+      })
 
-  member this.parsePostData (contentLengthHeader:Choice<string,_>) contentTypeHeader = socket {
-    match contentLengthHeader with 
-    | Choice1Of2 contentLengthString ->
-      let contentLength = Convert.ToInt32 contentLengthString
-      logger.verbose (eventX "Expecting {contentLength}" >> setFieldValue "contentLength" contentLength)
+  member val Connection = connection with get,set
+  member val Runtime = runtime with get,set
+  member val ConnectionId = connectionId with get
 
-      match contentTypeHeader with
-      | Choice1Of2 ce when String.startsWith "application/x-www-form-urlencoded" ce ->
-        let! rawForm = this.readBytesToArray contentLength
-        _rawForm <- rawForm
-        return Some ()
+  member this.parsePostData maxContentLength (contentLengthHeader : Choice<string,_>) (contentTypeHeader:Choice<string,_>) : SocketOp<unit> =
+    // Hot-path version: a direct task { } that hand-binds Result values instead of routing
+    // through the socket { } CE. Only the cold multipart path still uses socket { }.
+    ValueTask<Result<unit,Error>>(
+      task {
+        match contentLengthHeader with
+        | Choice2Of2 _ -> return Ok ()
+        | Choice1Of2 contentLengthString ->
+          let contentLength = Convert.ToInt32 contentLengthString
+          if contentLength > maxContentLength then
+            return Result.Error (InputDataError (Some 413, "Payload too large"))
+          else
+            match contentTypeHeader with
+            | Choice1Of2 ce when String.startsWith "multipart/form-data" ce ->
+              let boundary = "--" + parseBoundary ce
+              // Cold path: keep the socket { } CE for multipart; we don't try to optimize it here.
+              let! mp = (parseMultipart boundary).AsTask()
+              return mp
+            | _ ->
+              // application/x-www-form-urlencoded and everything else read raw bytes.
+              let! raw = (getRawPostData contentLength).AsTask()
+              match raw with
+              | Ok rawForm ->
+                _rawForm <- rawForm
+                return Ok ()
+              | Result.Error e ->
+                return Result.Error e
+      })
 
-      | Choice1Of2 ce when String.startsWith "multipart/form-data" ce ->
-        let boundary = "--" + (ce |> String.substring (ce.IndexOf('=') + 1) |> String.trimStart |> String.trimc '"')
+  member this.readRequest () : SocketOp<HttpRequest> =
+    // Steady-state hot path. We deliberately avoid the socket { } CE here because each
+    // of its binds wraps a task in a ValueTask and forces .AsTask() boxing on every let!.
+    // Instead we run a single task { } and hand-bind the Result returned by each step.
+    ValueTask<Result<HttpRequest,Error>>(
+      task {
+        // Clear pooled per-connection collections at the start of every request rather than
+        // allocating fresh ones. The collections live on the ConnectionFacade and are reset
+        // here, before the new request is parsed in.
+        requestHeaders.Clear()
+        files.Clear()
+        multiPartFields.Clear()
+        _rawForm <- [||]
 
+        let! firstLineRes = reader.readRequestLine()
+        match firstLineRes with
+        | Result.Error e -> return Result.Error e
+        | Ok (rawMethod, path, rawQuery, httpVersion) ->
 
-        logger.verbose (eventX "Parsing multipart")
-        do! this.parseMultipart boundary
+        let! headersRes = reader.readHeadersInto(requestHeaders)
+        match headersRes with
+        | Result.Error e -> return Result.Error e
+        | Ok headers ->
 
-        return Some ()
+        match headers @@ "host" with
+        | Choice2Of2 _ ->
+          return Result.Error (InputDataError (None, "Missing 'Host' header"))
+        | Choice1Of2 rawHost ->
 
-      | Choice1Of2 _ | Choice2Of2 _ ->
-        let! rawForm = this.readBytesToArray contentLength
-        _rawForm <- rawForm
-        return Some ()
-    | Choice2Of2 _ -> return Some ()
+        // 100-continue handling
+        if headers @@ "expect" = Choice1Of2 "100-continue" then
+          let! _ = httpOutput.run HttpRequest.empty Intermediate.CONTINUE
+          ()
+
+        let! postRes =
+          this.parsePostData
+            runtime.maxContentLength
+            (headers @@ "content-length")
+            (headers @@ "content-type")
+        match postRes with
+        | Result.Error e -> return Result.Error e
+        | Ok () ->
+
+        let request =
+          { httpVersion      = httpVersion
+            binding          = runtime.matchedBinding
+            rawPath          = path
+            rawHost          = rawHost
+            rawMethod        = rawMethod
+            headers          = headers
+            rawForm          = _rawForm
+            rawQuery         = rawQuery
+            files            = files
+            multiPartFields  = multiPartFields }
+
+        return Ok request
+      })
+
+  member this.exitHttpLoopWithError (err:Error) = task{
+      match err with
+      | InputDataError (None, msg) ->
+        let! _ = httpOutput.run HttpRequest.empty (RequestErrors.BAD_REQUEST msg)
+        ()
+
+      | InputDataError (Some status,msg) ->
+        match Http.HttpCode.tryParse status with 
+        | (Choice1Of2 statusCode) ->
+          let! _ = httpOutput.run HttpRequest.empty (Response.response statusCode (Globals.UTF8.GetBytes msg))
+          ()
+        | (Choice2Of2 _err) ->
+          let! _ = httpOutput.run HttpRequest.empty (RequestErrors.BAD_REQUEST msg)
+          ()
+      | _ -> ()
+      return Ok(false)
     }
 
-  /// Process the request, reading as it goes from the incoming 'stream', yielding a HttpRequest
-  /// when done
-  member this.processRequest firstLine = socket {
+  member this.processRequest () =
+    task {
+      let! reqRes = this.readRequest()
+      match reqRes with
+      | Result.Error err ->
+        // Couldn't parse HTTP request; answering with BAD_REQUEST and closing the connection.
+        return! this.exitHttpLoopWithError err
+      | Ok request ->
+        try
+          let! runRes = httpOutput.run request webpart
+          match runRes with
+          | Result.Error err -> return Result.Error err
+          | Ok keepAlive -> return Ok keepAlive
+        with ex ->
+          return Result.Error (Error.ConnectionError ex.Message)
+    }
 
-    let verbose message = logger.verbose (eventX message)
+  member this.shutdown() =
+      reader.cancelPendingReads()
+      // Shutdown transport FIRST to unblock any waiting reads in readLoop
+      // This prevents the readLoop from being stuck in transport.read() when we set running=false
+      connection.transport.shutdown()
+      reader.stop()
 
-    let rawMethod, path, rawQuery, httpVersion = parseUrl firstLine
-    let meth = HttpMethod.parse rawMethod
+  member private this.recycleConnection() =
+      // Clear the line buffer to prevent data leakage and ensure clean state for reuse
+      Array.Clear(connection.lineBuffer)
+      connection.lineBufferCount <- 0
+      try connection.pipe.Writer.Complete() with _ -> ()
+      try connection.pipe.Reader.Complete() with _ -> ()
+      try connection.pipe.Reset() with _ -> ()
+      // Note: Push() now notifies the tracker that connection is being returned
+      connectionPool.Push(this)
 
-    verbose "reading headers"
-    let! headers = this.readHeaders
+  // Return the lineBuffer to Suave's private BufferPool when the connection is disposed.
+  interface IDisposable with
+    member this.Dispose() =
+      Suave.Globals.BufferPool.returnArray connection.lineBuffer true
 
-    // Respond with 400 Bad Request as
-    // per http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html
-    let! host =
-      (headers %% "host" |> Choice.map (function
-        | s when System.Text.RegularExpressions.Regex.IsMatch(s, ":\d+$") ->
-          s.Substring(0, s.LastIndexOf(':'))
-        | s -> s))
-      @|! "Missing 'Host' header"
+  /// The request loop initialises a request with a processor to handle the
+  /// incoming stream and possibly pass the request to the web parts, a protocol,
+  /// a web part, an error handler and a Connection to use for read-write
+  /// communication -- getting the initial request stream.
+  member this.requestLoop () =
+    task {
+      let mutable flag = true
+      let mutable result = Ok ()
+      while flag && not (cancellationToken.IsCancellationRequested) do
+        let! b = this.processRequest ()
+        match b with
+        | Ok b ->
+          flag <- b
+        | Result.Error e ->
+          flag <- false
+          result <- Result.Error e
+      return result
+    }
 
-    if headers %% "expect" = Choice1Of2 "100-continue" then
-      let! _ = HttpOutput.run Intermediate.CONTINUE ctx
-      verbose "sent 100-continue response"
+  member this.accept(binding) = task{
+    let clientIp = (binding.ip.ToString())
+    if Globals.verbose then
+      Console.WriteLine("[Conn:{0}] accept: {1} connected. Now has {2} connected", connectionId, clientIp, tracker.ActiveConnectionCount)
+    connection.socketBinding <- binding
+    try
+      try
+        reader.init()
+        let! loopRes = this.requestLoop()
+        match loopRes with
+        | Ok () -> ()
+        | Result.Error err ->
+          if Globals.verbose then
+            do Console.WriteLine($"[Conn:{connectionId}] accept: Error: {err}")
+      with ex ->
+        if Globals.verbose then
+          do Console.WriteLine($"[Conn:{connectionId}] accept: Exception: {ex.Message}")
+    finally
+      // The reader pumps the inbound transport on demand from inside the request
+      // loop, so by the time requestLoop has returned there is no background
+      // reader task to await \u2014 just shut the transport down and recycle.
+      this.shutdown()
 
-    if ctx.runtime.parsePostData then
-      verbose "parsing post data"
-      let! _ = this.parsePostData (headers %% "content-length") (headers %% "content-type")
-      ()
-
-    let request =
-      { httpVersion      = httpVersion
-        url              = matchedBinding.uri path rawQuery
-        host             = host
-        ``method``       = meth
-        headers          = headers
-        rawForm          = _rawForm
-        rawQuery         = rawQuery
-        files            = Seq.toList files
-        multiPartFields  = Seq.toList multiPartFields
-        trace            = TraceHeader.parseTraceHeaders headers }
-
-    return Some { ctx with request = request; connection = { ctx.connection with segments = Seq.toList segments } }
+    this.recycleConnection()
+    if Globals.verbose then
+        do Console.WriteLine("[Conn:{0}] accept:Disconnected {1}. {2} connected.", connectionId, clientIp, tracker.ActiveConnectionCount)
   }
-
-  member this.GetCurrentContext() =
-    { ctx with connection = { ctx.connection with segments = Seq.toList segments } }

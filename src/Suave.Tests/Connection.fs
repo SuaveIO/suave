@@ -4,7 +4,7 @@ open System
 open System.Net
 open System.Net.Http
 
-open Fuchu
+open Expecto
 
 open Suave
 open Suave.Successful
@@ -14,6 +14,9 @@ open Suave.Testing
 let setConnectionKeepAlive (r : HttpRequestMessage) =
   r.Headers.ConnectionClose <- Nullable false
   r
+
+// several times the size of a buffer
+let veryLargeContent = String.replicate (defaultConfig.bufferSize * 1000) "A"
 
 [<Tests>]
 let connectionTests cfg =
@@ -26,5 +29,11 @@ let connectionTests cfg =
                  setConnectionKeepAlive
                  contentString
                  context
-      Assert.Equal("should ACK", "ACK", res)
+      Expect.equal res "ACK" "should ACK"
+
+    testCase "test large response" <| fun _ ->
+      let context = runWith cfg (OK veryLargeContent)
+      let res =
+        req HttpMethod.GET "/" None context
+      Expect.equal res.Length veryLargeContent.Length "should match"
     ]

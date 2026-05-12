@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Suave Router Module - Advanced routing patterns and parameter extraction">
+  <title>Router Module - Suave</title>
+  <link rel="shortcut icon" href="/images/favicon.ico" type="image/x-icon">
+  <link rel="icon" href="/images/favicon-32x32.png" sizes="32x32" type="image/png">
+  <link rel="icon" href="/images/favicon-96x96.png" sizes="96x96" type="image/png">
+  <link rel="apple-touch-icon" href="/images/apple-touch-icon-57x57.png" sizes="57x57">
+  <link rel="apple-touch-icon" href="/images/apple-touch-icon-114x114.png" sizes="114x114">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header>
+    <div class="container">
+      <nav>
+        <div class="logo">
+          <img src="/images/head_600_trans.png" alt="Suave Logo" width="40" height="40" style="vertical-align: middle; margin-right: 12px; background: white; padding: 2px; border-radius: 4px;">
+          Suave
+        </div>
+        <button id="hamburger" class="hamburger" aria-label="Toggle menu">
+          <span></span><span></span><span></span>
+        </button>
+        <ul id="nav-links" class="nav-links">
+          <li><a href="/">Home</a></li>
+          <li><a href="/docs/">Documentation</a></li>
+          <li><a href="/docs/performance.html">Performance</a></li>
+          <li><a href="https://github.com/SuaveIO/suave" target="_blank">GitHub</a></li>
+          <li><a href="https://www.nuget.org/packages/Suave/" target="_blank">NuGet</a></li>
+          <li><button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme">🌙</button></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <div class="container">
+      <h1>Router Module</h1>
+      <p>The Router module provides efficient HTTP routing with path parameter extraction and flexible route matching patterns.</p>
+
+      <h2>Basic Router Setup</h2>
+      <p>Create a simple router with basic routes:</p>
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.Router
+
+let app =
+  router {
+    get "/" (OK "Home page")
+    get "/about" (OK "About page")
+    post "/submit" (OK "Form submitted")
+    delete "/items/:id" (OK "Item deleted")
+  }
+
+[&lt;EntryPoint&gt;]
+let main argv =
+  startWebServer defaultConfig app
+  0</code></pre>
+      </div>
+
+      <h2>Path Parameters</h2>
+      <p>Extract values from URL paths using parameters:</p>
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.Router
+open Suave.Operators
+
+let getUser ctx =
+  match routeParam "id" ctx with
+  | Some id -> OK (sprintf "User %s" id) ctx
+  | None -> RequestErrors.BAD_REQUEST "Missing user ID" ctx
+
+let app =
+  router {
+    get "/users/:id" getUser
+    get "/posts/:postId/comments/:commentId" (fun ctx ->
+      match (routeParam "postId" ctx, routeParam "commentId" ctx) with
+      | (Some postId, Some commentId) ->
+          OK (sprintf "Post %s, Comment %s" postId commentId) ctx
+      | _ -> RequestErrors.BAD_REQUEST "Missing parameters" ctx
+    )
+  }
+
+[&lt;EntryPoint&gt;]
+let main argv =
+  startWebServer defaultConfig app
+  0</code></pre>
+      </div>
+
+      <h2>HTTP Methods</h2>
+      <p>Use different HTTP methods for different route handlers:</p>
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.Router
+open Suave.Operators
+
+let app =
+  router {
+    get "/api/users" (OK "List all users")
+    post "/api/users" (OK "Create new user")
+    get "/api/users/:id" (OK "Get user by ID")
+    put "/api/users/:id" (OK "Update user")
+    delete "/api/users/:id" (OK "Delete user")
+    patch "/api/users/:id" (OK "Patch user")
+    head "/api/health" (OK "")
+    options "/api/users" (OK "")
+  }
+
+[&lt;EntryPoint&gt;]
+let main argv =
+  startWebServer defaultConfig app
+  0</code></pre>
+      </div>
+
+      <h2>Route Scoping</h2>
+      <p>Group routes with a common prefix using scopes:</p>
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.Router
+open Suave.Operators
+
+let apiScope =
+  scope "/api" {
+    get "/users" (OK "List users")
+    get "/users/:id" (OK "Get user")
+    post "/users" (OK "Create user")
+    delete "/users/:id" (OK "Delete user")
+  }
+
+let v2Scope =
+  scope "/v2" {
+    get "/users" (OK "List users (v2)")
+    get "/posts" (OK "List posts (v2)")
+  }
+
+let app =
+  choose [
+    apiScope
+    v2Scope
+    router {
+      get "/" (OK "Home")
+    }
+  ]
+
+[&lt;EntryPoint&gt;]
+let main argv =
+  startWebServer defaultConfig app
+  0</code></pre>
+      </div>
+
+      <h2>Wildcard Routes</h2>
+      <p>Match remaining path segments with wildcards:</p>
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.Router
+open Suave.Operators
+
+let serveStatic ctx =
+  match routeParam "path" ctx with
+  | Some filepath ->
+      OK (sprintf "Serving file: %s" filepath) ctx
+  | None -> RequestErrors.NOT_FOUND "File not found" ctx
+
+let app =
+  router {
+    get "/files/*" serveStatic
+    get "/docs/*" (fun ctx ->
+      match routeParam "path" ctx with
+      | Some docPath ->
+          OK (sprintf "Documentation: %s" docPath) ctx
+      | None -> RequestErrors.NOT_FOUND "Doc not found" ctx
+    )
+  }
+
+[&lt;EntryPoint&gt;]
+let main argv =
+  startWebServer defaultConfig app
+  0</code></pre>
+      </div>
+
+      <h2>Complex Route Patterns</h2>
+      <p>Combine multiple parameters and dynamic segments:</p>
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.Router
+open Suave.Operators
+
+let getCommentHandler ctx =
+  match (routeParam "userId" ctx, routeParam "postId" ctx, routeParam "commentId" ctx) with
+  | (Some userId, Some postId, Some commentId) ->
+      let response = 
+        sprintf "User %s, Post %s, Comment %s"
+          userId postId commentId
+      OK response ctx
+  | _ ->
+      RequestErrors.BAD_REQUEST "Missing required parameters" ctx
+
+let app =
+  router {
+    get "/users/:userId/posts/:postId/comments/:commentId" getCommentHandler
+    get "/repos/:owner/:repo/branches/:branch" (fun ctx ->
+      match (routeParam "owner" ctx, routeParam "repo" ctx, routeParam "branch" ctx) with
+      | (Some owner, Some repo, Some branch) ->
+          OK (sprintf "%s/%s - Branch: %s" owner repo branch) ctx
+      | _ -> RequestErrors.BAD_REQUEST "Missing repository parameters" ctx
+    )
+  }
+
+[&lt;EntryPoint&gt;]
+let main argv =
+  startWebServer defaultConfig app
+  0</code></pre>
+      </div>
+
+      <h2>Route with Middleware</h2>
+      <p>Apply middleware to router handlers:</p>
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.Router
+open Suave.Operators
+open Suave.Filters
+
+let requireJson =
+  Writers.setHeader "Content-Type" "application/json"
+
+let logRequest ctx =
+  printfn "Method: %s, Path: %s" 
+    (ctx.request.method.ToString())
+    ctx.request.path
+  async { return Some ctx }
+
+let app =
+  router {
+    get "/" (logRequest >=> OK "Home")
+    get "/api/data" (logRequest >=> requireJson >=> OK """{"message":"Hello"}""")
+    post "/api/submit" (logRequest >=> OK "Submitted")
+  }
+
+[&lt;EntryPoint&gt;]
+let main argv =
+  startWebServer defaultConfig app
+  0</code></pre>
+      </div>
+
+      <h2>RESTful API Example</h2>
+      <p>Build a complete RESTful API with the Router module:</p>
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.Router
+open Suave.Operators
+open Suave.Successful
+open Suave.RequestErrors
+
+let users = System.Collections.Generic.Dictionary&lt;string, string&gt;()
+
+let getAllUsers _ = OK (System.String.Join(",", users.Keys)) 
+let getUser ctx =
+  match routeParam "id" ctx with
+  | Some id when users.ContainsKey(id) ->
+      OK (sprintf "User: %s" users.[id]) ctx
+  | Some _ -> NOT_FOUND "User not found" ctx
+  | None -> BAD_REQUEST "Missing user ID" ctx
+
+let createUser ctx = async {
+  // In a real app, parse JSON from body
+  OK "User created" ctx
+}
+
+let updateUser ctx = async {
+  match routeParam "id" ctx with
+  | Some id ->
+      users.[id] <- "Updated"
+      return! OK "User updated" ctx
+  | None -> return! BAD_REQUEST "Missing user ID" ctx
+}
+
+let deleteUser ctx = async {
+  match routeParam "id" ctx with
+  | Some id when users.ContainsKey(id) ->
+      users.Remove(id) |> ignore
+      return! OK "User deleted" ctx
+  | Some _ -> return! NOT_FOUND "User not found" ctx
+  | None -> return! BAD_REQUEST "Missing user ID" ctx
+}
+
+let app =
+  router {
+    get "/api/users" getAllUsers
+    post "/api/users" createUser
+    get "/api/users/:id" getUser
+    put "/api/users/:id" updateUser
+    delete "/api/users/:id" deleteUser
+  }
+
+[&lt;EntryPoint&gt;]
+let main argv =
+  startWebServer defaultConfig app
+  0</code></pre>
+      </div>
+
+      <h2>Nested Scopes</h2>
+      <p>Create deeply nested route hierarchies with multiple scopes:</p>
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.Router
+open Suave.Operators
+
+let v1ApiRoutes =
+  scope "/api" {
+    scope "/v1" {
+      get "/users" (OK "V1 Users")
+      get "/posts" (OK "V1 Posts")
+    }
+  }
+
+let v2ApiRoutes =
+  scope "/api" {
+    scope "/v2" {
+      get "/users" (OK "V2 Users")
+      get "/posts" (OK "V2 Posts")
+    }
+  }
+
+let adminRoutes =
+  scope "/admin" {
+    get "/dashboard" (OK "Admin Dashboard")
+    get "/users" (OK "Admin Users")
+    delete "/users/:id" (OK "User deleted")
+  }
+
+let app =
+  choose [
+    v1ApiRoutes
+    v2ApiRoutes
+    adminRoutes
+    router {
+      get "/" (OK "Home")
+    }
+  ]
+
+[&lt;EntryPoint&gt;]
+let main argv =
+  startWebServer defaultConfig app
+  0</code></pre>
+      </div>
+
+      <h2>Route Parameters in Complex Handlers</h2>
+      <p>Use route parameters in sophisticated request handling:</p>
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.Router
+open Suave.Operators
+open Suave.Successful
+open Suave.RequestErrors
+
+let handleRequest ctx =
+  async {
+    // Extract multiple parameters
+    let orgId = routeParam "orgId" ctx
+    let projectId = routeParam "projectId" ctx
+    let resourceId = routeParam "resourceId" ctx
+    
+    match (orgId, projectId, resourceId) with
+    | (Some org, Some proj, Some res) ->
+        let response = 
+          sprintf 
+            "Organization: %s\nProject: %s\nResource: %s"
+            org proj res
+        return! OK response ctx
+    | _ ->
+        return! BAD_REQUEST "Missing required parameters" ctx
+  }
+
+let app =
+  router {
+    get "/orgs/:orgId/projects/:projectId/resources/:resourceId" handleRequest
+  }
+
+[&lt;EntryPoint&gt;]
+let main argv =
+  startWebServer defaultConfig app
+  0</code></pre>
+      </div>
+
+      <h2>Custom Route Builder</h2>
+      <p>Build routes programmatically with the route helper:</p>
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.Router
+open Suave.Operators
+
+let buildApiRoute path handler =
+  router {
+    route [HttpMethod.GET; HttpMethod.POST] path handler
+  }
+
+let multiMethodHandler ctx =
+  match ctx.request.method with
+  | HttpMethod.GET -> OK "GET request" ctx
+  | HttpMethod.POST -> OK "POST request" ctx
+  | _ -> OK "Other method" ctx
+
+let app =
+  choose [
+    buildApiRoute "/data" multiMethodHandler
+    router {
+      get "/" (OK "Home")
+    }
+  ]
+
+[&lt;EntryPoint&gt;]
+let main argv =
+  startWebServer defaultConfig app
+  0</code></pre>
+      </div>
+
+      <h2>Route Matching Performance</h2>
+      <p>The Router module optimizes performance with exact and pattern matching:</p>
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.Router
+open Suave.Operators
+
+// Routes with exact paths are O(1) lookups
+// Routes with parameters are checked in order
+
+let app =
+  router {
+    // Exact matches (fast - O(1))
+    get "/" (OK "Home")
+    get "/about" (OK "About")
+    get "/contact" (OK "Contact")
+    
+    // Parameterized routes (slower - checked in order)
+    get "/users/:id" (fun ctx ->
+      match routeParam "id" ctx with
+      | Some id -> OK (sprintf "User %s" id) ctx
+      | None -> OK "No user" ctx
+    )
+    
+    // Wildcard routes (checked last)
+    get "/static/*" (fun ctx ->
+      match routeParam "path" ctx with
+      | Some path -> OK (sprintf "Static: %s" path) ctx
+      | None -> OK "Static file" ctx
+    )
+  }
+
+[&lt;EntryPoint&gt;]
+let main argv =
+  startWebServer defaultConfig app
+  0</code></pre>
+      </div>
+
+      <h2>Error Handling in Routes</h2>
+      <p>Handle errors and edge cases in router handlers:</p>
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.Router
+open Suave.Operators
+open Suave.Successful
+open Suave.RequestErrors
+
+let safeGetUser ctx =
+  async {
+    try
+      match routeParam "id" ctx with
+      | Some id ->
+          let userId = System.Int32.Parse(id)
+          if userId > 0 then
+            return! OK (sprintf "User %d" userId) ctx
+          else
+            return! BAD_REQUEST "Invalid user ID" ctx
+      | None ->
+          return! BAD_REQUEST "Missing user ID" ctx
+    with
+    | _ -> return! BAD_REQUEST "Invalid format" ctx
+  }
+
+let app =
+  router {
+    get "/users/:id" safeGetUser
+  }
+
+[&lt;EntryPoint&gt;]
+let main argv =
+  startWebServer defaultConfig app
+  0</code></pre>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <div class="container">
+      <div class="footer-links">
+        <a href="/docs/">Documentation</a>
+        <a href="https://github.com/SuaveIO/suave" target="_blank">GitHub</a>
+        <a href="https://www.nuget.org/packages/Suave/" target="_blank">NuGet</a>
+        <a href="https://x.com/SuaveIO" target="_blank">X</a>
+        <a href="https://github.com/SuaveIO/suave/blob/master/LICENSE" target="_blank">License</a>
+      </div>
+      <p>&copy; 2025 Suave. Open source, MIT licensed.</p>
+      <p>Suave is a project created and maintained by Ademar Gonzalez.</p>
+    </div>
+  </footer>
+
+  <script src="/js/main.js"></script>
+</body>
+</html>

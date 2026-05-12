@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Getting Started with Suave - Installation and first project">
+  <title>Getting Started - Suave</title>
+  <link rel="shortcut icon" href="/images/favicon.ico" type="image/x-icon">
+  <link rel="icon" href="/images/favicon-32x32.png" sizes="32x32" type="image/png">
+  <link rel="icon" href="/images/favicon-96x96.png" sizes="96x96" type="image/png">
+  <link rel="apple-touch-icon" href="/images/apple-touch-icon-57x57.png" sizes="57x57">
+  <link rel="apple-touch-icon" href="/images/apple-touch-icon-114x114.png" sizes="114x114">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <!-- Header -->
+  <header>
+    <div class="container">
+      <nav>
+        <div class="logo">
+          <img src="/images/head_600_trans.png" alt="Suave Logo" width="40" height="40" style="vertical-align: middle; margin-right: 12px; background: white; padding: 2px; border-radius: 4px;">
+          Suave
+        </div>
+        <button id="hamburger" class="hamburger" aria-label="Toggle menu">
+          <span></span>
+          <span></span>
+          <span></span>
+        </button>
+        <ul id="nav-links" class="nav-links">
+          <li><a href="/">Home</a></li>
+          <li><a href="/docs/">Documentation</a></li>
+          <li><a href="/docs/performance.html">Performance</a></li>
+          <li><a href="https://github.com/SuaveIO/suave" target="_blank">GitHub</a></li>
+          <li><a href="https://www.nuget.org/packages/Suave/" target="_blank">NuGet</a></li>
+          <li><button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme">🌙</button></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Main content -->
+  <main>
+    <div class="container">
+      <h1>Getting Started with Suave</h1>
+      <p>This guide will help you install Suave and create your first web server.</p>
+
+      <h2 id="prerequisites">Prerequisites</h2>
+      <ul>
+        <li>.NET 8 or later</li>
+        <li>F# 4.7 or later</li>
+        <li>A code editor (VS Code, Visual Studio, or similar)</li>
+      </ul>
+
+      <h2 id="installation">Installation</h2>
+
+      <h3>Step 1: Create a new F# project</h3>
+      <div class="code-block">
+        <pre><code>dotnet new console -lang F# -n MyWebServer
+cd MyWebServer</code></pre>
+      </div>
+
+      <h3>Step 2: Add Suave via NuGet</h3>
+      <div class="code-block">
+        <pre><code>dotnet add package Suave</code></pre>
+      </div>
+
+      <h2 id="hello-world">Hello World</h2>
+
+      <p>Replace the contents of <code>Program.fs</code> with:</p>
+
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.Successful
+
+let app = OK "Hello, Suave!"
+
+startWebServer defaultConfig app</code></pre>
+      </div>
+
+      <p>Run your server:</p>
+      <div class="code-block">
+        <pre><code>dotnet run</code></pre>
+      </div>
+
+      <p>Open your browser to <code>http://localhost:8080</code> and you should see "Hello, Suave!"</p>
+
+      <h2 id="json-response">JSON Response</h2>
+
+      <p>Return JSON from your API:</p>
+
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.Successful
+open Suave.Json
+
+type Person = { name: string; age: int }
+
+let handler =
+  let person = { name = "Alice"; age = 30 }
+  Json.toJson person |> JSON
+
+startWebServer defaultConfig handler</code></pre>
+      </div>
+
+      <h2 id="routing">Basic Routing</h2>
+
+      <p>Handle different URLs:</p>
+
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.Filters
+open Suave.Operators
+open Suave.Successful
+open Suave.RequestErrors
+
+let app =
+  choose [
+    path "/" >=> OK "Welcome!"
+    path "/about" >=> OK "About page"
+    path "/contact" >=> OK "Contact us"
+    NOT_FOUND "Page not found"
+  ]
+
+startWebServer defaultConfig app</code></pre>
+      </div>
+
+      <p><a href="routing.html">→ Learn more about routing</a></p>
+
+      <h2 id="handling-requests">Handling Requests</h2>
+
+      <p>Access request data:</p>
+
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.Filters
+open Suave.Operators
+
+let app =
+  request (fun req ->
+    let method = req.method
+    let url = req.url
+    sprintf "You made a %s request to %s" (string method) (string url)
+    |> Successful.OK)
+
+startWebServer defaultConfig app</code></pre>
+      </div>
+
+      <h2 id="query-parameters">Query Parameters</h2>
+
+      <p>Parse query strings:</p>
+
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.Filters
+open Suave.Operators
+open Suave.Successful
+
+let app =
+  request (fun req ->
+    match req.queryParam "name" with
+    | Choice1Of2 name -> OK (sprintf "Hello, %s!" name)
+    | Choice2Of2 _ -> OK "No name provided")
+
+startWebServer defaultConfig app</code></pre>
+      </div>
+
+      <p>Try: <code>http://localhost:8080?name=World</code></p>
+
+      <h2 id="form-data">POST Data & Forms</h2>
+
+      <p>Handle form submissions:</p>
+
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.Filters
+open Suave.Operators
+open Suave.Successful
+
+let app =
+  choose [
+    POST >=> request (fun req ->
+      match req.formData "message" with
+      | Choice1Of2 message -> OK (sprintf "Received: %s" message)
+      | Choice2Of2 _ -> OK "No message")
+    
+    GET >=> OK "<form method='POST'>
+      <input name='message'>
+      <button>Send</button>
+    </form>"
+  ]
+
+startWebServer defaultConfig app</code></pre>
+      </div>
+
+      <h2 id="static-files">Serving Static Files</h2>
+
+      <p>Serve files from a directory:</p>
+
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.Filters
+open Suave.Operators
+open Suave.Files
+
+let app =
+  choose [
+    browseHome
+    Files.file "404.html"
+  ]
+
+let config = {
+  defaultConfig with
+    homeFolder = Some (System.IO.Path.GetFullPath("public"))
+}
+
+startWebServer config app</code></pre>
+      </div>
+
+      <h2 id="configuration">Configuration</h2>
+
+      <p>Customize your server:</p>
+
+      <div class="code-block">
+        <pre><code>open Suave
+
+let config = {
+  defaultConfig with
+    bindings = [ HttpBinding.createSimple HTTP "127.0.0.1" 3000 ]
+    homeFolder = Some "public"
+    logger = Logging.Targets.create Logging.LogLevel.Info [||]
+}
+
+startWebServer config app</code></pre>
+      </div>
+
+      <h2 id="next-steps">Next Steps</h2>
+      <ul>
+        <li><a href="routing.html">Learn more about routing patterns</a></li>
+        <li><a href="async.html">Master async/await patterns</a></li>
+        <li><a href="composing.html">Understand WebPart composition</a></li>
+        <li><a href="websockets.html">Add WebSocket support</a></li>
+        <li>Check out the <a href="https://github.com/SuaveIO/suave/tree/master/examples" target="_blank">examples on GitHub</a></li>
+      </ul>
+
+      <h2 id="troubleshooting">Troubleshooting</h2>
+
+      <h3>Port already in use</h3>
+      <p>If port 8080 is already in use, change it in the config:</p>
+      <div class="code-block">
+        <pre><code>let config = {
+  defaultConfig with
+    bindings = [ HttpBinding.createSimple HTTP "127.0.0.1" 3000 ]
+}
+
+startWebServer config app</code></pre>
+      </div>
+
+      <h3>Changes not showing</h3>
+      <p>Stop the server (Ctrl+C) and rebuild:</p>
+      <div class="code-block">
+        <pre><code>dotnet clean
+dotnet build
+dotnet run</code></pre>
+      </div>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer>
+    <div class="container">
+      <div class="footer-links">
+        <a href="/docs/">Documentation</a>
+        <a href="https://github.com/SuaveIO/suave" target="_blank">GitHub</a>
+        <a href="https://www.nuget.org/packages/Suave/" target="_blank">NuGet</a>
+        <a href="https://x.com/SuaveIO" target="_blank">X</a>
+        <a href="https://github.com/SuaveIO/suave/blob/master/LICENSE" target="_blank">License</a>
+      </div>
+      <p>&copy; 2025 Suave. Open source, MIT licensed.</p>
+      <p>Suave is a project created and maintained by Ademar Gonzalez.</p>
+    </div>
+  </footer>
+
+  <script src="/js/main.js"></script>
+</body>
+</html>

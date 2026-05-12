@@ -3,6 +3,7 @@
 module Suave.Utils.Collections
 
 open System.Collections.Generic
+open System
 
 /// A (string * string) list, use (%%) to access
 type NameValueList = (string * string) list
@@ -14,26 +15,26 @@ type IDictionary<'b,'a> with
   member dict.TryLookup key =
     match dict.TryGetValue key with
     | true, v  -> Choice1Of2 v
-    | false, _ -> Choice2Of2 (sprintf "Key %A was not present" key)
+    | false, _ -> Choice2Of2 ("Key " + (key.ToString()) + " was not present")
 
-let getFirst (target : NameValueList) (key : string) =
-  match target |> List.tryPick (fun (a, b) -> if a.Equals key then Some b else None) with
-  | Some b -> Choice1Of2 b
-  | None   -> Choice2Of2 (sprintf "Couldn't find key '%s' in NameValueList" key)
+let getFirst (target : List<string*string>) (key : string) =
+  let index = target.FindIndex(fun (x:string,y:string) -> x.Equals(key))
+  if index < 0 then
+    Choice2Of2 ("Key " + (key.ToString()) + " was not present")
+  else
+    Choice1Of2 (let (a,b) = target[index] in b)
 
-let getFirstCaseInsensitive (target : NameValueList) (key : string) =
-  match target |> List.tryPick (fun (a, b) -> if String.equalsCaseInsensitive a key then Some b else None) with
-  | Some b -> Choice1Of2 b
-  | None   -> Choice2Of2 (sprintf "Couldn't find key '%s' in NameValueList" key)
-
-[<System.Obsolete("Use getFirstCaseInsensitive with an i")>]
-let getFirstCaseInsensitve (target : NameValueList) (key : string) =
-  getFirstCaseInsensitive target key
+let getFirstCaseInsensitive (target : List<string*string>) (key : string) =
+  let index = target.FindIndex(fun (x:string,y:string) -> x.Equals(key, StringComparison.InvariantCultureIgnoreCase))
+  if index < 0 then
+    Choice2Of2 ("Key " + (key.ToString()) + " was not present")
+  else
+    Choice1Of2 (let (a,b) = target[index] in b)
 
 let getFirstOpt (target : NameOptionValueList) (key : string) =
   match target |> List.tryPick (fun (a,b) -> if a.Equals key then b else None) with
   | Some b -> Choice1Of2 b
-  | None -> Choice2Of2 (sprintf "Couldn't find key '%s' in NameOptionValueList" key)
+  | None -> Choice2Of2 ("Couldn't find key '" + key + "' in NameOptionValueList")
 
 let tryGetChoice1 f x =
   match f x with
@@ -42,3 +43,11 @@ let tryGetChoice1 f x =
 
 let (%%) target key = getFirst target key
 let (^^) target key = getFirstOpt target key
+
+let (@@) (target:List<string*string>) key =
+  let index = target.FindIndex(fun (x:string,y:string) -> x.Equals(key))
+  if index < 0 then
+    Choice2Of2 ("Key " + (key.ToString()) + " was not present")
+  else
+    Choice1Of2 (let (a,b) = target[index] in b)
+  

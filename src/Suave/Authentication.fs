@@ -1,38 +1,58 @@
-﻿module Suave.Authentication
+module Suave.Authentication
 
-open System
 open System.Text
 open Suave.RequestErrors
 open Suave.Utils
-open Suave.Logging
-open Suave.Logging.Message
 open Suave.Cookie
 open Suave.State.CookieStateStore
 open Suave.Operators
 
-
 let UserNameKey = "userName"
 
-let internal parseAuthenticationToken (token : string) =
-  let parts = token.Split (' ')
-  let enc = parts.[1].Trim()
-  let decoded = ASCII.decodeBase64 enc
-  let indexOfColon = decoded.IndexOf(':')
-  (parts.[0].ToLower(), decoded.Substring(0,indexOfColon), decoded.Substring(indexOfColon+1))
+let internal tryParseBasicAuthenticationToken (rawHeader : string) =
+  match rawHeader.Split(' ') with
+  | [| basic; tokenBase64 |] when String.equalsOrdinalCI "basic" basic ->
+    match ASCII.tryDecodeBase64 tokenBase64 with
+    | Some token ->
+      match token.IndexOf(':') with
+      | -1 ->
+        None
+      | i ->
+        let username = token.Substring(0, i)
+        let password = token.Substring(i + 1)
+        Some (username, password)
+    | None ->
+      None
+  | _ ->
+    None
 
-let inline private addUserName username ctx = { ctx with userState = ctx.userState |> Map.add UserNameKey (box username) }
+let inline private addUserName username ctx =
+  if ctx.userState.ContainsKey UserNameKey then
+    ctx.userState.[UserNameKey] <- box username
+  else
+    ctx.userState.Add(UserNameKey, box username)
+  ctx
 
-let authenticateBasic f (protectedPart : WebPart) (ctx : HttpContext) =
-  let p = ctx.request
-  match p.header "authorization" with
-  | Choice1Of2 header ->
-    let (typ, username, password) = parseAuthenticationToken header
-    if (typ.Equals("basic")) && f (username, password) then
-      protectedPart (addUserName username ctx)
-    else
-      challenge (addUserName username ctx)
-  | Choice2Of2 _ ->
-    challenge ctx
+let authenticateBasicAsync f protectedPart ctx =
+  async {
+    let p = ctx.request
+    match p.header "authorization" with
+    | Choice1Of2 header ->
+      match tryParseBasicAuthenticationToken header with
+      | Some (username, password) ->
+          let! authenticated = f (username, password)
+          if authenticated then
+            return! protectedPart (addUserName username ctx)
+          else
+            return! challenge ctx
+      | None ->
+          return! challenge ctx
+    | Choice2Of2 _ ->
+      return! challenge ctx
+  }
+
+let authenticateBasic f protectedPart ctx =
+  authenticateBasicAsync (f >> async.Return) protectedPart ctx
 
 module internal Utils =
   /// Generates a string key from the available characters with the given key size
@@ -40,7 +60,7 @@ module internal Utils =
   /// random number generator would produce as we only use a small subset alphabet.
   let generateReadableKey (keySize : int) =
     let arr = Array.zeroCreate<byte> keySize |> Crypto.randomize
-    let alpha = "abcdefghijklmnopqrstuvwuxyz0123456789"
+    let alpha = "abcdefghijklmnopqrstuvwxyz0123456789"
     let result = new StringBuilder(keySize)
     arr
     |> Array.iter (fun (b : byte) -> result.Append alpha.[int b % alpha.Length] |> ignore)
@@ -77,9 +97,6 @@ let authenticate relativeExpiry secure
                  : WebPart =
 
   context (fun ctx ->
-    ctx.runtime.logger.debug (
-      eventX "Authenticating"
-      >> setSingleName "Suave.Auth.authenticate")
 
     let state =
       { serverKey      = ctx.runtime.serverKey
@@ -91,14 +108,15 @@ let authenticate relativeExpiry secure
     cookieState state missingCookie decryptionFailure fSuccess)
 
 let authenticateWithLogin relativeExpiry loginPage fSuccess : WebPart =
+  let decryptionFailure  = (fun s -> s.ToString()) >> RequestErrors.BAD_REQUEST >> Choice2Of2
   authenticate relativeExpiry false
                (fun () -> Choice2Of2(Redirection.FOUND loginPage))
-               (sprintf "%A" >> RequestErrors.BAD_REQUEST >> Choice2Of2)
+               decryptionFailure
                fSuccess
 
 let authenticated relativeExpiry secure : WebPart =
   context (fun ctx ->
-    let data = generateData ctx |> UTF8.bytes
+    let data = generateData ctx |> Encoding.UTF8.GetBytes
     authenticate relativeExpiry secure
                  (fun _ -> Choice1Of2 data)
                  (fun _ -> Choice1Of2 data)
@@ -114,7 +132,8 @@ let deauthenticateWithLogin loginPage : WebPart =
 
 module HttpContext =
 
-  let sessionId x =
-    x.userState
-    |> Map.tryFind StateStoreType
-    |> Option.map (fun x -> x :?> string |> parseData)
+  let sessionId ctx =
+    match ctx.userState.TryGetValue StateStoreType with
+    | true, x ->
+      Some (x :?> byte[] |> Encoding.UTF8.GetString |> parseData)
+    | _,_ -> None

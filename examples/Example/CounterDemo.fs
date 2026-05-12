@@ -1,4 +1,4 @@
-﻿module CounterDemo
+module CounterDemo
 
 module private Helpers =
   let (<!>) a b =
@@ -12,15 +12,13 @@ module private Helpers =
     | Choice2Of2 _ -> b
 
   /// Maybe convert to int32 from string
-  let muint32 str =
+  let muint32 (str:string) =
     match System.UInt32.TryParse str with
     | true, i -> Choice1Of2 i
     | _       -> Choice2Of2 "couldn't convert to int32"
 
 open Suave
 open Suave.Sockets
-open Suave.Sockets.Control
-open Suave.Http
 open Suave.EventSource
 open Suave.Utils
 
@@ -29,13 +27,13 @@ open Helpers
 let counterDemo (req : HttpRequest) (out : Connection) =
 
   let write i =
-    socket {
+    task {
       let msg = { id = i; data = string i; ``type`` = None }
-      do! msg |> send out
-      return! SocketOp.ofAsync (Async.Sleep 100)
+      let! _ = send out msg 
+      return! Async.Sleep 100
     }
 
-  socket {
+  task {
     let lastEvtId =
       (req.header "last-event-id" |> Choice.bind muint32) <!>
       ((req.queryParam "lastEventId") |> Choice.bind muint32) <.>
@@ -48,4 +46,4 @@ let counterDemo (req : HttpRequest) (out : Connection) =
 
     for a in actions do
       do! a
-    return out }
+    }

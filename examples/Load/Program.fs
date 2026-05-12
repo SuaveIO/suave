@@ -1,24 +1,22 @@
-﻿open System
+open System
 open System.Net
 
 open Suave
 open Suave.Operators
-open Suave.Http
 open Suave.Filters
 open Suave.Files
-open Suave.Logging
+open System.Threading.Tasks
 
-let logger = Targets.create Verbose
 
 let config =
   { defaultConfig with
       bindings   = [ HttpBinding.createSimple HTTP "127.0.0.1" 8082 ]
       bufferSize = 2048
       maxOps     = 10000
-      logger     = logger }
+      }
 
 let listening, server = startWebServerAsync config (choose [ GET >=> browseHome ])
-Async.Start server
+Task.WaitAll server
 
 // wait for the server to start listening
 listening |> Async.RunSynchronously |> ignore

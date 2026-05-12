@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Suave Composition - Build middleware pipelines and compose applications">
+  <title>Composition & Middleware - Suave</title>
+  <link rel="shortcut icon" href="/images/favicon.ico" type="image/x-icon">
+  <link rel="icon" href="/images/favicon-32x32.png" sizes="32x32" type="image/png">
+  <link rel="icon" href="/images/favicon-96x96.png" sizes="96x96" type="image/png">
+  <link rel="apple-touch-icon" href="/images/apple-touch-icon-57x57.png" sizes="57x57">
+  <link rel="apple-touch-icon" href="/images/apple-touch-icon-114x114.png" sizes="114x114">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header>
+    <div class="container">
+      <nav>
+        <div class="logo">
+          <img src="/images/head_600_trans.png" alt="Suave Logo" width="40" height="40" style="vertical-align: middle; margin-right: 12px; background: white; padding: 2px; border-radius: 4px;">
+          Suave
+        </div>
+        <button id="hamburger" class="hamburger" aria-label="Toggle menu">
+          <span></span><span></span><span></span>
+        </button>
+        <ul id="nav-links" class="nav-links">
+          <li><a href="/">Home</a></li>
+          <li><a href="/docs/">Documentation</a></li>
+          <li><a href="/docs/performance.html">Performance</a></li>
+          <li><a href="https://github.com/SuaveIO/suave" target="_blank">GitHub</a></li>
+          <li><a href="https://www.nuget.org/packages/Suave/" target="_blank">NuGet</a></li>
+          <li><button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme">🌙</button></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <div class="container">
+      <h1>Composition & Middleware</h1>
+      <p>Learn how to compose handlers, build middleware pipelines, and create reusable components.</p>
+
+      <h2>Understanding WebPart</h2>
+      <p>A WebPart is the basic building block in Suave:</p>
+      <div class="code-block">
+        <pre><code>// A WebPart is a function that takes HttpContext and returns async option
+type WebPart = HttpContext -> Async&lt;HttpContext option&gt;
+
+// If Some ctx is returned, the handler succeeded
+// If None is returned, the handler failed and the next handler is tried</code></pre>
+      </div>
+
+      <h2>The pipe-forward Operator (>=>)</h2>
+      <p>Chain handlers together using the <code>>=></code> operator:</p>
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.Operators
+open Suave.Writers
+open Suave.Successful
+
+// Apply headers, then return OK
+let app =
+  setHeader "X-Custom" "value" >=>
+  setHeader "Content-Type" "text/plain" >=>
+  OK "Hello World"</code></pre>
+      </div>
+
+      <h2>The choose Combinator</h2>
+      <p>Try handlers in order until one succeeds:</p>
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.Operators
+open Suave.Filters
+open Suave.Successful
+
+let app =
+  choose [
+    path "/hello" >=> OK "Hello"
+    path "/goodbye" >=> OK "Goodbye"
+    RequestErrors.NOT_FOUND "Not found"
+  ]
+
+// The first matching path wins
+// If path "/hello" fails, try path "/goodbye"
+// If both fail, return NOT_FOUND</code></pre>
+      </div>
+
+      <h2>Creating Middleware</h2>
+      <p>Build reusable middleware components:</p>
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.Operators
+open Suave.Writers
+
+// Logging middleware
+let logRequest : WebPart =
+  fun ctx ->
+    printfn "[%s] %s %s" (System.DateTime.Now.ToString()) ctx.request.method ctx.request.path
+    async { return Some ctx }
+
+// Authentication middleware
+let requireAuth : WebPart =
+  fun ctx ->
+    match ctx.request.header "Authorization" with
+    | Choice1Of2 auth -> async { return Some ctx }
+    | Choice2Of2 _ -> async { return None }  // Fails, try next handler
+
+// Error handling middleware
+let errorHandler (ex: System.Exception) : WebPart =
+  fun ctx ->
+    printfn "Error: %s" ex.Message
+    RequestErrors.INTERNAL_ERROR ex.Message ctx
+
+// Use middleware
+let app =
+  choose [
+    logRequest >=> path "/public" >=> OK "Public area"
+    logRequest >=> requireAuth >=> path "/admin" >=> OK "Admin area"
+  ]</code></pre>
+      </div>
+
+      <h2>Middleware Pipeline</h2>
+      <p>Build complex middleware pipelines:</p>
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.Operators
+open Suave.Writers
+
+// Common middleware stack
+let globalMiddleware =
+  setHeader "X-Frame-Options" "SAMEORIGIN" >=>
+  setHeader "X-Content-Type-Options" "nosniff" >=>
+  setHeader "X-XSS-Protection" "1; mode=block"
+
+// CORS middleware
+let corsMiddleware =
+  setHeader "Access-Control-Allow-Origin" "*" >=>
+  setHeader "Access-Control-Allow-Methods" "GET, POST, PUT, DELETE"
+
+// Logging middleware
+let loggingMiddleware : WebPart =
+  fun ctx ->
+    async {
+      printfn "[%s] %s %s" (System.DateTime.UtcNow.ToString()) ctx.request.method ctx.request.path
+      return Some ctx
+    }
+
+// Apply all middleware
+let app =
+  globalMiddleware >=>
+  loggingMiddleware >=>
+  corsMiddleware >=>
+  choose [
+    path "/" >=> OK "Home"
+    path "/api" >=> OK "API"
+  ]</code></pre>
+      </div>
+
+      <h2>Conditional Composition</h2>
+      <p>Conditionally compose handlers:</p>
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.Operators
+open Suave.Filters
+
+let isDev = System.Environment.GetEnvironmentVariable("ENV") = "Development"
+
+let app =
+  choose [
+    // Development-only routes
+    if isDev then
+      yield path "/debug" >=> OK "Debug info"
+      yield path "/metrics" >=> OK "Metrics"
+
+    // Always available
+    yield path "/" >=> OK "Home"
+
+    // API routes
+    yield path "/api/users" >=> OK "Users"
+  ] |> choose  // Wrap in choose to handle the if-expression</code></pre>
+      </div>
+
+      <h2>Scoped Middleware</h2>
+      <p>Apply middleware to specific routes:</p>
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.Operators
+open Suave.Filters
+open Suave.Writers
+
+let adminMiddleware =
+  setHeader "X-Admin" "true" >=>
+  fun ctx ->
+    match ctx.request.header "Authorization" with
+    | Choice1Of2 _ -> async { return Some ctx }
+    | _ -> async { return None }
+
+let apiMiddleware =
+  setHeader "Content-Type" "application/json" >=>
+  setHeader "Access-Control-Allow-Origin" "*"
+
+let app =
+  choose [
+    // Admin routes with auth
+    path "/admin" >=> adminMiddleware >=> OK "Admin Dashboard"
+
+    // API routes with JSON headers
+    path "/api" >=> apiMiddleware >=> OK "{\"message\":\"API\"}"
+
+    // Public routes
+    path "/" >=> OK "Public Home"
+  ]</code></pre>
+      </div>
+
+      <h2>Higher-Order Handlers</h2>
+      <p>Create handlers that return handlers (higher-order functions):</p>
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.Operators
+open Suave.Writers
+open Suave.Successful
+
+// Returns a handler that requires a specific header
+let requireHeader name value : WebPart =
+  fun ctx ->
+    match ctx.request.header name with
+    | Choice1Of2 headerValue when headerValue = value ->
+        async { return Some ctx }
+    | _ ->
+        RequestErrors.FORBIDDEN (sprintf "Missing required header: %s" name) ctx
+
+// Returns a handler that sets a header
+let withHeader name value : WebPart =
+  setHeader name value
+
+// Returns a handler that applies a transformation
+let withTransform (transform: string -> string) : WebPart =
+  fun ctx ->
+    async {
+      let original = ctx.request.path
+      let transformed = transform original
+      printfn "Transformed %s to %s" original transformed
+      return Some ctx
+    }
+
+// Usage
+let app =
+  choose [
+    requireHeader "X-API-Key" "secret" >=>
+      withHeader "X-Authenticated" "true" >=>
+      OK "Authenticated"
+  ]</code></pre>
+      </div>
+
+      <h2>Composing Multiple Applications</h2>
+      <p>Combine multiple applications into one:</p>
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.Operators
+open Suave.Filters
+
+// Sub-application 1: API
+let apiApp =
+  choose [
+    path "/users" >=> OK "Users API"
+    path "/posts" >=> OK "Posts API"
+  ]
+
+// Sub-application 2: Admin
+let adminApp =
+  choose [
+    path "/dashboard" >=> OK "Admin Dashboard"
+    path "/settings" >=> OK "Settings"
+  ]
+
+// Sub-application 3: Public
+let publicApp =
+  choose [
+    path "/" >=> OK "Home"
+    path "/about" >=> OK "About"
+  ]
+
+// Combine into main app
+let app =
+  choose [
+    pathPrefix "/api" >=> apiApp
+    pathPrefix "/admin" >=> adminApp
+    publicApp
+  ]</code></pre>
+      </div>
+
+      <h2>Error Handling Composition</h2>
+      <p>Compose error handlers:</p>
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.Operators
+
+// Error handler wrapper
+let withErrorHandling (handler: WebPart) : WebPart =
+  fun ctx ->
+    async {
+      try
+        match! handler ctx with
+        | Some ctx -> return Some ctx
+        | None -> 
+            // Handler failed, return error
+            return! RequestErrors.NOT_FOUND "Not found" ctx
+      with
+      | ex ->
+          printfn "Unhandled error: %s" ex.Message
+          return! RequestErrors.INTERNAL_ERROR "Server error" ctx
+    }
+
+let app =
+  withErrorHandling (
+    choose [
+      path "/" >=> OK "Home"
+      path "/error" >=> failwith "Intentional error"
+    ]
+  )</code></pre>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <div class="container">
+      <div class="footer-links">
+        <a href="/docs/">Documentation</a>
+        <a href="https://github.com/SuaveIO/suave" target="_blank">GitHub</a>
+        <a href="https://www.nuget.org/packages/Suave/" target="_blank">NuGet</a>
+        <a href="https://x.com/SuaveIO" target="_blank">X</a>
+        <a href="https://github.com/SuaveIO/suave/blob/master/LICENSE" target="_blank">License</a>
+      </div>
+      <p>&copy; 2025 Suave. Open source, MIT licensed.</p>
+      <p>Suave is a project created and maintained by Ademar Gonzalez.</p>
+    </div>
+  </footer>
+
+  <script src="/js/main.js"></script>
+</body>
+</html>

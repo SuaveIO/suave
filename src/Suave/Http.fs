@@ -4,21 +4,11 @@ namespace Suave
 module Http =
 
   open System
-  open System.IO
   open System.Collections.Generic
-  open System.Net.Sockets
   open System.Net
   open System.Text
   open Suave.Utils
-  open Suave.Utils.Aether
-  open Suave.Utils.Aether.Operators
-  open Suave.Utils.Collections
   open Suave.Sockets
-  open Suave.Tcp
-  open Suave.Utils
-  open Suave.Logging
-
-  open Microsoft.FSharp.Reflection
 
   [<RequireQualifiedAccess>]
   type HttpMethod =
@@ -66,17 +56,15 @@ module Http =
     { code   : int
       reason : string
     }
-    static member code_ = (fun x -> x.code), fun v x -> { x with code = v }
-    static member reason_ = (fun x -> x.reason), fun v x -> { x with reason = v }
 
   type HttpCode =
     | HTTP_100 | HTTP_101
     | HTTP_200 | HTTP_201 | HTTP_202 | HTTP_203 | HTTP_204 | HTTP_205 | HTTP_206
     | HTTP_300 | HTTP_301 | HTTP_302 | HTTP_303 | HTTP_304 | HTTP_305 | HTTP_306
-    | HTTP_307 | HTTP_400 | HTTP_401 | HTTP_402 | HTTP_403 | HTTP_404 | HTTP_405 
-    | HTTP_406 | HTTP_407 | HTTP_408 | HTTP_409 | HTTP_410 | HTTP_411 | HTTP_412 
-    | HTTP_413 | HTTP_422 | HTTP_426 | HTTP_428 | HTTP_429 | HTTP_414 | HTTP_415 
-    | HTTP_416 | HTTP_417 | HTTP_451 | HTTP_500 | HTTP_501 | HTTP_502 | HTTP_503 
+    | HTTP_307 | HTTP_400 | HTTP_401 | HTTP_402 | HTTP_403 | HTTP_404 | HTTP_405
+    | HTTP_406 | HTTP_407 | HTTP_408 | HTTP_409 | HTTP_410 | HTTP_411 | HTTP_412
+    | HTTP_413 | HTTP_422 | HTTP_426 | HTTP_428 | HTTP_429 | HTTP_414 | HTTP_415
+    | HTTP_416 | HTTP_417 | HTTP_451 | HTTP_500 | HTTP_501 | HTTP_502 | HTTP_503
     | HTTP_504 | HTTP_505
 
     member x.code =
@@ -84,14 +72,14 @@ module Http =
       | HTTP_100 -> 100 | HTTP_101 -> 101 | HTTP_200 -> 200 | HTTP_201 -> 201
       | HTTP_202 -> 202 | HTTP_203 -> 203 | HTTP_204 -> 204 | HTTP_205 -> 205
       | HTTP_206 -> 206 | HTTP_300 -> 300 | HTTP_301 -> 301 | HTTP_302 -> 302
-      | HTTP_303 -> 303 | HTTP_304 -> 304 | HTTP_305 -> 305 | HTTP_306 -> 306 
-      | HTTP_307 -> 307 | HTTP_400 -> 400 | HTTP_401 -> 401 | HTTP_402 -> 402 
-      | HTTP_403 -> 403 | HTTP_404 -> 404 | HTTP_405 -> 405 | HTTP_406 -> 406 
-      | HTTP_407 -> 407 | HTTP_408 -> 408 | HTTP_409 -> 409 | HTTP_410 -> 410 
-      | HTTP_411 -> 411 | HTTP_412 -> 412 | HTTP_413 -> 413 | HTTP_414 -> 414 
-      | HTTP_415 -> 415 | HTTP_416 -> 416 | HTTP_417 -> 417 | HTTP_422 -> 422 
-      | HTTP_426 -> 426 | HTTP_428 -> 428 | HTTP_429 -> 429 | HTTP_451 -> 451 
-      | HTTP_500 -> 500 | HTTP_501 -> 501 | HTTP_502 -> 502 | HTTP_503 -> 503 
+      | HTTP_303 -> 303 | HTTP_304 -> 304 | HTTP_305 -> 305 | HTTP_306 -> 306
+      | HTTP_307 -> 307 | HTTP_400 -> 400 | HTTP_401 -> 401 | HTTP_402 -> 402
+      | HTTP_403 -> 403 | HTTP_404 -> 404 | HTTP_405 -> 405 | HTTP_406 -> 406
+      | HTTP_407 -> 407 | HTTP_408 -> 408 | HTTP_409 -> 409 | HTTP_410 -> 410
+      | HTTP_411 -> 411 | HTTP_412 -> 412 | HTTP_413 -> 413 | HTTP_414 -> 414
+      | HTTP_415 -> 415 | HTTP_416 -> 416 | HTTP_417 -> 417 | HTTP_422 -> 422
+      | HTTP_426 -> 426 | HTTP_428 -> 428 | HTTP_429 -> 429 | HTTP_451 -> 451
+      | HTTP_500 -> 500 | HTTP_501 -> 501 | HTTP_502 -> 502 | HTTP_503 -> 503
       | HTTP_504 -> 504 | HTTP_505 -> 505
 
     member x.reason =
@@ -193,28 +181,42 @@ module Http =
       | HTTP_505 -> "Cannot fulfill request."
 
     member x.describe () =
-      sprintf "%d %s: %s" x.code x.reason x.message
+       x.code.ToString()  + " " + x.reason + ": " + x.message
 
     member x.status = { code = x.code; reason = x.reason }
 
     static member tryParse (code : int) =
-      let found =
-        HttpCodeStatics.mapCases.Force()
-        |> Map.tryFind ("HTTP_" + string code)
+      match code with
+      | 100 -> Choice1Of2 HTTP_100 | 101 -> Choice1Of2 HTTP_101
+      | 200 -> Choice1Of2 HTTP_200 | 201 -> Choice1Of2 HTTP_201
+      | 202 -> Choice1Of2 HTTP_202 | 203 -> Choice1Of2 HTTP_203
+      | 204 -> Choice1Of2 HTTP_204 | 205 -> Choice1Of2 HTTP_205
+      | 206 -> Choice1Of2 HTTP_206
+      | 300 -> Choice1Of2 HTTP_300 | 301 -> Choice1Of2 HTTP_301
+      | 302 -> Choice1Of2 HTTP_302 | 303 -> Choice1Of2 HTTP_303
+      | 304 -> Choice1Of2 HTTP_304 | 305 -> Choice1Of2 HTTP_305
+      | 306 -> Choice1Of2 HTTP_306 | 307 -> Choice1Of2 HTTP_307
+      | 400 -> Choice1Of2 HTTP_400 | 401 -> Choice1Of2 HTTP_401
+      | 402 -> Choice1Of2 HTTP_402 | 403 -> Choice1Of2 HTTP_403
+      | 404 -> Choice1Of2 HTTP_404 | 405 -> Choice1Of2 HTTP_405
+      | 406 -> Choice1Of2 HTTP_406 | 407 -> Choice1Of2 HTTP_407
+      | 408 -> Choice1Of2 HTTP_408 | 409 -> Choice1Of2 HTTP_409
+      | 410 -> Choice1Of2 HTTP_410 | 411 -> Choice1Of2 HTTP_411
+      | 412 -> Choice1Of2 HTTP_412 | 413 -> Choice1Of2 HTTP_413
+      | 414 -> Choice1Of2 HTTP_414 | 415 -> Choice1Of2 HTTP_415
+      | 416 -> Choice1Of2 HTTP_416 | 417 -> Choice1Of2 HTTP_417
+      | 422 -> Choice1Of2 HTTP_422 | 426 -> Choice1Of2 HTTP_426
+      | 428 -> Choice1Of2 HTTP_428 | 429 -> Choice1Of2 HTTP_429
+      | 451 -> Choice1Of2 HTTP_451
+      | 500 -> Choice1Of2 HTTP_500 | 501 -> Choice1Of2 HTTP_501
+      | 502 -> Choice1Of2 HTTP_502 | 503 -> Choice1Of2 HTTP_503
+      | 504 -> Choice1Of2 HTTP_504 | 505 -> Choice1Of2 HTTP_505
+      | _ ->
+        Choice2Of2 ("Couldn't convert " + code.ToString() + " to HttpCode. Please send a PR to https://github.com/suaveio/suave if you want it")
 
-      match found with
-      | Some x ->
-        Choice1Of2 x
-
-      | None ->
-        Choice2Of2 (sprintf "Couldn't convert %i to HttpCode. Please send a PR to https://github.com/suaveio/suave if you want it" code)
-
-  and private HttpCodeStatics() =
-    static member val mapCases : Lazy<Map<string,HttpCode>> =
-      lazy
-        FSharpType.GetUnionCases(typeof<HttpCode>)
-        |> Array.map (fun case -> case.Name, FSharpValue.MakeUnion(case, [||]) :?> HttpCode)
-        |> Map.ofArray
+  type SameSite =
+      | Strict
+      | Lax
 
   type HttpCookie =
     { name     : string
@@ -223,28 +225,21 @@ module Http =
       path     : string option
       domain   : string option
       secure   : bool
-      httpOnly : bool }
-
-    static member name_     = (fun x -> x.name),    fun v (x : HttpCookie) -> { x with name = v }
-    static member value_    = (fun x -> x.value), fun v (x : HttpCookie) -> { x with value = v }
-    static member expires_  = (fun x -> x.expires), fun v x -> { x with expires = v }
-    static member path_     = (fun x -> x.path), fun v (x : HttpCookie) -> { x with path = v }
-    static member domain_   = (fun x -> x.domain), fun v x -> { x with domain = v }
-    static member secure_   = (fun x -> x.secure), fun v x -> { x with secure = v }
-    static member httpOnly_ = (fun x -> x.httpOnly), fun v x -> { x with httpOnly = v }
+      httpOnly : bool
+      sameSite : SameSite option }
 
   [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
   module HttpCookie =
 
-    let create name value expires path domain secure httpOnly =
+    let create name value expires path domain secure httpOnly sameSite =
       { name      = name
         value     = value
         expires   = expires
         path      = path
         domain    = domain
         secure    = secure
-        httpOnly = httpOnly }
-
+        httpOnly = httpOnly
+        sameSite = sameSite }
 
     let createKV name value =
       { name      = name
@@ -253,89 +248,76 @@ module Http =
         path      = Some "/"
         domain    = None
         secure    = false
-        httpOnly = true }
+        httpOnly = true
+        sameSite = None }
 
     let empty = createKV "" ""
 
-    let toHeader (x : HttpCookie) =
-      let app (sb : StringBuilder) (value : string) = sb.Append value |> ignore
-      let sb = new StringBuilder(String.Concat [ x.name; "="; x.value ])
-      let app value = app sb (String.Concat [";"; value])
-      let appkv k fMap v = v |> Option.iter (fun v -> app (String.Concat [ k; "="; fMap v ]))
-      x.domain  |> appkv "Domain" id
-      x.path    |> appkv "Path" id
-      x.expires |> appkv "Expires" (fun (i : DateTimeOffset) -> i.ToString("R"))
-      if x.httpOnly then app "HttpOnly"
-      if x.secure    then app "Secure"
-      sb.ToString ()
+    let toHeader (cookie : HttpCookie) =
+      let sb = Globals.StringBuilderPool.Get()
+      try
+        // Build cookie header without string concatenation
+        sb.Append(cookie.name : string) |> ignore
+        sb.Append('=') |> ignore
+        sb.Append(cookie.value : string) |> ignore
+        
+        let appSemi (value : string) =
+          sb.Append(';') |> ignore
+          sb.Append(value : string) |> ignore
+        
+        let appKeyValue (k : string) (value : string) =
+          sb.Append(';') |> ignore
+          sb.Append(k : string) |> ignore
+          sb.Append('=') |> ignore
+          sb.Append(value : string) |> ignore
+        
+        cookie.domain  |> Option.iter (appKeyValue "Domain")
+        cookie.path    |> Option.iter (appKeyValue "Path")
+        cookie.expires |> Option.iter (fun i -> appKeyValue "Expires" (i.ToString("R")))
+        
+        if cookie.httpOnly then appSemi "HttpOnly"
+        if cookie.secure then appSemi "Secure"
+        
+        match cookie.sameSite with
+        | Some Strict -> appKeyValue "SameSite" "Strict"
+        | Some Lax -> appKeyValue "SameSite" "Lax"
+        | None -> ()
+        
+        sb.ToString()
+      finally
+        Globals.StringBuilderPool.Return(sb)
 
-  type MimeType =
-    { name        : string
-      compression : bool }
-
-    static member name_ = Property (fun x -> x.name) (fun v (x : MimeType) -> { x with name = v })
-    static member compression_ = Property (fun x -> x.compression) (fun v (x : MimeType) -> { x with compression = v })
-
-  type MimeTypesMap = string -> MimeType option
-
-  type HttpUpload =
-    { fieldName    : string
-      fileName     : string
-      mimeType     : string
-      tempFilePath : string }
-
-    static member fieldName_ = Property<HttpUpload,_> (fun x -> x.fieldName) (fun v x -> { x with fieldName = v })
-    static member fileName_ = Property<HttpUpload,_> (fun x -> x.fileName) (fun v x -> { x with fileName = v })
-    static member mimeType_ = Property<HttpUpload,_> (fun x -> x.mimeType) (fun v x -> { x with mimeType = v })
-    static member tempFilePath_ = Property<HttpUpload,_> (fun x -> x.tempFilePath) (fun v x -> { x with tempFilePath = v })
-
-  [<AllowNullLiteral>]
-  type TlsProvider =
-    abstract member wrap : Connection * obj -> SocketOp<Connection>
-
-  type Protocol =
-    | HTTP
-    | HTTPS of obj
-
-    member x.secure =
-      match x with
-      | HTTP    -> false
-      | HTTPS _ -> true
-
-    override x.ToString() =
-      match x with
-      | HTTP    -> "http"
-      | HTTPS _ -> "https"
-
-  type Host = string
-
-  type HttpRequest =
+  type [<Struct>] HttpRequest =
     { httpVersion     : string
-      url             : Uri
-      host            : Host
-      ``method``      : HttpMethod
-      headers         : (string * string) list
+      binding         : HttpBinding
+      rawPath         : string
+      rawHost         : string
+      rawMethod       : string
+      headers         : List<(string * string)>
       rawForm         : byte []
       rawQuery        : string
-      files           : HttpUpload list
-      multiPartFields : (string * string) list
-      trace           : TraceHeader }
-    static member httpVersion_     = Property<HttpRequest,_> (fun x -> x.httpVersion) (fun v (x : HttpRequest) -> { x with httpVersion = v })
-    static member url_             = Property<HttpRequest,_> (fun x -> x.url) (fun v x -> { x with url = v })
-    static member host_            = Property<HttpRequest,_> (fun x -> x.host) (fun v x -> { x with host = v })
-    static member method_          = Property<HttpRequest,_> (fun x -> x.``method``) (fun v x -> { x with ``method`` = v })
-    static member headers_         = Property<HttpRequest,_> (fun x -> x.headers) (fun v x -> { x with headers = v })
-    static member rawForm_         = Property<HttpRequest,_> (fun x -> x.rawForm) (fun v x -> { x with rawForm = v })
-    static member rawQuery_        = Property<HttpRequest,_> (fun x -> x.rawQuery) (fun v x -> { x with rawQuery = v })
-    static member files_           = Property<HttpRequest,_> (fun x -> x.files) (fun v x -> { x with files = v })
-    static member multipartFields_ = Property<HttpRequest,_> (fun x -> x.multiPartFields) (fun v x -> { x with multiPartFields = v })
-    static member trace_           = Property<HttpRequest,_> (fun x -> x.trace) (fun v x -> { x with trace = v })
+      files           : List<HttpUpload>
+      multiPartFields : List<(string * string)> }
+
+    member x.url = x.binding.uri x.rawPath x.rawQuery
 
     member x.query =
       Parsing.parseData x.rawQuery
 
     member x.queryParam (key : string) =
       getFirstOpt x.query key
+
+    member x.queryParamOpt (key : string) =
+      x.query |> List.tryFind (fst >> (=) key)
+
+    member x.queryFlag flag =
+      match x.queryParamOpt flag with
+      | None -> false // no flag
+      | Some (_, None) -> true // flag with no value (means true)
+      | Some (_, Some value) -> // flag with some value
+        match bool.TryParse value with
+        | true, res -> res // parsed bool to `res`
+        | false, _ -> false // couldn't parse boo
 
     member x.header key =
       // Field names are case-insensitive (RFC 2616 section 4.2)
@@ -347,11 +329,11 @@ module Http =
     member x.formData (key : string) =
       getFirstOpt x.form key
 
-    member x.fieldData (k : string) =
-      getFirst x.multiPartFields k
+    member x.fieldData (key : string) =
+      getFirst x.multiPartFields key
 
     member this.Item
-      with get(x) =
+      with get(key) =
 
         let inline (>>=) f1 f2 x =
           match f1 x with
@@ -363,13 +345,14 @@ module Http =
             >>= (tryGetChoice1 this.formData)
             >>= (tryGetChoice1 <| getFirst this.multiPartFields)
 
-        params' x
+        params' key
 
     member x.clientHost trustProxy sources : string =
       if trustProxy then
+        let y = x //
         sources
         |> List.fold (fun state source ->
-          state |> Choice.bindSnd (fun _ -> x.header source))
+          state |> Choice.bindSnd (fun _ -> y.header source))
           (Choice2Of2 "")
         |> Choice.orDefault x.host
       else
@@ -379,164 +362,92 @@ module Http =
       x.clientHost true [ "x-forwarded-host" ]
 
     member x.path =
-      System.Net.WebUtility.UrlDecode x.url.AbsolutePath
+      System.Net.WebUtility.UrlDecode x.rawPath
+
+    member x.method = HttpMethod.parse x.rawMethod
+
+    member x.host =
+      let indexOfColon = x.rawHost.LastIndexOf(':')
+      if indexOfColon = -1 then
+        x.rawHost
+      else
+        x.rawHost.Substring(0, indexOfColon)
 
   [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
   module HttpRequest =
 
-    open Suave.Utils
-
     let empty =
       { httpVersion     = "HTTP/1.1"
-        url             = Uri "http://localhost/"
-        host            = "localhost"
-        ``method``      = HttpMethod.OTHER ""
-        headers         = []
+        rawPath = "/"
+        binding = { scheme = HTTP; socketBinding = SocketBinding.create IPAddress.Any 8080us }
+        rawHost            = "localhost"
+        rawMethod     = "GET"
+        headers         = List<_>()
         rawForm         = Array.empty
         rawQuery        = ""
-        files           = []
-        multiPartFields = []
-        trace           = TraceHeader.empty }
-
-  type HttpBinding =
-    { scheme        : Protocol
-      socketBinding : SocketBinding }
-
-    member x.uri (path : string) query =
-      let path' = if path.StartsWith "/" then path else "/" + path
-      String.Concat [
-        x.scheme.ToString(); "://"; x.socketBinding.ToString()
-        path'
-        (match query with | "" -> "" | qs -> "?" + qs)
-      ]
-      |> fun x -> Uri x
-
-    override x.ToString() =
-      String.Concat [ x.scheme.ToString(); "://"; x.socketBinding.ToString() ]
-
-    static member scheme_ = Property<HttpBinding,_> (fun x -> x.scheme) (fun v x -> { x with scheme = v })
-    static member socketBinding_ = Property<HttpBinding,_> (fun x -> x.socketBinding) (fun v x -> { x with socketBinding=v })
-
-  [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
-  module HttpBinding =
-
-    let DefaultBindingPort = 8083us
-
-    let defaults =
-      { scheme        = HTTP
-        socketBinding = SocketBinding.create IPAddress.Loopback DefaultBindingPort }
-
-    let create scheme (ip : IPAddress) (port : Port) =
-      { scheme        = scheme
-        socketBinding = SocketBinding.create ip port }
-
-    let createSimple scheme ip (port : int) =
-      { scheme        = scheme
-        socketBinding = SocketBinding.create (IPAddress.Parse ip) (uint16 port) }
+        files           = List<_>()
+        multiPartFields = List<_>()
+        }
 
   type HttpContent =
     | NullContent
     | Bytes of byte []
-    | SocketTask of (Connection * HttpResult -> SocketOp<Connection>)
+    | SocketTask of (Connection * HttpResult -> Threading.Tasks.Task<unit>)
 
-    static member NullContent__ =
-      (function | NullContent -> Some ()
-                | _ -> None),
-      fun _ -> NullContent
-
-    static member Bytes__ =
-      (function | Bytes bs -> Some bs
-                | _ -> None),
-      Bytes
-
-    static member SocketTask__ =
-      (function | SocketTask cb -> Some cb
-                | _ -> None),
-      (fun cb -> SocketTask cb)
-
-    static member NullContent_ : PLens<HttpContent, unit> =
-      Aether.idLens <-?> HttpContent.NullContent__
-
-    static member Bytes_ : PLens<HttpContent, byte[]> =
-      Aether.idLens <-?> HttpContent.Bytes__
-
-    static member SocketTask_ : PLens<HttpContent, Connection * HttpResult -> SocketOp<Connection>> =
-      Aether.idLens <-?> HttpContent.SocketTask__
-
-  and HttpResult =
+  and [<Struct>] HttpResult =
     { status        : HttpStatus
       headers       : (string * string) list
       content       : HttpContent
       writePreamble : bool }
 
-    static member status_ = Property<HttpResult,_> (fun x -> x.status) (fun v x -> { x with status = v })
-    static member headers_ = Property<HttpResult,_> (fun x -> x.headers) (fun v x -> { x with headers = v })
-    static member content_ = Property<HttpResult,_> (fun x -> x.content) (fun v x -> { x with content = v })
-    static member writePreamble_ = Property<HttpResult,_> (fun x -> x.writePreamble) (fun v x -> { x with writePreamble = v })
-
-  type ServerKey = byte []
-
-  type IPAddress with
-    static member tryParseC str =
-      match IPAddress.TryParse str with
-      | false, _ -> Choice2Of2 ()
-      | _, ip    -> Choice1Of2 ip
-
   type HttpRuntime =
     { serverKey         : ServerKey
-      errorHandler      : ErrorHandler
+      errorHandler      : ErrorHandler // this shouldn't be here
       mimeTypesMap      : MimeTypesMap
       homeDirectory     : string
       compressionFolder : string
-      logger            : Logger
       matchedBinding    : HttpBinding
-      parsePostData     : bool
       cookieSerialiser  : CookieSerialiser
-      tlsProvider       : TlsProvider
-      hideHeader        : bool }
-
-    static member serverKey_ = Property (fun x -> x.serverKey) (fun v x -> { x with serverKey = v })
-    static member errorHandler_ = Property (fun x -> x.errorHandler) (fun v x -> { x with errorHandler = v })
-    static member mimeTypesMap_ = Property (fun x -> x.mimeTypesMap) (fun v x -> { x with mimeTypesMap = v })
-    static member homeDirectory_ = Property (fun x -> x.homeDirectory) (fun v x -> { x with homeDirectory = v })
-    static member compressionFolder_ = Property (fun x -> x.compressionFolder) (fun v x -> { x with compressionFolder = v })
-    static member logger_ = Property (fun x -> x.logger) (fun v x -> { x with logger = v })
-    static member matchedBinding_ = Property (fun x -> x.matchedBinding) (fun v x -> { x with matchedBinding = v })
-    static member parsePostData_ = Property (fun x -> x.parsePostData) (fun v x -> { x with parsePostData = v })
-    static member cookieSerialiser_ = Property (fun x -> x.cookieSerialiser) (fun v x -> { x with cookieSerialiser = v })
-    static member tlsProvider_ = Property (fun x -> x.tlsProvider) (fun v x -> { x with tlsProvider = v })
-    static member hideHeader_ = Property (fun x -> x.hideHeader) (fun v x -> { x with hideHeader = v })
-
-  and HttpContext =
-    { request    : HttpRequest
+      hideHeader        : bool
+      maxContentLength  : int
+      /// Optional sink factory for streaming multipart file parts.
+      /// When <c>None</c> (the default), each file part is buffered to a temp file on disk.
+      filePartSink      : FilePartSink option }
+  and [<Struct>] HttpContext =
+    { mutable request    : HttpRequest
       runtime    : HttpRuntime
       connection : Connection
-      userState  : Map<string, obj>
+      userState  : Dictionary<string, obj>
       response   : HttpResult }
 
     member x.clientIp trustProxy sources =
       if trustProxy then
+        let y = x
         sources
         |> List.fold (fun state source ->
           state |> Choice.bindSnd (fun _ ->
-            x.request.header source |> Choice.bindUnit IPAddress.tryParseC))
+            y.request.header source |> Choice.bindUnit IPAddress.tryParseC))
           (Choice2Of2 ())
         |> Choice.orDefault x.connection.ipAddr
       else
         x.connection.ipAddr
 
     member x.clientIpTrustProxy =
-      x.clientIp true [ "x-real-ip" ]
+      x.clientIp true [ "x-real-ip"; "x-forwarded-for" ]
 
     member x.isLocal =
       IPAddress.IsLoopback (x.clientIp false [])
+      
+    member x.isLocalTrustProxy =
+      IPAddress.IsLoopback (x.clientIp true [ "x-real-ip"; "x-forwarded-for" ])
 
     member x.clientPort trustProxy sources : Port =
       if trustProxy then
+        let y = x
         sources
         |> List.fold (fun state source ->
           state |> Choice.bindSnd (fun _ ->
-            x.request.header source
+            y.request.header source
             |> Choice.bind (
               Choice.parser UInt16.TryParse "failed to parse X-Forwarded-Port")))
           (Choice2Of2 "")
@@ -549,10 +460,11 @@ module Http =
 
     member x.clientProto trustProxy sources : string =
       if trustProxy then
+        let y = x
         sources
         |> List.fold (fun state source ->
           state |> Choice.bindSnd (fun _ ->
-            x.request.header source))
+            y.request.header source))
           (Choice2Of2 "")
         |> Choice.orDefault (x.runtime.matchedBinding.scheme.ToString())
       else
@@ -560,18 +472,6 @@ module Http =
 
     member x.clientProtoTrustProxy =
       x.clientProto true [ "x-forwarded-proto" ]
-
-    static member request_     = Property (fun x -> x.request) (fun v x -> { x with request = v })
-    static member runtime_     = Property (fun x -> x.runtime) (fun v x -> { x with runtime = v })
-    static member connection_  = Property (fun x -> x.connection) (fun v x -> x)
-    static member userState_   = Property (fun x -> x.userState) (fun v x -> { x with userState = v })
-    static member response_    = Property (fun x -> x.response) (fun v x -> { x with response = v })
-
-    // read-only
-    static member clientIp_    = Property (fun (x : HttpContext) -> x.clientIpTrustProxy) (fun v x -> x)
-    static member isLocal_     = Property (fun (x : HttpContext) -> x.isLocal) (fun v x -> x)
-    static member clientPort_  = Property (fun (x : HttpContext) -> x.clientPortTrustProxy) (fun v x -> x)
-    static member clientProto_ = Property (fun (x : HttpContext) -> x.clientProtoTrustProxy) (fun v x -> x)
 
   and ErrorHandler = Exception -> String -> WebPart<HttpContext>
 
@@ -601,43 +501,37 @@ module Http =
         mimeTypesMap      = fun _ -> None
         homeDirectory     = "."
         compressionFolder = "."
-        logger            = Targets.create Debug
         matchedBinding    = HttpBinding.defaults
-        parsePostData     = false
-        #if NETSTANDARD1_5
-        cookieSerialiser  = new JsonFormatterSerialiser()
-        #else
         cookieSerialiser  = new BinaryFormatterSerialiser()
-        #endif
-        tlsProvider       = null
-        hideHeader        = false }
+        hideHeader        = false
+        maxContentLength  = 1024
+        filePartSink      = None }
 
     let create serverKey errorHandler mimeTypes homeDirectory compressionFolder
-           logger parsePostData cookieSerialiser tlsProvider hideHeader binding =
+           (*logger*) cookieSerialiser hideHeader maxContentLength binding =
       { serverKey         = serverKey
         errorHandler      = errorHandler
         mimeTypesMap      = mimeTypes
         homeDirectory     = homeDirectory
         compressionFolder = compressionFolder
-        logger            = logger
         matchedBinding    = binding
-        parsePostData     = parsePostData
         cookieSerialiser  = cookieSerialiser
-        tlsProvider       = tlsProvider
-        hideHeader        = hideHeader }
+        hideHeader        = hideHeader
+        maxContentLength  = maxContentLength
+        filePartSink      = None }
 
   [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
   module HttpContext =
     let empty =
       { request    = HttpRequest.empty
-        userState  = Map.empty
+        userState  = null
         runtime    = HttpRuntime.empty
         connection = Connection.empty
         response   = HttpResult.empty }
 
     let create request runtime connection writePreamble =
       { request    = request
-        userState  = Map.empty
+        userState  = Globals.DictionaryPool.Get()
         runtime    = runtime
         connection = connection
         response   = { status = HTTP_404.status
@@ -650,5 +544,11 @@ module Http =
     let runtime x = x.runtime
     let response x = x.response
 
-  let request apply (a : HttpContext) = apply a.request a
-  let context apply (a : HttpContext) = apply a a
+    let addKeepAliveHeader (ctx : HttpContext) =
+      match ctx.request.httpVersion, ctx.request.header "connection" with
+      | "HTTP/1.0", Choice1Of2 v when String.equalsOrdinalCI v "keep-alive" ->
+        { ctx with response = { ctx.response with headers = ("Connection","Keep-Alive") :: ctx.response.headers } }
+      | _ -> ctx
+
+  let request apply (context : HttpContext) = apply context.request context
+  let context apply (context : HttpContext) = apply context context

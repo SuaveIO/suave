@@ -2,28 +2,23 @@ namespace Suave
 
 open Suave.Operators
 open Suave.Sockets
+open System.Threading.Tasks
 
 module Response =
 
-  open System
-  open System.IO
-
-  let response (statusCode : HttpCode) (cnt : byte []) =
+  let response (statusCode : HttpCode) (content : byte []) =
     fun (ctx : HttpContext) ->
       let response =
-        { ctx.response with status = statusCode.status; content = Bytes cnt }
+        { ctx.response with status = statusCode.status; content = Bytes content }
       { ctx with response = response } |> succeed
 
 module Writers =
-  // TODO: transform into a set of lenses with Aether
-  // @ https://github.com/xyncro/aether and move closer to HttpContext.
 
   open System
-  open Suave.Utils
 
-  let setStatus (s : HttpCode) : WebPart =
+  let setStatus (status : HttpCode) : WebPart =
     fun ctx ->
-      { ctx with response = { ctx.response with status = s.status }}
+      { ctx with response = { ctx.response with status = status.status }}
       |> succeed
 
   let setStatusCode (code : int) : WebPart =
@@ -76,18 +71,22 @@ module Writers =
     |> succeed
 
   let setUserData key value (ctx : HttpContext) =
-    { ctx with userState = ctx.userState |> Map.add key (box value) }
-    |> succeed
+    if ctx.userState.ContainsKey key then
+      ctx.userState.[key] <- box value
+    else
+      ctx.userState.Add(key, box value)
+    succeed ctx
 
   let unsetUserData key (ctx : HttpContext) =
-    { ctx with userState = ctx.userState |> Map.remove key }
-    |> succeed
+    ctx.userState.Remove(key) |> ignore
+    succeed ctx
 
   // TODO: I'm not sure about having MIME types in the Writers module
   let createMimeType name compression =
     { name=name; compression=compression } |> Some
 
-  let defaultMimeTypesMap = function
+  let defaultMimeTypesMap (ext:string) =
+    match ext with
     | ".bmp" -> createMimeType "image/bmp" false
     | ".css" -> createMimeType "text/css" true
     | ".gif" -> createMimeType "image/gif" false
@@ -104,6 +103,7 @@ module Writers =
     | ".jpeg"
     | ".jpg" -> createMimeType "image/jpeg" false
     | ".exe" -> createMimeType "application/exe" false
+    | ".pdf" -> createMimeType "application/pdf" false
     | ".txt" -> createMimeType "text/plain" true
     | ".ttf" -> createMimeType "application/x-font-ttf" true
     | ".otf" -> createMimeType "application/font-sfnt" true
@@ -112,7 +112,7 @@ module Writers =
     | ".eot" -> createMimeType "application/vnd.ms-fontobject" false
     | _      -> None
 
-  let setMimeType t = setHeader "Content-Type" t
+  let setMimeType mimeType = setHeader "Content-Type" mimeType
 
 // 1xx
 module Intermediate =
@@ -128,22 +128,21 @@ module Intermediate =
 
 // 2xx
 module Successful =
-
-  open Suave.Utils
+  open System.Text
   open Response
 
-  let ok s : WebPart =
-    fun ctx -> { ctx with response = { ctx.response with status = HTTP_200.status; content = Bytes s }} |> succeed
+  let ok bytes : WebPart =
+    fun ctx -> { ctx with response = { ctx.response with status = HTTP_200.status; content = Bytes bytes }} |> succeed
 
-  let OK a = ok (UTF8.bytes a)
+  let OK (body:string) = ok (Encoding.UTF8.GetBytes body)
 
-  let created s = response HTTP_201 s
+  let created bytes = response HTTP_201 bytes
 
-  let CREATED s = created (UTF8.bytes s)
+  let CREATED (body:string) = created (Encoding.UTF8.GetBytes body)
 
-  let accepted s = response HTTP_202 s
+  let accepted bytes = response HTTP_202 bytes
 
-  let ACCEPTED s = accepted (UTF8.bytes s)
+  let ACCEPTED (body:string) = accepted (Encoding.UTF8.GetBytes body)
 
   let no_content : WebPart =
     fun ctx -> { ctx with response = { status = HTTP_204.status; headers = ctx.response.headers; content = Bytes [||]; writePreamble = true }} |> succeed
@@ -152,8 +151,7 @@ module Successful =
 
 // 3xx
 module Redirection =
-
-  open Suave.Utils
+  open System.Text
   open Response
   open Writers
 
@@ -169,16 +167,25 @@ module Redirection =
 
   let FOUND location = found location
 
-  let redirect url =
-    setHeader "Location" url
+  let redirect location =
+    setHeader "Location" location
     >=> setHeader "Content-Type" "text/html; charset=utf-8"
     >=> response HTTP_302 (
-      UTF8.bytes(sprintf "<html>
+      Encoding.UTF8.GetBytes("<html>
   <body>
-    <a href=\"%s\">%s</a>
+    <a href=\"" + location  + "\">" + HTTP_302.message + "</a>
   </body>
-</html>"
-      url HTTP_302.message))
+</html>"))
+
+  let see_other location =
+    setHeader "Location" location
+    >=> setHeader "Content-Type" "text/html; charset=utf-8"
+    >=> response HTTP_303 (
+      Encoding.UTF8.GetBytes("<html>
+  <body>
+    <a href=\"" + location + "\">" + HTTP_303.message + "</a>
+  </body>
+</html>"))
 
   let not_modified : WebPart =
     fun ctx -> { ctx with response = {status = HTTP_304.status; headers = []; content = Bytes [||]; writePreamble = true }} |> succeed
@@ -188,131 +195,132 @@ module Redirection =
 
 // 4xx
 module RequestErrors =
-
-  open Suave.Utils
+  open System.Text
   open Response
   open Writers
 
-  let bad_request s = response HTTP_400 s
+  let bad_request bytes = response HTTP_400 bytes
 
-  let BAD_REQUEST s = bad_request (UTF8.bytes s)
+  let BAD_REQUEST (body:string) = bad_request (Encoding.UTF8.GetBytes body)
 
   /// 401: see http://stackoverflow.com/questions/3297048/403-forbidden-vs-401-unauthorized-http-responses/12675357
-  let unauthorized s =
+  let unauthorized bytes =
     setHeader "WWW-Authenticate" "Basic realm=\"protected\""
-    >=> response HTTP_401 s
+    >=> response HTTP_401 bytes
 
-  let UNAUTHORIZED s = unauthorized (UTF8.bytes s)
+  let UNAUTHORIZED (body:string) = unauthorized (Encoding.UTF8.GetBytes body)
 
   let challenge = UNAUTHORIZED HTTP_401.message
 
-  let forbidden s = response HTTP_403 s
+  let forbidden bytes = response HTTP_403 bytes
 
-  let FORBIDDEN s = forbidden (UTF8.bytes s)
+  let FORBIDDEN (body:string) = forbidden (Encoding.UTF8.GetBytes body)
 
-  let not_found s = response HTTP_404 s
+  let not_found bytes = response HTTP_404 bytes
 
-  let NOT_FOUND message = not_found (UTF8.bytes message)
+  let NOT_FOUND (body:string) = not_found (Encoding.UTF8.GetBytes body)
 
-  let method_not_allowed s = response HTTP_405 s
+  let method_not_allowed bytes = response HTTP_405 bytes
 
-  let METHOD_NOT_ALLOWED s = method_not_allowed (UTF8.bytes s)
+  let METHOD_NOT_ALLOWED (body:string) = method_not_allowed (Encoding.UTF8.GetBytes body)
 
-  let not_acceptable s = response HTTP_406 s
+  let not_acceptable bytes = response HTTP_406 bytes
 
-  let NOT_ACCEPTABLE message = not_acceptable (UTF8.bytes message)
+  let NOT_ACCEPTABLE (body:string) = not_acceptable (Encoding.UTF8.GetBytes body)
 
   let request_timeout = response HTTP_408 [||]
 
   // all-caps req.timeout elided intentionally, as nothing can be passed to
   // a writing client
 
-  let conflict s = response HTTP_409 s
+  let conflict bytes = response HTTP_409 bytes
 
-  let CONFLICT message = conflict (UTF8.bytes message)
+  let CONFLICT (body:string) = conflict (Encoding.UTF8.GetBytes body)
 
-  let gone s = response HTTP_410 s
+  let gone bytes = response HTTP_410 bytes
 
-  let GONE s = gone (UTF8.bytes s)
+  let GONE (body:string) = gone (Encoding.UTF8.GetBytes body)
 
-  let unsupported_media_type s = response HTTP_415 s
+  let unsupported_media_type bytes = response HTTP_415 bytes
 
-  let UNSUPPORTED_MEDIA_TYPE s = unsupported_media_type (UTF8.bytes s)
+  let UNSUPPORTED_MEDIA_TYPE (body:string) = unsupported_media_type (Encoding.UTF8.GetBytes body)
 
-  let unprocessable_entity s = response HTTP_422 s
+  let unprocessable_entity bytes = response HTTP_422 bytes
 
-  let UNPROCESSABLE_ENTITY s = unprocessable_entity (UTF8.bytes s)
+  let UNPROCESSABLE_ENTITY (body:string) = unprocessable_entity (Encoding.UTF8.GetBytes body)
 
-  let precondition_required body = response HTTP_428 body
+  let precondition_required bytes = response HTTP_428 bytes
 
-  let PRECONDITION_REQUIRED body = precondition_required (UTF8.bytes body)
+  let PRECONDITION_REQUIRED (body:string) = precondition_required (Encoding.UTF8.GetBytes body)
 
-  let too_many_requests s = response HTTP_429 s
+  let too_many_requests bytes = response HTTP_429 bytes
 
-  let TOO_MANY_REQUESTS s = too_many_requests (UTF8.bytes s)
+  let TOO_MANY_REQUESTS (body:string) = too_many_requests (Encoding.UTF8.GetBytes body)
 
 module ServerErrors =
 
-  open Suave.Utils
+  open System.Text
   open Response
 
-  let internal_error arr = response HTTP_500 arr
+  let internal_error bytes = response HTTP_500 bytes
 
-  let INTERNAL_ERROR message = internal_error (UTF8.bytes message)
+  let INTERNAL_ERROR (body:string) = internal_error (Encoding.UTF8.GetBytes body)
 
-  let not_implemented arr = response HTTP_501 arr
+  let not_implemented bytes = response HTTP_501 bytes
 
-  let NOT_IMPLEMENTED message = not_implemented (UTF8.bytes message)
+  let NOT_IMPLEMENTED (body:string) = not_implemented (Encoding.UTF8.GetBytes body)
 
-  let bad_gateway arr = response HTTP_502 arr
+  let bad_gateway bytes = response HTTP_502 bytes
 
-  let BAD_GATEWAY message = bad_gateway (UTF8.bytes message)
+  let BAD_GATEWAY (body:string) = bad_gateway (Encoding.UTF8.GetBytes body)
 
-  let service_unavailable arr = response HTTP_503 arr
+  let service_unavailable bytes = response HTTP_503 bytes
 
-  let SERVICE_UNAVAILABLE message = service_unavailable (UTF8.bytes message)
+  let SERVICE_UNAVAILABLE (body:string) = service_unavailable (Encoding.UTF8.GetBytes body)
 
-  let gateway_timeout arr = response HTTP_504 arr
+  let gateway_timeout bytes = response HTTP_504 bytes
 
-  let GATEWAY_TIMEOUT message = gateway_timeout (UTF8.bytes message)
+  let GATEWAY_TIMEOUT (body:string) = gateway_timeout (Encoding.UTF8.GetBytes body)
 
-  let invalid_http_version arr = response HTTP_505 arr
+  let invalid_http_version bytes = response HTTP_505 bytes
 
-  let INVALID_HTTP_VERSION = invalid_http_version (UTF8.bytes HTTP_505.message)
+  let INVALID_HTTP_VERSION = invalid_http_version (Encoding.UTF8.GetBytes HTTP_505.message)
 
 module Filters =
-  open Suave.Utils
   open Suave.Utils.AsyncExtensions
-  open Suave.Logging
   open System
+  open System.Text
   open System.Text.RegularExpressions
 
   module private Option =
     let iff b x =
       if b then Some x else None
 
-  let path s (x : HttpContext) =
-    async.Return (Option.iff (s = x.request.path) x)
+  let path pathAfterDomain (x : HttpContext) =
+    async.Return (Option.iff (pathAfterDomain = x.request.path) x)
 
-  let pathStarts s (x : HttpContext) =
-    async.Return (Option.iff (x.request.path.StartsWith s) x)
+  let pathCi pathAfterDomain (x : HttpContext) =
+    async.Return (Option.iff (String.Equals(pathAfterDomain, x.request.path, StringComparison.CurrentCultureIgnoreCase)) x)
+
+  let pathStarts (pathAfterDomainSubstr:string) (x : HttpContext) =
+    async.Return (Option.iff (x.request.path.StartsWith pathAfterDomainSubstr) x)
+
+  let pathStartsCi pathAfterDomainSubstr (x : HttpContext) =
+    async.Return (Option.iff (x.request.path.StartsWith (pathAfterDomainSubstr, StringComparison.CurrentCultureIgnoreCase)) x)
 
   let url x = path x
 
-  let ``method`` (m : HttpMethod) (x : HttpContext) =
-    async.Return (Option.iff (m = x.request.``method``) x)
+  let ``method`` (method : HttpMethod) (x : HttpContext) =
+    async.Return (Option.iff (method = x.request.``method``) x)
 
   let isSecure (x : HttpContext) =
     async.Return (Option.iff x.runtime.matchedBinding.scheme.secure x)
 
-  let hasFlag flag (x : HttpContext) =
-    x.request.query
-    |> List.tryFind (fst >> (=) flag)
-    |> Option.map (fun _ -> x)
-    |> async.Return
+  let hasFlag flag (ctx : HttpContext) =
+    if ctx.request.queryFlag flag then succeed ctx else fail
 
-  let pathRegex regex (x : HttpContext) =
-    async.Return (Option.iff (Regex.IsMatch(x.request.path, regex)) x)
+  let pathRegex pathAfterDomainRegex (x : HttpContext) =
+    async.Return (Option.iff (Regex.IsMatch(x.request.path, pathAfterDomainRegex)) x)
 
   let urlRegex x = pathRegex x
 
@@ -336,30 +344,32 @@ module Filters =
   let TRACE   (x : HttpContext) = ``method`` HttpMethod.TRACE x
   let OPTIONS (x : HttpContext) = ``method`` HttpMethod.OPTIONS x
 
+  let getUserName (ctx : HttpContext) =
+    match ctx.userState.TryGetValue "userName"  with true, x -> x :?> string | false, _ -> "-"
+
   let logFormat (ctx : HttpContext) =
 
     let dash = function | "" | null -> "-" | x -> x
     let ci = Globalization.CultureInfo("en-US")
     let processId = System.Diagnostics.Process.GetCurrentProcess().Id.ToString()
-    sprintf "%O %s %s [%s] \"%s %s %s\" %d %d"
-      ctx.clientIpTrustProxy
-      processId //TODO: obtain connection owner via Ident protocol
-                         // Authentication.UserNameKey
-      (match Map.tryFind "userName" ctx.userState with Some x -> x :?> string | None -> "-")
-      (DateTime.UtcNow.ToString("dd/MMM/yyyy:hh:mm:ss %K", ci))
-      (string ctx.request.``method``)
-      ctx.request.url.AbsolutePath
-      ctx.request.httpVersion
-      ctx.response.status.code
-      (match ctx.response.content with
-      | Bytes bs -> bs.Length
-      | _ -> 0)
+    ctx.clientIpTrustProxy.ToString() + " " +
+    processId + " " + //TODO: obtain connection owner via Ident protocol
+                       // Authentication.UserNameKey
+    (getUserName ctx) + " [" +
+    (DateTime.UtcNow.ToString("dd/MMM/yyyy:hh:mm:ss %K", ci)) + "] \"" +
+    (string ctx.request.``method``) + " " +
+    ctx.request.url.AbsolutePath + " " +
+    ctx.request.httpVersion + "\" " +
+    ctx.response.status.code.ToString() + " " +
+    (match ctx.response.content with
+    | Bytes bs -> bs.Length.ToString()
+    | _ -> "0")
 
   let logFormatStructured (ctx : HttpContext) =
     let fieldList : (string*obj) list = [
       "clientIp", box ctx.clientIpTrustProxy
       "processId", box (System.Diagnostics.Process.GetCurrentProcess().Id.ToString())
-      "userName", box (match Map.tryFind "userName" ctx.userState with Some x -> x :?> string | None -> "-")
+      "userName", box (getUserName ctx)
       "utcNow", box DateTime.UtcNow
       "requestMethod", box (ctx.request.``method``)
       "requestUrlPath", box (ctx.request.url.AbsolutePath)
@@ -369,35 +379,7 @@ module Filters =
     ]
     "{clientIp} {processId} {userName} [{utcNow:dd/MMM/yyyy:hh:mm:ss %K}] \"{requestMethod} {requestUrlPath} {httpVersion}\" {httpStatusCode} {responseContentLength}", fieldList |> Map
 
-  let logWithLevel (level : LogLevel) (logger : Logger) (formatter : HttpContext -> string) (ctx : HttpContext) =
-    logger.log level <| fun _ ->
-      { value         = Event (formatter ctx)
-        level         = level
-        name          = [| "Suave"; "Http"; "requests" |]
-        fields        = Map.empty
-        timestamp     = Suave.Logging.Global.timestamp() }
-
-    succeed ctx
-
-  let logWithLevelStructured (level : LogLevel) (logger : Logger) (templateAndFieldsCreator : HttpContext -> (string * Map<string,obj>)) (ctx : HttpContext) =
-    logger.log level <| fun _ ->
-      let template, fields = templateAndFieldsCreator ctx
-      { value         = Event template
-        level         = level
-        name          = [| "Suave"; "Http"; "requests" |]
-        fields        = fields
-        timestamp     = Suave.Logging.Global.timestamp() }
-
-    succeed ctx
-
-  let logStructured (logger : Logger) (structuredFormatter : HttpContext -> (string * Map<string,obj>)) =
-    logWithLevelStructured LogLevel.Debug logger structuredFormatter
-
-  let log (logger : Logger) (formatter : HttpContext -> string) =
-    logWithLevel LogLevel.Debug logger formatter
-
   open Suave.Sscanf
-  open ServerErrors
 
   let pathScan (pf : PrintfFormat<_,_,_,_,'t>) (h : 't ->  WebPart) : WebPart =
 
@@ -416,15 +398,37 @@ module Filters =
         fail
     F
 
+  let pathScanCi (format : PrintfFormat<_,_,_,_,'t>) (handler : 't ->  WebPart) : WebPart =
+    let scan path =
+      try
+        let extract = sscanfci format path
+        Some extract
+      with _ ->
+        None
+
+    let part (context:HttpContext) =
+      match scan context.request.path with
+      | Some extract ->
+        handler extract context
+      | None ->
+        fail
+    part
+
+  [<System.Diagnostics.CodeAnalysis.RequiresDynamicCode(
+    "urlScan delegates to pathScan / Suave.Sscanf. Use Suave.Router for AOT.")>]
   let urlScan s x = pathScan s x
 
-  let timeoutWebPart (timeSpan : TimeSpan) (webPart : WebPart) : WebPart =
+  [<System.Diagnostics.CodeAnalysis.RequiresDynamicCode(
+    "urlScanCi delegates to pathScanCi / Suave.Sscanf. Use Suave.Router for AOT.")>]
+  let urlScanCi s x = pathScanCi s x
+
+  let timeoutWebPart (timeout : TimeSpan) (child : WebPart) : WebPart =
     fun (ctx : HttpContext) -> async {
       try
-        return! Async.WithTimeout (timeSpan, webPart ctx)
+        return! Async.WithTimeout (timeout, child ctx)
       with
         | :? TimeoutException ->
-          return! Response.response HttpCode.HTTP_408 (UTF8.bytes "Request Timeout") ctx
+          return! Response.response HttpCode.HTTP_408 (Encoding.UTF8.GetBytes "Request Timeout") ctx
           }
 
 /// not part of the public API at this point
@@ -436,8 +440,6 @@ module ServeResource =
   open Redirection
   open RequestErrors
   open Suave.Utils
-  open Suave.Logging
-  open Suave.Logging.Message
 
   // If a response includes both an Expires header and a max-age directive,
   // the max-age directive overrides the Expires header, even if the Expires header is more restrictive
@@ -445,13 +447,9 @@ module ServeResource =
   let resource key exists getLast getExtension
                 (send : string -> bool -> WebPart)
                 ctx =
-    let log =
-      event Verbose
-      >> setSingleName "Suave.Http.ServeResource.resource"
-      >> ctx.runtime.logger.logSimple
 
     let sendIt name compression =
-      setHeader "Last-Modified" ((getLast key : DateTime).ToString("R"))
+      setHeader "Last-Modified" ((getLast key : DateTimeOffset).ToString("R"))
       >=> setHeader "Vary" "Accept-Encoding"
       >=> setMimeType name
       >=> send key compression
@@ -462,20 +460,45 @@ module ServeResource =
       | Some value ->
         match ctx.request.header "if-modified-since" with
         | Choice1Of2 v ->
-          match Parse.dateTime v with
+          match Parse.dateTimeOffset v with
           | Choice1Of2 date ->
-            if getLast key > date then sendIt value.name value.compression ctx
+            let lm = getLast key
+            // RFC1123 is only precise to the second so the comparison must be done with this precision
+            let lmSeconds = new DateTimeOffset(lm.Year, lm.Month, lm.Day, lm.Hour, lm.Minute, lm.Second, lm.Offset)
+            if lmSeconds > date then sendIt value.name value.compression ctx
             else NOT_MODIFIED ctx
-          | Choice2Of2 parse_error -> bad_request [||] ctx
+          | Choice2Of2 _parse_error -> bad_request [||] ctx
         | Choice2Of2 _ ->
           sendIt value.name value.compression ctx
       | None ->
-        let ext = getExtension key
-        log (sprintf "failed to find matching mime for ext '%s'" ext)
         fail
     else
-      log (sprintf "failed to find resource by key '%s'" key)
       fail
+
+module ContentRange =
+  open System
+  open System.IO
+  open Suave.Utils
+
+  let parseContentRange (input:string) =
+    let contentUnit = input.Split([|' '; '='|], 2)
+    let rangeArray = contentUnit.[1].Split([|'-'|])
+    let start = int64 rangeArray.[0]
+    let finish = if Int64.TryParse (rangeArray.[1], ref 0L) then Some <| int64 rangeArray.[1] else None
+    start, finish
+
+  let (|ContentRange|_|) (context:HttpContext) =
+    match context.request.header "range" with
+    | Choice1Of2 rangeValue -> Some <| parseContentRange rangeValue
+    | Choice2Of2 _ -> None
+
+  let getFileStream (ctx:HttpContext) path =
+    let fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite) :> Stream
+    match ctx with
+    | ContentRange (start, finish) ->
+      let length = finish |> Option.bind (fun finish -> Some (finish - start))
+      new RangedStream(fs, start, length, true) :> Stream, start, fs.Length, HTTP_206.status
+    | _ -> fs, 0L, fs.Length, HTTP_200.status
 
 module Files =
 
@@ -483,52 +506,55 @@ module Files =
   open System.IO
   open System.Text
 
-  open Suave.Utils
-  open Suave.Logging
-  open Suave.Logging.Message
-  open Suave.Sockets.Control
-
-  open Response
-  open Writers
   open Successful
-  open Redirection
   open ServeResource
+  open ContentRange
 
   let sendFile fileName (compression : bool) (ctx : HttpContext) =
-    let writeFile file (conn, _) = socket {
-      let getFs = fun path -> new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite) :> Stream
-      let getLm = fun path -> FileInfo(path).LastWriteTime
-      let! (encoding,fs) = Compression.transformStream file getFs getLm compression ctx.runtime.compressionFolder ctx
-      try
-        match encoding with
-        | Some n ->
-          let! (_,conn) = asyncWriteLn (String.Concat [| "Content-Encoding: "; n.ToString() |]) conn
-          let! (_,conn) = asyncWriteLn (sprintf "Content-Length: %d\r\n" (fs : Stream).Length) conn
-          let! conn = flush conn
-          if  ctx.request.``method`` <> HttpMethod.HEAD && fs.Length > 0L then
-            do! transferStream conn fs
-          return conn
-        | None ->
-          let! (_,conn) = asyncWriteLn (sprintf "Content-Length: %d\r\n" (fs : Stream).Length) conn
-          let! conn = flush conn
-          if  ctx.request.``method`` <> HttpMethod.HEAD && fs.Length > 0L then
-            do! transferStream conn fs
-          return conn
-      finally
-        fs.Dispose()
-    }
+    let writeFile file =
+      let fs, start, total, status = getFileStream ctx file
+      fun (conn:Connection, _) -> task {
+        let getLm = fun path -> FileInfo(path).LastWriteTime
+        match! Compression.transformStream file fs getLm compression ctx.runtime.compressionFolder ctx with
+        | Ok(encoding,fs) ->
+          let finish = start + fs.Length - 1L
+          try
+            try
+              match encoding with
+              | Some n ->
+                do! conn.asyncWriteLn ("Content-Range: bytes " + start.ToString() + "-" + finish.ToString() + "/*")
+                do! conn.asyncWriteLn (String.Concat [| "Content-Encoding: "; n.ToString() |])
+                do! conn.asyncWriteLn ("Content-Length: " + (fs : Stream).Length.ToString() + "\r\n")
+                do! conn.flush ()
+                if ctx.request.``method`` <> HttpMethod.HEAD && fs.Length > 0L then
+                  do! transferStream conn fs
+              | None ->
+                do! conn.asyncWriteLn ("Content-Range: bytes " + start.ToString() + "-" + finish.ToString() + "/" + total.ToString())
+                do! conn.asyncWriteLn ("Content-Length: " + (fs : Stream).Length.ToString() + "\r\n")
+                do! conn.flush()
+                if ctx.request.``method`` <> HttpMethod.HEAD && fs.Length > 0L then
+                  do! transferStream conn fs
+            with ex ->
+              raise ex
+          finally
+            fs.Dispose()
+        | Result.Error error ->
+          return failwith "error"
+      }, status
+    let task, status = writeFile fileName
     { ctx with
         response =
           { ctx.response with
-              status = HTTP_200.status
-              content = SocketTask (writeFile fileName) } }
+              status = status
+              content = SocketTask task } }
     |> succeed
+
 
   let file fileName : WebPart =
     resource
       fileName
       (File.Exists)
-      (fun name -> FileInfo(name).LastAccessTime)
+      (fun name -> new DateTimeOffset(FileInfo(name).LastWriteTime))
       (Path.GetExtension)
       sendFile
 
@@ -552,13 +578,7 @@ module Files =
       browseFile q.homeDirectory fileName h
 
   let browse rootPath : WebPart =
-    warbler (fun ctx ->
-      ctx.runtime.logger.verbose (
-        eventX "Files.browser trying {localFileUrl} at {rootPath}"
-        >> setFieldValue "localFileUrl" ctx.request.url.AbsolutePath
-        >> setFieldValue "rootPath" rootPath
-        >> setSingleName "Suave.Http.Files.browse")
-      file (resolvePath rootPath ctx.request.path))
+    warbler (fun ctx -> file (resolvePath rootPath ctx.request.path))
 
   let browseHome : WebPart =
     warbler (fun ctx -> browse ctx.runtime.homeDirectory)
@@ -596,51 +616,58 @@ module Embedded =
   open System
   open System.IO
   open System.Reflection
+  open System.Xml
+  open System.Xml.Linq
 
-  open Suave.Utils
-  open Suave.Sockets.Control
+  open Suave.Utils.Option.Operators
 
-  open Response
   open ServeResource
 
-  #if !NETSTANDARD1_5
   let defaultSourceAssembly =
     if Assembly.GetEntryAssembly() = null
     then Assembly.GetCallingAssembly()
     else Assembly.GetEntryAssembly()
-  #endif
 
   let resources (assembly : Assembly) =
     assembly.GetManifestResourceNames()
 
+  [<System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage(
+    "SingleFile", "IL3000",
+    Justification = "The Assembly.Location empty-string case is explicitly handled and falls back to the process start time.")>]
   let lastModified (assembly : Assembly) =
-    FileInfo(assembly.Location).CreationTime
+    // Assembly.Location might not be available, such as in single-file deployments.
+    if String.IsNullOrEmpty assembly.Location then
+      Diagnostics.Process.GetCurrentProcess().StartTime
+    else
+      FileInfo(assembly.Location).CreationTime
 
-  let sendResource (assembly : Assembly)
+  let sendResource (source : Assembly)
                     resourceName
                     (compression : bool)
                     (ctx : HttpContext) =
-    let writeResource name (conn, _) = socket {
-      let getFs = fun name -> assembly.GetManifestResourceStream(name)
-      let getLm = fun _ -> lastModified assembly
-      let! encoding,fs = Compression.transformStream name getFs getLm compression ctx.runtime.compressionFolder ctx
-
-      match encoding with
-      | Some n ->
-        let! (_,conn) =  asyncWriteLn (String.Concat [| "Content-Encoding: "; n.ToString() |]) conn
-        let! (_,conn) = asyncWriteLn (sprintf "Content-Length: %d\r\n" (fs: Stream).Length) conn
-        let! conn = flush conn
-        if ctx.request.``method`` <> HttpMethod.HEAD && fs.Length > 0L then
-          do! transferStream conn fs
-        fs.Dispose()
-        return conn
-      | None ->
-        let! (_,conn) = asyncWriteLn (sprintf "Content-Length: %d\r\n" (fs: Stream).Length) conn
-        let! conn = flush conn
-        if ctx.request.``method`` <> HttpMethod.HEAD && fs.Length > 0L then
-          do! transferStream conn fs
-        fs.Dispose()
-        return conn
+    let writeResource name (conn:Connection, _) = task {
+      let fs = source.GetManifestResourceStream(name)
+      let getLm = fun _ -> lastModified source
+      match! Compression.transformStream name fs getLm compression ctx.runtime.compressionFolder ctx with
+      | Ok (encoding,fs) ->
+        match encoding with
+        | Some n ->
+          do! conn.asyncWriteLn (String.Concat [| "Content-Encoding: "; n.ToString() |])
+          do! conn.asyncWriteLn ("Content-Length: " + (fs: Stream).Length.ToString() + "\r\n")
+          do! conn.flush()
+          if ctx.request.``method`` <> HttpMethod.HEAD && fs.Length > 0L then
+            do! transferStream conn fs
+          fs.Dispose()
+          return ()
+        | None ->
+          do! conn.asyncWriteLn ("Content-Length: " + (fs: Stream).Length.ToString() + "\r\n")
+          do! conn.flush ()
+          if ctx.request.``method`` <> HttpMethod.HEAD && fs.Length > 0L then
+            do! transferStream conn fs
+          fs.Dispose()
+          return ()
+      | Result.Error error ->
+        return failwith "error"
     }
     { ctx with
         response =
@@ -649,63 +676,139 @@ module Embedded =
               content = SocketTask (writeResource resourceName) }}
     |> succeed
 
-  #if !NETSTANDARD1_5
   let sendResourceFromDefaultAssembly resourceName compression =
     sendResource defaultSourceAssembly resourceName compression
-  #endif
 
-  let resource assembly name =
+  let resource source name =
     resource
       name
-      (fun name -> resources assembly |> Array.exists ((=) name))
-      (fun _ -> lastModified assembly)
+      (fun name -> resources source |> Array.exists ((=) name))
+      (fun _ -> new DateTimeOffset(lastModified source))
       (Path.GetExtension)
-      (sendResource assembly)
+      (sendResource source)
 
-  #if !NETSTANDARD1_5
   let resourceFromDefaultAssembly name =
     resource defaultSourceAssembly name
-  #endif
 
-  let browse assembly =
-    warbler (fun ctx -> resource assembly (ctx.request.path.TrimStart [|'/'|]))
+  let browse source =
+    warbler (fun ctx -> resource source (ctx.request.path.TrimStart [|'/'|]))
 
-  #if !NETSTANDARD1_5
   let browseDefaultAsssembly =
     browse defaultSourceAssembly
-  #endif
+
+  [<Literal>]
+  let defaultManifestFile = "Microsoft.Extensions.FileProviders.Embedded.Manifest.xml"
+
+  // Reference: https://github.com/dotnet/aspnetcore/blob/HEAD/src/FileProviders/Embedded/src/Manifest/ManifestParser.cs
+  let browseManifest (source: Assembly) manifestFile root =
+    let getElements (container: XContainer) = container.Elements()
+
+    let ensureElement (name: string) (container: XContainer) =
+      match container.Element name with
+      | null -> invalidOp $"Invalid manifest format. Missing '{name}' element name"
+      | elem -> elem
+
+    let ensureText (element: XElement) =
+      if Seq.isEmpty(getElements element)
+        && not element.IsEmpty
+        && element.Nodes() |> Seq.length |> (=) 1
+        && element.FirstNode.NodeType = XmlNodeType.Text
+      then
+        element.Value
+      else
+        invalidOp $"Invalid manifest format. '{element.Name.LocalName}' must contain a text value. '{element.Value}'"
+
+    let ensureName (element: XElement) =
+      let value = element.Attribute "Name" |> Option.ofObj >>= (fun a -> Option.ofObj a.Value)
+      match value with
+      | None -> invalidOp $"Invalid manifest format. '{element.Name}' must contain a 'Name' attribute."
+      | Some name -> name
+
+    let getResourcePath = ensureElement "ResourcePath" >> ensureText
+
+    let manifestFile = defaultArg manifestFile defaultManifestFile
+
+    let manifest =
+      manifestFile
+      |> source.GetManifestResourceStream
+      |> Option.ofObj
+      |> Option.map XDocument.Load
+      |> Option.defaultWith (fun () ->
+           invalidOp
+             $"Could not load the embedded file manifest '{manifestFile}' for assembly '{source.GetName().Name}'.")
+      |> ensureElement "Manifest"
+
+    let version =
+      manifest
+      |> ensureElement "ManifestVersion"
+      |> ensureText
+
+    if not (String.equalsConstantTime "1.0" version) then
+      invalidOp $"The embedded file manifest '{manifestFile}' for assembly '{source.GetName().Name}'" +
+        $"specifies an unsupported file format version: '{version}'."
+      |> ignore
+
+    let filesystem = ensureElement "FileSystem" manifest
+
+    let rec buildMapping prefix mapping (element: XElement) =
+      let path = prefix + (ensureName element)
+      match element.Name.LocalName with
+      | "File" -> Map.add path (getResourcePath element) mapping
+      | "Directory" -> mapElement element (path + "/") mapping
+      | invalidNode ->
+        invalidOp $"Invalid manifest format. Expected a 'File' or a 'Directory' node. Got '{invalidNode}' instead."
+
+    and mapElement element prefix mapping =
+      element |> getElements |> Seq.fold (buildMapping prefix) mapping
+
+    let resourceMapping = mapElement filesystem "" Map.empty
+
+    let resolveResource reqPath =
+      let path = [root; String.trimc '/' <!> Some reqPath] |> Seq.choose id |> String.concat "/"
+      Map.tryFind path resourceMapping
+
+    request (fun r ->
+      match resolveResource r.path with
+      | Some name -> resource source name
+      | None -> never)
+
+  let browseDefaultAsssemblyManifest manifestFile root = browseManifest defaultSourceAssembly manifestFile root
 
 // See www.w3.org/TR/eventsource/#event-stream-interpretation
 module EventSource =
   open System
   open Suave
-  open Suave.Sockets
   open Suave.Sockets.Control
   open Suave.Sockets.Connection
-  open Suave.Utils
+  open System.Text
 
   [<Literal>]
   let private ES_EOL = "\n"
 
-  let private ES_EOL_S = ArraySegment<_>(UTF8.bytes ES_EOL, 0, 1)
+  let private ES_EOL_S = Memory<_>(Encoding.UTF8.GetBytes ES_EOL, 0, 1)
 
   let asyncWrite (out : Connection) (data : string) =
-    asyncWriteBytes out (UTF8.bytes data)
+    out.asyncWriteBytes (Encoding.UTF8.GetBytes data)
 
   let (<<.) (out : Connection) (data : string) =
-    asyncWriteBytes out (UTF8.bytes data)
+    out.asyncWriteBytes (Encoding.UTF8.GetBytes data)
 
   let dispatch (out : Connection) =
-    send out ES_EOL_S
+    task {
+      let! r = out.transport.write ES_EOL_S
+      match r with
+      | Ok () -> return ()
+      | Result.Error _ -> return ()
+    }
 
   let comment (out : Connection) (cmt : string) =
     out <<. ": " + cmt + ES_EOL
 
-  let eventType (out : Connection) (evType : string) =
-    out <<. "event: " + evType + ES_EOL
+  let eventType (out : Connection) (eventType : string) =
+    out <<. "event: " + eventType + ES_EOL
 
-  let data (out : Connection) (text : string) =
-    out <<. "data: " + text + ES_EOL
+  let data (out : Connection) (data : string) =
+    out <<. "data: " + data + ES_EOL
 
   let esId (out : Connection) (lastEventId : string) =
     out <<. "id: " + lastEventId + ES_EOL
@@ -729,27 +832,30 @@ module EventSource =
       { id = id; data = data; ``type`` = Some typ }
 
   let send (out : Connection) (msg : Message) =
-    socket {
-      do! msg.id |> esId out
+    task {
+      do! esId out msg.id
       match msg.``type`` with
-      | Some x -> do! x |> eventType out
+      | Some x -> do! eventType out x
       | None   -> ()
-      do! msg.data |> data out
-      return! dispatch out
+      do! data out msg.data
+      do! dispatch out
+      return ()
     }
 
   let private handShakeAux f (out : Connection, _) =
-    socket {
-      let! (_,out) = asyncWriteLn "" out// newline after headers
-      let! out = flush out // must flush lines buffer before using asyncWriteBytes
+    task {
+      do! out.asyncWriteLn "" // newline after headers
+      do! out.flush() // must flush lines buffer before using asyncWriteBytes
 
       // Buggy Internet Explorer; 2kB of comment padding for IE
-      do! String.replicate 2000 " " |> comment out
-      do! 2000u |> retry out
-      return! f out
+      do! comment out (String.replicate 2000 " ")
+      do! retry out 2000u
+      // Call f out as a separate awaited step (avoid piping or complex composition)
+      do! f out
+      return ()
     }
 
-  let handShake f (ctx : HttpContext) =
+  let handShake (fCont: Connection -> Task<unit>) (ctx : HttpContext) =
     { ctx with
         response =
           { ctx.response with
@@ -762,12 +868,35 @@ module EventSource =
                 // also see http://wiki.nginx.org/HttpProxyModule#proxy_buffering
                 :: ("X-Accel-Buffering",           "no")
                 :: []
-              content = SocketTask (handShakeAux f)
+              content = SocketTask (handShakeAux fCont)
+          }
+    }
+    |> succeed
+
+module TransferEncoding =
+  open Suave
+  open Suave.Sockets.Control
+
+  let chunked (asyncWriteChunks: Connection -> System.Threading.Tasks.Task<unit>) (ctx : HttpContext) =
+    let task (conn:Connection,_) = task {
+      do! conn.asyncWriteLn ""
+      do! asyncWriteChunks conn
+    }
+    { ctx with
+        response =
+          {
+            ctx.response with
+              status = ctx.response.status
+              headers = ("Transfer-Encoding", "chunked") :: ctx.response.headers
+              writePreamble = true
+              content = SocketTask task
           }
     }
     |> succeed
 
 module Control =
+
+  open System.Collections.Generic
 
   let CLOSE (ctx : HttpContext) =
     { ctx with
@@ -778,16 +907,14 @@ module Control =
           }
         request =
           { ctx.request with
-              headers = [ "connection", "close" ]
+              headers = List<_>([ "connection", "close" ])
           }
     }
     |> succeed
 
 module CORS =
 
-  open System
   open Successful
-  open Utils
 
   [<Literal>]
   let Origin = "Origin"
@@ -830,17 +957,11 @@ module CORS =
       /// Allow cookies? This is sent in the AccessControlAllowCredentials header.
       allowCookies            : bool
 
-      /// Should response headers be exposed to the client? This is sent in AccessControlExposeHeaders header.
-      exposeHeaders           : bool
+      /// The list of response headers exposed to client. This is sent in AccessControlExposeHeaders header.
+      exposeHeaders           : InclusiveOption<string list>
 
       /// Max age in seconds the user agent is allowed to cache the result of the request.
       maxAge                  : int option }
-
-    static member allowedUris_           = Property<CORSConfig,_> (fun x -> x.allowedUris)           (fun v x -> { x with allowedUris = v })
-    static member allowedMethods_        = Property<CORSConfig,_> (fun x -> x.allowedMethods)        (fun v x -> { x with allowedMethods = v })
-    static member allowCookies_          = Property<CORSConfig,_> (fun x -> x.allowCookies)          (fun v x -> { x with allowCookies = v })
-    static member exposeHeaders_         = Property<CORSConfig,_> (fun x -> x.exposeHeaders)         (fun v x -> { x with exposeHeaders = v })
-    static member maxAge_                = Property<CORSConfig,_> (fun x -> x.maxAge)                (fun v x -> { x with maxAge = v })
 
   let private isAllowedOrigin config (value : string) =
     match config.allowedUris with
@@ -863,7 +984,10 @@ module CORS =
       Writers.setHeader AccessControlMaxAge (age.ToString())
 
   let private setAllowCredentialsHeader config =
-    Writers.setHeader AccessControlAllowCredentials (config.allowCookies.ToString())
+    if config.allowCookies then
+        Writers.setHeader AccessControlAllowCredentials "true"
+    else
+        succeed
 
   let private setAllowMethodsHeader config value =
     match config.allowedMethods with
@@ -876,7 +1000,7 @@ module CORS =
     | InclusiveOption.Some (m :: ms) ->
       let exists = m.ToString() = value || List.exists (fun m -> m.ToString() = value) ms
       if exists then
-        let header = sprintf "%s,%s" (m.ToString()) (ms |> Seq.map (fun i -> i.ToString()) |> String.concat( ", "))
+        let header = (m.ToString()) + "," + (ms |> Seq.map (fun i -> i.ToString()) |> String.concat( ", "))
         Writers.setHeader AccessControlAllowMethods header
       else
         succeed
@@ -888,7 +1012,15 @@ module CORS =
     Writers.setHeader AccessControlAllowOrigin value
 
   let private setExposeHeadersHeader config =
-    Writers.setHeader AccessControlExposeHeaders (config.exposeHeaders.ToString())
+    match config.exposeHeaders with
+    | InclusiveOption.None
+    | InclusiveOption.Some [] ->
+      succeed
+    | InclusiveOption.All ->
+      Writers.setHeader AccessControlExposeHeaders "*"
+    | InclusiveOption.Some hs ->
+      let header = hs |> String.concat(", ")
+      Writers.setHeader AccessControlExposeHeaders header
 
   let cors (config : CORSConfig) : WebPart =
     fun (ctx : HttpContext) ->
@@ -942,5 +1074,5 @@ module CORS =
     { allowedUris           = InclusiveOption.All
       allowedMethods        = InclusiveOption.All
       allowCookies          = true
-      exposeHeaders         = true
+      exposeHeaders         = InclusiveOption.None
       maxAge                = None }

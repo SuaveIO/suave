@@ -1,13 +1,9 @@
-﻿module Suave.Tests.Cookie
+module Suave.Tests.Cookie
 
 open Suave
 open Suave.Cookie
-open Suave.Logging
-open Suave.Testing
 
-open Fuchu
-
-open FsCheck
+open Expecto
 
 open Tests.TestUtilities
 
@@ -24,8 +20,37 @@ let parseResultCookie (_:SuaveConfig) =
           path      = Some "/"
           domain    = None
           secure    = false
-          httpOnly = true }
-      Assert.Equal("cookie should eq", expected, subject)
+          httpOnly  = true
+          sameSite  = None }
+      Expect.equal subject expected "cookie should eq"
+
+    testCase "parse SameSite=Strict" <| fun _ ->
+      let sample = @"st=oFqpYxbMObHvpEW!QLzedHwSZ1gZnotBs$; Path=/; HttpOnly; SameSite=Strict"
+      let subject = Cookie.parseResultCookie sample
+      let expected =
+        { name      = "st"
+          value     = "oFqpYxbMObHvpEW!QLzedHwSZ1gZnotBs$"
+          expires   = None
+          path      = Some "/"
+          domain    = None
+          secure    = false
+          httpOnly  = true
+          sameSite  = Some Strict }
+      Expect.equal subject expected "cookie should eq"
+
+    testCase "parse SameSite=Lax" <| fun _ ->
+      let sample = @"st=oFqpYxbMObHvpEW!QLzedHwSZ1gZnotBs$; Path=/; HttpOnly; SameSite=Lax"
+      let subject = Cookie.parseResultCookie sample
+      let expected =
+        { name      = "st"
+          value     = "oFqpYxbMObHvpEW!QLzedHwSZ1gZnotBs$"
+          expires   = None
+          path      = Some "/"
+          domain    = None
+          secure    = false
+          httpOnly  = true
+          sameSite  = Some Lax }
+      Expect.equal subject expected "cookie should eq"
 
     testCase "parse secure" <| fun _ ->
       let cookie =
@@ -35,14 +60,10 @@ let parseResultCookie (_:SuaveConfig) =
           path      = Some "/"
           domain    = None
           secure    = true
-          httpOnly = false }
+          httpOnly  = false
+          sameSite  = None }
       let parsed = Cookie.parseResultCookie (HttpCookie.toHeader cookie)
-      Assert.Equal("eq", cookie, parsed)
-
-// FsCheck character gen from RFC slightly painful; let's do that when merging Freya
-//    testPropertyWithConfig fscheck_config "anything generated" <| fun (cookie : HttpCookie) ->
-//      let parsed = Cookie.parse_cookie (HttpCookie.to_header cookie)
-//      Assert.Equal("eq", cookie, parsed)
+      Expect.equal parsed cookie "eq"
 
     testCase "set cookie (same name) twice keeps last" <| fun _ ->
       let force = Async.RunSynchronously >> Option.get
@@ -67,52 +88,12 @@ let parseRequestCookies (_ : SuaveConfig) =
         let expected = [HttpCookie.createKV "session" "2b14f6a69199243f570031bf94865bb6"
                         HttpCookie.createKV "abc" "123"
                         HttpCookie.createKV "alphaplusvalues" "!#$%&'()*+-./:<=>?@[]^_`{|}~"]
-        Assert.Equal("cookies should eq", expected, result)
+        Expect.equal result expected "cookies should eq"
 
       testCase "ignore malformed cookies" <| fun _ ->
         let sample = "session=;value;anothervalue= "
         let result = Cookie.parseCookies sample
-        Assert.Equal("cookies should be ignored", [], result)
+        Expect.equal result [] "cookies should be ignored"
     ]
 
-[<Tests>]
-let setCookie (_ : SuaveConfig) =
-  testList "set cookie" [
-    testCase "set cookie - no warning when < 4k" <| fun _ ->
-      let log = InspectableLog()
-      let cookie =
-        { name      = "test cookie"
-          value     = String.replicate 4095 "x"
-          expires   = None
-          path      = Some "/"
-          domain    = None
-          secure    = true
-          httpOnly  = false }
-      let ctx = Cookie.setCookie cookie { HttpContext.empty with runtime = { HttpRuntime.empty with logger = log }}
-      Assert.Equal("should be no logs generated", true, List.isEmpty log.logs)
-    testCase "set cookie - no warning when = 4k" <| fun _ ->
-      let log = InspectableLog()
-      let cookie =
-        { name      = "test cookie"
-          value     = String.replicate 4096 "x"
-          expires   = None
-          path      = Some "/"
-          domain    = None
-          secure    = true
-          httpOnly  = false }
-      let ctx = Cookie.setCookie cookie { HttpContext.empty with runtime = { HttpRuntime.empty with logger = log }}
-      Assert.Equal("should be no logs generated", true, List.isEmpty log.logs)
-    testCase "set cookie - warning when > 4k" <| fun _ ->
-      let log = InspectableLog()
-      let cookie =
-        { name      = "test cookie"
-          value     = String.replicate 4097 "x"
-          expires   = None
-          path      = Some "/"
-          domain    = None
-          secure    = true
-          httpOnly  = false }
-      let ctx = Cookie.setCookie cookie { HttpContext.empty with runtime = { HttpRuntime.empty with logger = log }}
-      Assert.Equal("should be 1 log generated", 1, List.length log.logs)
-      Assert.Equal("should be a warning", LogLevel.Warn, (List.head log.logs).level)
-  ]
+

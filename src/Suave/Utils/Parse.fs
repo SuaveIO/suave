@@ -1,4 +1,4 @@
-﻿namespace Suave.Utils
+namespace Suave.Utils
 
 [<RequireQualifiedAccess>]
 module Parse =
@@ -8,7 +8,7 @@ module Parse =
   let private parseUsing<'T> (f:string -> bool * 'T) s =
     match f s with
     | true, i -> Choice1Of2 i
-    | false, _ -> Choice2Of2 (sprintf "Cound not parse '%s' to %s" s typeof<'T>.Name)
+    | false, _ -> Choice2Of2 ("Cound not parse '" + s + "' to " + typeof<'T>.Name)
 
   let int32 = parseUsing Int32.TryParse
   let uint32 = parseUsing UInt32.TryParse
@@ -16,4 +16,5 @@ module Parse =
   let uint64 = parseUsing UInt64.TryParse
   let uri = parseUsing (fun s -> Uri.TryCreate(s, UriKind.RelativeOrAbsolute))
   let dateTime = parseUsing (fun s -> DateTime.TryParse(s, CultureInfo.InvariantCulture.DateTimeFormat, DateTimeStyles.RoundtripKind))
-  let decimal = parseUsing (fun s -> Decimal.TryParse(s, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture))
+  let dateTimeOffset = parseUsing (fun s -> DateTimeOffset.TryParse(s, CultureInfo.InvariantCulture.DateTimeFormat, DateTimeStyles.AssumeUniversal))
+  let decimal = parseUsing (fun s -> Decimal.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture))

@@ -40,3 +40,14 @@ let encodeBase64 (s : string) =
 let decodeBase64 (s : string) =
   let bytes = Convert.FromBase64String s
   Encoding.ASCII.GetString bytes
+
+/// Try to convert the passed string `s`, which may be a valid Base64 encoding, to a
+/// CLR string, going through ASCII.
+let tryDecodeBase64 (s : string) =
+  try
+    let bytes = Convert.FromBase64String s
+    Encoding.ASCII.GetString bytes
+    |> Some
+  with
+  | :? FormatException ->
+    None

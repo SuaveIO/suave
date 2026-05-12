@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Suave Routing & Handlers - Learn how to define routes and handle requests">
+  <title>Routing & Handlers - Suave</title>
+  <link rel="shortcut icon" href="/images/favicon.ico" type="image/x-icon">
+  <link rel="icon" href="/images/favicon-32x32.png" sizes="32x32" type="image/png">
+  <link rel="icon" href="/images/favicon-96x96.png" sizes="96x96" type="image/png">
+  <link rel="apple-touch-icon" href="/images/apple-touch-icon-57x57.png" sizes="57x57">
+  <link rel="apple-touch-icon" href="/images/apple-touch-icon-114x114.png" sizes="114x114">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header>
+    <div class="container">
+      <nav>
+        <div class="logo">
+          <img src="/images/head_600_trans.png" alt="Suave Logo" width="40" height="40" style="vertical-align: middle; margin-right: 12px; background: white; padding: 2px; border-radius: 4px;">
+          Suave
+        </div>
+        <button id="hamburger" class="hamburger" aria-label="Toggle menu">
+          <span></span><span></span><span></span>
+        </button>
+        <ul id="nav-links" class="nav-links">
+          <li><a href="/">Home</a></li>
+          <li><a href="/docs/">Documentation</a></li>
+          <li><a href="/docs/performance.html">Performance</a></li>
+          <li><a href="https://github.com/SuaveIO/suave" target="_blank">GitHub</a></li>
+          <li><a href="https://www.nuget.org/packages/Suave/" target="_blank">NuGet</a></li>
+          <li><button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme">🌙</button></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <div class="container">
+      <h1>Routing & Handlers</h1>
+      <p>Learn how to define routes, handle HTTP requests, and build RESTful APIs with Suave.</p>
+
+      <h2>Basic Routing</h2>
+      <p>Suave uses the <code>choose</code> combinator to select between different handlers:</p>
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.Operators
+open Suave.Filters
+open Suave.Successful
+
+let app =
+  choose [
+    path "/hello" >=> OK "Hello GET"
+    path "/goodbye" >=> OK "Good bye GET"
+    RequestErrors.NOT_FOUND "Path not found"
+  ]</code></pre>
+      </div>
+
+      <h2>HTTP Methods</h2>
+      <p>Use <code>GET</code>, <code>POST</code>, <code>PUT</code>, <code>DELETE</code> to match specific HTTP methods:</p>
+      <div class="code-block">
+        <pre><code>let app =
+  choose [
+    GET >=> path "/users" >=> OK "List users"
+    POST >=> path "/users" >=> OK "Create user"
+    PUT >=> path "/users" >=> OK "Update user"
+    DELETE >=> path "/users" >=> OK "Delete user"
+  ]</code></pre>
+      </div>
+
+      <h2>Path Parameters</h2>
+      <p>Extract parameters from URL paths using <code>pathScan</code>:</p>
+      <div class="code-block">
+        <pre><code>let app =
+  choose [
+    pathScan "/users/%d" (fun userId -> 
+      OK (sprintf "User ID: %d" userId))
+    
+    pathScan "/posts/%d/comments/%d" (fun (postId, commentId) ->
+      OK (sprintf "Post %d, Comment %d" postId commentId))
+    
+    RequestErrors.NOT_FOUND "Not found"
+  ]</code></pre>
+      </div>
+
+      <h2>Query Strings</h2>
+      <p>Access query parameters from the request context:</p>
+      <div class="code-block">
+        <pre><code>let app =
+  choose [
+    GET >=> path "/search" >=> fun ctx ->
+      match ctx.request.queryParam "q" with
+      | Choice1Of2 query -> OK (sprintf "Searching for: %s" query) ctx
+      | Choice2Of2 _ -> RequestErrors.BAD_REQUEST "Missing 'q' parameter" ctx
+  ]</code></pre>
+      </div>
+
+      <h2>Regular Expression Routes</h2>
+      <p>Match paths using regular expressions:</p>
+      <div class="code-block">
+        <pre><code>let app =
+  choose [
+    pathRegex "(.*?)\.(dll|mdb|log)$" >=> 
+      RequestErrors.FORBIDDEN "Access denied"
+    
+    pathRegex "^/api/v[0-9]+/.*" >=> 
+      OK "Versioned API"
+  ]</code></pre>
+      </div>
+
+      <h2>REST API Example</h2>
+      <p>Building a complete REST API for users:</p>
+      <div class="code-block">
+        <pre><code>type User = { id: int; name: string; email: string }
+
+let users = 
+  [ { id = 1; name = "Alice"; email = "alice@example.com" }
+    { id = 2; name = "Bob"; email = "bob@example.com" } ]
+
+let getUser ctx =
+  match ctx.request.queryParam "id" with
+  | Choice1Of2 idStr when System.Int32.TryParse(idStr) |> fst ->
+      let id = System.Int32.Parse(idStr)
+      match users |> List.tryFind (fun u -> u.id = id) with
+      | Some user -> 
+          OK (sprintf "Name: %s, Email: %s" user.name user.email) ctx
+      | None -> 
+          RequestErrors.NOT_FOUND (sprintf "User %d not found" id) ctx
+  | _ -> RequestErrors.BAD_REQUEST "Invalid ID" ctx
+
+let app =
+  choose [
+    GET >=> path "/users" >=> 
+      OK "Users: Alice (alice@example.com), Bob (bob@example.com)"
+    
+    GET >=> path "/users/search" >=> getUser
+    
+    POST >=> path "/users" >=> 
+      OK "User created"
+    
+    RequestErrors.NOT_FOUND "Not found"
+  ]</code></pre>
+      </div>
+
+      <h2>Combining Routes</h2>
+      <p>Use the <code>choose</code> combinator to organize routes hierarchically:</p>
+      <div class="code-block">
+        <pre><code>let userRoutes =
+  choose [
+    GET >=> OK "List users"
+    POST >=> OK "Create user"
+  ]
+
+let postRoutes =
+  choose [
+    GET >=> OK "List posts"
+    POST >=> OK "Create post"
+  ]
+
+let app =
+  choose [
+    path "/users" >=> userRoutes
+    path "/posts" >=> postRoutes
+    RequestErrors.NOT_FOUND "Not found"
+  ]</code></pre>
+      </div>
+
+      <h2>Advanced: Custom Handlers</h2>
+      <p>Create custom handler functions for complex logic:</p>
+      <div class="code-block">
+        <pre><code>let delayedResponse (delayMs: int) =
+  fun (ctx: HttpContext) ->
+    async {
+      do! Async.Sleep delayMs
+      return! OK "Delayed response" ctx
+    }
+
+let app =
+  choose [
+    path "/fast" >=> OK "Instant response"
+    path "/slow" >=> delayedResponse 1000
+  ]</code></pre>
+      </div>
+
+      <h2>Handling Errors</h2>
+      <p>Return appropriate HTTP status codes:</p>
+      <div class="code-block">
+        <pre><code>let app =
+  choose [
+    path "/ok" >=> OK "200 OK"
+    path "/created" >=> Successful.CREATED "Resource created"
+    path "/bad" >=> RequestErrors.BAD_REQUEST "Invalid request"
+    path "/not-found" >=> RequestErrors.NOT_FOUND "Not found"
+    path "/forbidden" >=> RequestErrors.FORBIDDEN "Access denied"
+    path "/error" >=> ServerErrors.INTERNAL_ERROR "Server error"
+  ]</code></pre>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <div class="container">
+      <div class="footer-links">
+        <a href="/docs/">Documentation</a>
+        <a href="https://github.com/SuaveIO/suave" target="_blank">GitHub</a>
+        <a href="https://www.nuget.org/packages/Suave/" target="_blank">NuGet</a>
+        <a href="https://x.com/SuaveIO" target="_blank">X</a>
+        <a href="https://github.com/SuaveIO/suave/blob/master/LICENSE" target="_blank">License</a>
+      </div>
+      <p>&copy; 2025 Suave. Open source, MIT licensed.</p>
+      <p>Suave is a project created and maintained by Ademar Gonzalez.</p>
+    </div>
+  </footer>
+
+  <script src="/js/main.js"></script>
+</body>
+</html>
