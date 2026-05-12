@@ -493,3 +493,127 @@ let flowControlTests (_ : SuaveConfig) =
       | Result.Error FlowControlError -> ()
       | other -> failtestf "expected FlowControlError, got %A" other
   ]
+
+// ---------------------------------------------------------------------------
+// Step 3 — h2c upgrade detection and HTTP2-Settings decoding (RFC 7540 §3.2).
+// These tests only cover the pure pieces of the upgrade path; the actual
+// connection handoff is exercised through the existing Web.fs integration
+// tests (which still pass — non-h2c traffic is unaffected).
+// ---------------------------------------------------------------------------
+
+[<Tests>]
+let h2cUpgradeTests (_ : SuaveConfig) =
+  let mkRequest (headers: (string * string) list) =
+    { HttpRequest.empty with
+        headers = System.Collections.Generic.List<_>(headers) }
+
+  // The minimal client SETTINGS payload is 0 bytes — RFC 7540 allows it.
+  // base64url("") = ""
+  let validUpgradeHeaders : (string * string) list =
+    [ "Host", "example.com"
+      "Connection", "Upgrade, HTTP2-Settings"
+      "Upgrade", "h2c"
+      "HTTP2-Settings", "" ]
+
+  testList "Http2 h2c upgrade" [
+    testCase "decodeBase64Url accepts standard base64" <| fun _ ->
+      let bytes = H2cUpgrade.decodeBase64Url "AAQAAP__"
+      Expect.isSome bytes "should decode"
+      Expect.equal (Option.get bytes).Length 6 "6-byte SETTINGS entry"
+
+    testCase "decodeBase64Url accepts unpadded input" <| fun _ ->
+      // base64url has no padding; "AA" decodes to a single 0 byte once we
+      // re-pad to "AA==".
+      let bytes = H2cUpgrade.decodeBase64Url "AA"
+      Expect.isSome bytes "should decode"
+      Expect.equal (Option.get bytes) [| 0uy |] "single 0 byte"
+
+    testCase "decodeBase64Url translates the URL-safe alphabet" <| fun _ ->
+      // 0xFB 0xFF decodes from standard base64 "+/8=" and base64url "-_8".
+      let std = H2cUpgrade.decodeBase64Url "+/8="
+      let url = H2cUpgrade.decodeBase64Url "-_8"
+      Expect.equal std url "url-safe and standard alphabets agree"
+
+    testCase "decodeBase64Url returns None on garbage" <| fun _ ->
+      Expect.isNone (H2cUpgrade.decodeBase64Url "!!!not base64!!!") "rejected"
+
+    testCase "tryDecodeHttp2SettingsHeader accepts an empty payload" <| fun _ ->
+      // RFC 7540 §3.2.1: an empty SETTINGS payload is legal — the client
+      // accepts the server defaults.
+      match H2cUpgrade.tryDecodeHttp2SettingsHeader "" with
+      | Some s -> Expect.equal s defaultSetting "empty -> defaults"
+      | None -> failtest "should accept empty payload"
+
+    testCase "tryDecodeHttp2SettingsHeader decodes a single SETTINGS entry" <| fun _ ->
+      // Encode SETTINGS_INITIAL_WINDOW_SIZE (id=4) = 0xFFFF as the on-wire
+      // SETTINGS body, then base64url it (no padding).
+      let payload = [| 0x00uy; 0x04uy; 0x00uy; 0x00uy; 0xFFuy; 0xFFuy |]
+      let b64 = System.Convert.ToBase64String(payload).TrimEnd('=')
+      match H2cUpgrade.tryDecodeHttp2SettingsHeader b64 with
+      | Some s -> Expect.equal s.initialWindowSize 0xFFFF "initial window size decoded"
+      | None -> failtest "should accept valid SETTINGS"
+
+    testCase "tryDecodeHttp2SettingsHeader rejects non-multiple-of-6 length" <| fun _ ->
+      // 5 bytes -> base64 -> tryDecode should reject.
+      let bad = System.Convert.ToBase64String([| 1uy; 2uy; 3uy; 4uy; 5uy |]).TrimEnd('=')
+      Expect.isNone (H2cUpgrade.tryDecodeHttp2SettingsHeader bad) "must reject"
+
+    testCase "isH2cUpgradeRequest recognises a well-formed upgrade" <| fun _ ->
+      Expect.isTrue
+        (ConnectionFacade.isH2cUpgradeRequest (mkRequest validUpgradeHeaders))
+        "all three signals present => h2c upgrade"
+
+    testCase "isH2cUpgradeRequest is case-insensitive on token values" <| fun _ ->
+      let req = mkRequest [
+        "Host", "example.com"
+        "Connection", "upgrade, http2-settings"
+        "Upgrade", "H2C"
+        "HTTP2-Settings", ""
+      ]
+      Expect.isTrue (ConnectionFacade.isH2cUpgradeRequest req)
+                    "tokens are case-insensitive"
+
+    testCase "isH2cUpgradeRequest rejects WebSocket upgrade" <| fun _ ->
+      // Regression: WebSocket Upgrade flow must still go through the user web
+      // part. The h2c classifier must not match it.
+      let req = mkRequest [
+        "Host", "example.com"
+        "Connection", "Upgrade"
+        "Upgrade", "websocket"
+        "Sec-WebSocket-Key", "dGhlIHNhbXBsZSBub25jZQ=="
+      ]
+      Expect.isFalse (ConnectionFacade.isH2cUpgradeRequest req)
+                     "websocket upgrade must not be intercepted as h2c"
+
+    testCase "isH2cUpgradeRequest requires HTTP2-Settings header" <| fun _ ->
+      let req = mkRequest [
+        "Host", "example.com"
+        "Connection", "Upgrade, HTTP2-Settings"
+        "Upgrade", "h2c"
+      ]
+      Expect.isFalse (ConnectionFacade.isH2cUpgradeRequest req)
+                     "missing HTTP2-Settings header"
+
+    testCase "isH2cUpgradeRequest requires Connection header to mention HTTP2-Settings" <| fun _ ->
+      let req = mkRequest [
+        "Host", "example.com"
+        "Connection", "Upgrade"
+        "Upgrade", "h2c"
+        "HTTP2-Settings", ""
+      ]
+      Expect.isFalse (ConnectionFacade.isH2cUpgradeRequest req)
+                     "RFC 7540 §3.2 requires both 'Upgrade' and 'HTTP2-Settings' tokens"
+
+    testCase "isH2cUpgradeRequest rejects a plain HTTP/1.1 GET" <| fun _ ->
+      Expect.isFalse
+        (ConnectionFacade.isH2cUpgradeRequest (mkRequest [ "Host", "example.com" ]))
+        "no upgrade headers => regular request"
+
+    testCase "register installs the upgrade handler hook" <| fun _ ->
+      // The hook is registered eagerly by Tcp.createPools; calling register
+      // again is idempotent and must leave a Some in place so any future
+      // ConnectionFacade respects h2c upgrades.
+      H2cUpgrade.register ()
+      Expect.isTrue ConnectionFacade.Http2UpgradeHandler.IsSome
+                    "Http2UpgradeHandler must be set"
+  ]

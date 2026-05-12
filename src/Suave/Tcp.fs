@@ -88,6 +88,12 @@ let createConnectionFacade tracker connectionPool listenSocket binding (runtime:
 
 let createPools listenSocket binding maxOps runtime cancellationToken bufferSize (webpart:WebPart) healthCheckEnabled healthCheckIntervalMs maxConnectionAgeSeconds =
 
+  // Wire the h2c upgrade handler into ConnectionFacade so HTTP/1.1 → HTTP/2
+  // cleartext upgrade requests are recognised on this server. This is
+  // idempotent and intentionally lives here (rather than at module load) so
+  // that `ConnectionFacade.fs` does not depend on `Http2.fs` directly.
+  Suave.Http2.H2cUpgrade.register ()
+
   let connectionPool = new ConcurrentPool<ConnectionFacade>()
   
   // Create active connection tracker for health checking

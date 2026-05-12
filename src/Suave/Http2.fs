@@ -824,3 +824,131 @@ module Http2 =
            alive := false
            closeEvent.Set() |> ignore
        }
+
+    /// Run the HTTP/2 connection-preface exchange (RFC 7540 §3.5):
+    ///   * read the 24-byte client preface ("PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n")
+    ///   * send our own (potentially empty) SETTINGS frame as the server
+    ///     connection preface
+    /// This is the entry point used by the h2c upgrade handler after writing
+    /// the 101 Switching Protocols response. Subsequent steps will extend
+    /// this to drive the full HTTP/2 read/write loop.
+    member x.start () : SocketOp<unit> =
+      socket {
+        let! prefaceBytes = readBytes facade connectionPreface.Length
+        let received = System.Text.Encoding.ASCII.GetString prefaceBytes
+        if received <> connectionPreface then
+          return! SocketOp.abort (InputDataError (None, "Invalid HTTP/2 connection preface"))
+        else
+          let encInfo = { flags = 0uy; streamIdentifier = 0; padding = None }
+          do! x.write (encInfo, Settings(false, defaultSetting))
+      }
+
+  // ---------------------------------------------------------------------------
+  // h2c upgrade (RFC 7540 §3.2)
+  //
+  // An HTTP/1.1 client requests an upgrade by sending:
+  //   GET / HTTP/1.1
+  //   Host: server.example.com
+  //   Connection: Upgrade, HTTP2-Settings
+  //   Upgrade: h2c
+  //   HTTP2-Settings: <base64url-encoded SETTINGS payload>
+  //
+  // If the server accepts, it responds with:
+  //   HTTP/1.1 101 Switching Protocols
+  //   Connection: Upgrade
+  //   Upgrade: h2c
+  // and then begins speaking HTTP/2, with the original request becoming
+  // stream 1 (implicitly half-closed from the client to the server).
+  // ---------------------------------------------------------------------------
+  module H2cUpgrade =
+
+    open Suave.Operators
+
+    /// Decode the base64url payload of an `HTTP2-Settings` header
+    /// (RFC 7540 §3.2.1, RFC 7235 token68). Returns `None` for malformed input.
+    let decodeBase64Url (s: string) : byte[] option =
+      try
+        let normalised = s.Replace('-', '+').Replace('_', '/')
+        let padded =
+          match normalised.Length % 4 with
+          | 0 -> normalised
+          | n -> normalised + System.String('=', 4 - n)
+        Some (System.Convert.FromBase64String padded)
+      with _ -> None
+
+    /// Decode the `HTTP2-Settings` header value into a `Settings` record by
+    /// reusing the wire-format SETTINGS parser. The base64url payload
+    /// contains zero or more 6-octet (id,value) pairs — exactly the body of
+    /// a SETTINGS frame, with no frame header — per RFC 7540 §3.2.1.
+    let tryDecodeHttp2SettingsHeader (headerValue: string) : Settings option =
+      match decodeBase64Url headerValue with
+      | None -> None
+      | Some bytes when bytes.Length % 6 <> 0 -> None
+      | Some bytes ->
+        // parseSettings expects a FrameHeader so it can fish out the ACK flag
+        // (which is meaningless here — the header carries client SETTINGS)
+        // and validate the length. Synthesise one with the right length.
+        let synthHeader =
+          { length = bytes.Length
+            ``type`` = 4uy
+            flags = 0uy
+            streamIdentifier = 0 }
+        try
+          match parseSettings synthHeader bytes with
+          | Settings (_, settings) -> Some settings
+          | _ -> None
+        with _ -> None
+
+    /// The 101 Switching Protocols response sent to acknowledge an h2c
+    /// upgrade. RFC 7540 §3.2 requires `Connection: Upgrade` and
+    /// `Upgrade: h2c`; the body MUST be empty.
+    let switchingProtocolsResponse : WebPart =
+      Writers.setHeader "Connection" "Upgrade"
+      >=> Writers.setHeader "Upgrade" "h2c"
+      >=> Response.response HTTP_101 [||]
+
+    /// The handler installed on `ConnectionFacade.Http2UpgradeHandler`. It
+    /// owns the connection from the moment it is invoked: it writes the 101,
+    /// marks the connection as long-lived (so the health checker leaves it
+    /// alone), then runs the HTTP/2 connection-preface exchange before
+    /// returning `Ok false` to break the HTTP/1.1 keep-alive loop.
+    let handleUpgrade (facade: ConnectionFacade) (request: HttpRequest)
+        : Task<Result<bool, Error>> =
+      task {
+        // Decode the client's SETTINGS hint up front; a malformed header is
+        // a 400 Bad Request per RFC 7540 §3.2 (the client never gets to
+        // become an HTTP/2 peer).
+        let settingsHeaderValue =
+          match request.header "http2-settings" with
+          | Choice1Of2 v -> v
+          | Choice2Of2 _ -> ""
+        match tryDecodeHttp2SettingsHeader settingsHeaderValue with
+        | None ->
+          let httpOutput = new HttpOutput(facade.Connection, facade.Runtime)
+          let! _ =
+            httpOutput.run request
+              (RequestErrors.BAD_REQUEST "Invalid HTTP2-Settings header")
+          return Ok false
+        | Some _clientSettings ->
+          // Send the 101 over HTTP/1.1.
+          let httpOutput = new HttpOutput(facade.Connection, facade.Runtime)
+          let! _ = httpOutput.run request switchingProtocolsResponse
+          // Mark the socket as long-lived so the keep-alive health checker
+          // does not reap it while HTTP/2 is in use.
+          facade.Connection.isLongLived <- true
+          // Run the HTTP/2 connection-preface exchange. Subsequent steps
+          // will extend this to actually drive the protocol; for now we
+          // hand off, perform the mandatory preface, and return — closing
+          // the HTTP/1.1 keep-alive loop so the connection is shut down
+          // cleanly afterwards.
+          let conn = Http2Connection(facade)
+          let! prefaceResult = (conn.start ()).AsTask()
+          match prefaceResult with
+          | Ok () -> return Ok false
+          | Result.Error e -> return Result.Error e
+      }
+
+    /// Wire `handleUpgrade` into `ConnectionFacade.Http2UpgradeHandler`.
+    /// Idempotent — safe to call from multiple bindings / restarts.
+    let register () : unit =
+      ConnectionFacade.Http2UpgradeHandler <- Some handleUpgrade
