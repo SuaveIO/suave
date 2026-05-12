@@ -835,8 +835,12 @@ module Http2 =
     member x.start () : SocketOp<unit> =
       socket {
         let! prefaceBytes = readBytes facade connectionPreface.Length
-        let received = System.Text.Encoding.ASCII.GetString prefaceBytes
-        if received <> connectionPreface then
+        // Compare as raw bytes — the preface is pure ASCII but going via
+        // string conversion would obscure any non-ASCII bytes the client
+        // might send and is also a needless allocation on the hot path.
+        let expected = System.Text.Encoding.ASCII.GetBytes connectionPreface
+        if prefaceBytes.Length <> expected.Length
+           || not (System.Linq.Enumerable.SequenceEqual(prefaceBytes, expected)) then
           return! SocketOp.abort (InputDataError (None, "Invalid HTTP/2 connection preface"))
         else
           let encInfo = { flags = 0uy; streamIdentifier = 0; padding = None }
@@ -866,9 +870,13 @@ module Http2 =
 
     /// Decode the base64url payload of an `HTTP2-Settings` header
     /// (RFC 7540 §3.2.1, RFC 7235 token68). Returns `None` for malformed input.
+    /// Surrounding linear whitespace is tolerated: although token68 itself
+    /// disallows whitespace, the header value can still arrive with
+    /// surrounding LWS depending on upstream parsing.
     let decodeBase64Url (s: string) : byte[] option =
       try
-        let normalised = s.Replace('-', '+').Replace('_', '/')
+        let trimmed = s.Trim()
+        let normalised = trimmed.Replace('-', '+').Replace('_', '/')
         let padded =
           match normalised.Length % 4 with
           | 0 -> normalised
