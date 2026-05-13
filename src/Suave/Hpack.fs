@@ -784,13 +784,20 @@ if I < 2^N - 1, encode I on N bits
   let isHuffman w   = isset w 7
 
   let extractByteString (rbuf:MemoryStream) (len:int) =
-    #if NETSTANDARD1_5
-    let (_, arrSegment) = rbuf.TryGetBuffer()
-    let buff = arrSegment.Array
-    #else
-    let buff = rbuf.GetBuffer()
-    #endif
-    Array.sub buff 0 len
+    // Read `len` bytes starting at the stream's current Position and advance
+    // the position past them. The previous implementation used GetBuffer() +
+    // Array.sub 0 len, which (a) returned bytes from offset 0 of the underlying
+    // buffer regardless of where we were reading from, and (b) failed to
+    // advance Position, so the next call would re-read the very same bytes.
+    // For a literal header field with a new (non-Huffman) name this manifested
+    // as a decoded "Empty header value" because the second headerStuff call
+    // ended up consuming the length byte of the name as the length of the
+    // value.
+    let out = Array.zeroCreate<byte> len
+    if len > 0 then
+      let read = rbuf.Read(out, 0, len)
+      if read <> len then failwith "Header block truncated"
+    out
 
   let decodeString (huff:bool) (decoder: HuffmanDecoding)  (rbuf:MemoryStream) (len:int) =
     if rbuf.Length <> rbuf.Position then
@@ -820,8 +827,8 @@ if I < 2^N - 1, encode I on N bits
     (t,v)
 
   let insertNewName (dyntbl : DynamicTable) (rbuf:MemoryStream) =
-    let headerValue = Text.Encoding.UTF8.GetString(headerStuff dyntbl rbuf)
-    let t = toToken headerValue
+    let headerName = Text.Encoding.UTF8.GetString(headerStuff dyntbl rbuf)
+    let t = toToken headerName
     let v = Text.Encoding.UTF8.GetString(headerStuff dyntbl rbuf)
     (t,v)
 

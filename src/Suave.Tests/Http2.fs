@@ -234,6 +234,26 @@ let hpackTests (_ : SuaveConfig) =
       let enc = newDynamicTableForEncoding 4096
       let bytes = Hpack.encodeHeader' defaultEncodeStrategy 4096 enc (toTokenHeaderList [ "custom-key", "custom-header" ])
       Expect.isGreaterThan bytes.Length 0 "encoder produced bytes"
+
+    testCase "decode literal header field with incremental indexing, new name (RFC 7541 C.2.1)" <| fun _ ->
+      // Regression for the "Empty header value" bug on literal-name decode:
+      // extractByteString used to read from offset 0 of the underlying
+      // MemoryStream buffer and never advanced Position, so the second
+      // headerStuff call inside insertNewName ended up consuming the very
+      // first bytes of the input as the value-length prefix, decoding the
+      // header value as empty.
+      //
+      // RFC 7541, Appendix C.2.1 hex dump:
+      //   400a 6375 7374 6f6d 2d6b 6579 0d63 7573
+      //   746f 6d2d 6865 6164 6572
+      let bytes =
+        [| 0x40uy; 0x0auy
+           0x63uy; 0x75uy; 0x73uy; 0x74uy; 0x6fuy; 0x6duy; 0x2duy; 0x6buy; 0x65uy; 0x79uy
+           0x0duy
+           0x63uy; 0x75uy; 0x73uy; 0x74uy; 0x6fuy; 0x6duy; 0x2duy; 0x68uy; 0x65uy; 0x61uy; 0x64uy; 0x65uy; 0x72uy |]
+      let dec = newDynamicTableForDecoding 4096 4096
+      let decoded = Hpack.decodeHeader dec bytes
+      Expect.equal decoded [ "custom-key", "custom-header" ] "decoded literal new-name header round-trip"
   ]
 
 [<Tests>]
