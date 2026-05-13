@@ -256,6 +256,24 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
   member val Connection = connection with get,set
   member val Runtime = runtime with get,set
   member val ConnectionId = connectionId with get
+  /// The web part used to serve requests on this connection. Exposed so that
+  /// protocol upgrade handlers (e.g. h2c) can drive their own request loop
+  /// using the same web part as the HTTP/1.1 keep-alive loop.
+  member val Webpart : WebPart = webpart with get
+
+  /// Optional hook invoked when an incoming HTTP/1.1 request asks to upgrade
+  /// to HTTP/2 cleartext (h2c) per RFC 7540 §3.2. When set, the hook owns
+  /// the connection from this point forward (it is responsible for writing
+  /// the 101 Switching Protocols response and then driving the HTTP/2
+  /// protocol). Returning `Ok false` terminates the HTTP/1.1 keep-alive
+  /// loop; any error is propagated to `accept`.
+  ///
+  /// The hook is registered by `Suave.Http2.H2cUpgrade.register` from
+  /// `Tcp.fs` at server startup so that `ConnectionFacade.fs` need not
+  /// take a forward dependency on `Http2.fs` (which is compiled later).
+  static member val Http2UpgradeHandler
+    : (ConnectionFacade -> HttpRequest -> Task<Result<bool, Error>>) option = None
+    with get, set
 
   member this.parsePostData maxContentLength (contentLengthHeader : Choice<string,_>) (contentTypeHeader:Choice<string,_>) : SocketOp<unit> =
     // Hot-path version: a direct task { } that hand-binds Result values instead of routing
@@ -362,6 +380,33 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
       return Ok(false)
     }
 
+  /// Returns true if `request` carries an HTTP/1.1 → HTTP/2 cleartext (h2c)
+  /// upgrade per RFC 7540 §3.2. The client must send all of:
+  ///   * `Connection: Upgrade, HTTP2-Settings` (in any order; case-insensitive)
+  ///   * `Upgrade: h2c`
+  ///   * `HTTP2-Settings: <base64url-encoded SETTINGS payload>`
+  /// The `HTTP2-Settings` value is not validated here — that is the
+  /// upgrade handler's job — we only check for its presence.
+  static member internal isH2cUpgradeRequest (request: HttpRequest) : bool =
+    let isUpgradeH2c =
+      match request.header "upgrade" with
+      | Choice1Of2 v -> String.equalsOrdinalCI (v.Trim()) "h2c"
+      | Choice2Of2 _ -> false
+    let connectionMentionsUpgradeAndSettings =
+      match request.header "connection" with
+      | Choice1Of2 v ->
+        let parts =
+          v.Split([| ',' |], StringSplitOptions.RemoveEmptyEntries)
+          |> Array.map (fun s -> s.Trim())
+        let has token = parts |> Array.exists (fun p -> String.equalsOrdinalCI p token)
+        has "upgrade" && has "HTTP2-Settings"
+      | Choice2Of2 _ -> false
+    let hasSettingsHeader =
+      match request.header "http2-settings" with
+      | Choice1Of2 _ -> true
+      | Choice2Of2 _ -> false
+    isUpgradeH2c && connectionMentionsUpgradeAndSettings && hasSettingsHeader
+
   member this.processRequest () =
     task {
       let! reqRes = this.readRequest()
@@ -370,13 +415,30 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
         // Couldn't parse HTTP request; answering with BAD_REQUEST and closing the connection.
         return! this.exitHttpLoopWithError err
       | Ok request ->
-        try
-          let! runRes = httpOutput.run request webpart
-          match runRes with
-          | Result.Error err -> return Result.Error err
-          | Ok keepAlive -> return Ok keepAlive
-        with ex ->
-          return Result.Error (Error.ConnectionError ex.Message)
+        // RFC 7540 §3.2: if the client requested an h2c upgrade and a handler
+        // is registered, hand the connection over. The handler owns the
+        // connection from here on (writes the 101, runs HTTP/2). If no handler
+        // is registered the upgrade headers are simply ignored and the request
+        // is processed as a normal HTTP/1.1 request — preserving backward
+        // compatibility for servers that haven't wired in HTTP/2.
+        //
+        // The WebSocket Upgrade (`Upgrade: websocket`) is handled by user web
+        // parts via the `handShake` combinator and is unaffected: we only
+        // intercept requests whose `Upgrade` token is exactly `h2c`.
+        match ConnectionFacade.Http2UpgradeHandler with
+        | Some handler when ConnectionFacade.isH2cUpgradeRequest request ->
+          try
+            return! handler this request
+          with ex ->
+            return Result.Error (Error.ConnectionError ex.Message)
+        | _ ->
+          try
+            let! runRes = httpOutput.run request webpart
+            match runRes with
+            | Result.Error err -> return Result.Error err
+            | Ok keepAlive -> return Ok keepAlive
+          with ex ->
+            return Result.Error (Error.ConnectionError ex.Message)
     }
 
   member this.shutdown() =
