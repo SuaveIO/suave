@@ -275,6 +275,22 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
     : (ConnectionFacade -> HttpRequest -> Task<Result<bool, Error>>) option = None
     with get, set
 
+  /// Optional hook invoked when an incoming cleartext connection opens with
+  /// the HTTP/2 connection preface ("PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n") per
+  /// RFC 7540 §3.4 (prior-knowledge mode). When set, the hook owns the
+  /// connection from this point forward: it must consume the remainder of
+  /// the preface (the request line "PRI * HTTP/2.0\r\n" has already been
+  /// read by `readRequest`) and drive the HTTP/2 protocol. Returning
+  /// `Ok false` terminates the HTTP/1.1 keep-alive loop; any error is
+  /// propagated to `accept`.
+  ///
+  /// The hook is registered by `Suave.Http2.H2cPriorKnowledge.register`
+  /// from `Tcp.fs` at server startup so that `ConnectionFacade.fs` need
+  /// not take a forward dependency on `Http2.fs` (which is compiled later).
+  static member val Http2PriorKnowledgeHandler
+    : (ConnectionFacade -> Task<Result<bool, Error>>) option = None
+    with get, set
+
   member this.parsePostData maxContentLength (contentLengthHeader : Choice<string,_>) (contentTypeHeader:Choice<string,_>) : SocketOp<unit> =
     // Hot-path version: a direct task { } that hand-binds Result values instead of routing
     // through the socket { } CE. Only the cold multipart path still uses socket { }.
@@ -322,6 +338,30 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
         match firstLineRes with
         | Result.Error e -> return Result.Error e
         | Ok (rawMethod, path, rawQuery, httpVersion) ->
+
+        // RFC 7540 §3.4: prior-knowledge HTTP/2 cleartext clients open the
+        // connection with the 24-byte preface beginning with the literal
+        // request line "PRI * HTTP/2.0\r\n". No legitimate HTTP/1.1 request
+        // can have this exact (method, target, version) triple, so it is a
+        // reliable in-band signal that we should switch to HTTP/2 framing.
+        // We surface it to `processRequest` as a sentinel `HttpRequest` —
+        // headers are not read (the next 8 preface bytes "\r\nSM\r\n\r\n"
+        // are consumed by the prior-knowledge handler, not by the HTTP/1.1
+        // header parser).
+        if ConnectionFacade.isHttp2PriorKnowledgePreface rawMethod path httpVersion then
+          let request =
+            { httpVersion      = httpVersion
+              binding          = runtime.matchedBinding
+              rawPath          = path
+              rawHost          = ""
+              rawMethod        = rawMethod
+              headers          = requestHeaders
+              rawForm          = [||]
+              rawQuery         = rawQuery
+              files            = files
+              multiPartFields  = multiPartFields }
+          return Ok request
+        else
 
         let! headersRes = reader.readHeadersInto(requestHeaders)
         match headersRes with
@@ -380,6 +420,16 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
       return Ok(false)
     }
 
+  /// Returns true if the parsed request line is the literal HTTP/2 connection
+  /// preface ("PRI * HTTP/2.0") that begins a prior-knowledge HTTP/2 cleartext
+  /// connection (RFC 7540 §3.4). This (method, target, version) triple is
+  /// impossible in any conforming HTTP/1.1 request, making it a safe in-band
+  /// discriminator for protocol selection.
+  static member internal isHttp2PriorKnowledgePreface (rawMethod: string)
+                                                      (path: string)
+                                                      (httpVersion: string) : bool =
+    rawMethod = "PRI" && path = "*" && httpVersion = "HTTP/2.0"
+
   /// Returns true if `request` carries an HTTP/1.1 → HTTP/2 cleartext (h2c)
   /// upgrade per RFC 7540 §3.2. The client must send all of:
   ///   * `Connection: Upgrade, HTTP2-Settings` (in any order; case-insensitive)
@@ -415,6 +465,26 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
         // Couldn't parse HTTP request; answering with BAD_REQUEST and closing the connection.
         return! this.exitHttpLoopWithError err
       | Ok request ->
+        // RFC 7540 §3.4: prior-knowledge HTTP/2 cleartext is signalled by
+        // the connection opening with "PRI * HTTP/2.0\r\n…" — `readRequest`
+        // tags such connections by returning a sentinel request with
+        // method="PRI", path="*", version="HTTP/2.0". Hand it to the
+        // prior-knowledge handler if one is registered. With no handler
+        // present we fall through and the request will be rejected as a
+        // missing-Host BAD_REQUEST further down — preserving the
+        // pre-HTTP/2 behaviour for servers that haven't wired in HTTP/2.
+        if ConnectionFacade.isHttp2PriorKnowledgePreface
+             request.rawMethod request.rawPath request.httpVersion then
+          match ConnectionFacade.Http2PriorKnowledgeHandler with
+          | Some handler ->
+            try
+              return! handler this
+            with ex ->
+              return Result.Error (Error.ConnectionError ex.Message)
+          | None ->
+            return! this.exitHttpLoopWithError
+              (InputDataError (Some 400, "HTTP/2 prior-knowledge not supported"))
+        else
         // RFC 7540 §3.2: if the client requested an h2c upgrade and a handler
         // is registered, hand the connection over. The handler owns the
         // connection from here on (writes the 101, runs HTTP/2). If no handler

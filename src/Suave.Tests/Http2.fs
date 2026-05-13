@@ -828,6 +828,137 @@ let h2cUpgradeTests (_ : SuaveConfig) =
   ]
 
 // ---------------------------------------------------------------------------
+// Step 3b — h2c prior-knowledge detection (RFC 7540 §3.4).
+// A client with prior knowledge that the server speaks HTTP/2 cleartext
+// opens the connection with the literal 24-byte preface
+// ("PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n"). Detection is done by parsing the
+// first line as if it were an HTTP/1.1 request line and matching the
+// (method, target, version) triple — no other HTTP/1.1 request can look
+// like this. These tests cover the pure detector plus the registration
+// hook; the actual connection handoff is exercised end-to-end by the
+// prior-knowledge integration test below.
+// ---------------------------------------------------------------------------
+
+[<Tests>]
+let h2cPriorKnowledgeTests (_ : SuaveConfig) =
+  testList "Http2 h2c prior-knowledge" [
+    testCase "isHttp2PriorKnowledgePreface matches the canonical request line" <| fun _ ->
+      Expect.isTrue
+        (ConnectionFacade.isHttp2PriorKnowledgePreface "PRI" "*" "HTTP/2.0")
+        "PRI * HTTP/2.0 is the HTTP/2 connection preface"
+
+    testCase "isHttp2PriorKnowledgePreface rejects ordinary HTTP/1.1 GET" <| fun _ ->
+      Expect.isFalse
+        (ConnectionFacade.isHttp2PriorKnowledgePreface "GET" "/" "HTTP/1.1")
+        "regular requests are not the preface"
+
+    testCase "isHttp2PriorKnowledgePreface requires HTTP/2.0 version exactly" <| fun _ ->
+      // OPTIONS * is legal in HTTP/1.1 but must not be mistaken for the preface.
+      Expect.isFalse
+        (ConnectionFacade.isHttp2PriorKnowledgePreface "OPTIONS" "*" "HTTP/1.1")
+        "OPTIONS * HTTP/1.1 must remain HTTP/1.1"
+      // The method must be the literal "PRI" — no other token can substitute.
+      Expect.isFalse
+        (ConnectionFacade.isHttp2PriorKnowledgePreface "GET" "*" "HTTP/2.0")
+        "method must be PRI"
+      // The path/target must be the literal "*".
+      Expect.isFalse
+        (ConnectionFacade.isHttp2PriorKnowledgePreface "PRI" "/" "HTTP/2.0")
+        "target must be *"
+
+    testCase "isHttp2PriorKnowledgePreface is case-sensitive on method" <| fun _ ->
+      // RFC 7540 §3.5 specifies the preface bytes literally; lowercase "pri"
+      // is not the connection preface and would also not match HTTP method
+      // tokens (which are case-sensitive per RFC 9110).
+      Expect.isFalse
+        (ConnectionFacade.isHttp2PriorKnowledgePreface "pri" "*" "HTTP/2.0")
+        "method comparison is byte-exact"
+
+    testCase "register installs the prior-knowledge handler hook" <| fun _ ->
+      // The hook is registered eagerly by Tcp.createPools; calling register
+      // again is idempotent and must leave a Some in place.
+      H2cPriorKnowledge.register ()
+      Expect.isTrue ConnectionFacade.Http2PriorKnowledgeHandler.IsSome
+                    "Http2PriorKnowledgeHandler must be set"
+  ]
+
+// ---------------------------------------------------------------------------
+// Step 3c — h2c prior-knowledge end-to-end.
+// Boots a real cleartext Suave server on a loopback port, sends the
+// literal HTTP/2 connection preface over raw TCP, and confirms that the
+// server responds with the HTTP/2 server preface (a SETTINGS frame). The
+// test does not parse full HTTP/2 responses — it only verifies that the
+// protocol switch happens (i.e. the server replies with HTTP/2 framing,
+// not "HTTP/1.1 400 Bad Request").
+// ---------------------------------------------------------------------------
+
+[<Tests>]
+let h2cPriorKnowledgeIntegrationTests (_ : SuaveConfig) =
+  let getFreePort () =
+    let l = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0)
+    l.Start()
+    let port = (l.LocalEndpoint :?> System.Net.IPEndPoint).Port
+    l.Stop()
+    port
+
+  let withHttpServer (body: int -> unit) =
+    let port = getFreePort ()
+    let cts = new System.Threading.CancellationTokenSource()
+    let cfg =
+      { defaultConfig with
+          bindings = [ HttpBinding.create HTTP System.Net.IPAddress.Loopback (uint16 port) ]
+          cancellationToken = cts.Token }
+    let ready, serverTask =
+      Web.startWebServerAsync cfg (Suave.Successful.OK "h2c prior-knowledge")
+    try
+      ready |> Async.RunSynchronously |> ignore
+      body port
+    finally
+      cts.Cancel()
+      try serverTask.Wait(System.TimeSpan.FromSeconds 5.0) |> ignore with _ -> ()
+
+  testList "Http2 h2c prior-knowledge integration" [
+    testCase "server responds to the HTTP/2 preface with a SETTINGS frame" <| fun _ ->
+      withHttpServer (fun port ->
+        use client = new System.Net.Sockets.TcpClient()
+        client.Connect(System.Net.IPAddress.Loopback, port)
+        let stream = client.GetStream()
+        // Send the literal 24-byte HTTP/2 connection preface, then an empty
+        // SETTINGS frame (9-byte header, zero payload) so the server has a
+        // complete frame to read after its own SETTINGS.
+        let preface = System.Text.Encoding.ASCII.GetBytes connectionPreface
+        let emptySettings : byte[] =
+          [| 0uy; 0uy; 0uy   // length = 0
+             4uy             // type = SETTINGS
+             0uy             // flags = 0
+             0uy; 0uy; 0uy; 0uy |] // stream id = 0
+        stream.Write(preface, 0, preface.Length)
+        stream.Write(emptySettings, 0, emptySettings.Length)
+        stream.Flush()
+
+        // Read the first 9 bytes of the server's response — that's a frame
+        // header. RFC 7540 §3.5 mandates the server's first frame after the
+        // preface be SETTINGS (type = 4). Anything else (in particular, a
+        // textual "HTTP/1.1 400…" response) means the protocol switch failed.
+        let buf : byte[] = Array.zeroCreate 9
+        stream.ReadTimeout <- 5000
+        let mutable offset = 0
+        while offset < buf.Length do
+          let n = stream.Read(buf, offset, buf.Length - offset)
+          if n <= 0 then failtest "server closed before sending its SETTINGS frame"
+          offset <- offset + n
+        Expect.equal buf.[3] 4uy
+          "server's first frame must be SETTINGS (type=4) per RFC 7540 §3.5"
+        Expect.equal buf.[4] 0uy
+          "server's initial SETTINGS frame must not have the ACK flag set"
+        // The stream identifier of any SETTINGS frame is 0 (RFC 7540 §6.5).
+        Expect.equal buf.[5] 0uy "stream id high byte = 0"
+        Expect.equal buf.[6] 0uy "stream id mid-hi byte = 0"
+        Expect.equal buf.[7] 0uy "stream id mid-lo byte = 0"
+        Expect.equal buf.[8] 0uy "stream id low byte = 0")
+  ]
+
+// ---------------------------------------------------------------------------
 // Step 4 — ALPN h2 negotiation over TLS.
 // Spins up a real HTTPS Suave server bound to an ephemeral port using the
 // test certificate, then runs a `.NET` `SslStream` client that advertises
