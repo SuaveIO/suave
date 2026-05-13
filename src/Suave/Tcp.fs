@@ -93,6 +93,10 @@ let createPools listenSocket binding maxOps runtime cancellationToken bufferSize
   // idempotent and intentionally lives here (rather than at module load) so
   // that `ConnectionFacade.fs` does not depend on `Http2.fs` directly.
   Suave.Http2.H2cUpgrade.register ()
+  // Likewise wire the HTTP/2 prior-knowledge handler (RFC 7540 §3.4): a
+  // cleartext client that opens the connection with the HTTP/2 preface
+  // ("PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n") is switched to HTTP/2 framing.
+  Suave.Http2.H2cPriorKnowledge.register ()
 
   let connectionPool = new ConcurrentPool<ConnectionFacade>()
   

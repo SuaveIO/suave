@@ -1713,6 +1713,40 @@ module Http2 =
         return Ok ()
     }
 
+    /// Run the HTTP/2 connection-preface exchange for prior-knowledge mode
+    /// (RFC 7540 §3.4). The caller has already consumed the first 16 bytes
+    /// of the 24-byte preface as an HTTP/1.1-looking request line
+    /// ("PRI * HTTP/2.0\r\n") via the normal request-line reader. This
+    /// method reads the remaining 8 preface bytes ("\r\nSM\r\n\r\n") and
+    /// sends our own (potentially empty) SETTINGS frame as the server
+    /// connection preface.
+    member x.startPriorKnowledge () : SocketOp<unit> =
+      socket {
+        let remainder = "\r\nSM\r\n\r\n"
+        let! tail = readBytes facade remainder.Length
+        let expected = System.Text.Encoding.ASCII.GetBytes remainder
+        if tail.Length <> expected.Length
+           || not (System.Linq.Enumerable.SequenceEqual(tail, expected)) then
+          return! SocketOp.abort (InputDataError (None, "Invalid HTTP/2 connection preface"))
+        else
+          let encInfo = { flags = 0uy; streamIdentifier = 0; padding = None }
+          do! x.write (encInfo, Settings(false, defaultSetting))
+      }
+
+    /// Top-level entry point used by the HTTP/2 prior-knowledge handler.
+    /// The request-line portion of the preface has already been consumed
+    /// by the HTTP/1.1 request-line reader; this runs the rest of the
+    /// preface exchange and then enters the read/dispatch loop until the
+    /// connection is closed.
+    member x.runPriorKnowledge (webPart: WebPart) : Async<Result<unit, Error>> = async {
+      let! prefaceResult = Async.AwaitTask ((x.startPriorKnowledge()).AsTask())
+      match prefaceResult with
+      | Result.Error e -> return Result.Error e
+      | Ok () ->
+        do! x.runReadLoop webPart
+        return Ok ()
+    }
+
     member x.writeResponseToFrame (response: HttpResult) = async {
       // Backward-compatible shim: writes the response on stream 1 with no
       // trailers. Retained because earlier code referenced it.
@@ -1854,3 +1888,42 @@ module Http2 =
     /// Idempotent — safe to call from multiple bindings / restarts.
     let register () : unit =
       ConnectionFacade.Http2UpgradeHandler <- Some handleUpgrade
+
+  // ---------------------------------------------------------------------------
+  // h2c prior-knowledge (RFC 7540 §3.4)
+  //
+  // A client with prior knowledge that the server speaks HTTP/2 cleartext
+  // opens the TCP connection and sends the 24-byte connection preface
+  // ("PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n") immediately, with no HTTP/1.1
+  // negotiation. The server reads the preface, sends its own SETTINGS, and
+  // proceeds with HTTP/2 framing.
+  //
+  // The first 16 bytes of the preface are syntactically a (bogus) HTTP/1.1
+  // request line, so they pass through `ConnectionFacade.readRequest` and
+  // are recognised there by `isHttp2PriorKnowledgePreface`. The handler
+  // below picks up the connection at that point: it consumes the remaining
+  // 8 preface bytes and runs the HTTP/2 connection loop.
+  // ---------------------------------------------------------------------------
+  module H2cPriorKnowledge =
+
+    /// The handler installed on
+    /// `ConnectionFacade.Http2PriorKnowledgeHandler`. It owns the
+    /// connection from the moment it is invoked: it consumes the remainder
+    /// of the preface, marks the connection long-lived, and runs the
+    /// HTTP/2 read/dispatch loop. Returns `Ok false` to break the HTTP/1.1
+    /// keep-alive loop in the facade.
+    let handlePriorKnowledge (facade: ConnectionFacade) : Task<Result<bool, Error>> =
+      task {
+        facade.Connection.isLongLived <- true
+        let conn = Http2Connection(facade)
+        let! runResult = conn.runPriorKnowledge facade.Webpart
+        match runResult with
+        | Ok () -> return Ok false
+        | Result.Error e -> return Result.Error e
+      }
+
+    /// Wire `handlePriorKnowledge` into
+    /// `ConnectionFacade.Http2PriorKnowledgeHandler`. Idempotent — safe to
+    /// call from multiple bindings / restarts.
+    let register () : unit =
+      ConnectionFacade.Http2PriorKnowledgeHandler <- Some handlePriorKnowledge
