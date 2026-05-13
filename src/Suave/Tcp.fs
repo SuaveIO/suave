@@ -242,18 +242,20 @@ let private runAcceptor
                   sslTransport.networkStream <- new NetworkStream(acceptedSocket, true)
                   sslTransport.sslStream <- new SslStream(sslTransport.networkStream, false)
 
-                  // Perform SSL handshake
+                  // Perform SSL handshake (with ALPN advertising h2, http/1.1).
                   try
                     let certificate =
                       match runtime.matchedBinding.scheme with
                       | HTTPS cert -> cert
                       | HTTP -> failwith "Expected HTTPS binding for SSL transport"
 
+                    let opts =
+                      SslTransport.buildServerAuthenticationOptions(
+                        certificate, checkCertificateRevocation = false)
                     do! sslTransport.sslStream.AuthenticateAsServerAsync(
-                      certificate,
-                      clientCertificateRequired = false,
-                      enabledSslProtocols = (SslProtocols.Tls12 ||| SslProtocols.Tls13),
-                      checkCertificateRevocation = false)
+                      opts, cancellationToken)
+                    sslTransport.negotiatedApplicationProtocol <-
+                      sslTransport.sslStream.NegotiatedApplicationProtocol
                     return Ok(remoteBinding acceptedSocket)
                   with ex ->
                     return Result.Error(Error.ConnectionError($"SSL handshake failed: {ex.Message}"))
