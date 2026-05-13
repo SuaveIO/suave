@@ -22,8 +22,37 @@ type SslTransport(listenSocket: Socket, certificate: X509Certificate, cancellati
   
   [<DefaultValue>]
   val mutable networkStream: NetworkStream
-  
+
+  /// The ALPN protocol negotiated during the TLS handshake. When ALPN was not
+  /// used (or the client did not advertise a known protocol), this is
+  /// `SslApplicationProtocol()` (i.e. its `Protocol` byte sequence is empty).
+  /// Callers may inspect this after `AuthenticateAsServerAsync` completes to
+  /// dispatch to an HTTP/2 reader for "h2", or fall back to HTTP/1.1 otherwise.
+  [<DefaultValue>]
+  val mutable negotiatedApplicationProtocol: SslApplicationProtocol
+
   let socketLock = obj()
+
+  /// ALPN protocols advertised by the server, in preference order: HTTP/2 first,
+  /// then HTTP/1.1. RFC 7301 / RFC 7540 §3.3.
+  static let alpnProtocols =
+    ResizeArray<SslApplicationProtocol>(
+      [| SslApplicationProtocol.Http2; SslApplicationProtocol.Http11 |])
+
+  /// Build the server authentication options used for every TLS handshake on
+  /// this transport. Centralised so the inline handshake in `Tcp.runAcceptor`
+  /// and `SslTransport.accept` stay in sync.
+  static member buildServerAuthenticationOptions
+      (certificate: X509Certificate, checkCertificateRevocation: bool) =
+    let opts = SslServerAuthenticationOptions()
+    opts.ServerCertificate <- certificate
+    opts.ClientCertificateRequired <- false
+    opts.EnabledSslProtocols <- SslProtocols.Tls12 ||| SslProtocols.Tls13
+    opts.CertificateRevocationCheckMode <-
+      if checkCertificateRevocation then X509RevocationMode.Online
+      else X509RevocationMode.NoCheck
+    opts.ApplicationProtocols <- alpnProtocols
+    opts
 
   let shutdownSocket (acceptSocket: Socket) =
     if acceptSocket <> null then
@@ -52,13 +81,13 @@ type SslTransport(listenSocket: Socket, certificate: X509Certificate, cancellati
         socket.SendTimeout <- 60000     // Send timeout
         this.networkStream <- new NetworkStream(socket, true)
         this.sslStream <- new SslStream(this.networkStream, false)
-        
-        // Perform SSL handshake
-        do! this.sslStream.AuthenticateAsServerAsync(
-          certificate,
-          clientCertificateRequired = false,
-          enabledSslProtocols = (SslProtocols.Tls12 ||| SslProtocols.Tls13),
-          checkCertificateRevocation = true)
+
+        // Perform SSL handshake (with ALPN advertising h2, http/1.1).
+        let opts =
+          SslTransport.buildServerAuthenticationOptions(
+            certificate, checkCertificateRevocation = true)
+        do! this.sslStream.AuthenticateAsServerAsync(opts, cancellationToken)
+        this.negotiatedApplicationProtocol <- this.sslStream.NegotiatedApplicationProtocol
         
         return Ok(remoteBinding socket)
       with

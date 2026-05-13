@@ -617,3 +617,102 @@ let h2cUpgradeTests (_ : SuaveConfig) =
       Expect.isTrue ConnectionFacade.Http2UpgradeHandler.IsSome
                     "Http2UpgradeHandler must be set"
   ]
+
+// ---------------------------------------------------------------------------
+// Step 4 — ALPN h2 negotiation over TLS.
+// Spins up a real HTTPS Suave server bound to an ephemeral port using the
+// test certificate, then runs a `.NET` `SslStream` client that advertises
+// ALPN and asserts the server selects "h2" when offered (and "http/1.1"
+// otherwise). This validates that `SslTransport` advertises h2 first and
+// honours the client's preference list (RFC 7301 / RFC 7540 §3.3).
+// ---------------------------------------------------------------------------
+
+[<Tests>]
+let alpnTests (_ : SuaveConfig) =
+  /// Build an in-memory self-signed certificate so the test does not depend
+  /// on the (SHA-1, 1024-bit) `suave.p12` shipped for legacy compatibility,
+  /// which modern OpenSSL rejects under default security levels.
+  let loadTestCertificate () =
+    use rsa = System.Security.Cryptography.RSA.Create(2048)
+    let req =
+      System.Security.Cryptography.X509Certificates.CertificateRequest(
+        "CN=localhost",
+        rsa,
+        System.Security.Cryptography.HashAlgorithmName.SHA256,
+        System.Security.Cryptography.RSASignaturePadding.Pkcs1)
+    let sanBuilder =
+      System.Security.Cryptography.X509Certificates.SubjectAlternativeNameBuilder()
+    sanBuilder.AddIpAddress(System.Net.IPAddress.Loopback)
+    sanBuilder.AddDnsName("localhost")
+    req.CertificateExtensions.Add(sanBuilder.Build())
+    let notBefore = System.DateTimeOffset.UtcNow.AddMinutes(-5.0)
+    let notAfter = System.DateTimeOffset.UtcNow.AddHours(1.0)
+    let cert = req.CreateSelfSigned(notBefore, notAfter)
+    // Round-trip through PKCS#12 so the private key handle survives on every OS.
+    let pfx = cert.Export(System.Security.Cryptography.X509Certificates.X509ContentType.Pkcs12)
+    System.Security.Cryptography.X509Certificates.X509CertificateLoader
+      .LoadPkcs12(pfx, (null : string))
+
+  /// Grab a free localhost TCP port (0-binding then release).
+  let getFreePort () =
+    let l = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0)
+    l.Start()
+    let port = (l.LocalEndpoint :?> System.Net.IPEndPoint).Port
+    l.Stop()
+    port
+
+  let connectAndNegotiate (port: int) (offered: string list) =
+    let protocols =
+      System.Collections.Generic.List<System.Net.Security.SslApplicationProtocol>(
+        offered |> List.map (fun p -> System.Net.Security.SslApplicationProtocol p))
+    use client = new System.Net.Sockets.TcpClient()
+    client.Connect(System.Net.IPAddress.Loopback, port)
+    let netStream = client.GetStream()
+    // Accept the self-signed test certificate.
+    let validate =
+      System.Net.Security.RemoteCertificateValidationCallback(fun _ _ _ _ -> true)
+    use ssl = new System.Net.Security.SslStream(netStream, false, validate)
+    let opts = System.Net.Security.SslClientAuthenticationOptions()
+    opts.TargetHost <- "localhost"
+    opts.ApplicationProtocols <- protocols
+    opts.EnabledSslProtocols <-
+      System.Security.Authentication.SslProtocols.Tls12 |||
+      System.Security.Authentication.SslProtocols.Tls13
+    let cts = new System.Threading.CancellationTokenSource(System.TimeSpan.FromSeconds 10.0)
+    ssl.AuthenticateAsClientAsync(opts, cts.Token).GetAwaiter().GetResult()
+    ssl.NegotiatedApplicationProtocol
+
+  /// Boot an HTTPS Suave server on an ephemeral loopback port, invoke `body`
+  /// with that port, and tear the server down deterministically.
+  let withTlsServer (body: int -> unit) =
+    let cert = loadTestCertificate ()
+    let port = getFreePort ()
+    let cts = new System.Threading.CancellationTokenSource()
+    let cfg =
+      { defaultConfig with
+          bindings = [ HttpBinding.create (HTTPS cert) System.Net.IPAddress.Loopback (uint16 port) ]
+          cancellationToken = cts.Token }
+    let ready, serverTask =
+      Web.startWebServerAsync cfg (Suave.Successful.OK "alpn test")
+    try
+      ready |> Async.RunSynchronously |> ignore
+      body port
+    finally
+      cts.Cancel()
+      try serverTask.Wait(System.TimeSpan.FromSeconds 5.0) |> ignore with _ -> ()
+
+  testList "Http2 ALPN" [
+    testCase "server selects h2 when client offers [h2, http/1.1]" <| fun _ ->
+      withTlsServer (fun port ->
+        let negotiated = connectAndNegotiate port [ "h2"; "http/1.1" ]
+        Expect.equal negotiated
+                     System.Net.Security.SslApplicationProtocol.Http2
+                     "server must select h2 when client offers it")
+
+    testCase "server falls back to http/1.1 when client offers only http/1.1" <| fun _ ->
+      withTlsServer (fun port ->
+        let negotiated = connectAndNegotiate port [ "http/1.1" ]
+        Expect.equal negotiated
+                     System.Net.Security.SslApplicationProtocol.Http11
+                     "server must select http/1.1 when h2 is not offered")
+  ]
