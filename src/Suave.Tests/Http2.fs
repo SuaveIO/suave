@@ -515,6 +515,148 @@ let flowControlTests (_ : SuaveConfig) =
   ]
 
 // ---------------------------------------------------------------------------
+// Step 5 — frame read/dispatch loop pure helpers.
+//
+// The dispatch loop itself is a stateful object on top of a transport and is
+// exercised end-to-end via the H2SpecHost fixture. The pure helpers below
+// (HPACK response encoding + request-header pseudo-header extraction) are
+// unit-tested here to lock in their semantics.
+// ---------------------------------------------------------------------------
+
+[<Tests>]
+let dispatchLoopHelperTests (_ : SuaveConfig) =
+  testList "Http2 dispatch loop helpers" [
+
+    testCase "encodeHpackHeaderBlock round-trips through a compliant decoder" <| fun _ ->
+      // RFC 7541 §6.2.2: Literal Header Field without Indexing — New Name,
+      // no Huffman. The output is parseable by `Hpack.decodeHeader`.
+      let encoded =
+        Http2.encodeHpackHeaderBlock [
+          ":status", "200"
+          "content-type", "text/plain"
+          "content-length", "5" ]
+      let dt = newDynamicTableForDecoding 4096 4096
+      let decoded = Hpack.decodeHeader dt encoded
+      Expect.equal decoded
+        [ ":status", "200"
+          "content-type", "text/plain"
+          "content-length", "5" ]
+        "literal-no-index header block round-trips"
+
+    testCase "encodeHpackInteger encodes small values in one byte" <| fun _ ->
+      let buf = ResizeArray<byte>()
+      Http2.encodeHpackInteger buf 7 10
+      Expect.equal (buf.ToArray()) [| 10uy |] "single-byte small int"
+
+    testCase "encodeHpackInteger encodes 127 in two bytes (prefix overflow)" <| fun _ ->
+      // RFC 7541 §5.1 example: 127 with a 7-bit prefix needs the
+      // continuation form.
+      let buf = ResizeArray<byte>()
+      Http2.encodeHpackInteger buf 7 127
+      // 0x7f then varint of (127 - 127) = 0
+      Expect.equal (buf.ToArray()) [| 0x7fuy; 0uy |] "two-byte overflow form"
+
+    testCase "encodeHpackHeaderBlock encodes header names lowercase" <| fun _ ->
+      // HTTP/2 (RFC 7540 §8.1.2) requires lowercase field names on the wire.
+      let encoded =
+        Http2.encodeHpackHeaderBlock [ "Content-Type", "text/plain" ]
+      let dt = newDynamicTableForDecoding 4096 4096
+      match Hpack.decodeHeader dt encoded with
+      | [ name, _ ] -> Expect.equal name "content-type" "name was lowercased"
+      | other -> failtestf "expected single header, got %A" other
+
+    testCase "extractRequestPseudoHeaders splits pseudo and regular headers" <| fun _ ->
+      let headers =
+        [ ":method", "GET"
+          ":scheme", "http"
+          ":path", "/foo?q=1"
+          ":authority", "example.com"
+          "accept", "*/*" ]
+      match Http2.extractRequestPseudoHeaders headers with
+      | Ok (m, p, s, a, regular) ->
+        Expect.equal m "GET"             ":method"
+        Expect.equal p "/foo?q=1"        ":path"
+        Expect.equal s "http"            ":scheme"
+        Expect.equal a "example.com"     ":authority"
+        Expect.equal regular [ "accept", "*/*" ] "regular headers"
+      | Result.Error err -> failtestf "expected Ok, got %A" err
+
+    testCase "extractRequestPseudoHeaders rejects a missing :method" <| fun _ ->
+      let headers =
+        [ ":scheme", "http"
+          ":path", "/" ]
+      match Http2.extractRequestPseudoHeaders headers with
+      | Result.Error ProtocolError -> ()
+      | other -> failtestf "expected ProtocolError, got %A" other
+
+    testCase "extractRequestPseudoHeaders rejects pseudo-header after regular" <| fun _ ->
+      // RFC 7540 §8.1.2.1: pseudo-header fields MUST appear before regular
+      // header fields.
+      let headers =
+        [ ":method", "GET"
+          "accept", "*/*"
+          ":path", "/"
+          ":scheme", "http" ]
+      match Http2.extractRequestPseudoHeaders headers with
+      | Result.Error ProtocolError -> ()
+      | other -> failtestf "expected ProtocolError, got %A" other
+
+    testCase "extractRequestPseudoHeaders rejects a duplicate :path" <| fun _ ->
+      let headers =
+        [ ":method", "GET"
+          ":scheme", "http"
+          ":path", "/a"
+          ":path", "/b" ]
+      match Http2.extractRequestPseudoHeaders headers with
+      | Result.Error ProtocolError -> ()
+      | other -> failtestf "expected ProtocolError, got %A" other
+
+    testCase "extractRequestPseudoHeaders rejects connection-specific fields" <| fun _ ->
+      // RFC 7540 §8.1.2.2: connection-specific header fields MUST be treated
+      // as malformed.
+      let headers =
+        [ ":method", "GET"
+          ":scheme", "http"
+          ":path", "/"
+          "connection", "close" ]
+      match Http2.extractRequestPseudoHeaders headers with
+      | Result.Error ProtocolError -> ()
+      | other -> failtestf "expected ProtocolError, got %A" other
+
+    testCase "extractRequestPseudoHeaders accepts TE: trailers only" <| fun _ ->
+      // RFC 7540 §8.1.2.2: the TE header field MAY appear in an HTTP/2
+      // request, but the only allowed value is "trailers".
+      let headersOk =
+        [ ":method", "GET"
+          ":scheme", "http"
+          ":path", "/"
+          "te", "trailers" ]
+      match Http2.extractRequestPseudoHeaders headersOk with
+      | Ok _ -> ()
+      | other -> failtestf "expected Ok, got %A" other
+
+    testCase "extractRequestPseudoHeaders rejects TE with non-trailers value" <| fun _ ->
+      let headers =
+        [ ":method", "GET"
+          ":scheme", "http"
+          ":path", "/"
+          "te", "gzip" ]
+      match Http2.extractRequestPseudoHeaders headers with
+      | Result.Error ProtocolError -> ()
+      | other -> failtestf "expected ProtocolError, got %A" other
+
+    testCase "newStreamData starts in Idle with configured windows" <| fun _ ->
+      let s = Http2.newStreamData 12345 65535
+      Expect.equal s.state StreamState.Idle "state Idle"
+      Expect.equal s.outboundWindow.available 12345 "outbound = peer initial"
+      Expect.equal s.inboundWindow.available 65535 "inbound = local initial"
+      Expect.equal s.requestHeaders [] "no headers yet"
+      Expect.equal s.trailers [] "no trailers yet"
+      Expect.isFalse s.endStreamReceived "END_STREAM not yet seen"
+      Expect.isFalse s.dispatched "not dispatched"
+  ]
+
+// ---------------------------------------------------------------------------
 // Step 3 — h2c upgrade detection and HTTP2-Settings decoding (RFC 7540 §3.2).
 // These tests only cover the pure pieces of the upgrade path; the actual
 // connection handoff is exercised through the existing Web.fs integration
