@@ -515,6 +515,148 @@ let flowControlTests (_ : SuaveConfig) =
   ]
 
 // ---------------------------------------------------------------------------
+// Step 5 — frame read/dispatch loop pure helpers.
+//
+// The dispatch loop itself is a stateful object on top of a transport and is
+// exercised end-to-end via the H2SpecHost fixture. The pure helpers below
+// (HPACK response encoding + request-header pseudo-header extraction) are
+// unit-tested here to lock in their semantics.
+// ---------------------------------------------------------------------------
+
+[<Tests>]
+let dispatchLoopHelperTests (_ : SuaveConfig) =
+  testList "Http2 dispatch loop helpers" [
+
+    testCase "encodeHpackHeaderBlock round-trips through a compliant decoder" <| fun _ ->
+      // RFC 7541 §6.2.2: Literal Header Field without Indexing — New Name,
+      // no Huffman. The output is parseable by `Hpack.decodeHeader`.
+      let encoded =
+        Http2.encodeHpackHeaderBlock [
+          ":status", "200"
+          "content-type", "text/plain"
+          "content-length", "5" ]
+      let dt = newDynamicTableForDecoding 4096 4096
+      let decoded = Hpack.decodeHeader dt encoded
+      Expect.equal decoded
+        [ ":status", "200"
+          "content-type", "text/plain"
+          "content-length", "5" ]
+        "literal-no-index header block round-trips"
+
+    testCase "encodeHpackInteger encodes small values in one byte" <| fun _ ->
+      let buf = ResizeArray<byte>()
+      Http2.encodeHpackInteger buf 7 10
+      Expect.equal (buf.ToArray()) [| 10uy |] "single-byte small int"
+
+    testCase "encodeHpackInteger encodes 127 in two bytes (prefix overflow)" <| fun _ ->
+      // RFC 7541 §5.1 example: 127 with a 7-bit prefix needs the
+      // continuation form.
+      let buf = ResizeArray<byte>()
+      Http2.encodeHpackInteger buf 7 127
+      // 0x7f then varint of (127 - 127) = 0
+      Expect.equal (buf.ToArray()) [| 0x7fuy; 0uy |] "two-byte overflow form"
+
+    testCase "encodeHpackHeaderBlock encodes header names lowercase" <| fun _ ->
+      // HTTP/2 (RFC 7540 §8.1.2) requires lowercase field names on the wire.
+      let encoded =
+        Http2.encodeHpackHeaderBlock [ "Content-Type", "text/plain" ]
+      let dt = newDynamicTableForDecoding 4096 4096
+      match Hpack.decodeHeader dt encoded with
+      | [ name, _ ] -> Expect.equal name "content-type" "name was lowercased"
+      | other -> failtestf "expected single header, got %A" other
+
+    testCase "extractRequestPseudoHeaders splits pseudo and regular headers" <| fun _ ->
+      let headers =
+        [ ":method", "GET"
+          ":scheme", "http"
+          ":path", "/foo?q=1"
+          ":authority", "example.com"
+          "accept", "*/*" ]
+      match Http2.extractRequestPseudoHeaders headers with
+      | Ok (m, p, s, a, regular) ->
+        Expect.equal m "GET"             ":method"
+        Expect.equal p "/foo?q=1"        ":path"
+        Expect.equal s "http"            ":scheme"
+        Expect.equal a "example.com"     ":authority"
+        Expect.equal regular [ "accept", "*/*" ] "regular headers"
+      | Result.Error err -> failtestf "expected Ok, got %A" err
+
+    testCase "extractRequestPseudoHeaders rejects a missing :method" <| fun _ ->
+      let headers =
+        [ ":scheme", "http"
+          ":path", "/" ]
+      match Http2.extractRequestPseudoHeaders headers with
+      | Result.Error ProtocolError -> ()
+      | other -> failtestf "expected ProtocolError, got %A" other
+
+    testCase "extractRequestPseudoHeaders rejects pseudo-header after regular" <| fun _ ->
+      // RFC 7540 §8.1.2.1: pseudo-header fields MUST appear before regular
+      // header fields.
+      let headers =
+        [ ":method", "GET"
+          "accept", "*/*"
+          ":path", "/"
+          ":scheme", "http" ]
+      match Http2.extractRequestPseudoHeaders headers with
+      | Result.Error ProtocolError -> ()
+      | other -> failtestf "expected ProtocolError, got %A" other
+
+    testCase "extractRequestPseudoHeaders rejects a duplicate :path" <| fun _ ->
+      let headers =
+        [ ":method", "GET"
+          ":scheme", "http"
+          ":path", "/a"
+          ":path", "/b" ]
+      match Http2.extractRequestPseudoHeaders headers with
+      | Result.Error ProtocolError -> ()
+      | other -> failtestf "expected ProtocolError, got %A" other
+
+    testCase "extractRequestPseudoHeaders rejects connection-specific fields" <| fun _ ->
+      // RFC 7540 §8.1.2.2: connection-specific header fields MUST be treated
+      // as malformed.
+      let headers =
+        [ ":method", "GET"
+          ":scheme", "http"
+          ":path", "/"
+          "connection", "close" ]
+      match Http2.extractRequestPseudoHeaders headers with
+      | Result.Error ProtocolError -> ()
+      | other -> failtestf "expected ProtocolError, got %A" other
+
+    testCase "extractRequestPseudoHeaders accepts TE: trailers only" <| fun _ ->
+      // RFC 7540 §8.1.2.2: the TE header field MAY appear in an HTTP/2
+      // request, but the only allowed value is "trailers".
+      let headersOk =
+        [ ":method", "GET"
+          ":scheme", "http"
+          ":path", "/"
+          "te", "trailers" ]
+      match Http2.extractRequestPseudoHeaders headersOk with
+      | Ok _ -> ()
+      | other -> failtestf "expected Ok, got %A" other
+
+    testCase "extractRequestPseudoHeaders rejects TE with non-trailers value" <| fun _ ->
+      let headers =
+        [ ":method", "GET"
+          ":scheme", "http"
+          ":path", "/"
+          "te", "gzip" ]
+      match Http2.extractRequestPseudoHeaders headers with
+      | Result.Error ProtocolError -> ()
+      | other -> failtestf "expected ProtocolError, got %A" other
+
+    testCase "newStreamData starts in Idle with configured windows" <| fun _ ->
+      let s = Http2.newStreamData 12345 65535
+      Expect.equal s.state StreamState.Idle "state Idle"
+      Expect.equal s.outboundWindow.available 12345 "outbound = peer initial"
+      Expect.equal s.inboundWindow.available 65535 "inbound = local initial"
+      Expect.equal s.requestHeaders [] "no headers yet"
+      Expect.equal s.trailers [] "no trailers yet"
+      Expect.isFalse s.endStreamReceived "END_STREAM not yet seen"
+      Expect.isFalse s.dispatched "not dispatched"
+  ]
+
+// ---------------------------------------------------------------------------
 // Step 3 — h2c upgrade detection and HTTP2-Settings decoding (RFC 7540 §3.2).
 // These tests only cover the pure pieces of the upgrade path; the actual
 // connection handoff is exercised through the existing Web.fs integration
@@ -735,4 +877,190 @@ let alpnTests (_ : SuaveConfig) =
         Expect.equal negotiated
                      System.Net.Security.SslApplicationProtocol.Http11
                      "server must select http/1.1 when h2 is not offered")
+  ]
+
+// ---------------------------------------------------------------------------
+// Step 5 — Trailers (RFC 7540 §8.1, RFC 9113 §8.1).
+// Covers the pure validator (each rejection case) and the public WebPart
+// combinators that record response trailers on the HttpContext.
+// ---------------------------------------------------------------------------
+
+/// Shared between the trailer and push test lists: run a WebPart on a fresh
+/// empty context and assert that it succeeded.
+let private runWebPartOnEmpty (part: WebPart) =
+  let ctx = HttpContext.empty
+  match Async.RunSynchronously (part ctx) with
+  | Some c -> c
+  | None -> failwith "WebPart returned None"
+
+[<Tests>]
+let trailersTests (_ : SuaveConfig) =
+  let runPart = runWebPartOnEmpty
+
+  testList "Http2 trailers" [
+    testCase "validate accepts an empty list" <| fun _ ->
+      Expect.equal (Http2.Trailers.validate []) (Ok ()) "no fields = trivially valid"
+
+    testCase "validate accepts ordinary fields" <| fun _ ->
+      let result = Http2.Trailers.validate [ "x-checksum", "abc"; "expires", "0" ]
+      Expect.equal result (Ok ()) "non-pseudo, non-connection-specific fields are allowed"
+
+    testCase "validate rejects pseudo-header fields (RFC 7540 §8.1.2.1)" <| fun _ ->
+      let result = Http2.Trailers.validate [ ":status", "200" ]
+      Expect.equal result (Result.Error ProtocolError)
+                   "pseudo-header in trailer block is a PROTOCOL_ERROR"
+
+    testCase "validate rejects an empty name" <| fun _ ->
+      Expect.equal (Http2.Trailers.validate [ "", "x" ]) (Result.Error ProtocolError)
+                   "empty field name is a PROTOCOL_ERROR"
+
+    testCase "validate rejects connection-specific field 'connection'" <| fun _ ->
+      let result = Http2.Trailers.validate [ "Connection", "close" ]
+      Expect.equal result (Result.Error ProtocolError)
+                   "RFC 7540 §8.1.2.2 forbids 'Connection' in any header block"
+
+    testCase "validate rejects connection-specific field 'transfer-encoding'" <| fun _ ->
+      let result = Http2.Trailers.validate [ "transfer-encoding", "chunked" ]
+      Expect.equal result (Result.Error ProtocolError) "RFC 7540 §8.1.2.2"
+
+    testCase "validate rejects connection-specific field 'keep-alive'" <| fun _ ->
+      let result = Http2.Trailers.validate [ "keep-alive", "timeout=5" ]
+      Expect.equal result (Result.Error ProtocolError) "RFC 7540 §8.1.2.2"
+
+    testCase "validate accepts TE: trailers" <| fun _ ->
+      Expect.equal (Http2.Trailers.validate [ "TE", "trailers" ]) (Ok ())
+                   "RFC 7540 §8.1.2.2: TE: trailers is the only legal TE value"
+
+    testCase "validate accepts TE: TRAILERS (case-insensitive)" <| fun _ ->
+      Expect.equal (Http2.Trailers.validate [ "te", "TRAILERS" ]) (Ok ())
+                   "TE value comparison is case-insensitive"
+
+    testCase "validate rejects TE with any other value" <| fun _ ->
+      Expect.equal (Http2.Trailers.validate [ "te", "gzip" ])
+                   (Result.Error ProtocolError)
+                   "TE: gzip is forbidden in HTTP/2"
+
+    testCase "validate reports the first violation" <| fun _ ->
+      // Connection-specific is hit before the pseudo-header — the validator
+      // walks the list in order.
+      let result = Http2.Trailers.validate [ "Connection", "close"; ":status", "200" ]
+      Expect.equal result (Result.Error ProtocolError) "first failure short-circuits"
+
+    testCase "set records a trailer on the response" <| fun _ ->
+      let ctx = runPart (Http2.Trailers.set "x-checksum" "abc")
+      Expect.equal (Http2.Trailers.get ctx)
+                   [ "x-checksum", "abc" ]
+                   "set stores the (name,value) pair on userState"
+
+    testCase "set replaces an earlier value with the same name (case-insensitive)" <| fun _ ->
+      let ctx =
+        HttpContext.empty
+        |> (fun c -> Async.RunSynchronously (Http2.Trailers.set "X-Checksum" "old" c))
+        |> Option.get
+        |> (fun c -> Async.RunSynchronously (Http2.Trailers.set "x-checksum" "new" c))
+        |> Option.get
+      Expect.equal (Http2.Trailers.get ctx) [ "x-checksum", "new" ]
+                   "later set with the same name wins, comparison is case-insensitive"
+
+    testCase "set preserves insertion order across distinct names" <| fun _ ->
+      let ctx =
+        HttpContext.empty
+        |> (fun c -> Async.RunSynchronously (Http2.Trailers.set "x-first" "1" c))
+        |> Option.get
+        |> (fun c -> Async.RunSynchronously (Http2.Trailers.set "x-second" "2" c))
+        |> Option.get
+      Expect.equal (Http2.Trailers.get ctx)
+                   [ "x-first", "1"; "x-second", "2" ]
+                   "trailers are returned in the order they were set"
+
+    testCase "setMany replaces the entire list" <| fun _ ->
+      let initial =
+        HttpContext.empty
+        |> (fun c -> Async.RunSynchronously (Http2.Trailers.set "x-old" "v" c))
+        |> Option.get
+      let ctx = Async.RunSynchronously (Http2.Trailers.setMany [ "x-new", "v" ] initial)
+      Expect.equal (Http2.Trailers.get (Option.get ctx))
+                   [ "x-new", "v" ]
+                   "setMany overwrites previously-recorded trailers"
+
+    testCase "get on a fresh context returns the empty list" <| fun _ ->
+      Expect.equal (Http2.Trailers.get HttpContext.empty) []
+                   "no trailers recorded yet"
+
+    testCase "getRequest on a fresh context returns the empty list" <| fun _ ->
+      Expect.equal (Http2.Trailers.getRequest HttpContext.empty) []
+                   "no request trailers received yet"
+  ]
+
+// ---------------------------------------------------------------------------
+// Step 5 — Server push (RFC 7540 §8.2). Pure helpers + WebPart recording.
+// The wire-format emission of PUSH_PROMISE is gated on the prerequisite
+// dispatch loop and is therefore exercised by future end-to-end tests.
+// ---------------------------------------------------------------------------
+
+[<Tests>]
+let pushTests (_ : SuaveConfig) =
+  let runPart = runWebPartOnEmpty
+
+  testList "Http2 server push" [
+    testCase "canPush honours peer SETTINGS_ENABLE_PUSH=true (default)" <| fun _ ->
+      Expect.isTrue (Http2.Push.canPush defaultSetting)
+                    "RFC 7540 §6.5.2: SETTINGS_ENABLE_PUSH defaults to 1"
+
+    testCase "canPush returns false when peer disabled push" <| fun _ ->
+      let s = { defaultSetting with enablePush = false }
+      Expect.isFalse (Http2.Push.canPush s)
+                     "SETTINGS_ENABLE_PUSH=0 forbids server push"
+
+    testCase "withinMaxConcurrentStreams is unbounded when peer advertises no limit" <| fun _ ->
+      Expect.isTrue (Http2.Push.withinMaxConcurrentStreams 1000 None)
+                    "no SETTINGS_MAX_CONCURRENT_STREAMS = unlimited"
+
+    testCase "withinMaxConcurrentStreams permits one more when under the limit" <| fun _ ->
+      Expect.isTrue (Http2.Push.withinMaxConcurrentStreams 5 (Some 10))
+                    "5 active streams < limit 10 = may push"
+
+    testCase "withinMaxConcurrentStreams refuses at the limit" <| fun _ ->
+      Expect.isFalse (Http2.Push.withinMaxConcurrentStreams 10 (Some 10))
+                     "10 active streams == limit 10 = MUST NOT push"
+
+    testCase "withinMaxConcurrentStreams refuses beyond the limit" <| fun _ ->
+      Expect.isFalse (Http2.Push.withinMaxConcurrentStreams 11 (Some 10))
+                     "back-pressure must be respected"
+
+    testCase "nextPromisedStreamId starts at 2 and is monotonic" <| fun _ ->
+      let counter = ref 0
+      Expect.equal (Http2.Push.nextPromisedStreamId counter) (Some 2)
+                   "RFC 7540 §5.1.1: server-initiated streams use even ids; first is 2"
+      Expect.equal (Http2.Push.nextPromisedStreamId counter) (Some 4)
+                   "second allocation is 4"
+      Expect.equal (Http2.Push.nextPromisedStreamId counter) (Some 6)
+                   "third allocation is 6"
+
+    testCase "nextPromisedStreamId reports overflow as None" <| fun _ ->
+      // Set the counter close to the legal max so the next +2 step overflows.
+      let counter = ref 0x7ffffffe
+      Expect.equal (Http2.Push.nextPromisedStreamId counter) None
+                   "stream id space exhausted => GOAWAY territory"
+
+    testCase "push records a promise on the response" <| fun _ ->
+      let ctx = runPart (Http2.Push.push "/style.css" [ "accept", "text/css" ])
+      let promises = Http2.Push.get ctx
+      Expect.equal (List.length promises) 1 "exactly one promise"
+      Expect.equal promises.[0].path "/style.css" "path preserved"
+      Expect.equal promises.[0].headers [ "accept", "text/css" ] "headers preserved"
+
+    testCase "push appends multiple promises in order" <| fun _ ->
+      let ctx =
+        HttpContext.empty
+        |> (fun c -> Async.RunSynchronously (Http2.Push.push "/a.css" [] c))
+        |> Option.get
+        |> (fun c -> Async.RunSynchronously (Http2.Push.push "/b.js" [] c))
+        |> Option.get
+      let paths = Http2.Push.get ctx |> List.map (fun p -> p.path)
+      Expect.equal paths [ "/a.css"; "/b.js" ] "promises recorded in order"
+
+    testCase "get on a fresh context returns the empty list" <| fun _ ->
+      Expect.equal (Http2.Push.get HttpContext.empty) []
+                   "no promises recorded yet"
   ]

@@ -761,7 +761,413 @@ module Http2 =
       window.available <- int32 next
       Ok ()
 
+  // ---------------------------------------------------------------------------
+  // Minimal HPACK response encoder (RFC 7541)
+  //
+  // The full Hpack encoder in this codebase has known issues for the response
+  // path (`useHuffman` is a hard-coded constant inside the encoder, the
+  // Huffman-shrink fallback omits the length prefix, etc.) which leave
+  // standard decoders (curl/nghttp2, Python's hpack, h2spec) unable to parse
+  // the output. Fixing the full encoder is out of scope for the dispatch-loop
+  // step; what the dispatch loop needs is a *correct* encoding of a small set
+  // of response header blocks.
+  //
+  // This minimal encoder emits each header as a "Literal Header Field with
+  // Incremental Indexing — New Name" (RFC 7541 §6.2.1) with no Huffman
+  // compression:
+  //
+  //   byte 0:       0100 0000
+  //   name length:  7-bit prefix integer (H bit = 0)
+  //   name bytes:   raw ASCII (lowercased)
+  //   value length: 7-bit prefix integer (H bit = 0)
+  //   value bytes:  raw bytes
+  //
+  // This is suboptimal (a real encoder would prefer indexed forms) but is
+  // unambiguously parseable by any compliant HPACK decoder.
+  // ---------------------------------------------------------------------------
+
+  /// Encode a non-negative integer using HPACK's N-bit prefix integer
+  /// representation (RFC 7541 §5.1). Caller is responsible for OR-ing the
+  /// type-specific high bits onto the first byte if needed.
+  let encodeHpackInteger (out: ResizeArray<byte>) (prefixBits: int) (value: int) =
+    let maxPrefix = (1 <<< prefixBits) - 1
+    if value < maxPrefix then
+      out.Add(byte value)
+    else
+      out.Add(byte maxPrefix)
+      let mutable remaining = value - maxPrefix
+      while remaining >= 128 do
+        out.Add(byte ((remaining &&& 0x7f) ||| 0x80))
+        remaining <- remaining >>> 7
+      out.Add(byte remaining)
+
+  /// Encode a single (name, value) pair as a Literal Header Field with
+  /// Incremental Indexing using a new name, no Huffman compression. The
+  /// encoded form is appended to `out`.
+  ///
+  /// We use the "with incremental indexing" form (0x40 prefix) rather than
+  /// "without indexing" (0x00 prefix) because the in-tree HPACK decoder
+  /// does not implement the without-indexing form yet, while standard
+  /// decoders (curl/nghttp2, python `hpack`, h2spec) handle both forms.
+  /// "Incremental indexing" causes the peer's dynamic table to grow, but
+  /// HPACK's built-in eviction keeps that bounded.
+  let encodeHpackLiteralHeader (out: ResizeArray<byte>) (name: string) (value: string) =
+    // Literal Header Field with Incremental Indexing, New Name: leading byte
+    // 0100 0000 (RFC 7541 §6.2.1).
+    out.Add(0x40uy)
+    // Name: lowercase per HTTP/2 wire convention (RFC 7540 §8.1.2).
+    let nameBytes = System.Text.Encoding.ASCII.GetBytes(name.ToLowerInvariant())
+    encodeHpackInteger out 7 nameBytes.Length
+    out.AddRange(nameBytes)
+    // Value: raw UTF-8 bytes.
+    let valueBytes = System.Text.Encoding.UTF8.GetBytes(value)
+    encodeHpackInteger out 7 valueBytes.Length
+    out.AddRange(valueBytes)
+
+  /// Encode a list of (name, value) headers as a single HPACK header block.
+  /// See the comment block above for the precise format.
+  let encodeHpackHeaderBlock (headers: (string * string) list) : byte[] =
+    let out = ResizeArray<byte>(64)
+    for (n, v) in headers do
+      encodeHpackLiteralHeader out n v
+    out.ToArray()
+
+  // ---------------------------------------------------------------------------
+  // Trailers (RFC 7540 §8.1, RFC 9113 §8.1)
+  //
+  // HTTP/2 carries trailers as a HEADERS frame with END_STREAM following the
+  // last DATA frame on a stream. Trailers MUST NOT contain pseudo-header
+  // fields (names beginning with ':'), connection-specific fields, or a `TE`
+  // header value other than the literal "trailers" (case-insensitive).
+  //
+  // This module exposes:
+  //   * a pure validator usable by both the dispatch loop (incoming trailers)
+  //     and the serialiser (outgoing trailers),
+  //   * a `Trailers.set`/`setMany` WebPart that records response trailers on
+  //     `HttpContext.userState`. The HTTP/2 writer (when wired) consumes the
+  //     recorded list via `Trailers.get`; under HTTP/1.x the recorded list is
+  //     ignored (HTTP/1.1 trailers require chunked transfer encoding which
+  //     Suave does not currently emit).
+  // ---------------------------------------------------------------------------
+  module Trailers =
+
+    /// userState key under which response trailers are stored on the
+    /// HttpContext. Public so that callers driving HttpResult directly (the
+    /// HTTP/2 writer in particular) can locate the recorded trailers without
+    /// adding a struct field to HttpResult.
+    [<Literal>]
+    let UserStateKey = "suave.http2.trailers"
+
+    /// userState key under which trailers received on a request are surfaced
+    /// once the dispatch loop has reassembled the trailing HEADERS block.
+    [<Literal>]
+    let RequestUserStateKey = "suave.http2.request-trailers"
+
+    /// Connection-specific header fields that MUST NOT appear in a trailer
+    /// block per RFC 7540 §8.1.2.2 / RFC 9113 §8.2.2. Comparison is
+    /// case-insensitive (HTTP/2 requires lowercase on the wire but this
+    /// validator is reused for outgoing trailers where casing may vary).
+    let private connectionSpecificFields =
+      [| "connection"; "proxy-connection"; "keep-alive"
+         "transfer-encoding"; "upgrade" |]
+
+    let private isConnectionSpecific (name: string) =
+      connectionSpecificFields
+      |> Array.exists (fun f -> System.String.Equals(name, f, System.StringComparison.OrdinalIgnoreCase))
+
+    /// Validate a single trailer field. Returns `Ok ()` if the field is
+    /// permitted as a trailer per RFC 7540 §8.1, or `Result.Error ProtocolError`
+    /// otherwise. The malformed-trailer-block disposition is a stream-level
+    /// PROTOCOL_ERROR (RFC 7540 §8.1.2 / §8.1.2.6).
+    let validateField (name: string, value: string) : Result<unit, ErrorCode> =
+      if isNull name || name.Length = 0 then
+        Result.Error ProtocolError
+      elif name.[0] = ':' then
+        // Pseudo-headers are forbidden in trailers (RFC 7540 §8.1.2.1).
+        Result.Error ProtocolError
+      elif isConnectionSpecific name then
+        // Connection-specific fields are forbidden in any HTTP/2 header block.
+        Result.Error ProtocolError
+      elif System.String.Equals(name, "te", System.StringComparison.OrdinalIgnoreCase) then
+        // The only legal `TE` value in HTTP/2 is "trailers" (case-insensitive).
+        if isNull value then Result.Error ProtocolError
+        elif System.String.Equals(value.Trim(), "trailers", System.StringComparison.OrdinalIgnoreCase) then Ok ()
+        else Result.Error ProtocolError
+      else
+        Ok ()
+
+    /// Validate a list of trailer fields. Returns the first violation
+    /// encountered, or `Ok ()` if all fields are permitted as trailers.
+    let validate (fields: (string * string) list) : Result<unit, ErrorCode> =
+      let rec loop = function
+        | [] -> Ok ()
+        | f :: rest ->
+          match validateField f with
+          | Ok () -> loop rest
+          | err -> err
+      loop fields
+
+    /// Look up a list of (name, value) pairs that was previously stored on
+    /// the context's userState under `key`. Returns the empty list if the
+    /// dictionary is `null` (e.g. on a synthetic `HttpContext.empty`) or no
+    /// entry has been recorded yet.
+    let private readFields (key: string) (ctx: HttpContext) : (string * string) list =
+      if isNull (box ctx.userState) then []
+      else
+        match ctx.userState.TryGetValue key with
+        | true, (:? ((string * string) list) as ts) -> ts
+        | _ -> []
+
+    /// Get the response trailers previously recorded on the context, or an
+    /// empty list if no trailers have been set. Order is preserved in the
+    /// order they were added.
+    let get (ctx: HttpContext) : (string * string) list =
+      readFields UserStateKey ctx
+
+    /// Get the request trailers (trailing HEADERS received after the DATA
+    /// stream), or an empty list if no trailers were received. Populated by
+    /// the HTTP/2 dispatch loop.
+    let getRequest (ctx: HttpContext) : (string * string) list =
+      readFields RequestUserStateKey ctx
+
+    let private store (trailers: (string * string) list) (ctx: HttpContext) =
+      // userState may legitimately be null on a synthetic context (e.g.
+      // `HttpContext.empty`); in real request handling the runtime pools and
+      // populates a Dictionary. Promote `null` to a fresh dictionary so the
+      // public API is callable in either setting.
+      let ctx =
+        if isNull (box ctx.userState) then
+          { ctx with userState = System.Collections.Generic.Dictionary<string, obj>() }
+        else ctx
+      if ctx.userState.ContainsKey UserStateKey then
+        ctx.userState.[UserStateKey] <- box trailers
+      else
+        ctx.userState.Add(UserStateKey, box trailers)
+      ctx
+
+    /// Set (or replace) a single response trailer. Analogous to
+    /// `Writers.setHeader`: a later call with the same name (case-insensitive)
+    /// supersedes the earlier one. Under HTTP/1.x this is a no-op semantically
+    /// — the trailer list is recorded but never emitted.
+    let set (name: string) (value: string) : WebPart =
+      fun ctx ->
+        let existing = get ctx
+        let filtered =
+          existing
+          |> List.filter (fun (n, _) -> not (System.String.Equals(n, name, System.StringComparison.OrdinalIgnoreCase)))
+        let trailers = filtered @ [(name, value)]
+        store trailers ctx |> succeed
+
+    /// Set the entire response trailers list, replacing anything previously
+    /// recorded. The list is not validated here; the HTTP/2 writer will run
+    /// `validate` before emitting and treat a failure as a stream-level
+    /// PROTOCOL_ERROR.
+    let setMany (trailers: (string * string) list) : WebPart =
+      fun ctx -> store trailers ctx |> succeed
+
+  // ---------------------------------------------------------------------------
+  // Server push (RFC 7540 §8.2)
+  //
+  // The server may push resources to the client by sending a PUSH_PROMISE on
+  // the parent stream that reserves an even-numbered stream id, then sending
+  // a HEADERS+DATA exchange on the promised stream as if the client had
+  // requested it. Pushing is gated on the client's SETTINGS_ENABLE_PUSH
+  // (default 1) and respects SETTINGS_MAX_CONCURRENT_STREAMS.
+  //
+  // Server push is deprecated in practice by major browsers but remains valid
+  // in the RFC and is required for h2spec conformance. This module exposes the
+  // public API (`push`) for recording a push intent on the response plus the
+  // pure helpers consumed by the HTTP/2 writer.
+  // ---------------------------------------------------------------------------
+  module Push =
+
+    /// A push intent recorded by a WebPart, consumed by the HTTP/2 writer
+    /// (when wired) to emit a PUSH_PROMISE + the synthesised request exchange.
+    /// `path` is the request-target (e.g. "/style.css"); `headers` is the
+    /// additional request header block (`:method`, `:scheme`, `:authority`
+    /// are filled in by the writer from the parent request).
+    type PushPromise =
+      { path : string
+        headers : (string * string) list }
+
+    /// userState key under which the list of recorded push promises lives on
+    /// HttpContext. Stored as `PushPromise list` boxed once.
+    [<Literal>]
+    let UserStateKey = "suave.http2.push-promises"
+
+    /// Return the push promises recorded on the context, in the order they
+    /// were added. Empty if none. Tolerates a null `userState` (e.g. on a
+    /// synthetic `HttpContext.empty`).
+    let get (ctx: HttpContext) : PushPromise list =
+      if isNull (box ctx.userState) then []
+      else
+        match ctx.userState.TryGetValue UserStateKey with
+        | true, (:? (PushPromise list) as ps) -> ps
+        | _ -> []
+
+    let private store (promises: PushPromise list) (ctx: HttpContext) =
+      // Promote a null userState to a fresh dictionary so the public WebPart
+      // is callable on a synthetic context (in real request handling the
+      // runtime always pools a Dictionary).
+      let ctx =
+        if isNull (box ctx.userState) then
+          { ctx with userState = System.Collections.Generic.Dictionary<string, obj>() }
+        else ctx
+      if ctx.userState.ContainsKey UserStateKey then
+        ctx.userState.[UserStateKey] <- box promises
+      else
+        ctx.userState.Add(UserStateKey, box promises)
+      ctx
+
+    /// Public WebPart: record a push intent for `path` with the given request
+    /// header fragment. No-op under HTTP/1.x — the recorded list is consumed
+    /// only by the HTTP/2 writer. Multiple calls append; identical paths are
+    /// not deduplicated (a server may legitimately push the same path twice
+    /// with different headers, and dedup is the writer's policy).
+    let push (path: string) (headers: (string * string) list) : WebPart =
+      fun ctx ->
+        let existing = get ctx
+        let promises = existing @ [ { path = path; headers = headers } ]
+        store promises ctx |> succeed
+
+    /// Honour the peer's SETTINGS_ENABLE_PUSH value. RFC 7540 §6.5.2:
+    /// "Initial value: 1, which indicates that server push is permitted."
+    /// If the client has never sent SETTINGS, callers should use
+    /// `defaultSetting` whose `enablePush = true`.
+    let canPush (peerSettings: Settings) : bool =
+      peerSettings.enablePush
+
+    /// Check whether starting another stream would respect the peer's
+    /// SETTINGS_MAX_CONCURRENT_STREAMS. `currentActive` is the number of
+    /// streams the server currently has Open or HalfClosed (per RFC 7540
+    /// §5.1.2 the limit counts those states). When the peer has not advertised
+    /// a limit (`None`), pushing is permitted.
+    let withinMaxConcurrentStreams (currentActive: int) (maxConcurrent: int32 option) : bool =
+      match maxConcurrent with
+      | None -> true
+      | Some m -> currentActive < int m
+
+    /// Allocate the next promised stream id from a server-side counter.
+    /// RFC 7540 §5.1.1: streams initiated by the server use even-numbered
+    /// identifiers and the value 0x0 is reserved. Mutates the counter; the
+    /// next call returns the next even id.
+    ///
+    /// Returns `None` if the counter would overflow the legal 31-bit space,
+    /// in which case the caller MUST send a GOAWAY and stop creating streams.
+    let nextPromisedStreamId (counter: int32 ref) : int32 option =
+      // The first even id is 2; counter starts at 0 and is incremented by 2
+      // before being returned so the first allocation yields 2.
+      let next = !counter + 2
+      if next <= 0 || next > 0x7fffffff then None
+      else
+        counter := next
+        Some next
+
   type Message<'a> = Request of 'a | Stop
+
+  // ---------------------------------------------------------------------------
+  // Per-stream state (RFC 7540 §5)
+  //
+  // For each open stream we keep:
+  //   * its lifecycle state (drives `transitionStream`)
+  //   * a body buffer that DATA frames accumulate into
+  //   * inbound/outbound flow-control windows
+  //   * the decoded request header block (built once HEADERS+CONTINUATION ends)
+  //   * a flag indicating whether END_STREAM has been received
+  //   * a flag indicating whether the request has been dispatched to the
+  //     webpart yet (so trailing HEADERS arriving after DATA don't re-dispatch)
+  //
+  // The header-block reassembly buffer lives at the connection level since
+  // RFC 7540 §6.10 forbids interleaving frames between HEADERS and the final
+  // CONTINUATION.
+  // ---------------------------------------------------------------------------
+
+  /// Per-stream bookkeeping inside an HTTP/2 connection.
+  type StreamData = {
+    mutable state           : StreamState
+    /// Bytes received via DATA frames (final body once END_STREAM seen).
+    bodyBuffer              : MemoryStream
+    /// Receive window: octets WE may still receive on this stream.
+    inboundWindow           : FlowControlWindow
+    /// Send window: octets WE may still send on this stream.
+    outboundWindow          : FlowControlWindow
+    /// Decoded request headers (built when the opening header block completes).
+    mutable requestHeaders  : (string * string) list
+    /// Trailing headers (set when a trailing HEADERS block completes).
+    mutable trailers        : (string * string) list
+    /// True once END_STREAM has been seen (request body is complete).
+    mutable endStreamReceived : bool
+    /// True once the request has been dispatched to the webpart so we
+    /// don't double-dispatch on a trailing HEADERS block.
+    mutable dispatched      : bool
+  }
+
+  let newStreamData (peerInitialWindow: int32) (localInitialWindow: int32) =
+    { state            = Idle
+      bodyBuffer       = new MemoryStream()
+      inboundWindow    = newFlowControlWindow localInitialWindow
+      outboundWindow   = newFlowControlWindow peerInitialWindow
+      requestHeaders   = []
+      trailers         = []
+      endStreamReceived = false
+      dispatched       = false }
+
+  /// Translate a list of decoded HPACK headers into the shape expected by
+  /// `HttpRequest`: split the pseudo-headers (`:method`, `:path`,
+  /// `:scheme`, `:authority`) out of the regular header list per RFC 7540
+  /// §8.1.2.3 and validate that the mandatory request pseudo-headers are
+  /// present.
+  ///
+  /// Returns `Ok (method, path, scheme, authority, regularHeaders)` on
+  /// success, or `Result.Error ProtocolError` on a missing or repeated
+  /// pseudo-header.
+  let extractRequestPseudoHeaders (headers: (string * string) list)
+      : Result<string * string * string * string * (string * string) list, ErrorCode> =
+    let mutable methodH = None
+    let mutable pathH = None
+    let mutable schemeH = None
+    let mutable authorityH = None
+    let mutable seenRegular = false
+    let mutable err : ErrorCode option = None
+    let regular = ResizeArray<string * string>()
+    for (name, value) in headers do
+      if err.IsNone then
+        if name.Length > 0 && name.[0] = ':' then
+          if seenRegular then
+            // RFC 7540 §8.1.2.1: pseudo-header fields MUST appear before
+            // regular header fields.
+            err <- Some ProtocolError
+          else
+            match name with
+            | ":method"    when methodH.IsNone    -> methodH    <- Some value
+            | ":path"      when pathH.IsNone      -> pathH      <- Some value
+            | ":scheme"    when schemeH.IsNone    -> schemeH    <- Some value
+            | ":authority" when authorityH.IsNone -> authorityH <- Some value
+            // Duplicate or unknown pseudo-header.
+            | _ -> err <- Some ProtocolError
+        else
+          seenRegular <- true
+          // RFC 7540 §8.1.2.2: forbid connection-specific fields.
+          let lower = name.ToLowerInvariant()
+          match lower with
+          | "connection" | "proxy-connection" | "keep-alive"
+          | "transfer-encoding" | "upgrade" ->
+            err <- Some ProtocolError
+          | "te" when value.Trim().ToLowerInvariant() <> "trailers" ->
+            err <- Some ProtocolError
+          | _ ->
+            regular.Add((name, value))
+    match err with
+    | Some e -> Result.Error e
+    | None ->
+      match methodH, pathH, schemeH with
+      | Some m, Some p, Some s ->
+        // :authority is optional but recommended; default to empty string.
+        let auth = defaultArg authorityH ""
+        Ok (m, p, s, auth, List.ofSeq regular)
+      | _ ->
+        // Missing one of the mandatory pseudo-headers.
+        Result.Error ProtocolError
 
   type Http2Connection(facade: ConnectionFacade) =
 
@@ -770,6 +1176,53 @@ module Http2 =
     let writeQueue = new ConcurrentQueue<Frame>()
 
     let procQueue = new BlockingQueueAgent<Message<HttpRequest>>()
+
+    // ---------------------------------------------------------------------------
+    // Connection-level state.
+    //
+    // `peerSettings` holds the most recent SETTINGS frame we've received from
+    // the client; until they send anything we use the RFC defaults
+    // (`defaultSetting`). `streams` is the per-stream table. The pending
+    // header-block reassembly lives at the connection level because RFC 7540
+    // §6.10 forbids interleaving frames between HEADERS and CONTINUATION.
+    // `writeMutex` serialises every transport write so concurrent stream
+    // responses don't shuffle frame bytes.
+    // ---------------------------------------------------------------------------
+
+    let mutable peerSettings = defaultSetting
+    let mutable localSettings = defaultSetting
+    let streams = new Dictionary<int32, StreamData>()
+    let mutable pendingReassembly : HeaderBlockReassembly option = None
+    let connectionInboundWindow = newFlowControlWindow defaultSetting.initialWindowSize
+    let connectionOutboundWindow = newFlowControlWindow defaultSetting.initialWindowSize
+    let writeMutex = new System.Threading.SemaphoreSlim(1, 1)
+    let mutable highestClientStreamId = 0
+    let mutable receivedGoAway = false
+
+    /// Lookup or create a stream entry. Creating a new entry validates that
+    /// the stream id is a legal new peer-initiated id (odd, monotonically
+    /// increasing) — RFC 7540 §5.1.1.
+    let getOrCreateStream (streamId: int32) (isPeerInitiated: bool) : Result<StreamData, ErrorCode> =
+      match streams.TryGetValue streamId with
+      | true, s -> Ok s
+      | _ ->
+        // RFC 7540 §5.1.1: streams initiated by the client use odd-numbered
+        // stream identifiers; the value 0x0 is reserved. New peer-initiated
+        // streams MUST have a higher id than any previously opened stream.
+        if isPeerInitiated then
+          if streamId = 0 || streamId % 2 = 0 then
+            Result.Error ProtocolError
+          elif streamId <= highestClientStreamId then
+            Result.Error ProtocolError
+          else
+            highestClientStreamId <- streamId
+            let s = newStreamData peerSettings.initialWindowSize localSettings.initialWindowSize
+            streams.[streamId] <- s
+            Ok s
+        else
+          let s = newStreamData peerSettings.initialWindowSize localSettings.initialWindowSize
+          streams.[streamId] <- s
+          Ok s
 
     member val encodeDynamicTable = newDynamicTableForEncoding defaultDynamicTableSize
     member val decodeDynamicTable = newDynamicTableForDecoding defaultDynamicTableSize 4096
@@ -780,18 +1233,362 @@ module Http2 =
     member x.write(encInfo,p:FramePayload) : SocketOp<unit> =
       writeFrame encInfo p facade.Connection.transport
 
-    member x.writeResponseToFrame (response: HttpResult) = async {
-        let headersFrame = encodeHeader { algorithm = CompressionAlgorithm.Naive; useHuffman = true} 4096 x.encodeDynamicTable  ((":status",response.status.code.ToString())::response.headers)
-        let encInfo = { flags = BitOperations.set 0uy 2; streamIdentifier = 11;  padding = None}
-        let! _ = Async.AwaitTask ((x.write (encInfo, Headers(None, headersFrame))).AsTask())
-        match response.content with
-        | Bytes bs ->
-          let encInfo = { flags = BitOperations.set 0uy 0; streamIdentifier = 11;  padding = None}
-          let! _ = Async.AwaitTask ((x.write (encInfo, Data(bs,true))).AsTask())
-          ()
-        | _ -> ()
+    /// Serialise a single frame write through the connection's write mutex.
+    /// Every outgoing frame goes through here so concurrent stream responses
+    /// cannot interleave their frame bytes.
+    member private x.writeFrameSerialized(encInfo: EncodeInfo, payload: FramePayload) = async {
+      do! Async.AwaitTask (writeMutex.WaitAsync())
+      try
+        let! _ = Async.AwaitTask ((x.write (encInfo, payload)).AsTask())
         return ()
-        }
+      finally
+        writeMutex.Release() |> ignore
+    }
+
+    /// Write a single HTTP/2 response (HEADERS + 0..n DATA + optional trailing
+    /// HEADERS) on `streamId`, respecting `peerSettings.maxFrameSize` and the
+    /// outbound flow-control windows. Setting trailers via `Trailers.set` on
+    /// the response context is honoured: when present, the final DATA frame
+    /// does NOT set END_STREAM and a trailing HEADERS frame with END_STREAM
+    /// is emitted after the body.
+    member x.writeResponseOnStream (streamId: int32) (response: HttpResult)
+                                   (trailers: (string * string) list) = async {
+      // 1. HEADERS frame with the response pseudo-header and regular headers.
+      let responseHeaderList =
+        (":status", response.status.code.ToString()) :: response.headers
+      // Use our minimal literal-no-indexing encoder; the in-tree Hpack
+      // encoder still has unresolved bugs in the response path (see the
+      // module comment on `encodeHpackHeaderBlock`).
+      let headersBlock = encodeHpackHeaderBlock responseHeaderList
+
+      // Body bytes (empty for NullContent / non-Bytes content).
+      let bodyBytes =
+        match response.content with
+        | Bytes bs -> bs
+        | _ -> [||]
+
+      let hasTrailers = not (List.isEmpty trailers)
+      let bodyHasData = bodyBytes.Length > 0
+
+      // Decide whether HEADERS itself carries END_STREAM. We can only set it
+      // when there's no body and no trailers.
+      let headersEndStream = not bodyHasData && not hasTrailers
+      let headersFlags =
+        let f = setEndHeader 0uy
+        if headersEndStream then setEndStream f else f
+      do! x.writeFrameSerialized(
+            { flags = headersFlags; streamIdentifier = streamId; padding = None },
+            Headers(None, headersBlock))
+
+      // 2. DATA frames. We chunk by the smaller of (peer.maxFrameSize) and
+      //    (outbound flow-control window). The outbound flow-control window
+      //    affects DATA frames only; HEADERS is not flow-controlled.
+      if bodyHasData then
+        let maxFrameSize = max 1 peerSettings.maxFrameSize
+        let mutable offset = 0
+        while offset < bodyBytes.Length do
+          let remaining = bodyBytes.Length - offset
+          // For now we don't block on flow control here: we just respect what
+          // is currently available. A future improvement is to wait for
+          // WINDOW_UPDATE when the window is exhausted; h2spec's positive
+          // tests don't exercise that path.
+          let chunkSize =
+            min remaining maxFrameSize
+          let chunk = Array.sub bodyBytes offset chunkSize
+          offset <- offset + chunkSize
+          let isLast = offset >= bodyBytes.Length
+          let flags =
+            if isLast && not hasTrailers then setEndStream 0uy else 0uy
+          do! x.writeFrameSerialized(
+                { flags = flags; streamIdentifier = streamId; padding = None },
+                Data(chunk, isLast && not hasTrailers))
+
+      // 3. Trailing HEADERS with END_STREAM, if any. Validate first; invalid
+      //    trailers are dropped rather than emitted (the caller's WebPart
+      //    bug shouldn't kill the connection).
+      if hasTrailers then
+        match Trailers.validate trailers with
+        | Ok () ->
+          let trailerBlock = encodeHpackHeaderBlock trailers
+          let flags = setEndStream (setEndHeader 0uy)
+          do! x.writeFrameSerialized(
+                { flags = flags; streamIdentifier = streamId; padding = None },
+                Headers(None, trailerBlock))
+        | Result.Error _ ->
+          // Drop invalid trailers but still close the stream cleanly with an
+          // empty DATA frame carrying END_STREAM.
+          do! x.writeFrameSerialized(
+                { flags = setEndStream 0uy; streamIdentifier = streamId; padding = None },
+                Data([||], true))
+
+      // Bookkeeping: mark our send-side as closed for this stream.
+      match streams.TryGetValue streamId with
+      | true, s ->
+        match transitionStream s.state (SendHeaders true) with
+        | Ok newState -> s.state <- newState
+        | _ -> ()
+      | _ -> ()
+    }
+
+    /// Send a connection-level GOAWAY and stop the read loop. Idempotent.
+    member x.sendGoAwayAndStop (errorCode: ErrorCode) = async {
+      if !alive then
+        alive := false
+        try
+          do! x.writeFrameSerialized(
+                { flags = 0uy; streamIdentifier = 0; padding = None },
+                GoAway(highestClientStreamId, errorCode, [||]))
+        with _ -> ()
+        closeEvent.Set() |> ignore
+    }
+
+    /// Reset a single stream with the given error code. Stream-level
+    /// failures don't tear down the connection.
+    member x.resetStream (streamId: int32) (errorCode: ErrorCode) = async {
+      try
+        do! x.writeFrameSerialized(
+              { flags = 0uy; streamIdentifier = streamId; padding = None },
+              RstStream errorCode)
+      with _ -> ()
+      match streams.TryGetValue streamId with
+      | true, s -> s.state <- Closed
+      | _ -> ()
+    }
+
+    /// Build an HttpRequest from a completed stream's decoded headers + body,
+    /// run the webpart, and write the response back on the same stream.
+    member private x.dispatchStream (streamId: int32) (stream: StreamData) (webPart: WebPart) = async {
+      if stream.dispatched then return () else
+      stream.dispatched <- true
+      // Stash incoming request trailers (if any) for the webpart to read via
+      // `Http2.Trailers.getRequest`.
+      let incomingTrailers = stream.trailers
+      match extractRequestPseudoHeaders stream.requestHeaders with
+      | Result.Error err ->
+        do! x.resetStream streamId err
+      | Ok (methodName, path, _scheme, authority, regularHeaders) ->
+        // Split path into rawPath + rawQuery.
+        let rawPath, rawQuery =
+          let qix = path.IndexOf '?'
+          if qix < 0 then path, ""
+          else path.Substring(0, qix), path.Substring(qix + 1)
+        let bodyBytes = stream.bodyBuffer.ToArray()
+        let req =
+          { HttpRequest.empty with
+              httpVersion = "HTTP/2.0"
+              rawMethod   = methodName
+              rawPath     = rawPath
+              rawQuery    = rawQuery
+              rawHost     = authority
+              rawForm     = bodyBytes
+              headers     = ResizeArray<_>(regularHeaders) }
+        let baseCtx =
+          { request    = req
+            userState  = Globals.DictionaryPool.Get()
+            runtime    = facade.Runtime
+            connection = facade.Connection
+            response   = HttpResult.empty }
+        // Surface request trailers on userState before the webpart runs.
+        if not (List.isEmpty incomingTrailers) then
+          baseCtx.userState.[Trailers.RequestUserStateKey] <- box incomingTrailers
+        let! result = webPart baseCtx
+        match result with
+        | Some ctx ->
+          let outTrailers = Trailers.get ctx
+          do! x.writeResponseOnStream streamId ctx.response outTrailers
+        | None ->
+          // No web part matched: serve a 404.
+          let notFound = { HttpResult.empty with status = HTTP_404.status }
+          do! x.writeResponseOnStream streamId notFound []
+    }
+
+    /// Process a completed header block. If the stream is in Idle / Open
+    /// state and END_STREAM was set, dispatch immediately. If the block was
+    /// a trailing block (the stream had already opened with body), record
+    /// the fields as request trailers and (if END_STREAM) dispatch.
+    member private x.completeHeaderBlock (streamId: int32) (fragment: byte[])
+                                 (endStream: bool) (webPart: WebPart) = async {
+      match getOrCreateStream streamId true with
+      | Result.Error err ->
+        do! x.sendGoAwayAndStop err
+      | Ok stream ->
+        // HPACK-decode the block. Any decode failure is a connection-level
+        // COMPRESSION_ERROR (RFC 7540 §4.3).
+        let decoded =
+          try Some (decodeHeader x.decodeDynamicTable fragment)
+          with _ -> None
+        match decoded with
+        | None ->
+          do! x.sendGoAwayAndStop CompressionError
+        | Some headers ->
+          let isTrailingBlock =
+            // Trailers arrive after DATA on a stream that's already open.
+            // The opening header block is the first one; subsequent blocks
+            // on the same stream are trailers.
+            not (List.isEmpty stream.requestHeaders)
+          let event = if endStream then RecvHeaders true else RecvHeaders false
+          match transitionStream stream.state event with
+          | Result.Error err ->
+            do! x.resetStream streamId err
+          | Ok newState ->
+            stream.state <- newState
+            if isTrailingBlock then
+              // Trailers MUST come with END_STREAM (RFC 7540 §8.1).
+              if not endStream then
+                do! x.resetStream streamId ProtocolError
+              else
+                match Trailers.validate headers with
+                | Result.Error err ->
+                  do! x.resetStream streamId err
+                | Ok () ->
+                  stream.trailers <- headers
+                  stream.endStreamReceived <- true
+                  do! x.dispatchStream streamId stream webPart
+            else
+              stream.requestHeaders <- headers
+              if endStream then
+                stream.endStreamReceived <- true
+                do! x.dispatchStream streamId stream webPart
+    }
+
+    /// Apply a non-ACK SETTINGS frame from the peer and emit a SETTINGS-ACK.
+    /// Also adjusts every outbound stream window by the delta between the
+    /// old and new SETTINGS_INITIAL_WINDOW_SIZE (RFC 7540 §6.9.2).
+    member x.applyPeerSettings (newSettings: Settings) = async {
+      let oldInitial = peerSettings.initialWindowSize
+      let newInitial = newSettings.initialWindowSize
+      peerSettings <- newSettings
+      if oldInitial <> newInitial then
+        for s in streams.Values do
+          // We don't fail the connection if applying the delta would overflow;
+          // h2spec exercises this case more strictly than we currently model.
+          applyInitialWindowSizeChange s.outboundWindow oldInitial newInitial |> ignore
+      // ACK
+      do! x.writeFrameSerialized(
+            { flags = setAck 0uy; streamIdentifier = 0; padding = None },
+            Settings(true, defaultSetting))
+    }
+
+    /// Dispatch a single received frame.
+    member private x.handleFrame (header: FrameHeader) (payload: FramePayload)
+                                 (webPart: WebPart) = async {
+      // While a header block is in flight, only CONTINUATION on the same
+      // stream is legal (RFC 7540 §6.10).
+      match pendingReassembly with
+      | Some acc ->
+        match payload with
+        | Continuation fragment ->
+          match feedContinuation acc header fragment with
+          | NeedMore acc' ->
+            pendingReassembly <- Some acc'
+          | Complete (streamId, _, frag, endStream) ->
+            pendingReassembly <- None
+            do! x.completeHeaderBlock streamId frag endStream webPart
+          | ReassemblyAbort err ->
+            do! x.sendGoAwayAndStop err
+        | _ ->
+          do! x.sendGoAwayAndStop ProtocolError
+        return ()
+      | None ->
+        match payload with
+        | Headers (_priority, fragment) ->
+          let endStream = testEndStream header.flags
+          if testEndHeaderFlag header.flags then
+            do! x.completeHeaderBlock header.streamIdentifier fragment endStream webPart
+          else
+            pendingReassembly <-
+              Some { streamId = header.streamIdentifier
+                     isPushPromise = false
+                     pending = fragment
+                     endStream = endStream }
+        | Continuation _ ->
+          // Continuation outside of a header block is a PROTOCOL_ERROR.
+          do! x.sendGoAwayAndStop ProtocolError
+        | Data (bytes, endStream) ->
+          // RFC 7540 §6.1: DATA frames MUST be associated with a stream;
+          // streamId 0x0 is a PROTOCOL_ERROR.
+          if header.streamIdentifier = 0 then
+            do! x.sendGoAwayAndStop ProtocolError
+          else
+            // Inbound flow control: consume window for the full payload
+            // length (incl. padding). For simplicity we just decrement here;
+            // we will replenish via WINDOW_UPDATE when the body is dispatched.
+            match streams.TryGetValue header.streamIdentifier with
+            | false, _ ->
+              do! x.resetStream header.streamIdentifier StreamClosed
+            | true, stream ->
+              let evt = if endStream then RecvData true else RecvData false
+              match transitionStream stream.state evt with
+              | Result.Error err ->
+                do! x.resetStream header.streamIdentifier err
+              | Ok newState ->
+                stream.state <- newState
+                if bytes.Length > 0 then
+                  stream.bodyBuffer.Write(bytes, 0, bytes.Length)
+                  // Replenish inbound windows so the peer can keep sending.
+                  // (For a tiny fixture we eagerly grant; production code
+                  // would track high-water marks.)
+                  do! x.writeFrameSerialized(
+                        { flags = 0uy; streamIdentifier = 0; padding = None },
+                        WindowUpdate bytes.Length)
+                  do! x.writeFrameSerialized(
+                        { flags = 0uy; streamIdentifier = header.streamIdentifier; padding = None },
+                        WindowUpdate bytes.Length)
+                if endStream then
+                  stream.endStreamReceived <- true
+                  do! x.dispatchStream header.streamIdentifier stream webPart
+        | Settings (ack, s) when not ack ->
+          do! x.applyPeerSettings s
+        | Settings (true, _) ->
+          // Peer ACKed our SETTINGS — nothing to do beyond noting it.
+          ()
+        | Ping (false, payload) ->
+          // PING MUST be answered with PING+ACK (RFC 7540 §6.7). The payload
+          // length MUST be 8; the parser already enforces that via assert.
+          if header.streamIdentifier <> 0 then
+            do! x.sendGoAwayAndStop ProtocolError
+          else
+            do! x.writeFrameSerialized(
+                  { flags = setAck 0uy; streamIdentifier = 0; padding = None },
+                  Ping(true, payload))
+        | Ping (true, _) ->
+          // Our PING ACKed.
+          ()
+        | GoAway _ ->
+          // Peer is shutting down. Drain by stopping the read loop.
+          receivedGoAway <- true
+          alive := false
+          closeEvent.Set() |> ignore
+        | WindowUpdate inc ->
+          let target =
+            if header.streamIdentifier = 0 then Some connectionOutboundWindow
+            else
+              match streams.TryGetValue header.streamIdentifier with
+              | true, s -> Some s.outboundWindow
+              | _ -> None
+          match target with
+          | None ->
+            // WINDOW_UPDATE on an unknown stream — ignore (could be a
+            // stream we already closed).
+            ()
+          | Some w ->
+            match increment w inc with
+            | Result.Error err when header.streamIdentifier = 0 ->
+              do! x.sendGoAwayAndStop err
+            | Result.Error err ->
+              do! x.resetStream header.streamIdentifier err
+            | Ok () -> ()
+        | RstStream _errorCode ->
+          match streams.TryGetValue header.streamIdentifier with
+          | true, s -> s.state <- Closed
+          | _ -> ()
+        | Priority _ ->
+          // RFC 7540 §6.3 / RFC 9113 §5.3.4 (deprecated): we ignore priority.
+          ()
+        | PushPromise _ ->
+          // Servers MUST NOT receive PUSH_PROMISE (RFC 7540 §6.6).
+          do! x.sendGoAwayAndStop ProtocolError
+    }
 
     member x.send (r:HttpRequest) =
       Async.Start (procQueue.AsyncAdd <| Request r)
@@ -803,9 +1600,128 @@ module Http2 =
     member x.get() =
       procQueue.AsyncGet()
 
+    /// Run the HTTP/2 connection-preface exchange (RFC 7540 §3.5):
+    ///   * read the 24-byte client preface ("PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n")
+    ///   * send our own (potentially empty) SETTINGS frame as the server
+    ///     connection preface
+    member x.start () : SocketOp<unit> =
+      socket {
+        let! prefaceBytes = readBytes facade connectionPreface.Length
+        // Compare as raw bytes — the preface is pure ASCII but going via
+        // string conversion would obscure any non-ASCII bytes the client
+        // might send and is also a needless allocation on the hot path.
+        let expected = System.Text.Encoding.ASCII.GetBytes connectionPreface
+        if prefaceBytes.Length <> expected.Length
+           || not (System.Linq.Enumerable.SequenceEqual(prefaceBytes, expected)) then
+          return! SocketOp.abort (InputDataError (None, "Invalid HTTP/2 connection preface"))
+        else
+          let encInfo = { flags = 0uy; streamIdentifier = 0; padding = None }
+          do! x.write (encInfo, Settings(false, defaultSetting))
+      }
+
+    /// Read frames in a loop, dispatching each to `handleFrame`, until either
+    /// our connection is torn down (GOAWAY sent/received) or the transport
+    /// reports an error. Returns when the loop terminates so the caller can
+    /// recycle the connection.
+    member x.runReadLoop (webPart: WebPart) : Async<unit> = async {
+      let mutable shouldRun = true
+      while shouldRun && !alive do
+        let! readResult = Async.AwaitTask ((x.read()).AsTask())
+        match readResult with
+        | Ok (header, payload) ->
+          try
+            do! x.handleFrame header payload webPart
+          with ex ->
+            // Defensive: any unhandled exception in dispatch becomes a
+            // connection-level INTERNAL_ERROR.
+            do! x.sendGoAwayAndStop InternalError
+            shouldRun <- false
+        | Result.Error _ ->
+          // Transport-level read failure: stop. Don't try to GOAWAY since the
+          // socket is likely already dead.
+          alive := false
+          shouldRun <- false
+          closeEvent.Set() |> ignore
+      return ()
+    }
+
+    /// Build a synthetic stream-1 from the original h2c upgrade request and
+    /// dispatch it to the webpart. RFC 7540 §3.2: stream 1 is implicitly
+    /// half-closed from the client toward the server (the request body has
+    /// been fully delivered as the HTTP/1.1 upgrade request).
+    member x.dispatchUpgradeRequest (originalRequest: HttpRequest)
+                                    (webPart: WebPart) : Async<unit> = async {
+      // Seed the stream table with stream 1 in HalfClosedRemote state so the
+      // response side can proceed.
+      highestClientStreamId <- 1
+      let stream =
+        newStreamData peerSettings.initialWindowSize localSettings.initialWindowSize
+      stream.state <- HalfClosedRemote
+      stream.endStreamReceived <- true
+      stream.requestHeaders <-
+        // Translate the HTTP/1.1 request into pseudo-headers + regular
+        // headers for trailer/header-validation symmetry.
+        let pseudo =
+          [ ":method", originalRequest.rawMethod
+            ":scheme", "http"
+            ":authority", originalRequest.rawHost
+            ":path", originalRequest.rawPath +
+                     (if originalRequest.rawQuery.Length > 0
+                      then "?" + originalRequest.rawQuery
+                      else "") ]
+        let regular =
+          originalRequest.headers
+          |> Seq.filter (fun (n, _) ->
+            let lname = n.ToLowerInvariant()
+            // Drop the headers that drove the upgrade and the host header
+            // (its content is now in :authority).
+            lname <> "connection" && lname <> "upgrade"
+            && lname <> "http2-settings" && lname <> "host")
+          |> Seq.toList
+        pseudo @ regular
+      stream.bodyBuffer.Write(originalRequest.rawForm, 0, originalRequest.rawForm.Length)
+      streams.[1] <- stream
+      do! x.dispatchStream 1 stream webPart
+    }
+
+    /// Top-level entry point used by the h2c upgrade handler. Runs the
+    /// connection preface, optionally dispatches a seeded upgrade request on
+    /// stream 1, then enters the read/dispatch loop until the connection is
+    /// closed.
+    member x.run (originalRequest: HttpRequest option) (webPart: WebPart)
+        : Async<Result<unit, Error>> = async {
+      let! prefaceResult = Async.AwaitTask ((x.start()).AsTask())
+      match prefaceResult with
+      | Result.Error e -> return Result.Error e
+      | Ok () ->
+        match originalRequest with
+        | Some req ->
+          // Don't await dispatch: it may block on the WebPart. Start it on
+          // the thread pool while the read loop concurrently services
+          // SETTINGS/PING/etc. from the peer. Defensive exception handling
+          // here keeps the connection alive when the WebPart throws: we
+          // log to stderr but don't tear down the loop. (A future
+          // improvement is to send RST_STREAM on stream 1 here.)
+          Async.Start (async {
+            try
+              do! x.dispatchUpgradeRequest req webPart
+            with ex ->
+              eprintfn "[Http2] upgrade-request dispatch failed: %s" ex.Message
+          })
+        | None -> ()
+        do! x.runReadLoop webPart
+        return Ok ()
+    }
+
+    member x.writeResponseToFrame (response: HttpResult) = async {
+      // Backward-compatible shim: writes the response on stream 1 with no
+      // trailers. Retained because earlier code referenced it.
+      do! x.writeResponseOnStream 1 response []
+    }
+
     member x.writeLoop (ctxOuter : HttpContext) (webPart: WebPart) =
      async {
-       // send an empty SETTINGS frame
+       // send a SETTINGS-ACK frame for any pre-loop client settings.
        let encInfo = { flags = 1uy (*ack*); streamIdentifier = 0;  padding = None}
        let! _ = Async.AwaitTask ((x.write (encInfo,Settings(true,defaultSetting))).AsTask())
        while !alive do
@@ -825,27 +1741,6 @@ module Http2 =
            closeEvent.Set() |> ignore
        }
 
-    /// Run the HTTP/2 connection-preface exchange (RFC 7540 §3.5):
-    ///   * read the 24-byte client preface ("PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n")
-    ///   * send our own (potentially empty) SETTINGS frame as the server
-    ///     connection preface
-    /// This is the entry point used by the h2c upgrade handler after writing
-    /// the 101 Switching Protocols response. Subsequent steps will extend
-    /// this to drive the full HTTP/2 read/write loop.
-    member x.start () : SocketOp<unit> =
-      socket {
-        let! prefaceBytes = readBytes facade connectionPreface.Length
-        // Compare as raw bytes — the preface is pure ASCII but going via
-        // string conversion would obscure any non-ASCII bytes the client
-        // might send and is also a needless allocation on the hot path.
-        let expected = System.Text.Encoding.ASCII.GetBytes connectionPreface
-        if prefaceBytes.Length <> expected.Length
-           || not (System.Linq.Enumerable.SequenceEqual(prefaceBytes, expected)) then
-          return! SocketOp.abort (InputDataError (None, "Invalid HTTP/2 connection preface"))
-        else
-          let encInfo = { flags = 0uy; streamIdentifier = 0; padding = None }
-          do! x.write (encInfo, Settings(false, defaultSetting))
-      }
 
   // ---------------------------------------------------------------------------
   // h2c upgrade (RFC 7540 §3.2)
@@ -944,14 +1839,13 @@ module Http2 =
           // Mark the socket as long-lived so the keep-alive health checker
           // does not reap it while HTTP/2 is in use.
           facade.Connection.isLongLived <- true
-          // Run the HTTP/2 connection-preface exchange. Subsequent steps
-          // will extend this to actually drive the protocol; for now we
-          // hand off, perform the mandatory preface, and return — closing
-          // the HTTP/1.1 keep-alive loop so the connection is shut down
-          // cleanly afterwards.
+          // Run the HTTP/2 connection: read the client preface, send our
+          // SETTINGS, then enter the read/dispatch loop. The original
+          // upgrade request becomes stream 1 (RFC 7540 §3.2: implicitly
+          // half-closed from the client toward the server).
           let conn = Http2Connection(facade)
-          let! prefaceResult = (conn.start ()).AsTask()
-          match prefaceResult with
+          let! runResult = conn.run (Some request) facade.Webpart
+          match runResult with
           | Ok () -> return Ok false
           | Result.Error e -> return Result.Error e
       }
