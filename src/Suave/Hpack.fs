@@ -476,7 +476,31 @@ if I < 2^N - 1, encode I on N bits
     let zs = List.map extract groups
     List.map toEnt zs
 
-  let lookupStaticRevIndex (ix:int) (v:HeaderValue) fa' fbd = ()
+  // Index `staticRevIndex` by token index for O(1) lookup. The list form is
+  // built once at module load; copying it into a Dictionary lets the encoding
+  // algorithms (Static / Linear) actually invoke the appropriate emitter when
+  // a header's token matches the static table.
+  let staticRevIndexMap =
+    let d = new Dictionary<int, StaticEntry>()
+    for (i, e) in staticRevIndex do d.[i] <- e
+    d
+
+  // Locate `ix` in the static reverse index. If the entry has a value map and
+  // `v` matches one of its known values, the header is fully indexed and
+  // `fa'` is invoked with that HIndex. Otherwise (key match only, or no value
+  // map at all) `fbd` is invoked with the key's HIndex so the caller can emit
+  // a "literal header with indexed name" representation. Previously this
+  // function had an empty body, which caused the Static and Linear encoding
+  // strategies to silently drop every header whose token was in the static
+  // table.
+  let lookupStaticRevIndex (ix:int) (v:HeaderValue) fa' fbd =
+    match staticRevIndexMap.TryGetValue ix with
+    | true, StaticEntry (hidx, None) -> fbd hidx
+    | true, StaticEntry (hidx, Some m) ->
+      match m.TryGetValue v with
+      | true, hidx' -> fa' hidx'
+      | false, _    -> fbd hidx
+    | false, _ -> ()
 
   let lookupDynamicStaticRevIndex (ix:int) (v:HeaderValue) (drev:DynamicRevIndex) fa' fbd' =
     let map = drev.[ix]
@@ -550,28 +574,39 @@ if I < 2^N - 1, encode I on N bits
 
 
   let encodeString (useHuffman : bool) (str: string) (wbuf : MemoryStream) =
+    // The wire format (RFC 7541 §5.2) is:
+    //   <H | length(7+)> <data...>
+    // where H is the "Huffman encoded" bit. Because the length field is a
+    // variable-length integer whose own size depends on the value it encodes,
+    // we cannot know the prefix's width until *after* we know how many
+    // bytes the data section will occupy. The previous implementation tried
+    // to predict the Huffman-encoded length, write the prefix in advance, and
+    // shift the data when the prediction was wrong — but the shift arithmetic
+    // (and the success/fallback rewinds) were all subtly broken, producing
+    // either truncated output, leading zero bytes, or content that decoded as
+    // an empty string. We instead encode Huffman output into a temporary
+    // buffer so we can choose the cheaper representation and write the prefix
+    // with the correct width up-front.
+    let raw = System.Text.Encoding.UTF8.GetBytes (str : string)
     if useHuffman then
-      let origLen = str.Length
-      let expectedLen = origLen / 10 * 8
-      let expectedLenInt = integerLength expectedLen
-      wbuf.Position <- wbuf.Position + int64 expectedLenInt
-      let len = Encoding.enc wbuf (new MemoryStream (UnicodeEncoding.UTF8.GetBytes str))
-      if origLen < len then
-        wbuf.Position <- wbuf.Position - int64(expectedLenInt + len)
-        encodeInteger wbuf id 7 origLen
-        copyByteString wbuf str
-      elif len = expectedLenInt then
-        wbuf.Position <- wbuf.Position - int64 (expectedLenInt + len)
-        encodeInteger wbuf setH 7 origLen
-        wbuf.Position <- wbuf.Position + int64 len
+      // Huffman never inflates the input by more than ~3x (worst symbol is
+      // 30 bits = 4 bytes for a 1-byte input). 4x + EOS padding leaves
+      // comfortable headroom for the encoder.
+      let tmp = Array.zeroCreate<byte> (raw.Length * 4 + 8)
+      let tmpBuf = new MemoryStream(tmp, 0, tmp.Length, true, true)
+      let huffLen = Encoding.enc tmpBuf (new MemoryStream(raw))
+      if huffLen < raw.Length then
+        encodeInteger wbuf setH 7 huffLen
+        wbuf.Write(tmp, 0, huffLen)
       else
-        let gap = len - expectedLenInt
-        shiftLastN wbuf gap (int64 len)
-        wbuf.Position <- wbuf.Position - int64(expectedLenInt + len)
+        // Huffman did not shrink the payload — emit the literal form (H bit
+        // clear). RFC 7541 §5.2 permits either representation regardless of
+        // whether Huffman saves bytes.
+        encodeInteger wbuf id 7 raw.Length
+        wbuf.Write(raw, 0, raw.Length)
     else
-      let len = str.Length
-      encodeInteger wbuf id 7 len
-      copyByteString wbuf str
+      encodeInteger wbuf id 7 raw.Length
+      wbuf.Write(raw, 0, raw.Length)
 
   let newName (wbuf : MemoryStream) huff (set : Setter) k v = do
     wbuf.WriteByte (set 0uy)
@@ -674,6 +709,12 @@ if I < 2^N - 1, encode I on N bits
     rev
 
   let encodeTokenHeader (wbuf : MemoryStream) size (strategy: EncodeStrategy) (first: bool) (dyntbl:DynamicTable) (hl:TokenHeaderList) =
+    // Honor the caller's Huffman preference rather than the module-level
+    // constant. Previously every emitter was hard-wired to Huffman, which
+    // contradicted `defaultEncodeStrategy.useHuffman = false` and prevented
+    // tests (and callers that lack a working Huffman codec) from selecting
+    // the literal representation.
+    let useHuffman = strategy.useHuffman
     let fa = indexedHeaderField dyntbl wbuf useHuffman
     let fb = literalHeaderFieldWithIncrementalIndexingIndexedName dyntbl wbuf useHuffman
     let fc = literalHeaderFieldWithIncrementalIndexingNewName dyntbl wbuf useHuffman
@@ -842,11 +883,23 @@ if I < 2^N - 1, encode I on N bits
     insertEntry e dyntbl
     tv
 
+  // RFC 7541 §6.2.2 "Literal Header Field without Indexing" (0x00 prefix) and
+  // §6.2.3 "Literal Header Field Never Indexed" (0x10 prefix) share the same
+  // wire format as incremental indexing minus the dynamic-table insertion;
+  // they only differ in the prefix width (4 bits) used to encode an indexed
+  // name. Without these the decoder rejected valid output produced by
+  // `encodeHeader` via the Naive and Static strategies.
   let neverIndexing (dyntbl : DynamicTable) (w: byte) rbuf : TokenHeader =
-    failwith "neverIndexing: not implemented"
+    if isIndexedName2 w then
+      inserIndexedName dyntbl w rbuf 4 mask4
+    else
+      insertNewName dyntbl rbuf
 
   let withoutIndexing (dyntbl : DynamicTable) (w: byte) rbuf : TokenHeader =
-    failwith "withoutIndexing: not implemented"
+    if isIndexedName2 w then
+      inserIndexedName dyntbl w rbuf 4 mask4
+    else
+      insertNewName dyntbl rbuf
 
   let toTokenHeader (dyntbl : DynamicTable) (w: byte) rbuf =
     if   isset w 7  then indexed dyntbl w rbuf
