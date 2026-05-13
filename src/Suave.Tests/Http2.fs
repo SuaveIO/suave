@@ -220,12 +220,12 @@ let framePayloadTests (_ : SuaveConfig) =
 [<Tests>]
 let hpackTests (_ : SuaveConfig) =
   testList "HPACK" [
-    testCase "integer decode" <| fun _ ->
+    yield testCase "integer decode" <| fun _ ->
       Expect.equal (Hpack.decode 8 42uy (new MemoryStream([||]))) 42 "single-byte value"
       Expect.equal (Hpack.decode 5 31uy (new MemoryStream([| 154uy; 10uy |]))) 1337 "multi-byte value 1337"
       Expect.equal (Hpack.decode 5 10uy (new MemoryStream([||]))) 10 "fits in prefix"
 
-    testCase "literal header field encode produces non-empty output" <| fun _ ->
+    yield testCase "literal header field encode produces non-empty output" <| fun _ ->
       // Note: a full HPACK encoder<->decoder round-trip for literal headers is
       // covered as part of step 2 (HPACK + per-stream state machine). The
       // dynamic-table insertion path on the decode side currently mishandles
@@ -235,7 +235,54 @@ let hpackTests (_ : SuaveConfig) =
       let bytes = Hpack.encodeHeader' defaultEncodeStrategy 4096 enc (toTokenHeaderList [ "custom-key", "custom-header" ])
       Expect.isGreaterThan bytes.Length 0 "encoder produced bytes"
 
-    testCase "decode literal header field with incremental indexing, new name (RFC 7541 C.2.1)" <| fun _ ->
+    // The following four tests exercise the encoder/decoder round-trip for
+    // each of the three encoding strategies (Naive, Static, Linear), and for
+    // both Huffman-encoded and literal string forms. They guard against the
+    // historical regressions where:
+    //   * `encodeString` mis-computed the length-prefix width and produced
+    //     garbage output in the Huffman path (Naive),
+    //   * `lookupStaticRevIndex` had an empty body so Static/Linear emitted
+    //     nothing when a header's name was in the static table,
+    //   * `encodeTokenHeader` ignored `strategy.useHuffman` and always picked
+    //     the Huffman path regardless of caller preference.
+    let roundTrip strategy headers =
+      let enc = newDynamicTableForEncoding 4096
+      let bytes = Hpack.encodeHeader strategy 4096 enc headers
+      Expect.isGreaterThan bytes.Length 0 "encoder produced bytes"
+      let dec = newDynamicTableForDecoding 4096 4096
+      Hpack.decodeHeader dec bytes
+
+    yield testCase "Naive strategy round-trips a literal-name header" <| fun _ ->
+      let strategy = { algorithm = Naive; useHuffman = false }
+      let decoded = roundTrip strategy [ "custom-key", "custom-header" ]
+      Expect.equal decoded [ "custom-key", "custom-header" ] "Naive (literal) round-trips"
+
+    yield testCase "Naive strategy round-trips a Huffman-encoded header" <| fun _ ->
+      let strategy = { algorithm = Naive; useHuffman = true }
+      // "www.example.com" is the canonical Huffman example from RFC 7541
+      // Appendix C.4.1 — its Huffman form (12 bytes) is shorter than the
+      // literal form (15 bytes), so the encoder must select the H-bit branch.
+      let decoded = roundTrip strategy [ "custom-key", "www.example.com" ]
+      Expect.equal decoded [ "custom-key", "www.example.com" ] "Naive (Huffman) round-trips"
+
+    yield testCase "Static strategy round-trips a static-table header" <| fun _ ->
+      let strategy = { algorithm = Static; useHuffman = false }
+      // ":path" is entry 4 (":path: /") and entry 5 (":path: /index.html") in
+      // the static table — sending "/foo" forces the "literal with indexed
+      // name" branch in `lookupStaticRevIndex`, exercising the formerly-empty
+      // function body.
+      let decoded = roundTrip strategy [ ":path", "/foo" ]
+      Expect.equal decoded [ ":path", "/foo" ] "Static (indexed name) round-trips"
+
+    yield testCase "Linear strategy round-trips a fully-indexed static header" <| fun _ ->
+      let strategy = { algorithm = Linear; useHuffman = false }
+      // ":method: GET" is entry 2 in the static table — it must be emitted as
+      // a single "indexed" byte (0x82). Previously Linear produced an empty
+      // block for this header.
+      let decoded = roundTrip strategy [ ":method", "GET" ]
+      Expect.equal decoded [ ":method", "GET" ] "Linear (fully indexed) round-trips"
+
+    yield testCase "decode literal header field with incremental indexing, new name (RFC 7541 C.2.1)" <| fun _ ->
       // Regression for the "Empty header value" bug on literal-name decode:
       // extractByteString used to read from offset 0 of the underlying
       // MemoryStream buffer and never advanced Position, so the second
