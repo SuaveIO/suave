@@ -736,3 +736,189 @@ let alpnTests (_ : SuaveConfig) =
                      System.Net.Security.SslApplicationProtocol.Http11
                      "server must select http/1.1 when h2 is not offered")
   ]
+
+// ---------------------------------------------------------------------------
+// Step 5 — Trailers (RFC 7540 §8.1, RFC 9113 §8.1).
+// Covers the pure validator (each rejection case) and the public WebPart
+// combinators that record response trailers on the HttpContext.
+// ---------------------------------------------------------------------------
+
+/// Shared between the trailer and push test lists: run a WebPart on a fresh
+/// empty context and assert that it succeeded.
+let private runWebPartOnEmpty (part: WebPart) =
+  let ctx = HttpContext.empty
+  match Async.RunSynchronously (part ctx) with
+  | Some c -> c
+  | None -> failwith "WebPart returned None"
+
+[<Tests>]
+let trailersTests (_ : SuaveConfig) =
+  let runPart = runWebPartOnEmpty
+
+  testList "Http2 trailers" [
+    testCase "validate accepts an empty list" <| fun _ ->
+      Expect.equal (Http2.Trailers.validate []) (Ok ()) "no fields = trivially valid"
+
+    testCase "validate accepts ordinary fields" <| fun _ ->
+      let result = Http2.Trailers.validate [ "x-checksum", "abc"; "expires", "0" ]
+      Expect.equal result (Ok ()) "non-pseudo, non-connection-specific fields are allowed"
+
+    testCase "validate rejects pseudo-header fields (RFC 7540 §8.1.2.1)" <| fun _ ->
+      let result = Http2.Trailers.validate [ ":status", "200" ]
+      Expect.equal result (Result.Error ProtocolError)
+                   "pseudo-header in trailer block is a PROTOCOL_ERROR"
+
+    testCase "validate rejects an empty name" <| fun _ ->
+      Expect.equal (Http2.Trailers.validate [ "", "x" ]) (Result.Error ProtocolError)
+                   "empty field name is a PROTOCOL_ERROR"
+
+    testCase "validate rejects connection-specific field 'connection'" <| fun _ ->
+      let result = Http2.Trailers.validate [ "Connection", "close" ]
+      Expect.equal result (Result.Error ProtocolError)
+                   "RFC 7540 §8.1.2.2 forbids 'Connection' in any header block"
+
+    testCase "validate rejects connection-specific field 'transfer-encoding'" <| fun _ ->
+      let result = Http2.Trailers.validate [ "transfer-encoding", "chunked" ]
+      Expect.equal result (Result.Error ProtocolError) "RFC 7540 §8.1.2.2"
+
+    testCase "validate rejects connection-specific field 'keep-alive'" <| fun _ ->
+      let result = Http2.Trailers.validate [ "keep-alive", "timeout=5" ]
+      Expect.equal result (Result.Error ProtocolError) "RFC 7540 §8.1.2.2"
+
+    testCase "validate accepts TE: trailers" <| fun _ ->
+      Expect.equal (Http2.Trailers.validate [ "TE", "trailers" ]) (Ok ())
+                   "RFC 7540 §8.1.2.2: TE: trailers is the only legal TE value"
+
+    testCase "validate accepts TE: TRAILERS (case-insensitive)" <| fun _ ->
+      Expect.equal (Http2.Trailers.validate [ "te", "TRAILERS" ]) (Ok ())
+                   "TE value comparison is case-insensitive"
+
+    testCase "validate rejects TE with any other value" <| fun _ ->
+      Expect.equal (Http2.Trailers.validate [ "te", "gzip" ])
+                   (Result.Error ProtocolError)
+                   "TE: gzip is forbidden in HTTP/2"
+
+    testCase "validate reports the first violation" <| fun _ ->
+      // Connection-specific is hit before the pseudo-header — the validator
+      // walks the list in order.
+      let result = Http2.Trailers.validate [ "Connection", "close"; ":status", "200" ]
+      Expect.equal result (Result.Error ProtocolError) "first failure short-circuits"
+
+    testCase "set records a trailer on the response" <| fun _ ->
+      let ctx = runPart (Http2.Trailers.set "x-checksum" "abc")
+      Expect.equal (Http2.Trailers.get ctx)
+                   [ "x-checksum", "abc" ]
+                   "set stores the (name,value) pair on userState"
+
+    testCase "set replaces an earlier value with the same name (case-insensitive)" <| fun _ ->
+      let ctx =
+        HttpContext.empty
+        |> (fun c -> Async.RunSynchronously (Http2.Trailers.set "X-Checksum" "old" c))
+        |> Option.get
+        |> (fun c -> Async.RunSynchronously (Http2.Trailers.set "x-checksum" "new" c))
+        |> Option.get
+      Expect.equal (Http2.Trailers.get ctx) [ "x-checksum", "new" ]
+                   "later set with the same name wins, comparison is case-insensitive"
+
+    testCase "set preserves insertion order across distinct names" <| fun _ ->
+      let ctx =
+        HttpContext.empty
+        |> (fun c -> Async.RunSynchronously (Http2.Trailers.set "x-first" "1" c))
+        |> Option.get
+        |> (fun c -> Async.RunSynchronously (Http2.Trailers.set "x-second" "2" c))
+        |> Option.get
+      Expect.equal (Http2.Trailers.get ctx)
+                   [ "x-first", "1"; "x-second", "2" ]
+                   "trailers are returned in the order they were set"
+
+    testCase "setMany replaces the entire list" <| fun _ ->
+      let initial =
+        HttpContext.empty
+        |> (fun c -> Async.RunSynchronously (Http2.Trailers.set "x-old" "v" c))
+        |> Option.get
+      let ctx = Async.RunSynchronously (Http2.Trailers.setMany [ "x-new", "v" ] initial)
+      Expect.equal (Http2.Trailers.get (Option.get ctx))
+                   [ "x-new", "v" ]
+                   "setMany overwrites previously-recorded trailers"
+
+    testCase "get on a fresh context returns the empty list" <| fun _ ->
+      Expect.equal (Http2.Trailers.get HttpContext.empty) []
+                   "no trailers recorded yet"
+
+    testCase "getRequest on a fresh context returns the empty list" <| fun _ ->
+      Expect.equal (Http2.Trailers.getRequest HttpContext.empty) []
+                   "no request trailers received yet"
+  ]
+
+// ---------------------------------------------------------------------------
+// Step 5 — Server push (RFC 7540 §8.2). Pure helpers + WebPart recording.
+// The wire-format emission of PUSH_PROMISE is gated on the prerequisite
+// dispatch loop and is therefore exercised by future end-to-end tests.
+// ---------------------------------------------------------------------------
+
+[<Tests>]
+let pushTests (_ : SuaveConfig) =
+  let runPart = runWebPartOnEmpty
+
+  testList "Http2 server push" [
+    testCase "canPush honours peer SETTINGS_ENABLE_PUSH=true (default)" <| fun _ ->
+      Expect.isTrue (Http2.Push.canPush defaultSetting)
+                    "RFC 7540 §6.5.2: SETTINGS_ENABLE_PUSH defaults to 1"
+
+    testCase "canPush returns false when peer disabled push" <| fun _ ->
+      let s = { defaultSetting with enablePush = false }
+      Expect.isFalse (Http2.Push.canPush s)
+                     "SETTINGS_ENABLE_PUSH=0 forbids server push"
+
+    testCase "withinMaxConcurrentStreams is unbounded when peer advertises no limit" <| fun _ ->
+      Expect.isTrue (Http2.Push.withinMaxConcurrentStreams 1000 None)
+                    "no SETTINGS_MAX_CONCURRENT_STREAMS = unlimited"
+
+    testCase "withinMaxConcurrentStreams permits one more when under the limit" <| fun _ ->
+      Expect.isTrue (Http2.Push.withinMaxConcurrentStreams 5 (Some 10))
+                    "5 active streams < limit 10 = may push"
+
+    testCase "withinMaxConcurrentStreams refuses at the limit" <| fun _ ->
+      Expect.isFalse (Http2.Push.withinMaxConcurrentStreams 10 (Some 10))
+                     "10 active streams == limit 10 = MUST NOT push"
+
+    testCase "withinMaxConcurrentStreams refuses beyond the limit" <| fun _ ->
+      Expect.isFalse (Http2.Push.withinMaxConcurrentStreams 11 (Some 10))
+                     "back-pressure must be respected"
+
+    testCase "nextPromisedStreamId starts at 2 and is monotonic" <| fun _ ->
+      let counter = ref 0
+      Expect.equal (Http2.Push.nextPromisedStreamId counter) (Some 2)
+                   "RFC 7540 §5.1.1: server-initiated streams use even ids; first is 2"
+      Expect.equal (Http2.Push.nextPromisedStreamId counter) (Some 4)
+                   "second allocation is 4"
+      Expect.equal (Http2.Push.nextPromisedStreamId counter) (Some 6)
+                   "third allocation is 6"
+
+    testCase "nextPromisedStreamId reports overflow as None" <| fun _ ->
+      // Set the counter close to the legal max so the next +2 step overflows.
+      let counter = ref 0x7ffffffe
+      Expect.equal (Http2.Push.nextPromisedStreamId counter) None
+                   "stream id space exhausted => GOAWAY territory"
+
+    testCase "push records a promise on the response" <| fun _ ->
+      let ctx = runPart (Http2.Push.push "/style.css" [ "accept", "text/css" ])
+      let promises = Http2.Push.get ctx
+      Expect.equal (List.length promises) 1 "exactly one promise"
+      Expect.equal promises.[0].path "/style.css" "path preserved"
+      Expect.equal promises.[0].headers [ "accept", "text/css" ] "headers preserved"
+
+    testCase "push appends multiple promises in order" <| fun _ ->
+      let ctx =
+        HttpContext.empty
+        |> (fun c -> Async.RunSynchronously (Http2.Push.push "/a.css" [] c))
+        |> Option.get
+        |> (fun c -> Async.RunSynchronously (Http2.Push.push "/b.js" [] c))
+        |> Option.get
+      let paths = Http2.Push.get ctx |> List.map (fun p -> p.path)
+      Expect.equal paths [ "/a.css"; "/b.js" ] "promises recorded in order"
+
+    testCase "get on a fresh context returns the empty list" <| fun _ ->
+      Expect.equal (Http2.Push.get HttpContext.empty) []
+                   "no promises recorded yet"
+  ]

@@ -848,6 +848,237 @@ module Http2 =
       }
 
   // ---------------------------------------------------------------------------
+  // Trailers (RFC 7540 §8.1, RFC 9113 §8.1)
+  //
+  // HTTP/2 carries trailers as a HEADERS frame with END_STREAM following the
+  // last DATA frame on a stream. Trailers MUST NOT contain pseudo-header
+  // fields (names beginning with ':'), connection-specific fields, or a `TE`
+  // header value other than the literal "trailers" (case-insensitive).
+  //
+  // This module exposes:
+  //   * a pure validator usable by both the dispatch loop (incoming trailers)
+  //     and the serialiser (outgoing trailers),
+  //   * a `Trailers.set`/`setMany` WebPart that records response trailers on
+  //     `HttpContext.userState`. The HTTP/2 writer (when wired) consumes the
+  //     recorded list via `Trailers.get`; under HTTP/1.x the recorded list is
+  //     ignored (HTTP/1.1 trailers require chunked transfer encoding which
+  //     Suave does not currently emit).
+  // ---------------------------------------------------------------------------
+  module Trailers =
+
+    /// userState key under which response trailers are stored on the
+    /// HttpContext. Public so that callers driving HttpResult directly (the
+    /// HTTP/2 writer in particular) can locate the recorded trailers without
+    /// adding a struct field to HttpResult.
+    [<Literal>]
+    let UserStateKey = "suave.http2.trailers"
+
+    /// userState key under which trailers received on a request are surfaced
+    /// once the dispatch loop has reassembled the trailing HEADERS block.
+    [<Literal>]
+    let RequestUserStateKey = "suave.http2.request-trailers"
+
+    /// Connection-specific header fields that MUST NOT appear in a trailer
+    /// block per RFC 7540 §8.1.2.2 / RFC 9113 §8.2.2. Comparison is
+    /// case-insensitive (HTTP/2 requires lowercase on the wire but this
+    /// validator is reused for outgoing trailers where casing may vary).
+    let private connectionSpecificFields =
+      [| "connection"; "proxy-connection"; "keep-alive"
+         "transfer-encoding"; "upgrade" |]
+
+    let private isConnectionSpecific (name: string) =
+      connectionSpecificFields
+      |> Array.exists (fun f -> System.String.Equals(name, f, System.StringComparison.OrdinalIgnoreCase))
+
+    /// Validate a single trailer field. Returns `Ok ()` if the field is
+    /// permitted as a trailer per RFC 7540 §8.1, or `Result.Error ProtocolError`
+    /// otherwise. The malformed-trailer-block disposition is a stream-level
+    /// PROTOCOL_ERROR (RFC 7540 §8.1.2 / §8.1.2.6).
+    let validateField (name: string, value: string) : Result<unit, ErrorCode> =
+      if isNull name || name.Length = 0 then
+        Result.Error ProtocolError
+      elif name.[0] = ':' then
+        // Pseudo-headers are forbidden in trailers (RFC 7540 §8.1.2.1).
+        Result.Error ProtocolError
+      elif isConnectionSpecific name then
+        // Connection-specific fields are forbidden in any HTTP/2 header block.
+        Result.Error ProtocolError
+      elif System.String.Equals(name, "te", System.StringComparison.OrdinalIgnoreCase) then
+        // The only legal `TE` value in HTTP/2 is "trailers" (case-insensitive).
+        if isNull value then Result.Error ProtocolError
+        elif System.String.Equals(value.Trim(), "trailers", System.StringComparison.OrdinalIgnoreCase) then Ok ()
+        else Result.Error ProtocolError
+      else
+        Ok ()
+
+    /// Validate a list of trailer fields. Returns the first violation
+    /// encountered, or `Ok ()` if all fields are permitted as trailers.
+    let validate (fields: (string * string) list) : Result<unit, ErrorCode> =
+      let rec loop = function
+        | [] -> Ok ()
+        | f :: rest ->
+          match validateField f with
+          | Ok () -> loop rest
+          | err -> err
+      loop fields
+
+    /// Look up a list of (name, value) pairs that was previously stored on
+    /// the context's userState under `key`. Returns the empty list if the
+    /// dictionary is `null` (e.g. on a synthetic `HttpContext.empty`) or no
+    /// entry has been recorded yet.
+    let private readFields (key: string) (ctx: HttpContext) : (string * string) list =
+      if isNull (box ctx.userState) then []
+      else
+        match ctx.userState.TryGetValue key with
+        | true, (:? ((string * string) list) as ts) -> ts
+        | _ -> []
+
+    /// Get the response trailers previously recorded on the context, or an
+    /// empty list if no trailers have been set. Order is preserved in the
+    /// order they were added.
+    let get (ctx: HttpContext) : (string * string) list =
+      readFields UserStateKey ctx
+
+    /// Get the request trailers (trailing HEADERS received after the DATA
+    /// stream), or an empty list if no trailers were received. Populated by
+    /// the HTTP/2 dispatch loop.
+    let getRequest (ctx: HttpContext) : (string * string) list =
+      readFields RequestUserStateKey ctx
+
+    let private store (trailers: (string * string) list) (ctx: HttpContext) =
+      // userState may legitimately be null on a synthetic context (e.g.
+      // `HttpContext.empty`); in real request handling the runtime pools and
+      // populates a Dictionary. Promote `null` to a fresh dictionary so the
+      // public API is callable in either setting.
+      let ctx =
+        if isNull (box ctx.userState) then
+          { ctx with userState = System.Collections.Generic.Dictionary<string, obj>() }
+        else ctx
+      if ctx.userState.ContainsKey UserStateKey then
+        ctx.userState.[UserStateKey] <- box trailers
+      else
+        ctx.userState.Add(UserStateKey, box trailers)
+      ctx
+
+    /// Set (or replace) a single response trailer. Analogous to
+    /// `Writers.setHeader`: a later call with the same name (case-insensitive)
+    /// supersedes the earlier one. Under HTTP/1.x this is a no-op semantically
+    /// — the trailer list is recorded but never emitted.
+    let set (name: string) (value: string) : WebPart =
+      fun ctx ->
+        let existing = get ctx
+        let filtered =
+          existing
+          |> List.filter (fun (n, _) -> not (System.String.Equals(n, name, System.StringComparison.OrdinalIgnoreCase)))
+        let trailers = filtered @ [(name, value)]
+        store trailers ctx |> succeed
+
+    /// Set the entire response trailers list, replacing anything previously
+    /// recorded. The list is not validated here; the HTTP/2 writer will run
+    /// `validate` before emitting and treat a failure as a stream-level
+    /// PROTOCOL_ERROR.
+    let setMany (trailers: (string * string) list) : WebPart =
+      fun ctx -> store trailers ctx |> succeed
+
+  // ---------------------------------------------------------------------------
+  // Server push (RFC 7540 §8.2)
+  //
+  // The server may push resources to the client by sending a PUSH_PROMISE on
+  // the parent stream that reserves an even-numbered stream id, then sending
+  // a HEADERS+DATA exchange on the promised stream as if the client had
+  // requested it. Pushing is gated on the client's SETTINGS_ENABLE_PUSH
+  // (default 1) and respects SETTINGS_MAX_CONCURRENT_STREAMS.
+  //
+  // Server push is deprecated in practice by major browsers but remains valid
+  // in the RFC and is required for h2spec conformance. This module exposes the
+  // public API (`push`) for recording a push intent on the response plus the
+  // pure helpers consumed by the HTTP/2 writer.
+  // ---------------------------------------------------------------------------
+  module Push =
+
+    /// A push intent recorded by a WebPart, consumed by the HTTP/2 writer
+    /// (when wired) to emit a PUSH_PROMISE + the synthesised request exchange.
+    /// `path` is the request-target (e.g. "/style.css"); `headers` is the
+    /// additional request header block (`:method`, `:scheme`, `:authority`
+    /// are filled in by the writer from the parent request).
+    type PushPromise =
+      { path : string
+        headers : (string * string) list }
+
+    /// userState key under which the list of recorded push promises lives on
+    /// HttpContext. Stored as `PushPromise list` boxed once.
+    [<Literal>]
+    let UserStateKey = "suave.http2.push-promises"
+
+    /// Return the push promises recorded on the context, in the order they
+    /// were added. Empty if none. Tolerates a null `userState` (e.g. on a
+    /// synthetic `HttpContext.empty`).
+    let get (ctx: HttpContext) : PushPromise list =
+      if isNull (box ctx.userState) then []
+      else
+        match ctx.userState.TryGetValue UserStateKey with
+        | true, (:? (PushPromise list) as ps) -> ps
+        | _ -> []
+
+    let private store (promises: PushPromise list) (ctx: HttpContext) =
+      // Promote a null userState to a fresh dictionary so the public WebPart
+      // is callable on a synthetic context (in real request handling the
+      // runtime always pools a Dictionary).
+      let ctx =
+        if isNull (box ctx.userState) then
+          { ctx with userState = System.Collections.Generic.Dictionary<string, obj>() }
+        else ctx
+      if ctx.userState.ContainsKey UserStateKey then
+        ctx.userState.[UserStateKey] <- box promises
+      else
+        ctx.userState.Add(UserStateKey, box promises)
+      ctx
+
+    /// Public WebPart: record a push intent for `path` with the given request
+    /// header fragment. No-op under HTTP/1.x — the recorded list is consumed
+    /// only by the HTTP/2 writer. Multiple calls append; identical paths are
+    /// not deduplicated (a server may legitimately push the same path twice
+    /// with different headers, and dedup is the writer's policy).
+    let push (path: string) (headers: (string * string) list) : WebPart =
+      fun ctx ->
+        let existing = get ctx
+        let promises = existing @ [ { path = path; headers = headers } ]
+        store promises ctx |> succeed
+
+    /// Honour the peer's SETTINGS_ENABLE_PUSH value. RFC 7540 §6.5.2:
+    /// "Initial value: 1, which indicates that server push is permitted."
+    /// If the client has never sent SETTINGS, callers should use
+    /// `defaultSetting` whose `enablePush = true`.
+    let canPush (peerSettings: Settings) : bool =
+      peerSettings.enablePush
+
+    /// Check whether starting another stream would respect the peer's
+    /// SETTINGS_MAX_CONCURRENT_STREAMS. `currentActive` is the number of
+    /// streams the server currently has Open or HalfClosed (per RFC 7540
+    /// §5.1.2 the limit counts those states). When the peer has not advertised
+    /// a limit (`None`), pushing is permitted.
+    let withinMaxConcurrentStreams (currentActive: int) (maxConcurrent: int32 option) : bool =
+      match maxConcurrent with
+      | None -> true
+      | Some m -> currentActive < int m
+
+    /// Allocate the next promised stream id from a server-side counter.
+    /// RFC 7540 §5.1.1: streams initiated by the server use even-numbered
+    /// identifiers and the value 0x0 is reserved. Mutates the counter; the
+    /// next call returns the next even id.
+    ///
+    /// Returns `None` if the counter would overflow the legal 31-bit space,
+    /// in which case the caller MUST send a GOAWAY and stop creating streams.
+    let nextPromisedStreamId (counter: int32 ref) : int32 option =
+      // The first even id is 2; counter starts at 0 and is incremented by 2
+      // before being returned so the first allocation yields 2.
+      let next = !counter + 2
+      if next <= 0 || next > 0x7fffffff then None
+      else
+        counter := next
+        Some next
+
+  // ---------------------------------------------------------------------------
   // h2c upgrade (RFC 7540 §3.2)
   //
   // An HTTP/1.1 client requests an upgrade by sending:

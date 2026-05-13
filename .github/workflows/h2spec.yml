@@ -1,0 +1,108 @@
+# Run the `h2spec` HTTP/2 conformance suite against an in-tree Suave fixture.
+#
+# h2spec is the de-facto HTTP/2 conformance suite (RFC 7540 / 7541). This
+# workflow boots `examples/H2SpecHost` on an ephemeral loopback port and runs
+# the generic + http2 + hpack suites against it.
+#
+# NOTE: this workflow is currently marked `continue-on-error: true`. The full
+# HTTP/2 read/dispatch loop is not yet wired into Suave; the fixture only
+# exercises the h2c upgrade machinery + connection preface. Once the
+# dispatch loop lands this becomes a hard gate (drop `continue-on-error`).
+name: h2spec conformance
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+permissions:
+  contents: read
+
+jobs:
+  h2spec:
+    runs-on: ubuntu-latest
+    # Soft gate: the underlying server is incomplete. See the note above.
+    continue-on-error: true
+
+    env:
+      # Pin h2spec to a known release. Bump deliberately when updating; the
+      # release binaries are content-addressed by the URL below.
+      H2SPEC_VERSION: 2.6.0
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: |
+            6.0.x
+            10.0.102
+
+      - name: Cache h2spec binary
+        id: h2spec-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/bin/h2spec
+          key: h2spec-${{ env.H2SPEC_VERSION }}-linux-amd64
+
+      - name: Download h2spec
+        if: steps.h2spec-cache.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.local/bin"
+          url="https://github.com/summerwind/h2spec/releases/download/v${H2SPEC_VERSION}/h2spec_linux_amd64.tar.gz"
+          curl -fsSL "$url" | tar -xz -C "$HOME/.local/bin" h2spec
+          chmod +x "$HOME/.local/bin/h2spec"
+
+      - name: Add h2spec to PATH
+        run: echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Restore paket tool
+        run: dotnet tool restore
+
+      - name: Build h2spec fixture host
+        run: dotnet build examples/H2SpecHost/H2SpecHost.fsproj -c Release
+
+      - name: Start fixture host
+        id: start-host
+        run: |
+          set -euo pipefail
+          # Pick a free port up front so we can pass it explicitly to h2spec.
+          port=$(python3 -c 'import socket;s=socket.socket();s.bind(("127.0.0.1",0));print(s.getsockname()[1]);s.close()')
+          echo "port=$port" >> "$GITHUB_OUTPUT"
+          nohup dotnet examples/H2SpecHost/bin/Release/net10.0/H2SpecHost.dll --port "$port" \
+            > h2spec-host.log 2>&1 &
+          echo $! > h2spec-host.pid
+          # Wait up to 30s for the listener to come up.
+          for _ in $(seq 1 60); do
+            if curl -sf "http://127.0.0.1:${port}/" >/dev/null; then
+              echo "fixture ready on $port"
+              break
+            fi
+            sleep 0.5
+          done
+
+      - name: Run h2spec (generic + http2 + hpack)
+        run: |
+          set -euo pipefail
+          port="${{ steps.start-host.outputs.port }}"
+          # h2c (cleartext) connection over the upgrade path. --strict surfaces
+          # failures that pass but with warnings; remove if it proves too noisy.
+          h2spec -h 127.0.0.1 -p "$port" --timeout 5 generic http2 hpack
+
+      - name: Stop fixture host
+        if: always()
+        run: |
+          if [ -f h2spec-host.pid ]; then
+            kill "$(cat h2spec-host.pid)" 2>/dev/null || true
+          fi
+
+      - name: Upload fixture log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: h2spec-host.log
+          path: h2spec-host.log
+          if-no-files-found: ignore
