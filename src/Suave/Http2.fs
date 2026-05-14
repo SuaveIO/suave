@@ -376,6 +376,140 @@ module Http2 =
     return header, payload
     }
 
+  /// Read a frame header and its raw payload, without decoding the payload.
+  /// Used by the connection's read loop so that frame-level validation
+  /// (RFC 7540 §4.1/§4.2/§6.x) can run before the per-type parser, which
+  /// otherwise asserts on malformed inputs.
+  let readRawFrame (facade:ConnectionFacade) = socket {
+    let! header = readFrameHeader facade
+    let! payload = readBytes facade (int header.length)
+    return header, payload
+    }
+
+  // ---------------------------------------------------------------------------
+  // Frame-level validation (RFC 7540 §4.1, §4.2, §6.x)
+  //
+  // Before invoking a per-type parser, the dispatcher must reject frames that
+  // violate generic invariants (oversized, malformed for their type, on an
+  // illegal stream id). The outcome is one of:
+  //   * Accept      — frame is well-formed; parse and dispatch normally.
+  //   * IgnoreUnknown — RFC 7540 §4.1/§5.5: unknown frame types MUST be
+  //                    silently ignored (payload discarded by the caller).
+  //   * ConnError   — connection-level error: emit GOAWAY then close.
+  //   * StreamError — stream-level error: emit RST_STREAM and continue.
+  // ---------------------------------------------------------------------------
+
+  type FrameValidation =
+    | FvAccept
+    | FvIgnoreUnknown
+    | FvConnError of ErrorCode
+    | FvStreamError of streamId: int32 * errorCode: ErrorCode
+
+  /// Per-type validation that depends only on the header and the raw payload
+  /// length. RST_STREAM additionally needs to know whether the stream is in
+  /// the Idle state (i.e. never opened), which the caller provides through
+  /// `isIdleStream`.
+  let validateFrame (header: FrameHeader) (rawLen: int)
+                    (maxFrameSize: int32)
+                    (isIdleStream: int32 -> bool)
+                    : FrameValidation =
+    // RFC 7540 §4.2: frames whose length exceeds SETTINGS_MAX_FRAME_SIZE
+    // (or that exceed any frame-specific limit) are a connection-level
+    // FRAME_SIZE_ERROR.
+    if rawLen > int maxFrameSize then
+      FvConnError FrameSizeError
+    else
+    match header.``type`` with
+    | 0uy -> // DATA
+      // RFC 7540 §6.1: DATA frames MUST be associated with a stream.
+      if header.streamIdentifier = 0 then FvConnError ProtocolError
+      else FvAccept
+    | 1uy -> // HEADERS
+      // RFC 7540 §6.2: HEADERS frames MUST be associated with a stream.
+      if header.streamIdentifier = 0 then FvConnError ProtocolError
+      else FvAccept
+    | 2uy -> // PRIORITY
+      // RFC 7540 §6.3: stream id 0 is a connection PROTOCOL_ERROR; length
+      // other than 5 is a stream-level FRAME_SIZE_ERROR.
+      if header.streamIdentifier = 0 then FvConnError ProtocolError
+      elif rawLen <> 5 then FvStreamError (header.streamIdentifier, FrameSizeError)
+      else FvAccept
+    | 3uy -> // RST_STREAM
+      // RFC 7540 §6.4: stream id 0 → connection PROTOCOL_ERROR; length
+      // other than 4 → connection FRAME_SIZE_ERROR; RST_STREAM on an idle
+      // stream → connection PROTOCOL_ERROR.
+      if header.streamIdentifier = 0 then FvConnError ProtocolError
+      elif rawLen <> 4 then FvConnError FrameSizeError
+      elif isIdleStream header.streamIdentifier then FvConnError ProtocolError
+      else FvAccept
+    | 4uy -> // SETTINGS
+      // RFC 7540 §6.5: SETTINGS frames always apply to the whole connection
+      // and MUST be sent on stream id 0; an ACK with a non-zero payload, or
+      // a non-ACK whose length is not a multiple of 6, is FRAME_SIZE_ERROR.
+      if header.streamIdentifier <> 0 then FvConnError ProtocolError
+      elif (header.flags &&& 0x1uy) = 0x1uy && rawLen <> 0 then FvConnError FrameSizeError
+      elif rawLen % 6 <> 0 then FvConnError FrameSizeError
+      else FvAccept
+    | 5uy -> // PUSH_PROMISE
+      // RFC 7540 §6.6 / §8.2: servers MUST NOT receive PUSH_PROMISE from
+      // clients (and SETTINGS_ENABLE_PUSH defaults to 1 only for the
+      // server→client direction). Any inbound PUSH_PROMISE is a connection
+      // PROTOCOL_ERROR.
+      FvConnError ProtocolError
+    | 6uy -> // PING
+      // RFC 7540 §6.7: PING MUST be on stream id 0 and exactly 8 bytes.
+      if header.streamIdentifier <> 0 then FvConnError ProtocolError
+      elif rawLen <> 8 then FvConnError FrameSizeError
+      else FvAccept
+    | 7uy -> // GOAWAY
+      // RFC 7540 §6.8: GOAWAY MUST be sent on stream id 0.
+      if header.streamIdentifier <> 0 then FvConnError ProtocolError
+      else FvAccept
+    | 8uy -> // WINDOW_UPDATE
+      // RFC 7540 §6.9: WINDOW_UPDATE payload is exactly 4 bytes.
+      if rawLen <> 4 then FvConnError FrameSizeError
+      else FvAccept
+    | 9uy -> // CONTINUATION
+      // RFC 7540 §6.10: CONTINUATION MUST be associated with a stream.
+      if header.streamIdentifier = 0 then FvConnError ProtocolError
+      else FvAccept
+    | _ ->
+      // RFC 7540 §4.1 / §5.5: implementations MUST ignore and discard any
+      // frame that has a type that is unknown.
+      FvIgnoreUnknown
+
+  /// Validate the individual entries of a SETTINGS payload against the
+  /// per-identifier rules in RFC 7540 §6.5.2. The decoded `parseSettings`
+  /// helper discards out-of-range values silently (e.g. coerces
+  /// SETTINGS_ENABLE_PUSH = 2 to `false`), so this validator works against
+  /// the raw payload bytes before parsing.
+  let validateSettingsValues (payload: byte[]) : Result<unit, ErrorCode> =
+    let mutable err : ErrorCode option = None
+    let mutable i = 0
+    while i + 6 <= payload.Length && err.IsNone do
+      let id =
+        (int payload.[i] <<< 8) ||| (int payload.[i + 1])
+      let value =
+        ((uint32 payload.[i + 2]) <<< 24) |||
+        ((uint32 payload.[i + 3]) <<< 16) |||
+        ((uint32 payload.[i + 4]) <<< 8)  |||
+        (uint32 payload.[i + 5])
+      match id with
+      | 2 ->
+        // SETTINGS_ENABLE_PUSH: any value other than 0 or 1 is PROTOCOL_ERROR.
+        if value > 1u then err <- Some ProtocolError
+      | 4 ->
+        // SETTINGS_INITIAL_WINDOW_SIZE: above 2^31-1 is FLOW_CONTROL_ERROR.
+        if value > 2147483647u then err <- Some FlowControlError
+      | 5 ->
+        // SETTINGS_MAX_FRAME_SIZE: must be in [2^14, 2^24-1].
+        if value < 16384u || value > 16777215u then err <- Some ProtocolError
+      | _ -> ()
+      i <- i + 6
+    match err with
+    | Some e -> Result.Error e
+    | None -> Ok ()
+
   let writeFrameHeader (h: FrameHeader) (t:ITransport) = socket {
     let bytes = encodeFrameHeader h
     do! t.write(ByteSegment(bytes,0,bytes.Length))
@@ -1196,6 +1330,13 @@ module Http2 =
     member x.read() : SocketOp<Frame> =
       readFrame facade
 
+    /// Read the next frame as (header, raw payload bytes), without invoking
+    /// a per-type decoder. The dispatcher runs `validateFrame` against the
+    /// raw form first so that malformed inputs surface as proper
+    /// GOAWAY/RST_STREAM frames instead of asserting inside a decoder.
+    member x.readRaw() : SocketOp<FrameHeader * byte[]> =
+      readRawFrame facade
+
     member x.write(encInfo,p:FramePayload) : SocketOp<unit> =
       writeFrame encInfo p facade.Connection.transport
 
@@ -1579,6 +1720,24 @@ module Http2 =
         let expected = System.Text.Encoding.ASCII.GetBytes connectionPreface
         if prefaceBytes.Length <> expected.Length
            || not (System.Linq.Enumerable.SequenceEqual(prefaceBytes, expected)) then
+          // RFC 7540 §3.5: emit a connection-level GOAWAY(PROTOCOL_ERROR)
+          // before closing the socket so the peer sees a clean error
+          // disposition rather than a bare FIN. Errors from the GOAWAY
+          // write itself are intentionally swallowed — the socket may
+          // already be half-dead.
+          let goAwayEncInfo =
+            { flags = 0uy; streamIdentifier = 0; padding = None }
+          let! _ =
+            ValueTask<Result<unit, Error>>(
+              task {
+                try
+                  let! _ =
+                    (writeFrame goAwayEncInfo
+                       (GoAway(0, ProtocolError, [||]))
+                       facade.Connection.transport).AsTask()
+                  return Ok ()
+                with _ -> return Ok ()
+              })
           return! SocketOp.abort (InputDataError (None, "Invalid HTTP/2 connection preface"))
         else
           let encInfo = { flags = 0uy; streamIdentifier = 0; padding = None }
@@ -1592,11 +1751,45 @@ module Http2 =
     member x.runReadLoop (webPart: WebPart) : Async<unit> = async {
       let mutable shouldRun = true
       while shouldRun && !alive do
-        let! readResult = Async.AwaitTask ((x.read()).AsTask())
+        let! readResult = Async.AwaitTask ((x.readRaw()).AsTask())
         match readResult with
-        | Ok (header, payload) ->
+        | Ok (header, rawPayload) ->
           try
-            do! x.handleFrame header payload webPart
+            // RFC 7540 §4.1/§4.2/§6.x frame-level validation runs against the
+            // raw payload before any per-type decoder is invoked.
+            let isIdle id = not (streams.ContainsKey id)
+            let action =
+              validateFrame header rawPayload.Length
+                            localSettings.maxFrameSize
+                            isIdle
+            match action with
+            | FvIgnoreUnknown ->
+              // Silently discard the payload (already consumed) and keep
+              // reading. h2spec §4.1/§5.5 expects the next legitimate frame
+              // (e.g. a PING) to be processed normally.
+              ()
+            | FvConnError err ->
+              do! x.sendGoAwayAndStop err
+              shouldRun <- false
+            | FvStreamError (sid, err) ->
+              do! x.resetStream sid err
+            | FvAccept ->
+              // For non-ACK SETTINGS frames, validate the individual setting
+              // values (RFC 7540 §6.5.2) before parsing/applying.
+              let mutable settingsValueErr : ErrorCode option = None
+              if header.``type`` = 4uy
+                 && (header.flags &&& 0x1uy) = 0uy then
+                match validateSettingsValues rawPayload with
+                | Result.Error err -> settingsValueErr <- Some err
+                | Ok () -> ()
+              match settingsValueErr with
+              | Some err ->
+                do! x.sendGoAwayAndStop err
+                shouldRun <- false
+              | None ->
+                let payload =
+                  payloadDecoders.[int header.``type``] header rawPayload
+                do! x.handleFrame header payload webPart
           with ex ->
             // Defensive: any unhandled exception in dispatch becomes a
             // connection-level INTERNAL_ERROR.
@@ -1693,6 +1886,21 @@ module Http2 =
         let expected = System.Text.Encoding.ASCII.GetBytes remainder
         if tail.Length <> expected.Length
            || not (System.Linq.Enumerable.SequenceEqual(tail, expected)) then
+          // RFC 7540 §3.5: send GOAWAY(PROTOCOL_ERROR) before closing on
+          // a malformed preface; see `start` for the same handling.
+          let goAwayEncInfo =
+            { flags = 0uy; streamIdentifier = 0; padding = None }
+          let! _ =
+            ValueTask<Result<unit, Error>>(
+              task {
+                try
+                  let! _ =
+                    (writeFrame goAwayEncInfo
+                       (GoAway(0, ProtocolError, [||]))
+                       facade.Connection.transport).AsTask()
+                  return Ok ()
+                with _ -> return Ok ()
+              })
           return! SocketOp.abort (InputDataError (None, "Invalid HTTP/2 connection preface"))
         else
           let encInfo = { flags = 0uy; streamIdentifier = 0; padding = None }
