@@ -1101,7 +1101,9 @@ let h2cPriorKnowledgeIntegrationTests (_ : SuaveConfig) =
         // We expect a GOAWAY frame (type = 7, stream id = 0, payload >= 8).
         // The server is allowed to send other connection-housekeeping
         // frames first (e.g. its own SETTINGS preface), so scan up to a
-        // small fixed budget of frames.
+        // small fixed budget of frames. 4 is comfortably above what RFC
+        // 7540 lets the server emit before the GOAWAY at this point: a
+        // SETTINGS, an optional SETTINGS-ACK, and the GOAWAY itself.
         stream.ReadTimeout <- 5000
         let readExact n =
           let buf : byte[] = Array.zeroCreate n
@@ -1202,6 +1204,11 @@ let h2cPriorKnowledgeIntegrationTests (_ : SuaveConfig) =
             else offset <- offset + r
           if closed && offset < n then None else Some buf
         let mutable sawGoAway = false
+        // Larger budget than the malformed-preface test: in addition to
+        // the server's SETTINGS preface and optional SETTINGS-ACK, our
+        // empty client SETTINGS triggers a SETTINGS-ACK from the server,
+        // so we may receive several housekeeping frames before the
+        // GOAWAY emitted in response to the unknown frame.
         let mutable budget = 8
         while not sawGoAway && budget > 0 do
           budget <- budget - 1
