@@ -1255,24 +1255,41 @@ module Http2 =
             | _ -> err <- Some ProtocolError
         else
           seenRegular <- true
-          // RFC 7540 §8.1.2.2: forbid connection-specific fields.
-          let lower = name.ToLowerInvariant()
-          match lower with
-          | "connection" | "proxy-connection" | "keep-alive"
-          | "transfer-encoding" | "upgrade" ->
+          // RFC 7540 §8.1.2: HTTP/2 header field names MUST be lowercase prior
+          // to encoding in HTTP/2. A request or response containing uppercase
+          // header field names MUST be treated as malformed (PROTOCOL_ERROR).
+          let mutable hasUpper = false
+          let mutable i = 0
+          while i < name.Length && not hasUpper do
+            let c = name.[i]
+            if c >= 'A' && c <= 'Z' then hasUpper <- true
+            i <- i + 1
+          if hasUpper then
             err <- Some ProtocolError
-          | "te" when value.Trim().ToLowerInvariant() <> "trailers" ->
-            err <- Some ProtocolError
-          | _ ->
-            regular.Add((name, value))
+          else
+            // RFC 7540 §8.1.2.2: forbid connection-specific fields.
+            match name with
+            | "connection" | "proxy-connection" | "keep-alive"
+            | "transfer-encoding" | "upgrade" ->
+              err <- Some ProtocolError
+            | "te" when value.Trim().ToLowerInvariant() <> "trailers" ->
+              err <- Some ProtocolError
+            | _ ->
+              regular.Add((name, value))
     match err with
     | Some e -> Result.Error e
     | None ->
       match methodH, pathH, schemeH with
       | Some m, Some p, Some s ->
-        // :authority is optional but recommended; default to empty string.
-        let auth = defaultArg authorityH ""
-        Ok (m, p, s, auth, List.ofSeq regular)
+        // RFC 7540 §8.1.2.3: ":path" MUST NOT be empty for HTTP or HTTPS
+        // URIs. (CONNECT requests omit ":path" entirely; if ":path" is
+        // present on a CONNECT it still must not be empty.)
+        if p.Length = 0 then
+          Result.Error ProtocolError
+        else
+          // :authority is optional but recommended; default to empty string.
+          let auth = defaultArg authorityH ""
+          Ok (m, p, s, auth, List.ofSeq regular)
       | _ ->
         // Missing one of the mandatory pseudo-headers.
         Result.Error ProtocolError
@@ -1306,6 +1323,20 @@ module Http2 =
     let writeMutex = new System.Threading.SemaphoreSlim(1, 1)
     let mutable highestClientStreamId = 0
     let mutable receivedGoAway = false
+
+    // Outbound flow-control waiter (RFC 7540 §6.9). The writer in
+    // `writeResponseOnStream` blocks on this TCS whenever either the
+    // connection or stream send window is ≤ 0; receipt of a WINDOW_UPDATE
+    // (or a SETTINGS_INITIAL_WINDOW_SIZE increase) calls `signalWindowUpdate`
+    // which swaps in a fresh TCS and completes the old one, releasing
+    // every awaiter so they can re-check the window.
+    let mutable windowSignal =
+      new TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
+    let signalWindowUpdate () =
+      let fresh =
+        new TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
+      let prev = System.Threading.Interlocked.Exchange(&windowSignal, fresh)
+      prev.TrySetResult(()) |> ignore
 
     /// Lookup or create a stream entry. Creating a new entry validates that
     /// the stream id is a legal new peer-initiated id (odd, monotonically
@@ -1396,27 +1427,53 @@ module Http2 =
             Headers(None, headersBlock))
 
       // 2. DATA frames. We chunk by the smaller of (peer.maxFrameSize) and
-      //    (outbound flow-control window). The outbound flow-control window
-      //    affects DATA frames only; HEADERS is not flow-controlled.
+      //    (outbound flow-control windows: per-connection and per-stream).
+      //    The outbound flow-control window affects DATA frames only;
+      //    HEADERS is not flow-controlled. When either window is ≤ 0 we
+      //    block on `windowSignal` until a WINDOW_UPDATE / SETTINGS change
+      //    replenishes one of them. (RFC 7540 §6.9.)
       if bodyHasData then
         let maxFrameSize = max 1 peerSettings.maxFrameSize
+        // Locate the per-stream send window (created in
+        // `dispatchStream` -> ultimately `newStreamData`). If the stream
+        // is gone (e.g. peer-side RST_STREAM) we abort the body emit.
+        let streamWindowOpt =
+          match streams.TryGetValue streamId with
+          | true, s -> Some s.outboundWindow
+          | _ -> None
         let mutable offset = 0
-        while offset < bodyBytes.Length do
-          let remaining = bodyBytes.Length - offset
-          // For now we don't block on flow control here: we just respect what
-          // is currently available. A future improvement is to wait for
-          // WINDOW_UPDATE when the window is exhausted; h2spec's positive
-          // tests don't exercise that path.
-          let chunkSize =
-            min remaining maxFrameSize
-          let chunk = Array.sub bodyBytes offset chunkSize
-          offset <- offset + chunkSize
-          let isLast = offset >= bodyBytes.Length
-          let flags =
-            if isLast && not hasTrailers then setEndStream 0uy else 0uy
-          do! x.writeFrameSerialized(
-                { flags = flags; streamIdentifier = streamId; padding = None },
-                Data(chunk, isLast && not hasTrailers))
+        let mutable aborted = false
+        while offset < bodyBytes.Length && not aborted do
+          match streamWindowOpt with
+          | None ->
+            // Stream was closed under us — stop emitting silently.
+            aborted <- true
+          | Some streamWindow ->
+            // Wait for both windows to be positive. Capture the current
+            // signal BEFORE inspecting window state to avoid a missed-
+            // wakeup race with the WindowUpdate handler.
+            let waiter = windowSignal
+            let available =
+              min connectionOutboundWindow.available streamWindow.available
+            if available <= 0 then
+              do! Async.AwaitTask waiter.Task
+            else
+              let remaining = bodyBytes.Length - offset
+              let chunkSize =
+                min remaining (min available maxFrameSize)
+              let chunk = Array.sub bodyBytes offset chunkSize
+              offset <- offset + chunkSize
+              // Decrement both windows. They can legitimately reach 0 after
+              // this; they only go negative via SETTINGS_INITIAL_WINDOW_SIZE
+              // adjustments (RFC 7540 §6.9.2), not via send accounting.
+              connectionOutboundWindow.available <- connectionOutboundWindow.available - chunkSize
+              streamWindow.available <- streamWindow.available - chunkSize
+              let isLast = offset >= bodyBytes.Length
+              let flags =
+                if isLast && not hasTrailers then setEndStream 0uy else 0uy
+              do! x.writeFrameSerialized(
+                    { flags = flags; streamIdentifier = streamId; padding = None },
+                    Data(chunk, isLast && not hasTrailers))
 
       // 3. Trailing HEADERS with END_STREAM, if any. Validate first; invalid
       //    trailers are dropped rather than emitted (the caller's WebPart
@@ -1475,6 +1532,22 @@ module Http2 =
     member private x.dispatchStream (streamId: int32) (stream: StreamData) (webPart: WebPart) = async {
       if stream.dispatched then return () else
       stream.dispatched <- true
+      // RFC 7540 §8.1.2.6: if `content-length` is advertised, the sum of the
+      // DATA frame payload lengths MUST equal that value. Otherwise the
+      // request is malformed → stream-level PROTOCOL_ERROR.
+      let contentLengthHeader =
+        stream.requestHeaders
+        |> List.tryFind (fun (n, _) -> System.String.Equals(n, "content-length", System.StringComparison.OrdinalIgnoreCase))
+      let contentLengthMismatch =
+        match contentLengthHeader with
+        | Some (_, v) ->
+          match System.Int64.TryParse(v.Trim()) with
+          | true, cl -> cl <> stream.bodyBuffer.Length
+          | _ -> true   // un-parseable content-length is itself malformed
+        | None -> false
+      if contentLengthMismatch then
+        do! x.resetStream streamId ProtocolError
+      else
       // Stash incoming request trailers (if any) for the webpart to read via
       // `Http2.Trailers.getRequest`.
       let incomingTrailers = stream.trailers
@@ -1516,6 +1589,18 @@ module Http2 =
           let notFound = { HttpResult.empty with status = HTTP_404.status }
           do! x.writeResponseOnStream streamId notFound []
     }
+
+    /// Dispatch a stream asynchronously on the thread-pool so the read loop
+    /// is not blocked by the WebPart or by flow-control waits inside
+    /// `writeResponseOnStream`. Exceptions are swallowed and logged: a
+    /// failing WebPart must not bring down the whole connection.
+    member private x.dispatchStreamAsync (streamId: int32) (stream: StreamData) (webPart: WebPart) =
+      Async.Start (async {
+        try
+          do! x.dispatchStream streamId stream webPart
+        with ex ->
+          eprintfn "[Http2] stream dispatch failed: %s" ex.Message
+      })
 
     /// Process a completed header block. If the stream is in Idle / Open
     /// state and END_STREAM was set, dispatch immediately. If the block was
@@ -1563,12 +1648,12 @@ module Http2 =
                 | Ok () ->
                   stream.trailers <- headers
                   stream.endStreamReceived <- true
-                  do! x.dispatchStream streamId stream webPart
+                  x.dispatchStreamAsync streamId stream webPart
             else
               stream.requestHeaders <- headers
               if endStream then
                 stream.endStreamReceived <- true
-                do! x.dispatchStream streamId stream webPart
+                x.dispatchStreamAsync streamId stream webPart
     }
 
     /// Apply a non-ACK SETTINGS frame from the peer and emit a SETTINGS-ACK.
@@ -1583,6 +1668,10 @@ module Http2 =
           // We don't fail the connection if applying the delta would overflow;
           // h2spec exercises this case more strictly than we currently model.
           applyInitialWindowSizeChange s.outboundWindow oldInitial newInitial |> ignore
+        // An increase may unblock writers waiting on flow control; a decrease
+        // cannot, but signalling is harmless (awaiters re-check the window).
+        if newInitial > oldInitial then
+          signalWindowUpdate ()
       // ACK
       do! x.writeFrameSerialized(
             { flags = setAck 0uy; streamIdentifier = 0; padding = None },
@@ -1663,7 +1752,7 @@ module Http2 =
                         WindowUpdate bytes.Length)
                 if endStream then
                   stream.endStreamReceived <- true
-                  do! x.dispatchStream header.streamIdentifier stream webPart
+                  x.dispatchStreamAsync header.streamIdentifier stream webPart
         | Settings (ack, s) when not ack ->
           do! x.applyPeerSettings s
         | Settings (true, _) ->
@@ -1704,7 +1793,10 @@ module Http2 =
               do! x.sendGoAwayAndStop err
             | Result.Error err ->
               do! x.resetStream header.streamIdentifier err
-            | Ok () -> ()
+            | Ok () ->
+              // Wake any writer that is currently blocked on flow control
+              // (RFC 7540 §6.9).
+              signalWindowUpdate ()
         | RstStream _errorCode ->
           match streams.TryGetValue header.streamIdentifier with
           | true, s -> s.state <- Closed
