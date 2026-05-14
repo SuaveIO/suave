@@ -179,11 +179,21 @@ module Hpack =
 
   let toStaticEntry (idx:int) = StaticTable.get (idx - 1)
 
+  // Circular-buffer modular arithmetic for the dynamic table index space.
+  // RFC 7541 §2.3.2 — the dynamic table is addressed as a ring buffer keyed
+  // by a moving `offset`. The wrap must use modulo, not integer division;
+  // the previous `(x + maxN) / maxN` formulation collapsed every index to
+  // 0 or 1, which corrupted both insertion (newer entries overwrote the
+  // tail) and indexed-lookup (the second request on a connection that
+  // referenced a dynamic entry resolved to a dummy slot, producing
+  // RST_STREAM(PROTOCOL_ERROR) at the HTTP/2 layer once the bogus pseudo-
+  // header tripped validation). Adding `maxN` before the modulus keeps the
+  // result non-negative for the `offset - 1` decrement performed by
+  // `insertEntry`; for all other call sites `x` is already non-negative.
   let adj maxN x =
     if maxN = 0 then failwith "Too small table size."
     else
-      let ret = (x + maxN) / maxN
-      ret
+      ((x % maxN) + maxN) % maxN
 
   let headerSize (kv : Header) = (fst kv).Length + (snd kv).Length + headerSizeMagicNumber
 
