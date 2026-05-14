@@ -1238,6 +1238,71 @@ let h2cPriorKnowledgeIntegrationTests (_ : SuaveConfig) =
               ()
         Expect.isTrue sawGoAway
           "server must send GOAWAY(PROTOCOL_ERROR) when an unknown frame interrupts a header block")
+
+    testCase "server emits HTTP/2 GOAWAY(PROTOCOL_ERROR) on raw garbage that is not a valid HTTP request" <| fun _ ->
+      // h2spec http2/3.5/2 reproduction. h2spec opens a raw TCP connection
+      // and sends "INVALID CONNECTION PREFACE\r\n\r\n" without an h2c
+      // upgrade negotiation. Suave's HTTP/1.1 request-line parser used to
+      // accept "INVALID" / "CONNECTION" / "PREFACE" as method / path /
+      // version, fail the Host-header check, and respond with HTTP/1.1
+      // 400 Bad Request. h2spec then misparsed the 400 response bytes as
+      // a truncated HTTP/2 frame header and reported "unexpected EOF".
+      //
+      // The fix: when the request line's version token does not start with
+      // "HTTP/", write a real HTTP/2 GOAWAY(PROTOCOL_ERROR, last_stream_id=0)
+      // directly to the transport and close the connection silently. This
+      // satisfies h2spec's RFC 7540 §3.5 expectation while remaining a
+      // best-effort signal for non-HTTP/2 clients sending malformed bytes.
+      withHttpServer (fun port ->
+        use client = new System.Net.Sockets.TcpClient()
+        client.Connect(System.Net.IPAddress.Loopback, port)
+        let stream = client.GetStream()
+        let garbage =
+          System.Text.Encoding.ASCII.GetBytes "INVALID CONNECTION PREFACE\r\n\r\n"
+        stream.Write(garbage, 0, garbage.Length)
+        stream.Flush()
+
+        stream.ReadTimeout <- 5000
+        // Read the first 9 bytes — the HTTP/2 frame header. They must
+        // describe a GOAWAY (type=7) with the connection stream id (0).
+        let buf : byte[] = Array.zeroCreate 9
+        let mutable offset = 0
+        let mutable closed = false
+        while offset < buf.Length && not closed do
+          let r =
+            try stream.Read(buf, offset, buf.Length - offset)
+            with _ -> 0
+          if r <= 0 then closed <- true
+          else offset <- offset + r
+        Expect.isFalse closed
+          "server must send a 17-byte GOAWAY frame, not a bare TCP FIN"
+        let length =
+          (int buf.[0] <<< 16) ||| (int buf.[1] <<< 8) ||| (int buf.[2])
+        Expect.equal length 8 "GOAWAY payload length must be 8"
+        Expect.equal buf.[3] 7uy "frame type must be GOAWAY (7)"
+        Expect.equal buf.[4] 0uy "GOAWAY flags must be 0"
+        // Stream id 0 (top bit reserved, must be unset).
+        Expect.equal (int buf.[5] &&& 0x7f) 0 "GOAWAY stream id high byte = 0"
+        Expect.equal buf.[6] 0uy "GOAWAY stream id mid-hi byte = 0"
+        Expect.equal buf.[7] 0uy "GOAWAY stream id mid-lo byte = 0"
+        Expect.equal buf.[8] 0uy "GOAWAY stream id low byte = 0"
+
+        let payload : byte[] = Array.zeroCreate 8
+        offset <- 0
+        while offset < payload.Length && not closed do
+          let r =
+            try stream.Read(payload, offset, payload.Length - offset)
+            with _ -> 0
+          if r <= 0 then closed <- true
+          else offset <- offset + r
+        Expect.isFalse closed "GOAWAY payload must reach the wire intact"
+        let errorCode =
+          ((uint32 payload.[4]) <<< 24)
+          ||| ((uint32 payload.[5]) <<< 16)
+          ||| ((uint32 payload.[6]) <<< 8)
+          ||| (uint32 payload.[7])
+        Expect.equal errorCode 1u
+          "GOAWAY error code on invalid preface must be PROTOCOL_ERROR (0x1)")
   ]
 
 // ---------------------------------------------------------------------------
