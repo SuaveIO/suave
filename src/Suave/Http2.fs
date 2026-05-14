@@ -1617,15 +1617,24 @@ module Http2 =
         if stream.state = Closed then
           do! x.sendGoAwayAndStop StreamClosed
         else
-        // HPACK-decode the block. Any decode failure is a connection-level
+        // HPACK-decode the block. A `HpackHeaderNameUppercaseException` is
+        // mapped to a stream-level PROTOCOL_ERROR (RFC 7540 §8.1.2: a request
+        // containing uppercase header field names MUST be treated as
+        // malformed). Any other decode failure is a connection-level
         // COMPRESSION_ERROR (RFC 7540 §4.3).
         let decoded =
-          try Some (decodeHeader x.decodeDynamicTable fragment)
-          with _ -> None
+          try Ok (decodeHeader x.decodeDynamicTable fragment)
+          with
+          | HpackHeaderNameUppercaseException _ ->
+            Result.Error (true, ProtocolError)
+          | _ ->
+            Result.Error (false, CompressionError)
         match decoded with
-        | None ->
-          do! x.sendGoAwayAndStop CompressionError
-        | Some headers ->
+        | Result.Error (true, err) ->
+          do! x.resetStream streamId err
+        | Result.Error (false, err) ->
+          do! x.sendGoAwayAndStop err
+        | Ok headers ->
           let isTrailingBlock =
             // Trailers arrive after DATA on a stream that's already open.
             // The opening header block is the first one; subsequent blocks
@@ -1834,12 +1843,30 @@ module Http2 =
           try
             let encInfo =
               { flags = 0uy; streamIdentifier = 0; padding = None }
-            let! _ =
+            let transport = facade.Connection.transport
+            let! writeRes =
               (writeFrame encInfo
                  (GoAway(0, errorCode, [||]))
-                 facade.Connection.transport).AsTask()
+                 transport).AsTask()
+            // Flush the transport so the GOAWAY bytes leave any
+            // application-layer buffer (relevant for SslTransport) before
+            // the caller follows up with `SocketOp.abort`, which tears
+            // the socket down. For TCP this is a no-op since SendAsync
+            // already pushed the data to the kernel.
+            let! flushRes = transport.flush().AsTask()
+            match writeRes, flushRes with
+            | Ok (), Ok () -> ()
+            | Result.Error e, _
+            | _, Result.Error e ->
+              // Surface the swallowed failure on stderr at debug level so
+              // future preface-related regressions are observable. The
+              // "best effort" contract is preserved: we still return Ok
+              // and let `SocketOp.abort` propagate.
+              eprintfn "[Http2] bestEffortGoAway: %A" e
             return Ok ()
-          with _ -> return Ok ()
+          with ex ->
+            eprintfn "[Http2] bestEffortGoAway threw: %s" ex.Message
+            return Ok ()
         })
 
     /// Run the HTTP/2 connection-preface exchange (RFC 7540 §3.5):
@@ -1883,6 +1910,17 @@ module Http2 =
               validateFrame header rawPayload.Length
                             localSettings.maxFrameSize
                             isIdle
+            // RFC 7540 §6.10: while a header block is in flight (HEADERS
+            // or PUSH_PROMISE without END_HEADERS) the only legal next
+            // frame is CONTINUATION on the same stream. Anything else —
+            // including frame types we'd otherwise silently discard as
+            // unknown — MUST be a connection-level PROTOCOL_ERROR.
+            let action =
+              match action with
+              | FvIgnoreUnknown when pendingReassembly.IsSome
+                                  && header.``type`` <> 9uy ->
+                FvConnError ProtocolError
+              | _ -> action
             match action with
             | FvIgnoreUnknown ->
               // Silently discard the payload (already consumed) and keep

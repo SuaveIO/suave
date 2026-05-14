@@ -58,9 +58,21 @@ type SslTransport(listenSocket: Socket, certificate: X509Certificate, cancellati
     if acceptSocket <> null then
       try
         try
-          acceptSocket.Shutdown(SocketShutdown.Both)
+          // Graceful close: see TcpTransport.shutdownSocket for the
+          // rationale. Drain any unread bytes left in the recv buffer so
+          // `close(2)` does not RST and discard a final GOAWAY/Alert.
+          try acceptSocket.Shutdown(SocketShutdown.Send) with _ -> ()
+          let buf : byte[] = Array.zeroCreate 1024
+          let mutable draining = acceptSocket.Available > 0
+          while draining do
+            try
+              let n = acceptSocket.Receive(buf, 0, min buf.Length acceptSocket.Available, SocketFlags.None)
+              draining <- n > 0 && acceptSocket.Available > 0
+            with _ -> draining <- false
+          try acceptSocket.Shutdown(SocketShutdown.Receive) with _ -> ()
         with
-          | :? SocketException -> () // Socket may already be closed
+          | :? SocketException ->
+            try acceptSocket.Shutdown(SocketShutdown.Both) with _ -> ()
           | :? ObjectDisposedException -> () // Socket already disposed
       finally
         try
@@ -182,3 +194,24 @@ type SslTransport(listenSocket: Socket, certificate: X509Certificate, cancellati
 
     member this.shutdown() =
       this.shutdown()
+
+    member this.flush () : SocketOp<unit> =
+      let stream = lock socketLock (fun () -> this.sslStream)
+      if stream = null then
+        ValueTask<Result<unit,Error>>(Ok())
+      else
+        ValueTask<Result<unit,Error>>(
+          task {
+            try
+              do! stream.FlushAsync(cancellationToken)
+              return Ok()
+            with
+            | :? IOException as ex ->
+              return Result.Error(Error.ConnectionError($"SSL flush error: {ex.Message}"))
+            | :? SocketException as ex ->
+              return Result.Error(Error.SocketError(ex.SocketErrorCode))
+            | :? ObjectDisposedException ->
+              return Result.Error(Error.ConnectionError("SSL stream has been disposed"))
+            | ex ->
+              return Result.Error(Error.ConnectionError($"Unexpected SSL flush error: {ex.Message}"))
+          })

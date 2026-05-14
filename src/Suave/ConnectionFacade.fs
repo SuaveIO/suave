@@ -339,6 +339,44 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
         | Result.Error e -> return Result.Error e
         | Ok (rawMethod, path, rawQuery, httpVersion) ->
 
+        // RFC 7230 §3.1.1: a conforming HTTP/1.x or HTTP/2 request line ends
+        // in an "HTTP/x.y" version token. If the parsed token does not start
+        // with "HTTP/", the bytes we just read are not an HTTP/1.x request
+        // and the connection is most plausibly a misbehaving HTTP/2 client
+        // (e.g. h2spec http2/3.5/2 sends the literal "INVALID CONNECTION
+        // PREFACE\r\n\r\n" on a fresh TCP connection without negotiating an
+        // h2c upgrade). Send a best-effort HTTP/2 GOAWAY(PROTOCOL_ERROR)
+        // so HTTP/2 clients observe the protocol error, then close the
+        // connection silently — the `_ -> ()` branch of
+        // `exitHttpLoopWithError` suppresses the 400 response that would
+        // otherwise be sent back as HTTP/1.1 bytes (and which h2spec
+        // misparses as a truncated HTTP/2 frame, reporting "unexpected EOF").
+        if not (httpVersion.StartsWith("HTTP/", StringComparison.Ordinal)) then
+          let goAwayBytes : byte[] =
+            // 9-byte frame header (length=8, type=GOAWAY=7, flags=0, stream id=0)
+            // followed by an 8-byte payload (last_stream_id=0, error_code=PROTOCOL_ERROR=1).
+            [| 0uy; 0uy; 8uy
+               7uy
+               0uy
+               0uy; 0uy; 0uy; 0uy
+               0uy; 0uy; 0uy; 0uy
+               0uy; 0uy; 0uy; 1uy |]
+          try
+            let writeVt = connection.transport.write(Memory<byte>(goAwayBytes))
+            let! _ = writeVt.AsTask()
+            let flushVt = connection.transport.flush()
+            let! _ = flushVt.AsTask()
+            ()
+          with ex ->
+            // Best-effort: the peer is not necessarily speaking HTTP/2, so a
+            // failed write is expected for plain noise. Surface it at debug
+            // level so future preface-related regressions are observable.
+            try eprintfn "Suave.Http2: failed to write GOAWAY for invalid HTTP version: %s" ex.Message
+            with _ -> ()
+          return Result.Error
+            (ConnectionError ("Invalid HTTP version: " + httpVersion))
+        else
+
         // RFC 7540 §3.4: prior-knowledge HTTP/2 cleartext clients open the
         // connection with the 24-byte preface beginning with the literal
         // request line "PRI * HTTP/2.0\r\n". No legitimate HTTP/1.1 request
