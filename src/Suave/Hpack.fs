@@ -385,9 +385,19 @@ module Hpack =
     dyntbl.circularTable.[dix]
 
   let toIndexedEntry (dyntbl:DynamicTable) (idx:int) =
-    if idx < 0 then failwith "Index overrun."
+    // RFC 7541 §2.3.3 — the index address space is the union of the static
+    // (1..staticTableSize) and dynamic (staticTableSize+1..staticTableSize+numOfEntries)
+    // tables. Index 0 is reserved and MUST be treated as a decoding error, as
+    // MUST any index that exceeds the populated portion of the dynamic table.
+    // Previously the dynamic branch was unbounded and silently returned a stale
+    // entry from the circular buffer (often an empty-name/empty-value default),
+    // which manifested at the HTTP/2 layer as serving a request whose header
+    // block contained a bogus indexed reference instead of a connection-level
+    // GOAWAY(COMPRESSION_ERROR).
+    if idx <= 0 then failwith "Index overrun."
     elif idx <= staticTableSize then toStaticEntry idx |> toEntry
-    else toDynamicEntry dyntbl idx
+    elif idx <= staticTableSize + dyntbl.numOfEntries then toDynamicEntry dyntbl idx
+    else failwith "Index overrun."
 
   /// encode index
 
@@ -782,7 +792,13 @@ if I < 2^N - 1, encode I on N bits
 
   let isSuitableSize size (dyntbl : DynamicTable) =
     let (DecodeInfo(_,limiref)) = dyntbl.codeInfo
-    size < limiref
+    // RFC 7541 §6.3 — the new maximum size MUST be less than OR equal to the
+    // value advertised by the decoder via SETTINGS_HEADER_TABLE_SIZE. Using a
+    // strict `<` rejected the boundary value, which is exactly what an encoder
+    // sends to settle a table-size renegotiation back at the cap; this caused
+    // h2spec generic/5/15 (two consecutive dynamic table size updates) to fail
+    // when the second update restored the size to the advertised maximum.
+    size <= limiref
 
   let renewDynamicTable size dyntbl =
     dyntbl
