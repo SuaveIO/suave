@@ -43,6 +43,8 @@ module Http2Demo.Program
 
 open System
 open System.Net
+open System.Security.Cryptography
+open System.Security.Cryptography.X509Certificates
 open System.Text
 open System.Threading
 open Suave
@@ -242,35 +244,80 @@ let private app : WebPart =
 // example can also be driven from scripts.
 // ---------------------------------------------------------------------------
 
-let private parsePort (argv: string[]) =
-  let rec loop i =
-    if i >= argv.Length then 8443us
-    elif argv.[i] = "--port" && i + 1 < argv.Length then
+let private parsePortPair (argv: string[]) =
+  let mutable httpPort = 8080us
+  let mutable httpsPort = 8443us
+  let mutable i = 0
+  while i < argv.Length do
+    match argv.[i] with
+    | "--port" | "--https-port" when i + 1 < argv.Length ->
       match UInt16.TryParse argv.[i + 1] with
-      | true, p -> p
-      | false, _ -> 8443us
-    else loop (i + 1)
-  loop 0
+      | true, p -> httpsPort <- p
+      | _ -> ()
+      i <- i + 2
+    | "--http-port" when i + 1 < argv.Length ->
+      match UInt16.TryParse argv.[i + 1] with
+      | true, p -> httpPort <- p
+      | _ -> ()
+      i <- i + 2
+    | _ -> i <- i + 1
+  httpPort, httpsPort
+
+/// Build an in-memory self-signed certificate covering `localhost` and the
+/// loopback address. Modelled on `loadTestCertificate` in
+/// `Suave.Tests.Http2.alpnTests` so the demo can drive a real TLS handshake
+/// (and therefore ALPN negotiation) without shipping a key on disk.
+let private buildSelfSignedCert () : X509Certificate2 =
+  use rsa = RSA.Create(2048)
+  let req =
+    CertificateRequest(
+      "CN=localhost",
+      rsa,
+      HashAlgorithmName.SHA256,
+      RSASignaturePadding.Pkcs1)
+  let san = SubjectAlternativeNameBuilder()
+  san.AddIpAddress(IPAddress.Loopback)
+  san.AddDnsName("localhost")
+  req.CertificateExtensions.Add(san.Build())
+  let notBefore = DateTimeOffset.UtcNow.AddMinutes(-5.0)
+  let notAfter = DateTimeOffset.UtcNow.AddYears(1)
+  let cert = req.CreateSelfSigned(notBefore, notAfter)
+  // Round-trip through PKCS#12 so the private key handle survives on every OS.
+  let pfx = cert.Export(X509ContentType.Pkcs12)
+  X509CertificateLoader.LoadPkcs12(pfx, (null : string))
 
 [<EntryPoint>]
 let main argv =
-  let port = parsePort argv
+  let httpPort, httpsPort = parsePortPair argv
+  let cert = buildSelfSignedCert ()
   let cts = new CancellationTokenSource()
   let cfg =
     { defaultConfig with
-        bindings          = [ HttpBinding.create HTTP IPAddress.Loopback port ]
+        bindings =
+          [ HttpBinding.create HTTP         IPAddress.Loopback httpPort
+            HttpBinding.create (HTTPS cert) IPAddress.Loopback httpsPort ]
         cancellationToken = cts.Token }
 
   let ready, server = Web.startWebServerAsync cfg app
   ready |> Async.RunSynchronously |> ignore
 
   printfn ""
-  printfn "Suave HTTP/2 demo listening on http://127.0.0.1:%d/" (int port)
+  printfn "Suave HTTP/2 demo listening on:"
+  printfn "  http://127.0.0.1:%d/  (h2c upgrade + prior knowledge)" (int httpPort)
+  printfn "  https://127.0.0.1:%d/ (TLS + ALPN h2 negotiation)" (int httpsPort)
+  printfn ""
+  printfn "Certificate thumbprint: %s" cert.Thumbprint
+  printfn "  (self-signed, regenerated on every start \u2014 trust manually if needed)"
   printfn ""
   printfn "Try one of:"
-  printfn "  curl --http2-prior-knowledge -v http://127.0.0.1:%d/" (int port)
-  printfn "  nghttp -nv http://127.0.0.1:%d/" (int port)
-  printfn "  h2load -n 100 -c 1 -m 10 http://127.0.0.1:%d/tile/1" (int port)
+  printfn "  curl --http2-prior-knowledge -v http://127.0.0.1:%d/" (int httpPort)
+  printfn "  curl -k --http2 -v https://127.0.0.1:%d/" (int httpsPort)
+  printfn "  nghttp -nv https://127.0.0.1:%d/" (int httpsPort)
+  printfn "  h2load -n 100 -c 1 -m 10 https://127.0.0.1:%d/tile/1" (int httpsPort)
+  printfn ""
+  printfn "Browser HTTP/2 ALPN test:"
+  printfn "  open https://localhost:%d/ in Chrome/Firefox, accept the self-signed" (int httpsPort)
+  printfn "  certificate, then check DevTools > Network > Protocol column for 'h2'."
   printfn ""
 
   Console.CancelKeyPress.Add(fun e ->
