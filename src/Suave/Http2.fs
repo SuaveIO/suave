@@ -422,7 +422,10 @@ module Http2 =
     match header.``type`` with
     | 0uy -> // DATA
       // RFC 7540 §6.1: DATA frames MUST be associated with a stream.
+      // RFC 7540 §5.1: receiving a DATA frame on a stream in the "idle"
+      // state is a connection-level PROTOCOL_ERROR.
       if header.streamIdentifier = 0 then FvConnError ProtocolError
+      elif isIdleStream header.streamIdentifier then FvConnError ProtocolError
       else FvAccept
     | 1uy -> // HEADERS
       // RFC 7540 §6.2: HEADERS frames MUST be associated with a stream.
@@ -467,7 +470,12 @@ module Http2 =
       else FvAccept
     | 8uy -> // WINDOW_UPDATE
       // RFC 7540 §6.9: WINDOW_UPDATE payload is exactly 4 bytes.
+      // RFC 7540 §5.1: a WINDOW_UPDATE frame received on a stream in the
+      // "idle" state is a connection-level PROTOCOL_ERROR. (A
+      // WINDOW_UPDATE on stream id 0 is always connection-scoped.)
       if rawLen <> 4 then FvConnError FrameSizeError
+      elif header.streamIdentifier <> 0
+           && isIdleStream header.streamIdentifier then FvConnError ProtocolError
       else FvAccept
     | 9uy -> // CONTINUATION
       // RFC 7540 §6.10: CONTINUATION MUST be associated with a stream.
@@ -1519,6 +1527,11 @@ module Http2 =
       | Result.Error err ->
         do! x.sendGoAwayAndStop err
       | Ok stream ->
+        // RFC 7540 §5.1: HEADERS received on a stream in the "closed"
+        // state is a connection-level STREAM_CLOSED error.
+        if stream.state = Closed then
+          do! x.sendGoAwayAndStop StreamClosed
+        else
         // HPACK-decode the block. Any decode failure is a connection-level
         // COMPRESSION_ERROR (RFC 7540 §4.3).
         let decoded =
@@ -1598,16 +1611,23 @@ module Http2 =
         return ()
       | None ->
         match payload with
-        | Headers (_priority, fragment) ->
-          let endStream = testEndStream header.flags
-          if testEndHeaderFlag header.flags then
-            do! x.completeHeaderBlock header.streamIdentifier fragment endStream webPart
-          else
-            pendingReassembly <-
-              Some { streamId = header.streamIdentifier
-                     isPushPromise = false
-                     pending = fragment
-                     endStream = endStream }
+        | Headers (priorityOpt, fragment) ->
+          // RFC 7540 §5.3.1: a stream cannot depend on itself; this is a
+          // stream-level PROTOCOL_ERROR. Abort header processing entirely
+          // for this stream.
+          match priorityOpt with
+          | Some p when p.streamIdentifier = header.streamIdentifier ->
+            do! x.resetStream header.streamIdentifier ProtocolError
+          | _ ->
+            let endStream = testEndStream header.flags
+            if testEndHeaderFlag header.flags then
+              do! x.completeHeaderBlock header.streamIdentifier fragment endStream webPart
+            else
+              pendingReassembly <-
+                Some { streamId = header.streamIdentifier
+                       isPushPromise = false
+                       pending = fragment
+                       endStream = endStream }
         | Continuation _ ->
           // Continuation outside of a header block is a PROTOCOL_ERROR.
           do! x.sendGoAwayAndStop ProtocolError
@@ -1689,6 +1709,9 @@ module Http2 =
           match streams.TryGetValue header.streamIdentifier with
           | true, s -> s.state <- Closed
           | _ -> ()
+        | Priority (Some p) when p.streamIdentifier = header.streamIdentifier ->
+          // RFC 7540 §5.3.1: a stream cannot depend on itself.
+          do! x.resetStream header.streamIdentifier ProtocolError
         | Priority _ ->
           // RFC 7540 §6.3 / RFC 9113 §5.3.4 (deprecated): we ignore priority.
           ()

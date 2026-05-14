@@ -1395,6 +1395,23 @@ let frameValidationTests (_ : SuaveConfig) =
                    (FvConnError ProtocolError)
                    "RFC 7540 §6.1: DATA on stream 0 → PROTOCOL_ERROR"
 
+    testCase "DATA on an idle stream is a connection PROTOCOL_ERROR" <| fun _ ->
+      let h = hdr 0uy 0uy 1 4
+      Expect.equal (validateFrame h h.length maxFrame allIdle)
+                   (FvConnError ProtocolError)
+                   "RFC 7540 §5.1: DATA on idle stream → PROTOCOL_ERROR"
+
+    testCase "WINDOW_UPDATE on an idle stream is a connection PROTOCOL_ERROR" <| fun _ ->
+      let h = hdr 8uy 0uy 1 4
+      Expect.equal (validateFrame h h.length maxFrame allIdle)
+                   (FvConnError ProtocolError)
+                   "RFC 7540 §5.1: WINDOW_UPDATE on idle stream → PROTOCOL_ERROR"
+
+    testCase "WINDOW_UPDATE on stream 0 is accepted regardless of stream table" <| fun _ ->
+      let h = hdr 8uy 0uy 0 4
+      Expect.equal (validateFrame h h.length maxFrame allIdle) FvAccept
+                   "WINDOW_UPDATE on connection-level stream 0 must not be flagged idle"
+
     testCase "valid HEADERS is accepted" <| fun _ ->
       let h = hdr 1uy 0x4uy 1 8
       Expect.equal (validateFrame h h.length maxFrame noIdle) FvAccept
