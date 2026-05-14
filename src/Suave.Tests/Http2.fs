@@ -301,6 +301,47 @@ let hpackTests (_ : SuaveConfig) =
       let dec = newDynamicTableForDecoding 4096 4096
       let decoded = Hpack.decodeHeader dec bytes
       Expect.equal decoded [ "custom-key", "custom-header" ] "decoded literal new-name header round-trip"
+
+    yield testCase "decode accepts two consecutive dynamic table size updates (RFC 7541 §4.2)" <| fun _ ->
+      // h2spec generic/5/15 — the encoder MAY emit up to two dynamic table
+      // size updates at the start of a header block (e.g. to acknowledge a
+      // reduction and then settle on a new value). The decoder must accept
+      // both, including the case where the second update restores the size to
+      // the advertised maximum. Previously `isSuitableSize` used a strict `<`
+      // so size==maximum was rejected and the second 0x20-prefixed octet tore
+      // down the connection.
+      //
+      // Wire format:
+      //   0x20            — table size update, size = 0  (mask5 = 0)
+      //   0x3F 0xE1 0x1F  — table size update, size = 4096 (5-bit prefix
+      //                     value 31 + 4065 = 31 + 0x61 + (0x1F << 7))
+      //   0x82            — indexed header field, static index 2 (":method: GET")
+      let bytes = [| 0x20uy; 0x3Fuy; 0xE1uy; 0x1Fuy; 0x82uy |]
+      let dec = newDynamicTableForDecoding 4096 4096
+      let decoded = Hpack.decodeHeader dec bytes
+      Expect.equal decoded [ ":method", "GET" ] "two size updates followed by a header decode"
+
+    yield testCase "decode rejects an indexed header with an out-of-range index (RFC 7541 §2.3.3)" <| fun _ ->
+      // h2spec hpack/2.3.3/1 — the index address space is the union of the
+      // static and dynamic tables. A reference beyond the populated portion
+      // (e.g. into the empty dynamic table) MUST surface as a decoding error
+      // that the dispatch loop translates into a connection-level
+      // GOAWAY(COMPRESSION_ERROR). Previously the dynamic branch was
+      // unbounded and silently returned a stale circular-buffer entry, so the
+      // request was served instead of the connection being torn down.
+      //
+      // 0xBE = 0x80 | 62 — indexed header, idx = 62 (one past the static
+      // table, into a brand-new empty dynamic table).
+      let bytes = [| 0xBEuy |]
+      let dec = newDynamicTableForDecoding 4096 4096
+      Expect.throws (fun () -> Hpack.decodeHeader dec bytes |> ignore)
+                    "out-of-range indexed reference must raise a decoding error"
+
+      // Index 0 (0x80) is reserved and must also be rejected even in Release
+      // builds where the `assert` in `indexed` is compiled out.
+      let dec2 = newDynamicTableForDecoding 4096 4096
+      Expect.throws (fun () -> Hpack.decodeHeader dec2 [| 0x80uy |] |> ignore)
+                    "indexed reference with index 0 must raise a decoding error"
   ]
 
 [<Tests>]
