@@ -762,75 +762,41 @@ module Http2 =
       Ok ()
 
   // ---------------------------------------------------------------------------
-  // Minimal HPACK response encoder (RFC 7541)
+  // HPACK response encoder (RFC 7541)
   //
-  // The full Hpack encoder in this codebase has known issues for the response
-  // path (`useHuffman` is a hard-coded constant inside the encoder, the
-  // Huffman-shrink fallback omits the length prefix, etc.) which leave
-  // standard decoders (curl/nghttp2, Python's hpack, h2spec) unable to parse
-  // the output. Fixing the full encoder is out of scope for the dispatch-loop
-  // step; what the dispatch loop needs is a *correct* encoding of a small set
-  // of response header blocks.
-  //
-  // This minimal encoder emits each header as a "Literal Header Field with
-  // Incremental Indexing — New Name" (RFC 7541 §6.2.1) with no Huffman
-  // compression:
-  //
-  //   byte 0:       0100 0000
-  //   name length:  7-bit prefix integer (H bit = 0)
-  //   name bytes:   raw ASCII (lowercased)
-  //   value length: 7-bit prefix integer (H bit = 0)
-  //   value bytes:  raw bytes
-  //
-  // This is suboptimal (a real encoder would prefer indexed forms) but is
-  // unambiguously parseable by any compliant HPACK decoder.
+  // The dispatch loop emits response HEADERS and trailing HEADERS blocks via
+  // the full HPACK encoder in `Suave.Hpack`. Earlier versions of this file
+  // carried a minimal "Literal Header Field with Incremental Indexing — New
+  // Name" stop-gap because the full encoder had bugs in the response path
+  // (`encodeString` mis-computed the Huffman length prefix, `useHuffman` was
+  // a hard-coded constant, etc.). Those bugs are fixed (see the round-trip
+  // tests in `Suave.Tests/Http2.fs` exercising Naive/Static/Linear with both
+  // Huffman and literal forms) and the dispatch loop now uses the real
+  // encoder against the per-connection encoder dynamic table — keeping the
+  // peer's decoder state synchronised across header blocks on the same
+  // connection.
   // ---------------------------------------------------------------------------
 
-  /// Encode a non-negative integer using HPACK's N-bit prefix integer
-  /// representation (RFC 7541 §5.1). Caller is responsible for OR-ing the
-  /// type-specific high bits onto the first byte if needed.
-  let encodeHpackInteger (out: ResizeArray<byte>) (prefixBits: int) (value: int) =
-    let maxPrefix = (1 <<< prefixBits) - 1
-    if value < maxPrefix then
-      out.Add(byte value)
-    else
-      out.Add(byte maxPrefix)
-      let mutable remaining = value - maxPrefix
-      while remaining >= 128 do
-        out.Add(byte ((remaining &&& 0x7f) ||| 0x80))
-        remaining <- remaining >>> 7
-      out.Add(byte remaining)
+  /// Estimate a safe upper bound for the encoded byte length of `headers`.
+  /// HPACK's worst case for a Linear-without-Huffman encoding of a single
+  /// (name,value) pair is `1` (type byte) + `5` (length prefix for name) +
+  /// `name` + `5` (length prefix for value) + `value` bytes; we round up to
+  /// `name + value + 32` per header (matching `headerSizeMagicNumber`) and
+  /// double that to leave headroom for any table-size-update prefix the
+  /// encoder may emit on the first call.
+  let estimateHpackBufferSize (headers: (string * string) list) : int =
+    let raw =
+      headers
+      |> List.sumBy (fun (n, v) -> n.Length + v.Length + headerSizeMagicNumber)
+    max 256 (raw * 2)
 
-  /// Encode a single (name, value) pair as a Literal Header Field with
-  /// Incremental Indexing using a new name, no Huffman compression. The
-  /// encoded form is appended to `out`.
-  ///
-  /// We use the "with incremental indexing" form (0x40 prefix) rather than
-  /// "without indexing" (0x00 prefix) because the in-tree HPACK decoder
-  /// does not implement the without-indexing form yet, while standard
-  /// decoders (curl/nghttp2, python `hpack`, h2spec) handle both forms.
-  /// "Incremental indexing" causes the peer's dynamic table to grow, but
-  /// HPACK's built-in eviction keeps that bounded.
-  let encodeHpackLiteralHeader (out: ResizeArray<byte>) (name: string) (value: string) =
-    // Literal Header Field with Incremental Indexing, New Name: leading byte
-    // 0100 0000 (RFC 7541 §6.2.1).
-    out.Add(0x40uy)
-    // Name: lowercase per HTTP/2 wire convention (RFC 7540 §8.1.2).
-    let nameBytes = System.Text.Encoding.ASCII.GetBytes(name.ToLowerInvariant())
-    encodeHpackInteger out 7 nameBytes.Length
-    out.AddRange(nameBytes)
-    // Value: raw UTF-8 bytes.
-    let valueBytes = System.Text.Encoding.UTF8.GetBytes(value)
-    encodeHpackInteger out 7 valueBytes.Length
-    out.AddRange(valueBytes)
-
-  /// Encode a list of (name, value) headers as a single HPACK header block.
-  /// See the comment block above for the precise format.
-  let encodeHpackHeaderBlock (headers: (string * string) list) : byte[] =
-    let out = ResizeArray<byte>(64)
-    for (n, v) in headers do
-      encodeHpackLiteralHeader out n v
-    out.ToArray()
+  /// Encode a list of (name, value) headers as a single HPACK header block
+  /// using the per-connection encoder dynamic table. Uses `defaultEncodeStrategy`
+  /// (Linear algorithm, no Huffman) which yields output that any compliant
+  /// HPACK decoder — including the in-tree `Hpack.decodeHeader` — can parse.
+  let encodeHpackHeaderBlock (dyntbl: DynamicTable) (headers: (string * string) list) : byte[] =
+    let size = estimateHpackBufferSize headers
+    Hpack.encodeHeader defaultEncodeStrategy size dyntbl headers
 
   // ---------------------------------------------------------------------------
   // Trailers (RFC 7540 §8.1, RFC 9113 §8.1)
@@ -1256,10 +1222,10 @@ module Http2 =
       // 1. HEADERS frame with the response pseudo-header and regular headers.
       let responseHeaderList =
         (":status", response.status.code.ToString()) :: response.headers
-      // Use our minimal literal-no-indexing encoder; the in-tree Hpack
-      // encoder still has unresolved bugs in the response path (see the
-      // module comment on `encodeHpackHeaderBlock`).
-      let headersBlock = encodeHpackHeaderBlock responseHeaderList
+      // Encode with the full HPACK encoder against the per-connection encoder
+      // dynamic table (RFC 7541). `defaultEncodeStrategy` selects Linear/no-
+      // Huffman, which is unambiguously parseable by every compliant decoder.
+      let headersBlock = encodeHpackHeaderBlock x.encodeDynamicTable responseHeaderList
 
       // Body bytes (empty for NullContent / non-Bytes content).
       let bodyBytes =
@@ -1309,7 +1275,7 @@ module Http2 =
       if hasTrailers then
         match Trailers.validate trailers with
         | Ok () ->
-          let trailerBlock = encodeHpackHeaderBlock trailers
+          let trailerBlock = encodeHpackHeaderBlock x.encodeDynamicTable trailers
           let flags = setEndStream (setEndHeader 0uy)
           do! x.writeFrameSerialized(
                 { flags = flags; streamIdentifier = streamId; padding = None },

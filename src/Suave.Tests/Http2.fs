@@ -574,41 +574,47 @@ let flowControlTests (_ : SuaveConfig) =
 let dispatchLoopHelperTests (_ : SuaveConfig) =
   testList "Http2 dispatch loop helpers" [
 
-    testCase "encodeHpackHeaderBlock round-trips through a compliant decoder" <| fun _ ->
-      // RFC 7541 §6.2.2: Literal Header Field without Indexing — New Name,
-      // no Huffman. The output is parseable by `Hpack.decodeHeader`.
+    testCase "encodeHpackHeaderBlock round-trips through the in-tree decoder" <| fun _ ->
+      // The dispatch loop hands header lists to the full HPACK encoder in
+      // `Suave.Hpack` via a per-connection encoder dynamic table. The output
+      // must be parseable by a peer decoder; we round-trip it through the
+      // in-tree decoder here to guard against future encoder regressions.
+      let encTbl = newDynamicTableForEncoding 4096
       let encoded =
-        Http2.encodeHpackHeaderBlock [
-          ":status", "200"
-          "content-type", "text/plain"
-          "content-length", "5" ]
+        Http2.encodeHpackHeaderBlock encTbl
+          [ ":status", "200"
+            "content-type", "text/plain"
+            "content-length", "5" ]
       let dt = newDynamicTableForDecoding 4096 4096
       let decoded = Hpack.decodeHeader dt encoded
       Expect.equal decoded
         [ ":status", "200"
           "content-type", "text/plain"
           "content-length", "5" ]
-        "literal-no-index header block round-trips"
+        "HPACK header block round-trips"
 
-    testCase "encodeHpackInteger encodes small values in one byte" <| fun _ ->
-      let buf = ResizeArray<byte>()
-      Http2.encodeHpackInteger buf 7 10
-      Expect.equal (buf.ToArray()) [| 10uy |] "single-byte small int"
+    testCase "encodeHpackHeaderBlock preserves header order across calls on the same encoder table" <| fun _ ->
+      // HPACK is stateful: a second call on the same encoder dynamic table may
+      // emit indexed references to entries inserted by the first call. The
+      // peer's decoder, sharing state, must still decode the same headers.
+      let encTbl = newDynamicTableForEncoding 4096
+      let decTbl = newDynamicTableForDecoding 4096 4096
+      let first  = Http2.encodeHpackHeaderBlock encTbl [ ":status", "200"; "content-type", "text/plain" ]
+      let second = Http2.encodeHpackHeaderBlock encTbl [ ":status", "200"; "content-type", "text/plain" ]
+      Expect.equal (Hpack.decodeHeader decTbl first)
+                   [ ":status", "200"; "content-type", "text/plain" ]
+                   "first block decodes"
+      Expect.equal (Hpack.decodeHeader decTbl second)
+                   [ ":status", "200"; "content-type", "text/plain" ]
+                   "second block decodes with shared dynamic-table state"
 
-    testCase "encodeHpackInteger encodes 127 in two bytes (prefix overflow)" <| fun _ ->
-      // RFC 7541 §5.1 example: 127 with a 7-bit prefix needs the
-      // continuation form.
-      let buf = ResizeArray<byte>()
-      Http2.encodeHpackInteger buf 7 127
-      // 0x7f then varint of (127 - 127) = 0
-      Expect.equal (buf.ToArray()) [| 0x7fuy; 0uy |] "two-byte overflow form"
-
-    testCase "encodeHpackHeaderBlock encodes header names lowercase" <| fun _ ->
+    testCase "encodeHpackHeaderBlock lowercases header names on the wire" <| fun _ ->
       // HTTP/2 (RFC 7540 §8.1.2) requires lowercase field names on the wire.
-      let encoded =
-        Http2.encodeHpackHeaderBlock [ "Content-Type", "text/plain" ]
-      let dt = newDynamicTableForDecoding 4096 4096
-      match Hpack.decodeHeader dt encoded with
+      // `Hpack.toToken` lowercases names before they reach the encoder.
+      let encTbl = newDynamicTableForEncoding 4096
+      let encoded = Http2.encodeHpackHeaderBlock encTbl [ "Content-Type", "text/plain" ]
+      let decTbl = newDynamicTableForDecoding 4096 4096
+      match Hpack.decodeHeader decTbl encoded with
       | [ name, _ ] -> Expect.equal name "content-type" "name was lowercased"
       | other -> failtestf "expected single header, got %A" other
 
