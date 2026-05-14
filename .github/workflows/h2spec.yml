@@ -4,10 +4,7 @@
 # workflow boots `examples/H2SpecHost` on an ephemeral loopback port and runs
 # the generic + http2 + hpack suites against it.
 #
-# NOTE: this workflow is currently marked `continue-on-error: true`. The full
-# HTTP/2 read/dispatch loop is not yet wired into Suave; the fixture only
-# exercises the h2c upgrade machinery + connection preface. Once the
-# dispatch loop lands this becomes a hard gate (drop `continue-on-error`).
+
 name: h2spec conformance
 
 on:
@@ -22,7 +19,6 @@ permissions:
 jobs:
   h2spec:
     runs-on: ubuntu-latest
-    # Soft gate: the underlying server is incomplete. See the note above.
     continue-on-error: true
 
     env:
