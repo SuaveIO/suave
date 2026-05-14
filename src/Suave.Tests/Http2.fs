@@ -1320,17 +1320,20 @@ let frameValidationTests (_ : SuaveConfig) =
     testCase "PRIORITY on stream 0 is a connection PROTOCOL_ERROR" <| fun _ ->
       let h = hdr 2uy 0uy 0 5
       Expect.equal (validateFrame h h.length maxFrame noIdle)
-                   (FvConnError ProtocolError) ""
+                   (FvConnError ProtocolError)
+                   "RFC 7540 §6.3: PRIORITY on stream 0 → PROTOCOL_ERROR"
 
     testCase "PRIORITY with length != 5 is a stream FRAME_SIZE_ERROR" <| fun _ ->
       let h = hdr 2uy 0uy 7 6
       Expect.equal (validateFrame h h.length maxFrame noIdle)
-                   (FvStreamError (7, FrameSizeError)) ""
+                   (FvStreamError (7, FrameSizeError))
+                   "RFC 7540 §6.3: PRIORITY length != 5 → stream FRAME_SIZE_ERROR"
 
     testCase "RST_STREAM on stream 0 is a connection PROTOCOL_ERROR" <| fun _ ->
       let h = hdr 3uy 0uy 0 4
       Expect.equal (validateFrame h h.length maxFrame noIdle)
-                   (FvConnError ProtocolError) ""
+                   (FvConnError ProtocolError)
+                   "RFC 7540 §6.4: RST_STREAM on stream 0 → PROTOCOL_ERROR"
 
     testCase "RST_STREAM on an idle stream is a connection PROTOCOL_ERROR" <| fun _ ->
       let h = hdr 3uy 0uy 5 4
@@ -1341,51 +1344,61 @@ let frameValidationTests (_ : SuaveConfig) =
     testCase "RST_STREAM with length != 4 is a connection FRAME_SIZE_ERROR" <| fun _ ->
       let h = hdr 3uy 0uy 1 5
       Expect.equal (validateFrame h h.length maxFrame noIdle)
-                   (FvConnError FrameSizeError) ""
+                   (FvConnError FrameSizeError)
+                   "RFC 7540 §6.4: RST_STREAM length != 4 → FRAME_SIZE_ERROR"
 
     testCase "SETTINGS on non-zero stream is a connection PROTOCOL_ERROR" <| fun _ ->
       let h = hdr 4uy 0uy 1 0
       Expect.equal (validateFrame h h.length maxFrame noIdle)
-                   (FvConnError ProtocolError) ""
+                   (FvConnError ProtocolError)
+                   "RFC 7540 §6.5: SETTINGS on non-zero stream → PROTOCOL_ERROR"
 
     testCase "SETTINGS ACK with payload is a FRAME_SIZE_ERROR" <| fun _ ->
       let h = hdr 4uy 0x1uy 0 6
       Expect.equal (validateFrame h h.length maxFrame noIdle)
-                   (FvConnError FrameSizeError) ""
+                   (FvConnError FrameSizeError)
+                   "RFC 7540 §6.5: SETTINGS ACK with payload → FRAME_SIZE_ERROR"
 
     testCase "SETTINGS payload not a multiple of 6 is a FRAME_SIZE_ERROR" <| fun _ ->
       let h = hdr 4uy 0uy 0 7
       Expect.equal (validateFrame h h.length maxFrame noIdle)
-                   (FvConnError FrameSizeError) ""
+                   (FvConnError FrameSizeError)
+                   "RFC 7540 §6.5: SETTINGS length not multiple of 6 → FRAME_SIZE_ERROR"
 
     testCase "PUSH_PROMISE from client is a connection PROTOCOL_ERROR" <| fun _ ->
       let h = hdr 5uy 0uy 1 12
       Expect.equal (validateFrame h h.length maxFrame noIdle)
-                   (FvConnError ProtocolError) ""
+                   (FvConnError ProtocolError)
+                   "RFC 7540 §8.2: client PUSH_PROMISE → PROTOCOL_ERROR"
 
     testCase "PING with length != 8 is a connection FRAME_SIZE_ERROR" <| fun _ ->
       let h = hdr 6uy 0uy 0 6
       Expect.equal (validateFrame h h.length maxFrame noIdle)
-                   (FvConnError FrameSizeError) ""
+                   (FvConnError FrameSizeError)
+                   "RFC 7540 §6.7: PING length != 8 → FRAME_SIZE_ERROR"
 
     testCase "PING with non-zero stream is a connection PROTOCOL_ERROR" <| fun _ ->
       let h = hdr 6uy 0uy 1 8
       Expect.equal (validateFrame h h.length maxFrame noIdle)
-                   (FvConnError ProtocolError) ""
+                   (FvConnError ProtocolError)
+                   "RFC 7540 §6.7: PING on non-zero stream → PROTOCOL_ERROR"
 
     testCase "WINDOW_UPDATE with length != 4 is a FRAME_SIZE_ERROR" <| fun _ ->
       let h = hdr 8uy 0uy 0 3
       Expect.equal (validateFrame h h.length maxFrame noIdle)
-                   (FvConnError FrameSizeError) ""
+                   (FvConnError FrameSizeError)
+                   "RFC 7540 §6.9: WINDOW_UPDATE length != 4 → FRAME_SIZE_ERROR"
 
     testCase "DATA on stream 0 is a connection PROTOCOL_ERROR" <| fun _ ->
       let h = hdr 0uy 0uy 0 4
       Expect.equal (validateFrame h h.length maxFrame noIdle)
-                   (FvConnError ProtocolError) ""
+                   (FvConnError ProtocolError)
+                   "RFC 7540 §6.1: DATA on stream 0 → PROTOCOL_ERROR"
 
     testCase "valid HEADERS is accepted" <| fun _ ->
       let h = hdr 1uy 0x4uy 1 8
-      Expect.equal (validateFrame h h.length maxFrame noIdle) FvAccept ""
+      Expect.equal (validateFrame h h.length maxFrame noIdle) FvAccept
+                   "well-formed HEADERS frame should be accepted"
 
     // Build a 6-byte SETTINGS entry (id, value) in network byte order.
     let entry (id: int) (value: uint32) =
@@ -1394,22 +1407,27 @@ let frameValidationTests (_ : SuaveConfig) =
          byte (value >>> 8); byte value |]
 
     testCase "validateSettingsValues: ENABLE_PUSH = 0 is OK" <| fun _ ->
-      Expect.equal (validateSettingsValues (entry 2 0u)) (Ok ()) ""
+      Expect.equal (validateSettingsValues (entry 2 0u)) (Ok ())
+                   "ENABLE_PUSH = 0 should be valid"
 
     testCase "validateSettingsValues: ENABLE_PUSH = 1 is OK" <| fun _ ->
-      Expect.equal (validateSettingsValues (entry 2 1u)) (Ok ()) ""
+      Expect.equal (validateSettingsValues (entry 2 1u)) (Ok ())
+                   "ENABLE_PUSH = 1 should be valid"
 
     testCase "validateSettingsValues: ENABLE_PUSH = 2 is PROTOCOL_ERROR" <| fun _ ->
       Expect.equal (validateSettingsValues (entry 2 2u))
-                   (Result.Error ProtocolError) ""
+                   (Result.Error ProtocolError)
+                   "RFC 7540 §6.5.2: ENABLE_PUSH > 1 → PROTOCOL_ERROR"
 
     testCase "validateSettingsValues: MAX_FRAME_SIZE < 2^14 is PROTOCOL_ERROR" <| fun _ ->
       Expect.equal (validateSettingsValues (entry 5 1u))
-                   (Result.Error ProtocolError) ""
+                   (Result.Error ProtocolError)
+                   "RFC 7540 §6.5.2: MAX_FRAME_SIZE < 2^14 → PROTOCOL_ERROR"
 
     testCase "validateSettingsValues: MAX_FRAME_SIZE > 2^24-1 is PROTOCOL_ERROR" <| fun _ ->
       Expect.equal (validateSettingsValues (entry 5 16777216u))
-                   (Result.Error ProtocolError) ""
+                   (Result.Error ProtocolError)
+                   "RFC 7540 §6.5.2: MAX_FRAME_SIZE > 2^24-1 → PROTOCOL_ERROR"
 
     testCase "validateSettingsValues: MAX_FRAME_SIZE at boundaries is OK" <| fun _ ->
       Expect.equal (validateSettingsValues (entry 5 16384u)) (Ok ()) "lower bound"
@@ -1417,9 +1435,11 @@ let frameValidationTests (_ : SuaveConfig) =
 
     testCase "validateSettingsValues: INITIAL_WINDOW_SIZE > 2^31-1 is FLOW_CONTROL_ERROR" <| fun _ ->
       Expect.equal (validateSettingsValues (entry 4 2147483648u))
-                   (Result.Error FlowControlError) ""
+                   (Result.Error FlowControlError)
+                   "RFC 7540 §6.5.2: INITIAL_WINDOW_SIZE > 2^31-1 → FLOW_CONTROL_ERROR"
 
     testCase "validateSettingsValues: unknown identifiers are ignored" <| fun _ ->
       // RFC 7540 §6.5.2: unknown identifiers MUST be ignored.
-      Expect.equal (validateSettingsValues (entry 0xFF 12345u)) (Ok ()) ""
+      Expect.equal (validateSettingsValues (entry 0xFF 12345u)) (Ok ())
+                   "RFC 7540 §6.5.2: unknown setting identifiers should be ignored"
   ]

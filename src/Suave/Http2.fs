@@ -1707,6 +1707,26 @@ module Http2 =
     member x.get() =
       procQueue.AsyncGet()
 
+    /// Best-effort emit of a connection-level GOAWAY with the given error
+    /// code prior to aborting the socket. Used by the preface mismatch
+    /// paths (`start` / `startPriorKnowledge`) where we have a transport
+    /// but no `Http2Connection` write mutex yet. Any failure writing the
+    /// frame is intentionally swallowed: the socket may already be half-
+    /// dead, and we still want the abort to propagate.
+    member private x.bestEffortGoAway (errorCode: ErrorCode) : SocketOp<unit> =
+      ValueTask<Result<unit, Error>>(
+        task {
+          try
+            let encInfo =
+              { flags = 0uy; streamIdentifier = 0; padding = None }
+            let! _ =
+              (writeFrame encInfo
+                 (GoAway(0, errorCode, [||]))
+                 facade.Connection.transport).AsTask()
+            return Ok ()
+          with _ -> return Ok ()
+        })
+
     /// Run the HTTP/2 connection-preface exchange (RFC 7540 §3.5):
     ///   * read the 24-byte client preface ("PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n")
     ///   * send our own (potentially empty) SETTINGS frame as the server
@@ -1722,22 +1742,8 @@ module Http2 =
            || not (System.Linq.Enumerable.SequenceEqual(prefaceBytes, expected)) then
           // RFC 7540 §3.5: emit a connection-level GOAWAY(PROTOCOL_ERROR)
           // before closing the socket so the peer sees a clean error
-          // disposition rather than a bare FIN. Errors from the GOAWAY
-          // write itself are intentionally swallowed — the socket may
-          // already be half-dead.
-          let goAwayEncInfo =
-            { flags = 0uy; streamIdentifier = 0; padding = None }
-          let! _ =
-            ValueTask<Result<unit, Error>>(
-              task {
-                try
-                  let! _ =
-                    (writeFrame goAwayEncInfo
-                       (GoAway(0, ProtocolError, [||]))
-                       facade.Connection.transport).AsTask()
-                  return Ok ()
-                with _ -> return Ok ()
-              })
+          // disposition rather than a bare FIN.
+          do! x.bestEffortGoAway ProtocolError
           return! SocketOp.abort (InputDataError (None, "Invalid HTTP/2 connection preface"))
         else
           let encInfo = { flags = 0uy; streamIdentifier = 0; padding = None }
@@ -1888,19 +1894,7 @@ module Http2 =
            || not (System.Linq.Enumerable.SequenceEqual(tail, expected)) then
           // RFC 7540 §3.5: send GOAWAY(PROTOCOL_ERROR) before closing on
           // a malformed preface; see `start` for the same handling.
-          let goAwayEncInfo =
-            { flags = 0uy; streamIdentifier = 0; padding = None }
-          let! _ =
-            ValueTask<Result<unit, Error>>(
-              task {
-                try
-                  let! _ =
-                    (writeFrame goAwayEncInfo
-                       (GoAway(0, ProtocolError, [||]))
-                       facade.Connection.transport).AsTask()
-                  return Ok ()
-                with _ -> return Ok ()
-              })
+          do! x.bestEffortGoAway ProtocolError
           return! SocketOp.abort (InputDataError (None, "Invalid HTTP/2 connection preface"))
         else
           let encInfo = { flags = 0uy; streamIdentifier = 0; padding = None }
