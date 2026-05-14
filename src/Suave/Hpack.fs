@@ -409,8 +409,15 @@ if I < 2^N - 1, encode I on N bits
   type Setter = byte -> byte
 
   let encodeInteger (wbuf : MemoryStream) (set : Setter) (n: int) (i: int) =
-    let p = powerArray.[n]
-    if n < (int p) then
+    // RFC 7541 §5.1 — N-bit prefix integer encoding. The "all-ones" sentinel
+    // for an N-bit prefix is 2^N - 1, which lives at `powerArray.[n - 1]`
+    // (powerArray is offset by one: powerArray.[k] = 2^(k+1) - 1). The
+    // overflow predicate compares the VALUE (`i`) to the sentinel — earlier
+    // code compared the bit width (`n`) which always took the short branch
+    // and corrupted any index that did not fit in the prefix (e.g. static-
+    // table index 28 = `content-length` under a 4-bit prefix).
+    let p = powerArray.[n - 1]
+    if i < (int p) then
       wbuf.WriteByte (set (byte i))
     else
       wbuf.WriteByte (set  p)
