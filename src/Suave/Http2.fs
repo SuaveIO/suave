@@ -1434,24 +1434,24 @@ module Http2 =
       //    replenishes one of them. (RFC 7540 §6.9.)
       if bodyHasData then
         let maxFrameSize = max 1 peerSettings.maxFrameSize
-        // Locate the per-stream send window (created in
-        // `dispatchStream` -> ultimately `newStreamData`). If the stream
-        // is gone (e.g. peer-side RST_STREAM) we abort the body emit.
-        let streamWindowOpt =
-          match streams.TryGetValue streamId with
-          | true, s -> Some s.outboundWindow
-          | _ -> None
         let mutable offset = 0
         let mutable aborted = false
         while offset < bodyBytes.Length && not aborted do
-          match streamWindowOpt with
-          | None ->
+          // Re-resolve the per-stream send window on each iteration so a
+          // mid-body RST_STREAM (which removes the stream from the table)
+          // is detected promptly rather than continuing against a stale
+          // reference.
+          match streams.TryGetValue streamId with
+          | false, _ ->
             // Stream was closed under us — stop emitting silently.
             aborted <- true
-          | Some streamWindow ->
-            // Wait for both windows to be positive. Capture the current
-            // signal BEFORE inspecting window state to avoid a missed-
-            // wakeup race with the WindowUpdate handler.
+          | true, streamData ->
+            let streamWindow = streamData.outboundWindow
+            // Capture the current signal BEFORE inspecting window state to
+            // avoid a missed-wakeup race with the WindowUpdate handler.
+            // If the signal fires after we capture and before we await, the
+            // task is already completed and the await returns immediately;
+            // we then re-loop and re-check the windows.
             let waiter = windowSignal
             let available =
               min connectionOutboundWindow.available streamWindow.available
