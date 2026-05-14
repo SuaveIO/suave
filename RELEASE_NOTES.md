@@ -1,3 +1,6 @@
+## New in v3.4.0-beta (Released 2026-05-14)
+* Full HTTP/2 support.
+
 ## New in v3.3.1 (Released 2026-05-06)
 * Multiple listening sockets / SO_REUSEPORT support on Linux/BSD.
 * Several performance optimizations.
