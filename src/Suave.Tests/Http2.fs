@@ -739,6 +739,38 @@ let dispatchLoopHelperTests (_ : SuaveConfig) =
       | Result.Error ProtocolError -> ()
       | other -> failtestf "expected ProtocolError, got %A" other
 
+    testCase "extractRequestPseudoHeaders rejects uppercase header field names (RFC 7540 §8.1.2)" <| fun _ ->
+      // h2spec http2/8.1.2/1: any uppercase ASCII in a header field name is
+      // malformed and MUST be treated as a stream PROTOCOL_ERROR.
+      let headers =
+        [ ":method", "GET"
+          ":scheme", "http"
+          ":path", "/"
+          "X-Test", "1" ]
+      match Http2.extractRequestPseudoHeaders headers with
+      | Result.Error ProtocolError -> ()
+      | other -> failtestf "expected ProtocolError, got %A" other
+
+    testCase "extractRequestPseudoHeaders rejects a single uppercase letter anywhere" <| fun _ ->
+      let headers =
+        [ ":method", "GET"
+          ":scheme", "http"
+          ":path", "/"
+          "contenT-type", "text/plain" ]
+      match Http2.extractRequestPseudoHeaders headers with
+      | Result.Error ProtocolError -> ()
+      | other -> failtestf "expected ProtocolError, got %A" other
+
+    testCase "extractRequestPseudoHeaders rejects an empty :path (RFC 7540 §8.1.2.3)" <| fun _ ->
+      // h2spec http2/8.1.2.3/1: ":path" MUST NOT be empty for HTTP/HTTPS.
+      let headers =
+        [ ":method", "GET"
+          ":scheme", "http"
+          ":path", "" ]
+      match Http2.extractRequestPseudoHeaders headers with
+      | Result.Error ProtocolError -> ()
+      | other -> failtestf "expected ProtocolError, got %A" other
+
     testCase "newStreamData starts in Idle with configured windows" <| fun _ ->
       let s = Http2.newStreamData 12345 65535
       Expect.equal s.state StreamState.Idle "state Idle"
