@@ -58,7 +58,7 @@
           <div class="feature-card">
             <div class="feature-icon">⚡</div>
             <h3>High Performance</h3>
-            <p>65-75% fewer allocations per request with modern .NET optimizations. Built for throughput and low latency.</p>
+            <p>Async, non-blocking I/O with low-allocation hot paths. Built for throughput and steady latency under load.</p>
           </div>
           <div class="feature-card">
             <div class="feature-icon">🔒</div>
@@ -79,6 +79,11 @@
             <div class="feature-icon">📦</div>
             <h3>Production Ready</h3>
             <p>HTTPS/TLS support, keep-alive connections, HTTP compression, rate limiting, and comprehensive logging built-in.</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">🚀</div>
+            <h3>HTTP/2 Built-in</h3>
+            <p>Multiplexed binary framing with HPACK, server push and ALPN — automatic, zero-config, same <code>WebPart</code> for HTTP/1.1 and HTTP/2.</p>
           </div>
           <div class="feature-card">
             <div class="feature-icon">🌍</div>
@@ -102,30 +107,6 @@ startWebServer defaultConfig app</code></pre>
         </div>
         <p>That's it! Your web server is running on <code>http://localhost:8080</code>.</p>
         <p><a href="/docs/getting-started.html">→ Read the getting started guide</a></p>
-      </section>
-
-      <!-- Performance Showcase -->
-      <section>
-        <h2>Performance Optimizations</h2>
-        <p>Suave has undergone comprehensive performance optimization using modern .NET best practices:</p>
-        <div class="features">
-          <div class="feature-card">
-            <div class="feature-icon">📉</div>
-            <h3>65-75% Fewer Allocations</h3>
-            <p>ArrayPool integration, encoder caching, Span&lt;T&gt; parsing, and pre-computed constants eliminate GC pressure.</p>
-          </div>
-          <div class="feature-card">
-            <div class="feature-icon">🚀</div>
-            <h3>40-70% Higher Throughput</h3>
-            <p>Optimized hot paths with ref-to-mutable conversions and zero-allocation integer formatting.</p>
-          </div>
-          <div class="feature-card">
-            <div class="feature-icon">⏱️</div>
-            <h3>35-55% Lower P99 Latency</h3>
-            <p>Reduced GC pauses through systematic allocation elimination. Smooth, predictable performance under load.</p>
-          </div>
-        </div>
-        <p><a href="/docs/performance.html">→ See detailed performance analysis</a></p>
       </section>
 
       <!-- Use Cases -->

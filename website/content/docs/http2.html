@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Suave HTTP/2 - Multiplexed, binary HTTP framing with server push, HPACK, flow control and prioritization">
+  <title>HTTP/2 - Suave</title>
+  <link rel="shortcut icon" href="/images/favicon.ico" type="image/x-icon">
+  <link rel="icon" href="/images/favicon-32x32.png" sizes="32x32" type="image/png">
+  <link rel="icon" href="/images/favicon-96x96.png" sizes="96x96" type="image/png">
+  <link rel="apple-touch-icon" href="/images/apple-touch-icon-57x57.png" sizes="57x57">
+  <link rel="apple-touch-icon" href="/images/apple-touch-icon-114x114.png" sizes="114x114">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header>
+    <div class="container">
+      <nav>
+        <div class="logo">
+          <img src="/images/head_600_trans.png" alt="Suave Logo" width="40" height="40" style="vertical-align: middle; margin-right: 12px; background: white; padding: 2px; border-radius: 4px;">
+          Suave
+        </div>
+        <button id="hamburger" class="hamburger" aria-label="Toggle menu">
+          <span></span><span></span><span></span>
+        </button>
+        <ul id="nav-links" class="nav-links">
+          <li><a href="/">Home</a></li>
+          <li><a href="/docs/">Documentation</a></li>
+          <li><a href="/docs/performance.html">Performance</a></li>
+          <li><a href="https://github.com/SuaveIO/suave" target="_blank">GitHub</a></li>
+          <li><a href="https://www.nuget.org/packages/Suave/" target="_blank">NuGet</a></li>
+          <li><button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme">🌙</button></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <div class="container">
+      <h1>HTTP/2</h1>
+      <p>
+        Suave ships with an in-tree HTTP/2 implementation (<code>Suave.Http2</code>) that
+        speaks the binary framing layer, HPACK header compression, stream multiplexing,
+        flow control, prioritization, server push and trailers as defined in
+        <a href="https://www.rfc-editor.org/rfc/rfc7540" target="_blank">RFC&nbsp;7540</a>
+        / <a href="https://www.rfc-editor.org/rfc/rfc9113" target="_blank">RFC&nbsp;9113</a>.
+      </p>
+
+      <p>
+        The same <code>WebPart</code> serves both HTTP/1.1 and HTTP/2 clients. Suave
+        picks the protocol automatically from the connection:
+      </p>
+      <ul>
+        <li><strong>TLS / ALPN</strong> &mdash; the server advertises <code>h2</code> and
+            <code>http/1.1</code> in ALPN; the negotiated protocol decides framing.</li>
+        <li><strong>h2c upgrade</strong> &mdash; an HTTP/1.1 client that sends
+            <code>Upgrade: h2c</code> with an <code>HTTP2-Settings</code> header is
+            switched after a <code>101 Switching Protocols</code> response.</li>
+        <li><strong>h2c prior knowledge</strong> &mdash; a client that opens the
+            connection with the HTTP/2 preface
+            (<code>PRI&nbsp;*&nbsp;HTTP/2.0\r\n\r\nSM\r\n\r\n</code>) is picked up
+            immediately, no HTTP/1.1 negotiation required.</li>
+      </ul>
+
+      <h2>Zero-config setup</h2>
+      <p>
+        HTTP/2 support is wired in at TCP-listener startup. No additional configuration
+        is required: any web application that runs on Suave can be reached over HTTP/2.
+        Plain HTTPS bindings get ALPN negotiation for free; plain HTTP bindings accept
+        both h2c upgrade and h2c prior-knowledge clients.
+      </p>
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.Filters
+open Suave.Operators
+open Suave.Successful
+
+let app =
+  choose [
+    GET >=> path "/" >=> OK "hello over HTTP/2 (or 1.1)"
+  ]
+
+[&lt;EntryPoint&gt;]
+let main _ =
+  startWebServer defaultConfig app
+  0</code></pre>
+      </div>
+      <p>Test the same server over both protocols:</p>
+      <div class="code-block">
+        <pre><code># HTTP/1.1
+curl -v http://localhost:8080/
+
+# h2c prior knowledge
+curl --http2-prior-knowledge -v http://localhost:8080/
+
+# h2c upgrade
+curl --http2 -v http://localhost:8080/</code></pre>
+      </div>
+
+      <h2>HTTP/2 over TLS (ALPN)</h2>
+      <p>
+        Browsers only speak HTTP/2 over TLS. Suave's TLS transport advertises
+        <code>h2</code> and <code>http/1.1</code> via ALPN, and the negotiated value
+        drives framing. Bind a certificate and you are done:
+      </p>
+      <div class="code-block">
+        <pre><code>open System.Net
+open System.Security.Cryptography.X509Certificates
+open Suave
+
+let cert : X509Certificate2 = (* load your certificate here *)
+
+let cfg =
+  { defaultConfig with
+      bindings =
+        [ HttpBinding.create HTTP         IPAddress.Loopback 8080us
+          HttpBinding.create (HTTPS cert) IPAddress.Loopback 8443us ] }
+
+startWebServer cfg app</code></pre>
+      </div>
+      <p>
+        Verify the negotiated protocol in any HTTP/2 client (Chrome / Firefox DevTools
+        &rarr; Network &rarr; Protocol column, or <code>curl -v</code>):
+      </p>
+      <div class="code-block">
+        <pre><code>curl -k --http2 -v https://localhost:8443/
+nghttp -nv https://localhost:8443/
+h2load -n 100 -c 1 -m 10 https://localhost:8443/</code></pre>
+      </div>
+
+      <h2>Server Push</h2>
+      <p>
+        Use <code>Suave.Http2.Push.push</code> to record a push intent on the response.
+        On an HTTP/2 connection the writer emits a <code>PUSH_PROMISE</code> on the
+        parent stream and delivers the synthesised response. On an HTTP/1.1 connection
+        the push intents are silently ignored, so the same handler works for both.
+      </p>
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.Filters
+open Suave.Operators
+open Suave.Successful
+open Suave.Writers
+
+let indexHtml = """&lt;!doctype html&gt;
+&lt;link rel="stylesheet" href="/style.css"&gt;
+&lt;script src="/app.js" defer&gt;&lt;/script&gt;
+&lt;h1&gt;Hello HTTP/2&lt;/h1&gt;"""
+
+let index : WebPart =
+  Http2.Push.push "/style.css" [ "accept", "text/css" ]
+  &gt;=&gt; Http2.Push.push "/app.js"   [ "accept", "application/javascript" ]
+  &gt;=&gt; setMimeType "text/html; charset=utf-8"
+  &gt;=&gt; OK indexHtml
+
+let app =
+  choose [
+    GET &gt;=&gt; choose [
+      path "/"          &gt;=&gt; index
+      path "/style.css" &gt;=&gt; setMimeType "text/css"
+                        &gt;=&gt; OK "body { font-family: system-ui; }"
+      path "/app.js"    &gt;=&gt; setMimeType "application/javascript"
+                        &gt;=&gt; OK "console.log('hydrated')"
+    ]
+  ]</code></pre>
+      </div>
+      <p>
+        Pushing respects the peer's <code>SETTINGS_ENABLE_PUSH</code> and
+        <code>SETTINGS_MAX_CONCURRENT_STREAMS</code>. Repeated calls to
+        <code>push</code> append &mdash; identical paths are not deduplicated.
+      </p>
+
+      <h2>Trailers</h2>
+      <p>
+        Trailers are headers that follow the body. They are emitted as a trailing
+        <code>HEADERS</code> block with <code>END_STREAM</code> set. Suave validates
+        each trailer against RFC&nbsp;7540 §8.1.2 (no pseudo-headers, no
+        connection-specific fields, only <code>te: trailers</code> for <code>TE</code>);
+        a violation is reported as a stream-level <code>PROTOCOL_ERROR</code>.
+      </p>
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.Filters
+open Suave.Operators
+open Suave.Successful
+
+let withTrailers : WebPart =
+  Http2.Trailers.set "x-request-duration-ms" "12"
+  &gt;=&gt; Http2.Trailers.set "x-cache" "MISS"
+  &gt;=&gt; OK "body delivered before trailers"
+
+// Read trailers sent by the client (RFC 7230 message trailers carried over h2):
+let echoTrailers : WebPart =
+  fun ctx -&gt;
+    let received = Http2.Trailers.getRequest ctx
+    let body =
+      received
+      |&gt; List.map (fun (n, v) -&gt; sprintf "%s: %s" n v)
+      |&gt; String.concat "\n"
+    OK body ctx
+
+let app =
+  choose [
+    GET  &gt;=&gt; path "/with-trailers" &gt;=&gt; withTrailers
+    POST &gt;=&gt; path "/echo-trailers" &gt;=&gt; echoTrailers
+  ]</code></pre>
+      </div>
+
+      <h2>Settings &amp; flow control</h2>
+      <p>
+        Suave exchanges a <code>SETTINGS</code> frame on connection start. The defaults
+        match RFC&nbsp;7540 (header table 4096, initial window 65535, max frame size
+        16384, push enabled). The peer's settings drive flow control end-to-end:
+        responses larger than the initial window block until the client issues
+        <code>WINDOW_UPDATE</code> frames.
+      </p>
+      <p>
+        The <code>Suave.Http2</code> module exposes the settings record and helpers
+        (<code>defaultSetting</code>, <code>setInitialWindowSize</code>,
+        <code>setMaxFrameSize</code>, <code>setMaxConcurrentStreams</code>, &hellip;)
+        for tests, tools and advanced wiring. They are not normally needed in a
+        web application.
+      </p>
+
+      <h2>What you observe on the wire</h2>
+      <p>The runnable <a href="https://github.com/SuaveIO/suave/tree/master/examples/Http2Demo" target="_blank"><code>Http2Demo</code> example</a> exercises every feature in one place:</p>
+      <table>
+        <thead>
+          <tr><th>Feature</th><th>How to observe it</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Multiplexing</strong></td>
+            <td>A page that references many sub-resources is fetched on one TCP
+                connection with concurrent streams (<code>nghttp -nv</code> shows
+                interleaved <code>HEADERS</code> / <code>DATA</code> frames).</td>
+          </tr>
+          <tr>
+            <td><strong>HPACK</strong></td>
+            <td>Repeated headers (<code>content-type</code>, <code>server</code>,
+                <code>date</code>) compress to one or two bytes after warm-up.</td>
+          </tr>
+          <tr>
+            <td><strong>Prioritization</strong></td>
+            <td>A slow handler does not block fast handlers &mdash; frame ordering is
+                driven by stream readiness, not request arrival.</td>
+          </tr>
+          <tr>
+            <td><strong>Flow control</strong></td>
+            <td>A response larger than 64 KiB triggers <code>WINDOW_UPDATE</code>
+                frames from the client.</td>
+          </tr>
+          <tr>
+            <td><strong>Server push</strong></td>
+            <td><code>PUSH_PROMISE</code> frames precede the synthesised pushed
+                responses on the parent stream.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>Running the demo</h2>
+      <div class="code-block">
+        <pre><code>dotnet run --project examples/Http2Demo/Http2Demo.fsproj -- \
+  --http-port 8080 --https-port 8443
+
+# h2c (clear text)
+curl --http2-prior-knowledge -v http://127.0.0.1:8080/
+nghttp -nv http://127.0.0.1:8080/
+
+# TLS + ALPN (self-signed cert, regenerated each start)
+curl -k --http2 -v https://127.0.0.1:8443/
+h2load -n 100 -c 1 -m 10 https://127.0.0.1:8443/tile/1</code></pre>
+      </div>
+
+      <h2>Notes &amp; caveats</h2>
+      <ul>
+        <li>Browsers refuse to speak HTTP/2 over plain TCP &mdash; use TLS (or a
+            terminating proxy) to exercise the protocol from a browser.</li>
+        <li>HTTP/2 server push has been disabled in major browsers; it is still
+            useful for non-browser clients and for h2spec conformance.</li>
+        <li><code>WebSocket</code> handshakes still require HTTP/1.1
+            (RFC&nbsp;8441 extended <code>CONNECT</code> is not currently supported).
+            Suave continues to serve WebSocket endpoints over HTTP/1.1 on the same
+            port without any extra configuration.</li>
+        <li>The HTTP/2 implementation is verified against
+            <a href="https://github.com/summerwind/h2spec" target="_blank">h2spec</a>;
+            the <code>H2SpecHost</code> example under <code>examples/</code> is the
+            fixture used by the test suite.</li>
+      </ul>
+
+      <h2>Further reading</h2>
+      <ul>
+        <li><a href="https://www.rfc-editor.org/rfc/rfc9113" target="_blank">RFC&nbsp;9113 &mdash; HTTP/2</a> (current spec, obsoletes RFC&nbsp;7540)</li>
+        <li><a href="https://www.rfc-editor.org/rfc/rfc7541" target="_blank">RFC&nbsp;7541 &mdash; HPACK header compression</a></li>
+        <li><a href="https://github.com/SuaveIO/suave/blob/master/src/Suave/Http2.fs" target="_blank">Source: <code>src/Suave/Http2.fs</code></a></li>
+        <li><a href="https://github.com/SuaveIO/suave/tree/master/examples/Http2Demo" target="_blank">Example: <code>examples/Http2Demo</code></a></li>
+      </ul>
+    </div>
+  </main>
+
+  <footer>
+    <div class="container">
+      <div class="footer-links">
+        <a href="/docs/">Documentation</a>
+        <a href="https://github.com/SuaveIO/suave" target="_blank">GitHub</a>
+        <a href="https://www.nuget.org/packages/Suave/" target="_blank">NuGet</a>
+        <a href="https://x.com/SuaveIO" target="_blank">X</a>
+        <a href="https://github.com/SuaveIO/suave/blob/master/LICENSE" target="_blank">License</a>
+      </div>
+      <p>&copy; 2025 Suave. Open source, MIT licensed.</p>
+      <p>Suave is a project created and maintained by Ademar Gonzalez.</p>
+    </div>
+  </footer>
+
+  <script src="/js/main.js"></script>
+</body>
+</html>

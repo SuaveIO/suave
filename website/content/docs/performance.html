@@ -41,283 +41,189 @@
   <!-- Main content -->
   <main>
     <div class="container">
-      <h1>Performance Optimizations</h1>
-      <p>Suave has undergone comprehensive performance optimization using modern .NET best practices. This document details the optimizations and their impact.</p>
+      <h1>Performance</h1>
+      <p>
+        Suave is a non-blocking async web server. The hot paths have been
+        incrementally tuned with modern .NET techniques &mdash; pooled buffers,
+        cached encoders, span-based parsing &mdash; so that a steady request
+        load translates into steady throughput and predictable latency rather
+        than GC pressure.
+      </p>
+      <p>
+        This page is a tour of the techniques in use and a pointer to the
+        in-tree benchmark harness you can run yourself. It is intentionally
+        free of headline percentages: hardware, workload and .NET version
+        dominate any such number, and you should always measure on the
+        configuration you care about.
+      </p>
 
-      <h2 id="overview">Overview</h2>
-      <p>Through systematic optimization across 6+ phases, Suave achieves:</p>
+      <h2 id="design">Design choices that matter</h2>
       <ul>
-        <li><strong>65-75% fewer allocations per request</strong> - From 60-80 down to 13-23 allocations</li>
-        <li><strong>40-70% higher throughput</strong> - Significant improvements in requests/second under load</li>
-        <li><strong>35-55% lower P99 latency</strong> - More predictable performance with fewer GC pauses</li>
-        <li><strong>55-65% less GC pressure</strong> - Dramatically reduced garbage collection frequency</li>
+        <li><strong>Async I/O end to end.</strong> Connection accept, read,
+            write and handler dispatch all run on the .NET thread pool with no
+            blocking calls in the request path.</li>
+        <li><strong>Pooled buffers.</strong> Per-connection read/write buffers
+            are rented from <code>ArrayPool&lt;byte&gt;</code> and returned on
+            close, so steady-state traffic creates almost no LOH pressure.</li>
+        <li><strong>Cached encoders &amp; pre-computed constants.</strong>
+            Common status lines, header names and the once-per-second HTTP
+            date are formatted once and reused.</li>
+        <li><strong>Span-based parsing.</strong> Request lines, header
+            fields and query strings are inspected as
+            <code>ReadOnlySpan&lt;char&gt;</code> / <code>ReadOnlySpan&lt;byte&gt;</code>,
+            avoiding intermediate <code>string[]</code> allocations from
+            <code>Split</code>.</li>
+        <li><strong>Mutable locals in hot loops.</strong> Tight inner loops
+            use <code>let mutable</code> rather than heap-allocated
+            <code>ref</code> cells.</li>
+        <li><strong>HPACK in HTTP/2.</strong> Header compression turns
+            repeated <code>content-type</code> / <code>server</code> /
+            <code>date</code> headers into one or two bytes per stream
+            after the first request &mdash; see the
+            <a href="http2.html">HTTP/2 docs</a>.</li>
       </ul>
 
-      <h2 id="techniques">Optimization Techniques</h2>
+      <h2 id="techniques">Techniques in your own code</h2>
+      <p>If you want to keep your handlers in the same low-allocation territory:</p>
 
-      <h3 id="arraypool">ArrayPool Integration</h3>
-      <p>Reusable byte array buffers eliminate allocation overhead:</p>
-      <table>
-        <tr>
-          <th>Operation</th>
-          <th>Before</th>
-          <th>After</th>
-          <th>Savings</th>
-        </tr>
-        <tr>
-          <td>Large string encoding</td>
-          <td>2-3 allocations</td>
-          <td>0-1 allocations</td>
-          <td>66%</td>
-        </tr>
-        <tr>
-          <td>Stream buffer per request</td>
-          <td>1 allocation</td>
-          <td>0 allocations</td>
-          <td>100%</td>
-        </tr>
-      </table>
-
-      <h3 id="encoding-cache">UTF8 Encoder Caching</h3>
-      <p>Cache encoder instances instead of creating new ones per operation:</p>
+      <h3>Rent large buffers from the pool</h3>
       <div class="code-block">
-        <pre><code>// Before: Creates encoder on every call
-let str = Encoding.UTF8.GetString(bytes)
+        <pre><code>open System.Buffers
 
-// After: Uses cached encoder
-let str = Globals.UTF8.GetString(bytes)</code></pre>
-      </div>
-      <p><strong>Impact:</strong> 11-14 allocations eliminated per request</p>
-
-      <h3 id="span-parsing">Span&lt;T&gt; Zero-Allocation Parsing</h3>
-      <p>Parse URLs and query strings without intermediate allocations:</p>
-      <div class="code-block">
-        <pre><code>// Before: Creates arrays from Split()
-let parts = line.Split(' ')
-
-// After: Uses ReadOnlySpan for character inspection
-let span = line.AsSpan()
-// ... manual iteration with no allocations</code></pre>
-      </div>
-      <p><strong>Impact:</strong> 5-10 allocations saved per request</p>
-
-      <h3 id="pre-computed">Pre-computed Constants</h3>
-      <p>Cache frequently used byte arrays and strings:</p>
-      <ul>
-        <li><strong>Status codes:</strong> Pre-compute 13 common HTTP status codes (covers 95% of responses)</li>
-        <li><strong>Header names:</strong> Pre-compute 10 most common headers</li>
-        <li><strong>HTTP dates:</strong> Cache refreshed once per second</li>
-      </ul>
-      <p><strong>Impact:</strong> 2-3 allocations per response eliminated</p>
-
-      <h3 id="ref-mutable">Ref-to-Mutable Conversions</h3>
-      <p>Replace heap-allocated ref cells with mutable bindings:</p>
-      <div class="code-block">
-        <pre><code>// Before: ref cells allocate on heap
-let flag = ref true
-while !flag do
-  flag := false
-
-// After: Mutable bindings (no allocation)
-let mutable flag = true
-while flag do
-  flag <- false</code></pre>
-      </div>
-      <p><strong>Impact:</strong> 8+ files optimized, significant reduction in hot paths</p>
-
-      <h3 id="integer-formatting">Span-Based Integer Formatting</h3>
-      <p>Format integers without string allocation:</p>
-      <div class="code-block">
-        <pre><code>// Before: String allocation
-let str = contentLength.ToString()
-let bytes = Encoding.ASCII.GetBytes(str)
-
-// After: Direct byte formatting
-let bytes = formatIntToBytes contentLength</code></pre>
-      </div>
-      <p><strong>Impact:</strong> 1 string allocation per request eliminated</p>
-
-      <h3 id="array-elimination">Array Literal Elimination</h3>
-      <p>Avoid unnecessary array allocations in response writing:</p>
-      <div class="code-block">
-        <pre><code>// Before: Creates array object
-connection.asyncWriteBufferedArrayBytes [| a; b; c |]
-
-// After: Sequential writes, no array
-do! connection.asyncWriteBufferedBytes a
-do! connection.asyncWriteBufferedBytes b
-do! connection.asyncWriteBufferedBytes c</code></pre>
-      </div>
-      <p><strong>Impact:</strong> 2 allocations per request (128 bytes) eliminated</p>
-
-      <h2 id="measurements">Measurement Results</h2>
-
-      <h3>Allocation Reduction Per Request</h3>
-      <table>
-        <tr>
-          <th>Component</th>
-          <th>Before</th>
-          <th>After</th>
-          <th>Savings</th>
-        </tr>
-        <tr>
-          <td>String Operations</td>
-          <td>10-15</td>
-          <td>3-5</td>
-          <td>7-10</td>
-        </tr>
-        <tr>
-          <td>Header Writing</td>
-          <td>5-10</td>
-          <td>0-1</td>
-          <td>5-9</td>
-        </tr>
-        <tr>
-          <td>URL Parsing</td>
-          <td>3-5</td>
-          <td>1-2</td>
-          <td>2-3</td>
-        </tr>
-        <tr>
-          <td>Date Formatting</td>
-          <td>2</td>
-          <td>0</td>
-          <td>2</td>
-        </tr>
-        <tr>
-          <td>Status Code Writing</td>
-          <td>2</td>
-          <td>0</td>
-          <td>2</td>
-        </tr>
-        <tr>
-          <td>Array Allocations</td>
-          <td>2</td>
-          <td>0</td>
-          <td>2</td>
-        </tr>
-        <tr>
-          <th>Total</th>
-          <th>24-50</th>
-          <th>4-8</th>
-          <th>16-42</th>
-        </tr>
-      </table>
-
-      <h3>GC Pressure Reduction</h3>
-      <table>
-        <tr>
-          <th>Metric</th>
-          <th>Before</th>
-          <th>After</th>
-          <th>Improvement</th>
-        </tr>
-        <tr>
-          <td>Gen0 Collections/sec (at 10K req/s)</td>
-          <td>~50</td>
-          <td>~15</td>
-          <td>-70%</td>
-        </tr>
-        <tr>
-          <td>Allocations/sec (at 10K req/s)</td>
-          <td>~700K</td>
-          <td>~200K</td>
-          <td>-71%</td>
-        </tr>
-        <tr>
-          <td>P99 Latency</td>
-          <td>Baseline</td>
-          <td>-35-55%</td>
-          <td>Much better</td>
-        </tr>
-      </table>
-
-      <h2 id="real-world">Real-World Impact</h2>
-
-      <h3>Scenario 1: REST API (10,000 req/s)</h3>
-      <ul>
-        <li><strong>Memory saved:</strong> 1.28 MB/sec in allocations</li>
-        <li><strong>Per hour:</strong> 4.6 GB</li>
-        <li><strong>GC pauses:</strong> 60-70% reduction</li>
-        <li><strong>Tail latency:</strong> Much more predictable</li>
-      </ul>
-
-      <h3>Scenario 2: Microservices (20 services × 1K req/s)</h3>
-      <ul>
-        <li><strong>Combined memory saved:</strong> 2.5 MB/sec</li>
-        <li><strong>Per day:</strong> 216 GB not allocated</li>
-        <li><strong>Infrastructure benefit:</strong> Lower resource requirements</li>
-      </ul>
-
-      <h3>Scenario 3: Long-Running Service (30 days)</h3>
-      <ul>
-        <li><strong>Total arrays eliminated:</strong> 51.8 billion</li>
-        <li><strong>Memory pressure:</strong> 6.6 TB not allocated</li>
-        <li><strong>GC impact:</strong> Dramatically reduced</li>
-      </ul>
-
-      <h2 id="best-practices">Best Practices</h2>
-
-      <h3>Use ArrayPool for Large Buffers</h3>
-      <div class="code-block">
-        <pre><code>let buffer = ArrayPool&lt;byte&gt;.Shared.Rent(size)
+let buffer = ArrayPool&lt;byte&gt;.Shared.Rent size
 try
-  // Use buffer
+  // use buffer ...
+  ()
 finally
-  ArrayPool&lt;byte&gt;.Shared.Return(buffer)</code></pre>
+  ArrayPool&lt;byte&gt;.Shared.Return buffer</code></pre>
       </div>
 
-      <h3>Cache Encoders</h3>
+      <h3>Inspect spans instead of splitting strings</h3>
       <div class="code-block">
-        <pre><code>// Use Globals.UTF8 instead of Encoding.UTF8
-let str = Globals.UTF8.GetString(bytes, 0, bytes.Length)</code></pre>
-      </div>
+        <pre><code>// Allocates a string[]:
+let parts = line.Split ' '
 
-      <h3>Avoid String Concatenation in Loops</h3>
-      <div class="code-block">
-        <pre><code>// Bad: Creates strings in loop
-for i in 1 .. count do
-  let s = str + i.ToString()
-
-// Good: Use StringBuilder or sequential writes
-do! connection.asyncWrite str
-do! connection.asyncWrite (i.ToString())</code></pre>
-      </div>
-
-      <h3>Use Span&lt;T&gt; for Parsing</h3>
-      <div class="code-block">
-        <pre><code>// Bad: Allocates array from Split()
-let parts = line.Split(' ')
-
-// Good: Use Span for zero-allocation inspection
+// Allocates nothing:
 let span = line.AsSpan()
-// ... iterate without allocating</code></pre>
+let idx  = span.IndexOf ' '
+let head = span.Slice(0, idx)
+let tail = span.Slice(idx + 1)</code></pre>
       </div>
 
-      <h2 id="benchmarking">Benchmarking Your Code</h2>
+      <h3>Stream bodies instead of concatenating</h3>
+      <div class="code-block">
+        <pre><code>// Bad: builds N intermediate strings.
+let mutable s = ""
+for i in 1 .. 1000 do s &lt;- s + line i
 
-      <p>To benchmark your own Suave applications, use BenchmarkDotNet:</p>
+// Good: write each chunk directly to the connection.
+fun ctx -&gt; async {
+  for i in 1 .. 1000 do
+    do! ctx.connection.asyncWriteBufferedBytes (line i)
+  return! Successful.no_content ctx
+}</code></pre>
+      </div>
 
+      <h3>Reuse the cached UTF-8 encoder</h3>
+      <div class="code-block">
+        <pre><code>// Suave's own hot paths read through a cached UTF-8 encoder:
+let str = Suave.Globals.UTF8.GetString(bytes, 0, bytes.Length)</code></pre>
+      </div>
+
+      <h2 id="benchmarking">Benchmarking</h2>
+      <p>
+        The repository ships two benchmark projects under <code>benchmarks/</code>:
+      </p>
+      <ul>
+        <li>
+          <a href="https://github.com/SuaveIO/suave/tree/master/benchmarks/InlineBenchmark" target="_blank"><code>benchmarks/InlineBenchmark</code></a>
+          &mdash; BenchmarkDotNet micro-benchmarks isolating specific hot-path
+          decisions (e.g. property access vs. direct fields, the cost of
+          <code>inline</code>).
+        </li>
+        <li>
+          <a href="https://github.com/SuaveIO/suave/tree/master/benchmarks/PongServer" target="_blank"><code>benchmarks/PongServer</code></a>
+          &mdash; a minimal Suave web app suitable for driving with
+          <code>wrk</code>, <code>h2load</code> or <code>bombardier</code> to
+          measure throughput and latency end to end.
+        </li>
+      </ul>
+      <p>Run the micro-benchmarks (Release configuration is required for meaningful JIT output):</p>
+      <div class="code-block">
+        <pre><code>cd benchmarks/InlineBenchmark
+dotnet run -c Release</code></pre>
+      </div>
+      <p>Drive the pong server with <code>wrk</code> for an end-to-end measurement:</p>
+      <div class="code-block">
+        <pre><code>cd benchmarks/PongServer
+dotnet run -c Release &amp;
+
+wrk -t4 -c128 -d30s http://localhost:8080/</code></pre>
+      </div>
+      <p>
+        See <a href="https://github.com/SuaveIO/suave/blob/master/BENCHMARKS_GUIDE.md" target="_blank"><code>BENCHMARKS_GUIDE.md</code></a>
+        for the methodology used in-tree, and the
+        <a href="https://github.com/SuaveIO/suave/tree/master/profile-output" target="_blank"><code>profile-output/</code></a>
+        directory for example traces (<code>cpu.nettrace</code>,
+        <code>alloc.nettrace</code>) that you can open in
+        <a href="https://www.speedscope.app/" target="_blank">speedscope</a>
+        or PerfView.
+      </p>
+
+      <h3>Microbenchmark your own handler</h3>
       <div class="code-block">
         <pre><code>open BenchmarkDotNet.Attributes
 open BenchmarkDotNet.Running
+open Suave
+open Suave.Successful
 
 [&lt;MemoryDiagnoser&gt;]
-type MyBenchmark() =
+type HandlerBench() =
+  let ctx = HttpContext.empty
+
   [&lt;Benchmark&gt;]
-  member this.MyHandler() =
-    // Your handler code here
-    Successful.OK "Result" |> async.Return</code></pre>
+  member _.OkHello() =
+    OK "hello" ctx |&gt; Async.RunSynchronously
+
+[&lt;EntryPoint&gt;]
+let main _ =
+  BenchmarkRunner.Run&lt;HandlerBench&gt;() |&gt; ignore
+  0</code></pre>
+      </div>
+      <p>
+        <a href="https://benchmarkdotnet.org/" target="_blank">BenchmarkDotNet</a>
+        will report allocations per operation alongside the timing &mdash; that
+        is the number worth optimising in a per-request handler.
+      </p>
+
+      <h2 id="profiling">Profiling a running server</h2>
+      <p>
+        For CPU and allocation profiles of a live process, use the .NET
+        diagnostic CLI tools. The <code>profile-output/</code> folder in the
+        repository was produced with this script:
+      </p>
+      <div class="code-block">
+        <pre><code># Replace &lt;pid&gt; with the Suave process id.
+dotnet-trace collect --process-id &lt;pid&gt; \
+  --profile cpu-sampling --duration 00:00:30 \
+  --output cpu.nettrace
+
+dotnet-trace collect --process-id &lt;pid&gt; \
+  --providers Microsoft-DotNETCore-SampleProfiler,Microsoft-Windows-DotNETRuntime:0x1:5 \
+  --duration 00:00:30 --output alloc.nettrace</code></pre>
+      </div>
+      <p>Convert to speedscope and inspect interactively:</p>
+      <div class="code-block">
+        <pre><code>dotnet-trace convert cpu.nettrace --format Speedscope</code></pre>
       </div>
 
-      <p><a href="https://benchmarkdotnet.org/" target="_blank">Learn more about BenchmarkDotNet</a></p>
-
-      <h2 id="resources">Further Reading</h2>
+      <h2 id="resources">Further reading</h2>
       <ul>
-        <li><a href="https://github.com/SuaveIO/suave/blob/master/PHASE1_OPTIMIZATIONS.md" target="_blank">Phase 1: Memory Management</a></li>
-        <li><a href="https://github.com/SuaveIO/suave/blob/master/PHASE2_OPTIMIZATIONS.md" target="_blank">Phase 2: Parsing Optimizations</a></li>
-        <li><a href="https://github.com/SuaveIO/suave/blob/master/OPTIMIZATION_SUMMARY.md" target="_blank">Complete Optimization Summary</a></li>
-        <li><a href="https://devblogs.microsoft.com/dotnet/performance-improvements-in-net-8/" target="_blank">.NET 8 Performance Improvements</a></li>
+        <li><a href="https://github.com/SuaveIO/suave/blob/master/BENCHMARKS_GUIDE.md" target="_blank">In-tree benchmark guide</a></li>
+        <li><a href="https://benchmarkdotnet.org/" target="_blank">BenchmarkDotNet</a> &mdash; the micro-benchmark harness used in <code>benchmarks/</code></li>
+        <li><a href="https://learn.microsoft.com/en-us/dotnet/core/diagnostics/dotnet-trace" target="_blank"><code>dotnet-trace</code></a> &mdash; production-grade profiling</li>
+        <li><a href="https://github.com/wg/wrk" target="_blank"><code>wrk</code></a> / <a href="https://nghttp2.org/documentation/h2load-howto.html" target="_blank"><code>h2load</code></a> &mdash; HTTP load generators</li>
+        <li><a href="http2.html">Suave HTTP/2</a> &mdash; multiplexing and HPACK reduce per-request overhead on the wire</li>
       </ul>
     </div>
   </main>
