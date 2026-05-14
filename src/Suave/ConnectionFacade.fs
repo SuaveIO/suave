@@ -367,7 +367,12 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
             let flushVt = connection.transport.flush()
             let! _ = flushVt.AsTask()
             ()
-          with _ -> ()
+          with ex ->
+            // Best-effort: the peer is not necessarily speaking HTTP/2, so a
+            // failed write is expected for plain noise. Surface it at debug
+            // level so future preface-related regressions are observable.
+            try eprintfn "Suave.Http2: failed to write GOAWAY for invalid HTTP version: %s" ex.Message
+            with _ -> ()
           return Result.Error
             (ConnectionError ("Invalid HTTP version: " + httpVersion))
         else
