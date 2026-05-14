@@ -104,5 +104,11 @@ type TcpTransport(listenSocket : Socket, cancellationToken:CancellationToken) =
               return Result.Error(Error.ConnectionError(ex.Message))
           })
 
+    member this.flush () : SocketOp<unit> =
+      // TCP sockets do not buffer above the kernel send queue: every byte
+      // handed to `SendAsync` is already in the OS buffer by the time the
+      // write task completes, so there is nothing for us to flush here.
+      ValueTask<Result<unit,Error>>(Ok())
+
     member this.shutdown()  =
       this.shutdown()

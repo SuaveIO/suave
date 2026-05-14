@@ -342,6 +342,43 @@ let hpackTests (_ : SuaveConfig) =
       let dec2 = newDynamicTableForDecoding 4096 4096
       Expect.throws (fun () -> Hpack.decodeHeader dec2 [| 0x80uy |] |> ignore)
                     "indexed reference with index 0 must raise a decoding error"
+
+    yield testCase "decode rejects literal header name with uppercase ASCII (RFC 7540 §8.1.2)" <| fun _ ->
+      // h2spec http2/8.1.2/1: header field names with uppercase letters
+      // MUST be treated as malformed. The HPACK decoder used to lower-case
+      // the wire name before storing it, so the uppercase characters were
+      // not observable to the HTTP/2 validation layer (extractRequestPseudoHeaders).
+      // The decoder now raises `HpackHeaderNameUppercaseException` for any
+      // literal-name path; indexed names (static/dynamic table) cannot carry
+      // uppercase by construction.
+      //
+      // Wire format: 0x40 (literal with incremental indexing, new name),
+      // 0x06 'X','-','T','e','s','t' (uppercase name), 0x01 '1' (value).
+      let bytes =
+        [| 0x40uy
+           0x06uy; byte 'X'; byte '-'; byte 'T'; byte 'e'; byte 's'; byte 't'
+           0x01uy; byte '1' |]
+      let dec = newDynamicTableForDecoding 4096 4096
+      let threwUpper =
+        try
+          Hpack.decodeHeader dec bytes |> ignore
+          false
+        with
+        | Hpack.HpackHeaderNameUppercaseException _ -> true
+        | _ -> false
+      Expect.isTrue threwUpper
+        "literal header name with uppercase ASCII must raise HpackHeaderNameUppercaseException"
+
+    yield testCase "decode accepts an all-lowercase literal header name" <| fun _ ->
+      // Companion to the uppercase test above: same wire layout but with a
+      // lowercase name should decode normally and round-trip the value.
+      let bytes =
+        [| 0x40uy
+           0x06uy; byte 'x'; byte '-'; byte 't'; byte 'e'; byte 's'; byte 't'
+           0x01uy; byte '1' |]
+      let dec = newDynamicTableForDecoding 4096 4096
+      let decoded = Hpack.decodeHeader dec bytes
+      Expect.equal decoded [ "x-test", "1" ] "lowercase literal name decodes intact"
   ]
 
 [<Tests>]
@@ -1035,6 +1072,165 @@ let h2cPriorKnowledgeIntegrationTests (_ : SuaveConfig) =
         Expect.equal buf.[6] 0uy "stream id mid-hi byte = 0"
         Expect.equal buf.[7] 0uy "stream id mid-lo byte = 0"
         Expect.equal buf.[8] 0uy "stream id low byte = 0")
+
+    testCase "server emits GOAWAY(PROTOCOL_ERROR) on a malformed HTTP/2 preface" <| fun _ ->
+      // h2spec http2/3.5/2 — when the 24-byte connection preface from the
+      // client does not match the literal value mandated by RFC 7540 §3.5,
+      // the server MUST treat it as a connection error of type
+      // PROTOCOL_ERROR. h2spec accepts either an explicit GOAWAY frame or a
+      // clean close; a bare TCP FIN with no data is reported as "unexpected
+      // EOF". This test reproduces the malformed preface scenario and
+      // asserts the server sends a GOAWAY frame on the wire before
+      // closing.
+      //
+      // Note: we send the prior-knowledge form ("PRI * HTTP/2.0\r\n…") so
+      // that the connection enters the `Http2Connection.startPriorKnowledge`
+      // path. The first 16 bytes parse as an HTTP/1.1 request line; the
+      // remaining 8 bytes are deliberately wrong ("XXXXXXXX") so the
+      // preface compare fails.
+      withHttpServer (fun port ->
+        use client = new System.Net.Sockets.TcpClient()
+        client.Connect(System.Net.IPAddress.Loopback, port)
+        let stream = client.GetStream()
+        let head = System.Text.Encoding.ASCII.GetBytes "PRI * HTTP/2.0\r\n"
+        let badTail = System.Text.Encoding.ASCII.GetBytes "XXXXXXXX"
+        stream.Write(head, 0, head.Length)
+        stream.Write(badTail, 0, badTail.Length)
+        stream.Flush()
+
+        // We expect a GOAWAY frame (type = 7, stream id = 0, payload >= 8).
+        // The server is allowed to send other connection-housekeeping
+        // frames first (e.g. its own SETTINGS preface), so scan up to a
+        // small fixed budget of frames.
+        stream.ReadTimeout <- 5000
+        let readExact n =
+          let buf : byte[] = Array.zeroCreate n
+          let mutable offset = 0
+          let mutable closed = false
+          while offset < n && not closed do
+            let r =
+              try stream.Read(buf, offset, n - offset)
+              with _ -> 0
+            if r <= 0 then closed <- true
+            else offset <- offset + r
+          if closed && offset < n then None else Some buf
+        let mutable sawGoAway = false
+        let mutable budget = 4
+        while not sawGoAway && budget > 0 do
+          budget <- budget - 1
+          match readExact 9 with
+          | None -> budget <- 0
+          | Some hdrBytes ->
+            let length =
+              (int hdrBytes.[0] <<< 16)
+              ||| (int hdrBytes.[1] <<< 8)
+              ||| (int hdrBytes.[2])
+            let ftype = hdrBytes.[3]
+            let payload =
+              if length > 0 then readExact length else Some [||]
+            if ftype = 7uy then
+              sawGoAway <- true
+              match payload with
+              | Some p ->
+                Expect.isGreaterThanOrEqual p.Length 8
+                  "GOAWAY payload must include last_stream_id and error_code"
+                let errorCode =
+                  ((uint32 p.[4]) <<< 24)
+                  ||| ((uint32 p.[5]) <<< 16)
+                  ||| ((uint32 p.[6]) <<< 8)
+                  ||| (uint32 p.[7])
+                // PROTOCOL_ERROR (RFC 7540 §7) is code 0x1.
+                Expect.equal errorCode 1u
+                  "GOAWAY error code on malformed preface must be PROTOCOL_ERROR"
+              | None -> failtest "GOAWAY payload truncated"
+            else
+              ()
+        Expect.isTrue sawGoAway
+          "server must send GOAWAY(PROTOCOL_ERROR) before closing on a malformed preface")
+
+    testCase "server emits GOAWAY(PROTOCOL_ERROR) on unknown frame in middle of header block" <| fun _ ->
+      // h2spec http2/5.5/2 — RFC 7540 §6.10: once a HEADERS frame without
+      // END_HEADERS has been sent, the only legal next frame on the
+      // connection is a CONTINUATION on the same stream. Anything else —
+      // including a frame type the server would normally discard as
+      // unknown per §4.1/§5.5 — MUST be a connection error of type
+      // PROTOCOL_ERROR. Previously the unknown-frame discard happened
+      // unconditionally in the read loop and the server hung waiting for
+      // the missing CONTINUATION until h2spec timed out.
+      withHttpServer (fun port ->
+        use client = new System.Net.Sockets.TcpClient()
+        client.Connect(System.Net.IPAddress.Loopback, port)
+        let stream = client.GetStream()
+        let preface = System.Text.Encoding.ASCII.GetBytes connectionPreface
+        let emptySettings : byte[] =
+          [| 0uy; 0uy; 0uy; 4uy; 0uy; 0uy; 0uy; 0uy; 0uy |]
+        stream.Write(preface, 0, preface.Length)
+        stream.Write(emptySettings, 0, emptySettings.Length)
+
+        // HEADERS frame on stream 1 with flags=0 (no END_HEADERS, no
+        // END_STREAM). Single-byte payload 0x82 (indexed header field for
+        // static index 2, ":method: GET") — enough to be a syntactically
+        // well-formed header fragment.
+        let headersFrame : byte[] =
+          [| 0uy; 0uy; 1uy          // length = 1
+             1uy                     // type = HEADERS
+             0uy                     // flags = 0 (no END_HEADERS)
+             0uy; 0uy; 0uy; 1uy      // stream id = 1
+             0x82uy |]               // indexed header field
+        stream.Write(headersFrame, 0, headersFrame.Length)
+
+        // Now send an unknown extension frame type (0xFF) on the same
+        // stream — illegal interleave per §6.10.
+        let unknownFrame : byte[] =
+          [| 0uy; 0uy; 0uy          // length = 0
+             0xFFuy                  // type = unknown extension
+             0uy                     // flags = 0
+             0uy; 0uy; 0uy; 1uy |]   // stream id = 1
+        stream.Write(unknownFrame, 0, unknownFrame.Length)
+        stream.Flush()
+
+        stream.ReadTimeout <- 5000
+        let readExact n =
+          let buf : byte[] = Array.zeroCreate n
+          let mutable offset = 0
+          let mutable closed = false
+          while offset < n && not closed do
+            let r =
+              try stream.Read(buf, offset, n - offset)
+              with _ -> 0
+            if r <= 0 then closed <- true
+            else offset <- offset + r
+          if closed && offset < n then None else Some buf
+        let mutable sawGoAway = false
+        let mutable budget = 8
+        while not sawGoAway && budget > 0 do
+          budget <- budget - 1
+          match readExact 9 with
+          | None -> budget <- 0
+          | Some hdrBytes ->
+            let length =
+              (int hdrBytes.[0] <<< 16)
+              ||| (int hdrBytes.[1] <<< 8)
+              ||| (int hdrBytes.[2])
+            let ftype = hdrBytes.[3]
+            let payload =
+              if length > 0 then readExact length else Some [||]
+            if ftype = 7uy then
+              sawGoAway <- true
+              match payload with
+              | Some p when p.Length >= 8 ->
+                let errorCode =
+                  ((uint32 p.[4]) <<< 24)
+                  ||| ((uint32 p.[5]) <<< 16)
+                  ||| ((uint32 p.[6]) <<< 8)
+                  ||| (uint32 p.[7])
+                Expect.equal errorCode 1u
+                  "GOAWAY error code on unknown-frame-in-header-block must be PROTOCOL_ERROR"
+              | _ -> failtest "GOAWAY payload truncated"
+            else
+              ()
+        Expect.isTrue sawGoAway
+          "server must send GOAWAY(PROTOCOL_ERROR) when an unknown frame interrupts a header block")
   ]
 
 // ---------------------------------------------------------------------------

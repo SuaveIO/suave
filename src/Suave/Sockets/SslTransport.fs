@@ -182,3 +182,24 @@ type SslTransport(listenSocket: Socket, certificate: X509Certificate, cancellati
 
     member this.shutdown() =
       this.shutdown()
+
+    member this.flush () : SocketOp<unit> =
+      let stream = lock socketLock (fun () -> this.sslStream)
+      if stream = null then
+        ValueTask<Result<unit,Error>>(Ok())
+      else
+        ValueTask<Result<unit,Error>>(
+          task {
+            try
+              do! stream.FlushAsync(cancellationToken)
+              return Ok()
+            with
+            | :? IOException as ex ->
+              return Result.Error(Error.ConnectionError($"SSL flush error: {ex.Message}"))
+            | :? SocketException as ex ->
+              return Result.Error(Error.SocketError(ex.SocketErrorCode))
+            | :? ObjectDisposedException ->
+              return Result.Error(Error.ConnectionError("SSL stream has been disposed"))
+            | ex ->
+              return Result.Error(Error.ConnectionError($"Unexpected SSL flush error: {ex.Message}"))
+          })

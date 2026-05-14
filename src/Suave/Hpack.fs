@@ -8,6 +8,16 @@ module Hpack =
 
   let defaultDynamicTableSize = 4096
 
+  /// Raised by the HPACK decoder when a literal header field name on the
+  /// wire contains an uppercase ASCII byte (0x41..0x5A). RFC 7540 §8.1.2
+  /// requires all HTTP/2 header field names to be lowercase prior to
+  /// encoding; a request that violates this MUST be treated as malformed
+  /// (a stream-level PROTOCOL_ERROR). The HPACK layer surfaces it as a
+  /// distinct exception so the HTTP/2 layer can distinguish it from a
+  /// generic compression error and respond with RST_STREAM rather than
+  /// GOAWAY(COMPRESSION_ERROR).
+  exception HpackHeaderNameUppercaseException of string
+
   type HeaderName = string
 
   type HeaderValue = string
@@ -891,7 +901,18 @@ if I < 2^N - 1, encode I on N bits
     (t,v)
 
   let insertNewName (dyntbl : DynamicTable) (rbuf:MemoryStream) =
-    let headerName = Text.Encoding.UTF8.GetString(headerStuff dyntbl rbuf)
+    let nameBytes = headerStuff dyntbl rbuf
+    // RFC 7540 §8.1.2: HTTP/2 header field names MUST be lowercase prior
+    // to encoding. Detect uppercase ASCII in the wire-form name before
+    // `toToken` folds it to lowercase, so the HTTP/2 layer can fail the
+    // stream with PROTOCOL_ERROR instead of accepting the malformed name.
+    // Indexed names (static or dynamic table) are guaranteed lowercase by
+    // construction, so the check is confined to the literal-name path.
+    for b in nameBytes do
+      if b >= 0x41uy && b <= 0x5Auy then
+        raise (HpackHeaderNameUppercaseException
+                 (Text.Encoding.UTF8.GetString nameBytes))
+    let headerName = Text.Encoding.UTF8.GetString(nameBytes)
     let t = toToken headerName
     let v = Text.Encoding.UTF8.GetString(headerStuff dyntbl rbuf)
     (t,v)
