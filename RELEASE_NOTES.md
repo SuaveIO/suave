@@ -1,3 +1,6 @@
+## New in v3.4.0 (Released 2026-05-18)
+* Full HTTP/2 support.
+
 ## New in v3.4.0-beta (Released 2026-05-14)
 * Full HTTP/2 support.
 
