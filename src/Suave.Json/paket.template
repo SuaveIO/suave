@@ -11,4 +11,4 @@ files
   bin/Release/net10.0/Suave.Json.pdb => lib/net10.0
 dependencies
   framework: net10.0
-  Suave >= LOCKEDVERSION
+  Suave  ~> 3.2
