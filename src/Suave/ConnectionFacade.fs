@@ -250,7 +250,13 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
             let target = new Span<byte>(rawForm, offset, count)
             source.CopyTo(target)
             offset <- offset + count)
-        return Ok (rawForm)
+        if offset = contentLength then
+          return Ok rawForm
+        else
+          // readPostData aborts silently on EOF / cancellation. Without this
+          // check the caller would observe a successfully-parsed request whose
+          // body is silently truncated and zero-padded.
+          return Result.Error (ConnectionError (sprintf "short read on request body: expected %d bytes, got %d" contentLength offset))
       })
 
   member val Connection = connection with get,set
