@@ -1,3 +1,6 @@
+## New in v3.4.1 (Released 2026-05-30)
+* Fix CPU spin on half-closed WebSocket (#828)
+
 ## New in v3.4.0 (Released 2026-05-18)
 * Full HTTP/2 support.
 
