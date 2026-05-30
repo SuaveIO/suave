@@ -147,7 +147,13 @@ module WebSocket =
             let target = new Span<byte>(arr,offset,count)
             source.CopyTo(target)
             offset <- offset + count)
-        return Ok(arr)
+        if offset = n then
+          return Ok arr
+        else
+          // readPostData aborts silently on EOF / cancellation; surface it as
+          // a connection error so the WebSocket reader does not interpret the
+          // zero-filled buffer as a valid frame and spin on it forever.
+          return Result.Error (ConnectionError (sprintf "short read: expected %d bytes, got %d" n offset))
       })
 
   let readBytesIntoByteSegment retrieveByteSegment (connection : Connection) (n : int) : SocketOp<ByteSegment> =
@@ -168,7 +174,10 @@ module WebSocket =
           let target = byteSegment.Span.Slice(offset,count)
           source.CopyTo(target)
           offset <- offset + count)
-        return Ok(byteSegment)
+        if offset = n then
+          return Ok byteSegment
+        else
+          return Result.Error (ConnectionError (sprintf "short read: expected %d bytes, got %d" n offset))
       })
 
   type internal Cont<'t> = 't -> unit
