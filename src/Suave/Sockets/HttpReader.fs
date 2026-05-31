@@ -585,6 +585,7 @@ type HttpReader(transport : ITransport, pipe: Pipe, cancellationToken: Threading
       let mutable abort = false
       while remaining > 0 && not abort do
         iterationCount <- iterationCount + 1
+        let remainingAtStart = remaining
         let mutable rr = Unchecked.defaultof<ReadResult>
         if not (pipe.Reader.TryRead(&rr)) then
           match! x.readMoreData() with
@@ -604,12 +605,27 @@ type HttpReader(transport : ITransport, pipe: Pipe, cancellationToken: Threading
                 select segment remaining
                 pipe.Reader.AdvanceTo(bufferSequence.GetPosition(int64 remaining))
                 remaining <- 0
-              else
+              elif segment.Length > 0 then
                 select segment segment.Length
                 pipe.Reader.AdvanceTo(bufferSequence.GetPosition(int64 segment.Length))
                 remaining <- remaining - segment.Length
+              else
+                // Pipe returned a non-empty ReadResult whose first
+                // segment is empty (possible with multi-segment
+                // ReadOnlySequence when the writer flushes a zero-byte
+                // memory block). Advance past it to expose later
+                // segments on the next iteration. Without this, the
+                // loop would re-read the same empty segment forever
+                // and pin a CPU core at 100%.
+                pipe.Reader.AdvanceTo(bufferSequence.GetPosition(1L))
             else
               abort <- true  // No data, exit loop
+        // Defence-in-depth against any other no-progress path: if an
+        // iteration neither consumed bytes nor signalled abort, bail.
+        // The caller (e.g. WebSocket.readBytes) re-checks the byte
+        // count and surfaces a ConnectionError to the protocol layer.
+        if not abort && remaining = remainingAtStart && iterationCount > bytes + 16 then
+          abort <- true
     }
 
   member this.isDirty = 
