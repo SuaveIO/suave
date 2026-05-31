@@ -1,3 +1,6 @@
+## New in v3.4.2 (Released 2026-05-31)
+* Fix CPU spin in readPostData on zero-length first pipe segment (8c2c1d6)
+
 ## New in v3.4.1 (Released 2026-05-30)
 * Fix CPU spin on half-closed WebSocket (#828)
 
