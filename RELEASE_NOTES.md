@@ -1,3 +1,6 @@
+## New in v3.4.3 (Released 2026-06-01)
+* Fix broken While implementation in the socket CE (00ab06e)
+
 ## New in v3.4.2 (Released 2026-05-31)
 * Fix CPU spin in readPostData on zero-length first pipe segment (8c2c1d6)
 
