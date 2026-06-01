@@ -47,6 +47,12 @@ let ws (webSocket : WebSocket) (context: HttpContext) =
         let emptyResponse = [||] |> ByteSegment
         do! webSocket.send Close emptyResponse true
 
+      | (Ping, data, _) ->
+        do! webSocket.send Pong data true
+
+      | (Pong, data, _) ->
+        Console.WriteLine("Received Pong with data: {0}", Encoding.UTF8.GetString data.Span)
+
         // after sending a Close message, stop the loop
         loop <- false
 

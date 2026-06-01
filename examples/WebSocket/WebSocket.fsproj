@@ -6,11 +6,14 @@
     <AssemblyName>WebSocket</AssemblyName>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="Program.fs" />
-    <ProjectReference Include="../../src/Suave/Suave.fsproj" />
+    <EmbeddedResource Remove="paket-files\**" />
   </ItemGroup>
   <ItemGroup>
-    <Folder Include="paket-files\" />
+    <Content Include="index.html">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Compile Include="Program.fs" />
+    <ProjectReference Include="../../src/Suave/Suave.fsproj" />
   </ItemGroup>
   <Import Project="..\..\.paket\Paket.Restore.targets" />
 </Project>
