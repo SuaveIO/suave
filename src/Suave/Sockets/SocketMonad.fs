@@ -10,7 +10,8 @@ type SocketMonad() =
   member this.Return(x:'a) : SocketOp<'a> = ValueTask<Result<'a,Error>>(Ok x)
   member this.Zero() : SocketOp<unit> = this.Return()
   member this.ReturnFrom(x : SocketOp<'a>) : SocketOp<'a> = x
-  member this.Delay(f: unit ->  SocketOp<'a>) = ValueTask<Result<'a,Error>>(task { return! (f ()).AsTask() })
+  member this.Delay(f: unit -> SocketOp<'a>) : unit -> SocketOp<'a> = f
+  member this.Run(f: unit -> SocketOp<'a>) : SocketOp<'a> = f()
 
   member this.Bind(x : SocketOp<'a>,f : 'a -> SocketOp<'b>) : SocketOp<'b> =
     ValueTask<Result<'b,Error>>(
@@ -20,18 +21,17 @@ type SocketMonad() =
         | Ok a -> return! (f a).AsTask()
         | Error b -> return Result.Error b
       })
- 
-  member this.Combine(v, f) =
-    this.Bind(v, fun () -> f)
 
-  // This is buggy avoid using
-  member this.While(guard, body : SocketOp<unit>) : SocketOp<unit> =
+  member this.Combine(v: SocketOp<unit>, f: unit -> SocketOp<'a>) : SocketOp<'a> =
+    this.Bind(v, fun () -> f())
+
+  member this.While(guard, body : unit -> SocketOp<unit>) : SocketOp<unit> =
     ValueTask<Result<unit,Error>>(
       task{
         let mutable error = false
         let mutable errorResult = Ok()
         while not error && guard () do
-          let! a = body.AsTask()
+          let! a = (body ()).AsTask()
           match a with
           | Ok () -> ()
           | Result.Error e as a ->
@@ -43,20 +43,20 @@ type SocketMonad() =
           return Ok()
       })
 
-  member this.TryWith(body : SocketOp<'a>, handler : exn -> SocketOp<'a>) : SocketOp<'a> =
+  member this.TryWith(body : unit -> SocketOp<'a>, handler : exn -> SocketOp<'a>) : SocketOp<'a> =
     ValueTask<Result<'a,Error>>(
       task {
         try
-          return! body.AsTask()
+          return! (body ()).AsTask()
         with e ->
           return! (handler e).AsTask()
       })
 
-  member this.TryFinally(body : SocketOp<'a>, compensation : unit -> unit) : SocketOp<'a> =
+  member this.TryFinally(body : unit -> SocketOp<'a>, compensation : unit -> unit) : SocketOp<'a> =
     ValueTask<Result<'a,Error>>(
       task {
          try
-           return! body.AsTask()
+           return! (body ()).AsTask()
          finally
            compensation()
       })
