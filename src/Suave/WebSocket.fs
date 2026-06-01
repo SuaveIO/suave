@@ -209,7 +209,7 @@ module WebSocket =
     let readSemaphore  = new SemaphoreSlim(1, 1)
 
     let runAsyncWithSemaphore (semaphore: SemaphoreSlim) asyncAction = task {
-      let! _ = semaphore.WaitAsync() |> Async.AwaitTask
+      do! semaphore.WaitAsync()
       try
         return! asyncAction
       finally
