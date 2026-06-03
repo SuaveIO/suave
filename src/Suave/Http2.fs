@@ -847,6 +847,48 @@ module Http2 =
   /// Maximum legal flow-control window size per RFC 7540 §6.9.1.
   let maxFlowControlWindow = 0x7fffffff
 
+  // ---------------------------------------------------------------------------
+  // HPACK / header-block defence-in-depth limits
+  //
+  // The HTTP/2 "header bomb" attack (https://blog.calif.io/p/codex-discovered-a-hidden-http2-bomb)
+  // abuses HPACK's amplification: a handful of bytes on the wire — repeated
+  // indexed-header references into a populated dynamic table, or unbounded
+  // CONTINUATION chains — can expand into hundreds of megabytes of allocated
+  // header strings on the server. We mitigate this with two complementary
+  // caps:
+  //
+  //   * `defaultMaxHeaderListSize`         — RFC 7541 §4.1 size of the *decoded*
+  //                                          header list. Advertised via
+  //                                          SETTINGS_MAX_HEADER_LIST_SIZE so
+  //                                          well-behaved peers stop sending
+  //                                          oversized blocks; enforced by the
+  //                                          HPACK decoder at decode time
+  //                                          (HpackHeaderListTooLargeException).
+  //   * `defaultMaxHeaderBlockReassemblyBytes` — hard cap on the *compressed*
+  //                                          cumulative size of one
+  //                                          HEADERS/CONTINUATION block. Stops
+  //                                          an attacker from making us
+  //                                          buffer-then-decode arbitrarily
+  //                                          many CONTINUATION frames.
+  //
+  // Tripping either limit results in GOAWAY(ENHANCE_YOUR_CALM); a stream-level
+  // reset is unsafe because the HPACK dynamic table may already be in a
+  // partially-mutated state by the time the cap is hit.
+  // ---------------------------------------------------------------------------
+
+  /// Default cap (in bytes, RFC 7541 §4.1 accounting) on the decoded size of
+  /// a single header list. Chosen to match Suave's HTTP/1.1 header-buffer
+  /// heuristics and the de-facto industry default (Tomcat / IIS ~32 KiB).
+  let defaultMaxHeaderListSize : int32 = 32768
+
+  /// Hard cap on the cumulative *compressed* bytes of one header block
+  /// (HEADERS + any CONTINUATION frames). HPACK can be denser than the
+  /// uncompressed form (the whole point of indexed representations) so this
+  /// is set to the decoded cap; combined with the per-block decoded check
+  /// it leaves no path for an unbounded attacker accumulation.
+  let defaultMaxHeaderBlockReassemblyBytes : int32 = defaultMaxHeaderListSize
+
+
   /// A mutable flow-control window. `available` is the number of DATA octets
   /// the holder may still send (for an outbound window) or receive (for an
   /// inbound window).
@@ -1315,7 +1357,12 @@ module Http2 =
     // ---------------------------------------------------------------------------
 
     let mutable peerSettings = defaultSetting
-    let mutable localSettings = defaultSetting
+    // `localSettings` reflects what *we* advertise to the peer. We override
+    // the RFC default for SETTINGS_MAX_HEADER_LIST_SIZE so peers know to
+    // cap their header blocks, and so the in-tree HPACK decoder has an
+    // explicit budget to enforce (defence against the HPACK bomb attack).
+    let mutable localSettings =
+      { defaultSetting with maxHeaderBlockSize = Some defaultMaxHeaderListSize }
     let streams = new Dictionary<int32, StreamData>()
     let mutable pendingReassembly : HeaderBlockReassembly option = None
     let connectionInboundWindow = newFlowControlWindow defaultSetting.initialWindowSize
@@ -1620,13 +1667,20 @@ module Http2 =
         // HPACK-decode the block. A `HpackHeaderNameUppercaseException` is
         // mapped to a stream-level PROTOCOL_ERROR (RFC 7540 §8.1.2: a request
         // containing uppercase header field names MUST be treated as
-        // malformed). Any other decode failure is a connection-level
+        // malformed). A `HpackHeaderListTooLargeException` is mapped to a
+        // connection-level ENHANCE_YOUR_CALM (the dynamic table state is
+        // partially updated when we abort decode, so the connection cannot
+        // safely continue). Any other decode failure is a connection-level
         // COMPRESSION_ERROR (RFC 7540 §4.3).
         let decoded =
-          try Ok (decodeHeader x.decodeDynamicTable fragment)
+          try Ok (decodeHeaderBounded x.decodeDynamicTable
+                                      localSettings.maxHeaderBlockSize
+                                      fragment)
           with
           | HpackHeaderNameUppercaseException _ ->
             Result.Error (true, ProtocolError)
+          | HpackHeaderListTooLargeException _ ->
+            Result.Error (false, EnhanceYourCalm)
           | _ ->
             Result.Error (false, CompressionError)
         match decoded with
@@ -1696,14 +1750,23 @@ module Http2 =
       | Some acc ->
         match payload with
         | Continuation fragment ->
-          match feedContinuation acc header fragment with
-          | NeedMore acc' ->
-            pendingReassembly <- Some acc'
-          | Complete (streamId, _, frag, endStream) ->
+          // Defence against unbounded CONTINUATION chains (HPACK bomb):
+          // refuse to buffer more compressed header bytes than the
+          // advertised cap. ENHANCE_YOUR_CALM (RFC 7540 §7) is the
+          // intended signal for "you're using too many resources".
+          if int64 acc.pending.Length + int64 fragment.Length
+             > int64 defaultMaxHeaderBlockReassemblyBytes then
             pendingReassembly <- None
-            do! x.completeHeaderBlock streamId frag endStream webPart
-          | ReassemblyAbort err ->
-            do! x.sendGoAwayAndStop err
+            do! x.sendGoAwayAndStop EnhanceYourCalm
+          else
+            match feedContinuation acc header fragment with
+            | NeedMore acc' ->
+              pendingReassembly <- Some acc'
+            | Complete (streamId, _, frag, endStream) ->
+              pendingReassembly <- None
+              do! x.completeHeaderBlock streamId frag endStream webPart
+            | ReassemblyAbort err ->
+              do! x.sendGoAwayAndStop err
         | _ ->
           do! x.sendGoAwayAndStop ProtocolError
         return ()
@@ -1717,15 +1780,20 @@ module Http2 =
           | Some p when p.streamIdentifier = header.streamIdentifier ->
             do! x.resetStream header.streamIdentifier ProtocolError
           | _ ->
-            let endStream = testEndStream header.flags
-            if testEndHeaderFlag header.flags then
-              do! x.completeHeaderBlock header.streamIdentifier fragment endStream webPart
+            // Reject an initial HEADERS fragment that already exceeds the
+            // compressed-block cap (also a HPACK-bomb mitigation).
+            if fragment.Length > defaultMaxHeaderBlockReassemblyBytes then
+              do! x.sendGoAwayAndStop EnhanceYourCalm
             else
-              pendingReassembly <-
-                Some { streamId = header.streamIdentifier
-                       isPushPromise = false
-                       pending = fragment
-                       endStream = endStream }
+              let endStream = testEndStream header.flags
+              if testEndHeaderFlag header.flags then
+                do! x.completeHeaderBlock header.streamIdentifier fragment endStream webPart
+              else
+                pendingReassembly <-
+                  Some { streamId = header.streamIdentifier
+                         isPushPromise = false
+                         pending = fragment
+                         endStream = endStream }
         | Continuation _ ->
           // Continuation outside of a header block is a PROTOCOL_ERROR.
           do! x.sendGoAwayAndStop ProtocolError
@@ -1889,7 +1957,7 @@ module Http2 =
           return! SocketOp.abort (InputDataError (None, "Invalid HTTP/2 connection preface"))
         else
           let encInfo = { flags = 0uy; streamIdentifier = 0; padding = None }
-          do! x.write (encInfo, Settings(false, defaultSetting))
+          do! x.write (encInfo, Settings(false, localSettings))
       }
 
     /// Read frames in a loop, dispatching each to `handleFrame`, until either
@@ -2051,7 +2119,7 @@ module Http2 =
           return! SocketOp.abort (InputDataError (None, "Invalid HTTP/2 connection preface"))
         else
           let encInfo = { flags = 0uy; streamIdentifier = 0; padding = None }
-          do! x.write (encInfo, Settings(false, defaultSetting))
+          do! x.write (encInfo, Settings(false, localSettings))
       }
 
     /// Top-level entry point used by the HTTP/2 prior-knowledge handler.

@@ -18,6 +18,20 @@ module Hpack =
   /// GOAWAY(COMPRESSION_ERROR).
   exception HpackHeaderNameUppercaseException of string
 
+  /// Raised by the HPACK decoder when the cumulative decoded header-list size
+  /// of a single header block exceeds the limit advertised via
+  /// SETTINGS_MAX_HEADER_LIST_SIZE (RFC 7540 §6.5.2) and computed per RFC 7541
+  /// §4.1 (`name.Length + value.Length + 32` for every entry). This is the
+  /// primary defence against the "HPACK bomb" amplification attack where a
+  /// handful of bytes on the wire (e.g. repeated indexed-header references
+  /// into a populated dynamic table) expand to many megabytes of allocated
+  /// header strings on the server. The HTTP/2 layer catches this and tears
+  /// the connection down with GOAWAY(ENHANCE_YOUR_CALM); a stream-level
+  /// reset is not safe because the dynamic table may already be in a
+  /// partially-updated state by the time the limit trips.
+  /// The carried `int` is the decoded size at the point the limit tripped.
+  exception HpackHeaderListTooLargeException of int
+
   type HeaderName = string
 
   type HeaderValue = string
@@ -976,12 +990,36 @@ if I < 2^N - 1, encode I on N bits
 
   let singleton x = Builder (prepend x)
 
-  let decodeSimple (dyntbl : DynamicTable) (rbuf : MemoryStream) : HeaderList = 
+  /// Decode a header block while enforcing the HPACK list-size budget.
+  ///
+  /// `maxListSize`:
+  ///  * `None`        — unbounded (legacy behaviour, used by some tests).
+  ///  * `Some bytes`  — abort with `HpackHeaderListTooLargeException` as soon
+  ///                    as the cumulative `name + value + 32` (per RFC 7541
+  ///                    §4.1) of every header decoded so far exceeds `bytes`.
+  ///
+  /// The check is performed *during* decoding so that an attacker cannot
+  /// force the server to fully decode (and allocate) a multi-megabyte header
+  /// list before we notice. We still pay for the headers decoded up to the
+  /// trip point; the bound chosen by the caller (typically a few tens of
+  /// kilobytes) keeps that worst case finite.
+  let decodeSimpleBounded (dyntbl : DynamicTable) (maxListSize : int option)
+                          (rbuf : MemoryStream) : HeaderList =
     let list = new List<Header>()
+    let mutable cumulative = 0
+    let check (name: string) (value: string) =
+      match maxListSize with
+      | None -> ()
+      | Some cap ->
+        // RFC 7541 §4.1: size = name.Length + value.Length + 32 (octets).
+        cumulative <- cumulative + name.Length + value.Length + headerSizeMagicNumber
+        if cumulative > cap then
+          raise (HpackHeaderListTooLargeException cumulative)
     let rec go builder =
       if rbuf.Position <> rbuf.Length then
         let w = byte(rbuf.ReadByte())
         let (token,headerValue) as tv = toTokenHeader dyntbl w rbuf
+        check (tokenFoldedKey token) headerValue
         let builder' = builder << tv
         go builder'
       else
@@ -990,5 +1028,19 @@ if I < 2^N - 1, encode I on N bits
         kvs
     go empty
 
+  // Legacy unbounded variant kept for callers (including the in-tree test
+  // suite) that don't want a size cap.
+  let decodeSimple (dyntbl : DynamicTable) (rbuf : MemoryStream) : HeaderList =
+    decodeSimpleBounded dyntbl None rbuf
+
   let decodeHeader (dyntbl : DynamicTable) (inp: byte array) : HeaderList =
     decodeHPACK dyntbl inp decodeSimple
+
+  /// Like `decodeHeader` but caps the cumulative decoded header-list size at
+  /// `maxListSize` bytes (RFC 7541 §4.1 accounting). Passing `None` is
+  /// equivalent to `decodeHeader`. Used by the HTTP/2 layer to enforce
+  /// SETTINGS_MAX_HEADER_LIST_SIZE and defend against HPACK amplification
+  /// ("HTTP/2 bomb") attacks.
+  let decodeHeaderBounded (dyntbl : DynamicTable) (maxListSize : int option)
+                          (inp: byte array) : HeaderList =
+    decodeHPACK dyntbl inp (fun dt rb -> decodeSimpleBounded dt maxListSize rb)
