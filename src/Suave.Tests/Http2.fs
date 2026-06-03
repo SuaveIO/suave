@@ -379,6 +379,48 @@ let hpackTests (_ : SuaveConfig) =
       let dec = newDynamicTableForDecoding 4096 4096
       let decoded = Hpack.decodeHeader dec bytes
       Expect.equal decoded [ "x-test", "1" ] "lowercase literal name decodes intact"
+
+    yield testCase "decodeHeaderBounded enforces the decoded list-size cap (HPACK bomb defence)" <| fun _ ->
+      // Defence against the "HTTP/2 bomb" amplification attack
+      // (https://blog.calif.io/p/codex-discovered-a-hidden-http2-bomb):
+      // a small wire payload can expand to a huge decoded header list via
+      // repeated indexed-header references. We populate the dynamic table
+      // with one entry whose value alone exceeds the budget and then send
+      // a single indexed reference to it (1 byte); the bounded decoder
+      // must abort with HpackHeaderListTooLargeException instead of
+      // returning the giant header.
+      //
+      // Wire format:
+      //   1) literal header w/ incremental indexing, new name (0x40)
+      //        name  = "x"   (length 1)
+      //        value = 200 × 'a' as a non-Huffman string (length-prefix 0x7F+73 = 0x7F,0x49)
+      //      -> dynamic table entry 62: ("x", 200×'a')
+      //   2) indexed reference 0xBE (= 0x80 | 62) — replays that entry.
+      let value = Array.create 200 (byte 'a')
+      let lit =
+        [| yield 0x40uy            // literal, incremental indexing, new name
+           yield 0x01uy             // name length = 1
+           yield byte 'x'
+           // value length 200 = 127 + 73 → 0x7F, 0x49
+           yield 0x7Fuy
+           yield 0x49uy
+           yield! value |]
+      let bytes = Array.append lit [| 0xBEuy |]
+      let dec = newDynamicTableForDecoding 4096 4096
+      // Cap is set well below 200 + name + 32 to force the trip.
+      Expect.throwsT<HpackHeaderListTooLargeException>
+        (fun () -> Hpack.decodeHeaderBounded dec (Some 64) bytes |> ignore)
+        "indexed reference into oversized dynamic-table entry must trip the bounded decoder"
+
+      // Sanity: with a comfortable cap, the same input decodes normally.
+      let dec2 = newDynamicTableForDecoding 4096 4096
+      let decoded = Hpack.decodeHeaderBounded dec2 (Some 4096) bytes
+      Expect.equal decoded.Length 2 "two headers decoded under a generous cap"
+
+      // Sanity: passing `None` is equivalent to the legacy decoder.
+      let dec3 = newDynamicTableForDecoding 4096 4096
+      let decoded' = Hpack.decodeHeaderBounded dec3 None bytes
+      Expect.equal decoded'.Length 2 "None cap matches legacy unbounded behaviour"
   ]
 
 [<Tests>]
