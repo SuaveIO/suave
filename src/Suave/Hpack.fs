@@ -990,9 +990,6 @@ if I < 2^N - 1, encode I on N bits
 
   let singleton x = Builder (prepend x)
 
-  let rec decodeSimple (dyntbl : DynamicTable) (rbuf : MemoryStream) : HeaderList = 
-    decodeSimpleBounded dyntbl None rbuf
-
   /// Decode a header block while enforcing the HPACK list-size budget.
   ///
   /// `maxListSize`:
@@ -1006,7 +1003,7 @@ if I < 2^N - 1, encode I on N bits
   /// list before we notice. We still pay for the headers decoded up to the
   /// trip point; the bound chosen by the caller (typically a few tens of
   /// kilobytes) keeps that worst case finite.
-  and decodeSimpleBounded (dyntbl : DynamicTable) (maxListSize : int option)
+  let decodeSimpleBounded (dyntbl : DynamicTable) (maxListSize : int option)
                           (rbuf : MemoryStream) : HeaderList =
     let list = new List<Header>()
     let mutable cumulative = 0
@@ -1030,6 +1027,11 @@ if I < 2^N - 1, encode I on N bits
         let kvs = List.map ( fun (t,v) -> let k = tokenFoldedKey t in (k,v)) tvs
         kvs
     go empty
+
+  // Legacy unbounded variant kept for callers (including the in-tree test
+  // suite) that don't want a size cap.
+  let decodeSimple (dyntbl : DynamicTable) (rbuf : MemoryStream) : HeaderList =
+    decodeSimpleBounded dyntbl None rbuf
 
   let decodeHeader (dyntbl : DynamicTable) (inp: byte array) : HeaderList =
     decodeHPACK dyntbl inp decodeSimple
