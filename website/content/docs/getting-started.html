@@ -183,10 +183,11 @@ let app =
       | Choice1Of2 message -> OK (sprintf "Received: %s" message)
       | Choice2Of2 _ -> OK "No message")
     
-    GET >=> OK "<form method='POST'>
-      <input name='message'>
-      <button>Send</button>
-    </form>"
+    GET >=> OK """
+      &lt;form method=&quot;POST&quot;&gt;
+        &lt;input name=&quot;message&quot;&gt;
+        &lt;button&gt;Send&lt;/button&gt;
+      &lt;/form&gt;"""
   ]
 
 startWebServer defaultConfig app</code></pre>
