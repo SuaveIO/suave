@@ -40,3 +40,4 @@ tools/dotnet-install.*
 .vscode/
 .ionide
 profile-output/
+/benchmarks/InlineBenchmark/BenchmarkDotNet.Artifacts
