@@ -1,3 +1,6 @@
+## New in v3.4.4 (Released 2026-07-13)
+* HPACK bomb defence: bound decoded header-list size and reassembly buffer (#829)
+
 ## New in v3.4.3 (Released 2026-06-01)
 * Fix broken While implementation in the socket CE (00ab06e)
 
