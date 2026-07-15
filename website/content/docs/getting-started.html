@@ -138,7 +138,6 @@ startWebServer defaultConfig app</code></pre>
         <pre><code>open System.Runtime.Serialization
 open Suave
 open Suave.Operators
-open Suave.Successful
 open Suave.Writers
 open Suave.Json
 
@@ -149,8 +148,10 @@ type Person =
 
 let person = { name = "Alice"; age = 30 }
 
+// toJson : 'T -&gt; byte[]  — use Successful.ok (bytes), not OK (string)
 let app =
-  ok (toJson person)
+  toJson person
+  |&gt; Successful.ok
   &gt;=&gt; setMimeType "application/json"
 
 startWebServer defaultConfig app</code></pre>
