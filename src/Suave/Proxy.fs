@@ -19,13 +19,40 @@ let private httpWebResponseToHttpContext (ctx : HttpContext) (response : HttpWeb
     | Choice1Of2 x -> x.status
     | _ -> HTTP_502.status
 
-  let headers =
+  let allHeaders =
     response.Headers.AllKeys
     |> Seq.map (fun k -> k, response.Headers.Get k)
     |> Seq.toList
 
+  // `HttpWebResponse.GetResponseStream()` transparently de-chunks a chunked
+  // response body. If we forward the origin's `Transfer-Encoding: chunked`
+  // header verbatim while writing the raw (already de-chunked) bytes, the
+  // client will fail to parse the body (curl: "Illegal or missing hexadecimal
+  // sequence in chunked-encoding"). Detect chunked responses and re-chunk the
+  // body on the way out, filtering the hop-by-hop `Transfer-Encoding` and any
+  // mutually-exclusive `Content-Length` header from the origin.
+  let isChunked =
+    match allHeaders ? ("Transfer-Encoding") with
+    | Some v -> v.IndexOf("chunked", StringComparison.OrdinalIgnoreCase) >= 0
+    | None -> false
+
+  let forwardedHeaders =
+    if isChunked then
+      allHeaders
+      |> List.filter (fun (k, _) ->
+          not (String.Equals(k, "Transfer-Encoding", StringComparison.OrdinalIgnoreCase))
+          && not (String.Equals(k, "Content-Length", StringComparison.OrdinalIgnoreCase)))
+    else
+      allHeaders
+
+  let headers =
+    if isChunked then
+      ("Transfer-Encoding", "chunked") :: forwardedHeaders
+    else
+      forwardedHeaders
+
   let writeContentLengthHeader (conn:Connection) = task {
-    match headers ? ("Content-Length") with
+    match allHeaders ? ("Content-Length") with
     | Some x -> do! conn.asyncWriteLn ($"Content-Length: {x}")
     | None -> ()
     }
@@ -33,11 +60,15 @@ let private httpWebResponseToHttpContext (ctx : HttpContext) (response : HttpWeb
   let content =
     SocketTask
       (fun (conn, _) -> task {
-          do! writeContentLengthHeader conn
+          if not isChunked then
+            do! writeContentLengthHeader conn
           do! conn.asyncWriteLn ""
           do! conn.flush()
           let stream = response.GetResponseStream ()
-          do! transferStream conn stream
+          if isChunked then
+            do! transferStreamChunked conn stream
+          else
+            do! transferStream conn stream
        })
 
   {
