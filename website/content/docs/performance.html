@@ -10,6 +10,9 @@
   <link rel="icon" href="/images/favicon-96x96.png" sizes="96x96" type="image/png">
   <link rel="apple-touch-icon" href="/images/apple-touch-icon-57x57.png" sizes="57x57">
   <link rel="apple-touch-icon" href="/images/apple-touch-icon-114x114.png" sizes="114x114">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,500;8..60,650;8..60,700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
@@ -17,22 +20,22 @@
   <header>
     <div class="container">
       <nav>
-        <div class="logo">
-          <img src="/images/head_600_trans.png" alt="Suave Logo" width="40" height="40" style="vertical-align: middle; margin-right: 12px; background: white; padding: 2px; border-radius: 4px;">
+        <a class="logo" href="/">
+          <img src="/images/head_600_trans.png" alt="" width="36" height="36">
           Suave
-        </div>
+        </a>
         <button id="hamburger" class="hamburger" aria-label="Toggle menu">
-          <span></span>
-          <span></span>
-          <span></span>
+          <span></span><span></span><span></span>
         </button>
         <ul id="nav-links" class="nav-links">
           <li><a href="/">Home</a></li>
-          <li><a href="/docs/">Documentation</a></li>
-          <li><a href="/docs/performance.html">Performance</a></li>
-          <li><a href="https://github.com/SuaveIO/suave" target="_blank">GitHub</a></li>
-          <li><a href="https://www.nuget.org/packages/Suave/" target="_blank">NuGet</a></li>
-          <li><button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme">🌙</button></li>
+          <li><a href="/docs/">Docs</a></li>
+          <li><a href="/docs/recipes/">Recipes</a></li>
+          <li><a href="/reference/">API</a></li>
+          <li><a href="/docs/faq.html">FAQ</a></li>
+          <li><a href="https://github.com/SuaveIO/suave" target="_blank" rel="noopener">GitHub</a></li>
+          <li><a href="https://www.nuget.org/packages/Suave/" target="_blank" rel="noopener">NuGet</a></li>
+          <li><button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme">☾</button></li>
         </ul>
       </nav>
     </div>
@@ -40,8 +43,43 @@
 
   <!-- Main content -->
   <main>
-    <div class="container">
-      <h1>Performance</h1>
+    <div class="docs-layout">
+      <aside class="docs-sidebar" aria-label="Documentation">
+        <h2>Start</h2>
+        <ul>
+          <li><a href="/docs/">Overview</a></li>
+          <li><a href="/docs/getting-started.html">Getting started</a></li>
+          <li><a href="/docs/routing.html">Routing</a></li>
+          <li><a href="/docs/request-response.html">Requests &amp; responses</a></li>
+        </ul>
+        <h2>Core</h2>
+        <ul>
+          <li><a href="/docs/router.html">Router</a></li>
+          <li><a href="/docs/binding-config.html">Bindings &amp; config</a></li>
+          <li><a href="/docs/file-handling.html">Files</a></li>
+          <li><a href="/docs/composition.html">Composition</a></li>
+          <li><a href="/docs/async-and-composition.html">Async &amp; &gt;=&gt;</a></li>
+          <li><a href="/docs/operators.html">Operators</a></li>
+          <li><a href="/docs/sessions.html">Sessions</a></li>
+          <li><a href="/docs/validation.html">Validation &amp; security</a></li>
+          <li><a href="/docs/rate-limiting.html">Rate limiting</a></li>
+          <li><a href="/docs/logging.html">Logging</a></li>
+          <li><a href="/docs/websockets.html">WebSockets</a></li>
+          <li><a href="/docs/http2.html">HTTP/2</a></li>
+          <li><a href="/docs/dotliquid.html">DotLiquid</a></li>
+          <li><a href="/docs/deployment.html">Deployment</a></li>
+          <li><a href="/docs/performance.html">Performance</a></li>
+        </ul>
+        <h2>Guides</h2>
+        <ul>
+          <li><a href="/docs/recipes/">Recipes</a></li>
+          <li><a href="/docs/faq.html">FAQ</a></li>
+          <li><a href="/docs/api.html">Module map</a></li>
+          <li><a href="/reference/">API reference</a></li>
+        </ul>
+      </aside>
+      <div class="docs-content">
+<h1>Performance</h1>
       <p>
         Suave is a non-blocking async web server. The hot paths have been
         incrementally tuned with modern .NET techniques &mdash; pooled buffers,
@@ -225,6 +263,7 @@ dotnet-trace collect --process-id &lt;pid&gt; \
         <li><a href="https://github.com/wg/wrk" target="_blank"><code>wrk</code></a> / <a href="https://nghttp2.org/documentation/h2load-howto.html" target="_blank"><code>h2load</code></a> &mdash; HTTP load generators</li>
         <li><a href="http2.html">Suave HTTP/2</a> &mdash; multiplexing and HPACK reduce per-request overhead on the wire</li>
       </ul>
+      </div>
     </div>
   </main>
 
@@ -233,13 +272,15 @@ dotnet-trace collect --process-id &lt;pid&gt; \
     <div class="container">
       <div class="footer-links">
         <a href="/docs/">Documentation</a>
-        <a href="https://github.com/SuaveIO/suave" target="_blank">GitHub</a>
-        <a href="https://www.nuget.org/packages/Suave/" target="_blank">NuGet</a>
-        <a href="https://x.com/SuaveIO" target="_blank">X</a>
-        <a href="https://github.com/SuaveIO/suave/blob/master/LICENSE" target="_blank">License</a>
+        <a href="/docs/recipes/">Recipes</a>
+        <a href="/reference/">API Reference</a>
+        <a href="/docs/faq.html">FAQ</a>
+        <a href="https://github.com/SuaveIO/suave" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://www.nuget.org/packages/Suave/" target="_blank" rel="noopener">NuGet</a>
+        <a href="https://github.com/SuaveIO/suave/blob/master/LICENSE" target="_blank" rel="noopener">License</a>
       </div>
-      <p>&copy; 2025 Suave. Open source, MIT licensed.</p>
-      <p>Suave is a project created and maintained by Ademar Gonzalez.</p>
+      <p>&copy; 2026 Suave. Open source, Apache-2.0 licensed.</p>
+      <p>Suave is created and maintained by Ademar Gonzalez.</p>
     </div>
   </footer>
 

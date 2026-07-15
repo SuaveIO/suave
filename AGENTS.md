@@ -12,6 +12,7 @@ Suave is an F# web server **library** (a small monorepo of NuGet packages: `Suav
 - Build the solution: `dotnet build Suave.sln` (or the FAKE target `dotnet run --project ./build/build.fsproj -- -t Build`). Expect ~46 warnings, 0 errors.
 - Run the test suite (same command CI uses): `dotnet run -c Release --framework net10.0 --project src/Suave.Tests -- --summary --sequenced`. Tests self-host Suave on loopback ports.
 - Run an example server (each defaults to HTTP `127.0.0.1:8080`; the `website` binds `0.0.0.0:8080` — run only one at a time): e.g. `dotnet run --project examples/RouterExample`, then hit `http://127.0.0.1:8080/`.
+- Preview the docs site: `dotnet run --project website`. Generate API reference first with `./scripts/generate-api-docs.sh` (or FAKE `-t Docs`) so `/reference/` is populated. Guides live under `website/content/docs/`; fsdocs input is `docs-api/`.
 
 ### Non-obvious caveats
 - **Do not `source .env` / run `build.sh` as-is.** `.env` sets a Mono-based `FrameworkPathOverride` (`dirname $(which mono)/...`); Mono is not installed, so this yields a bogus path. It is unnecessary for the .NET SDK build — run the underlying `dotnet` commands directly instead.

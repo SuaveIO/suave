@@ -120,4 +120,4 @@ The example demonstrates different ways to identify clients:
 
 ## Learn More
 
-See the [complete rate limiting documentation](../../docs/ratelimit.md) for more details.
+See the [complete rate limiting documentation](../../website/content/docs/rate-limiting.html) for more details.

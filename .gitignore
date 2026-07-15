@@ -41,3 +41,7 @@ tools/dotnet-install.*
 .ionide
 profile-output/
 /benchmarks/InlineBenchmark/BenchmarkDotNet.Artifacts
+
+website/content/reference/
+tmp/
+.fsdocs/

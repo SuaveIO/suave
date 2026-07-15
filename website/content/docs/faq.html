@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Frequently asked questions about Suave">
+  <title>FAQ — Suave</title>
+  <link rel="shortcut icon" href="/images/favicon.ico" type="image/x-icon">
+  <link rel="icon" href="/images/favicon-32x32.png" sizes="32x32" type="image/png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,500;8..60,650;8..60,700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<header>
+    <div class="container">
+      <nav>
+        <a class="logo" href="/">
+          <img src="/images/head_600_trans.png" alt="" width="36" height="36">
+          Suave
+        </a>
+        <button id="hamburger" class="hamburger" aria-label="Toggle menu">
+          <span></span><span></span><span></span>
+        </button>
+        <ul id="nav-links" class="nav-links">
+          <li><a href="/">Home</a></li>
+          <li><a href="/docs/">Docs</a></li>
+          <li><a href="/docs/recipes/">Recipes</a></li>
+          <li><a href="/reference/">API</a></li>
+          <li><a href="/docs/faq.html">FAQ</a></li>
+          <li><a href="https://github.com/SuaveIO/suave" target="_blank" rel="noopener">GitHub</a></li>
+          <li><a href="https://www.nuget.org/packages/Suave/" target="_blank" rel="noopener">NuGet</a></li>
+          <li><button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme">☾</button></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+  <main>
+    <div class="docs-layout">
+      <aside class="docs-sidebar" aria-label="Documentation">
+        <h2>Start</h2>
+        <ul>
+          <li><a href="/docs/">Overview</a></li>
+          <li><a href="/docs/getting-started.html">Getting started</a></li>
+          <li><a href="/docs/routing.html">Routing</a></li>
+          <li><a href="/docs/request-response.html">Requests &amp; responses</a></li>
+        </ul>
+        <h2>Core</h2>
+        <ul>
+          <li><a href="/docs/router.html">Router</a></li>
+          <li><a href="/docs/binding-config.html">Bindings &amp; config</a></li>
+          <li><a href="/docs/file-handling.html">Files</a></li>
+          <li><a href="/docs/composition.html">Composition</a></li>
+          <li><a href="/docs/async-and-composition.html">Async &amp; &gt;=&gt;</a></li>
+          <li><a href="/docs/operators.html">Operators</a></li>
+          <li><a href="/docs/sessions.html">Sessions</a></li>
+          <li><a href="/docs/validation.html">Validation &amp; security</a></li>
+          <li><a href="/docs/rate-limiting.html">Rate limiting</a></li>
+          <li><a href="/docs/logging.html">Logging</a></li>
+          <li><a href="/docs/websockets.html">WebSockets</a></li>
+          <li><a href="/docs/http2.html">HTTP/2</a></li>
+          <li><a href="/docs/dotliquid.html">DotLiquid</a></li>
+          <li><a href="/docs/deployment.html">Deployment</a></li>
+          <li><a href="/docs/performance.html">Performance</a></li>
+        </ul>
+        <h2>Guides</h2>
+        <ul>
+          <li><a href="/docs/recipes/">Recipes</a></li>
+          <li><a href="/docs/faq.html">FAQ</a></li>
+          <li><a href="/docs/api.html">Module map</a></li>
+          <li><a href="/reference/">API reference</a></li>
+        </ul>
+      </aside>
+      <div class="docs-content">
+
+        <h1>FAQ</h1>
+        <p>Common questions from Stack Overflow and the community. For copy-paste how-tos, see <a href="recipes/">Recipes</a>.</p>
+
+        <div class="faq-item">
+          <h3>Why does my WebPart always return the same value?</h3>
+          <p>WebParts are functions, but many combinators (<code>OK</code>, string interpolation of the time, etc.) capture values when the WebPart is <em>constructed</em>—often once at startup. Rebuild the response inside the request:</p>
+          <div class="code-block"><pre><code>// Wrong: time baked in once
+let bad = OK (string DateTime.UtcNow)
+
+// Right: evaluate per request
+let good : WebPart =
+  fun ctx -&gt; OK (string DateTime.UtcNow) ctx
+// or
+let good2 = context (fun _ -&gt; OK (string DateTime.UtcNow))</code></pre></div>
+        </div>
+
+        <div class="faq-item">
+          <h3>File uploads are empty — <code>request.files</code> has nothing</h3>
+          <p>The HTML form (or client) must use <code>enctype="multipart/form-data"</code>. Without it the browser posts fields as URL-encoded text and Suave will not populate file parts.</p>
+        </div>
+
+        <div class="faq-item">
+          <h3>How do <code>&gt;=&gt;</code>, <code>choose</code>, and <code>&lt;|&gt;</code> relate?</h3>
+          <p><code>&gt;=&gt;</code> runs A then B if A succeeded. <code>choose</code> tries a list until one succeeds. <code>&lt;|&gt;</code> is “try left, else right”. See <a href="async-and-composition.html">Async &amp; &gt;=&gt;</a> and <a href="operators.html">Operators</a>.</p>
+        </div>
+
+        <div class="faq-item">
+          <h3>How do I enable HTTPS?</h3>
+          <p>Load a PKCS certificate and create an HTTPS binding:</p>
+          <div class="code-block"><pre><code>open System.Security.Cryptography.X509Certificates
+
+let cert = new X509Certificate2("certificate.p12", "password")
+let https = HttpBinding.createSimple (HTTPS cert) "0.0.0.0" 8443
+let cfg = { defaultConfig with bindings = [ https ] }</code></pre></div>
+          <p>See the <a href="recipes/https.html">HTTPS recipe</a>.</p>
+        </div>
+
+        <div class="faq-item">
+          <h3>How do I redirect HTTP to HTTPS?</h3>
+          <p>Inspect <code>ctx.request.binding.scheme.secure</code> or, behind a reverse proxy, the <code>x-forwarded-proto</code> header, then <code>Redirection.redirect</code> to an <code>https://</code> URL. Recipe: <a href="recipes/https.html">HTTPS</a>.</p>
+        </div>
+
+        <div class="faq-item">
+          <h3>Can REST and WebSockets share one port?</h3>
+          <p>Yes. Put both in one <code>choose</code> tree; you do not need two <code>startWebServer</code> calls.</p>
+          <div class="code-block"><pre><code>choose [
+  path "/ws" &gt;=&gt; handShake wsHandler
+  path "/api/people" &gt;=&gt; GET &gt;=&gt; OK "..."
+]</code></pre></div>
+        </div>
+
+        <div class="faq-item">
+          <h3>How do I broadcast to all WebSocket clients?</h3>
+          <p>Suave does not ship a bus. Register sockets on connect (e.g. <code>ConcurrentDictionary</code> or a <code>MailboxProcessor</code>) and iterate when sending. See <a href="recipes/websocket-broadcast.html">broadcast recipe</a>.</p>
+        </div>
+
+        <div class="faq-item">
+          <h3><code>pathScan "/%s"</code> eats the rest of my URL</h3>
+          <p><code>pathScan</code> matches the <em>full</em> remaining path against the format. Prefer formats that include the rest of the route (<code>"/%s/customers"</code>) or nest with explicit prefixes. Recipe: <a href="recipes/nested-routes.html">Nested routes</a>.</p>
+        </div>
+
+        <div class="faq-item">
+          <h3>My app is hosted under a path prefix / behind a proxy</h3>
+          <p>Ensure your <code>path</code> / <code>pathScan</code> values match what Suave sees after the proxy. Configure forwarded headers at the reverse proxy and align bindings. See <a href="deployment.html">Deployment</a>.</p>
+        </div>
+
+        <div class="faq-item">
+          <h3>Where is the full API documentation?</h3>
+          <p>Generated reference for Suave, Suave.Json, and Suave.DotLiquid: <a href="/reference/">/reference/</a>. Module overview: <a href="api.html">Module map</a>.</p>
+        </div>
+
+      </div>
+    </div>
+  </main>
+<footer>
+    <div class="container">
+      <div class="footer-links">
+        <a href="/docs/">Documentation</a>
+        <a href="/docs/recipes/">Recipes</a>
+        <a href="/reference/">API Reference</a>
+        <a href="/docs/faq.html">FAQ</a>
+        <a href="https://github.com/SuaveIO/suave" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://www.nuget.org/packages/Suave/" target="_blank" rel="noopener">NuGet</a>
+        <a href="https://github.com/SuaveIO/suave/blob/master/LICENSE" target="_blank" rel="noopener">License</a>
+      </div>
+      <p>&copy; 2026 Suave. Open source, Apache-2.0 licensed.</p>
+      <p>Suave is created and maintained by Ademar Gonzalez.</p>
+    </div>
+  </footer>
+  <script src="/js/main.js"></script>
+</body>
+</html>

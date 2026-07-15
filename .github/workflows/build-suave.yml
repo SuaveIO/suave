@@ -1,5 +1,5 @@
 # This workflow will build a .NET project
-# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-net
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-testing-net
 
 name: Build Suave web server
 
@@ -26,3 +26,13 @@ jobs:
             10.0.102
     - name: Build
       run: ./build.sh
+    - name: Restore local tools
+      run: dotnet tool restore
+    - name: Generate API documentation
+      run: ./scripts/generate-api-docs.sh
+    - name: Upload API docs artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: suave-api-reference
+        path: website/content/reference
+        if-no-files-found: error

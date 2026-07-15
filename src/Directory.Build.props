@@ -1,0 +1,10 @@
+<Project>
+  <PropertyGroup>
+    <PackageProjectUrl>https://suave.io</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/SuaveIO/suave</RepositoryUrl>
+    <FsDocsLicenseLink>https://github.com/SuaveIO/suave/blob/master/LICENSE</FsDocsLicenseLink>
+    <FsDocsReleaseNotesLink>https://github.com/SuaveIO/suave/blob/master/RELEASE_NOTES.md</FsDocsReleaseNotesLink>
+    <FsDocsLogoSource>https://raw.githubusercontent.com/SuaveIO/resources/master/images/head_trans.png</FsDocsLogoSource>
+    <FsDocsLogoLink>https://suave.io</FsDocsLogoLink>
+  </PropertyGroup>
+</Project>

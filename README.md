@@ -34,7 +34,11 @@ startWebServer defaultConfig (Successful.OK "Hello World!")
 ```
 
 Now that you've discovered how to do "Hello World!", go read the
-[rest of the documentation](https://suave.io/) – editable in the `docs` folder.
+[documentation](https://suave.io/) — guides and recipes live in
+[`website/content`](website/content); API reference is generated with
+[FSharp.Formatting](https://fsprojects.github.io/FSharp.Formatting/) via
+`./scripts/generate-api-docs.sh` (also FAKE target `Docs`). The legacy Jekyll
+tree under [`docs/`](docs/) is historical only.
 
 # How to Build
 

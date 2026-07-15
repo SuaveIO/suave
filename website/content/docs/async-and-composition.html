@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Suave WebParts, async, and the >=> operator">
+  <title>Async and composition — Suave</title>
+  <link rel="shortcut icon" href="/images/favicon.ico" type="image/x-icon">
+  <link rel="icon" href="/images/favicon-32x32.png" sizes="32x32" type="image/png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,500;8..60,650;8..60,700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<header>
+    <div class="container">
+      <nav>
+        <a class="logo" href="/">
+          <img src="/images/head_600_trans.png" alt="" width="36" height="36">
+          Suave
+        </a>
+        <button id="hamburger" class="hamburger" aria-label="Toggle menu">
+          <span></span><span></span><span></span>
+        </button>
+        <ul id="nav-links" class="nav-links">
+          <li><a href="/">Home</a></li>
+          <li><a href="/docs/">Docs</a></li>
+          <li><a href="/docs/recipes/">Recipes</a></li>
+          <li><a href="/reference/">API</a></li>
+          <li><a href="/docs/faq.html">FAQ</a></li>
+          <li><a href="https://github.com/SuaveIO/suave" target="_blank" rel="noopener">GitHub</a></li>
+          <li><a href="https://www.nuget.org/packages/Suave/" target="_blank" rel="noopener">NuGet</a></li>
+          <li><button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme">☾</button></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+  <main>
+    <div class="docs-layout">
+      <aside class="docs-sidebar" aria-label="Documentation">
+        <h2>Start</h2>
+        <ul>
+          <li><a href="/docs/">Overview</a></li>
+          <li><a href="/docs/getting-started.html">Getting started</a></li>
+          <li><a href="/docs/routing.html">Routing</a></li>
+          <li><a href="/docs/request-response.html">Requests &amp; responses</a></li>
+        </ul>
+        <h2>Core</h2>
+        <ul>
+          <li><a href="/docs/router.html">Router</a></li>
+          <li><a href="/docs/binding-config.html">Bindings &amp; config</a></li>
+          <li><a href="/docs/file-handling.html">Files</a></li>
+          <li><a href="/docs/composition.html">Composition</a></li>
+          <li><a href="/docs/async-and-composition.html">Async &amp; &gt;=&gt;</a></li>
+          <li><a href="/docs/operators.html">Operators</a></li>
+          <li><a href="/docs/sessions.html">Sessions</a></li>
+          <li><a href="/docs/validation.html">Validation &amp; security</a></li>
+          <li><a href="/docs/rate-limiting.html">Rate limiting</a></li>
+          <li><a href="/docs/logging.html">Logging</a></li>
+          <li><a href="/docs/websockets.html">WebSockets</a></li>
+          <li><a href="/docs/http2.html">HTTP/2</a></li>
+          <li><a href="/docs/dotliquid.html">DotLiquid</a></li>
+          <li><a href="/docs/deployment.html">Deployment</a></li>
+          <li><a href="/docs/performance.html">Performance</a></li>
+        </ul>
+        <h2>Guides</h2>
+        <ul>
+          <li><a href="/docs/recipes/">Recipes</a></li>
+          <li><a href="/docs/faq.html">FAQ</a></li>
+          <li><a href="/docs/api.html">Module map</a></li>
+          <li><a href="/reference/">API reference</a></li>
+        </ul>
+      </aside>
+      <div class="docs-content">
+
+        <h1>Async WebParts and &gt;=&gt;</h1>
+        <p>Every Suave handler is a <code>WebPart</code>: a function from <code>HttpContext</code> to an async optional context.</p>
+        <div class="code-block"><pre><code>type WebPart = HttpContext -&gt; Async&lt;HttpContext option&gt;</code></pre></div>
+
+        <h2>Async computation expressions</h2>
+        <p>You can write WebParts with F# <code>async</code> workflows:</p>
+        <div class="code-block"><pre><code>open Suave
+open Suave.Successful
+
+let sleep milliseconds message : WebPart =
+  fun ctx -&gt; async {
+    do! Async.Sleep milliseconds
+    return! OK message ctx
+  }</code></pre></div>
+
+        <h2>Kleisli composition (&gt;=&gt;)</h2>
+        <p>The <code>&gt;=&gt;</code> operator chains two WebParts. If the left-hand side returns <code>None</code>, the right-hand side is never run (short-circuit). If it returns <code>Some ctx</code>, that context is passed to the next WebPart.</p>
+        <div class="code-block"><pre><code>open Suave.Filters
+open Suave.Operators
+
+let app =
+  path "/hello"
+  &gt;=&gt; GET
+  &gt;=&gt; OK "Hello"</code></pre></div>
+        <p>This is the same idea as <a href="https://fsharpforfunandprofit.com/posts/recipe-part2/" target="_blank" rel="noopener">railway-oriented programming</a>: success continues, failure stops the chain.</p>
+
+        <h2>choose</h2>
+        <p><code>choose</code> tries WebParts in order until one succeeds:</p>
+        <div class="code-block"><pre><code>let app = choose [
+  path "/a" &gt;=&gt; OK "A"
+  path "/b" &gt;=&gt; OK "B"
+  RequestErrors.NOT_FOUND "Not found"
+]</code></pre></div>
+
+        <h2>WebParts are values — evaluate per request</h2>
+        <div class="callout warn">
+          <p>A WebPart closes over values captured when it was <em>constructed</em>. If you bake in <code>DateTime.Now</code> at definition time, every request sees that same timestamp. Wrap dynamic work in a function applied to the context (or use <code>context</code> / <code>request</code> / <code>warbler</code>) so it runs per request. See the <a href="faq.html">FAQ</a>.</p>
+        </div>
+
+        <p>Next: <a href="operators.html">operators</a>, <a href="composition.html">composition</a>, or a <a href="recipes/">recipe</a>.</p>
+
+      </div>
+    </div>
+  </main>
+<footer>
+    <div class="container">
+      <div class="footer-links">
+        <a href="/docs/">Documentation</a>
+        <a href="/docs/recipes/">Recipes</a>
+        <a href="/reference/">API Reference</a>
+        <a href="/docs/faq.html">FAQ</a>
+        <a href="https://github.com/SuaveIO/suave" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://www.nuget.org/packages/Suave/" target="_blank" rel="noopener">NuGet</a>
+        <a href="https://github.com/SuaveIO/suave/blob/master/LICENSE" target="_blank" rel="noopener">License</a>
+      </div>
+      <p>&copy; 2026 Suave. Open source, Apache-2.0 licensed.</p>
+      <p>Suave is created and maintained by Ademar Gonzalez.</p>
+    </div>
+  </footer>
+  <script src="/js/main.js"></script>
+</body>
+</html>

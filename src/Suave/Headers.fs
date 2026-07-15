@@ -1,6 +1,5 @@
 namespace Suave
 
-/// Inspired by https://github.com/NancyFx/Nancy/blob/45860c82e4df8e2d380997ddf1d19d61400fb145/src/Nancy/RequestHeaders.cs
 module Headers =
   module Fields =
     module Response =

@@ -60,6 +60,15 @@ let initTargets () =
       res.Errors |> Seq.iter (eprintfn "%s")
       failwith "Tests failed."
 
+  Target.create "Docs" <| fun _ ->
+    let script = Path.GetFullPath ("scripts" </> "generate-api-docs.sh")
+    let result =
+      CreateProcess.fromRawCommand "bash" [ script ]
+      |> CreateProcess.withWorkingDirectory (Path.GetFullPath ".")
+      |> Proc.run
+    if result.ExitCode <> 0 then
+      failwithf "API docs generation failed with exit code %d" result.ExitCode
+
   Target.create "Pack" <| fun _ ->
     let pkg = Path.GetFullPath "./pkg"
     let props (project: string) (p: Paket.PaketPackParams) =
@@ -119,6 +128,9 @@ let initTargets () =
     ==> "Load"
     ==> "Pack"
     ==> "Release"
+
+  "Build"
+    ==> "Docs"
 
 [<EntryPoint>]
 let main argv =

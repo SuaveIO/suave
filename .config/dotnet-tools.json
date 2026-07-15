@@ -6,13 +6,22 @@
       "version": "10.0.0-alpha011",
       "commands": [
         "paket"
-      ]
+      ],
+      "rollForward": false
     },
     "fake-cli": {
       "version": "6.1.4",
       "commands": [
         "fake"
-      ]
+      ],
+      "rollForward": false
+    },
+    "fsdocs-tool": {
+      "version": "20.0.1",
+      "commands": [
+        "fsdocs"
+      ],
+      "rollForward": false
     }
   }
 }

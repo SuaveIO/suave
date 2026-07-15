@@ -19,4 +19,6 @@
     <None Include="content/**" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
+  <Import Project="..\.paket\Paket.Restore.targets" />
+
 </Project>

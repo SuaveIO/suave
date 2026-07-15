@@ -3,139 +3,147 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Suave Documentation - Learn how to build fast, async web applications with F#">
-  <title>Documentation - Suave</title>
+  <meta name="description" content="Suave documentation hub">
+  <title>Documentation — Suave</title>
   <link rel="shortcut icon" href="/images/favicon.ico" type="image/x-icon">
   <link rel="icon" href="/images/favicon-32x32.png" sizes="32x32" type="image/png">
-  <link rel="icon" href="/images/favicon-96x96.png" sizes="96x96" type="image/png">
-  <link rel="apple-touch-icon" href="/images/apple-touch-icon-57x57.png" sizes="57x57">
-  <link rel="apple-touch-icon" href="/images/apple-touch-icon-114x114.png" sizes="114x114">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,500;8..60,650;8..60,700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
-  <!-- Header -->
-  <header>
+<header>
     <div class="container">
       <nav>
-        <div class="logo">
-          <img src="/images/head_600_trans.png" alt="Suave Logo" width="40" height="40" style="vertical-align: middle; margin-right: 12px; background: white; padding: 2px; border-radius: 4px;">
+        <a class="logo" href="/">
+          <img src="/images/head_600_trans.png" alt="" width="36" height="36">
           Suave
-        </div>
+        </a>
         <button id="hamburger" class="hamburger" aria-label="Toggle menu">
-          <span></span>
-          <span></span>
-          <span></span>
+          <span></span><span></span><span></span>
         </button>
         <ul id="nav-links" class="nav-links">
           <li><a href="/">Home</a></li>
-          <li><a href="/docs/">Documentation</a></li>
-          <li><a href="/docs/performance.html">Performance</a></li>
-          <li><a href="https://github.com/SuaveIO/suave" target="_blank">GitHub</a></li>
-          <li><a href="https://www.nuget.org/packages/Suave/" target="_blank">NuGet</a></li>
-          <li><button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme">🌙</button></li>
+          <li><a href="/docs/">Docs</a></li>
+          <li><a href="/docs/recipes/">Recipes</a></li>
+          <li><a href="/reference/">API</a></li>
+          <li><a href="/docs/faq.html">FAQ</a></li>
+          <li><a href="https://github.com/SuaveIO/suave" target="_blank" rel="noopener">GitHub</a></li>
+          <li><a href="https://www.nuget.org/packages/Suave/" target="_blank" rel="noopener">NuGet</a></li>
+          <li><button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme">☾</button></li>
         </ul>
       </nav>
     </div>
   </header>
-
-  <!-- Main content -->
   <main>
-    <div class="container">
-      <h1>Documentation</h1>
-      <p>Learn how to build fast, type-safe web applications with Suave. Everything you need from basic routing to advanced patterns.</p>
-
-      <section>
-        <h2>Getting Started</h2>
-        <div class="features">
-          <div class="feature-card">
-            <h3>📦 <a href="getting-started.html">Getting Started</a></h3>
-            <p>Installation, your first project, and building a "Hello World" web server with Suave.</p>
-          </div>
-          <div class="feature-card">
-            <h3>🛣️ <a href="routing.html">Routing & Handlers</a></h3>
-            <p>Define URL patterns, path matching, HTTP methods, and build REST APIs with typed routes.</p>
-          </div>
-          <div class="feature-card">
-            <h3>⚙️ <a href="request-response.html">Requests & Responses</a></h3>
-            <p>Handle query strings, form data, headers, JSON bodies, and build type-safe responses.</p>
-          </div>
-        </div>
-      </section>
-
-      <section>
-        <h2>Core Features</h2>
-        <div class="features">
-          <div class="feature-card">
-            <h3>🧭 <a href="router.html">Router Module</a></h3>
-            <p>Advanced routing with path parameters, scopes, wildcards, and efficient pattern matching.</p>
-          </div>
-          <div class="feature-card">
-            <h3>🔗 <a href="binding-config.html">Bindings & Configuration</a></h3>
-            <p>Configure ports, HTTPS/TLS, server settings, and deployment options.</p>
-          </div>
-          <div class="feature-card">
-            <h3>📁 <a href="file-handling.html">File Handling & Static Files</a></h3>
-            <p>Serve static files, handle file uploads, stream large files, and manage static content.</p>
-          </div>
-          <div class="feature-card">
-            <h3>🔄 <a href="composition.html">Composition & Middleware</a></h3>
-            <p>Combine handlers, build middleware pipelines, and compose complex applications.</p>
-          </div>
-          <div class="feature-card">
-            <h3>✅ <a href="validation.html">Validation & Security</a></h3>
-            <p>Input validation, CORS, security headers, authentication, and rate limiting.</p>
-          </div>
-          <div class="feature-card">
-            <h3>🔌 <a href="websockets.html">WebSockets</a></h3>
-            <p>Real-time bidirectional communication with full WebSocket support.</p>
-          </div>
-          <div class="feature-card">
-            <h3>🚀 <a href="http2.html">HTTP/2</a></h3>
-            <p>Multiplexed binary framing with HPACK, server push, flow control and ALPN — automatic and zero-config.</p>
-          </div>
-          <div class="feature-card">
-            <h3>⚡ <a href="performance.html">Performance</a></h3>
-            <p>Optimization techniques and performance benchmarks.</p>
-          </div>
-        </div>
-      </section>
-
-      <section>
-        <h2>Community & Resources</h2>
+    <div class="docs-layout">
+      <aside class="docs-sidebar" aria-label="Documentation">
+        <h2>Start</h2>
         <ul>
-          <li><strong><a href="https://github.com/SuaveIO/suave" target="_blank">GitHub Repository</a></strong> - Source code and issue tracker</li>
-          <li><strong><a href="https://nuget.org/packages/suave" target="_blank">NuGet Package</a></strong> - Install Suave via NuGet</li>
-          <li><strong><a href="https://github.com/SuaveIO/suave/discussions" target="_blank">Discussions</a></strong> - Ask questions and share ideas</li>
-          <li><strong><a href="https://github.com/SuaveIO/suave/blob/master/CONTRIBUTING.md" target="_blank">Contributing</a></strong> - Help improve Suave</li>
+          <li><a href="/docs/">Overview</a></li>
+          <li><a href="/docs/getting-started.html">Getting started</a></li>
+          <li><a href="/docs/routing.html">Routing</a></li>
+          <li><a href="/docs/request-response.html">Requests &amp; responses</a></li>
         </ul>
-      </section>
-
-      <section>
-        <h2>Troubleshooting</h2>
+        <h2>Core</h2>
         <ul>
-          <li><strong>Port already in use?</strong> Change the port in <code>defaultConfig</code> or use a different binding.</li>
-          <li><strong>HTTPS not working?</strong> See the <a href="binding-config.html">Bindings & Configuration</a> guide.</li>
-          <li><strong>Looking for more examples?</strong> Check the <a href="https://github.com/SuaveIO/suave/tree/master/examples" target="_blank">examples folder</a> on GitHub.</li>
+          <li><a href="/docs/router.html">Router</a></li>
+          <li><a href="/docs/binding-config.html">Bindings &amp; config</a></li>
+          <li><a href="/docs/file-handling.html">Files</a></li>
+          <li><a href="/docs/composition.html">Composition</a></li>
+          <li><a href="/docs/async-and-composition.html">Async &amp; &gt;=&gt;</a></li>
+          <li><a href="/docs/operators.html">Operators</a></li>
+          <li><a href="/docs/sessions.html">Sessions</a></li>
+          <li><a href="/docs/validation.html">Validation &amp; security</a></li>
+          <li><a href="/docs/rate-limiting.html">Rate limiting</a></li>
+          <li><a href="/docs/logging.html">Logging</a></li>
+          <li><a href="/docs/websockets.html">WebSockets</a></li>
+          <li><a href="/docs/http2.html">HTTP/2</a></li>
+          <li><a href="/docs/dotliquid.html">DotLiquid</a></li>
+          <li><a href="/docs/deployment.html">Deployment</a></li>
+          <li><a href="/docs/performance.html">Performance</a></li>
         </ul>
-      </section>
+        <h2>Guides</h2>
+        <ul>
+          <li><a href="/docs/recipes/">Recipes</a></li>
+          <li><a href="/docs/faq.html">FAQ</a></li>
+          <li><a href="/docs/api.html">Module map</a></li>
+          <li><a href="/reference/">API reference</a></li>
+        </ul>
+      </aside>
+      <div class="docs-content">
+
+        <h1>Documentation</h1>
+        <p class="section-lead">Guides, recipes, and API reference for building async web apps with Suave.</p>
+
+        <section>
+          <h2>Getting started</h2>
+          <div class="features">
+            <div class="feature-card">
+              <h3><a href="getting-started.html">Getting started</a></h3>
+              <p>Install Suave and run Hello World.</p>
+            </div>
+            <div class="feature-card">
+              <h3><a href="routing.html">Routing &amp; handlers</a></h3>
+              <p>URL patterns, methods, and typed routes.</p>
+            </div>
+            <div class="feature-card">
+              <h3><a href="request-response.html">Requests &amp; responses</a></h3>
+              <p>Query strings, forms, headers, and JSON.</p>
+            </div>
+          </div>
+        </section>
+
+        <section>
+          <h2>Core</h2>
+          <div class="features">
+            <div class="feature-card"><h3><a href="router.html">Router</a></h3><p>Path parameters, scopes, and wildcards.</p></div>
+            <div class="feature-card"><h3><a href="binding-config.html">Bindings &amp; config</a></h3><p>Ports, TLS, and SuaveConfig.</p></div>
+            <div class="feature-card"><h3><a href="file-handling.html">Files</a></h3><p>Static files, uploads, and streaming.</p></div>
+            <div class="feature-card"><h3><a href="composition.html">Composition</a></h3><p>Middleware and pipelines.</p></div>
+            <div class="feature-card"><h3><a href="async-and-composition.html">Async &amp; &gt;=&gt;</a></h3><p>WebParts, Kleisli composition, short-circuiting.</p></div>
+            <div class="feature-card"><h3><a href="operators.html">Operators</a></h3><p>Reference for &gt;=&gt;, &lt;|&gt;, and helpers.</p></div>
+            <div class="feature-card"><h3><a href="sessions.html">Sessions</a></h3><p>Cookie state and server keys.</p></div>
+            <div class="feature-card"><h3><a href="validation.html">Validation &amp; security</a></h3><p>CORS, headers, auth.</p></div>
+            <div class="feature-card"><h3><a href="rate-limiting.html">Rate limiting</a></h3><p>Fixed window, sliding window, token bucket.</p></div>
+            <div class="feature-card"><h3><a href="logging.html">Logging</a></h3><p>Built-in Logger and redirection tips.</p></div>
+            <div class="feature-card"><h3><a href="websockets.html">WebSockets</a></h3><p>Realtime bidirectional messaging.</p></div>
+            <div class="feature-card"><h3><a href="http2.html">HTTP/2</a></h3><p>Automatic multiplexed HTTP/2.</p></div>
+            <div class="feature-card"><h3><a href="dotliquid.html">DotLiquid</a></h3><p>HTML templating package.</p></div>
+            <div class="feature-card"><h3><a href="deployment.html">Deployment</a></h3><p>Docker, nginx, systemd.</p></div>
+            <div class="feature-card"><h3><a href="performance.html">Performance</a></h3><p>Tuning and benchmarks.</p></div>
+          </div>
+        </section>
+
+        <section>
+          <h2>Recipes, FAQ &amp; API</h2>
+          <div class="features">
+            <div class="feature-card"><h3><a href="recipes/">Recipes</a></h3><p>Copy-paste how-tos for common tasks.</p></div>
+            <div class="feature-card"><h3><a href="faq.html">FAQ</a></h3><p>Answers to common pitfalls.</p></div>
+            <div class="feature-card"><h3><a href="api.html">Module map</a></h3><p>Overview of public modules.</p></div>
+            <div class="feature-card"><h3><a href="/reference/">API reference</a></h3><p>Generated docs for every type and member.</p></div>
+          </div>
+        </section>
+
+      </div>
     </div>
   </main>
-
-  <!-- Footer -->
-  <footer>
+<footer>
     <div class="container">
       <div class="footer-links">
         <a href="/docs/">Documentation</a>
-        <a href="https://github.com/SuaveIO/suave" target="_blank">GitHub</a>
-        <a href="https://www.nuget.org/packages/Suave/" target="_blank">NuGet</a>
-        <a href="https://x.com/SuaveIO" target="_blank">X</a>
-        <a href="https://github.com/SuaveIO/suave/blob/master/LICENSE" target="_blank">License</a>
+        <a href="/docs/recipes/">Recipes</a>
+        <a href="/reference/">API Reference</a>
+        <a href="/docs/faq.html">FAQ</a>
+        <a href="https://github.com/SuaveIO/suave" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://www.nuget.org/packages/Suave/" target="_blank" rel="noopener">NuGet</a>
+        <a href="https://github.com/SuaveIO/suave/blob/master/LICENSE" target="_blank" rel="noopener">License</a>
       </div>
-      <p>&copy; 2025 Suave. Open source, MIT licensed.</p>
-      <p>Suave is a project created and maintained by Ademar Gonzalez.</p>
+      <p>&copy; 2026 Suave. Open source, Apache-2.0 licensed.</p>
+      <p>Suave is created and maintained by Ademar Gonzalez.</p>
     </div>
   </footer>
-
   <script src="/js/main.js"></script>
 </body>
 </html>

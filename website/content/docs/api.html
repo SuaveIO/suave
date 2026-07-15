@@ -3,223 +3,129 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Suave API Reference - Complete documentation of Suave modules and functions">
-  <title>API Reference - Suave</title>
+  <meta name="description" content="Suave module map and API overview">
+  <title>Module map — Suave</title>
   <link rel="shortcut icon" href="/images/favicon.ico" type="image/x-icon">
   <link rel="icon" href="/images/favicon-32x32.png" sizes="32x32" type="image/png">
-  <link rel="icon" href="/images/favicon-96x96.png" sizes="96x96" type="image/png">
-  <link rel="apple-touch-icon" href="/images/apple-touch-icon-57x57.png" sizes="57x57">
-  <link rel="apple-touch-icon" href="/images/apple-touch-icon-114x114.png" sizes="114x114">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,500;8..60,650;8..60,700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
-  <header>
+<header>
     <div class="container">
       <nav>
-        <div class="logo">
-          <img src="/images/head_600_trans.png" alt="Suave Logo" width="40" height="40" style="vertical-align: middle; margin-right: 12px; background: white; padding: 2px; border-radius: 4px;">
+        <a class="logo" href="/">
+          <img src="/images/head_600_trans.png" alt="" width="36" height="36">
           Suave
-        </div>
+        </a>
         <button id="hamburger" class="hamburger" aria-label="Toggle menu">
           <span></span><span></span><span></span>
         </button>
         <ul id="nav-links" class="nav-links">
           <li><a href="/">Home</a></li>
-          <li><a href="/docs/">Documentation</a></li>
-          <li><a href="/docs/performance.html">Performance</a></li>
-          <li><a href="https://github.com/SuaveIO/suave" target="_blank">GitHub</a></li>
-          <li><a href="https://www.nuget.org/packages/Suave/" target="_blank">NuGet</a></li>
-          <li><button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme">🌙</button></li>
+          <li><a href="/docs/">Docs</a></li>
+          <li><a href="/docs/recipes/">Recipes</a></li>
+          <li><a href="/reference/">API</a></li>
+          <li><a href="/docs/faq.html">FAQ</a></li>
+          <li><a href="https://github.com/SuaveIO/suave" target="_blank" rel="noopener">GitHub</a></li>
+          <li><a href="https://www.nuget.org/packages/Suave/" target="_blank" rel="noopener">NuGet</a></li>
+          <li><button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme">☾</button></li>
         </ul>
       </nav>
     </div>
   </header>
-
   <main>
-    <div class="container">
-      <h1>API Reference</h1>
-      <p>Complete reference documentation for Suave's core modules and functions.</p>
+    <div class="docs-layout">
+      <aside class="docs-sidebar" aria-label="Documentation">
+        <h2>Start</h2>
+        <ul>
+          <li><a href="/docs/">Overview</a></li>
+          <li><a href="/docs/getting-started.html">Getting started</a></li>
+          <li><a href="/docs/routing.html">Routing</a></li>
+          <li><a href="/docs/request-response.html">Requests &amp; responses</a></li>
+        </ul>
+        <h2>Core</h2>
+        <ul>
+          <li><a href="/docs/router.html">Router</a></li>
+          <li><a href="/docs/binding-config.html">Bindings &amp; config</a></li>
+          <li><a href="/docs/file-handling.html">Files</a></li>
+          <li><a href="/docs/composition.html">Composition</a></li>
+          <li><a href="/docs/async-and-composition.html">Async &amp; &gt;=&gt;</a></li>
+          <li><a href="/docs/operators.html">Operators</a></li>
+          <li><a href="/docs/sessions.html">Sessions</a></li>
+          <li><a href="/docs/validation.html">Validation &amp; security</a></li>
+          <li><a href="/docs/rate-limiting.html">Rate limiting</a></li>
+          <li><a href="/docs/logging.html">Logging</a></li>
+          <li><a href="/docs/websockets.html">WebSockets</a></li>
+          <li><a href="/docs/http2.html">HTTP/2</a></li>
+          <li><a href="/docs/dotliquid.html">DotLiquid</a></li>
+          <li><a href="/docs/deployment.html">Deployment</a></li>
+          <li><a href="/docs/performance.html">Performance</a></li>
+        </ul>
+        <h2>Guides</h2>
+        <ul>
+          <li><a href="/docs/recipes/">Recipes</a></li>
+          <li><a href="/docs/faq.html">FAQ</a></li>
+          <li><a href="/docs/api.html">Module map</a></li>
+          <li><a href="/reference/">API reference</a></li>
+        </ul>
+      </aside>
+      <div class="docs-content">
 
-      <h2>Core Modules</h2>
+        <h1>Module map</h1>
+        <p>A guided index of Suave’s public surface. For every type and member, see the generated <a href="/reference/">API reference</a>.</p>
+        <table>
+          <thead><tr><th>Area</th><th>Modules / types</th><th>Start here</th></tr></thead>
+          <tbody>
+            <tr><td>Core</td><td><code>WebPart</code>, <code>HttpContext</code>, <code>HttpRequest</code>, <code>SuaveConfig</code></td><td><a href="/docs/async-and-composition.html">Async &amp; &gt;=&gt;</a></td></tr>
+            <tr><td>Routing</td><td><code>Filters</code>, <code>Router</code></td><td><a href="/docs/routing.html">Routing</a>, <a href="/docs/router.html">Router</a></td></tr>
+            <tr><td>Responses</td><td><code>Successful</code>, <code>RequestErrors</code>, <code>ServerErrors</code>, <code>Redirection</code>, <code>Writers</code></td><td><a href="/docs/request-response.html">Requests &amp; responses</a></td></tr>
+            <tr><td>Files</td><td><code>Files</code>, <code>Compression</code></td><td><a href="/docs/file-handling.html">Files</a></td></tr>
+            <tr><td>State</td><td><code>Cookie</code>, <code>State</code>, session helpers</td><td><a href="/docs/sessions.html">Sessions</a></td></tr>
+            <tr><td>Security</td><td><code>Authentication</code>, <code>RateLimit</code></td><td><a href="/docs/validation.html">Validation</a>, <a href="/docs/rate-limiting.html">Rate limiting</a></td></tr>
+            <tr><td>Realtime</td><td><code>WebSocket</code></td><td><a href="/docs/websockets.html">WebSockets</a></td></tr>
+            <tr><td>Packages</td><td><code>Suave.Json</code>, <code>Suave.DotLiquid</code></td><td><a href="/docs/dotliquid.html">DotLiquid</a>, recipes</td></tr>
+          </tbody>
+        </table>
+        <h2>Quick signatures</h2>
+        <div class="code-block"><pre><code>type WebPart = HttpContext -&gt; Async&lt;HttpContext option&gt;
 
-      <h3>Suave.Filters</h3>
-      <p>Route filtering functions:</p>
-      <div class="code-block">
-        <pre><code>// HTTP Method filters
-GET : WebPart
-POST : WebPart
-PUT : WebPart
-DELETE : WebPart
-HEAD : WebPart
-PATCH : WebPart
-OPTIONS : WebPart
+// Filters
+GET, POST, PUT, DELETE, HEAD, PATCH, OPTIONS : WebPart
+path : string -&gt; WebPart
+pathScan : PrintfFormat&lt;_,_,_,_,_'t&gt; -&gt; ('t -&gt; WebPart) -&gt; WebPart
 
-// Path filters
-path : string -> WebPart
-pathScan : string -> ('a -> WebPart) -> WebPart
-pathRegex : string -> WebPart
-pathPrefix : string -> WebPart
+// Responses
+OK : string -&gt; WebPart
+NOT_FOUND : string -&gt; WebPart
+setHeader : string -&gt; string -&gt; WebPart
+setMimeType : string -&gt; WebPart
 
-// Request filters
-method : string -> WebPart
-host : string -> WebPart
-isSecure : WebPart</code></pre>
+// Composition
+choose : WebPart list -&gt; WebPart
+(&gt;=&gt;) : WebPart -&gt; WebPart -&gt; WebPart</code></pre></div>
+        <p>Browse generated docs: <a href="/reference/">/reference/</a>.</p>
+
       </div>
-
-      <h3>Suave.Successful</h3>
-      <p>2xx success response builders:</p>
-      <div class="code-block">
-        <pre><code>OK : string -> WebPart
-CREATED : string -> WebPart
-ACCEPTED : string -> WebPart
-NO_CONTENT : WebPart</code></pre>
-      </div>
-
-      <h3>Suave.RequestErrors</h3>
-      <p>4xx error response builders:</p>
-      <div class="code-block">
-        <pre><code>BAD_REQUEST : string -> WebPart
-UNAUTHORIZED : string -> WebPart
-FORBIDDEN : string -> WebPart
-NOT_FOUND : string -> WebPart
-CONFLICT : string -> WebPart
-UNSUPPORTED_MEDIA_TYPE : string -> WebPart</code></pre>
-      </div>
-
-      <h3>Suave.ServerErrors</h3>
-      <p>5xx error response builders:</p>
-      <div class="code-block">
-        <pre><code>INTERNAL_ERROR : string -> WebPart
-NOT_IMPLEMENTED : string -> WebPart
-BAD_GATEWAY : string -> WebPart
-SERVICE_UNAVAILABLE : string -> WebPart</code></pre>
-      </div>
-
-      <h3>Suave.Writers</h3>
-      <p>Response header and content writers:</p>
-      <div class="code-block">
-        <pre><code>setHeader : string -> string -> WebPart
-setStatus : HttpStatusCode -> WebPart
-setMimeType : string -> WebPart
-setContentEncoding : string -> WebPart</code></pre>
-      </div>
-
-      <h3>Suave.Files</h3>
-      <p>File serving functions:</p>
-      <div class="code-block">
-        <pre><code>browse : string -> WebPart
-browseHome : WebPart
-browseFileHome : string -> WebPart
-file : string -> WebPart
-sendFile : string -> WebPart</code></pre>
-      </div>
-
-      <h3>Suave.Operators</h3>
-      <p>Composition operators:</p>
-      <div class="code-block">
-        <pre><code>// Pipe-forward operator
->=> : WebPart -> WebPart -> WebPart
-
-// Choice combinator
-choose : WebPart list -> WebPart</code></pre>
-      </div>
-
-      <h2>WebPart Type</h2>
-      <p>The core type for all Suave handlers:</p>
-      <div class="code-block">
-        <pre><code>type WebPart = HttpContext -> Async&lt;HttpContext option&gt;
-
-// A WebPart takes an HttpContext
-// Returns an async computation that yields Some ctx on success
-// Or None on failure to pass to the next handler</code></pre>
-      </div>
-
-      <h2>HttpContext Type</h2>
-      <p>Contains request and response information:</p>
-      <div class="code-block">
-        <pre><code>type HttpContext = {
-  request : HttpRequest
-  response : HttpResponse
-  connection : Connection
-  runtime : HttpRuntime
-  userState : Map&lt;string, obj&gt;
-}</code></pre>
-      </div>
-
-      <h2>HttpRequest Type</h2>
-      <p>Represents an incoming HTTP request:</p>
-      <div class="code-block">
-        <pre><code>type HttpRequest = {
-  method : string
-  path : string
-  headers : (string * string) list
-  query : string
-  cookies : HttpCookie list
-  files : HttpUpload list
-  rawForm : byte[]
-  // Methods:
-  header : string -> Choice&lt;string, string&gt;
-  queryParam : string -> Choice&lt;string, string&gt;
-  formData : string -> Choice&lt;string, string&gt;
-}</code></pre>
-      </div>
-
-      <h2>Configuration</h2>
-      <p>Server configuration options:</p>
-      <div class="code-block">
-        <pre><code>type SuaveConfig = {
-  bindings : HttpBinding list
-  maxContentLength : int
-  requestTimeout : TimeSpan
-  homeFolder : string option
-  mimeTypesMap : MimeType
-  logger : Logger
-}</code></pre>
-      </div>
-
-      <h2>Common Patterns</h2>
-
-      <h3>Creating a Simple Handler</h3>
-      <div class="code-block">
-        <pre><code>let hello : WebPart =
-  fun ctx ->
-    async {
-      return! OK "Hello World" ctx
-    }</code></pre>
-      </div>
-
-      <h3>Conditional Handlers</h3>
-      <div class="code-block">
-        <pre><code>let requireParam name : WebPart =
-  fun ctx ->
-    match ctx.request.queryParam name with
-    | Choice1Of2 value -> async { return Some ctx }
-    | Choice2Of2 _ -> async { return None }</code></pre>
-      </div>
-
-      <h2>More Documentation</h2>
-      <p>For detailed API documentation and source code, visit:</p>
-      <ul style="line-height: 1.8;">
-        <li><strong><a href="https://github.com/SuaveIO/suave" target="_blank">Suave GitHub Repository</a></strong></li>
-        <li><strong><a href="https://suave.io" target="_blank">Official Suave Website</a></strong></li>
-      </ul>
     </div>
   </main>
-
-  <footer>
+<footer>
     <div class="container">
       <div class="footer-links">
         <a href="/docs/">Documentation</a>
-        <a href="https://github.com/SuaveIO/suave" target="_blank">GitHub</a>
-        <a href="https://www.nuget.org/packages/Suave/" target="_blank">NuGet</a>
-        <a href="https://x.com/SuaveIO" target="_blank">X</a>
-        <a href="https://github.com/SuaveIO/suave/blob/master/LICENSE" target="_blank">License</a>
+        <a href="/docs/recipes/">Recipes</a>
+        <a href="/reference/">API Reference</a>
+        <a href="/docs/faq.html">FAQ</a>
+        <a href="https://github.com/SuaveIO/suave" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://www.nuget.org/packages/Suave/" target="_blank" rel="noopener">NuGet</a>
+        <a href="https://github.com/SuaveIO/suave/blob/master/LICENSE" target="_blank" rel="noopener">License</a>
       </div>
-      <p>&copy; 2025 Suave. Open source, MIT licensed.</p>
-      <p>Suave is a project created and maintained by Ademar Gonzalez.</p>
+      <p>&copy; 2026 Suave. Open source, Apache-2.0 licensed.</p>
+      <p>Suave is created and maintained by Ademar Gonzalez.</p>
     </div>
   </footer>
-
   <script src="/js/main.js"></script>
 </body>
 </html>

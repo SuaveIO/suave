@@ -9,6 +9,7 @@ open Suave.Successful
 open Suave.RequestErrors
 open Suave.Files
 open Suave.Writers
+open Suave.Redirection
 
 module Website =
   
@@ -19,11 +20,11 @@ module Website =
   // Main app - serve static files with proper caching headers
   let app =
     choose [
-      // Map root path to index.html
       path "/" >=> Files.browseFileHome "index.html"
-      // Map /docs/ to docs/index.html
       path "/docs/" >=> Files.browseFileHome "docs/index.html"
-      // Serve all other files with caching headers
+      path "/docs/recipes/" >=> Files.browseFileHome "docs/recipes/index.html"
+      path "/reference" >=> Redirection.redirect "/reference/"
+      path "/reference/" >=> Files.browseFileHome "reference/index.html"
       browseHome
       >=> setHeader "Cache-Control" "public, max-age=3600"
       >=> setHeader "X-Content-Type-Options" "nosniff"

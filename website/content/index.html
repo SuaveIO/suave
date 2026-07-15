@@ -3,100 +3,89 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Suave - A fast, non-blocking web server for F#. Type-safe, async-native, and production-ready.">
-  <title>Suave - Fast Web Server for F#</title>
+  <meta name="description" content="Suave — a fast, async, type-safe web server library for F#.">
+  <title>Suave — Fast web server for F#</title>
   <link rel="shortcut icon" href="/images/favicon.ico" type="image/x-icon">
   <link rel="icon" href="/images/favicon-32x32.png" sizes="32x32" type="image/png">
   <link rel="icon" href="/images/favicon-96x96.png" sizes="96x96" type="image/png">
   <link rel="apple-touch-icon" href="/images/apple-touch-icon-57x57.png" sizes="57x57">
   <link rel="apple-touch-icon" href="/images/apple-touch-icon-114x114.png" sizes="114x114">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,500;8..60,650;8..60,700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/style.css">
 </head>
-<body>
-  <!-- Header -->
+<body class="home">
   <header>
     <div class="container">
       <nav>
-        <div class="logo">
-          <img src="/images/head_600_trans.png" alt="Suave Logo" width="40" height="40" style="vertical-align: middle; margin-right: 12px; background: white; padding: 2px; border-radius: 4px;">
+        <a class="logo" href="/">
+          <img src="/images/head_600_trans.png" alt="" width="36" height="36">
           Suave
-        </div>
+        </a>
         <button id="hamburger" class="hamburger" aria-label="Toggle menu">
-          <span></span>
-          <span></span>
-          <span></span>
+          <span></span><span></span><span></span>
         </button>
         <ul id="nav-links" class="nav-links">
           <li><a href="/">Home</a></li>
-          <li><a href="/docs/">Documentation</a></li>
-          <li><a href="/docs/performance.html">Performance</a></li>
-          <li><a href="https://github.com/SuaveIO/suave" target="_blank">GitHub</a></li>
-          <li><a href="https://www.nuget.org/packages/Suave/" target="_blank">NuGet</a></li>
-          <li><button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme">🌙</button></li>
+          <li><a href="/docs/">Docs</a></li>
+          <li><a href="/docs/recipes/">Recipes</a></li>
+          <li><a href="/reference/">API</a></li>
+          <li><a href="/docs/faq.html">FAQ</a></li>
+          <li><a href="https://github.com/SuaveIO/suave" target="_blank" rel="noopener">GitHub</a></li>
+          <li><a href="https://www.nuget.org/packages/Suave/" target="_blank" rel="noopener">NuGet</a></li>
+          <li><button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme">☾</button></li>
         </ul>
       </nav>
     </div>
   </header>
 
-  <!-- Main content -->
   <main>
-    <div class="container">
-      <!-- Hero Section -->
+    <div class="container" data-no-toc="true">
       <section class="hero">
-        <h1>Fast. Non-Blocking. Type-Safe.</h1>
-        <p>Suave is a lightweight, high-performance web server written in F#. Async from the ground up with modern optimizations for production workloads.</p>
+        <span class="brand">Suave</span>
+        <h1>Async web programs, composed in F#</h1>
+        <p>A lightweight, high-performance web server and library. Non-blocking I/O, composable <code>WebPart</code>s, and a small surface you can learn in an afternoon.</p>
         <div class="cta-buttons">
-          <a href="/docs/getting-started.html" class="btn btn-primary">Get Started</a>
+          <a href="/docs/getting-started.html" class="btn btn-primary">Get started</a>
           <a href="/docs/" class="btn btn-secondary">Documentation</a>
+          <a href="/docs/recipes/" class="btn btn-secondary">Recipes</a>
         </div>
       </section>
 
-      <!-- Features Section -->
       <section>
         <h2>Why Suave?</h2>
+        <p class="section-lead">Built for teams who want full control of HTTP without a heavy framework.</p>
         <div class="features">
           <div class="feature-card">
-            <div class="feature-icon">⚡</div>
-            <h3>High Performance</h3>
-            <p>Async, non-blocking I/O with low-allocation hot paths. Built for throughput and steady latency under load.</p>
+            <h3>High performance</h3>
+            <p>Async, non-blocking I/O with low-allocation hot paths—steady latency under load.</p>
           </div>
           <div class="feature-card">
-            <div class="feature-icon">🔒</div>
-            <h3>Type-Safe</h3>
-            <p>Leverage F#'s powerful type system. Catch errors at compile time. Domain modeling with discriminated unions and records.</p>
+            <h3>Type-safe by default</h3>
+            <p>Model routes and responses with F# types. Catch mistakes at compile time.</p>
           </div>
           <div class="feature-card">
-            <div class="feature-icon">⚙️</div>
-            <h3>Async Native</h3>
-            <p>Completely non-blocking I/O throughout. Native async/await with task computation expressions. Scales to thousands of concurrent connections.</p>
+            <h3>Composable WebParts</h3>
+            <p>Small functions of type <code>HttpContext → Async&lt;HttpContext option&gt;</code>, combined with <code>&gt;=&gt;</code> and <code>choose</code>.</p>
           </div>
           <div class="feature-card">
-            <div class="feature-icon">🔧</div>
-            <h3>Easy to Use</h3>
-            <p>Simple, composable API. Build REST APIs, WebSockets, and microservices with minimal code. No magic, just pure F#.</p>
+            <h3>HTTP/2 built-in</h3>
+            <p>Multiplexed framing, HPACK, and ALPN—same handlers for HTTP/1.1 and HTTP/2.</p>
           </div>
           <div class="feature-card">
-            <div class="feature-icon">📦</div>
-            <h3>Production Ready</h3>
-            <p>HTTPS/TLS support, keep-alive connections, HTTP compression, rate limiting, and comprehensive logging built-in.</p>
+            <h3>Production features</h3>
+            <p>TLS, compression, cookies/sessions, rate limiting, WebSockets, and logging hooks.</p>
           </div>
           <div class="feature-card">
-            <div class="feature-icon">🚀</div>
-            <h3>HTTP/2 Built-in</h3>
-            <p>Multiplexed binary framing with HPACK, server push and ALPN — automatic, zero-config, same <code>WebPart</code> for HTTP/1.1 and HTTP/2.</p>
-          </div>
-          <div class="feature-card">
-            <div class="feature-icon">🌍</div>
-            <h3>Cross-Platform</h3>
-            <p>Runs on Linux, macOS, and Windows. .NET 8+ support. Deploy as executable or container.</p>
+            <h3>Cross-platform</h3>
+            <p>Runs on modern .NET on Linux, macOS, and Windows—as an executable or a container.</p>
           </div>
         </div>
       </section>
 
-      <!-- Quick Start -->
       <section>
-        <h2>Hello World - 30 Seconds</h2>
-        <p>The simplest Suave application:</p>
+        <h2>Hello World</h2>
         <div class="code-block">
           <pre><code>open Suave
 open Suave.Successful
@@ -105,60 +94,51 @@ let app = OK "Hello, Suave!"
 
 startWebServer defaultConfig app</code></pre>
         </div>
-        <p>That's it! Your web server is running on <code>http://localhost:8080</code>.</p>
-        <p><a href="/docs/getting-started.html">→ Read the getting started guide</a></p>
+        <p>Serves on <code>http://127.0.0.1:8080</code>. Next: <a href="/docs/getting-started.html">getting started</a> or a <a href="/docs/recipes/">recipe</a>.</p>
       </section>
 
-      <!-- Use Cases -->
       <section>
-        <h2>What Can You Build?</h2>
-        <ul>
-          <li><strong>REST APIs</strong> - Fast, type-safe REST backends</li>
-          <li><strong>Microservices</strong> - Lightweight services with minimal overhead</li>
-          <li><strong>Real-time Apps</strong> - WebSocket support for live features</li>
-          <li><strong>GraphQL Servers</strong> - Built on top of Suave's composition model</li>
-          <li><strong>Static File Server</strong> - Efficient static content delivery</li>
-          <li><strong>Embedded Web Servers</strong> - Add web capabilities to any F# application</li>
+        <h2>What you can build</h2>
+        <ul class="use-cases">
+          <li><strong>REST APIs</strong> Typed routes, JSON bodies, status combinators</li>
+          <li><strong>Microservices</strong> Small process footprint, clear composition</li>
+          <li><strong>Real-time apps</strong> First-class WebSockets</li>
+          <li><strong>Static &amp; hybrid sites</strong> Files, templates, SPA fallbacks</li>
         </ul>
       </section>
 
-      <!-- Installation -->
       <section>
-        <h2>Installation</h2>
-        <p>Add Suave to your F# project via NuGet:</p>
+        <h2>Install</h2>
         <div class="code-block">
           <pre><code>dotnet add package Suave</code></pre>
         </div>
-        <p>Or add to paket.dependencies:</p>
-        <div class="code-block">
-          <pre><code>nuget Suave</code></pre>
-        </div>
-        <p><a href="/docs/getting-started.html">→ Get started with your first project</a></p>
+        <p>Or with Paket: <code>nuget Suave</code></p>
       </section>
 
-      <!-- Call to Action -->
-      <section style="text-align: center; padding: 3rem 0;">
-        <h2>Ready to build something fast?</h2>
+      <section style="padding: 2rem 0 1rem;">
+        <h2>Go further</h2>
         <div class="cta-buttons">
-          <a href="/docs/getting-started.html" class="btn btn-primary">Get Started Now</a>
-          <a href="https://github.com/SuaveIO/suave" class="btn btn-secondary" target="_blank">View on GitHub</a>
+          <a href="/docs/getting-started.html" class="btn btn-primary">Get started</a>
+          <a href="/reference/" class="btn btn-secondary">API reference</a>
+          <a href="/docs/faq.html" class="btn btn-secondary">FAQ</a>
         </div>
       </section>
     </div>
   </main>
 
-  <!-- Footer -->
   <footer>
     <div class="container">
       <div class="footer-links">
         <a href="/docs/">Documentation</a>
-        <a href="https://github.com/SuaveIO/suave" target="_blank">GitHub</a>
-        <a href="https://www.nuget.org/packages/Suave/" target="_blank">NuGet</a>
-        <a href="https://x.com/SuaveIO" target="_blank">X</a>
-        <a href="https://github.com/SuaveIO/suave/blob/master/LICENSE" target="_blank">License</a>
+        <a href="/docs/recipes/">Recipes</a>
+        <a href="/reference/">API Reference</a>
+        <a href="/docs/faq.html">FAQ</a>
+        <a href="https://github.com/SuaveIO/suave" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://www.nuget.org/packages/Suave/" target="_blank" rel="noopener">NuGet</a>
+        <a href="https://github.com/SuaveIO/suave/blob/master/LICENSE" target="_blank" rel="noopener">License</a>
       </div>
-      <p>&copy; 2025 Suave. Open source, MIT licensed.</p>
-      <p>Suave is a project created and maintained by Ademar Gonzalez.</p>
+      <p>&copy; 2026 Suave. Open source, Apache-2.0 licensed.</p>
+      <p>Suave is created and maintained by Ademar Gonzalez.</p>
     </div>
   </footer>
 
