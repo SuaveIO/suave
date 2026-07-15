@@ -84,6 +84,7 @@
       <p>Create a simple router with basic routes:</p>
       <div class="code-block">
         <pre><code>open Suave
+open Suave.Successful
 open Suave.Router
 
 let app =
@@ -104,6 +105,7 @@ let main argv =
       <p>Extract values from URL paths using parameters:</p>
       <div class="code-block">
         <pre><code>open Suave
+open Suave.Successful
 open Suave.Router
 open Suave.Operators
 
@@ -133,6 +135,7 @@ let main argv =
       <p>Use different HTTP methods for different route handlers:</p>
       <div class="code-block">
         <pre><code>open Suave
+open Suave.Successful
 open Suave.Router
 open Suave.Operators
 
@@ -155,11 +158,15 @@ let main argv =
       </div>
 
       <h2>Route Scoping</h2>
-      <p>Group routes with a common prefix using scopes:</p>
+      <p>Group routes with a common prefix. <code>scope</code> builds a <code>Router</code>; turn it into a <code>WebPart</code> with <code>tryRoute</code> (or put the same paths in a top-level <code>router</code>):</p>
       <div class="code-block">
         <pre><code>open Suave
+open Suave.Successful
 open Suave.Router
 open Suave.Operators
+
+let runRouter (r : Router) : WebPart =
+  fun ctx -> tryRoute r ctx
 
 let apiScope =
   scope "/api" {
@@ -177,8 +184,8 @@ let v2Scope =
 
 let app =
   choose [
-    apiScope
-    v2Scope
+    runRouter apiScope
+    runRouter v2Scope
     router {
       get "/" (OK "Home")
     }
@@ -194,20 +201,21 @@ let main argv =
       <p>Match remaining path segments with wildcards:</p>
       <div class="code-block">
         <pre><code>open Suave
+open Suave.Successful
 open Suave.Router
 open Suave.Operators
 
 let serveStatic ctx =
-  match routeParam "path" ctx with
+  match routeParam "filepath" ctx with
   | Some filepath ->
       OK (sprintf "Serving file: %s" filepath) ctx
   | None -> RequestErrors.NOT_FOUND "File not found" ctx
 
 let app =
   router {
-    get "/files/*" serveStatic
-    get "/docs/*" (fun ctx ->
-      match routeParam "path" ctx with
+    get "/files/*filepath" serveStatic
+    get "/docs/*filepath" (fun ctx ->
+      match routeParam "filepath" ctx with
       | Some docPath ->
           OK (sprintf "Documentation: %s" docPath) ctx
       | None -> RequestErrors.NOT_FOUND "Doc not found" ctx
@@ -224,6 +232,7 @@ let main argv =
       <p>Combine multiple parameters and dynamic segments:</p>
       <div class="code-block">
         <pre><code>open Suave
+open Suave.Successful
 open Suave.Router
 open Suave.Operators
 
@@ -258,6 +267,7 @@ let main argv =
       <p>Apply middleware to router handlers:</p>
       <div class="code-block">
         <pre><code>open Suave
+open Suave.Successful
 open Suave.Router
 open Suave.Operators
 open Suave.Filters
@@ -265,11 +275,12 @@ open Suave.Filters
 let requireJson =
   Writers.setHeader "Content-Type" "application/json"
 
-let logRequest ctx =
-  printfn "Method: %s, Path: %s" 
-    (ctx.request.method.ToString())
-    ctx.request.path
-  async { return Some ctx }
+let logRequest : WebPart =
+  fun ctx ->
+    printfn "Method: %s, Path: %s"
+      ctx.request.rawMethod
+      ctx.request.path
+    async { return Some ctx }
 
 let app =
   router {
@@ -295,7 +306,7 @@ open Suave.RequestErrors
 
 let users = System.Collections.Generic.Dictionary&lt;string, string&gt;()
 
-let getAllUsers _ = OK (System.String.Join(",", users.Keys)) 
+let getAllUsers = OK (System.String.Join(",", users.Keys)) 
 let getUser ctx =
   match routeParam "id" ctx with
   | Some id when users.ContainsKey(id) ->
@@ -303,10 +314,7 @@ let getUser ctx =
   | Some _ -> NOT_FOUND "User not found" ctx
   | None -> BAD_REQUEST "Missing user ID" ctx
 
-let createUser ctx = async {
-  // In a real app, parse JSON from body
-  OK "User created" ctx
-}
+let createUser = OK "User created"
 
 let updateUser ctx = async {
   match routeParam "id" ctx with
@@ -341,44 +349,24 @@ let main argv =
       </div>
 
       <h2>Nested Scopes</h2>
-      <p>Create deeply nested route hierarchies with multiple scopes:</p>
+      <p>Prefer one <code>router</code> (or one <code>scope</code>) with the full path prefix — nested <code>scope</code> builders are not supported:</p>
       <div class="code-block">
         <pre><code>open Suave
+open Suave.Successful
 open Suave.Router
 open Suave.Operators
 
-let v1ApiRoutes =
-  scope "/api" {
-    scope "/v1" {
-      get "/users" (OK "V1 Users")
-      get "/posts" (OK "V1 Posts")
-    }
-  }
-
-let v2ApiRoutes =
-  scope "/api" {
-    scope "/v2" {
-      get "/users" (OK "V2 Users")
-      get "/posts" (OK "V2 Posts")
-    }
-  }
-
-let adminRoutes =
-  scope "/admin" {
-    get "/dashboard" (OK "Admin Dashboard")
-    get "/users" (OK "Admin Users")
-    delete "/users/:id" (OK "User deleted")
-  }
-
 let app =
-  choose [
-    v1ApiRoutes
-    v2ApiRoutes
-    adminRoutes
-    router {
-      get "/" (OK "Home")
-    }
-  ]
+  router {
+    get "/api/v1/users" (OK "V1 Users")
+    get "/api/v1/posts" (OK "V1 Posts")
+    get "/api/v2/users" (OK "V2 Users")
+    get "/api/v2/posts" (OK "V2 Posts")
+    get "/admin/dashboard" (OK "Admin Dashboard")
+    get "/admin/users" (OK "Admin Users")
+    delete "/admin/users/:id" (OK "User deleted")
+    get "/" (OK "Home")
+  }
 
 [&lt;EntryPoint&gt;]
 let main argv =
@@ -428,12 +416,14 @@ let main argv =
       <p>Build routes programmatically with the route helper:</p>
       <div class="code-block">
         <pre><code>open Suave
+open Suave.Successful
 open Suave.Router
 open Suave.Operators
 
 let buildApiRoute path handler =
   router {
-    route [HttpMethod.GET; HttpMethod.POST] path handler
+    // Custom `route` takes one argument: (methods * path * handler)
+    route ([ HttpMethod.GET; HttpMethod.POST ], path, handler)
   }
 
 let multiMethodHandler ctx =
@@ -460,6 +450,7 @@ let main argv =
       <p>The Router module optimizes performance with exact and pattern matching:</p>
       <div class="code-block">
         <pre><code>open Suave
+open Suave.Successful
 open Suave.Router
 open Suave.Operators
 

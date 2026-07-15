@@ -89,18 +89,18 @@ open Suave.Filters
 open Suave.Successful
 open Suave.RequestErrors
 
-let validateEmail email =
-  email.Contains("@") && email.Contains(".")
+let validateEmail (email: string) =
+  email.Contains("@") &amp;&amp; email.Contains(".")
 
 let app =
   choose [
-    POST >=> path "/subscribe" >=> fun ctx ->
+    POST &gt;=&gt; path "/subscribe" &gt;=&gt; fun ctx -&gt;
       match ctx.request.formData "email" with
-      | Choice1Of2 email when validateEmail email ->
+      | Choice1Of2 email when validateEmail email -&gt;
           OK (sprintf "Subscribed: %s" email) ctx
-      | Choice1Of2 _ ->
+      | Choice1Of2 _ -&gt;
           BAD_REQUEST "Invalid email address" ctx
-      | Choice2Of2 _ ->
+      | Choice2Of2 _ -&gt;
           BAD_REQUEST "Missing email field" ctx
   ]</code></pre>
       </div>
@@ -120,7 +120,7 @@ let corsConfig =
 
 let app =
   choose [
-    GET >=> path "/api/data" >=> cors corsConfig >=> OK "CORS enabled"
+    GET &gt;=&gt; path "/api/data" &gt;=&gt; cors corsConfig &gt;=&gt; OK "CORS enabled"
   ]</code></pre>
       </div>
 
@@ -130,16 +130,18 @@ let app =
         <pre><code>open Suave
 open Suave.Operators
 open Suave.Writers
+open Suave.Filters
+open Suave.Successful
 
 let setSecurityHeaders =
-  setHeader "X-Content-Type-Options" "nosniff" >=>
-  setHeader "X-Frame-Options" "SAMEORIGIN" >=>
-  setHeader "X-XSS-Protection" "1; mode=block" >=>
+  setHeader "X-Content-Type-Options" "nosniff" &gt;=&gt;
+  setHeader "X-Frame-Options" "SAMEORIGIN" &gt;=&gt;
+  setHeader "X-XSS-Protection" "1; mode=block" &gt;=&gt;
   setHeader "Strict-Transport-Security" "max-age=31536000; includeSubDomains"
 
 let app =
   choose [
-    path "/" >=> setSecurityHeaders >=> OK "Secure content"
+    path "/" &gt;=&gt; setSecurityHeaders &gt;=&gt; OK "Secure content"
   ]</code></pre>
       </div>
 
@@ -152,14 +154,12 @@ open Suave.Filters
 open Suave.Successful
 open Suave.Authentication
 
-let basicAuth =
-  Authentication.authenticateBasic (fun (username, password) ->
-    username = "admin" && password = "secret"
-  )
+let check (username, password) =
+  username = "admin" &amp;&amp; password = "secret"
 
 let app =
   choose [
-    GET >=> path "/admin" >=> basicAuth >=> OK "Admin area"
+    GET &gt;=&gt; path "/admin" &gt;=&gt; Authentication.authenticateBasic check (OK "Admin area")
   ]</code></pre>
       </div>
 
@@ -180,13 +180,13 @@ let rateLimit10PerMin =
 let limitByUser =
   rateLimit 
     (perMinute 100 
-     |> withKeyExtractor (headerKeyExtractor "X-User-Id"))
+     |&gt; withKeyExtractor (headerKeyExtractor "X-User-Id"))
     (OK "User request successful")
 
 let app =
   choose [
-    path "/api/public" >=> rateLimit10PerMin
-    path "/api/private" >=> limitByUser
+    path "/api/public" &gt;=&gt; rateLimit10PerMin
+    path "/api/private" &gt;=&gt; limitByUser
   ]</code></pre>
       </div>
 
@@ -194,6 +194,7 @@ let app =
       <p>Limit request body size to prevent abuse:</p>
       <div class="code-block">
         <pre><code>open Suave
+open Suave.Successful
 
 let config =
   { defaultConfig with
@@ -207,21 +208,22 @@ let main argv =
   0</code></pre>
       </div>
 
-      <h2>Request Timeout</h2>
-      <p>Set timeout for long-running requests:</p>
+      <h2>Listen / bind timeout</h2>
+      <p><code>listenTimeout</code> controls how long Suave waits for the socket bind to finish (not per-request duration):</p>
       <div class="code-block">
         <pre><code>open Suave
 open System
+open Suave.Successful
 
 let config =
   { defaultConfig with
       bindings = [ HttpBinding.createSimple HTTP "0.0.0.0" 8080 ]
-      requestTimeout = TimeSpan.FromSeconds(30.0)
+      listenTimeout = TimeSpan.FromSeconds(30.0)
   }
 
 [&lt;EntryPoint&gt;]
 let main argv =
-  startWebServer config (OK "Timeout configured")
+  startWebServer config (OK "Configured")
   0</code></pre>
       </div>
 
@@ -233,23 +235,20 @@ open Suave.Operators
 open Suave.Filters
 open Suave.Successful
 
+open System.Net
+open Suave.RequestErrors
+
 let sanitize (input: string) =
-  input
-    .Replace("&", "&amp;")
-    .Replace("<", "&lt;")
-    .Replace(">", "&gt;")
-    .Replace("\"", "&quot;")
-    .Replace("'", "&#39;")
+  WebUtility.HtmlEncode input
 
 let app =
   choose [
-    POST >=> path "/comment" >=> fun ctx ->
-      match ctx.request.formData "text" with
-      | Choice1Of2 text ->
-          let safe = sanitize text
-          OK (sprintf "Comment: %s" safe) ctx
-      | Choice2Of2 _ ->
-          RequestErrors.BAD_REQUEST "Missing text" ctx
+    POST &gt;=&gt; path "/comment" &gt;=&gt; request (fun r -&gt;
+      match r.formData "text" with
+      | Choice1Of2 text -&gt;
+          OK (sprintf "Comment: %s" (sanitize text))
+      | Choice2Of2 _ -&gt;
+          RequestErrors.BAD_REQUEST "Missing text")
   ]</code></pre>
       </div>
 
@@ -259,18 +258,20 @@ let app =
         <pre><code>open Suave
 open Suave.Operators
 open Suave.Filters
-open Suave.Writers
+open Suave.Successful
+open Suave.Redirection
 
 let enforceHttps : WebPart =
-  fun ctx ->
-    match ctx.request.header "x-forwarded-proto" with
-    | Choice1Of2 "https" -> None // Continue
-    | _ -> Some (ctx |> setStatus HTTP_307 >=> setHeader "Location" ("https://" + ctx.request.host + ctx.request.path))
+  fun ctx -&gt;
+    if ctx.request.binding.scheme.secure then
+      async { return Some ctx }
+    else
+      let url = "https://" + ctx.request.host + ctx.request.path
+      FOUND url ctx
 
 let app =
   choose [
-    enforceHttps
-    path "/" >=> OK "Secure connection"
+    enforceHttps &gt;=&gt; path "/" &gt;=&gt; OK "Secure connection"
   ]</code></pre>
       </div>
 
@@ -287,28 +288,27 @@ type CreateUserRequest = { name: string; email: string; age: int }
 
 let validateUser (req: CreateUserRequest) =
   match req with
-  | _ when req.name.Length < 2 -> Error "Name too short"
-  | _ when not (req.email.Contains "@") -> Error "Invalid email"
-  | _ when req.age < 18 -> Error "Must be 18+"
-  | _ -> Ok req
+  | _ when req.name.Length &lt; 2 -&gt; Result.Error "Name too short"
+  | _ when not (req.email.Contains "@") -&gt; Result.Error "Invalid email"
+  | _ when req.age &lt; 18 -&gt; Result.Error "Must be 18+"
+  | _ -&gt; Result.Ok req
 
 let app =
   choose [
-    POST >=> path "/users" >=> fun ctx ->
+    POST &gt;=&gt; path "/users" &gt;=&gt; fun ctx -&gt;
       async {
         try
-          // Parse JSON
-          let! body = ctx.request.rawForm |> Async.ofTask
-          let json = System.Text.UTF8Encoding.UTF8.GetString(body)
+          // rawForm is already a byte[]
+          let body = ctx.request.rawForm
+          let json = System.Text.Encoding.UTF8.GetString(body)
           let req = System.Text.Json.JsonSerializer.Deserialize&lt;CreateUserRequest&gt;(json)
           
-          // Validate
           match validateUser req with
-          | Ok validReq -> 
+          | Result.Ok validReq -&gt; 
               return! OK (sprintf "User created: %s" validReq.name) ctx
-          | Error msg -> 
+          | Result.Error msg -&gt; 
               return! BAD_REQUEST msg ctx
-        with _ ->
+        with _ -&gt;
           return! BAD_REQUEST "Invalid request" ctx
       }
   ]</code></pre>

@@ -84,6 +84,7 @@
       <p>Start with the default configuration:</p>
       <div class="code-block">
         <pre><code>open Suave
+open Suave.Successful
 
 let app = OK "Hello World"
 
@@ -99,6 +100,7 @@ let main argv =
       <p>Configure the server to listen on a specific port:</p>
       <div class="code-block">
         <pre><code>open Suave
+open Suave.Successful
 
 let config =
   { defaultConfig with
@@ -116,17 +118,15 @@ let main argv =
       <p>Enable HTTPS with a certificate:</p>
       <div class="code-block">
         <pre><code>open Suave
-open System.Net
+open Suave.Successful
 open System.Security.Cryptography.X509Certificates
 
 let cert = new X509Certificate2("./server.pfx", "password")
 
 let config =
   { defaultConfig with
-      bindings = 
-        [ HttpBinding.createSimple HTTPS "0.0.0.0" 8443 ]
-      certificateChainFilePath = Some "./server.pfx"
-      certificatePassword = Some "password" }
+      bindings =
+        [ HttpBinding.createSimple (HTTPS cert) "0.0.0.0" 8443 ] }
 
 let app = OK "Secure connection"
 
@@ -140,6 +140,7 @@ let main argv =
       <p>Listen on multiple ports and protocols:</p>
       <div class="code-block">
         <pre><code>open Suave
+open Suave.Successful
 
 let config =
   { defaultConfig with
@@ -159,14 +160,15 @@ let main argv =
       <p>Configure server behavior:</p>
       <div class="code-block">
         <pre><code>open Suave
+open Suave.Successful
 
 let config =
   { defaultConfig with
       bindings = [ HttpBinding.createSimple HTTP "0.0.0.0" 8080 ]
       maxContentLength = 1024 * 1024 * 100  // 100 MB
-      requestTimeout = System.TimeSpan.FromSeconds(60.0)
+      listenTimeout = System.TimeSpan.FromSeconds(60.0)
       cancellationToken = System.Threading.CancellationToken.None
-      logger = Logging.Targets.create Logging.LogLevel.Debug [||] }
+      hideHeader = false }
 
 let app = OK "Custom server settings"
 
@@ -180,6 +182,7 @@ let main argv =
       <p>Configure differently based on environment:</p>
       <div class="code-block">
         <pre><code>open Suave
+open Suave.Successful
 open System
 
 let getConfig () =
@@ -189,7 +192,6 @@ let getConfig () =
   
   { defaultConfig with
       bindings = [ HttpBinding.createSimple HTTP host port ]
-      // More dev-specific settings
   }
 
 let app = OK "Environment-aware configuration"
@@ -205,6 +207,7 @@ let main argv =
       <p>Handle server shutdown gracefully:</p>
       <div class="code-block">
         <pre><code>open Suave
+open Suave.Successful
 open System.Threading
 
 let app = OK "Graceful shutdown demo"
@@ -233,6 +236,7 @@ let main argv =
       <p>Enable gzip compression for responses:</p>
       <div class="code-block">
         <pre><code>open Suave
+open Suave.Successful
 open Suave.Operators
 open Suave.Writers
 
@@ -254,6 +258,8 @@ let main argv =
       <p>Add custom MIME types:</p>
       <div class="code-block">
         <pre><code>open Suave
+open Suave.Successful
+open Suave.Operators
 open Suave.Writers
 
 let mimeTypes =

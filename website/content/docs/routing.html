@@ -87,11 +87,12 @@
 open Suave.Operators
 open Suave.Filters
 open Suave.Successful
+open Suave.RequestErrors
 
 let app =
   choose [
-    path "/hello" >=> OK "Hello GET"
-    path "/goodbye" >=> OK "Good bye GET"
+    path "/hello" &gt;=&gt; OK "Hello GET"
+    path "/goodbye" &gt;=&gt; OK "Good bye GET"
     RequestErrors.NOT_FOUND "Path not found"
   ]</code></pre>
       </div>
@@ -99,24 +100,34 @@ let app =
       <h2>HTTP Methods</h2>
       <p>Use <code>GET</code>, <code>POST</code>, <code>PUT</code>, <code>DELETE</code> to match specific HTTP methods:</p>
       <div class="code-block">
-        <pre><code>let app =
+        <pre><code>open Suave
+open Suave.Filters
+open Suave.Operators
+open Suave.Successful
+
+let app =
   choose [
-    GET >=> path "/users" >=> OK "List users"
-    POST >=> path "/users" >=> OK "Create user"
-    PUT >=> path "/users" >=> OK "Update user"
-    DELETE >=> path "/users" >=> OK "Delete user"
+    GET &gt;=&gt; path "/users" &gt;=&gt; OK "List users"
+    POST &gt;=&gt; path "/users" &gt;=&gt; OK "Create user"
+    PUT &gt;=&gt; path "/users" &gt;=&gt; OK "Update user"
+    DELETE &gt;=&gt; path "/users" &gt;=&gt; OK "Delete user"
   ]</code></pre>
       </div>
 
       <h2>Path Parameters</h2>
       <p>Extract parameters from URL paths using <code>pathScan</code>:</p>
       <div class="code-block">
-        <pre><code>let app =
+        <pre><code>open Suave
+open Suave.Filters
+open Suave.Successful
+open Suave.RequestErrors
+
+let app =
   choose [
-    pathScan "/users/%d" (fun userId -> 
+    pathScan "/users/%d" (fun userId -&gt; 
       OK (sprintf "User ID: %d" userId))
     
-    pathScan "/posts/%d/comments/%d" (fun (postId, commentId) ->
+    pathScan "/posts/%d/comments/%d" (fun (postId, commentId) -&gt;
       OK (sprintf "Post %d, Comment %d" postId commentId))
     
     RequestErrors.NOT_FOUND "Not found"
@@ -126,24 +137,36 @@ let app =
       <h2>Query Strings</h2>
       <p>Access query parameters from the request context:</p>
       <div class="code-block">
-        <pre><code>let app =
+        <pre><code>open Suave
+open Suave.Filters
+open Suave.Operators
+open Suave.Successful
+open Suave.RequestErrors
+
+let app =
   choose [
-    GET >=> path "/search" >=> fun ctx ->
+    GET &gt;=&gt; path "/search" &gt;=&gt; fun ctx -&gt;
       match ctx.request.queryParam "q" with
-      | Choice1Of2 query -> OK (sprintf "Searching for: %s" query) ctx
-      | Choice2Of2 _ -> RequestErrors.BAD_REQUEST "Missing 'q' parameter" ctx
+      | Choice1Of2 query -&gt; OK (sprintf "Searching for: %s" query) ctx
+      | Choice2Of2 _ -&gt; RequestErrors.BAD_REQUEST "Missing 'q' parameter" ctx
   ]</code></pre>
       </div>
 
       <h2>Regular Expression Routes</h2>
       <p>Match paths using regular expressions:</p>
       <div class="code-block">
-        <pre><code>let app =
+        <pre><code>open Suave
+open Suave.Filters
+open Suave.Operators
+open Suave.Successful
+open Suave.RequestErrors
+
+let app =
   choose [
-    pathRegex "(.*?)\.(dll|mdb|log)$" >=> 
+    pathRegex "(.*?)\.(dll|mdb|log)$" &gt;=&gt; 
       RequestErrors.FORBIDDEN "Access denied"
     
-    pathRegex "^/api/v[0-9]+/.*" >=> 
+    pathRegex "^/api/v[0-9]+/.*" &gt;=&gt; 
       OK "Versioned API"
   ]</code></pre>
       </div>
@@ -151,7 +174,13 @@ let app =
       <h2>REST API Example</h2>
       <p>Building a complete REST API for users:</p>
       <div class="code-block">
-        <pre><code>type User = { id: int; name: string; email: string }
+        <pre><code>open Suave
+open Suave.Filters
+open Suave.Operators
+open Suave.Successful
+open Suave.RequestErrors
+
+type User = { id: int; name: string; email: string }
 
 let users = 
   [ { id = 1; name = "Alice"; email = "alice@example.com" }
@@ -159,23 +188,23 @@ let users =
 
 let getUser ctx =
   match ctx.request.queryParam "id" with
-  | Choice1Of2 idStr when System.Int32.TryParse(idStr) |> fst ->
+  | Choice1Of2 idStr when System.Int32.TryParse(idStr) |&gt; fst -&gt;
       let id = System.Int32.Parse(idStr)
-      match users |> List.tryFind (fun u -> u.id = id) with
-      | Some user -> 
+      match users |&gt; List.tryFind (fun u -&gt; u.id = id) with
+      | Some user -&gt; 
           OK (sprintf "Name: %s, Email: %s" user.name user.email) ctx
-      | None -> 
+      | None -&gt; 
           RequestErrors.NOT_FOUND (sprintf "User %d not found" id) ctx
-  | _ -> RequestErrors.BAD_REQUEST "Invalid ID" ctx
+  | _ -&gt; RequestErrors.BAD_REQUEST "Invalid ID" ctx
 
 let app =
   choose [
-    GET >=> path "/users" >=> 
+    GET &gt;=&gt; path "/users" &gt;=&gt; 
       OK "Users: Alice (alice@example.com), Bob (bob@example.com)"
     
-    GET >=> path "/users/search" >=> getUser
+    GET &gt;=&gt; path "/users/search" &gt;=&gt; getUser
     
-    POST >=> path "/users" >=> 
+    POST &gt;=&gt; path "/users" &gt;=&gt; 
       OK "User created"
     
     RequestErrors.NOT_FOUND "Not found"
@@ -185,22 +214,28 @@ let app =
       <h2>Combining Routes</h2>
       <p>Use the <code>choose</code> combinator to organize routes hierarchically:</p>
       <div class="code-block">
-        <pre><code>let userRoutes =
+        <pre><code>open Suave
+open Suave.Filters
+open Suave.Operators
+open Suave.Successful
+open Suave.RequestErrors
+
+let userRoutes =
   choose [
-    GET >=> OK "List users"
-    POST >=> OK "Create user"
+    GET &gt;=&gt; OK "List users"
+    POST &gt;=&gt; OK "Create user"
   ]
 
 let postRoutes =
   choose [
-    GET >=> OK "List posts"
-    POST >=> OK "Create post"
+    GET &gt;=&gt; OK "List posts"
+    POST &gt;=&gt; OK "Create post"
   ]
 
 let app =
   choose [
-    path "/users" >=> userRoutes
-    path "/posts" >=> postRoutes
+    path "/users" &gt;=&gt; userRoutes
+    path "/posts" &gt;=&gt; postRoutes
     RequestErrors.NOT_FOUND "Not found"
   ]</code></pre>
       </div>
@@ -208,8 +243,13 @@ let app =
       <h2>Advanced: Custom Handlers</h2>
       <p>Create custom handler functions for complex logic:</p>
       <div class="code-block">
-        <pre><code>let delayedResponse (delayMs: int) =
-  fun (ctx: HttpContext) ->
+        <pre><code>open Suave
+open Suave.Filters
+open Suave.Operators
+open Suave.Successful
+
+let delayedResponse (delayMs: int) =
+  fun (ctx: HttpContext) -&gt;
     async {
       do! Async.Sleep delayMs
       return! OK "Delayed response" ctx
@@ -217,22 +257,28 @@ let app =
 
 let app =
   choose [
-    path "/fast" >=> OK "Instant response"
-    path "/slow" >=> delayedResponse 1000
+    path "/fast" &gt;=&gt; OK "Instant response"
+    path "/slow" &gt;=&gt; delayedResponse 1000
   ]</code></pre>
       </div>
 
       <h2>Handling Errors</h2>
       <p>Return appropriate HTTP status codes:</p>
       <div class="code-block">
-        <pre><code>let app =
+        <pre><code>open Suave
+open Suave.Filters
+open Suave.Operators
+open Suave.Successful
+open Suave.RequestErrors
+
+let app =
   choose [
-    path "/ok" >=> OK "200 OK"
-    path "/created" >=> Successful.CREATED "Resource created"
-    path "/bad" >=> RequestErrors.BAD_REQUEST "Invalid request"
-    path "/not-found" >=> RequestErrors.NOT_FOUND "Not found"
-    path "/forbidden" >=> RequestErrors.FORBIDDEN "Access denied"
-    path "/error" >=> ServerErrors.INTERNAL_ERROR "Server error"
+    path "/ok" &gt;=&gt; OK "200 OK"
+    path "/created" &gt;=&gt; Successful.CREATED "Resource created"
+    path "/bad" &gt;=&gt; RequestErrors.BAD_REQUEST "Invalid request"
+    path "/not-found" &gt;=&gt; RequestErrors.NOT_FOUND "Not found"
+    path "/forbidden" &gt;=&gt; RequestErrors.FORBIDDEN "Access denied"
+    path "/error" &gt;=&gt; ServerErrors.INTERNAL_ERROR "Server error"
   ]</code></pre>
       </div>
       </div>

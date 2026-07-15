@@ -85,7 +85,7 @@ let app = choose [
   GET &gt;=&gt; path "/config" &gt;=&gt; OK "global config"
   GET &gt;=&gt; pathScan "/%s/customers" (fun company -&gt;
     OK (sprintf "customers for %s" company))
-  GET &gt;=&gt; pathScan "/%s/customers/%d" (fun company id -&gt;
+  GET &gt;=&gt; pathScan "/%s/customers/%d" (fun (company, id) -&gt;
     OK (sprintf "%s customer %d" company id))
   RequestErrors.NOT_FOUND "Not found"
 ]</code></pre></div>

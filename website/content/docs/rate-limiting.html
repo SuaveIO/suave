@@ -83,8 +83,7 @@ open Suave.RateLimit
 open Suave.Successful
 
 let app =
-  rateLimit (perMinute 10)
-  &gt;=&gt; OK "Hello"
+  rateLimit (perMinute 10) (OK "Hello")
 
 startWebServer defaultConfig app</code></pre></div>
 

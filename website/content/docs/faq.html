@@ -80,7 +80,12 @@
         <div class="faq-item">
           <h3>Why does my WebPart always return the same value?</h3>
           <p>WebParts are functions, but many combinators (<code>OK</code>, string interpolation of the time, etc.) capture values when the WebPart is <em>constructed</em>—often once at startup. Rebuild the response inside the request:</p>
-          <div class="code-block"><pre><code>// Wrong: time baked in once
+          <div class="code-block"><pre><code>open System
+open Suave
+open Suave.Successful
+open Suave.Operators
+
+// Wrong: time baked in once
 let bad = OK (string DateTime.UtcNow)
 
 // Right: evaluate per request
@@ -104,6 +109,7 @@ let good2 = context (fun _ -&gt; OK (string DateTime.UtcNow))</code></pre></div>
           <h3>How do I enable HTTPS?</h3>
           <p>Load a PKCS certificate and create an HTTPS binding:</p>
           <div class="code-block"><pre><code>open System.Security.Cryptography.X509Certificates
+open Suave
 
 let cert = new X509Certificate2("certificate.p12", "password")
 let https = HttpBinding.createSimple (HTTPS cert) "0.0.0.0" 8443
@@ -119,7 +125,24 @@ let cfg = { defaultConfig with bindings = [ https ] }</code></pre></div>
         <div class="faq-item">
           <h3>Can REST and WebSockets share one port?</h3>
           <p>Yes. Put both in one <code>choose</code> tree; you do not need two <code>startWebServer</code> calls.</p>
-          <div class="code-block"><pre><code>choose [
+          <div class="code-block"><pre><code>open Suave
+open Suave.Filters
+open Suave.Operators
+open Suave.Successful
+open Suave.WebSocket
+open Suave.Sockets
+open Suave.Sockets.Control
+
+let wsHandler (webSocket : WebSocket) (ctx : HttpContext) = socket {
+  let mutable loop = true
+  while loop do
+    let! msg = webSocket.read()
+    match msg with
+    | (Close, _, _) -&gt; loop &lt;- false
+    | _ -&gt; ()
+}
+
+let app = choose [
   path "/ws" &gt;=&gt; handShake wsHandler
   path "/api/people" &gt;=&gt; GET &gt;=&gt; OK "..."
 ]</code></pre></div>

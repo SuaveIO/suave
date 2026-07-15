@@ -87,39 +87,46 @@
 open Suave.Successful
 open Suave.RequestErrors
 open Suave.ServerErrors
+open Suave.Filters
+open Suave.Operators
 
 let app =
   choose [
-    path "/ok" >=> OK "200 OK"
-    path "/created" >=> CREATED "201 Created"
-    path "/accepted" >=> ACCEPTED "202 Accepted"
+    path "/ok" &gt;=&gt; OK "200 OK"
+    path "/created" &gt;=&gt; CREATED "201 Created"
+    path "/accepted" &gt;=&gt; ACCEPTED "202 Accepted"
     
-    path "/bad-request" >=> BAD_REQUEST "400 Bad Request"
-    path "/unauthorized" >=> UNAUTHORIZED "401 Unauthorized"
-    path "/forbidden" >=> FORBIDDEN "403 Forbidden"
-    path "/not-found" >=> NOT_FOUND "404 Not Found"
-    path "/conflict" >=> CONFLICT "409 Conflict"
+    path "/bad-request" &gt;=&gt; BAD_REQUEST "400 Bad Request"
+    path "/unauthorized" &gt;=&gt; UNAUTHORIZED "401 Unauthorized"
+    path "/forbidden" &gt;=&gt; FORBIDDEN "403 Forbidden"
+    path "/not-found" &gt;=&gt; NOT_FOUND "404 Not Found"
+    path "/conflict" &gt;=&gt; CONFLICT "409 Conflict"
     
-    path "/server-error" >=> INTERNAL_ERROR "500 Server Error"
-    path "/not-implemented" >=> NOT_IMPLEMENTED "501 Not Implemented"
+    path "/server-error" &gt;=&gt; INTERNAL_ERROR "500 Server Error"
+    path "/not-implemented" &gt;=&gt; NOT_IMPLEMENTED "501 Not Implemented"
   ]</code></pre>
       </div>
 
       <h2>Reading Request Headers</h2>
       <p>Access HTTP headers from the request:</p>
       <div class="code-block">
-        <pre><code>let app =
+        <pre><code>open Suave
+open Suave.Filters
+open Suave.Operators
+open Suave.Successful
+
+let app =
   choose [
-    path "/headers" >=> fun ctx ->
+    path "/headers" &gt;=&gt; fun ctx -&gt;
       let userAgent = 
         match ctx.request.header "user-agent" with
-        | Choice1Of2 ua -> sprintf "User-Agent: %s" ua
-        | Choice2Of2 _ -> "User-Agent not provided"
+        | Choice1Of2 ua -&gt; sprintf "User-Agent: %s" ua
+        | Choice2Of2 _ -&gt; "User-Agent not provided"
       
       let contentType =
         match ctx.request.header "content-type" with
-        | Choice1Of2 ct -> sprintf "Content-Type: %s" ct
-        | Choice2Of2 _ -> "Content-Type not provided"
+        | Choice1Of2 ct -&gt; sprintf "Content-Type: %s" ct
+        | Choice2Of2 _ -&gt; "Content-Type not provided"
       
       let response = sprintf "%s\n%s" userAgent contentType
       OK response ctx
@@ -129,21 +136,27 @@ let app =
       <h2>Query String Parameters</h2>
       <p>Extract and parse query parameters:</p>
       <div class="code-block">
-        <pre><code>let app =
+        <pre><code>open Suave
+open Suave.Filters
+open Suave.Operators
+open Suave.Successful
+open Suave.RequestErrors
+
+let app =
   choose [
-    path "/search" >=> fun ctx ->
+    path "/search" &gt;=&gt; fun ctx -&gt;
       match ctx.request.queryParam "q" with
-      | Choice1Of2 query -> 
+      | Choice1Of2 query -&gt; 
           OK (sprintf "Search results for: %s" query) ctx
-      | Choice2Of2 _ -> 
+      | Choice2Of2 _ -&gt; 
           BAD_REQUEST "Missing 'q' parameter" ctx
     
-    path "/page" >=> fun ctx ->
+    path "/page" &gt;=&gt; fun ctx -&gt;
       match ctx.request.queryParam "n" with
-      | Choice1Of2 nStr when System.Int32.TryParse(nStr) |> fst ->
+      | Choice1Of2 nStr when System.Int32.TryParse(nStr) |&gt; fst -&gt;
           let page = System.Int32.Parse(nStr)
           OK (sprintf "Page: %d" page) ctx
-      | _ -> 
+      | _ -&gt; 
           BAD_REQUEST "Invalid page number" ctx
   ]</code></pre>
       </div>
@@ -151,62 +164,79 @@ let app =
       <h2>Request Body (Form Data)</h2>
       <p>Read form data from POST requests:</p>
       <div class="code-block">
-        <pre><code>let app =
+        <pre><code>open Suave
+open Suave.Filters
+open Suave.Operators
+open Suave.Successful
+open Suave.RequestErrors
+
+let app =
   choose [
-    POST >=> path "/form" >=> fun ctx ->
+    POST &gt;=&gt; path "/form" &gt;=&gt; fun ctx -&gt;
       async {
         match ctx.request.formData "name" with
-        | Choice1Of2 name ->
+        | Choice1Of2 name -&gt;
             let response = sprintf "Hello, %s!" name
             return! OK response ctx
-        | Choice2Of2 _ ->
+        | Choice2Of2 _ -&gt;
             return! BAD_REQUEST "Missing 'name' field" ctx
       }
   ]</code></pre>
       </div>
 
       <h2>JSON Request/Response</h2>
-      <p>Work with JSON using Suave's JSON support:</p>
+      <p>Work with JSON using the <code>Suave.Json</code> package (<code>dotnet add package Suave.Json</code>). <code>toJson</code>/<code>fromJson</code> use <code>DataContractJsonSerializer</code>, so mark records with <code>DataContract</code>:</p>
       <div class="code-block">
-        <pre><code>open Suave
+        <pre><code>open System.Runtime.Serialization
+open Suave
+open Suave.Filters
+open Suave.Operators
+open Suave.Successful
+open Suave.RequestErrors
+open Suave.Writers
 open Suave.Json
 
-type User = { id: int; name: string; email: string }
+[&lt;DataContract&gt;]
+type User =
+  { [&lt;field: DataMember(Name = "id")&gt;] id : int
+    [&lt;field: DataMember(Name = "name")&gt;] name : string
+    [&lt;field: DataMember(Name = "email")&gt;] email : string }
 
 let app =
   choose [
-    POST >=> path "/api/users" >=> fun ctx ->
-      async {
-        try
-          let! user = ctx.request.rawForm |> UTF8.toString |> JSON.parse&lt;User&gt;
-          let response = sprintf "Created user: %s" user.name
-          return! OK response ctx
-        with
-        | _ -> return! BAD_REQUEST "Invalid JSON" ctx
-      }
-    
-    GET >=> path "/api/users" >=> fun ctx ->
-      let users = 
+    POST &gt;=&gt; path "/api/users" &gt;=&gt; fun ctx -&gt;
+      try
+        let user = fromJson&lt;User&gt; ctx.request.rawForm
+        OK (sprintf "Created user: %s" user.name) ctx
+      with
+      | _ -&gt; BAD_REQUEST "Invalid JSON" ctx
+
+    GET &gt;=&gt; path "/api/users" &gt;=&gt; fun ctx -&gt;
+      let users =
         [ { id = 1; name = "Alice"; email = "alice@example.com" }
           { id = 2; name = "Bob"; email = "bob@example.com" } ]
-      JSON.toJson users |> OK |> (fun f -> f ctx)
+      (toJson users |&gt; Successful.ok &gt;=&gt; setMimeType "application/json") ctx
   ]</code></pre>
       </div>
 
       <h2>Setting Response Headers</h2>
       <p>Add custom headers to responses:</p>
       <div class="code-block">
-        <pre><code>open Suave.Writers
+        <pre><code>open Suave
+open Suave.Filters
+open Suave.Operators
+open Suave.Successful
+open Suave.Writers
 
 let app =
   choose [
-    path "/custom-headers" =>
-      setHeader "X-Custom-Header" "CustomValue" >=>
-      setHeader "Cache-Control" "no-cache" >=>
+    path "/custom-headers" &gt;=&gt;
+      setHeader "X-Custom-Header" "CustomValue" &gt;=&gt;
+      setHeader "Cache-Control" "no-cache" &gt;=&gt;
       OK "Response with custom headers"
-    
-    path "/json-api" =>
-      setHeader "Content-Type" "application/json" >=>
+
+    path "/json-api" &gt;=&gt;
+      setMimeType "application/json; charset=utf-8" &gt;=&gt;
       OK "{\"message\":\"Hello\"}"
   ]</code></pre>
       </div>
@@ -214,12 +244,16 @@ let app =
       <h2>Setting Response Cookies</h2>
       <p>Add cookies to responses:</p>
       <div class="code-block">
-        <pre><code>open Suave.Writers
+        <pre><code>open Suave
+open Suave.Writers
+open Suave.Filters
+open Suave.Operators
+open Suave.Successful
 
 let app =
   choose [
-    path "/set-cookie" >=>
-      setHeader "Set-Cookie" "session=abc123; Path=/" >=>
+    path "/set-cookie" &gt;=&gt;
+      setHeader "Set-Cookie" "session=abc123; Path=/" &gt;=&gt;
       OK "Cookie set"
   ]</code></pre>
       </div>
@@ -242,26 +276,26 @@ let mutable products =
 let app =
   choose [
     // GET /products - List all
-    GET >=> path "/products" >=> 
+    GET &gt;=&gt; path "/products" &gt;=&gt; 
       OK (sprintf "Products: %A" products)
     
     // GET /products/:id - Get one
-    GET >=> pathScan "/products/%d" (fun id ->
-      match products |> List.tryFind (fun p -> p.id = id) with
-      | Some p -> OK (sprintf "Product: %s - $%.2f" p.name p.price)
-      | None -> NOT_FOUND "Product not found"
+    GET &gt;=&gt; pathScan "/products/%d" (fun id -&gt;
+      match products |&gt; List.tryFind (fun p -&gt; p.id = id) with
+      | Some p -&gt; OK (sprintf "Product: %s - $%.2f" p.name p.price)
+      | None -&gt; NOT_FOUND "Product not found"
     )
     
     // POST /products - Create
-    POST >=> path "/products" >=> fun ctx ->
+    POST &gt;=&gt; path "/products" &gt;=&gt; fun ctx -&gt;
       match ctx.request.formData "name", ctx.request.formData "price" with
-      | Choice1Of2 name, Choice1Of2 priceStr when System.Double.TryParse(priceStr) |> fst ->
+      | Choice1Of2 name, Choice1Of2 priceStr when System.Double.TryParse(priceStr) |&gt; fst -&gt;
           let price = System.Double.Parse(priceStr)
-          let id = products |> List.maxBy (fun p -> p.id) |> fun p -> p.id + 1
+          let id = products |&gt; List.maxBy (fun p -&gt; p.id) |&gt; fun p -&gt; p.id + 1
           let product = { id = id; name = name; price = price }
-          products <- products @ [product]
+          products &lt;- products @ [product]
           CREATED (sprintf "Created: %s" name) ctx
-      | _ -> BAD_REQUEST "Invalid data" ctx
+      | _ -&gt; BAD_REQUEST "Invalid data" ctx
   ]</code></pre>
       </div>
       </div>

@@ -79,13 +79,18 @@
 
         <h2>Built-in Logger</h2>
         <div class="code-block"><pre><code>open Suave
+open Suave.Globals
 
 Logger.info "Server starting"
 // Logger.debug is only emitted when the DEBUG conditional is defined</code></pre></div>
 
         <h2>Application logging</h2>
         <p>Prefer structured logging from your own code (Serilog, Microsoft.Extensions.Logging, Logary, etc.) at the WebPart boundary:</p>
-        <div class="code-block"><pre><code>let logged path next : WebPart =
+        <div class="code-block"><pre><code>open Suave
+open Suave.Globals
+open Suave.Operators
+
+let logged path next : WebPart =
   context (fun ctx -&gt;
     Logger.info (sprintf "%s %s" ctx.request.rawMethod path)
     next)</code></pre></div>

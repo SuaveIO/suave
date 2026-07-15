@@ -91,15 +91,15 @@ open Suave.Writers
 
 let app =
   choose [
-    path "/set-session" >=>
-      setHeader "Set-Cookie" "session=user123; Path=/; HttpOnly" >=>
+    path "/set-session" &gt;=&gt;
+      setHeader "Set-Cookie" "session=user123; Path=/; HttpOnly" &gt;=&gt;
       OK "Session set"
     
-    path "/get-session" >=> fun ctx ->
+    path "/get-session" &gt;=&gt; fun ctx -&gt;
       match ctx.request.header "Cookie" with
-      | Choice1Of2 cookies ->
+      | Choice1Of2 cookies -&gt;
           OK (sprintf "Cookies: %s" cookies) ctx
-      | Choice2Of2 _ ->
+      | Choice2Of2 _ -&gt;
           OK "No session" ctx
   ]</code></pre>
       </div>
@@ -109,35 +109,41 @@ let app =
       <div class="code-block">
         <pre><code>open Suave
 open Suave.Operators
+open Suave.Filters
+open Suave.Successful
+open Suave.Writers
 open System.Collections.Concurrent
+open Suave.RequestErrors
+
+type SessionData = { userId : int; username : string }
 
 // In-memory session store
-let sessions = new ConcurrentDictionary&lt;string, obj&gt;()
+let sessions = new ConcurrentDictionary&lt;string, SessionData&gt;()
 
 let app =
   choose [
-    POST >=> path "/login" >=> fun ctx ->
+    POST &gt;=&gt; path "/login" &gt;=&gt; fun ctx -&gt;
       async {
         let sessionId = System.Guid.NewGuid().ToString()
-        let sessionData = box { userId = 1; username = "john" }
-        sessions.TryAdd(sessionId, sessionData) |> ignore
+        let sessionData = { userId = 1; username = "john" }
+        sessions.TryAdd(sessionId, sessionData) |&gt; ignore
         
-        return! 
-          setHeader "Set-Cookie" 
-            (sprintf "sessionId=%s; Path=/; HttpOnly" sessionId) >=>
-          OK "Session created" ctx
+        return!
+          (setHeader "Set-Cookie"
+            (sprintf "sessionId=%s; Path=/; HttpOnly" sessionId) &gt;=&gt;
+           OK "Session created") ctx
       }
     
-    path "/profile" >=> fun ctx ->
-      match ctx.request.header "Cookie" with
-      | Choice1Of2 cookie ->
+    path "/profile" &gt;=&gt; fun ctx -&gt;
+      match ctx.request.header "cookie" with
+      | Choice1Of2 cookie -&gt;
           let sessionId = cookie.Split('=').[1]
           match sessions.TryGetValue(sessionId) with
-          | true, sessionData ->
-              OK (sprintf "Session data: %O" sessionData) ctx
-          | false, _ ->
+          | true, sessionData -&gt;
+              OK (sprintf "Session data: %A" sessionData) ctx
+          | false, _ -&gt;
               RequestErrors.UNAUTHORIZED "Invalid session" ctx
-      | Choice2Of2 _ ->
+      | Choice2Of2 _ -&gt;
           RequestErrors.UNAUTHORIZED "No session" ctx
   ]</code></pre>
       </div>
@@ -148,15 +154,18 @@ let app =
         <pre><code>open Suave
 open Suave.Operators
 open System
+open Suave.Filters
+open Suave.Successful
+open Suave.Writers
 
 let sessionTimeout = TimeSpan.FromMinutes(30.0)
 
 let app =
   choose [
-    path "/login" >=>
+    path "/login" &gt;=&gt;
       setHeader "Set-Cookie" 
         (sprintf "session=xyz; Path=/; Max-Age=%d; HttpOnly" 
-          (int sessionTimeout.TotalSeconds)) >=>
+          (int sessionTimeout.TotalSeconds)) &gt;=&gt;
       OK "Session created with 30 minute timeout"
   ]</code></pre>
       </div>
@@ -167,14 +176,16 @@ let app =
         <pre><code>open Suave
 open Suave.Operators
 open Suave.Writers
+open Suave.Filters
+open Suave.Successful
 
 let createSecureSessionCookie (sessionId: string) =
   sprintf "session=%s; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=1800" sessionId
 
 let app =
   choose [
-    path "/secure-login" >=>
-      setHeader "Set-Cookie" (createSecureSessionCookie "session-xyz") >=>
+    path "/secure-login" &gt;=&gt;
+      setHeader "Set-Cookie" (createSecureSessionCookie "session-xyz") &gt;=&gt;
       OK "Secure session created"
   ]</code></pre>
       </div>
@@ -185,6 +196,7 @@ let app =
         <pre><code>open Suave
 open System
 open System.Collections.Concurrent
+open Suave.Successful
 
 let sessions = new ConcurrentDictionary&lt;string, (obj * DateTime)&gt;()
 
@@ -195,11 +207,11 @@ let cleanupExpiredSessions () =
       let now = DateTime.UtcNow
       let expired = 
         sessions 
-        |> Seq.filter (fun kvp -> (snd kvp.Value - now).TotalMinutes > 30.0)
-        |> Seq.map (fun kvp -> kvp.Key)
-        |> Seq.toList
+        |&gt; Seq.filter (fun kvp -&gt; (snd kvp.Value - now).TotalMinutes &gt; 30.0)
+        |&gt; Seq.map (fun kvp -&gt; kvp.Key)
+        |&gt; Seq.toList
       
-      expired |> List.iter (fun key -> sessions.TryRemove(key) |> ignore)
+      expired |&gt; List.iter (fun key -&gt; sessions.TryRemove(key) |&gt; ignore)
       printfn "Cleaned up %d expired sessions" expired.Length
   }
 
@@ -219,32 +231,35 @@ let main argv =
         <pre><code>open Suave
 open Suave.Operators
 open System.Collections.Concurrent
+open Suave.Filters
+open Suave.Successful
+open Suave.RequestErrors
 
 let csrfTokens = new ConcurrentDictionary&lt;string, string&gt;()
 
 let generateCSRFToken sessionId =
   let token = System.Guid.NewGuid().ToString()
-  csrfTokens.AddOrUpdate(sessionId, token, fun _ _ -> token) |> ignore
+  csrfTokens.AddOrUpdate(sessionId, token, fun _ _ -&gt; token) |&gt; ignore
   token
 
 let validateCSRFToken sessionId token =
   match csrfTokens.TryGetValue(sessionId) with
-  | true, storedToken -> storedToken = token
-  | false, _ -> false
+  | true, storedToken -&gt; storedToken = token
+  | false, _ -&gt; false
 
 let app =
   choose [
-    GET >=> path "/form" >=> fun ctx ->
+    GET &gt;=&gt; path "/form" &gt;=&gt; fun ctx -&gt;
       let sessionId = "session-123"
       let token = generateCSRFToken sessionId
       let html = sprintf "&lt;input type='hidden' name='csrf_token' value='%s'&gt;" token
       OK html ctx
     
-    POST >=> path "/form" >=> fun ctx ->
+    POST &gt;=&gt; path "/form" &gt;=&gt; fun ctx -&gt;
       match ctx.request.formData "csrf_token" with
-      | Choice1Of2 token when validateCSRFToken "session-123" token ->
+      | Choice1Of2 token when validateCSRFToken "session-123" token -&gt;
           OK "Form submitted safely" ctx
-      | _ ->
+      | _ -&gt;
           RequestErrors.FORBIDDEN "CSRF token invalid" ctx
   ]</code></pre>
       </div>

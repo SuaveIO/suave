@@ -150,16 +150,22 @@ let tail = span.Slice(idx + 1)</code></pre>
 
       <h3>Stream bodies instead of concatenating</h3>
       <div class="code-block">
-        <pre><code>// Bad: builds N intermediate strings.
+        <pre><code>open System.Text
+open Suave
+open Suave.Successful
+
+// Bad: builds N intermediate strings.
 let mutable s = ""
-for i in 1 .. 1000 do s &lt;- s + line i
+for i in 1 .. 1000 do s &lt;- s + sprintf "line %d" i
 
 // Good: write each chunk directly to the connection.
-fun ctx -&gt; async {
-  for i in 1 .. 1000 do
-    do! ctx.connection.asyncWriteBufferedBytes (line i)
-  return! Successful.no_content ctx
-}</code></pre>
+let streamLines : WebPart =
+  fun ctx -&gt; async {
+    for i in 1 .. 1000 do
+      let chunk = Encoding.UTF8.GetBytes(sprintf "line %d\n" i)
+      do! Async.AwaitTask (ctx.connection.asyncWriteBufferedBytes chunk)
+    return! NO_CONTENT ctx
+  }</code></pre>
       </div>
 
       <h3>Reuse the cached UTF-8 encoder</h3>

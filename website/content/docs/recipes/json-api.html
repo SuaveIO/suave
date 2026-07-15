@@ -77,12 +77,16 @@
         <h1>Recipe: JSON with Suave.Json</h1>
         <div class="recipe-meta"><p><strong>Goal:</strong> Map JSON bodies with the Suave.Json package.</p></div>
         <div class="code-block"><pre><code>// dotnet add package Suave.Json
+open System.Runtime.Serialization
 open Suave
 open Suave.Filters
 open Suave.Operators
 open Suave.Json
 
-type Person = { name : string; age : int }
+[&lt;DataContract&gt;]
+type Person =
+  { [&lt;field: DataMember(Name = "name")&gt;] name : string
+    [&lt;field: DataMember(Name = "age")&gt;]  age  : int }
 
 let echo =
   mapJson (fun (p : Person) -&gt; { p with name = p.name.ToUpperInvariant() })

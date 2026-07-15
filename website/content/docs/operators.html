@@ -95,7 +95,7 @@ open Suave.Successful
 open Suave.Utils.Collections
 
 let greetings q =
-  defaultArg (Option.ofChoice (q ^^ "name")) "World"
+  defaultArg (Suave.Utils.Option.ofChoice (q ^^ "name")) "World"
   |&gt; sprintf "Hello %s"
 
 let app =

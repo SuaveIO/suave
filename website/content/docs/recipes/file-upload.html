@@ -86,13 +86,15 @@ open Suave.RequestErrors
 
 let handleUpload =
   request (fun r -&gt;
-    match r.files with
-    | file :: _ -&gt;
+    let files = r.files
+    if files.Count = 0 then
+      BAD_REQUEST "No file"
+    else
+      let file = files.[0]
       let dest = Path.Combine("uploads", file.fileName)
       Directory.CreateDirectory("uploads") |&gt; ignore
       File.Copy(file.tempFilePath, dest, true)
-      OK (sprintf "Saved %s" file.fileName)
-    | [] -&gt; BAD_REQUEST "No file")
+      OK (sprintf "Saved %s" file.fileName))
 
 let app = choose [
   GET &gt;=&gt; path "/" &gt;=&gt; OK """

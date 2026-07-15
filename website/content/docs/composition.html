@@ -83,7 +83,9 @@
       <h2>Understanding WebPart</h2>
       <p>A WebPart is the basic building block in Suave:</p>
       <div class="code-block">
-        <pre><code>// A WebPart is a function that takes HttpContext and returns async option
+        <pre><code>open Suave
+
+// A WebPart is a function that takes HttpContext and returns an async option
 type WebPart = HttpContext -> Async&lt;HttpContext option&gt;
 
 // If Some ctx is returned, the handler succeeded
@@ -131,11 +133,14 @@ let app =
         <pre><code>open Suave
 open Suave.Operators
 open Suave.Writers
+open Suave.Successful
+open Suave.Filters
+open Suave.ServerErrors
 
 // Logging middleware
 let logRequest : WebPart =
   fun ctx ->
-    printfn "[%s] %s %s" (System.DateTime.Now.ToString()) ctx.request.method ctx.request.path
+    printfn "[%s] %s %s" (System.DateTime.Now.ToString()) ctx.request.rawMethod ctx.request.path
     async { return Some ctx }
 
 // Authentication middleware
@@ -149,7 +154,7 @@ let requireAuth : WebPart =
 let errorHandler (ex: System.Exception) : WebPart =
   fun ctx ->
     printfn "Error: %s" ex.Message
-    RequestErrors.INTERNAL_ERROR ex.Message ctx
+    INTERNAL_ERROR ex.Message ctx
 
 // Use middleware
 let app =
@@ -165,6 +170,8 @@ let app =
         <pre><code>open Suave
 open Suave.Operators
 open Suave.Writers
+open Suave.Successful
+open Suave.Filters
 
 // Common middleware stack
 let globalMiddleware =
@@ -181,7 +188,7 @@ let corsMiddleware =
 let loggingMiddleware : WebPart =
   fun ctx ->
     async {
-      printfn "[%s] %s %s" (System.DateTime.UtcNow.ToString()) ctx.request.method ctx.request.path
+      printfn "[%s] %s %s" (System.DateTime.UtcNow.ToString()) ctx.request.rawMethod ctx.request.path
       return Some ctx
     }
 
@@ -202,6 +209,7 @@ let app =
         <pre><code>open Suave
 open Suave.Operators
 open Suave.Filters
+open Suave.Successful
 
 let isDev = System.Environment.GetEnvironmentVariable("ENV") = "Development"
 
@@ -217,7 +225,7 @@ let app =
 
     // API routes
     yield path "/api/users" >=> OK "Users"
-  ] |> choose  // Wrap in choose to handle the if-expression</code></pre>
+  ]</code></pre>
       </div>
 
       <h2>Scoped Middleware</h2>
@@ -227,6 +235,7 @@ let app =
 open Suave.Operators
 open Suave.Filters
 open Suave.Writers
+open Suave.Successful
 
 let adminMiddleware =
   setHeader "X-Admin" "true" >=>
@@ -298,6 +307,7 @@ let app =
         <pre><code>open Suave
 open Suave.Operators
 open Suave.Filters
+open Suave.Successful
 
 // Sub-application 1: API
 let apiApp =
@@ -320,11 +330,11 @@ let publicApp =
     path "/about" >=> OK "About"
   ]
 
-// Combine into main app
+// Combine into main app (pathStarts matches a prefix)
 let app =
   choose [
-    pathPrefix "/api" >=> apiApp
-    pathPrefix "/admin" >=> adminApp
+    pathStarts "/api" >=> apiApp
+    pathStarts "/admin" >=> adminApp
     publicApp
   ]</code></pre>
       </div>
@@ -334,6 +344,9 @@ let app =
       <div class="code-block">
         <pre><code>open Suave
 open Suave.Operators
+open Suave.Filters
+open Suave.Successful
+open Suave.ServerErrors
 
 // Error handler wrapper
 let withErrorHandling (handler: WebPart) : WebPart =
@@ -348,14 +361,14 @@ let withErrorHandling (handler: WebPart) : WebPart =
       with
       | ex ->
           printfn "Unhandled error: %s" ex.Message
-          return! RequestErrors.INTERNAL_ERROR "Server error" ctx
+          return! INTERNAL_ERROR "Server error" ctx
     }
 
 let app =
   withErrorHandling (
     choose [
       path "/" >=> OK "Home"
-      path "/error" >=> failwith "Intentional error"
+      path "/error" >=> fun _ -> failwith "Intentional error"
     ]
   )</code></pre>
       </div>

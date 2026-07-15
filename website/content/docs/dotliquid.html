@@ -77,237 +77,63 @@
         </ul>
       </aside>
       <div class="docs-content">
-<h1>Template Engines</h1>
-      <p>Use DotLiquid and other templating engines to generate dynamic HTML with Suave.</p>
+        <h1>DotLiquid templates</h1>
+      <p>Render HTML with the <code>Suave.DotLiquid</code> package. Install it first:</p>
+      <div class="code-block">
+        <pre><code>dotnet add package Suave.DotLiquid</code></pre>
+      </div>
 
-      <h2>DotLiquid Basics</h2>
-      <p>Use DotLiquid templates for flexible HTML generation:</p>
+      <h2>Hello template</h2>
+      <p>Put a file such as <code>templates/hello.liquid</code> next to your app:</p>
+      <div class="code-block">
+        <pre><code>&lt;!-- templates/hello.liquid --&gt;
+&lt;h1&gt;Hello {{ model.name }}&lt;/h1&gt;
+&lt;p&gt;You are {{ model.age }} years old.&lt;/p&gt;</code></pre>
+      </div>
       <div class="code-block">
         <pre><code>open Suave
-open Suave.Operators
-open Suave.Successful
-open DotLiquid
-
-let template = "Hello {{name}}, you are {{age}} years old"
-
-let app =
-  choose [
-    path "/greet" >=> fun ctx ->
-      let template = Template.Parse(template)
-      let data = DotLiquid.Hash.FromDictionary(dict ["name", box "John"; "age", box 30])
-      let result = template.Render(data)
-      OK result ctx
-  ]</code></pre>
-      </div>
-
-      <h2>Loading Templates from Files</h2>
-      <p>Load and render templates from disk:</p>
-      <div class="code-block">
-        <pre><code>open Suave
-open Suave.Operators
-open Suave.Successful
-open DotLiquid
-open System.IO
-
-let loadTemplate path =
-  let content = File.ReadAllText(path)
-  Template.Parse(content)
-
-let app =
-  choose [
-    path "/page" >=> fun ctx ->
-      let template = loadTemplate "./templates/page.liquid"
-      let data = DotLiquid.Hash.FromDictionary(
-        dict ["title", box "Welcome"; "content", box "Hello World"]
-      )
-      let result = template.Render(data)
-      OK result ctx
-  ]</code></pre>
-      </div>
-
-      <h2>Template with Loops</h2>
-      <p>Use loops in DotLiquid templates:</p>
-      <div class="code-block">
-        <pre><code>// Template file: list.liquid
-// {% for item in items %}
-//   &lt;li&gt;{{item.name}}&lt;/li&gt;
-// {% endfor %}
-
-open Suave
-open Suave.Operators
-open DotLiquid
-
-let app =
-  choose [
-    path "/items" >=> fun ctx ->
-      let template = Template.Parse("""
-        &lt;ul&gt;
-        {% for item in items %}
-          &lt;li&gt;{{item.name}}&lt;/li&gt;
-        {% endfor %}
-        &lt;/ul&gt;
-      """)
-      
-      let items = [
-        dict ["name", box "Item 1"]
-        dict ["name", box "Item 2"]
-        dict ["name", box "Item 3"]
-      ]
-      
-      let data = DotLiquid.Hash.FromDictionary(
-        dict ["items", box items]
-      )
-      
-      let result = template.Render(data)
-      OK result ctx
-  ]</code></pre>
-      </div>
-
-      <h2>Template Inheritance</h2>
-      <p>Create reusable template layouts:</p>
-      <div class="code-block">
-        <pre><code>// layout.liquid
-// &lt;html&gt;
-//   &lt;body&gt;
-//     {% block content %}{% endblock %}
-//   &lt;/body&gt;
-// &lt;/html&gt;
-
-// page.liquid
-// {% extends layout %}
-// {% block content %}
-//   &lt;h1&gt;{{title}}&lt;/h1&gt;
-//   {{body}}
-// {% endblock %}
-
-open Suave
-open Suave.Operators
-open DotLiquid
-
-let app =
-  choose [
-    path "/page" >=> fun ctx ->
-      let template = Template.Parse("""
-        &lt;html&gt;
-          &lt;body&gt;
-            &lt;h1&gt;{{title}}&lt;/h1&gt;
-            &lt;p&gt;{{content}}&lt;/p&gt;
-          &lt;/body&gt;
-        &lt;/html&gt;
-      """)
-      
-      let data = DotLiquid.Hash.FromDictionary(
-        dict ["title", box "My Page"; "content", box "Welcome!"]
-      )
-      
-      let result = template.Render(data)
-      OK result ctx
-  ]</code></pre>
-      </div>
-
-      <h2>Conditional Rendering</h2>
-      <p>Use conditionals in templates:</p>
-      <div class="code-block">
-        <pre><code>open Suave
-open Suave.Operators
-open DotLiquid
-
-let app =
-  choose [
-    path "/user" >=> fun ctx ->
-      let template = Template.Parse("""
-        {% if isLoggedIn %}
-          &lt;p&gt;Welcome back, {{username}}!&lt;/p&gt;
-        {% else %}
-          &lt;p&gt;&lt;a href="/login"&gt;Please log in&lt;/a&gt;&lt;/p&gt;
-        {% endif %}
-      """)
-      
-      let data = DotLiquid.Hash.FromDictionary(
-        dict ["isLoggedIn", box true; "username", box "John"]
-      )
-      
-      let result = template.Render(data)
-      OK result ctx
-  ]</code></pre>
-      </div>
-
-      <h2>Custom Filters</h2>
-      <p>Define custom filters for template rendering:</p>
-      <div class="code-block">
-        <pre><code>open Suave
-open Suave.Operators
-open DotLiquid
-
-// Define a custom filter
-Template.NamingConvention <- DotLiquid.NamingConventions.RubyNamingConvention()
-
-Template.RegisterFilter("uppercase", fun (input: obj) ->
-  (input.ToString()).ToUpper()
-)
-
-let app =
-  choose [
-    path "/filtered" >=> fun ctx ->
-      let template = Template.Parse("{{message | uppercase}}")
-      let data = DotLiquid.Hash.FromDictionary(
-        dict ["message", box "hello world"]
-      )
-      let result = template.Render(data)
-      // Output: "HELLO WORLD"
-      OK result ctx
-  ]</code></pre>
-      </div>
-
-      <h2>Complete Example</h2>
-      <p>Full example with layout and data:</p>
-      <div class="code-block">
-        <pre><code>open Suave
-open Suave.Operators
 open Suave.Filters
-open DotLiquid
+open Suave.Operators
+open Suave.DotLiquid
 
-let layoutTemplate = """
-&lt;!DOCTYPE html&gt;
-&lt;html&gt;
-&lt;head&gt;
-  &lt;title&gt;{{title}}&lt;/title&gt;
-&lt;/head&gt;
-&lt;body&gt;
-  &lt;header&gt;
-    &lt;h1&gt;{{siteTitle}}&lt;/h1&gt;
-  &lt;/header&gt;
-  &lt;main&gt;
-    {{content}}
-  &lt;/main&gt;
-  &lt;footer&gt;
-    &lt;p&gt;{{year}} - All rights reserved&lt;/p&gt;
-  &lt;/footer&gt;
-&lt;/body&gt;
-&lt;/html&gt;
-"""
+type Person = { name : string; age : int }
 
-let renderPage title content =
-  let template = Template.Parse(layoutTemplate)
-  let data = DotLiquid.Hash.FromDictionary(
-    dict [
-      "title", box title
-      "siteTitle", box "My Site"
-      "content", box content
-      "year", box (System.DateTime.Now.Year)
-    ]
-  )
-  template.Render(data)
+// Point DotLiquid at your templates folder (once at startup)
+do setTemplatesDir "./templates"
+
+let app =
+  path "/greet" &gt;=&gt; page "hello.liquid" { name = "Ada"; age = 36 }
+
+startWebServer defaultConfig app</code></pre>
+      </div>
+      <div class="callout">
+        <p>Prefer <code>Suave.DotLiquid.page</code> over calling DotLiquid’s <code>Template.Parse</code> yourself — it wires rendering into a <code>WebPart</code> for you.</p>
+      </div>
+
+      <h2>Multiple pages</h2>
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.Filters
+open Suave.Operators
+open Suave.RequestErrors
+open Suave.DotLiquid
+
+type PageModel = { title : string }
+
+do setTemplatesDir "./templates"
 
 let app =
   choose [
-    path "/" >=> 
-      OK (renderPage "Home" "&lt;h2&gt;Welcome!&lt;/h2&gt;")
-    
-    path "/about" >=>
-      OK (renderPage "About" "&lt;h2&gt;About Us&lt;/h2&gt;&lt;p&gt;Learn more...&lt;/p&gt;")
-  ]</code></pre>
+    path "/" &gt;=&gt; page "home.liquid" { title = "Home" }
+    path "/about" &gt;=&gt; page "about.liquid" { title = "About" }
+    NOT_FOUND "Not found"
+  ]
+
+startWebServer defaultConfig app</code></pre>
       </div>
+
+      <p>See also the <a href="recipes/dotliquid.html">DotLiquid recipe</a> and <a href="/reference/">API reference</a>.</p>
+
       </div>
     </div>
   </main>

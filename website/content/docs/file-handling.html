@@ -127,6 +127,7 @@ let app =
       <div class="code-block">
         <pre><code>open Suave
 open Suave.Operators
+open Suave.Filters
 open Suave.Writers
 
 let app =
@@ -144,6 +145,7 @@ let app =
 open Suave.Operators
 open Suave.Filters
 open Suave.Successful
+open Suave.ServerErrors
 open System.IO
 
 let app =
@@ -152,17 +154,18 @@ let app =
       async {
         try
           let files = ctx.request.files
-          match files |> List.tryHead with
-          | Some file ->
-              let uploadDir = "./uploads"
-              Directory.CreateDirectory(uploadDir) |> ignore
-              let savePath = Path.Combine(uploadDir, file.fileName)
-              File.WriteAllBytes(savePath, file.fileData)
-              return! OK (sprintf "File uploaded: %s" file.fileName) ctx
-          | None ->
-              return! RequestErrors.BAD_REQUEST "No file provided" ctx
+          if files.Count = 0 then
+            return! RequestErrors.BAD_REQUEST "No file provided" ctx
+          else
+            let file = files.[0]
+            let uploadDir = "./uploads"
+            Directory.CreateDirectory(uploadDir) |> ignore
+            let savePath = Path.Combine(uploadDir, file.fileName)
+            // Uploads land on disk at tempFilePath; copy/move from there
+            File.Copy(file.tempFilePath, savePath, true)
+            return! OK (sprintf "File uploaded: %s" file.fileName) ctx
         with ex ->
-          return! RequestErrors.INTERNAL_ERROR (sprintf "Upload failed: %s" ex.Message) ctx
+          return! INTERNAL_ERROR (sprintf "Upload failed: %s" ex.Message) ctx
       }
   ]</code></pre>
       </div>
@@ -172,25 +175,13 @@ let app =
       <div class="code-block">
         <pre><code>open Suave
 open Suave.Operators
-open Suave.Writers
-open System.IO
+open Suave.Filters
+open Suave.Files
 
-let streamFile filePath =
-  fun (ctx: HttpContext) ->
-    async {
-      try
-        let fileInfo = FileInfo(filePath)
-        let! result = ctx.response.asyncWriteLn(sprintf "Content-Length: %d" fileInfo.Length)
-        use file = File.OpenRead(filePath)
-        do! Suave.Sockets.Control.transferStream ctx.connection.socket file
-        return Some ctx
-      with _ ->
-        return! RequestErrors.INTERNAL_ERROR "Stream error" ctx
-    }
-
+// Files.file streams from disk without buffering the whole payload
 let app =
   choose [
-    path "/large-file" >=> streamFile "./data/large-file.bin"
+    path "/large-file" >=> file "./data/large-file.bin"
   ]</code></pre>
       </div>
 
@@ -200,23 +191,24 @@ let app =
         <pre><code>open Suave
 open Suave.Files
 open Suave.Operators
+open Suave.Filters
 open Suave.Writers
 
 let app =
   choose [
     pathRegex @".*\.pdf$" >=>
       setHeader "Content-Type" "application/pdf" >=>
-      Files.file
+      browseHome
 
     pathRegex @".*\.txt$" >=>
       setHeader "Content-Type" "text/plain" >=>
-      Files.file
+      browseHome
 
     pathRegex @".*\.json$" >=>
       setHeader "Content-Type" "application/json" >=>
-      Files.file
+      browseHome
 
-    Files.browseHome
+    browseHome
   ]</code></pre>
       </div>
 
@@ -247,6 +239,7 @@ let app =
         <pre><code>open Suave
 open Suave.Files
 open Suave.Operators
+open Suave.Filters
 open Suave.Writers
 
 let cacheFor (seconds: int) =
@@ -256,17 +249,17 @@ let app =
   choose [
     pathRegex @".*\.(js|css)$" >=>
       cacheFor 86400 >=>  // 1 day
-      Files.browseHome
+      browseHome
 
     pathRegex @".*\.(jpg|png|gif|svg)$" >=>
       cacheFor 604800 >=>  // 7 days
-      Files.browseHome
+      browseHome
 
     pathRegex @".*\.html$" >=>
       cacheFor 3600 >=>   // 1 hour
-      Files.browseHome
+      browseHome
 
-    Files.browseHome
+    browseHome
   ]</code></pre>
       </div>
 

@@ -84,8 +84,7 @@ open Suave.RateLimit
 
 let app = choose [
   path "/api/public"
-    &gt;=&gt; rateLimit (perMinute 10)
-    &gt;=&gt; OK "public data"
+    &gt;=&gt; rateLimit (perMinute 10) (OK "public data")
   path "/health" &gt;=&gt; OK "ok"
 ]
 

@@ -79,6 +79,7 @@
         <p>Suave does not include a built-in bus. Track sockets yourself:</p>
         <div class="code-block"><pre><code>open System.Collections.Concurrent
 open System.Text
+open System.Threading.Tasks
 open Suave
 open Suave.Filters
 open Suave.Operators
@@ -88,11 +89,11 @@ open Suave.Sockets.Control
 
 let clients = ConcurrentDictionary&lt;System.Guid, WebSocket&gt;()
 
-let broadcast (text : string) = async {
+let broadcast (text : string) =
   let data = ByteSegment (Encoding.UTF8.GetBytes text)
   for KeyValue(_, ws) in clients do
-    do! ws.send Text data true |&gt; Async.Ignore
-}
+    // send returns SocketOp (ValueTask) — fire-and-forget fan-out
+    ws.send Text data true |&gt; ignore
 
 let ws (webSocket : WebSocket) (_ : HttpContext) =
   let id = System.Guid.NewGuid()
@@ -104,8 +105,8 @@ let ws (webSocket : WebSocket) (_ : HttpContext) =
         let! msg = webSocket.read()
         match msg with
         | (Text, data, true) -&gt;
-            let s = Encoding.UTF8.GetString data
-            do! async.Return () // optionally broadcast s
+            let s = Encoding.UTF8.GetString data.Span
+            // optionally call broadcast s
             do! webSocket.send Text data true
         | (Close, _, _) -&gt; loop &lt;- false
         | _ -&gt; ()

@@ -83,7 +83,7 @@
         <div class="code-block"><pre><code>open Suave
 open Suave.Successful
 
-let sleep milliseconds message : WebPart =
+let sleep (milliseconds : int) message : WebPart =
   fun ctx -&gt; async {
     do! Async.Sleep milliseconds
     return! OK message ctx
@@ -91,8 +91,10 @@ let sleep milliseconds message : WebPart =
 
         <h2>Kleisli composition (&gt;=&gt;)</h2>
         <p>The <code>&gt;=&gt;</code> operator chains two WebParts. If the left-hand side returns <code>None</code>, the right-hand side is never run (short-circuit). If it returns <code>Some ctx</code>, that context is passed to the next WebPart.</p>
-        <div class="code-block"><pre><code>open Suave.Filters
+        <div class="code-block"><pre><code>open Suave
+open Suave.Filters
 open Suave.Operators
+open Suave.Successful
 
 let app =
   path "/hello"
@@ -102,7 +104,12 @@ let app =
 
         <h2>choose</h2>
         <p><code>choose</code> tries WebParts in order until one succeeds:</p>
-        <div class="code-block"><pre><code>let app = choose [
+        <div class="code-block"><pre><code>open Suave
+open Suave.Filters
+open Suave.Operators
+open Suave.Successful
+
+let app = choose [
   path "/a" &gt;=&gt; OK "A"
   path "/b" &gt;=&gt; OK "B"
   RequestErrors.NOT_FOUND "Not found"

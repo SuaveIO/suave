@@ -280,12 +280,15 @@ startWebServer config app</code></pre>
 
       <div class="code-block">
         <pre><code>open Suave
+open Suave.Successful
+
+let app = OK "Hello"
 
 let config = {
   defaultConfig with
     bindings = [ HttpBinding.createSimple HTTP "127.0.0.1" 3000 ]
     homeFolder = Some "public"
-    logger = Logging.Targets.create Logging.LogLevel.Info [||]
+    hideHeader = false
 }
 
 startWebServer config app</code></pre>
@@ -305,7 +308,12 @@ startWebServer config app</code></pre>
       <h3>Port already in use</h3>
       <p>If port 8080 is already in use, change it in the config:</p>
       <div class="code-block">
-        <pre><code>let config = {
+        <pre><code>open Suave
+open Suave.Successful
+
+let app = OK "Hello"
+
+let config = {
   defaultConfig with
     bindings = [ HttpBinding.createSimple HTTP "127.0.0.1" 3000 ]
 }

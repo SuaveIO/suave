@@ -229,19 +229,20 @@ server {
       <h2>HTTPS/SSL Configuration</h2>
       <p>Configure HTTPS in Suave for production:</p>
       <div class="code-block">
-        <pre><code>open Suave
+        <pre><code>open System.Security.Cryptography.X509Certificates
+open Suave
+open Suave.Filters
 open Suave.Operators
 open Suave.Successful
+
+let cert = new X509Certificate2("/etc/ssl/certs/server.pfx", "password")
 
 let httpsConfig =
   { defaultConfig with
       bindings = [
-        HttpBinding.createSimple ProtocolType.HTTP "0.0.0.0" 80
-        HttpBinding.mk ProtocolType.HTTPS "0.0.0.0" 443 
-          (CertificateFromFilePath "/etc/ssl/certs/cert.pem" 
-                                   "/etc/ssl/private/key.pem")
+        HttpBinding.createSimple HTTP "0.0.0.0" 80
+        HttpBinding.createSimple (HTTPS cert) "0.0.0.0" 443
       ]
-      logger = Logging.defaultLogger
   }
 
 let app =
@@ -271,8 +272,7 @@ let getConfig () =
 
   let config =
     { defaultConfig with
-        bindings = [HttpBinding.createSimple ProtocolType.HTTP "0.0.0.0" port]
-        logger = Logging.defaultLogger
+        bindings = [HttpBinding.createSimple HTTP "0.0.0.0" port]
     }
   
   match env with
@@ -336,8 +336,7 @@ open System
 
 let monitoredConfig =
   { defaultConfig with
-      bindings = [HttpBinding.createSimple ProtocolType.HTTP "0.0.0.0" 8080]
-      logger = Logging.defaultLogger
+      bindings = [HttpBinding.createSimple HTTP "0.0.0.0" 8080]
       maxOps = 1000
   }
 
@@ -378,7 +377,7 @@ let main argv =
 // Production-optimized configuration
 let productionConfig =
   { defaultConfig with
-      bindings = [HttpBinding.createSimple ProtocolType.HTTP "0.0.0.0" 8080]
+      bindings = [HttpBinding.createSimple HTTP "0.0.0.0" 8080]
       
       // Increase concurrent operations
       maxOps = 10000

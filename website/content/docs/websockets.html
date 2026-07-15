@@ -88,6 +88,8 @@ open Suave.WebSocket
 open Suave.Sockets
 open Suave.Sockets.Control
 open System.Text
+open Suave.Filters
+open Suave.Operators
 
 let echo (webSocket: WebSocket) (context: HttpContext) =
   socket {
@@ -97,25 +99,25 @@ let echo (webSocket: WebSocket) (context: HttpContext) =
       let! msg = webSocket.read()
 
       match msg with
-      | (Text, data, true) ->
+      | (Text, data, true) -&gt;
           let str = Encoding.UTF8.GetString data.Span
           let response = sprintf "Echo: %s" str
           let byteResponse =
             response
-            |> Encoding.ASCII.GetBytes
-            |> ByteSegment
+            |&gt; Encoding.ASCII.GetBytes
+            |&gt; ByteSegment
           do! webSocket.send Text byteResponse true
 
-      | (Close, _, _) ->
+      | (Close, _, _) -&gt;
           do! webSocket.send Close (ByteSegment [||]) true
-          loop <- false
+          loop &lt;- false
 
-      | _ -> ()
+      | _ -&gt; ()
   }
 
 let app =
   choose [
-    path "/ws" >=> handShake echo
+    path "/ws" &gt;=&gt; handShake echo
   ]</code></pre>
       </div>
 
@@ -126,42 +128,44 @@ let app =
 open Suave.WebSocket
 open System.Collections.Concurrent
 open System.Text
+open Suave.Filters
+open Suave.Operators
+open Suave.Sockets
+open Suave.Sockets.Control
 
 let clients = new ConcurrentDictionary&lt;string, WebSocket&gt;()
 
 let broadcast (message: string) =
-  let bytes = Encoding.UTF8.GetBytes(message) |> ByteSegment
+  let bytes = Encoding.UTF8.GetBytes(message) |&gt; ByteSegment
   for client in clients.Values do
-    async {
-      do! client.send Text bytes true
-    } |> Async.Start
+    client.send Text bytes true |&gt; ignore
 
 let chatHandler (webSocket: WebSocket) (context: HttpContext) =
   socket {
     let clientId = System.Guid.NewGuid().ToString()
-    clients.TryAdd(clientId, webSocket) |> ignore
+    clients.TryAdd(clientId, webSocket) |&gt; ignore
     
     let mutable loop = true
     while loop do
       let! msg = webSocket.read()
 
       match msg with
-      | (Text, data, true) ->
+      | (Text, data, true) -&gt;
           let str = Encoding.UTF8.GetString data.Span
           broadcast (sprintf "%s: %s" clientId str)
 
-      | (Close, _, _) ->
+      | (Close, _, _) -&gt;
           broadcast (sprintf "%s left" clientId)
-          clients.TryRemove(clientId) |> ignore
+          clients.TryRemove(clientId) |&gt; ignore
           do! webSocket.send Close (ByteSegment [||]) true
-          loop <- false
+          loop &lt;- false
 
-      | _ -> ()
+      | _ -&gt; ()
   }
 
 let app =
   choose [
-    path "/chat" >=> handShake chatHandler
+    path "/chat" &gt;=&gt; handShake chatHandler
   ]</code></pre>
       </div>
 
@@ -172,6 +176,10 @@ let app =
 open Suave.WebSocket
 open System.Text
 open System.Text.Json
+open Suave.Filters
+open Suave.Operators
+open Suave.Sockets
+open Suave.Sockets.Control
 
 type Message = { user: string; text: string; timestamp: System.DateTime }
 
@@ -183,28 +191,28 @@ let jsonWebSocket (webSocket: WebSocket) (context: HttpContext) =
       let! msg = webSocket.read()
 
       match msg with
-      | (Text, data, true) ->
+      | (Text, data, true) -&gt;
           try
             let json = Encoding.UTF8.GetString data.Span
             let message = JsonSerializer.Deserialize&lt;Message&gt;(json)
             
             let response = { message with timestamp = System.DateTime.UtcNow }
             let responseJson = JsonSerializer.Serialize(response)
-            let responseBytes = Encoding.UTF8.GetBytes(responseJson) |> ByteSegment
+            let responseBytes = Encoding.UTF8.GetBytes(responseJson) |&gt; ByteSegment
             
             do! webSocket.send Text responseBytes true
-          with _ -> ()
+          with _ -&gt; ()
 
-      | (Close, _, _) ->
+      | (Close, _, _) -&gt;
           do! webSocket.send Close (ByteSegment [||]) true
-          loop <- false
+          loop &lt;- false
 
-      | _ -> ()
+      | _ -&gt; ()
   }
 
 let app =
   choose [
-    path "/json-ws" >=> handShake jsonWebSocket
+    path "/json-ws" &gt;=&gt; handShake jsonWebSocket
   ]</code></pre>
       </div>
 
@@ -213,6 +221,10 @@ let app =
       <div class="code-block">
         <pre><code>open Suave
 open Suave.WebSocket
+open Suave.Filters
+open Suave.Operators
+open Suave.Sockets
+open Suave.Sockets.Control
 
 let binaryEcho (webSocket: WebSocket) (context: HttpContext) =
   socket {
@@ -222,20 +234,20 @@ let binaryEcho (webSocket: WebSocket) (context: HttpContext) =
       let! msg = webSocket.read()
 
       match msg with
-      | (Binary, data, true) ->
+      | (Binary, data, true) -&gt;
           // Echo binary data back
           do! webSocket.send Binary data true
 
-      | (Close, _, _) ->
+      | (Close, _, _) -&gt;
           do! webSocket.send Close (ByteSegment [||]) true
-          loop <- false
+          loop &lt;- false
 
-      | _ -> ()
+      | _ -&gt; ()
   }
 
 let app =
   choose [
-    path "/binary" >=> handShake binaryEcho
+    path "/binary" &gt;=&gt; handShake binaryEcho
   ]</code></pre>
       </div>
 
@@ -286,6 +298,10 @@ let app =
       <div class="code-block">
         <pre><code>open Suave
 open Suave.WebSocket
+open Suave.Filters
+open Suave.Operators
+open Suave.Sockets
+open Suave.Sockets.Control
 
 let safeWebSocket (webSocket: WebSocket) (context: HttpContext) =
   socket {
@@ -297,28 +313,28 @@ let safeWebSocket (webSocket: WebSocket) (context: HttpContext) =
           let! msg = webSocket.read()
 
           match msg with
-          | (Text, data, true) ->
+          | (Text, data, true) -&gt;
               let str = System.Text.Encoding.UTF8.GetString data.Span
-              let response = sprintf "OK: %s" str |> System.Text.Encoding.ASCII.GetBytes |> ByteSegment
+              let response = sprintf "OK: %s" str |&gt; System.Text.Encoding.ASCII.GetBytes |&gt; ByteSegment
               do! webSocket.send Text response true
 
-          | (Close, _, _) ->
+          | (Close, _, _) -&gt;
               do! webSocket.send Close (ByteSegment [||]) true
-              loop <- false
+              loop &lt;- false
 
-          | _ -> ()
+          | _ -&gt; ()
         with
-        | ex ->
+        | ex -&gt;
             printfn "WebSocket error: %s" ex.Message
-            loop <- false
+            loop &lt;- false
 
-    with ex ->
+    with ex -&gt;
       printfn "Fatal WebSocket error: %s" ex.Message
   }
 
 let app =
   choose [
-    path "/safe-ws" >=> handShake safeWebSocket
+    path "/safe-ws" &gt;=&gt; handShake safeWebSocket
   ]</code></pre>
       </div>
 
@@ -329,6 +345,12 @@ let app =
 open Suave.WebSocket
 open System.Collections.Concurrent
 open System.Text
+open Suave.Filters
+open Suave.Operators
+open Suave.Successful
+open Suave.RequestErrors
+open Suave.Sockets
+open Suave.Sockets.Control
 
 let notificationClients = new ConcurrentBag&lt;WebSocket&gt;()
 
@@ -341,31 +363,29 @@ let notificationHandler (webSocket: WebSocket) (context: HttpContext) =
       let! msg = webSocket.read()
 
       match msg with
-      | (Close, _, _) ->
+      | (Close, _, _) -&gt;
           do! webSocket.send Close (ByteSegment [||]) true
-          loop <- false
+          loop &lt;- false
 
-      | _ -> ()
+      | _ -&gt; ()
   }
 
 let sendNotification (notification: string) =
-  let bytes = Encoding.UTF8.GetBytes(notification) |> ByteSegment
+  let bytes = Encoding.UTF8.GetBytes(notification) |&gt; ByteSegment
   for client in notificationClients do
-    async {
-      try
-        do! client.send Text bytes true
-      with _ -> ()
-    } |> Async.Start
+    try
+      client.send Text bytes true |&gt; ignore
+    with _ -&gt; ()
 
 let app =
   choose [
-    path "/notifications" >=> handShake notificationHandler
-    POST >=> path "/notify" >=> fun ctx ->
+    path "/notifications" &gt;=&gt; handShake notificationHandler
+    POST &gt;=&gt; path "/notify" &gt;=&gt; fun ctx -&gt;
       match ctx.request.formData "message" with
-      | Choice1Of2 msg ->
+      | Choice1Of2 msg -&gt;
           sendNotification msg
           OK "Notification sent" ctx
-      | _ -> RequestErrors.BAD_REQUEST "Missing message" ctx
+      | _ -&gt; RequestErrors.BAD_REQUEST "Missing message" ctx
   ]</code></pre>
       </div>
       </div>
