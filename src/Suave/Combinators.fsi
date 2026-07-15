@@ -1473,6 +1473,16 @@ module Files =
   val file : fileName:string -> WebPart
 
   /// <summary><para>
+  /// Compute a weak ETag for the file at the given path from its length and
+  /// last-write time. This is cheap (no file hashing), stable across processes,
+  /// and invalidates automatically when the file is modified. Used by <c>file</c>
+  /// (and therefore by <c>browse</c>, <c>browseHome</c>, <c>browseFile</c>,
+  /// <c>browseFileHome</c>) to populate the <c>ETag</c> response header and
+  /// honour the <c>If-None-Match</c> request header.
+  /// </para></summary>
+  val fileEtag : fileName:string -> string
+
+  /// <summary><para>
   /// Format a string with a local file path given a file name 'fileName'. You should
   /// use this helper method to find the current directory and concatenate that current
   /// directory to the filename which should be absolute and start with a path separator.

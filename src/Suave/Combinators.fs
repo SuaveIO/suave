@@ -444,32 +444,56 @@ module ServeResource =
   // If a response includes both an Expires header and a max-age directive,
   // the max-age directive overrides the Expires header, even if the Expires header is more restrictive
   // 'Cache-Control' and 'Expires' headers should be left up to the user
-  let resource key exists getLast getExtension
+  let resource key exists getLast getExtension (getEtag : string -> string option)
                 (send : string -> bool -> WebPart)
                 ctx =
 
+    let etag = getEtag key
+
+    let setEtagHeader : WebPart =
+      match etag with
+      | Some e -> setHeader "ETag" e
+      | None -> succeed
+
     let sendIt name compression =
       setHeader "Last-Modified" ((getLast key : DateTimeOffset).ToString("R"))
+      >=> setEtagHeader
       >=> setHeader "Vary" "Accept-Encoding"
       >=> setMimeType name
       >=> send key compression
+
+    // RFC 7232 section 3.2: If-None-Match uses weak comparison. Since
+    // both the request tag and our own tag are compared as opaque strings
+    // after trimming, weak validators (W/"...") match correctly when the
+    // client echoes back what we sent.
+    let ifNoneMatchMatches () =
+      match etag, ctx.request.header "if-none-match" with
+      | Some e, Choice1Of2 v ->
+        v.Split(',')
+        |> Array.exists (fun tag ->
+             let t = tag.Trim()
+             t = "*" || t = e)
+      | _ -> false
 
     if exists key then
       let mimes = ctx.runtime.mimeTypesMap (getExtension key)
       match mimes with
       | Some value ->
-        match ctx.request.header "if-modified-since" with
-        | Choice1Of2 v ->
-          match Parse.dateTimeOffset v with
-          | Choice1Of2 date ->
-            let lm = getLast key
-            // RFC1123 is only precise to the second so the comparison must be done with this precision
-            let lmSeconds = new DateTimeOffset(lm.Year, lm.Month, lm.Day, lm.Hour, lm.Minute, lm.Second, lm.Offset)
-            if lmSeconds > date then sendIt value.name value.compression ctx
-            else NOT_MODIFIED ctx
-          | Choice2Of2 _parse_error -> bad_request [||] ctx
-        | Choice2Of2 _ ->
-          sendIt value.name value.compression ctx
+        if ifNoneMatchMatches () then
+          (NOT_MODIFIED >=> setEtagHeader) ctx
+        else
+          match ctx.request.header "if-modified-since" with
+          | Choice1Of2 v ->
+            match Parse.dateTimeOffset v with
+            | Choice1Of2 date ->
+              let lm = getLast key
+              // RFC1123 is only precise to the second so the comparison must be done with this precision
+              let lmSeconds = new DateTimeOffset(lm.Year, lm.Month, lm.Day, lm.Hour, lm.Minute, lm.Second, lm.Offset)
+              if lmSeconds > date then sendIt value.name value.compression ctx
+              else (NOT_MODIFIED >=> setEtagHeader) ctx
+            | Choice2Of2 _parse_error -> bad_request [||] ctx
+          | Choice2Of2 _ ->
+            sendIt value.name value.compression ctx
       | None ->
         fail
     else
@@ -550,12 +574,22 @@ module Files =
     |> succeed
 
 
+  /// <summary>
+  /// Compute a weak ETag for the file at the given path from its length and
+  /// last-write time. This is cheap (no file hashing), stable across processes,
+  /// and invalidates automatically when the file is modified.
+  /// </summary>
+  let fileEtag (fileName : string) : string =
+    let fi = FileInfo(fileName)
+    sprintf "W/\"%x-%x\"" fi.Length fi.LastWriteTimeUtc.Ticks
+
   let file fileName : WebPart =
     resource
       fileName
       (File.Exists)
       (fun name -> new DateTimeOffset(FileInfo(name).LastWriteTime))
       (Path.GetExtension)
+      (fun name -> Some (fileEtag name))
       sendFile
 
   let resolvePath (rootPath : string) (fileName : string) =
@@ -685,6 +719,7 @@ module Embedded =
       (fun name -> resources source |> Array.exists ((=) name))
       (fun _ -> new DateTimeOffset(lastModified source))
       (Path.GetExtension)
+      (fun _ -> None)
       (sendResource source)
 
   let resourceFromDefaultAssembly name =

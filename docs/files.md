@@ -33,6 +33,13 @@ learn about all of them check out the Files module
 `file` will take the relative or absolute path for the file we want to serve to
 the client. It will set MIME-type headers based on the file extension.
 
+`file` (and `browse`, `browseHome`, `browseFile`, `browseFileHome`) also emit a
+weak `ETag` response header derived from the file's size and last-write time,
+and honour the `If-None-Match` request header by responding with `304 Not
+Modified` when the client's cached ETag still matches. This is cheap (no file
+hashing) and requires no configuration. `Files.fileEtag` is exposed if you want
+to compute the same value yourself.
+
 `browseHome` will match existing files in the `homeFolder` based on the `Url`
 property and will serve them via the `file` combinator; `homeFolder` is a
 configuration parameter and can be set in the configuration record.
