@@ -33,7 +33,9 @@ let private httpWebResponseToHttpContext (ctx : HttpContext) (response : HttpWeb
   // mutually-exclusive `Content-Length` header from the origin.
   let isChunked =
     match allHeaders ? ("Transfer-Encoding") with
-    | Some v -> v.IndexOf("chunked", StringComparison.OrdinalIgnoreCase) >= 0
+    | Some v ->
+      v.Split(',')
+      |> Array.exists (fun t -> String.Equals(t.Trim(), "chunked", StringComparison.OrdinalIgnoreCase))
     | None -> false
 
   let forwardedHeaders =
