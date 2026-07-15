@@ -27,6 +27,7 @@
     <Compile Include="AsyncSocket.fs" />
     <Compile Include="Web.fs" />
     <Compile Include="Stream.fs" />
+    <Compile Include="Proxy.fs" />
     <Compile Include="HttpWriters.fs" />
     <Compile Include="HttpFile.fs" />
     <Compile Include="HttpEmbedded.fs" />
