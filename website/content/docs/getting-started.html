@@ -124,22 +124,39 @@ startWebServer defaultConfig app</code></pre>
 
       <h2 id="json-response">JSON Response</h2>
 
-      <p>Return JSON by writing the body and setting the <code>Content-Type</code> header (there is no built-in <code>JSON</code> function in core Suave):</p>
+      <p>Return a typed record as JSON with <code>Suave.Json.toJson</code>. Install the package first:</p>
 
       <div class="code-block">
-        <pre><code>open Suave
+        <pre><code>dotnet add package Suave.Json</code></pre>
+      </div>
+
+      <div class="callout">
+        <p><code>toJson</code> lives in the separate <strong>Suave.Json</strong> NuGet package — it is not part of core <code>Suave</code>.</p>
+      </div>
+
+      <div class="code-block">
+        <pre><code>open System.Runtime.Serialization
+open Suave
 open Suave.Operators
 open Suave.Successful
 open Suave.Writers
+open Suave.Json
+
+[&lt;DataContract&gt;]
+type Person =
+  { [&lt;field: DataMember(Name = "name")&gt;] name : string
+    [&lt;field: DataMember(Name = "age")&gt;]  age  : int }
+
+let person = { name = "Alice"; age = 30 }
 
 let app =
-  OK """{"name":"Alice","age":30}"""
-  >=> setMimeType "application/json; charset=utf-8"
+  ok (toJson person)
+  &gt;=&gt; setMimeType "application/json"
 
 startWebServer defaultConfig app</code></pre>
       </div>
 
-      <p>For typed request/response mapping with the optional <code>Suave.Json</code> package, see the <a href="recipes/json-api.html">JSON recipe</a>.</p>
+      <p>For request/response mapping with <code>mapJson</code>, see the <a href="recipes/json-api.html">JSON recipe</a>.</p>
 
       <h2 id="routing">Basic Routing</h2>
 
