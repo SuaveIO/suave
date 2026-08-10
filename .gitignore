@@ -5,7 +5,6 @@ pkg/
 .idea/
 packages/
 gh-pages/
-docs/output/
 miTLS/
 .bundle/
 
@@ -29,7 +28,6 @@ paket.exe
 .DS_Store
 *.bak
 paket-files/
-docs/output/
 
 project.lock.json
 *.project.lock.json

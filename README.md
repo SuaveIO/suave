@@ -5,13 +5,15 @@
 Suave is a simple web development F# library providing a lightweight web server
 and a set of combinators to manipulate route flow and task composition. Suave
 is inspired in the simplicity of Happstack and born out of the necessity of
-embedding web server capabilities in my own applications.  Suave supports 
-Websocket, HTTPS, multiple TCP/IP bindings, Basic Access Authentication, 
+embedding web server capabilities in my own applications. Suave supports full
+HTTP/2, Server-Sent Events, WebSockets, HTTPS/TLS, multiple TCP/IP bindings
+(with SO_REUSEPORT on Linux/BSD), rate limiting, security headers, validation
+web parts, the AOT-friendly `Router` module, Basic Access Authentication and
 Keep-Alive.
 
-Suave also takes advantage of F# asynchronous
-workflows to perform non-blocking IO. In fact, Suave is written in a completely
-non-blocking fashion throughout.
+Suave performs non-blocking IO throughout: its internals were rewritten around
+Task, Memory and Pipelines targeting .NET 9 and later, focusing on fewer
+allocations, higher throughput and lower latency.
 
 ## Build Status
 
@@ -35,10 +37,11 @@ startWebServer defaultConfig (Successful.OK "Hello World!")
 
 Now that you've discovered how to do "Hello World!", go read the
 [documentation](https://suave.io/) — guides and recipes live in
-[`website/content`](website/content); API reference is generated with
-[FSharp.Formatting](https://fsprojects.github.io/FSharp.Formatting/) via
-`./scripts/generate-api-docs.sh` (also FAKE target `Docs`). The legacy Jekyll
-tree under [`docs/`](docs/) is historical only.
+[`website/content/docs`](website/content/docs); the API reference is generated
+from [`docs-api/`](docs-api) with
+[FSharp.Formatting](https://fsprojects.github.io/FSharp.Formatting/) into
+`website/content/reference` via `./scripts/generate-api-docs.sh` (also FAKE
+target `Docs`).
 
 # How to Build
 
