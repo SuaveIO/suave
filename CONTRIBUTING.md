@@ -19,7 +19,7 @@ Coding style: two-space indentation (see [README](README.md) and [`.editorconfig
 
 ## Website and documentation
 
-- Hand-crafted guides, recipes, and FAQ: [`website/content/`](website/content/)
+- Hand-crafted guides, recipes, and FAQ: [`website/content/docs/`](website/content/docs/)
 - Preview locally: `dotnet run --project website` → http://localhost:8080
 - API reference is generated with fsdocs:
 
@@ -29,9 +29,7 @@ Coding style: two-space indentation (see [README](README.md) and [`.editorconfig
 dotnet run --project ./build/build.fsproj -- -t Docs
 ```
 
-Output is written to `website/content/reference/` (gitignored; CI uploads it as an artifact).
-
-The old Jekyll site under `docs/` is not the live documentation — use it only as historical reference when porting content.
+The fsdocs input lives in [`docs-api/`](docs-api/) and output is written to `website/content/reference/` (gitignored; CI uploads it as an artifact).
 
 ## Pull requests
 

@@ -1,4 +1,5 @@
 ## Unreleased
+* Refresh `README.md` to describe current v3.x capabilities and remove the legacy Jekyll `docs/` tree in favor of `website/` (guides) and `docs-api/` (API reference)
 * Modernize the reverse proxy to use `System.Net.Http.HttpClient` (shared, static instance) instead of the obsolete `WebRequest`/`HttpWebRequest` API
 
 ## New in v3.4.4 (Released 2026-07-13)

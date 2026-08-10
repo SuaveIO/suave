@@ -1,2 +1,0 @@
----
-exclude: [Rakefile, Gemfile, Gemfile.lock, .gitignore, .python-version]
