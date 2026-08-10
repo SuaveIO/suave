@@ -1,3 +1,6 @@
+## Unreleased
+* Modernize the reverse proxy to use `System.Net.Http.HttpClient` (shared, static instance) instead of the obsolete `WebRequest`/`HttpWebRequest` API
+
 ## New in v3.4.4 (Released 2026-07-13)
 * HPACK bomb defence: bound decoded header-list size and reassembly buffer (#829)
 
