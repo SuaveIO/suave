@@ -145,15 +145,15 @@ let private rawGet (port : int) (path : string) : string =
     else ms.Write(buf, 0, n)
   Encoding.ASCII.GetString(ms.ToArray())
 
-/// Same as `rawGet` but drives an arbitrary verb with a request body and
-/// optional extra headers.
-let private rawSend (port : int) (verb : string) (path : string) (extraHeaders : (string * string) list) (body : string) : string =
+/// Same as `rawGet` but drives an arbitrary verb with a caller-chosen `Host`,
+/// a request body and optional extra headers.
+let private rawSendWithHost (port : int) (verb : string) (path : string) (host : string) (extraHeaders : (string * string) list) (body : string) : string =
   use client = new TcpClient()
   client.Connect(IPAddress.Loopback, port)
   let s = client.GetStream()
   let sb = StringBuilder()
   sb.Append(sprintf "%s %s HTTP/1.1\r\n" verb path) |> ignore
-  sb.Append("Host: 127.0.0.1\r\n") |> ignore
+  sb.Append(sprintf "Host: %s\r\n" host) |> ignore
   sb.Append("Connection: close\r\n") |> ignore
   sb.Append("Content-Type: text/plain\r\n") |> ignore
   sb.Append(sprintf "Content-Length: %d\r\n" (Encoding.ASCII.GetByteCount body)) |> ignore
@@ -171,6 +171,17 @@ let private rawSend (port : int) (verb : string) (path : string) (extraHeaders :
     if n <= 0 then reading <- false
     else ms.Write(buf, 0, n)
   Encoding.ASCII.GetString(ms.ToArray())
+
+let private rawSend port verb path extraHeaders body =
+  rawSendWithHost port verb path "127.0.0.1" extraHeaders body
+
+/// An upstream that echoes the request headers it received back as the response
+/// body, so the test can assert on what the proxy forwarded.
+let private startHeaderEchoUpstream () =
+  startRawUpstream (fun request ->
+    let idx = request.IndexOf("\r\n\r\n")
+    let headerBlock = if idx >= 0 then request.Substring(0, idx) else request
+    fixedLengthResponse "200 OK" headerBlock)
 
 [<Tests>]
 let proxyTests (_ : SuaveConfig) =
@@ -322,11 +333,7 @@ let proxyTests (_ : SuaveConfig) =
         disposeContext ctx
 
     testCase "adds X-Forwarded-For and forwards request headers" <| fun _ ->
-      let upstreamPort, upstreamCts =
-        startRawUpstream (fun request ->
-          let idx = request.IndexOf("\r\n\r\n")
-          let headerBlock = if idx >= 0 then request.Substring(0, idx) else request
-          fixedLengthResponse "200 OK" headerBlock)
+      let upstreamPort, upstreamCts = startHeaderEchoUpstream ()
       let proxyPort, ctx = startProxy upstreamPort
       try
         let response = rawSend proxyPort "POST" "/headers" [ "User-Agent", "suave-test-agent" ] "x"
@@ -337,6 +344,69 @@ let proxyTests (_ : SuaveConfig) =
           "the proxy should forward the User-Agent header"
         Expect.stringContains response "Content-Type: text/plain"
           "the proxy should forward the request Content-Type on the content headers"
+      finally
+        upstreamCts.Cancel()
+        disposeContext ctx
+
+    testCase "sets X-Forwarded-For to the client address" <| fun _ ->
+      let upstreamPort, upstreamCts = startHeaderEchoUpstream ()
+      let proxyPort, ctx = startProxy upstreamPort
+      try
+        let response = rawGet proxyPort "/headers"
+
+        Expect.stringContains response "X-Forwarded-For: 127.0.0.1"
+          "X-Forwarded-For should name the connecting client, not the proxy's own host"
+      finally
+        upstreamCts.Cancel()
+        disposeContext ctx
+
+    testCase "appends to an existing X-Forwarded-For chain" <| fun _ ->
+      let upstreamPort, upstreamCts = startHeaderEchoUpstream ()
+      let proxyPort, ctx = startProxy upstreamPort
+      try
+        let response =
+          rawSend proxyPort "POST" "/headers" [ "X-Forwarded-For", "203.0.113.7" ] "x"
+
+        Expect.stringContains response "X-Forwarded-For: 203.0.113.7, 127.0.0.1"
+          "the client we received the request from should be appended to the chain"
+      finally
+        upstreamCts.Cancel()
+        disposeContext ctx
+
+    // Forwarding the client's Host verbatim names the proxy rather than the
+    // origin, which breaks virtual-hosted upstreams.
+    testCase "rewrites Host to the upstream authority and preserves the client host" <| fun _ ->
+      let upstreamPort, upstreamCts = startHeaderEchoUpstream ()
+      let proxyPort, ctx = startProxy upstreamPort
+      try
+        let response =
+          rawSendWithHost proxyPort "POST" "/headers" "client.example" [] "x"
+
+        Expect.stringContains response (sprintf "Host: 127.0.0.1:%d" upstreamPort)
+          "the upstream should see its own authority in the Host header"
+        // Match on the line start so `X-Forwarded-Host` doesn't count as a hit.
+        Expect.isFalse (response.Contains "\r\nHost: client.example")
+          "the client's Host must not be forwarded verbatim"
+        Expect.stringContains response "X-Forwarded-Host: client.example"
+          "the client's Host should be preserved in X-Forwarded-Host"
+        Expect.stringContains response "X-Forwarded-Proto: http"
+          "the client's scheme should be preserved in X-Forwarded-Proto"
+      finally
+        upstreamCts.Cancel()
+        disposeContext ctx
+
+    testCase "preserves existing X-Forwarded-Host and X-Forwarded-Proto" <| fun _ ->
+      let upstreamPort, upstreamCts = startHeaderEchoUpstream ()
+      let proxyPort, ctx = startProxy upstreamPort
+      try
+        let response =
+          rawSend proxyPort "POST" "/headers"
+            [ "X-Forwarded-Host", "edge.example"; "X-Forwarded-Proto", "https" ] "x"
+
+        Expect.stringContains response "X-Forwarded-Host: edge.example"
+          "an upstream proxy's X-Forwarded-Host should not be overwritten"
+        Expect.stringContains response "X-Forwarded-Proto: https"
+          "an upstream proxy's X-Forwarded-Proto should not be overwritten"
       finally
         upstreamCts.Cancel()
         disposeContext ctx
