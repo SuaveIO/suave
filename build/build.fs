@@ -13,9 +13,19 @@ open Fake.Core.TargetOperators
 
 Console.OutputEncoding <- Encoding.UTF8
 
-let initTargets () =
-  let release = ReleaseNotes.load "RELEASE_NOTES.md"
+let releaseNotesPath = "RELEASE_NOTES.md"
 
+let loadLatestVersionedRelease () =
+  let lines = File.ReadAllLines releaseNotesPath
+  let releaseStart =
+    lines
+    |> Array.tryFindIndex (fun line -> line.StartsWith("## New in v", StringComparison.Ordinal))
+
+  match releaseStart with
+  | Some index -> lines |> Seq.skip index |> ReleaseNotes.parse
+  | None -> failwithf "Unable to find a versioned release entry in %s." releaseNotesPath
+
+let initTargets () =
   let projects =
     !! "src/**/Suave*.fsproj"
     -- "src/*.Tests/*.fsproj"
@@ -30,6 +40,7 @@ let initTargets () =
     DotNet.restore (fun args -> { args with MSBuildParams = { MSBuild.CliArguments.Create() with DisableInternalBinLog = true }}) "Suave.sln"
 
   Target.create "AsmInfo" <| fun _ ->
+    let release = loadLatestVersionedRelease ()
     projects |> Seq.iter (fun project ->
       let dir = Path.GetDirectoryName project
       let name = Path.GetFileNameWithoutExtension project
@@ -70,6 +81,7 @@ let initTargets () =
       failwithf "API docs generation failed with exit code %d" result.ExitCode
 
   Target.create "Pack" <| fun _ ->
+    let release = ReleaseNotes.load releaseNotesPath
     let pkg = Path.GetFullPath "./pkg"
     let props (project: string) (p: Paket.PaketPackParams) =
       { p with OutputPath = pkg
@@ -95,6 +107,7 @@ let initTargets () =
     ignore (Environment.environVarOrFail "GITHUB_TOKEN")
 
   Target.create "Release" <| fun _ ->
+    let release = ReleaseNotes.load releaseNotesPath
     let gitOwner, gitName = "SuaveIO", "suave"
     let gitOwnerName = gitOwner + "/" + gitName
     let remote =
