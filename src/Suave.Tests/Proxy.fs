@@ -3,7 +3,11 @@ module Suave.Tests.Proxy
 open System
 open System.IO
 open System.Net
+open System.Net.Security
 open System.Net.Sockets
+open System.Security.Authentication
+open System.Security.Cryptography
+open System.Security.Cryptography.X509Certificates
 open System.Text
 open System.Threading
 open System.Threading.Tasks
@@ -145,15 +149,15 @@ let private rawGet (port : int) (path : string) : string =
     else ms.Write(buf, 0, n)
   Encoding.ASCII.GetString(ms.ToArray())
 
-/// Same as `rawGet` but drives an arbitrary verb with a request body and
-/// optional extra headers.
-let private rawSend (port : int) (verb : string) (path : string) (extraHeaders : (string * string) list) (body : string) : string =
+/// Same as `rawGet` but drives an arbitrary verb with a caller-chosen `Host`,
+/// a request body and optional extra headers.
+let private rawSendWithHost (port : int) (verb : string) (path : string) (host : string) (extraHeaders : (string * string) list) (body : string) : string =
   use client = new TcpClient()
   client.Connect(IPAddress.Loopback, port)
   let s = client.GetStream()
   let sb = StringBuilder()
   sb.Append(sprintf "%s %s HTTP/1.1\r\n" verb path) |> ignore
-  sb.Append("Host: 127.0.0.1\r\n") |> ignore
+  sb.Append(sprintf "Host: %s\r\n" host) |> ignore
   sb.Append("Connection: close\r\n") |> ignore
   sb.Append("Content-Type: text/plain\r\n") |> ignore
   sb.Append(sprintf "Content-Length: %d\r\n" (Encoding.ASCII.GetByteCount body)) |> ignore
@@ -171,6 +175,77 @@ let private rawSend (port : int) (verb : string) (path : string) (extraHeaders :
     if n <= 0 then reading <- false
     else ms.Write(buf, 0, n)
   Encoding.ASCII.GetString(ms.ToArray())
+
+let private rawSend port verb path extraHeaders body =
+  rawSendWithHost port verb path "127.0.0.1" extraHeaders body
+
+/// A self-signed, in-memory certificate for the TLS binding, mirroring the one
+/// the HTTP/2 ALPN tests build (the shipped `suave.p12` is SHA-1/1024-bit and
+/// modern OpenSSL rejects it).
+let private loadTestCertificate () =
+  use rsa = RSA.Create 2048
+  let req =
+    CertificateRequest("CN=localhost", rsa, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1)
+  let sanBuilder = SubjectAlternativeNameBuilder()
+  sanBuilder.AddIpAddress IPAddress.Loopback
+  sanBuilder.AddDnsName "localhost"
+  req.CertificateExtensions.Add(sanBuilder.Build())
+  let cert =
+    req.CreateSelfSigned(DateTimeOffset.UtcNow.AddMinutes -5.0, DateTimeOffset.UtcNow.AddHours 1.0)
+  // Round-trip through PKCS#12 so the private key handle survives on every OS.
+  X509CertificateLoader.LoadPkcs12(cert.Export X509ContentType.Pkcs12, (null : string))
+
+/// Bind the proxy on an ephemeral port over TLS, pointing at `upstreamPort`.
+/// Returns the port plus a shutdown action.
+let private startTlsProxy (upstreamPort : int) =
+  let listener = new TcpListener(IPAddress.Loopback, 0)
+  listener.Start()
+  let proxyPort = (listener.LocalEndpoint :?> IPEndPoint).Port
+  listener.Stop()
+
+  let cts = new CancellationTokenSource()
+  let proxyCfg =
+    { defaultConfig with
+        bindings = [ HttpBinding.create (HTTPS (loadTestCertificate ())) IPAddress.Loopback (uint16 proxyPort) ]
+        cancellationToken = cts.Token }
+  let ready, serverTask =
+    Web.startWebServerAsync proxyCfg (proxy (Uri(sprintf "http://127.0.0.1:%d" upstreamPort)))
+  ready |> Async.RunSynchronously |> ignore
+  let shutdown () =
+    cts.Cancel()
+    try serverTask.Wait(TimeSpan.FromSeconds 5.0) |> ignore with _ -> ()
+  proxyPort, shutdown
+
+/// Drive a request over TLS, accepting the self-signed test certificate.
+let private rawGetTls (port : int) (path : string) (host : string) : string =
+  use client = new TcpClient()
+  client.Connect(IPAddress.Loopback, port)
+  use ssl =
+    new SslStream(client.GetStream(), false, RemoteCertificateValidationCallback(fun _ _ _ _ -> true))
+  let opts = SslClientAuthenticationOptions()
+  opts.TargetHost <- "localhost"
+  opts.EnabledSslProtocols <- SslProtocols.Tls12 ||| SslProtocols.Tls13
+  ssl.AuthenticateAsClient opts
+  let req = sprintf "GET %s HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n\r\n" path host
+  let reqBytes = Encoding.ASCII.GetBytes req
+  ssl.Write(reqBytes, 0, reqBytes.Length)
+  ssl.Flush()
+  use ms = new MemoryStream()
+  let buf = Array.zeroCreate 4096
+  let mutable reading = true
+  while reading do
+    let n = ssl.Read(buf, 0, buf.Length)
+    if n <= 0 then reading <- false
+    else ms.Write(buf, 0, n)
+  Encoding.ASCII.GetString(ms.ToArray())
+
+/// An upstream that echoes the request headers it received back as the response
+/// body, so the test can assert on what the proxy forwarded.
+let private startHeaderEchoUpstream () =
+  startRawUpstream (fun request ->
+    let idx = request.IndexOf("\r\n\r\n")
+    let headerBlock = if idx >= 0 then request.Substring(0, idx) else request
+    fixedLengthResponse "200 OK" headerBlock)
 
 [<Tests>]
 let proxyTests (_ : SuaveConfig) =
@@ -322,11 +397,7 @@ let proxyTests (_ : SuaveConfig) =
         disposeContext ctx
 
     testCase "adds X-Forwarded-For and forwards request headers" <| fun _ ->
-      let upstreamPort, upstreamCts =
-        startRawUpstream (fun request ->
-          let idx = request.IndexOf("\r\n\r\n")
-          let headerBlock = if idx >= 0 then request.Substring(0, idx) else request
-          fixedLengthResponse "200 OK" headerBlock)
+      let upstreamPort, upstreamCts = startHeaderEchoUpstream ()
       let proxyPort, ctx = startProxy upstreamPort
       try
         let response = rawSend proxyPort "POST" "/headers" [ "User-Agent", "suave-test-agent" ] "x"
@@ -340,4 +411,84 @@ let proxyTests (_ : SuaveConfig) =
       finally
         upstreamCts.Cancel()
         disposeContext ctx
+
+    testCase "sets X-Forwarded-For to the client address" <| fun _ ->
+      let upstreamPort, upstreamCts = startHeaderEchoUpstream ()
+      let proxyPort, ctx = startProxy upstreamPort
+      try
+        let response = rawGet proxyPort "/headers"
+
+        Expect.stringContains response "X-Forwarded-For: 127.0.0.1"
+          "X-Forwarded-For should name the connecting client, not the proxy's own host"
+      finally
+        upstreamCts.Cancel()
+        disposeContext ctx
+
+    testCase "appends to an existing X-Forwarded-For chain" <| fun _ ->
+      let upstreamPort, upstreamCts = startHeaderEchoUpstream ()
+      let proxyPort, ctx = startProxy upstreamPort
+      try
+        let response =
+          rawSend proxyPort "POST" "/headers" [ "X-Forwarded-For", "203.0.113.7" ] "x"
+
+        Expect.stringContains response "X-Forwarded-For: 203.0.113.7, 127.0.0.1"
+          "the client we received the request from should be appended to the chain"
+      finally
+        upstreamCts.Cancel()
+        disposeContext ctx
+
+    // Forwarding the client's Host verbatim names the proxy rather than the
+    // origin, which breaks virtual-hosted upstreams.
+    testCase "rewrites Host to the upstream authority and preserves the client host" <| fun _ ->
+      let upstreamPort, upstreamCts = startHeaderEchoUpstream ()
+      let proxyPort, ctx = startProxy upstreamPort
+      try
+        let response =
+          rawSendWithHost proxyPort "POST" "/headers" "client.example" [] "x"
+
+        Expect.stringContains response (sprintf "Host: 127.0.0.1:%d" upstreamPort)
+          "the upstream should see its own authority in the Host header"
+        // Match on the line start so `X-Forwarded-Host` doesn't count as a hit.
+        Expect.isFalse (response.Contains "\r\nHost: client.example")
+          "the client's Host must not be forwarded verbatim"
+        Expect.stringContains response "X-Forwarded-Host: client.example"
+          "the client's Host should be preserved in X-Forwarded-Host"
+        Expect.stringContains response "X-Forwarded-Proto: http"
+          "the client's scheme should be preserved in X-Forwarded-Proto"
+      finally
+        upstreamCts.Cancel()
+        disposeContext ctx
+
+    testCase "preserves existing X-Forwarded-Host and X-Forwarded-Proto" <| fun _ ->
+      let upstreamPort, upstreamCts = startHeaderEchoUpstream ()
+      let proxyPort, ctx = startProxy upstreamPort
+      try
+        let response =
+          rawSend proxyPort "POST" "/headers"
+            [ "X-Forwarded-Host", "edge.example"; "X-Forwarded-Proto", "https" ] "x"
+
+        Expect.stringContains response "X-Forwarded-Host: edge.example"
+          "an upstream proxy's X-Forwarded-Host should not be overwritten"
+        Expect.stringContains response "X-Forwarded-Proto: https"
+          "an upstream proxy's X-Forwarded-Proto should not be overwritten"
+      finally
+        upstreamCts.Cancel()
+        disposeContext ctx
+
+    // The scheme is derived from the matched binding, so a TLS binding is the
+    // only way to exercise the `https` branch.
+    testCase "derives X-Forwarded-Proto https from a TLS binding" <| fun _ ->
+      let upstreamPort, upstreamCts = startHeaderEchoUpstream ()
+      let proxyPort, shutdownProxy = startTlsProxy upstreamPort
+      try
+        let response = rawGetTls proxyPort "/headers" "client.example"
+
+        Expect.stringStarts response "HTTP/1.1 200 OK" "the request should be proxied over TLS"
+        Expect.stringContains response "X-Forwarded-Proto: https"
+          "a secure binding should be reported as https"
+        Expect.stringContains response "X-Forwarded-Host: client.example"
+          "the client's Host should still be preserved in X-Forwarded-Host"
+      finally
+        upstreamCts.Cancel()
+        shutdownProxy ()
   ]

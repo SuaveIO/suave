@@ -128,9 +128,10 @@ let proxy (newHost : Uri) : WebPart =
       match ctx.request.headers ? ("Date") |> Option.bind (Parse.dateTime >> Choice.toOption) with
       | Some x -> request.Headers.Date <- Nullable (DateTimeOffset x)
       | None -> ()
-      match ctx.request.headers ? ("Host") with
-      | Some x -> request.Headers.TryAddWithoutValidation("Host", x) |> ignore
-      | None -> ()
+      // The client's `Host` names *this* proxy, so forwarding it verbatim breaks
+      // virtual-hosted upstreams. Target the upstream authority instead and
+      // preserve what the client asked for in `X-Forwarded-Host`.
+      request.Headers.Host <- newHost.Authority
       // Content-related headers live on the content, not on the request message.
       match ctx.request.headers ? ("Content-Type") with
       | Some x -> withContent (fun c -> c.Headers.TryAddWithoutValidation("Content-Type", x) |> ignore)
@@ -139,7 +140,24 @@ let proxy (newHost : Uri) : WebPart =
       | Some x -> withContent (fun c -> c.Headers.ContentLength <- Nullable x)
       | None -> ()
 
-      request.Headers.TryAddWithoutValidation("X-Forwarded-For", ctx.request.host) |> ignore
+      // `X-Forwarded-For` is a chain of client addresses, so append the peer we
+      // received this request from to whatever the client sent (if anything).
+      let clientIp = string (ctx.clientIp false [])
+      let forwardedFor =
+        match ctx.request.headers ? ("X-Forwarded-For") with
+        | Some existing when not (String.IsNullOrWhiteSpace existing) -> $"{existing}, {clientIp}"
+        | _ -> clientIp
+      request.Headers.TryAddWithoutValidation("X-Forwarded-For", forwardedFor) |> ignore
+
+      match ctx.request.headers ? ("X-Forwarded-Host") with
+      | Some existing -> request.Headers.TryAddWithoutValidation("X-Forwarded-Host", existing) |> ignore
+      | None -> request.Headers.TryAddWithoutValidation("X-Forwarded-Host", ctx.request.rawHost) |> ignore
+
+      match ctx.request.headers ? ("X-Forwarded-Proto") with
+      | Some existing -> request.Headers.TryAddWithoutValidation("X-Forwarded-Proto", existing) |> ignore
+      | None ->
+        let proto = if ctx.request.binding.scheme.secure then "https" else "http"
+        request.Headers.TryAddWithoutValidation("X-Forwarded-Proto", proto) |> ignore
 
       try
         // `ResponseHeadersRead` keeps the body streaming instead of buffering it.
