@@ -32,9 +32,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: |
-            6.0.x
-            10.0.102
+          dotnet-version: 10.0.x
 
       - name: Cache h2spec binary
         id: h2spec-cache

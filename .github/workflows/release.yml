@@ -1,0 +1,122 @@
+# Cut a release when a `vX.Y.Z` tag is pushed.
+#
+# The tag is only a trigger — `.semver` is the source of truth. The build
+# refuses to go any further unless the tag, `.semver` and the topmost
+# `## New in v…` entry in `RELEASE_NOTES.md` all agree (FAKE `CheckVersion`).
+#
+# Publishing uses nuget.org Trusted Publishing: `NuGet/login` exchanges the
+# workflow's OIDC token for a short-lived API key, so there is no long-lived
+# NUGET_KEY secret to rotate. Set up on nuget.org, once per package:
+#   Account → Trusted Publishing → repository `SuaveIO/suave`, workflow
+#   `release.yml`. Then set the repository variable `NUGET_USER` to the
+#   nuget.org account that owns the policy.
+#
+# To release:  bump `.semver`, add a `## New in vX.Y.Z` section to
+# `RELEASE_NOTES.md`, commit, then `git tag vX.Y.Z && git push origin vX.Y.Z`
+# (or run the FAKE `Tag` target, which validates before it pushes).
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - 'v[0-9]+.[0-9]+.[0-9]+-*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    # Recommended: create a `release` environment with required reviewers and
+    # uncomment the next line to gate publishing behind a manual approval.
+    # environment: release
+
+    permissions:
+      contents: write   # create the GitHub Release
+      id-token: write   # OIDC token for nuget.org Trusted Publishing
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # AsmInfo stamps the commit hash into the assemblies.
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore local tools
+        run: dotnet tool restore
+
+      - name: Restore dependencies
+        run: dotnet paket restore
+
+      # Fails fast, before spending several minutes on a build we would throw away.
+      - name: Verify tag against .semver and RELEASE_NOTES.md
+        run: dotnet run --project ./build/build.fsproj -- --single-target -t CheckVersion
+
+      - name: Build, test and pack
+        run: dotnet run --project ./build/build.fsproj -- -t Pack
+
+      - name: Read release version
+        id: version
+        run: echo "version=$(cat pkg/version.txt)" >> "$GITHUB_OUTPUT"
+
+      - name: Upload packages as a workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nupkg-${{ steps.version.outputs.version }}
+          path: pkg/*.nupkg
+          if-no-files-found: error
+
+      - name: Check NUGET_USER is configured
+        env:
+          NUGET_USER: ${{ vars.NUGET_USER }}
+        run: |
+          if [ -z "${NUGET_USER:-}" ]; then
+            echo "::error::Repository variable NUGET_USER is not set; it must name the nuget.org account that owns the Trusted Publishing policy."
+            exit 1
+          fi
+
+      - name: Log in to nuget.org (Trusted Publishing)
+        id: nuget-login
+        uses: NuGet/login@v1
+        with:
+          user: ${{ vars.NUGET_USER }}
+
+      - name: Push packages to nuget.org
+        env:
+          NUGET_API_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
+        run: dotnet run --project ./build/build.fsproj -- --single-target -t Push
+
+      - name: Publish the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          # A `-suffix` in the version means this is a pre-release.
+          case "$VERSION" in
+            *-*) prerelease=(--prerelease) ;;
+            *)   prerelease=() ;;
+          esac
+          # Re-running the workflow must not fail on an existing release.
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" pkg/*.nupkg --clobber
+          else
+            gh release create "$TAG" pkg/*.nupkg \
+              --verify-tag \
+              --title "$TAG" \
+              --notes-file pkg/release-notes.md \
+              "${prerelease[@]}"
+          fi

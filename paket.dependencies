@@ -40,11 +40,10 @@ group SourceLink
   
 group FakeBuild
   source https://api.nuget.org/v3/index.json
-  framework: net6.0
+  framework: net10.0
   storage: none
 
   nuget FSharp.Core
-  nuget Fake.Api.GitHub
   nuget Fake.BuildServer.TeamFoundation
   nuget Fake.Core.Environment
   nuget Fake.Core.Process
