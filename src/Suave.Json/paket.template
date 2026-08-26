@@ -3,6 +3,7 @@ authors Ademar Gonzalez
 owners Ademar Gonzalez
 description Suave.Json provides a small JSON serialization layer for Suave, backed by DataContractJsonSerializer. This package relies on runtime reflection and is NOT compatible with .NET Native AOT.
 licenseExpression Apache-2.0
+licenseUrl https://licenses.nuget.org/Apache-2.0
 repositoryUrl https://github.com/SuaveIO/suave
 repositoryType git
 iconUrl https://raw.githubusercontent.com/SuaveIO/resources/master/images/head_trans.png
