@@ -1,4 +1,5 @@
 ## Unreleased
+* Allow consuming projects to use FSharp.Core versions newer than 10.0.102 (#840)
 * Refresh `README.md` to describe current v3.x capabilities and remove the legacy Jekyll `docs/` tree in favor of `website/` (guides) and `docs-api/` (API reference)
 * Modernize the reverse proxy to use `System.Net.Http.HttpClient` (shared, static instance) instead of the obsolete `WebRequest`/`HttpWebRequest` API
 * Proxy: set `X-Forwarded-For` from the client address (appending to any existing chain), target `Host` at the upstream authority, and forward the client's host/scheme as `X-Forwarded-Host`/`X-Forwarded-Proto`
