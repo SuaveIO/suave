@@ -1,9 +1,10 @@
-## Unreleased
+## New in v3.4.5 (Released 2026-08-26)
 * Packages now declare the Apache-2.0 license as an SPDX expression (`licenseExpression`) instead of the deprecated `licenseUrl`, and carry repository metadata
 * Allow consuming projects to use FSharp.Core versions newer than 10.0.102 (#840)
 * Refresh `README.md` to describe current v3.x capabilities and remove the legacy Jekyll `docs/` tree in favor of `website/` (guides) and `docs-api/` (API reference)
 * Modernize the reverse proxy to use `System.Net.Http.HttpClient` (shared, static instance) instead of the obsolete `WebRequest`/`HttpWebRequest` API
 * Proxy: set `X-Forwarded-For` from the client address (appending to any existing chain), target `Host` at the upstream authority, and forward the client's host/scheme as `X-Forwarded-Host`/`X-Forwarded-Proto`
+* Fix HPACK empty string and overlong len decode
 
 ## New in v3.4.4 (Released 2026-07-13)
 * HPACK bomb defence: bound decoded header-list size and reassembly buffer (#829)
