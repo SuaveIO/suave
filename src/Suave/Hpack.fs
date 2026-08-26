@@ -898,13 +898,21 @@ if I < 2^N - 1, encode I on N bits
     out
 
   let decodeString (huff:bool) (decoder: HuffmanDecoding)  (rbuf:MemoryStream) (len:int) =
-    if rbuf.Length <> rbuf.Position then
-      if huff then
-        decoder rbuf len
-      else
-        extractByteString rbuf len
-    else
+    // RFC 7541 §5.2: a string literal of length 0 is legal and consumes no
+    // octets, so being positioned at the end of the buffer is not truncation.
+    // Without this, any header with an empty value that lands last in a
+    // header block fails to decode.
+    if len = 0 then Array.empty
+    // `len` is an attacker-controlled integer off the wire: a handful of
+    // continuation octets (RFC 7541 §5.1) reaches ~2^31. Validate it against
+    // the octets the buffer can actually supply BEFORE allocating, otherwise
+    // a 12-byte header block provokes a ~2GB allocation.
+    elif len < 0 || int64 len > rbuf.Length - rbuf.Position then
       failwith "Header block truncated"
+    elif huff then
+      decoder rbuf len
+    else
+      extractByteString rbuf len
 
   let huffmanDecoder (dyntbl : DynamicTable) = 
     let (DecodeInfo(dec,_)) = dyntbl.codeInfo
