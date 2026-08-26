@@ -2,7 +2,9 @@ type project
 authors Ademar Gonzalez
 owners Ademar Gonzalez
 description Suave.DotLiquid provides Liquid templates for Suave web server.
-licenseUrl https://github.com/SuaveIO/Suave/blob/master/LICENSE
+licenseExpression Apache-2.0
+repositoryUrl https://github.com/SuaveIO/suave
+repositoryType git
 iconUrl https://raw.githubusercontent.com/SuaveIO/resources/master/images/head_trans.png
 files
   bin/Release/net10.0/Suave.DotLiquid.dll => lib/net10.0

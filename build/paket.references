@@ -1,6 +1,5 @@
 group FakeBuild
 FSharp.Core
-Fake.Api.GitHub
 Fake.BuildServer.TeamFoundation
 Fake.Core.Environment
 Fake.Core.Process

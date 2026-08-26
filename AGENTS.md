@@ -22,13 +22,14 @@ NuGet packages plus tests, examples, and a documentation website.
   `website/content/docs/`; API reference is generated into
   `website/content/reference/`.
 - `docs-api/` — fsdocs input used to generate the API reference.
-- `build/` — FAKE build script (`build/build.fsproj`, targets `net6.0`).
+- `build/` — FAKE build script (`build/build.fsproj`, targets `net10.0`).
 - `scripts/` — helper scripts, notably `generate-api-docs.sh`.
 
 ## Toolchain
 
-- .NET SDK **`10.0.102`** is pinned by `global.json`. The .NET **6** runtime
-  is also required because the FAKE build project targets `net6.0`.
+- `global.json` requires .NET SDK **`10.0.100` or newer** in the `10.0`
+  band (`rollForward: latestFeature`), so any recent 10.0.x SDK works. No
+  other runtime is needed — the FAKE build project targets `net10.0`.
 - Dependencies are managed with **Paket**, not plain `PackageReference`.
   Local tools (`paket`, `fake-cli`, `fsdocs-tool`) are declared in
   `.config/dotnet-tools.json`.
@@ -42,7 +43,9 @@ NuGet packages plus tests, examples, and a documentation website.
 
 - **Build the solution:**
   `dotnet build Suave.sln`
-  (equivalent FAKE target: `dotnet run --project ./build/build.fsproj -- -t Build`).
+  (equivalent FAKE target: `./build.sh -t Build`). `build.sh` / `build.cmd`
+  restore tools and packages, then pass their arguments straight to FAKE;
+  with no arguments the default target is `Tests`.
   Expect a number of warnings but 0 errors.
 - **Run the test suite (matches CI):**
   `dotnet run -c Release --framework net10.0 --project src/Suave.Tests -- --summary --sequenced`
@@ -55,8 +58,26 @@ NuGet packages plus tests, examples, and a documentation website.
   populated.
 
 CI (`.github/workflows/build-suave.yml`) runs `./build.sh` on
-`ubuntu-latest` with both the .NET 6 and .NET `10.0.102` SDKs installed, then
-regenerates the API docs.
+`ubuntu-latest` with the .NET 10 SDK, then regenerates the API docs.
+
+## Releasing
+
+`.semver` is the single source of truth for the version. A release is cut by
+pushing a `vX.Y.Z` tag, which triggers `.github/workflows/release.yml`:
+
+1. Bump `.semver` and add a matching `## New in vX.Y.Z` section to
+   `RELEASE_NOTES.md` (the `## Unreleased` section is skipped by the build).
+2. Commit, then `./build.sh -t Tag` — it refuses to run
+   unless the working copy is clean and `.semver` matches `RELEASE_NOTES.md`,
+   then pushes the branch and the tag. `git tag vX.Y.Z && git push origin
+   vX.Y.Z` does the same thing by hand.
+3. The workflow re-checks that the tag matches `.semver` (FAKE
+   `CheckVersion`), builds, tests, packs, publishes to nuget.org via Trusted
+   Publishing (no API key secret — see the header of `release.yml`), and
+   creates the GitHub Release.
+
+The FAKE `Push` target reads `NUGET_API_KEY` (issued by the Trusted
+Publishing login) or, for a manual push, the legacy `NUGET_KEY`.
 
 ## Code style
 
@@ -81,11 +102,9 @@ regenerates the API docs.
 
 ## Non-obvious caveats
 
-- **Do not `source .env` or run `build.sh` unmodified in a Mono-less
-  environment.** `.env` sets a Mono-based `FrameworkPathOverride`
-  (`dirname $(which mono)/...`); without Mono installed this yields a
-  bogus path. It is unnecessary for the .NET SDK build — invoke `dotnet`
-  directly instead.
+- **`.env` is dead weight.** It sets a Mono-based `FrameworkPathOverride`
+  that was only needed while the build project targeted an old framework.
+  Nothing sources it any more; do not reintroduce it.
 - **The websocket tests can flaky-hang under `--sequenced` on some
   machines.** The large 32-bit (66000-byte) binary-payload test on
   `/websocketAppSubprotocolUrl` uses `mre.WaitOne()` with no timeout, so a
