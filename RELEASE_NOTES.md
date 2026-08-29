@@ -1,3 +1,6 @@
+## New in v3.4.6 (Released 2026-08-26)
+* Fix static file fallback for missing resources (#844)
+
 ## New in v3.4.5 (Released 2026-08-26)
 * Packages now declare the Apache-2.0 license as an SPDX expression (`licenseExpression`, with `licenseUrl` kept at the canonical `licenses.nuget.org` address for older clients) and carry repository metadata
 * Allow consuming projects to use FSharp.Core versions newer than 10.0.102 (#840)
