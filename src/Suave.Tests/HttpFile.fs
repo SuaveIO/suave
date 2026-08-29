@@ -109,6 +109,20 @@ let ``ETag support`` cfg =
       Expect.equal a b "Two consecutive calls should return the same ETag"
       Expect.stringStarts a "W/\"" "ETag should be a weak validator"
 
+    testCase "missing file falls through to the next WebPart" <| fun _ ->
+      let app =
+        choose [
+          Files.browseHome
+          RequestErrors.NOT_FOUND "fallback"
+        ]
+      let status, body =
+        runWithConfig app
+        |> reqResp HttpMethod.GET "/file-that-does-not-exist.txt" "" None None DecompressionMethods.None id (fun response ->
+             response.StatusCode,
+             contentString response)
+      Expect.equal status HttpStatusCode.NotFound "Should use the fallback response"
+      Expect.equal body "fallback" "Should return the fallback body"
+
     testCase "If-None-Match with matching ETag returns 304 Not Modified" <| fun _ ->
       let setIfNoneMatch (req : HttpRequestMessage) =
         req.Headers.TryAddWithoutValidation("If-None-Match", expectedEtag) |> ignore

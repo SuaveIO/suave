@@ -448,7 +448,11 @@ module ServeResource =
                 (send : string -> bool -> WebPart)
                 ctx =
 
-    let etag = getEtag key
+    let resourceExists = exists key
+
+    let etag =
+      if resourceExists then getEtag key
+      else None
 
     let setEtagHeader : WebPart =
       match etag with
@@ -475,7 +479,7 @@ module ServeResource =
              t = "*" || t = e)
       | _ -> false
 
-    if exists key then
+    if resourceExists then
       let mimes = ctx.runtime.mimeTypesMap (getExtension key)
       match mimes with
       | Some value ->
