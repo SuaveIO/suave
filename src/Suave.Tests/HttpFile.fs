@@ -25,6 +25,55 @@ let ``canonicalization attacks`` (_: SuaveConfig) =
         "'../../passwd' is not a valid path"
     testCase "can use dot" <| fun _ ->
       Expect.equal (Files.resolvePath currentPath ".") currentPath "expect currentPath"
+
+    testCase "sibling directory sharing the root's prefix is rejected" <| fun _ ->
+      // root "<...>/app" must not serve "<...>/app-secret/passwd", even though
+      // the latter starts with the root as a plain string prefix.
+      let root = Path.Combine(currentPath, "app")
+      Expect.throwsT<Exception> (fun _ -> Files.resolvePath root "../app-secret/passwd" |> ignore)
+        "'../app-secret/passwd' escapes the root"
+
+    testCase "sibling directory sharing the root's prefix is rejected for a rooted request path" <| fun _ ->
+      // request paths start with '/', which is trimmed before combining
+      let root = Path.Combine(currentPath, "app")
+      Expect.throwsT<Exception> (fun _ -> Files.resolvePath root "/../app-secret/passwd" |> ignore)
+        "'/../app-secret/passwd' escapes the root"
+
+    testCase "a file directly below a prefix-sharing root is still served" <| fun _ ->
+      let root = Path.Combine(currentPath, "app")
+      let expected = Path.Combine(root, "index.html")
+      Expect.equal (Files.resolvePath root "/index.html") expected
+        "files inside the root must still resolve"
+
+    testCase "root with a trailing separator resolves the same paths" <| fun _ ->
+      let expected = Path.Combine(currentPath, "test-text-file.txt")
+      let rootWithSeparator = currentPath + string Path.DirectorySeparatorChar
+      Expect.equal (Files.resolvePath rootWithSeparator "/test-text-file.txt") expected
+        "a trailing separator on the root should not matter"
+      Expect.throwsT<Exception> (fun _ -> Files.resolvePath rootWithSeparator "../../passwd" |> ignore)
+        "'../../passwd' is not a valid path"
+
+    testCase "relative root is canonicalized" <| fun _ ->
+      let expected = Path.Combine(currentPath, "test-text-file.txt")
+      let relativeRoot = Path.Combine(currentPath, "sub", "..")
+      Expect.equal (Files.resolvePath relativeRoot "/test-text-file.txt") expected
+        "the root should be canonicalized before comparison"
+
+    testCase "forward slashes are honoured on every platform" <| fun _ ->
+      let expected = Path.Combine(currentPath, "sub", "test-text-file.txt")
+      Expect.equal (Files.resolvePath currentPath "/sub/test-text-file.txt") expected
+        "'/' should be translated to the platform separator"
+      Expect.throwsT<Exception> (fun _ -> Files.resolvePath currentPath "/sub/../../passwd" |> ignore)
+        "'..' segments written with '/' must still be caught"
+
+    testCase "platform separator is honoured" <| fun _ ->
+      let sep = string Path.DirectorySeparatorChar
+      let expected = Path.Combine(currentPath, "sub", "test-text-file.txt")
+      Expect.equal (Files.resolvePath currentPath (sep + "sub" + sep + "test-text-file.txt")) expected
+        "expect the file below the root"
+      Expect.throwsT<Exception> (fun _ ->
+        Files.resolvePath currentPath (sep + ".." + sep + ".." + sep + "passwd") |> ignore)
+        "'..' segments written with the platform separator must be caught"
   ]
 
 [<Tests>]

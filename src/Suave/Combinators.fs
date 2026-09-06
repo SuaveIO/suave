@@ -596,16 +596,51 @@ module Files =
       (fun name -> Some (fileEtag name))
       sendFile
 
+  /// Appends a trailing directory separator to `path` unless it already ends
+  /// with one (which is the case for roots such as "/" or "C:\").
+  let private withTrailingSeparator (path : string) =
+    if path.EndsWith(string Path.DirectorySeparatorChar, StringComparison.Ordinal)
+       || path.EndsWith(string Path.AltDirectorySeparatorChar, StringComparison.Ordinal) then
+      path
+    else
+      path + string Path.DirectorySeparatorChar
+
+  /// Removes any trailing directory separator from `path`, so that roots given
+  /// as "/srv/app/" and "/srv/app" compare equal. Filesystem roots ("/", "C:\")
+  /// are left untouched, since trimming those changes their meaning.
+  let private trimTrailingSeparator (path : string) =
+    let trimmed = path.TrimEnd([| Path.DirectorySeparatorChar; Path.AltDirectorySeparatorChar |])
+    if trimmed.Length = 0 // "/" (and "\\" on Windows)
+       || trimmed.EndsWith(":", StringComparison.Ordinal) // "C:\"
+    then path
+    else trimmed
+
   let resolvePath (rootPath : string) (fileName : string) =
     let fileName =
       if Path.DirectorySeparatorChar.Equals('/') then fileName
       else fileName.Replace('/', Path.DirectorySeparatorChar)
+    // Canonicalise the root first: it may be relative, contain '.'/'..' segments
+    // or a trailing separator, none of which can be compared against reliably.
+    // The trailing separator is dropped as well, since Path.GetFullPath keeps it
+    // and the resolved path for "." or "./" never has one.
+    let rootPath = trimTrailingSeparator (Path.GetFullPath rootPath)
     let calculatedPath =
       Path.Combine(rootPath, fileName.TrimStart([| Path.DirectorySeparatorChar; Path.AltDirectorySeparatorChar |]))
       |> Path.GetFullPath
-    if calculatedPath.StartsWith rootPath then
+    // A plain StartsWith check on the root is not enough: a sibling directory
+    // whose name merely has the root as a string prefix (root "/srv/app" and
+    // "/srv/app-secret") would pass it. Require either an exact match with the
+    // root, or a directory-separator boundary right after it.
+    let isInsideRoot =
+      String.Equals(calculatedPath, rootPath, StringComparison.Ordinal)
+      || calculatedPath.StartsWith(withTrailingSeparator rootPath, StringComparison.Ordinal)
+    if isInsideRoot then
       calculatedPath
-    else raise <| Exception("File canonalization issue.")
+    else
+      // Neither the resolved path nor the root is included in the message: this
+      // exception can surface in an error response, and would then disclose the
+      // server's directory layout to whoever crafted the request.
+      raise <| Exception("The requested path resolves outside of the root directory it is served from; refusing to serve it.")
 
   let browseFile rootPath fileName =
     fun ({request = r; runtime = q} as h) ->
