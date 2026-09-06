@@ -636,7 +636,11 @@ module Files =
       || calculatedPath.StartsWith(withTrailingSeparator rootPath, StringComparison.Ordinal)
     if isInsideRoot then
       calculatedPath
-    else raise <| Exception("File canonalization issue.")
+    else
+      // Neither the resolved path nor the root is included in the message: this
+      // exception can surface in an error response, and would then disclose the
+      // server's directory layout to whoever crafted the request.
+      raise <| Exception("The requested path resolves outside of the root directory it is served from; refusing to serve it.")
 
   let browseFile rootPath fileName =
     fun ({request = r; runtime = q} as h) ->
