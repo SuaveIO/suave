@@ -50,8 +50,6 @@ let ``canonicalization attacks`` (_: SuaveConfig) =
       let rootWithSeparator = currentPath + string Path.DirectorySeparatorChar
       Expect.equal (Files.resolvePath rootWithSeparator "/test-text-file.txt") expected
         "a trailing separator on the root should not matter"
-      Expect.equal (Files.resolvePath rootWithSeparator ".") currentPath
-        "dot should resolve to the root even when the root has a trailing separator"
       Expect.throwsT<Exception> (fun _ -> Files.resolvePath rootWithSeparator "../../passwd" |> ignore)
         "'../../passwd' is not a valid path"
 

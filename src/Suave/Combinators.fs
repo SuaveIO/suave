@@ -605,13 +605,25 @@ module Files =
     else
       path + string Path.DirectorySeparatorChar
 
+  /// Removes any trailing directory separator from `path`, so that roots given
+  /// as "/srv/app/" and "/srv/app" compare equal. Filesystem roots ("/", "C:\")
+  /// are left untouched, since trimming those changes their meaning.
+  let private trimTrailingSeparator (path : string) =
+    let trimmed = path.TrimEnd([| Path.DirectorySeparatorChar; Path.AltDirectorySeparatorChar |])
+    if trimmed.Length = 0 // "/" (and "\\" on Windows)
+       || trimmed.EndsWith(":", StringComparison.Ordinal) // "C:\"
+    then path
+    else trimmed
+
   let resolvePath (rootPath : string) (fileName : string) =
     let fileName =
       if Path.DirectorySeparatorChar.Equals('/') then fileName
       else fileName.Replace('/', Path.DirectorySeparatorChar)
     // Canonicalise the root first: it may be relative, contain '.'/'..' segments
     // or a trailing separator, none of which can be compared against reliably.
-    let rootPath = Path.GetFullPath rootPath
+    // The trailing separator is dropped as well, since Path.GetFullPath keeps it
+    // and the resolved path for "." or "./" never has one.
+    let rootPath = trimTrailingSeparator (Path.GetFullPath rootPath)
     let calculatedPath =
       Path.Combine(rootPath, fileName.TrimStart([| Path.DirectorySeparatorChar; Path.AltDirectorySeparatorChar |]))
       |> Path.GetFullPath
