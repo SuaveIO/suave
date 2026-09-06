@@ -1,0 +1,22 @@
+{
+  "policy": {
+    "allow": [
+      "edit_file",
+      "write_file"
+    ],
+    "deny": [
+      "mcp__*"
+    ],
+    "edits_within": [
+      "src/",
+      "examples/",
+      "website/",
+      "build/",
+      "benchmarks/"
+    ],
+    "memory": "deny",
+    "shell_allow": [
+      "build.sh"
+    ]
+  }
+}
