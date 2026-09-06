@@ -1486,10 +1486,13 @@ module Files =
   /// Format a string with a local file path given a file name 'fileName'. You should
   /// use this helper method to find the current directory and concatenate that current
   /// directory to the filename which should be absolute and start with a path separator.
+  /// </para><para>
+  /// Both the root and the resulting path are canonicalised, and the result must be
+  /// the root itself or live below it, with a directory separator on the boundary; a
+  /// sibling directory that merely shares the root's name as a string prefix (root
+  /// "/srv/app" and "/srv/app-secret") is rejected. An <c>Exception</c> is raised when
+  /// the resolved path escapes the root.
   /// </para></summary>
-  /// <remarks>
-  /// The current implementation doesn't take kindly to relative paths.
-  /// </remarks>
   val resolvePath : rootPath:string -> fileName:string -> string
 
 

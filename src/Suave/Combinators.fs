@@ -596,14 +596,33 @@ module Files =
       (fun name -> Some (fileEtag name))
       sendFile
 
+  /// Appends a trailing directory separator to `path` unless it already ends
+  /// with one (which is the case for roots such as "/" or "C:\").
+  let private withTrailingSeparator (path : string) =
+    if path.EndsWith(string Path.DirectorySeparatorChar, StringComparison.Ordinal)
+       || path.EndsWith(string Path.AltDirectorySeparatorChar, StringComparison.Ordinal) then
+      path
+    else
+      path + string Path.DirectorySeparatorChar
+
   let resolvePath (rootPath : string) (fileName : string) =
     let fileName =
       if Path.DirectorySeparatorChar.Equals('/') then fileName
       else fileName.Replace('/', Path.DirectorySeparatorChar)
+    // Canonicalise the root first: it may be relative, contain '.'/'..' segments
+    // or a trailing separator, none of which can be compared against reliably.
+    let rootPath = Path.GetFullPath rootPath
     let calculatedPath =
       Path.Combine(rootPath, fileName.TrimStart([| Path.DirectorySeparatorChar; Path.AltDirectorySeparatorChar |]))
       |> Path.GetFullPath
-    if calculatedPath.StartsWith rootPath then
+    // A plain StartsWith check on the root is not enough: a sibling directory
+    // whose name merely has the root as a string prefix (root "/srv/app" and
+    // "/srv/app-secret") would pass it. Require either an exact match with the
+    // root, or a directory-separator boundary right after it.
+    let isInsideRoot =
+      String.Equals(calculatedPath, rootPath, StringComparison.Ordinal)
+      || calculatedPath.StartsWith(withTrailingSeparator rootPath, StringComparison.Ordinal)
+    if isInsideRoot then
       calculatedPath
     else raise <| Exception("File canonalization issue.")
 
