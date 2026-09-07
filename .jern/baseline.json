@@ -2,6 +2,8 @@
   "policy": {
     "allow": [
       "edit_file",
+      "edit_symbol",
+      "apply_patch",
       "write_file"
     ],
     "deny": [
