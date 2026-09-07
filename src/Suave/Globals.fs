@@ -137,10 +137,13 @@ module DictionaryPool =
 
 open System.Collections.Concurrent
 
-/// A map of compressed files. The key is the is the name of the file, and value is 
-/// a pair: the name of the compressed file and timestamp of the original file at 
-/// time of compression.
-let internal compressedFilesMap = new ConcurrentDictionary<string,string * DateTime>()
+/// A map of compressed files. The key is a pair: the name of the file and the
+/// name of the compression algorithm it was compressed with (the algorithm has
+/// to be part of the key, or a file compressed for a "gzip" request would be
+/// served to a client that asked for "deflate"). The value is a pair: the name
+/// of the compressed file and timestamp of the original file at time of
+/// compression.
+let internal compressedFilesMap = new ConcurrentDictionary<struct(string * string),string * DateTime>()
 
 open System.Reflection
 
