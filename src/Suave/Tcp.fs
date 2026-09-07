@@ -334,10 +334,11 @@ let runServerEx acceptorCount maxConcurrentOps bufferSize (binding: SocketBindin
       let ipAddress = startData.binding.ip.ToString()
       let port = startData.binding.port
 
-      if effective > 1 then
-        Console.WriteLine($"Smooth! Suave v{Globals.SuaveVersion} listener started in {startedListeningMilliseconds} ms with binding {ipAddress}:{port} ({effective} acceptors)")
-      else
-        Console.WriteLine($"Smooth! Suave v{Globals.SuaveVersion} listener started in {startedListeningMilliseconds} ms with binding {ipAddress}:{port}")
+      if not runtime.hideStartupMessage then
+        if effective > 1 then
+          Console.WriteLine($"Smooth! Suave v{Globals.SuaveVersion} listener started in {startedListeningMilliseconds} ms with binding {ipAddress}:{port} ({effective} acceptors)")
+        else
+          Console.WriteLine($"Smooth! Suave v{Globals.SuaveVersion} listener started in {startedListeningMilliseconds} ms with binding {ipAddress}:{port}")
 
       // Create one connection pool per acceptor so each accept loop pops from
       // its own thread-local-ish pool, removing cross-acceptor contention.

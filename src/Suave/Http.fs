@@ -409,6 +409,9 @@ module Http =
       matchedBinding    : HttpBinding
       cookieSerialiser  : CookieSerialiser
       hideHeader        : bool
+      /// Make this true to skip the "Smooth! Suave ... listener started" console
+      /// message written when the TCP listener starts. Defaults to false.
+      hideStartupMessage : bool
       maxContentLength  : int
       /// Optional sink factory for streaming multipart file parts.
       /// When <c>None</c> (the default), each file part is buffered to a temp file on disk.
@@ -504,11 +507,12 @@ module Http =
         matchedBinding    = HttpBinding.defaults
         cookieSerialiser  = new BinaryFormatterSerialiser()
         hideHeader        = false
+        hideStartupMessage = false
         maxContentLength  = 1024
         filePartSink      = None }
 
     let create serverKey errorHandler mimeTypes homeDirectory compressionFolder
-           (*logger*) cookieSerialiser hideHeader maxContentLength binding =
+           (*logger*) cookieSerialiser hideHeader hideStartupMessage maxContentLength binding =
       { serverKey         = serverKey
         errorHandler      = errorHandler
         mimeTypesMap      = mimeTypes
@@ -517,6 +521,7 @@ module Http =
         matchedBinding    = binding
         cookieSerialiser  = cookieSerialiser
         hideHeader        = hideHeader
+        hideStartupMessage = hideStartupMessage
         maxContentLength  = maxContentLength
         filePartSink      = None }
 

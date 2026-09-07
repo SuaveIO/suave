@@ -48,6 +48,11 @@ type SuaveConfig =
     /// every response. Defaults to false.
     hideHeader            : bool
 
+    /// Make this true, if you want Suave not to print the "Smooth! Suave ...
+    /// listener started" message to the console when the server starts listening.
+    /// Defaults to false.
+    hideStartupMessage    : bool
+
     /// Maximun upload size in bytes
     maxContentLength      : int
 
@@ -90,6 +95,7 @@ type SuaveConfig =
   member x.withHomeFolder(v)            = { x with homeFolder = v }
   member x.withCompressedFilesFolder(v) = { x with compressedFilesFolder = v }
   member x.withHiddenHeader(v)          = { x with hideHeader = v }
+  member x.withHideStartupMessage(v)    = { x with hideStartupMessage = v }
   member x.withMaxContentLength(v)      = { x with maxContentLength = v }
   member x.withHealthCheckEnabled(v)    = { x with healthCheckEnabled = v }
   member x.withHealthCheckIntervalMs(v) = { x with healthCheckIntervalMs = v }
@@ -113,6 +119,7 @@ module SuaveConfig =
                          compressionFolder
                          config.cookieSerialiser
                          config.hideHeader
+                         config.hideStartupMessage
                          config.maxContentLength
     fun binding -> { createRuntime binding with filePartSink = config.filePartSink }
 
