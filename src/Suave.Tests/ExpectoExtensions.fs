@@ -66,6 +66,8 @@ let defaultMainThisAssemblyWithParam param args =
       | Some t -> t
       | None -> failwith "Found no tests."
 
-  match ExpectoConfig.fillFromArgs defaultConfig args with
-  | ArgsRun cfg -> runTestsWithCLIArgs [ Verbosity Verbose; Sequenced ] [| |] tests
-  | _ -> 1
+  // The CLI arguments below are only defaults: they are applied first and then
+  // whatever was passed on the command line (filters, --list-tests, --parallel,
+  // a different verbosity, ...) is layered on top of them. Passing `args`
+  // through is what makes those options take effect at all.
+  runTestsWithCLIArgs [ Verbosity Verbose; Sequenced ] args tests
