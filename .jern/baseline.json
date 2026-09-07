@@ -4,7 +4,14 @@
       "edit_file",
       "edit_symbol",
       "apply_patch",
-      "write_file"
+      "write_file",
+      "mcp__jern__read_issue",
+      "mcp__jern__list_issues",
+      "mcp__jern__read_pull_request",
+      "mcp__jern__read_check_log",
+      "mcp__jern__ask_human",
+      "mcp__jern__fetch_page",
+      "mcp__jern__package_info"
     ],
     "deny": [
       "mcp__*"
@@ -18,9 +25,9 @@
       "RELEASE_NOTES.md"
     ],
     "memory": "deny",
-    "test_command": "./build.sh",
     "shell_allow": [
       "build.sh"
     ]
-  }
+  },
+  "test_command": "./build.sh"
 }
