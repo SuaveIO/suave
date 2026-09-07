@@ -82,6 +82,7 @@ module Web =
       compressedFilesFolder = None
       cookieSerialiser      = new BinaryFormatterSerialiser()
       hideHeader            = false
+      hideStartupMessage    = false
       maxContentLength      = 10000000 // 10 megabytes
       healthCheckEnabled    = true   // Enable connection health monitoring
       healthCheckIntervalMs = 30000  // Check every 30 seconds

@@ -259,6 +259,9 @@ module Http =
       matchedBinding    : HttpBinding
       cookieSerialiser  : CookieSerialiser
       hideHeader        : bool
+      /// Make this true to skip the "Smooth! Suave ... listener started" console
+      /// message written when the TCP listener starts. Defaults to false.
+      hideStartupMessage : bool
       maxContentLength  : int
       /// Optional sink factory for streaming multipart file parts without a temp file.
       /// When <c>None</c> (the default), each file part is buffered to a temporary file on disk.
@@ -340,7 +343,7 @@ module Http =
                -> mimeTypes:MimeTypesMap -> homeDirectory:string
                -> compressionFolder:string (*-> logger:Logger*)
                -> cookieSerialiser:CookieSerialiser
-               -> hideHeader:bool -> maxContentLength:int
+               -> hideHeader:bool -> hideStartupMessage:bool -> maxContentLength:int
                -> binding:HttpBinding
                -> HttpRuntime
 

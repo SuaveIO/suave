@@ -181,6 +181,7 @@ let main argv =
       compressedFilesFolder = None
       cookieSerialiser      = new BinaryFormatterSerialiser()
       hideHeader            = false
+      hideStartupMessage    = false
       maxContentLength      = 1000000
       healthCheckEnabled    = true
       healthCheckIntervalMs = 30000
