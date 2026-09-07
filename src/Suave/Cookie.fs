@@ -227,7 +227,10 @@ module Cookie =
 
       match readCookies csctx.serverKey csctx.cookieName ctx.request.cookies with
       | Choice1Of2 (httpCookie, plainText) ->
-        refreshCookies csctx.relativeExpiry httpCookie
+        // The cookie was parsed from the request, and clients never send the
+        // Secure flag back; take it from the state instead of silently
+        // downgrading the refreshed cookie.
+        refreshCookies csctx.relativeExpiry { httpCookie with secure = csctx.secure }
           >=> Writers.setUserData csctx.userStateKey plainText
           >=> fSuccess
 

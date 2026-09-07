@@ -150,6 +150,26 @@ let authTests cfg =
         Expect.equal (contentString res''''') "please authenticate" "should not have access to protected after logout"
         ]
 
+/// Perform a request with the given raw cookie header, if any. A
+/// CookieContainer can't be used for Secure cookies here, since it refuses to
+/// hand them back over plain HTTP.
+let interactRaw methd resource (cookieHeader : string option) ctx =
+  reqResp methd resource None
+          (fun r ->
+            cookieHeader |> Option.iter (fun c -> r.Headers.Add("Cookie", c))
+            setConnectionKeepAlive r)
+          id
+          ctx
+
+/// The state cookie, as it was written to the response's Set-Cookie headers.
+let responseStateCookie (res : HttpResponseMessage) =
+  match res.Headers.TryGetValues "Set-Cookie" with
+  | false, _ -> None
+  | true, values ->
+    values
+    |> Seq.map Cookie.parseResultCookie
+    |> Seq.tryFind (fun cookie -> cookie.name = StateCookie)
+
 let sessionState f =
   context(fun r ->
     match HttpContext.state r with
@@ -237,4 +257,43 @@ let sessionTests cfg =
 
         use res'' = interact HttpMethod.GET "/get_a"
         Expect.equal (contentString res'') "a" "should return a")
+
+    testCase "a secure session stays secure when the state is set and unset" <| fun _ ->
+      // given
+      let ctx =
+        runWithConfig (
+          stateful Session true >=> choose [
+            path "/set"   >=> sessionState (fun state -> state.set "a" "a" >=> OK "set")
+            path "/unset" >=> sessionState (fun state -> state.unset "a" >=> OK "unset")
+            path "/read"  >=> sessionState (fun state ->
+                                match state.get "a" with
+                                | Some (a : string) -> OK a
+                                | None -> OK "none")
+            ])
+
+      let stateCookie (res : HttpResponseMessage) what =
+        match responseStateCookie res with
+        | Some cookie -> cookie
+        | None -> Tests.failtestf "no %s cookie in the response" what
+
+      interaction ctx (fun _ ->
+        use res = interactRaw HttpMethod.GET "/set" None ctx
+        Expect.equal (contentString res) "set" "should have set the value"
+        let afterSet = stateCookie res StateCookie
+        Expect.isTrue afterSet.secure "state cookie should be Secure after set"
+
+        let cookieHeader = Some (StateCookie + "=" + afterSet.value)
+
+        use res' = interactRaw HttpMethod.GET "/read" cookieHeader ctx
+        Expect.equal (contentString res') "a" "should have kept the value"
+        Expect.isTrue (stateCookie res' StateCookie).secure
+                      "state cookie should be Secure when it is only refreshed"
+
+        use res'' = interactRaw HttpMethod.GET "/unset" cookieHeader ctx
+        Expect.equal (contentString res'') "unset" "should have unset the value"
+        let afterUnset = stateCookie res'' StateCookie
+        Expect.isTrue afterUnset.secure "state cookie should be Secure after unset"
+
+        use res''' = interactRaw HttpMethod.GET "/read" (Some (StateCookie + "=" + afterUnset.value)) ctx
+        Expect.equal (contentString res''') "none" "the value should be gone")
     ]

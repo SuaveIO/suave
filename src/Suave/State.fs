@@ -1,6 +1,7 @@
 module Suave.State
 
 open Suave.Cookie
+open Suave.Operators
 
 open System.Text.Json
 
@@ -23,6 +24,17 @@ module CookieStateStore =
   [<Literal>]
   let StateCookie = "st"
 
+  /// The user state key under which the `secure` flag given to `stateful` is
+  /// kept, so that later writes to the state store can re-generate the cookie
+  /// with the same flag.
+  let internal secureKey = StateStoreType + "-secure"
+
+  /// Was the state cookie of this context created as a Secure cookie?
+  let internal isSecure (ctx : HttpContext) =
+    match ctx.userState.TryGetValue secureKey with
+    | true, (:? bool as secure) -> secure
+    | _ -> false
+
   let write relativeExpiry (cookieName : string) (value : 'T) =
     context (fun ctx ->
 
@@ -31,7 +43,7 @@ module CookieStateStore =
           cookieName     = StateCookie
           userStateKey   = StateStoreType
           relativeExpiry = relativeExpiry
-          secure         = false }
+          secure         = isSecure ctx }
 
       updateCookies cookieState (function
          | None ->
@@ -60,7 +72,7 @@ module CookieStateStore =
           cookieName     = StateCookie
           userStateKey   = StateStoreType
           relativeExpiry = relativeExpiry
-          secure         = false }
+          secure         = isSecure ctx }
 
       updateCookies cookieState (function
         | None ->          
@@ -94,8 +106,12 @@ module CookieStateStore =
       let cipherTextCorrupt =
         (fun s -> s.ToString()) >> RequestErrors.BAD_REQUEST >> Choice2Of2
 
-      let setExpiry : WebPart =
+      // Both values are needed by `write`/`remove` when the state store is
+      // updated later in the request, so that the cookie they re-generate
+      // keeps the expiry and the Secure flag of the session.
+      let setStateContext : WebPart =
         Writers.setUserData (StateStoreType + "-expiry") relativeExpiry
+        >=> Writers.setUserData secureKey secure
 
       cookieState
         { serverKey      = ctx.runtime.serverKey
@@ -105,7 +121,7 @@ module CookieStateStore =
           secure         = secure }
         (fun () -> Choice1Of2(Map.empty<string, obj> |> ctx.runtime.cookieSerialiser.serialise))
         cipherTextCorrupt
-        setExpiry)
+        setStateContext)
 
   ///
   /// Only save the state for the duration of the browser session.
