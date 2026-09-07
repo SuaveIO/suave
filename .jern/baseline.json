@@ -14,9 +14,11 @@
       "examples/",
       "website/",
       "build/",
-      "benchmarks/"
+      "benchmarks/",
+      "RELEASE_NOTES.md"
     ],
     "memory": "deny",
+    "test_command": "./build.sh",
     "shell_allow": [
       "build.sh"
     ]
