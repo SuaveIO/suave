@@ -110,12 +110,19 @@ module Compression =
           return Result.Error e
       })
 
+  /// The key under which a compressed copy of a resource is cached. The
+  /// algorithm is part of the key: cached entries are not interchangeable
+  /// between algorithms, or a file compressed for a `gzip` request would be
+  /// handed to – and labelled `deflate` for – the next client.
+  let internal cacheKey (key : string) (n : Algorithm) : struct (string * string) =
+    struct (key, n.ToString())
+
   let transformStream (key : string) (stream : Stream) (getLast : string -> DateTime)
                       compression compressionFolder ctx =
-    let syncCheckForExisting (key:string) (getLast: string -> DateTime) =
+    let syncCheckForExisting (key:string) (n:Algorithm) (getLast: string -> DateTime) =
       let map = Globals.compressedFilesMap
       let lastModified = getLast key
-      match map.TryGetValue key with
+      match map.TryGetValue (cacheKey key n) with
       | true, (existingPath, prevLastModified) when lastModified <= prevLastModified ->
           Choice1Of2 existingPath
       | _ ->
@@ -128,7 +135,7 @@ module Compression =
           match newPathResult with
           | Ok newPath ->
               let map = Globals.compressedFilesMap
-              map.[key] <- (newPath, lastModified)
+              map.[cacheKey key n] <- (newPath, lastModified)
               return Ok newPath
           | Result.Error e ->
               return Result.Error e
@@ -141,7 +148,7 @@ module Compression =
         match parseEncoder ctx.request with
         | Some n ->
           // First check synchronously if we already have a compressed file that is up-to-date
-          match syncCheckForExisting key getLast with
+          match syncCheckForExisting key n getLast with
           | Choice1Of2 existingPath ->
             // existing compressed file is current; dispose original stream and return file stream
             stream.Dispose()

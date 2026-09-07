@@ -104,6 +104,63 @@ let compression cfg =
     ]
 
 [<Tests>]
+let ``compressed file cache`` cfg =
+  let runWithConfig = runWith cfg
+
+  // Big enough to be compressed (see Compression.MIN_BYTES_TO_COMPRESS) and
+  // compressible enough that the two algorithms give different bytes.
+  let expected = System.String.Join("\n", Array.replicate 100 "hello compressed world")
+
+  /// Serve a file nothing else has served yet, so that the process-wide
+  /// compressed-file cache starts out cold for it.
+  let withTempFile f =
+    let path = Path.Combine(Path.GetTempPath(), "suave-compression-" + Guid.NewGuid().ToString("N") + ".txt")
+    File.WriteAllText(path, expected)
+    try
+      f path
+    finally
+      try File.Delete path with _ -> ()
+
+  /// A single request against an already running server, asking for exactly
+  /// one encoding and doing no decompression of its own.
+  let request (encoding : string) (ctx : SuaveTestCtx) =
+    use handler = createHandler DecompressionMethods.None None
+    use client = createClient handler
+    use message = createRequest HttpMethod.GET "/" "" None (endpointUri ctx.suaveConfig)
+    message.Headers.TryAddWithoutValidation("Accept-Encoding", encoding) |> ignore
+    use response = message |> send client (TimeSpan.FromSeconds 10.) ctx
+    let contentEncoding = response.Content.Headers.ContentEncoding |> Seq.toList
+    contentEncoding, contentByteArray response
+
+  let decode encoding bytes =
+    match encoding with
+    | "gzip" -> Suave.Utils.Compression.gzipDecode bytes
+    | "deflate" -> Suave.Utils.Compression.deflateDecode bytes
+    | other -> Tests.failtestf "unexpected Content-Encoding '%s'" other
+
+  let expectServedWith encoding (contentEncoding, bytes) =
+    Expect.equal contentEncoding [ encoding ] (sprintf "should be served as '%s'" encoding)
+    let decoded =
+      try Encoding.UTF8.GetString (decode encoding bytes)
+      with :? InvalidDataException ->
+        Tests.failtestf "the body is not actually %s-compressed" encoding
+    Expect.equal decoded expected (sprintf "the body should be the file, %s-compressed" encoding)
+
+  // A file compressed for the first request must not be handed out - under a
+  // different Content-Encoding - to the second one.
+  let sequentially first second =
+    withTempFile (fun path ->
+      runWithConfig (Files.file path)
+      |> withContext (fun ctx ->
+        expectServedWith first (request first ctx)
+        expectServedWith second (request second ctx)))
+
+  testList "compressed file cache is keyed by algorithm" [
+    testCase "gzip then deflate" <| fun _ -> sequentially "gzip" "deflate"
+    testCase "deflate then gzip" <| fun _ -> sequentially "deflate" "gzip"
+  ]
+
+[<Tests>]
 let ``http HEAD method`` cfg =
   let runWithConfig = runWith cfg
   let ip, port =
