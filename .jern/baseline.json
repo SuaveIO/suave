@@ -26,8 +26,9 @@
     ],
     "memory": "deny",
     "shell_allow": [
-      "build.sh"
+      "build.sh","dotnet","head","tail","sed","ls"
     ]
   },
-  "test_command": "./build.sh"
+  "test_command": "./build.sh",
+  "environment": { "network_allow": ["api.nuget.org"] }
 }
