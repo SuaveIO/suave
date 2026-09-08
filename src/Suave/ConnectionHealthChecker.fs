@@ -93,27 +93,63 @@ module ConnectionHealthChecker =
     maxConnectionAgeSeconds = 300  // 5 minutes
   }
 
-  /// Starts the background health checker for active connections
+  /// Handle over a running background health checker. Disposing the handle
+  /// cancels the checker loop; `Task` completes once the loop has stopped.
+  type HealthChecker(checkerTask: Task, cancellation: CancellationTokenSource) =
+    let mutable disposed = false
+
+    /// The background task running the health check loop
+    member this.Task = checkerTask
+
+    /// Requests cancellation of the health check loop; returns the task so that
+    /// callers can await its completion
+    member this.Cancel() : Task =
+      try
+        if not cancellation.IsCancellationRequested then
+          cancellation.Cancel()
+      with :? ObjectDisposedException -> ()
+      checkerTask
+
+    interface IDisposable with
+      member this.Dispose() =
+        if not disposed then
+          disposed <- true
+          try
+            cancellation.Cancel()
+            cancellation.Dispose()
+          with :? ObjectDisposedException -> ()
+
+  /// Starts the background health checker for active connections.
+  /// The checker stops when `cancellationToken` (typically the server's own
+  /// cancellation token) is cancelled, or when the returned handle is disposed.
   let startHealthChecker<'T when 'T :> IDisposable> 
       (tracker: ActiveConnectionTracker<'T>)
       (config: HealthCheckerConfig)
       (getSocket: 'T -> Socket option)
       (isLongLived: 'T -> bool)
-      (closeConnection: 'T -> unit) : Task =
-    
+      (closeConnection: 'T -> unit)
+      (cancellationToken: CancellationToken) : HealthChecker =
+
+    // Linked to the caller's token so that shutting the server down stops the
+    // checker; disposing the returned handle cancels it as well.
+    let cancellationTokenSource =
+      CancellationTokenSource.CreateLinkedTokenSource(cancellationToken)
+
     if not config.enabled then
-      Task.CompletedTask
+      new HealthChecker(Task.CompletedTask, cancellationTokenSource)
     else
-      let cancellationTokenSource = new CancellationTokenSource()
+      // Capture the token once: a CancellationToken remains readable even after
+      // its source has been disposed, the source itself does not.
+      let checkerToken = cancellationTokenSource.Token
       let mutable isRunning = true
       let mutable connectionsChecked = 0L
       let mutable connectionsForced = 0L
 
       let checkerLoop () = task {
         try
-          while isRunning && not (cancellationTokenSource.Token.IsCancellationRequested) do
+          while isRunning && not checkerToken.IsCancellationRequested do
             try
-              do! Task.Delay(config.checkIntervalMs, cancellationTokenSource.Token)
+              do! Task.Delay(config.checkIntervalMs, checkerToken)
               
               // Get all active connections
               let activeConns = tracker.GetActiveConnections()
@@ -173,12 +209,12 @@ module ConnectionHealthChecker =
           isRunning <- false
       }
 
-      let task = checkerLoop ()
-      task
+      new HealthChecker(checkerLoop () :> Task, cancellationTokenSource)
 
-  /// Stops the background health checker
-  let stopHealthChecker (checkerTask: Task) : Task =
-    checkerTask
+  /// Stops the background health checker, returning the task that completes
+  /// once the checker loop has finished
+  let stopHealthChecker (checker: HealthChecker) : Task =
+    checker.Cancel()
 
   /// Checks health of a single connection
   let checkConnectionHealth (socket: Socket option) : ConnectionHealth =
