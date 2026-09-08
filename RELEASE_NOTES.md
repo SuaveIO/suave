@@ -1,3 +1,7 @@
+## Unreleased
+* Connection health checker: `startHealthChecker` now takes the server's cancellation token and returns a disposable handle, which each connection pool owns and disposes; `stopHealthChecker` actually cancels the loop (#854)
+* Mark EventSource (SSE) connections as long-lived so the health checker's maximum connection age no longer closes them, and reset the flag when the stream ends (#854)
+
 ## New in v3.4.6 (Released 2026-08-26)
 * Fix static file fallback for missing resources (#844)
 

@@ -12,7 +12,7 @@ let poolTests (config: SuaveConfig) =
   testList "test pool autogrow capability" [
 
     testCase "ConcurrentPool" <| fun _ ->
-      let pool = ConcurrentPool<Foo>()
+      use pool = new ConcurrentPool<Foo>()
       pool.ObjectGenerator <- fun _ -> new Foo()
       for i = 0 to 10 do pool.Push (new Foo())
       for i = 0 to 20 do pool.Pop() |> ignore

@@ -21,6 +21,9 @@ type ConcurrentPool<'T>() =
   let mutable healthCheckEnabled = false
   let mutable healthCheckIntervalMs = 30000
   let mutable healthCheckTask: Task option = None
+  // Handle over the background health checker owned by this pool; disposing it
+  // cancels the checker loop
+  let mutable healthChecker: IDisposable option = None
   
   // Active connection tracking for health checking
   let mutable onConnectionAcquired: ('T -> unit) option = None
@@ -87,6 +90,11 @@ type ConcurrentPool<'T>() =
   member this.HealthCheckTask
     with get () = healthCheckTask
     and set (value) = healthCheckTask <- value
+
+  /// The health checker owned by this pool, cancelled when the pool is disposed
+  member this.HealthChecker
+    with get () = healthChecker
+    and set (value) = healthChecker <- value
   
   // Active connection tracking callbacks
   member this.OnConnectionAcquired
@@ -154,3 +162,17 @@ type ConcurrentPool<'T>() =
       objects.Add(item)
     
     removed
+
+  /// Stops the health checker attached to this pool, if any
+  member this.Dispose() =
+    match healthChecker with
+    | Some checker ->
+      healthChecker <- None
+      healthCheckTask <- None
+      try
+        checker.Dispose()
+      with _ -> ()
+    | None -> ()
+
+  interface IDisposable with
+    member this.Dispose() = this.Dispose()

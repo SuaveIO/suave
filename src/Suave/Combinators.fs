@@ -924,8 +924,15 @@ module EventSource =
       // Buggy Internet Explorer; 2kB of comment padding for IE
       do! comment out (String.replicate 2000 " ")
       do! retry out 2000u
-      // Call f out as a separate awaited step (avoid piping or complex composition)
-      do! f out
+      // Mark the connection as long-lived (SSE) so that the health checker does
+      // not close it once it exceeds the maximum connection age
+      out.isLongLived <- true
+      try
+        // Call f out as a separate awaited step (avoid piping or complex composition)
+        do! f out
+      finally
+        // The event stream is over; the connection is an ordinary one again
+        out.isLongLived <- false
       return ()
     }
 

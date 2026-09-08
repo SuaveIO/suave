@@ -146,10 +146,13 @@ let createPools listenSocket binding maxOps runtime cancellationToken bufferSize
         conn.shutdown()
       with _ -> ()
     
-    let healthCheckerTask = 
-      Suave.ConnectionHealthChecker.startHealthChecker tracker healthCheckerConfig getSocket isLongLived closeConnection
+    // The checker is linked to the server's cancellation token and owned by the
+    // pool, so it stops both on shutdown and when the pool is disposed.
+    let healthChecker = 
+      Suave.ConnectionHealthChecker.startHealthChecker tracker healthCheckerConfig getSocket isLongLived closeConnection cancellationToken
     
-    connectionPool.HealthCheckTask <- Some healthCheckerTask
+    connectionPool.HealthCheckTask <- Some healthChecker.Task
+    connectionPool.HealthChecker <- Some (healthChecker :> IDisposable)
 
   connectionPool
 
@@ -361,6 +364,10 @@ let runServerEx acceptorCount maxConcurrentOps bufferSize (binding: SocketBindin
         | :? AggregateException
         | :? OperationCanceledException
         | :? TaskCanceledException -> ()
+
+      // Stops the health checker owned by each pool
+      for pool in pools do
+        (pool :> IDisposable).Dispose()
 
       for s in listenSockets do
         stopTcp "cancellation requested" s
