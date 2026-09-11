@@ -6,6 +6,8 @@ module Compression =
   open Suave.Sockets
 
   open System
+  open System.Collections.Concurrent
+  open System.Collections.Generic
   open System.IO
   open System.IO.Compression
 
