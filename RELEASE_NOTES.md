@@ -1,3 +1,7 @@
+## Unreleased
+* Evict obsolete compressed artifacts: a recompressed resource's superseded copy is now deleted as part of the atomic cache swap, and the `_temporary_compressed_files` folder is swept - age- and count-bounded, see `Compression.cleanupFolder` - on server startup and shutdown (#655)
+* Cached compressed copies that have gone missing from disk are treated as a cache miss instead of failing the request
+
 ## New in v3.5.0 (Released 2026-09-09)
 * Connection health checker: `startHealthChecker` now takes the server's cancellation token and returns a disposable handle, which each connection pool owns and disposes; `stopHealthChecker` actually cancels the loop (#854)
 * Mark EventSource (SSE) connections as long-lived so the health checker's maximum connection age no longer closes them, and reset the flag when the stream ends (#854)
