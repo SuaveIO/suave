@@ -43,6 +43,14 @@ module Web =
       resolveDirectory config.homeFolder,
       Path.Combine(resolveDirectory config.compressedFilesFolder, "_temporary_compressed_files")
 
+    // Compressed copies are a cache on disk; copies left behind by resources
+    // that were recompressed, renamed or deleted while the server was down are
+    // evicted before we start serving, and again when the server is shut down,
+    // so the folder stays bounded instead of growing with every restart.
+    Compression.cleanup compressionFolder |> ignore
+    config.cancellationToken.Register(Action(fun () -> Compression.cleanup compressionFolder |> ignore))
+    |> ignore
+
     // spawn tcp listeners/web workers
     let toRuntime = SuaveConfig.toRuntime config homeFolder compressionFolder
 

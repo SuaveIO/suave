@@ -161,6 +161,99 @@ let ``compressed file cache`` cfg =
   ]
 
 [<Tests>]
+let ``obsolete compressed artifacts`` cfg =
+
+  let expected = System.String.Join("\n", Array.replicate 100 "hello compressed world")
+  let updated = System.String.Join("\n", Array.replicate 100 "hello recompressed world")
+
+  /// A private root for the server's `_temporary_compressed_files` folder, so
+  /// that counting what is in it cannot be confused by any other test.
+  let withTempDir f =
+    let dir = Path.Combine(Path.GetTempPath(), "suave-compression-" + Guid.NewGuid().ToString("N"))
+    Directory.CreateDirectory dir |> ignore
+    try
+      f dir
+    finally
+      try Directory.Delete(dir, true) with _ -> ()
+
+  let compressionFolder (root : string) =
+    Path.Combine(root, "_temporary_compressed_files")
+
+  let compressedFiles (root : string) =
+    let folder = compressionFolder root
+    if Directory.Exists folder then Directory.GetFiles folder else [||]
+
+  /// Writes `content` and dates the file `age` in the past, so that a rewrite
+  /// is unambiguously newer than the copy taken from it.
+  let write (path : string) (content : string) (age : TimeSpan) =
+    File.WriteAllText(path, content)
+    File.SetLastWriteTime(path, DateTime.Now - age)
+
+  let gzipRequest (ctx : SuaveTestCtx) =
+    use handler = createHandler DecompressionMethods.None None
+    use client = createClient handler
+    use message = createRequest HttpMethod.GET "/" "" None (endpointUri ctx.suaveConfig)
+    message.Headers.TryAddWithoutValidation("Accept-Encoding", "gzip") |> ignore
+    use response = message |> send client (TimeSpan.FromSeconds 10.) ctx
+    Encoding.UTF8.GetString (Suave.Utils.Compression.gzipDecode (contentByteArray response))
+
+  testList "obsolete compressed artifacts are evicted" [
+    testCase "recompressing a resource deletes the copy it supersedes" <| fun _ ->
+      withTempDir (fun root ->
+        let file = Path.Combine(root, "resource.txt")
+        write file expected (TimeSpan.FromMinutes 10.)
+        runWith { cfg with compressedFilesFolder = Some root } (Files.file file)
+        |> withContext (fun ctx ->
+          Expect.equal (gzipRequest ctx) expected "the file should be served gzipped"
+          Expect.equal (compressedFiles root).Length 1 "there should be exactly one compressed copy"
+          // A newer resource has to be compressed again; the copy that is
+          // superseded must not be left behind in the folder.
+          write file updated TimeSpan.Zero
+          Expect.equal (gzipRequest ctx) updated "the new contents should be served"
+          Expect.equal (compressedFiles root).Length 1 "the superseded copy should have been deleted"))
+
+    testCase "a copy evicted from disk is compressed again on the next request" <| fun _ ->
+      withTempDir (fun root ->
+        let file = Path.Combine(root, "resource.txt")
+        write file expected (TimeSpan.FromMinutes 10.)
+        runWith { cfg with compressedFilesFolder = Some root } (Files.file file)
+        |> withContext (fun ctx ->
+          Expect.equal (gzipRequest ctx) expected "the file should be served gzipped"
+          // an aggressive sweep: everything in the folder counts as obsolete
+          Suave.Compression.cleanupFolder (compressionFolder root) TimeSpan.Zero 0 |> ignore
+          Expect.equal (compressedFiles root).Length 0 "the sweep should have emptied the folder"
+          Expect.equal (gzipRequest ctx) expected "the file should still be served after its copy was evicted"
+          Expect.equal (compressedFiles root).Length 1 "the resource should have been compressed again"))
+
+    testCase "cleanupFolder deletes files older than the maximum age" <| fun _ ->
+      withTempDir (fun dir ->
+        let old = Path.Combine(dir, "old")
+        let recent = Path.Combine(dir, "recent")
+        write old "old" (TimeSpan.FromHours 2.)
+        write recent "recent" TimeSpan.Zero
+        Suave.Compression.cleanupFolder dir (TimeSpan.FromHours 1.) 1000 |> ignore
+        Expect.isFalse (File.Exists old) "the file over the maximum age should be gone"
+        Expect.isTrue (File.Exists recent) "the recent file should be kept")
+
+    testCase "cleanupFolder bounds the folder, oldest first" <| fun _ ->
+      withTempDir (fun dir ->
+        let files =
+          [ for i in 1 .. 5 ->
+              let path = Path.Combine(dir, sprintf "file-%d" i)
+              write path (string i) (TimeSpan.FromMinutes (float (10 - i)))
+              path ]
+        Suave.Compression.cleanupFolder dir (TimeSpan.FromDays 365.) 2 |> ignore
+        Expect.equal (files |> List.filter File.Exists) [ files.[3]; files.[4] ]
+          "the two newest files should be the ones kept")
+
+    testCase "cleanupFolder tolerates a folder that does not exist" <| fun _ ->
+      let missing = Path.Combine(Path.GetTempPath(), "suave-compression-" + Guid.NewGuid().ToString("N"))
+      // there is nothing to delete, and nothing to throw either
+      Suave.Compression.cleanupFolder missing TimeSpan.Zero 0 |> ignore
+      Expect.isFalse (Directory.Exists missing) "the sweep should not create the folder"
+  ]
+
+[<Tests>]
 let ``http HEAD method`` cfg =
   let runWithConfig = runWith cfg
   let ip, port =
