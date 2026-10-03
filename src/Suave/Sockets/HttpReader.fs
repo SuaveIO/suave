@@ -229,55 +229,90 @@ type HttpReader(transport : ITransport, pipe: Pipe, cancellationToken: Threading
           dirty <- false)
     with ex ->  ()
 
+  /// Start reading from the transport into the pipe's next write buffer. The result
+  /// must be passed to `commitReceived`. Together they are `readMoreData`, split so
+  /// that a long-lived caller can await both steps itself instead of suspending inside
+  /// a fresh task for every read.
+  member x.receive () : SocketOp<int> =
+    transport.read (pipe.Writer.GetMemory())
+
+  /// Make the bytes of a completed `receive` available to the pipe reader.
+  member x.commitReceived (received : Result<int,Error>) : SocketOp<unit> =
+    match received with
+    | Ok bytesRead ->
+      if bytesRead > 0 then
+        pipe.Writer.Advance(bytesRead)
+        // Try to also complete the flush synchronously. PipeWriter.FlushAsync returns
+        // ValueTask<FlushResult>; in steady state on a localhost benchmark this is the
+        // overwhelmingly common case, so bypass the F# task builder entirely when it does.
+        let flush = pipe.Writer.FlushAsync(readerCancellationTokenSource.Token)
+        if flush.IsCompletedSuccessfully then
+          // Touch .Result so any synchronously-thrown exception still surfaces; we don't
+          // care about the FlushResult fields on the success path.
+          let _ = flush.Result
+          ValueTask<Result<unit,Error>>(Ok())
+        else
+          // Fall back to the task builder only when the flush actually went async.
+          ValueTask<Result<unit,Error>>(
+            task {
+              let! _ = flush
+              return Ok()
+            })
+      else
+        ValueTask<Result<unit,Error>>(Result.Error (Error.ConnectionError "no more data"))
+    | Result.Error e ->
+      ValueTask<Result<unit,Error>>(Result.Error e)
+
   member x.readMoreData () =
-    let buff = pipe.Writer.GetMemory()
-    let readResult = transport.read buff
+    let readResult = x.receive()
     if readResult.IsCompletedSuccessfully then
       // Synchronous read completion
-      match readResult.Result with
-      | Ok bytesRead ->
-        if bytesRead > 0 then
-          pipe.Writer.Advance(bytesRead)
-          // Try to also complete the flush synchronously. PipeWriter.FlushAsync returns
-          // ValueTask<FlushResult>; in steady state on a localhost benchmark this is the
-          // overwhelmingly common case, so bypass the F# task builder entirely when it does.
-          let flush = pipe.Writer.FlushAsync(readerCancellationTokenSource.Token)
-          if flush.IsCompletedSuccessfully then
-            // Touch .Result so any synchronously-thrown exception still surfaces; we don't
-            // care about the FlushResult fields on the success path.
-            let _ = flush.Result
-            ValueTask<Result<unit,Error>>(Ok())
-          else
-            // Fall back to the task builder only when the flush actually went async.
-            ValueTask<Result<unit,Error>>(
-              task {
-                let! _ = flush
-                return Ok()
-              })
-        else
-          ValueTask<Result<unit,Error>>(Result.Error (Error.ConnectionError "no more data"))
-      | Result.Error e ->
-        ValueTask<Result<unit,Error>>(Result.Error e)
+      x.commitReceived readResult.Result
     else
       // Async path
       ValueTask<Result<unit,Error>>(
         task {
-          match! readResult with
-          | Ok bytesRead -> 
-            if bytesRead > 0 then
-              pipe.Writer.Advance(bytesRead)
-              let flush = pipe.Writer.FlushAsync(readerCancellationTokenSource.Token)
-              if flush.IsCompletedSuccessfully then
-                let _ = flush.Result
-                return Ok()
-              else
-                let! _ = flush
-                return Ok()
-            else
-              return Result.Error (Error.ConnectionError "no more data")
-          | Result.Error e ->
-            return Result.Error e
+          let! received = readResult
+          return! x.commitReceived received
         })
+
+  /// True when the first buffered line is complete and is not an HTTP/1.x request
+  /// line, e.g. the HTTP/2 prior-knowledge preface or garbage. Such input is not
+  /// followed by an empty line, so it must be handed to the parser without waiting.
+  member private x.firstLineIsNotHttp1 (buffer: ReadOnlySequence<byte>) : bool =
+    match findMarker EOL buffer with
+    | ValueNone -> false
+    | ValueSome n when n < 8L -> true
+    | ValueSome n ->
+      // Scratch use of the line buffer: no request is being parsed while waiting.
+      buffer.Slice(n - 8L, 8L).CopyTo(Span<byte>(readLineBuffer, 0, 8))
+      match KnownVersions.tryMatch (ReadOnlySpan<byte>(readLineBuffer, 0, 8)) with
+      | "HTTP/1.1" | "HTTP/1.0" -> false
+      | _ -> true
+
+  /// Check, without consuming input, whether the pipe already holds a complete
+  /// request head (request line and headers up to the empty line) that fits the
+  /// line buffer. Also returns true when waiting cannot help (read canceled,
+  /// input completed, more buffered than the line buffer holds, or a first line
+  /// that is not HTTP/1.x) so that the streaming parser takes over and reports
+  /// the outcome as before. When this returns true, parsing the head completes
+  /// synchronously in the common case.
+  member x.requestHeadReady () : bool =
+    let mutable rr = Unchecked.defaultof<ReadResult>
+    if pipe.Reader.TryRead(&rr) then
+      let buffer = rr.Buffer
+      let ready =
+        rr.IsCanceled || rr.IsCompleted
+        || buffer.Length >= int64 readLineBuffer.Length
+        || (findMarker HttpReader.EmptyLineMarker buffer).IsSome
+        || x.firstLineIsNotHttp1 buffer
+      if ready then pipe.Reader.AdvanceTo(buffer.Start)
+      else pipe.Reader.AdvanceTo(buffer.Start, buffer.End)
+      ready
+    else
+      false
+
+  static member val private EmptyLineMarker : byte[] = [| 13uy; 10uy; 13uy; 10uy |]
 
   /// Inspect an already-available `ReadResult` for the marker and advance the
   /// pipe reader. Returns `ValueSome r` when the scan is terminal (marker found,
@@ -423,7 +458,7 @@ type HttpReader(transport : ITransport, pipe: Pipe, cancellationToken: Threading
           return Ok result
       })
 
-  /// Read the HTTP request line directly from the byte buffer and decompose it
+  /// Decompose the request line held in the first `offset` bytes of `readLineBuffer`
   /// into (method, path, rawQuery, version).
   ///
   /// Allocation profile vs. the previous `readLine` + `parseUrl` pipeline:
@@ -432,6 +467,48 @@ type HttpReader(transport : ITransport, pipe: Pipe, cancellationToken: Threading
   ///   - path: 1 string allocation (sliced directly from `readLineBuffer`)
   ///   - rawQuery: 1 string allocation only when '?' is present, otherwise `String.Empty`
   /// Previously the same data cost: 1 full-line UTF-8 string + 4 `Substring` allocations.
+  member private x.parseRequestLine (offset: int) : Result<struct (string * string * string * string), Error> =
+    // Walk the captured bytes once, locating the two ASCII spaces.
+    let lineSpan = System.ReadOnlySpan<byte>(readLineBuffer, 0, offset)
+    let firstSpace = lineSpan.IndexOf(0x20uy)
+    if firstSpace <= 0 then
+      Result.Error (InputDataError (Some 400, "Invalid first line"))
+    else
+      let afterMethod = lineSpan.Slice(firstSpace + 1)
+      let secondSpaceRel = afterMethod.IndexOf(0x20uy)
+      if secondSpaceRel <= 0 then
+        Result.Error (InputDataError (Some 400, "Invalid first line"))
+      else
+        let methodSpan = lineSpan.Slice(0, firstSpace)
+        let urlSpan = afterMethod.Slice(0, secondSpaceRel)
+        let versionSpan = afterMethod.Slice(secondSpaceRel + 1)
+
+        // Method: prefer interned; fall back to allocation only for unknowns.
+        let knownMethod = KnownMethods.tryMatch methodSpan
+        let methodStr =
+          if not (isNull knownMethod) then knownMethod
+          else System.Text.Encoding.ASCII.GetString(methodSpan)
+
+        // Version: prefer interned; fall back to allocation only for unknowns.
+        let knownVersion = KnownVersions.tryMatch versionSpan
+        let versionStr =
+          if not (isNull knownVersion) then knownVersion
+          else System.Text.Encoding.ASCII.GetString(versionSpan)
+
+        // Path / rawQuery: split on '?'. Path is materialised directly from
+        // the byte buffer (one allocation). rawQuery only allocates when
+        // the URL actually contains '?'.
+        let queryRel = urlSpan.IndexOf(0x3Fuy)  // '?'
+        if queryRel >= 0 then
+          let pathStr = Globals.UTF8.GetString(urlSpan.Slice(0, queryRel))
+          let queryStr = Globals.UTF8.GetString(urlSpan.Slice(queryRel + 1))
+          Ok (struct (methodStr, pathStr, queryStr, versionStr))
+        else
+          let pathStr = Globals.UTF8.GetString(urlSpan)
+          Ok (struct (methodStr, pathStr, System.String.Empty, versionStr))
+
+  /// Read the HTTP request line directly from the byte buffer and decompose it
+  /// into (method, path, rawQuery, version).
   member x.readRequestLine () : SocketOp<string * string * string * string> =
     ValueTask<Result<string * string * string * string, Error>>(
       task {
@@ -448,58 +525,46 @@ type HttpReader(transport : ITransport, pipe: Pipe, cancellationToken: Threading
         | Result.Error e ->
           return Result.Error e
         | Ok _ ->
-          // Walk the captured bytes once, locating the two ASCII spaces.
-          let lineSpan = System.ReadOnlySpan<byte>(readLineBuffer, 0, offset)
-          let firstSpace = lineSpan.IndexOf(0x20uy)
-          if firstSpace <= 0 then
-            return Result.Error (InputDataError (Some 400, "Invalid first line"))
-          else
-            let afterMethod = lineSpan.Slice(firstSpace + 1)
-            let secondSpaceRel = afterMethod.IndexOf(0x20uy)
-            if secondSpaceRel <= 0 then
-              return Result.Error (InputDataError (Some 400, "Invalid first line"))
-            else
-              let methodSpan = lineSpan.Slice(0, firstSpace)
-              let urlSpan = afterMethod.Slice(0, secondSpaceRel)
-              let versionSpan = afterMethod.Slice(secondSpaceRel + 1)
-
-              // Method: prefer interned; fall back to allocation only for unknowns.
-              let knownMethod = KnownMethods.tryMatch methodSpan
-              let methodStr =
-                if not (isNull knownMethod) then knownMethod
-                else System.Text.Encoding.ASCII.GetString(methodSpan)
-
-              // Version: prefer interned; fall back to allocation only for unknowns.
-              let knownVersion = KnownVersions.tryMatch versionSpan
-              let versionStr =
-                if not (isNull knownVersion) then knownVersion
-                else System.Text.Encoding.ASCII.GetString(versionSpan)
-
-              // Path / rawQuery: split on '?'. Path is materialised directly from
-              // the byte buffer (one allocation). rawQuery only allocates when
-              // the URL actually contains '?'.
-              let queryRel = urlSpan.IndexOf(0x3Fuy)  // '?'
-              if queryRel >= 0 then
-                let pathStr = Globals.UTF8.GetString(urlSpan.Slice(0, queryRel))
-                let queryStr = Globals.UTF8.GetString(urlSpan.Slice(queryRel + 1))
-                return Ok (methodStr, pathStr, queryStr, versionStr)
-              else
-                let pathStr = Globals.UTF8.GetString(urlSpan)
-                return Ok (methodStr, pathStr, System.String.Empty, versionStr)
+          match x.parseRequestLine offset with
+          | Ok (struct (methodStr, pathStr, queryStr, versionStr)) ->
+            return Ok (methodStr, pathStr, queryStr, versionStr)
+          | Result.Error e ->
+            return Result.Error e
       })
 
-  /// Parse a single header line out of the first `offset` bytes of `readLineBuffer`.
+  /// Parse the request line straight from the pipe when the whole line is already
+  /// buffered and fits the line buffer, skipping the task machinery of
+  /// `readRequestLine`. Returns ValueNone, consuming nothing, otherwise; the caller
+  /// then falls back to `readRequestLine`.
+  member x.tryReadRequestLineBuffered () : ValueOption<Result<struct (string * string * string * string), Error>> =
+    let mutable rr = Unchecked.defaultof<ReadResult>
+    if not (pipe.Reader.TryRead(&rr)) then
+      ValueNone
+    else
+      let buffer = rr.Buffer
+      let lineEnd = if rr.IsCanceled then ValueNone else findMarker EOL buffer
+      match lineEnd with
+      | ValueSome n when n <= int64 readLineBuffer.Length ->
+        buffer.Slice(0L, n).CopyTo(Span<byte>(readLineBuffer))
+        pipe.Reader.AdvanceTo(buffer.GetPosition(n + int64 EOL.Length))
+        ValueSome (x.parseRequestLine (int n))
+      | _ ->
+        pipe.Reader.AdvanceTo(buffer.Start)
+        ValueNone
+
+  /// Parse a single header line held in `readLineBuffer` at [start, start + length).
   /// Returns the canonical lowercase name + the trimmed UTF-8 value with at most one
   /// string allocation per header (zero for the name when it is well-known).
-  member private x.parseHeaderLine (offset: int) : Result<string * string, Error> =
-    let lineSpan = System.ReadOnlySpan<byte>(readLineBuffer, 0, offset)
+  member private x.parseHeaderLine (start: int) (length: int) : Result<string * string, Error> =
+    let lineSpan = System.ReadOnlySpan<byte>(readLineBuffer, start, length)
     let colonIdx = lineSpan.IndexOf(0x3Auy)
     if colonIdx <= 0 then
       Result.Error (InputDataError (Some 400, "Bad Request: Malformed Header"))
     else
       let nameSpan = lineSpan.Slice(0, colonIdx)
       // Trim leading SP/HTAB on value, trailing SP/HTAB on value.
-      let mutable vStart = colonIdx + 1
+      let offset = start + length
+      let mutable vStart = start + colonIdx + 1
       while vStart < offset && (readLineBuffer.[vStart] = 0x20uy || readLineBuffer.[vStart] = 0x09uy) do
         vStart <- vStart + 1
       let mutable vEnd = offset
@@ -568,13 +633,54 @@ type HttpReader(transport : ITransport, pipe: Pipe, cancellationToken: Threading
               // Empty line — end of headers
               flag <- false
             else
-              match x.parseHeaderLine offset with
+              match x.parseHeaderLine 0 offset with
               | Ok kv -> headers.Add kv
               | Result.Error e ->
                 flag <- false
                 result <- Result.Error e
         return result
       })
+
+  /// Parse all header lines and the terminating empty line straight from the pipe
+  /// when that whole block is already buffered and fits the line buffer, skipping
+  /// the per-line task and closure of `readHeadersInto`. Returns ValueNone,
+  /// consuming nothing, otherwise; the caller then falls back to `readHeadersInto`.
+  member x.tryReadHeadersBuffered (headers: List<string*string>) : ValueOption<Result<unit, Error>> =
+    let mutable rr = Unchecked.defaultof<ReadResult>
+    if not (pipe.Reader.TryRead(&rr)) then
+      ValueNone
+    else
+      let buffer = rr.Buffer
+      // Length of the header lines, each with its CRLF, before the empty line.
+      let blockLength =
+        if rr.IsCanceled || cancellationToken.IsCancellationRequested then ValueNone
+        else
+          match findMarker EOL buffer with
+          | ValueSome 0L -> ValueSome 0L
+          | _ ->
+            match findMarker HttpReader.EmptyLineMarker buffer with
+            | ValueSome p -> ValueSome (p + int64 EOL.Length)
+            | ValueNone -> ValueNone
+      match blockLength with
+      | ValueSome n when n <= int64 readLineBuffer.Length ->
+        let blockLength = int n
+        buffer.Slice(0L, n).CopyTo(Span<byte>(readLineBuffer))
+        pipe.Reader.AdvanceTo(buffer.GetPosition(n + int64 EOL.Length))
+        let mutable result = Ok ()
+        let mutable lineStart = 0
+        while lineStart < blockLength do
+          let lineLength = ReadOnlySpan<byte>(readLineBuffer, lineStart, blockLength - lineStart).IndexOf(ReadOnlySpan<byte>(EOL))
+          match x.parseHeaderLine lineStart lineLength with
+          | Ok kv ->
+            headers.Add kv
+            lineStart <- lineStart + lineLength + EOL.Length
+          | Result.Error e ->
+            result <- Result.Error e
+            lineStart <- blockLength
+        ValueSome result
+      | _ ->
+        pipe.Reader.AdvanceTo(buffer.Start)
+        ValueNone
 
   /// Read the post data from the stream, given the number of bytes that makes up the post data.
   member x.readPostData (bytes : int) (select:ReadOnlyMemory<byte> -> int -> unit) : Task<unit> =

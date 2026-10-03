@@ -21,6 +21,8 @@ open ConnectionHealthChecker
 type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPool: ConcurrentPool<ConnectionFacade>, tracker: ActiveConnectionTracker<ConnectionFacade>, cancellationToken: CancellationToken, webpart: WebPart) =
 
   static let mutable connectionIdCounter = 0L
+  static let absentContentLength : Choice<string,string> = Choice2Of2 "Key content-length was not present"
+  static let absentContentType : Choice<string,string> = Choice2Of2 "Key content-type was not present"
   let connectionId = Interlocked.Increment(&connectionIdCounter)
 
   let httpOutput = new HttpOutput(connection,runtime)
@@ -326,125 +328,165 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
                 return Result.Error e
       })
 
-  member this.readRequest () : SocketOp<HttpRequest> =
-    // Steady-state hot path. We deliberately avoid the socket { } CE here because each
-    // of its binds wraps a task in a ValueTask and forces .AsTask() boxing on every let!.
-    // Instead we run a single task { } and hand-bind the Result returned by each step.
-    ValueTask<Result<HttpRequest,Error>>(
-      task {
-        // Clear pooled per-connection collections at the start of every request rather than
-        // allocating fresh ones. The collections live on the ConnectionFacade and are reset
-        // here, before the new request is parsed in.
-        requestHeaders.Clear()
-        files.Clear()
-        multiPartFields.Clear()
-        _rawForm <- [||]
+  /// Streaming request reader. Besides reading a request from scratch, it finishes
+  /// requests whose request line (`line`) and possibly headers (`headersRead`) were
+  /// already parsed from the buffer by `readRequest` but that need further I/O.
+  member private this.readRequestAsync (line : (string * string * string * string) voption) (headersRead : bool) : Task<Result<HttpRequest,Error>> =
+    // We deliberately avoid the socket { } CE here because each of its binds wraps a
+    // task in a ValueTask and forces .AsTask() boxing on every let!. Instead we run a
+    // single task { } and hand-bind the Result returned by each step.
+    task {
+      let! firstLineRes =
+        match line with
+        | ValueSome line -> ValueTask<Result<string * string * string * string, Error>>(Ok line)
+        | ValueNone -> reader.readRequestLine()
+      match firstLineRes with
+      | Result.Error e -> return Result.Error e
+      | Ok (rawMethod, path, rawQuery, httpVersion) ->
 
-        let! firstLineRes = reader.readRequestLine()
-        match firstLineRes with
-        | Result.Error e -> return Result.Error e
-        | Ok (rawMethod, path, rawQuery, httpVersion) ->
-
-        // RFC 7230 §3.1.1: a conforming HTTP/1.x or HTTP/2 request line ends
-        // in an "HTTP/x.y" version token. If the parsed token does not start
-        // with "HTTP/", the bytes we just read are not an HTTP/1.x request
-        // and the connection is most plausibly a misbehaving HTTP/2 client
-        // (e.g. h2spec http2/3.5/2 sends the literal "INVALID CONNECTION
-        // PREFACE\r\n\r\n" on a fresh TCP connection without negotiating an
-        // h2c upgrade). Send a best-effort HTTP/2 GOAWAY(PROTOCOL_ERROR)
-        // so HTTP/2 clients observe the protocol error, then close the
-        // connection silently — the `_ -> ()` branch of
-        // `exitHttpLoopWithError` suppresses the 400 response that would
-        // otherwise be sent back as HTTP/1.1 bytes (and which h2spec
-        // misparses as a truncated HTTP/2 frame, reporting "unexpected EOF").
-        if not (httpVersion.StartsWith("HTTP/", StringComparison.Ordinal)) then
-          let goAwayBytes : byte[] =
-            // 9-byte frame header (length=8, type=GOAWAY=7, flags=0, stream id=0)
-            // followed by an 8-byte payload (last_stream_id=0, error_code=PROTOCOL_ERROR=1).
-            [| 0uy; 0uy; 8uy
-               7uy
-               0uy
-               0uy; 0uy; 0uy; 0uy
-               0uy; 0uy; 0uy; 0uy
-               0uy; 0uy; 0uy; 1uy |]
-          try
-            let writeVt = connection.transport.write(Memory<byte>(goAwayBytes))
-            let! _ = writeVt.AsTask()
-            let flushVt = connection.transport.flush()
-            let! _ = flushVt.AsTask()
-            ()
-          with ex ->
-            // Best-effort: the peer is not necessarily speaking HTTP/2, so a
-            // failed write is expected for plain noise. Surface it at debug
-            // level so future preface-related regressions are observable.
-            try eprintfn "Suave.Http2: failed to write GOAWAY for invalid HTTP version: %s" ex.Message
-            with _ -> ()
-          return Result.Error
-            (ConnectionError ("Invalid HTTP version: " + httpVersion))
-        else
-
-        // RFC 7540 §3.4: prior-knowledge HTTP/2 cleartext clients open the
-        // connection with the 24-byte preface beginning with the literal
-        // request line "PRI * HTTP/2.0\r\n". No legitimate HTTP/1.1 request
-        // can have this exact (method, target, version) triple, so it is a
-        // reliable in-band signal that we should switch to HTTP/2 framing.
-        // We surface it to `processRequest` as a sentinel `HttpRequest` —
-        // headers are not read (the next 8 preface bytes "\r\nSM\r\n\r\n"
-        // are consumed by the prior-knowledge handler, not by the HTTP/1.1
-        // header parser).
-        if ConnectionFacade.isHttp2PriorKnowledgePreface rawMethod path httpVersion then
-          let request =
-            { httpVersion      = httpVersion
-              binding          = runtime.matchedBinding
-              rawPath          = path
-              rawHost          = ""
-              rawMethod        = rawMethod
-              headers          = requestHeaders
-              rawForm          = [||]
-              rawQuery         = rawQuery
-              files            = files
-              multiPartFields  = multiPartFields }
-          return Ok request
-        else
-
-        let! headersRes = reader.readHeadersInto(requestHeaders)
-        match headersRes with
-        | Result.Error e -> return Result.Error e
-        | Ok headers ->
-
-        match headers @@ "host" with
-        | Choice2Of2 _ ->
-          return Result.Error (InputDataError (None, "Missing 'Host' header"))
-        | Choice1Of2 rawHost ->
-
-        // 100-continue handling
-        if headers @@ "expect" = Choice1Of2 "100-continue" then
-          let! _ = httpOutput.run HttpRequest.empty Intermediate.CONTINUE
+      // RFC 7230 §3.1.1: a conforming HTTP/1.x or HTTP/2 request line ends
+      // in an "HTTP/x.y" version token. If the parsed token does not start
+      // with "HTTP/", the bytes we just read are not an HTTP/1.x request
+      // and the connection is most plausibly a misbehaving HTTP/2 client
+      // (e.g. h2spec http2/3.5/2 sends the literal "INVALID CONNECTION
+      // PREFACE\r\n\r\n" on a fresh TCP connection without negotiating an
+      // h2c upgrade). Send a best-effort HTTP/2 GOAWAY(PROTOCOL_ERROR)
+      // so HTTP/2 clients observe the protocol error, then close the
+      // connection silently — the `_ -> ()` branch of
+      // `exitHttpLoopWithError` suppresses the 400 response that would
+      // otherwise be sent back as HTTP/1.1 bytes (and which h2spec
+      // misparses as a truncated HTTP/2 frame, reporting "unexpected EOF").
+      if not (httpVersion.StartsWith("HTTP/", StringComparison.Ordinal)) then
+        let goAwayBytes : byte[] =
+          // 9-byte frame header (length=8, type=GOAWAY=7, flags=0, stream id=0)
+          // followed by an 8-byte payload (last_stream_id=0, error_code=PROTOCOL_ERROR=1).
+          [| 0uy; 0uy; 8uy
+             7uy
+             0uy
+             0uy; 0uy; 0uy; 0uy
+             0uy; 0uy; 0uy; 0uy
+             0uy; 0uy; 0uy; 1uy |]
+        try
+          let writeVt = connection.transport.write(Memory<byte>(goAwayBytes))
+          let! _ = writeVt.AsTask()
+          let flushVt = connection.transport.flush()
+          let! _ = flushVt.AsTask()
           ()
+        with ex ->
+          // Best-effort: the peer is not necessarily speaking HTTP/2, so a
+          // failed write is expected for plain noise. Surface it at debug
+          // level so future preface-related regressions are observable.
+          try eprintfn "Suave.Http2: failed to write GOAWAY for invalid HTTP version: %s" ex.Message
+          with _ -> ()
+        return Result.Error
+          (ConnectionError ("Invalid HTTP version: " + httpVersion))
+      else
 
-        let! postRes =
-          this.parsePostData
-            runtime.maxContentLength
-            (headers @@ "content-length")
-            (headers @@ "content-type")
-        match postRes with
-        | Result.Error e -> return Result.Error e
-        | Ok () ->
-
+      // RFC 7540 §3.4: prior-knowledge HTTP/2 cleartext clients open the
+      // connection with the 24-byte preface beginning with the literal
+      // request line "PRI * HTTP/2.0\r\n". No legitimate HTTP/1.1 request
+      // can have this exact (method, target, version) triple, so it is a
+      // reliable in-band signal that we should switch to HTTP/2 framing.
+      // We surface it to `processRequest` as a sentinel `HttpRequest` —
+      // headers are not read (the next 8 preface bytes "\r\nSM\r\n\r\n"
+      // are consumed by the prior-knowledge handler, not by the HTTP/1.1
+      // header parser).
+      if ConnectionFacade.isHttp2PriorKnowledgePreface rawMethod path httpVersion then
         let request =
           { httpVersion      = httpVersion
             binding          = runtime.matchedBinding
             rawPath          = path
-            rawHost          = rawHost
+            rawHost          = ""
             rawMethod        = rawMethod
-            headers          = headers
-            rawForm          = _rawForm
+            headers          = requestHeaders
+            rawForm          = [||]
             rawQuery         = rawQuery
             files            = files
             multiPartFields  = multiPartFields }
-
         return Ok request
-      })
+      else
+
+      let! headersRes =
+        if headersRead then ValueTask<Result<List<string*string>, Error>>(Ok requestHeaders)
+        else reader.readHeadersInto(requestHeaders)
+      match headersRes with
+      | Result.Error e -> return Result.Error e
+      | Ok headers ->
+
+      // Header names are stored lowercase. These lookups use the null-returning
+      // variant because the probed headers are usually absent, and building the
+      // Choice error message for each miss was a measurable per-request cost.
+      let header name = tryGetFirstWithComparison StringComparison.Ordinal headers name
+      match header "host" with
+      | null ->
+        return Result.Error (InputDataError (None, "Missing 'Host' header"))
+      | rawHost ->
+
+      // 100-continue handling
+      if header "expect" = "100-continue" then
+        let! _ = httpOutput.run HttpRequest.empty Intermediate.CONTINUE
+        ()
+
+      let! postRes =
+        this.parsePostData
+          runtime.maxContentLength
+          (match header "content-length" with null -> absentContentLength | v -> Choice1Of2 v)
+          (match header "content-type" with null -> absentContentType | v -> Choice1Of2 v)
+      match postRes with
+      | Result.Error e -> return Result.Error e
+      | Ok () ->
+
+      return Ok (this.buildRequest httpVersion path rawHost rawMethod rawQuery)
+    }
+
+  member private this.buildRequest httpVersion path rawHost rawMethod rawQuery =
+    { httpVersion      = httpVersion
+      binding          = runtime.matchedBinding
+      rawPath          = path
+      rawHost          = rawHost
+      rawMethod        = rawMethod
+      headers          = requestHeaders
+      rawForm          = _rawForm
+      rawQuery         = rawQuery
+      files            = files
+      multiPartFields  = multiPartFields }
+
+  member this.readRequest () : SocketOp<HttpRequest> =
+    // Clear pooled per-connection collections at the start of every request rather than
+    // allocating fresh ones. The collections live on the ConnectionFacade and are reset
+    // here, before the new request is parsed in.
+    requestHeaders.Clear()
+    files.Clear()
+    multiPartFields.Clear()
+    _rawForm <- [||]
+
+    // Steady-state hot path: `requestLoop` waits until the request head is buffered, so
+    // the request line and headers can usually be parsed synchronously, and a request
+    // without a body or `Expect` header is then complete without any task allocation.
+    // Everything else continues on the streaming path, which behaves as before.
+    match reader.tryReadRequestLineBuffered() with
+    | ValueNone -> ValueTask<Result<HttpRequest,Error>>(this.readRequestAsync ValueNone false)
+    | ValueSome (Result.Error e) -> ValueTask<Result<HttpRequest,Error>>(Result.Error e)
+    | ValueSome (Ok (struct (rawMethod, path, rawQuery, httpVersion))) ->
+      // Allocated only when handing over to the streaming path.
+      let line () = ValueSome (rawMethod, path, rawQuery, httpVersion)
+      if not (httpVersion.StartsWith("HTTP/", StringComparison.Ordinal))
+         || ConnectionFacade.isHttp2PriorKnowledgePreface rawMethod path httpVersion then
+        ValueTask<Result<HttpRequest,Error>>(this.readRequestAsync (line ()) false)
+      else
+        match reader.tryReadHeadersBuffered requestHeaders with
+        | ValueNone -> ValueTask<Result<HttpRequest,Error>>(this.readRequestAsync (line ()) false)
+        | ValueSome (Result.Error e) -> ValueTask<Result<HttpRequest,Error>>(Result.Error e)
+        | ValueSome (Ok ()) ->
+          let header name = tryGetFirstWithComparison StringComparison.Ordinal requestHeaders name
+          match header "host" with
+          | null ->
+            ValueTask<Result<HttpRequest,Error>>(Result.Error (InputDataError (None, "Missing 'Host' header")))
+          | rawHost ->
+            if isNull (header "expect") && isNull (header "content-length") then
+              ValueTask<Result<HttpRequest,Error>>(Ok (this.buildRequest httpVersion path rawHost rawMethod rawQuery))
+            else
+              ValueTask<Result<HttpRequest,Error>>(this.readRequestAsync (line ()) true)
 
   member this.exitHttpLoopWithError (err:Error) = task{
       match err with
@@ -483,22 +525,24 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
   /// upgrade handler's job — we only check for its presence.
   static member internal isH2cUpgradeRequest (request: HttpRequest) : bool =
     let isUpgradeH2c =
-      match request.header "upgrade" with
-      | Choice1Of2 v -> String.equalsOrdinalCI (v.Trim()) "h2c"
-      | Choice2Of2 _ -> false
+      match request.headerOrNull "upgrade" with
+      | null -> false
+      | v -> String.equalsOrdinalCI (v.Trim()) "h2c"
     let connectionMentionsUpgradeAndSettings =
-      match request.header "connection" with
-      | Choice1Of2 v ->
-        let parts =
-          v.Split([| ',' |], StringSplitOptions.RemoveEmptyEntries)
-          |> Array.map (fun s -> s.Trim())
-        let has token = parts |> Array.exists (fun p -> String.equalsOrdinalCI p token)
-        has "upgrade" && has "HTTP2-Settings"
-      | Choice2Of2 _ -> false
+      isUpgradeH2c &&
+        (match request.header "connection" with
+         | Choice1Of2 v ->
+           let parts =
+             v.Split([| ',' |], StringSplitOptions.RemoveEmptyEntries)
+             |> Array.map (fun s -> s.Trim())
+           let has token = parts |> Array.exists (fun p -> String.equalsOrdinalCI p token)
+           has "upgrade" && has "HTTP2-Settings"
+         | Choice2Of2 _ -> false)
     let hasSettingsHeader =
-      match request.header "http2-settings" with
-      | Choice1Of2 _ -> true
-      | Choice2Of2 _ -> false
+      connectionMentionsUpgradeAndSettings &&
+        (match request.header "http2-settings" with
+         | Choice1Of2 _ -> true
+         | Choice2Of2 _ -> false)
     isUpgradeH2c && connectionMentionsUpgradeAndSettings && hasSettingsHeader
 
   member this.processRequest () =
@@ -586,13 +630,29 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
       let mutable flag = true
       let mutable result = Ok ()
       while flag && not (cancellationToken.IsCancellationRequested) do
-        let! b = this.processRequest ()
-        match b with
-        | Ok b ->
-          flag <- b
-        | Result.Error e ->
+        // Wait for the next request head here, in the loop whose state machine is
+        // allocated once per connection, rather than deep inside the parser where
+        // every nested task would suspend and allocate a state machine per request.
+        // A read failure ends the loop quietly, as it did when raised by the parser.
+        try
+          let mutable waiting = not (reader.requestHeadReady())
+          while waiting do
+            let! received = reader.receive()
+            match! reader.commitReceived received with
+            | Ok () -> waiting <- not (reader.requestHeadReady())
+            | Result.Error _ ->
+              waiting <- false
+              flag <- false
+        with _ ->
           flag <- false
-          result <- Result.Error e
+        if flag then
+          let! b = this.processRequest ()
+          match b with
+          | Ok b ->
+            flag <- b
+          | Result.Error e ->
+            flag <- false
+            result <- Result.Error e
       return result
     }
 
@@ -601,6 +661,9 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
     if Globals.verbose then
       Console.WriteLine("[Conn:{0}] accept: {1} connected. Now has {2} connected", connectionId, clientIp, tracker.ActiveConnectionCount)
     connection.socketBinding <- binding
+    // Server shutdown ends a pending receive by shutting the connection down, so
+    // transports need not pass the server token to every read.
+    let shutdownOnCancel = cancellationToken.UnsafeRegister((fun state -> (state :?> ConnectionFacade).shutdown()), this)
     try
       try
         reader.init()
@@ -614,6 +677,7 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
         if Globals.verbose then
           do Console.WriteLine($"[Conn:{connectionId}] accept: Exception: {ex.Message}")
     finally
+      shutdownOnCancel.Dispose()
       // The reader pumps the inbound transport on demand from inside the request
       // loop, so by the time requestLoop has returned there is no background
       // reader task to await \u2014 just shut the transport down and recycle.

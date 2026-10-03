@@ -219,21 +219,12 @@ type Connection =
   /// false if there is not enough room. Avoids allocating an intermediate byte[]/string.
   [<MethodImpl(MethodImplOptions.AggressiveInlining)>]
   member inline this.tryAppendInt (value : int) : bool =
-    // Max 11 chars for int32 (sign + 10 digits)
-    let mutable charBuf = System.Span<char>(Array.zeroCreate<char> 11)
-    let mutable charsWritten = 0
-    if value.TryFormat(charBuf, &charsWritten) then
-      if this.lineBufferCount + charsWritten > this.lineBuffer.Length then
-        false
-      else
-        let dst = this.lineBuffer
-        let mutable i = 0
-        let baseIdx = this.lineBufferCount
-        while i < charsWritten do
-          dst.[baseIdx + i] <- byte charBuf.[i]
-          i <- i + 1
-        this.lineBufferCount <- this.lineBufferCount + charsWritten
-        true
+    // Format straight into lineBuffer as ASCII (UTF-8) digits; false when it does not fit.
+    let mutable bytesWritten = 0
+    let dst = System.Span<byte>(this.lineBuffer, this.lineBufferCount, this.lineBuffer.Length - this.lineBufferCount)
+    if value.TryFormat(dst, &bytesWritten) then
+      this.lineBufferCount <- this.lineBufferCount + bytesWritten
+      true
     else
       false
 

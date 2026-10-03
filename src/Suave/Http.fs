@@ -321,7 +321,12 @@ module Http =
 
     member x.header key =
       // Field names are case-insensitive (RFC 2616 section 4.2)
-      getFirstCaseInsensitive x.headers key
+      getFirstOrdinalIgnoreCase x.headers key
+
+    /// Like `header`, but returns null for a missing header instead of allocating
+    /// an error message.
+    member internal x.headerOrNull key =
+      tryGetFirstWithComparison StringComparison.OrdinalIgnoreCase x.headers key
 
     member x.form =
       Parsing.parseData (ASCII.toString x.rawForm)
@@ -362,7 +367,9 @@ module Http =
       x.clientHost true [ "x-forwarded-host" ]
 
     member x.path =
-      System.Net.WebUtility.UrlDecode x.rawPath
+      // UrlDecode only changes '%' escapes and '+'; skip its buffer allocation otherwise.
+      if x.rawPath.AsSpan().IndexOfAny('%', '+') < 0 then x.rawPath
+      else System.Net.WebUtility.UrlDecode x.rawPath
 
     member x.method = HttpMethod.parse x.rawMethod
 

@@ -97,10 +97,10 @@ module Router =
       let method = ctx.request.method
       
       // First try exact match (O(1))
-      if router.exactRoutes.ContainsKey(path, method) then
-        let handler = router.exactRoutes.[path, method]
+      match router.exactRoutes.TryGetValue((path, method)) with
+      | true, handler ->
         return! handler ctx
-      else
+      | false, _ ->
         // Try pattern routes in order
         let rec tryPatterns = function
           | [] -> async { return None }

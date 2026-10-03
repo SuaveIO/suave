@@ -413,3 +413,106 @@ let filePartSinkTests cfg =
       Expect.isFalse successCalled "onSuccess should not have been called for empty part"
   ]
 
+
+[<Tests>]
+let requestHeadParsingTests cfg =
+  // Requests whose head is fully buffered are parsed synchronously from the pipe;
+  // fragmented, oversized and body-carrying requests hand over to the streaming
+  // parser. These tests drive both paths over a raw keep-alive connection.
+  let ip, port =
+    let binding = SuaveConfig.firstBinding cfg
+    binding.socketBinding.ip,
+    int binding.socketBinding.port
+
+  let headerOrDash name (r : HttpRequest) =
+    match r.header name with
+    | Choice1Of2 v -> v
+    | Choice2Of2 _ -> "-"
+
+  let app =
+    choose [
+      path "/body" >=> request (fun r -> OK ("body:" + Encoding.UTF8.GetString r.rawForm))
+      request (fun r ->
+        OK (String.Join("|", [ r.rawMethod; r.path; r.rawQuery; headerOrDash "x-test" r; string r.headers.Count ])))
+    ]
+
+  let countOf (marker : string) (text : string) =
+    let mutable count = 0
+    let mutable index = text.IndexOf(marker, StringComparison.Ordinal)
+    while index >= 0 do
+      count <- count + 1
+      index <- text.IndexOf(marker, index + marker.Length, StringComparison.Ordinal)
+    count
+
+  /// Send each chunk separately (with a pause so they arrive as separate reads)
+  /// and collect the responses until `responses` complete ones have arrived.
+  let exchange (chunks : string list) responses =
+    use socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp)
+    socket.NoDelay <- true
+    socket.ReceiveTimeout <- 5000
+    socket.Connect(IPEndPoint(ip, port))
+    for chunk in chunks do
+      socket.Send(Encoding.ASCII.GetBytes chunk) |> ignore
+      Threading.Thread.Sleep 30
+    let received = StringBuilder()
+    let buffer = Array.zeroCreate<byte> 4096
+    let complete () =
+      // Every response in these tests has a short body following its head.
+      let text = received.ToString()
+      countOf "HTTP/1.1 " text >= responses
+      && text.EndsWith("\r\n", StringComparison.Ordinal) |> not
+      && countOf "\r\n\r\n" text >= responses
+    let mutable closed = false
+    while not (complete ()) && not closed do
+      let n = socket.Receive buffer
+      if n = 0 then closed <- true
+      else received.Append(Encoding.ASCII.GetString(buffer, 0, n)) |> ignore
+    received.ToString()
+
+  let withServer f =
+    let ctx = runWith cfg app
+    try f () finally disposeContext ctx
+
+  let get path headers =
+    sprintf "GET %s HTTP/1.1\r\nHost: localhost\r\n%s\r\n" path headers
+
+  testList "request head parsing" [
+    testCase "pipelined requests in one packet are answered in order" <| fun _ ->
+      withServer (fun () ->
+        let response = exchange [ get "/first?a=1" "X-Test: one\r\n" + get "/second" "X-Test: two\r\n" ] 2
+        Expect.equal (countOf "HTTP/1.1 200 OK" response) 2 "Both requests are answered"
+        let first = response.IndexOf("GET|/first|a=1|one|2", StringComparison.Ordinal)
+        let second = response.IndexOf("GET|/second||two|2", StringComparison.Ordinal)
+        Expect.isGreaterThanOrEqual first 0 "First request parsed"
+        Expect.isGreaterThan second first "Second request parsed after the first")
+
+    testCase "a head split across reads is parsed once complete" <| fun _ ->
+      withServer (fun () ->
+        let response =
+          exchange [ "GET /fr"; "agmented?q=2 HTTP/1.1\r\nHo"; "st: localhost\r\nX-Te"; "st: split\r\n"; "\r\n" ] 1
+        Expect.stringContains response "GET|/fragmented|q=2|split|2" "Fragmented head parsed")
+
+    testCase "header names are case-insensitive and values trimmed" <| fun _ ->
+      withServer (fun () ->
+        let response = exchange [ get "/trim" "x-TEST: \t padded value \t\r\nX-Other:\r\n" ] 1
+        Expect.stringContains response "GET|/trim||padded value|3" "Trimmed value, empty header kept")
+
+    testCase "a head larger than the line buffer is still parsed" <| fun _ ->
+      withServer (fun () ->
+        let filler = String.replicate 40 (sprintf "X-Filler: %s\r\n" (String.replicate 300 "f"))
+        let response = exchange [ get "/large" (filler + "X-Test: big\r\n") + get "/after" "" ] 2
+        Expect.stringContains response "GET|/large||big|42" "Large head parsed"
+        Expect.stringContains response "GET|/after||-|1" "Following request parsed")
+
+    testCase "a request body is read before the next pipelined request" <| fun _ ->
+      withServer (fun () ->
+        let post = "POST /body HTTP/1.1\r\nHost: localhost\r\nContent-Length: 5\r\n\r\nhello"
+        let response = exchange [ post + get "/next" "X-Test: after-body\r\n" ] 2
+        Expect.stringContains response "body:hello" "Body read"
+        Expect.stringContains response "GET|/next||after-body|2" "Next request parsed")
+
+    testCase "a malformed header is rejected with 400" <| fun _ ->
+      withServer (fun () ->
+        let response = exchange [ get "/bad" "no colon here\r\n" ] 1
+        Expect.stringContains response "HTTP/1.1 400" "Malformed header rejected")
+  ]
