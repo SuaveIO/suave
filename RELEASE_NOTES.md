@@ -1,4 +1,12 @@
 ## Unreleased
+* Cut keep-alive request-processing allocations by about 70% (≈5.7 KB to ≈1.7 KB per request for a routed empty response) and raise local keep-alive throughput by roughly 10-13%:
+  * wait for the next request head in the connection's long-lived request loop, then parse a buffered request line and headers synchronously instead of suspending through nested tasks on every request; fragmented, oversized (beyond the 8 KiB line buffer), non-HTTP/1.x and body-carrying requests continue on the streaming parser
+  * complete pending TCP receives and WebPart executions through reusable per-connection completion sources instead of a `task { }` wrapper and `Async.StartImmediateAsTask` per request
+  * stop allocating error messages for absent request headers on the request path, format `Content-Length` without a temporary buffer, avoid a closure per response in `HttpOutput.writeContent`, skip URL decoding of paths without escapes, and look exact routes up once in `Router`
+* TCP receives no longer register on the server's cancellation token individually; each connection registers once and is shut down when the server stops, which also ends a pending receive
+* Reduce Async WebPart error-handling allocations while preserving exception recovery and cancellation behavior
+* Reduce request-header lookup allocations and skip unnecessary h2c upgrade checks on ordinary HTTP/1 requests
+* Match HTTP request header names with ordinal case-insensitive comparison; invalid Unicode names no longer receive linguistic equivalence matching
 * Evict obsolete compressed artifacts: a recompressed resource's superseded copy is now deleted as part of the atomic cache swap, and the `_temporary_compressed_files` folder is swept - age- and count-bounded, see `Compression.cleanupFolder` - on server startup and shutdown (#655)
 * Cached compressed copies that have gone missing from disk are treated as a cache miss instead of failing the request
 

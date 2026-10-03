@@ -16,6 +16,22 @@ open TestUtilities
 [<Tests>]
 let utilities (_: SuaveConfig) =
   testList "trying some utility functions" [
+    testCase "header lookup preserves first match and case sensitivity" <| fun _ ->
+      let headers = Collections.Generic.List<string * string>([
+        "host", "first"
+        "host", "second"
+        "Host", "mixed-case"
+        "empty", ""
+        "null", null
+      ])
+      for lookup in [getFirst; (@@)] do
+        Expect.equal (lookup headers "host") (Choice1Of2 "first") "Use the first duplicate"
+        Expect.equal (lookup headers "Host") (Choice1Of2 "mixed-case") "Preserve exact matching"
+        Expect.equal (lookup headers "empty") (Choice1Of2 "") "Preserve empty values"
+        Expect.equal (lookup headers "null") (Choice1Of2 null) "Preserve null values"
+        Expect.equal (lookup headers "missing") (Choice2Of2 "Key missing was not present") "Preserve the diagnostic"
+        Expect.equal (lookup (Collections.Generic.List<_>()) "host") (Choice2Of2 "Key host was not present") "Handle empty lists"
+
     testCase "loopback ipv4" <| fun _ ->
       Expect.isTrue (isLocalAddress "127.0.0.1") "127.0.0.1 is a local address"
 

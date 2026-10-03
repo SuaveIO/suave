@@ -4,8 +4,53 @@ open System
 open System.Net
 open System.Net.Sockets
 open System.Threading
+open System.Runtime.CompilerServices
 open System.Threading.Tasks
+open System.Threading.Tasks.Sources
 open Suave
+
+/// Adapts the pooled `ValueTask<int>` of `Socket.ReceiveAsync` to `SocketOp<int>`
+/// without allocating when the receive does not complete synchronously. Each
+/// instance serves one receive at a time; `TryStart` returns false while one is
+/// pending so that callers can fall back to an allocating adapter.
+[<Sealed>]
+type internal ReceiveCompletion() =
+  [<DefaultValue(false)>]
+  val mutable private core : ManualResetValueTaskSourceCore<Result<int,Error>>
+  [<DefaultValue(false)>]
+  val mutable private awaiter : ValueTaskAwaiter<int>
+  [<DefaultValue(false)>]
+  val mutable private pending : int
+  [<DefaultValue(false)>]
+  val mutable private onCompleted : Action
+
+  member x.TryStart (receive : ValueTask<int>, result : byref<SocketOp<int>>) : bool =
+    if Interlocked.CompareExchange(&x.pending, 1, 0) <> 0 then false
+    else
+      if isNull x.onCompleted then x.onCompleted <- Action(x.Complete)
+      x.core.Reset()
+      x.awaiter <- receive.GetAwaiter()
+      result <- ValueTask<Result<int,Error>>(x, x.core.Version)
+      x.awaiter.UnsafeOnCompleted(x.onCompleted)
+      true
+
+  member private x.Complete () =
+    let result =
+      try
+        Ok (x.awaiter.GetResult())
+      with
+      | :? SocketException as ex -> Result.Error(Error.SocketError(ex.SocketErrorCode))
+      | ex -> Result.Error(Error.ConnectionError(ex.Message))
+    x.awaiter <- Unchecked.defaultof<_>
+    x.core.SetResult result
+
+  interface IValueTaskSource<Result<int,Error>> with
+    member x.GetResult token =
+      try x.core.GetResult token
+      finally Volatile.Write(&x.pending, 0)
+    member x.GetStatus token = x.core.GetStatus token
+    member x.OnCompleted (continuation, state, token, flags) =
+      x.core.OnCompleted(continuation, state, token, flags)
 
 [<AllowNullLiteral>]
 type TcpTransport(listenSocket : Socket, cancellationToken:CancellationToken) =
@@ -14,6 +59,7 @@ type TcpTransport(listenSocket : Socket, cancellationToken:CancellationToken) =
   val mutable acceptSocket :  Socket
   
   let socketLock = obj()
+  let receiveCompletion = ReceiveCompletion()
 
   let shutdownSocket (acceptSocket:Socket) =
     if acceptSocket <> null then
@@ -73,7 +119,10 @@ type TcpTransport(listenSocket : Socket, cancellationToken:CancellationToken) =
     let socket = lock socketLock (fun () -> this.acceptSocket)
     if socket = null then
       raise (ObjectDisposedException("Socket has been disposed"))
-    socket.ReceiveAsync(buf,cancellationToken)
+    // No cancellation token: registering every pending receive on the server-wide
+    // token contends across connections. `ConnectionFacade.accept` instead registers
+    // once per connection to shut the socket down, which ends a pending receive.
+    socket.ReceiveAsync(buf, CancellationToken.None)
 
   member this.writeInternal (buf : ByteSegment) =
     let socket = lock socketLock (fun () -> this.acceptSocket)
@@ -93,11 +142,15 @@ type TcpTransport(listenSocket : Socket, cancellationToken:CancellationToken) =
     member this.read (buf : Memory<byte>) : SocketOp<int> =
       // Use ValueTask directly for zero-allocation when synchronous
       let vt = this.readInternal buf
+      let mutable pending = Unchecked.defaultof<SocketOp<int>>
       if vt.IsCompletedSuccessfully then
         // Synchronous completion - zero allocations!
         ValueTask<Result<int,Error>>(Ok vt.Result)
+      elif receiveCompletion.TryStart(vt, &pending) then
+        // Async path - complete through the reusable source, also without allocating
+        pending
       else
-        // Async path - wrap in task
+        // Overlapping read (not done by Suave itself) - wrap in task
         ValueTask<Result<int,Error>>(
           task {
             try

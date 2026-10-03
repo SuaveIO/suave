@@ -157,6 +157,10 @@ module Http =
     /// Gets the header for the given key in the `HttpRequest`
     member header : key:string -> Choice<string, string>
 
+    /// Like `header`, but returns null for a missing header instead of allocating
+    /// an error message.
+    member internal headerOrNull : key:string -> string
+
     /// Gets the form as a `((string * string option) list)` from the HttpRequest.
     /// Use `formData` to get the data for a particular key or use the indexed
     /// property in the `HttpRequest`.

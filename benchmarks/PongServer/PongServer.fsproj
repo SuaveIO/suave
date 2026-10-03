@@ -10,6 +10,7 @@
     <TieredPGO>true</TieredPGO>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="RequestAllocations.fs" />
     <Compile Include="Program.fs" />
     <ProjectReference Include="../../src/Suave/Suave.fsproj" />
   </ItemGroup>

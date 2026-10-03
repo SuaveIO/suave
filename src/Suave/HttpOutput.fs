@@ -2,6 +2,9 @@ namespace Suave
 
 open System.Collections.Generic
 open System.Runtime.CompilerServices
+open System.Threading
+open System.Threading.Tasks
+open System.Threading.Tasks.Sources
 open Suave.Utils
 open Suave.Sockets
 
@@ -101,6 +104,46 @@ module ByteConstants =
     | "upgrade" -> headerUpgrade
     | _ -> ASCII.bytes headerName
 
+/// Runs an Async to completion as a ValueTask, for awaiting a WebPart from the
+/// Task-based request pipeline. It behaves like `Async.StartImmediateAsTask` with the
+/// default cancellation token (what `let!` on an Async in `task { }` uses), but reuses
+/// one completion source and set of continuations instead of allocating a Task, a
+/// TaskCompletionSource and continuation closures per request. A start that overlaps
+/// a pending one falls back to `Async.StartImmediateAsTask`.
+[<Sealed>]
+type internal AsyncCompletion<'T>() =
+  [<DefaultValue(false)>]
+  val mutable private core : ManualResetValueTaskSourceCore<'T>
+  [<DefaultValue(false)>]
+  val mutable private pending : int
+  [<DefaultValue(false)>]
+  val mutable private onSuccess : 'T -> unit
+  [<DefaultValue(false)>]
+  val mutable private onError : exn -> unit
+  [<DefaultValue(false)>]
+  val mutable private onCancel : OperationCanceledException -> unit
+
+  member x.Start (computation : Async<'T>) : ValueTask<'T> =
+    if Interlocked.CompareExchange(&x.pending, 1, 0) <> 0 then
+      ValueTask<'T>(Async.StartImmediateAsTask computation)
+    else
+      if isNull (box x.onSuccess) then
+        x.onSuccess <- fun result -> x.core.SetResult result
+        x.onError <- fun ex -> x.core.SetException ex
+        x.onCancel <- fun ex -> x.core.SetException ex
+      x.core.Reset()
+      let completion = ValueTask<'T>(x, x.core.Version)
+      Async.StartWithContinuations(computation, x.onSuccess, x.onError, x.onCancel, Async.DefaultCancellationToken)
+      completion
+
+  interface IValueTaskSource<'T> with
+    member x.GetResult token =
+      try x.core.GetResult token
+      finally Volatile.Write(&x.pending, 0)
+    member x.GetStatus token = x.core.GetStatus token
+    member x.OnCompleted (continuation, state, token, flags) =
+      x.core.OnCompleted(continuation, state, token, flags)
+
 type HttpOutput(connection: Connection, runtime: HttpRuntime) =
 
   let mutable freshContext =
@@ -109,6 +152,11 @@ type HttpOutput(connection: Connection, runtime: HttpRuntime) =
         ; request = HttpRequest.empty
         ; userState = Globals.DictionaryPool.Get()
         ; response = HttpResult.empty }
+
+  let webPartCompletion = AsyncCompletion<HttpContext option>()
+
+  let handleError =
+    fun ex -> runtime.errorHandler ex "request failed" { HttpContext.empty with connection = connection; runtime = runtime }
   
   // Expose connection as a property to enable inlining of write methods
   member val Connection = connection with get
@@ -174,6 +222,10 @@ type HttpOutput(connection: Connection, runtime: HttpRuntime) =
       do! this.appendIntOrFlush content.Length
       do! this.appendOrFlush ByteConstants.EOLEOL
     }
+
+  /// Response headers written by Suave itself, so not copied from the response.
+  static member val private excludedHeaders = ["server";"date";"content-length"]
+  static member val private excludedWhenHidden = ["date";"content-length"]
 
   /// Compare a header name against a lowercase-ASCII excluded name without allocating.
   static member inline private headerNameEqualsCI (a : string) (lowerB : string) : bool =
@@ -300,9 +352,9 @@ type HttpOutput(connection: Connection, runtime: HttpRuntime) =
         do! this.appendOrFlush serverBytes
 
     if runtime.hideHeader then
-      do! this.writeHeaders ["date";"content-length"] r.headers
+      do! this.writeHeaders HttpOutput.excludedWhenHidden r.headers
     else
-      do! this.writeHeaders ["server";"date";"content-length"] r.headers
+      do! this.writeHeaders HttpOutput.excludedHeaders r.headers
     do! this.writeContentType r.headers
     }
 
@@ -351,7 +403,8 @@ type HttpOutput(connection: Connection, runtime: HttpRuntime) =
           conn.appendSpanUnsafe (System.ReadOnlySpan<byte>(content))
         true
 
-  member this.writeContent writePreamble context = function
+  member this.writeContent writePreamble context content =
+    match content with
     | Bytes b -> task {
       // Compression decision is fully synchronous; no Task allocation, no
       // accept-encoding parsing on the hot path when the body is too small or
@@ -402,13 +455,8 @@ type HttpOutput(connection: Connection, runtime: HttpRuntime) =
           do! this.Connection.flush()
            }
 
-  member this.executeTask task  = async {
-    try
-      let! q = task
-      return q
-    with ex ->
-      return! runtime.errorHandler ex "request failed" { HttpContext.empty with connection = connection; runtime = runtime }
-  }
+  member this.executeTask task =
+    async.TryWith(task, handleError)
 
   member this.writeResponse (newCtx:HttpContext) =
     task{
@@ -427,19 +475,16 @@ type HttpOutput(connection: Connection, runtime: HttpRuntime) =
         freshContext.request <- request
         freshContext.userState.Clear()
         let task = webPart freshContext
-        match! this.executeTask task with 
+        match! webPartCompletion.Start(this.executeTask task) with
         | Some ctx ->
           let! _ = this.writeResponse ctx
           let keepAlive =
-            match ctx.request.header "connection" with
-            | Choice1Of2 conn ->
-              String.equalsOrdinalCI conn "keep-alive"
-            | Choice2Of2 _ ->
-              ctx.request.httpVersion.Equals("HTTP/1.1")
+            match ctx.request.headerOrNull "connection" with
+            | null -> ctx.request.httpVersion.Equals("HTTP/1.1")
+            | conn -> String.equalsOrdinalCI conn "keep-alive"
           return Ok (keepAlive)
         | None ->
           return Ok (false)
       with ex ->
         return Result.Error(Error.ConnectionError ex.Message)
   }
-

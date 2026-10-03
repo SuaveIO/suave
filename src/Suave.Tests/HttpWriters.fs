@@ -17,6 +17,114 @@ open Suave.Tests.TestUtilities
 open Suave.Testing
 
 [<Tests>]
+let errorWrapper (_ : SuaveConfig) =
+  let createOutput errorHandler =
+    let runtime = { HttpRuntime.empty with errorHandler = errorHandler }
+    HttpOutput(Unchecked.defaultof<_>, runtime), runtime
+  let run workflow = Async.RunSynchronously(workflow, timeout = 5000)
+
+  testList "HttpOutput error wrapper" [
+    testCase "execution stays lazy and repeatable for handled and unhandled results" <| fun _ ->
+      let mutable executions = 0
+      let mutable errors = 0
+      let output, _ = createOutput (fun _ _ _ -> errors <- errors + 1; async.Return None)
+      let wrapped = output.executeTask (async {
+        executions <- executions + 1
+        return Some HttpContext.empty
+      })
+      Expect.equal executions 0 "Constructing the wrapper must not execute the workflow"
+      for iteration in 1 .. 2 do
+        Expect.isSome (run wrapped) "Preserve handled results"
+        Expect.equal executions iteration "Each execution runs the workflow again"
+      Expect.isNone (run (output.executeTask (async.Return None))) "Preserve unhandled results"
+      Expect.equal errors 0 "Successful workflows must not invoke error handling"
+
+    testCase "sync and delayed faults preserve handler arguments and recovery" <| fun _ ->
+      for original in [ InvalidOperationException("fault") :> exn; OperationCanceledException("raised exception") :> exn ] do
+        for delayed in [ false; true ] do
+          let mutable calls = 0
+          let mutable capturedContext = None
+          let output, runtime = createOutput (fun error message context ->
+            calls <- calls + 1
+            Expect.isTrue (Object.ReferenceEquals(error, original)) "Pass the original exception"
+            Expect.equal message "request failed" "Preserve the diagnostic message"
+            capturedContext <- Some context
+            async {
+              do! Async.Sleep 1
+              return Some context
+            })
+          let result =
+            output.executeTask (async {
+              if delayed then do! Async.Sleep 1
+              return raise original
+            }) |> run
+          Expect.isSome result "Await and return the handler's recovery workflow"
+          Expect.equal calls 1 "Invoke the error handler exactly once"
+          let context = capturedContext |> Option.get
+          Expect.isTrue (Object.ReferenceEquals(context.runtime, runtime)) "Use the configured runtime"
+          Expect.isTrue (Object.ReferenceEquals(context.connection, output.Connection)) "Use the current connection"
+          Expect.equal context.request.rawPath HttpContext.empty.request.rawPath "Keep the existing empty error context"
+
+    testCase "faults in the error handler propagate without recursive handling" <| fun _ ->
+      for delayed in [ false; true ] do
+        let mutable calls = 0
+        let handlerError = InvalidOperationException("handler fault")
+        let output, _ = createOutput (fun _ _ _ ->
+          calls <- calls + 1
+          if delayed then async {
+            do! Async.Sleep 1
+            return raise handlerError
+          }
+          else raise handlerError)
+        let caught =
+          try
+            output.executeTask (async { return raise (Exception "workflow fault") }) |> run |> ignore
+            None
+          with error -> Some error
+        Expect.isTrue (caught |> Option.exists (fun error -> Object.ReferenceEquals(error, handlerError))) "Propagate the handler exception"
+        Expect.equal calls 1 "Do not recursively invoke the handler"
+
+    testCase "cancellation continuations bypass the error handler" <| fun _ ->
+      let mutable calls = 0
+      let output, _ = createOutput (fun _ _ _ -> calls <- calls + 1; async.Return None)
+      let workflow = Async.FromContinuations(fun (_, _, cancel) -> cancel (OperationCanceledException "cancel"))
+      Expect.throwsT<OperationCanceledException> (fun () -> output.executeTask workflow |> run |> ignore) "Preserve cancellation"
+      Expect.equal calls 0 "Cancellation must not become an error response"
+
+    testCase "ambient cancellation is preserved before and during execution" <| fun _ ->
+      for preCanceled in [ false; true ] do
+        use cancellation = new System.Threading.CancellationTokenSource()
+        let mutable calls = 0
+        let mutable started = false
+        let output, _ = createOutput (fun _ _ _ -> calls <- calls + 1; async.Return None)
+        if preCanceled then cancellation.Cancel()
+        let pending = Async.StartImmediateAsTask(output.executeTask (async {
+          started <- true
+          do! Async.Sleep 10000
+          return Some HttpContext.empty
+        }), cancellationToken = cancellation.Token)
+        Expect.equal started (not preCanceled) "Respect cancellation before entering the workflow"
+        cancellation.Cancel()
+        Expect.throwsT<System.Threading.Tasks.TaskCanceledException>
+          (fun () -> pending.WaitAsync(TimeSpan.FromSeconds 5.).GetAwaiter().GetResult() |> ignore)
+          "Cancel without waiting for the sleep to finish"
+        Expect.isTrue pending.IsCanceled "Keep the Task canceled rather than faulted"
+        Expect.equal calls 0 "Ambient cancellation bypasses the handler"
+
+    testCase "execution context is captured at execution rather than construction" <| fun _ ->
+      let ambient = System.Threading.AsyncLocal<string>()
+      let output, _ = createOutput (fun error _ _ -> async { return raise error })
+      ambient.Value <- "construction"
+      let wrapped = output.executeTask (async {
+        do! Async.Sleep 1
+        Expect.equal ambient.Value "execution" "Flow the caller's execution context through suspension"
+        return None
+      })
+      ambient.Value <- "execution"
+      Expect.isNone (run wrapped) "The workflow completes normally"
+  ]
+
+[<Tests>]
 let cookies cfg =
   let runWithConfig = runWith cfg
 
