@@ -31,7 +31,7 @@ type StartedData =
 
 /// Stop the TCP listener server
 let stopTcp (reason:string) (socket : Socket) =
-  Console.WriteLine("Stopping TCP server due to {0}", reason)
+  Globals.writeMessage $"Stopping TCP server due to {reason}"
   try
     socket.Dispose()
   with ex ->
@@ -307,7 +307,7 @@ let private runAcceptor
                 connectionPool.Push(connection)
           with ex ->
             if Globals.verbose then
-              Console.WriteLine("TCP server accept exception: {0}", ex)
+              Globals.writeMessage $"TCP server accept exception: {ex}"
     with
       | :? AggregateException
       | :? OperationCanceledException
@@ -366,9 +366,9 @@ let runServerEx acceptorCount maxConcurrentOps bufferSize (binding: SocketBindin
 
       if not runtime.hideStartupMessage then
         if effective > 1 then
-          Console.WriteLine($"Smooth! Suave v{Globals.SuaveVersion} listener started in {startedListeningMilliseconds} ms with binding {ipAddress}:{port} ({effective} acceptors)")
+          Globals.writeMessage $"Smooth! Suave v{Globals.SuaveVersion} listener started in {startedListeningMilliseconds} ms with binding {ipAddress}:{port} ({effective} acceptors)"
         else
-          Console.WriteLine($"Smooth! Suave v{Globals.SuaveVersion} listener started in {startedListeningMilliseconds} ms with binding {ipAddress}:{port}")
+          Globals.writeMessage $"Smooth! Suave v{Globals.SuaveVersion} listener started in {startedListeningMilliseconds} ms with binding {ipAddress}:{port}"
 
       // Create one connection pool per acceptor so each accept loop pops from
       // its own thread-local-ish pool, removing cross-acceptor contention.
@@ -418,7 +418,7 @@ let runServerEx acceptorCount maxConcurrentOps bufferSize (binding: SocketBindin
         for s in listenSockets do
           if not (isNull (box s)) then stopTcp "The operation was canceled" s
       | ex ->
-        Console.WriteLine("TCP server runtime exception: {0}", ex)
+        Globals.writeMessage $"TCP server runtime exception: {ex}"
         for s in listenSockets do
           if not (isNull (box s)) then stopTcp "runtime exception" s
         }))

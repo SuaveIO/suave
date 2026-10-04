@@ -105,12 +105,19 @@ Publishing login) or, for a manual push, the legacy `NUGET_KEY`.
 - **`.env` is dead weight.** It sets a Mono-based `FrameworkPathOverride`
   that was only needed while the build project targeted an old framework.
   Nothing sources it any more; do not reintroduce it.
-- **The websocket tests can flaky-hang under `--sequenced` on some
-  machines.** The large 32-bit (66000-byte) binary-payload test on
-  `/websocketAppSubprotocolUrl` uses `mre.WaitOne()` with no timeout, so a
-  single missed frame over loopback can block the whole run. CI runs the
-  full suite green (~2m23s). If a local run hangs, kill and retry, or
-  narrow the run with `--filter-test-list miscellaneous` (~364 tests).
+- **Server threads must not write to `Console` during tests.** Expecto
+  redirects `Console.Out` to a synchronized writer and holds its own lock
+  while flushing to the real console; on Unix, .NET's console stream then
+  locks `Console.Out`. A Suave server thread calling `Console.WriteLine`
+  takes the two locks in the opposite order, which deadlocks the run. It
+  used to show up as an intermittent hang after websocket or rate-limit
+  tests, where a test then waits forever on its `ManualResetEvent`. Suave's
+  own messages (startup banner, "Stopping TCP server", websocket
+  disconnects) go through `Globals.writeMessage`, which
+  `src/Suave.Tests/Program.fs` points at `TextWriter.Null`. Route any new
+  unconditional server-side output the same way, and keep `printfn` out of
+  test web parts. If a run still hangs, sample it with
+  `dotnet-trace collect -p PID --profile dotnet-sampled-thread-time`.
 - Examples and the `website` all default to port `8080`; only run one at a
   time or change the port.
 

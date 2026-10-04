@@ -9,6 +9,7 @@
 * Match HTTP request header names with ordinal case-insensitive comparison; invalid Unicode names no longer receive linguistic equivalence matching
 * Evict obsolete compressed artifacts: a recompressed resource's superseded copy is now deleted as part of the atomic cache swap, and the `_temporary_compressed_files` folder is swept - age- and count-bounded, see `Compression.cleanupFolder` - on server startup and shutdown (#655)
 * Cached compressed copies that have gone missing from disk are treated as a cache miss instead of failing the request
+* Add `Globals.messageWriter` to redirect or silence Suave's own console messages (startup banner, "Stopping TCP server", websocket disconnects); the test suite uses it to avoid a Console lock deadlock with Expecto that caused intermittent hangs
 
 ## New in v3.5.0 (Released 2026-09-09)
 * Connection health checker: `startHealthChecker` now takes the server's cancellation token and returns a disposable handle, which each connection pool owns and disposes; `stopHealthChecker` actually cancels the loop (#854)

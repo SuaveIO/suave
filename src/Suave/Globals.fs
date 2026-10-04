@@ -155,6 +155,19 @@ let ServerHeader = "Server: Suave (https://suave.io)"
 
 let mutable verbose = false
 
+/// Where Suave writes its own console messages, such as the startup banner
+/// and "Stopping TCP server". `None` (the default) means `Console.Out` at the
+/// time of writing. Set it to `Some TextWriter.Null` to silence them, e.g. in a
+/// test runner that redirects `Console.Out` and could deadlock when server
+/// threads write to it.
+let mutable messageWriter : IO.TextWriter option = None
+
+/// Writes a line to `messageWriter`, or to `Console.Out` when it is unset.
+let writeMessage (s : string) =
+  match messageWriter with
+  | Some w -> w.WriteLine s
+  | None -> Console.WriteLine s
+
 open System.Diagnostics
 
 [<AbstractClass; Sealed>]
