@@ -340,7 +340,7 @@ module WebSocket =
       | Ok _ ->
         do ()
       | Result.Error err ->
-        Console.WriteLine($"WebSocket disconnected {err}",err)
+        Globals.writeMessage $"WebSocket disconnected {err}"
       return! Control.CLOSE ctx
     | Choice2Of2 response ->
       return! response

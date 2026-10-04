@@ -14,6 +14,12 @@ let main args =
     , arch Environment.Is64BitProcess
     , arch Environment.Is64BitOperatingSystem)
 
+  // Expecto redirects Console.Out and holds its own lock while flushing to the
+  // real console, which on Unix locks Console.Out in turn. A Suave server
+  // thread writing to Console.Out takes those locks in the opposite order and
+  // can deadlock the run, so keep Suave's own messages off the console.
+  Globals.messageWriter <- Some IO.TextWriter.Null
+
   let testConfig =
     { defaultConfig with
         bindings = [ HttpBinding.createSimple HTTP "127.0.0.1" 9001 ]
