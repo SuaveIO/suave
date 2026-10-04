@@ -431,3 +431,37 @@ inversion between Expecto's redirected `Console.Out` and .NET's Unix
 `ConsolePal`, reached when the server writes "Stopping TCP server …" while
 Expecto flushes. It is not a Suave networking fault. Rerunning passes. This is
 probably the websocket hang described in `AGENTS.md`.
+
+## Follow-up: Synchronous Completion (2026-10-04)
+
+A Linux run (same-host loopback, `oha`, six balanced rounds) left Suave about 8-10%
+behind Minimal API at 64 connections, and level at 256. A larger gen0 budget
+(`DOTNET_GCgen0size=0x10000000`) roughly halved that gap and brought Suave's p99
+latency to Minimal API's. On Linux, at ≈600k requests/second, the remaining
+allocations cost measurable GC time.
+
+This follow-up removes more per-request allocations without changing public APIs.
+Each step was measured with the exact probe at 64 connections:
+
+| Step | Bytes/request |
+| --- | ---: |
+| Start (keep-alive pipeline PR) | 1,714 |
+| `processRequestValue`/`runValue` complete synchronously; error recovery inside `AsyncCompletion` | 1,330 |
+| Status line and ASCII headers written synchronously; no `ToLowerInvariant` per header | 1,242 |
+
+`AsyncCompletion` takes an optional `recover` function that reproduces
+`async.TryWith(workflow, recover)`. A failure after cancellation was requested
+becomes cancellation, and failures of the recovery are not recovered. New tests
+check this directly (`AsyncCompletion recovery`), and a raw-socket test checks
+response header casing. `SslTransport` reads use the same reusable completion
+source as TCP. A same-host Mac A/B against the PR build showed no regression
+(193k vs 191k requests/second at 64 connections), but the Mac is already near
+its loopback ceiling, so CPU savings need Linux to show.
+
+The Linux CPU trace also showed ≈15% of request-processing time copying the
+`HttpContext` struct (≈136 bytes of references, including `HttpRequest` and
+`HttpResult` by value) with GC write barriers. The `experiment/httpcontext-class`
+branch makes `HttpContext` and `HttpRequest` classes. In the socket-free probe, a
+routed WebPart through the error wrapper then takes 192 ns instead of 262 ns.
+Making `HttpResult` a class as well was slightly slower. That change is
+binary-breaking, so it is kept separate for a major version.

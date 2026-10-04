@@ -545,9 +545,29 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
          | Choice2Of2 _ -> false)
     isUpgradeH2c && connectionMentionsUpgradeAndSettings && hasSettingsHeader
 
-  member this.processRequest () =
+  /// `processRequest` without a Task per request: an ordinary HTTP/1.x request
+  /// whose parsing, web part and response all complete synchronously completes
+  /// synchronously. Everything else continues in `processRequestAsync`.
+  member internal this.processRequestValue () : ValueTask<Result<bool, Error>> =
+    let reqRes = this.readRequest()
+    if reqRes.IsCompletedSuccessfully then
+      match reqRes.Result with
+      | Ok request when
+          not (ConnectionFacade.isHttp2PriorKnowledgePreface request.rawMethod request.rawPath request.httpVersion)
+          && not (ConnectionFacade.Http2UpgradeHandler.IsSome && ConnectionFacade.isH2cUpgradeRequest request) ->
+        // runValue reports failures as an Error result rather than throwing.
+        httpOutput.runValue request webpart
+      | _ ->
+        ValueTask<Result<bool, Error>>(this.processRequestAsync reqRes)
+    else
+      ValueTask<Result<bool, Error>>(this.processRequestAsync reqRes)
+
+  member this.processRequest () : Task<Result<bool, Error>> =
+    this.processRequestValue().AsTask()
+
+  member private this.processRequestAsync (request : SocketOp<HttpRequest>) : Task<Result<bool, Error>> =
     task {
-      let! reqRes = this.readRequest()
+      let! reqRes = request
       match reqRes with
       | Result.Error err ->
         // Couldn't parse HTTP request; answering with BAD_REQUEST and closing the connection.
@@ -646,7 +666,7 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
         with _ ->
           flag <- false
         if flag then
-          let! b = this.processRequest ()
+          let! b = this.processRequestValue ()
           match b with
           | Ok b ->
             flag <- b

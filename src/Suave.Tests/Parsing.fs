@@ -432,6 +432,10 @@ let requestHeadParsingTests cfg =
   let app =
     choose [
       path "/body" >=> request (fun r -> OK ("body:" + Encoding.UTF8.GetString r.rawForm))
+      path "/headers"
+        >=> Writers.addHeader "content-type" "text/plain"
+        >=> Writers.addHeader "X-Custom-Name" "custom value"
+        >=> OK "headers"
       request (fun r ->
         OK (String.Join("|", [ r.rawMethod; r.path; r.rawQuery; headerOrDash "x-test" r; string r.headers.Count ])))
     ]
@@ -510,6 +514,12 @@ let requestHeadParsingTests cfg =
         let response = exchange [ post + get "/next" "X-Test: after-body\r\n" ] 2
         Expect.stringContains response "body:hello" "Body read"
         Expect.stringContains response "GET|/next||after-body|2" "Next request parsed")
+
+    testCase "response header names keep canonical or given casing" <| fun _ ->
+      withServer (fun () ->
+        let response = exchange [ get "/headers" "" ] 1
+        Expect.stringContains response "\r\nContent-Type: text/plain\r\n" "Known names use canonical casing"
+        Expect.stringContains response "\r\nX-Custom-Name: custom value\r\n" "Other names are written as given")
 
     testCase "a malformed header is rejected with 400" <| fun _ ->
       withServer (fun () ->

@@ -9,12 +9,13 @@ open System.Threading.Tasks
 open System.Threading.Tasks.Sources
 open Suave
 
-/// Adapts the pooled `ValueTask<int>` of `Socket.ReceiveAsync` to `SocketOp<int>`
-/// without allocating when the receive does not complete synchronously. Each
-/// instance serves one receive at a time; `TryStart` returns false while one is
+/// Adapts the `ValueTask<int>` of a transport read (`Socket.ReceiveAsync`,
+/// `SslStream.ReadAsync`) to `SocketOp<int>` without allocating when the read does
+/// not complete synchronously; `mapError` turns a failed read into its `Error`.
+/// Each instance serves one read at a time; `TryStart` returns false while one is
 /// pending so that callers can fall back to an allocating adapter.
 [<Sealed>]
-type internal ReceiveCompletion() =
+type internal ReceiveCompletion(mapError : exn -> Error) =
   [<DefaultValue(false)>]
   val mutable private core : ManualResetValueTaskSourceCore<Result<int,Error>>
   [<DefaultValue(false)>]
@@ -38,9 +39,8 @@ type internal ReceiveCompletion() =
     let result =
       try
         Ok (x.awaiter.GetResult())
-      with
-      | :? SocketException as ex -> Result.Error(Error.SocketError(ex.SocketErrorCode))
-      | ex -> Result.Error(Error.ConnectionError(ex.Message))
+      with ex ->
+        Result.Error(mapError ex)
     x.awaiter <- Unchecked.defaultof<_>
     x.core.SetResult result
 
@@ -59,7 +59,10 @@ type TcpTransport(listenSocket : Socket, cancellationToken:CancellationToken) =
   val mutable acceptSocket :  Socket
   
   let socketLock = obj()
-  let receiveCompletion = ReceiveCompletion()
+  let receiveCompletion =
+    ReceiveCompletion(function
+      | :? SocketException as ex -> Error.SocketError(ex.SocketErrorCode)
+      | ex -> Error.ConnectionError(ex.Message))
 
   let shutdownSocket (acceptSocket:Socket) =
     if acceptSocket <> null then
