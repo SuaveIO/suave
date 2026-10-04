@@ -287,7 +287,7 @@ module Http =
       finally
         Globals.StringBuilderPool.Return(sb)
 
-  type [<Struct>] HttpRequest =
+  type HttpRequest =
     { httpVersion     : string
       binding         : HttpBinding
       rawPath         : string
@@ -423,7 +423,7 @@ module Http =
       /// Optional sink factory for streaming multipart file parts.
       /// When <c>None</c> (the default), each file part is buffered to a temp file on disk.
       filePartSink      : FilePartSink option }
-  and [<Struct>] HttpContext =
+  and HttpContext =
     { mutable request    : HttpRequest
       runtime    : HttpRuntime
       connection : Connection

@@ -110,7 +110,7 @@ module Http =
     val toHeader : cookie:HttpCookie -> string
 
   /// A holder for the data extracted from the request.
-  type [<Struct>] HttpRequest =
+  type HttpRequest =
     { httpVersion     : string
       binding         : HttpBinding
       rawPath         : string
@@ -273,7 +273,7 @@ module Http =
 
   /// The `HttpContext` is the container of the request, runtime, user-state and
   /// response.
-  and [<Struct>] HttpContext =
+  and HttpContext =
     { /// The HTTP request being processed
       mutable request    : HttpRequest
 

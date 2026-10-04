@@ -472,9 +472,10 @@ type HttpOutput(connection: Connection, runtime: HttpRuntime) =
   member this.run (request:HttpRequest) (webPart : WebPart) = 
     task {
       try
-        freshContext.request <- request
         freshContext.userState.Clear()
-        let task = webPart freshContext
+        // A new context per request: HttpContext is a class, and a web part may
+        // keep the context it was given, so it must not change under it.
+        let task = webPart { freshContext with request = request }
         match! webPartCompletion.Start(this.executeTask task) with
         | Some ctx ->
           let! _ = this.writeResponse ctx
