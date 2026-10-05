@@ -125,6 +125,60 @@ let errorWrapper (_ : SuaveConfig) =
   ]
 
 [<Tests>]
+let asyncCompletion (_ : SuaveConfig) =
+  // HttpOutput runs web parts through AsyncCompletion with the error handler as
+  // `recover`; it must behave like `async.TryWith(workflow, recover)`.
+  let await (pending : System.Threading.Tasks.ValueTask<'T>) =
+    pending.AsTask().WaitAsync(TimeSpan.FromSeconds 5.).GetAwaiter().GetResult()
+
+  testList "AsyncCompletion recovery" [
+    testCase "results pass through without recovery, also when reused" <| fun _ ->
+      let mutable calls = 0
+      let completion = AsyncCompletion<int>(Some (fun _ -> calls <- calls + 1; async.Return -1))
+      for delayed in [ false; true; false ] do
+        let result = completion.Start(async {
+          if delayed then do! Async.Sleep 1
+          return 42 }) |> await
+        Expect.equal result 42 "Return the workflow's result"
+      Expect.equal calls 0 "Do not recover successful workflows"
+
+    testCase "sync and delayed faults are recovered once with the original exception" <| fun _ ->
+      let completion = AsyncCompletion<int>(Some (fun ex -> async {
+        do! Async.Sleep 1
+        return (if ex.Message = "fault" then 7 else -1) }))
+      for delayed in [ false; true; false; true ] do
+        let result = completion.Start(async {
+          if delayed then do! Async.Sleep 1
+          return raise (InvalidOperationException "fault") }) |> await
+        Expect.equal result 7 "Return the recovery result"
+
+    testCase "faults in recovery propagate without recursive recovery" <| fun _ ->
+      for delayed in [ false; true ] do
+        let mutable calls = 0
+        let recoveryError = InvalidOperationException "recovery fault"
+        let completion = AsyncCompletion<int>(Some (fun _ ->
+          calls <- calls + 1
+          if delayed then async {
+            do! Async.Sleep 1
+            return raise recoveryError }
+          else raise recoveryError))
+        for _ in 1 .. 2 do
+          let caught =
+            try completion.Start(async { return raise (Exception "workflow fault") }) |> await |> ignore; None
+            with error -> Some error
+          Expect.isTrue (caught |> Option.exists (fun error -> Object.ReferenceEquals(error, recoveryError))) "Propagate the recovery exception"
+        Expect.equal calls 2 "Recover once per run"
+
+    testCase "cancellation continuations bypass recovery" <| fun _ ->
+      let mutable calls = 0
+      let completion = AsyncCompletion<int>(Some (fun _ -> calls <- calls + 1; async.Return -1))
+      let workflow = Async.FromContinuations(fun (_, _, cancel) -> cancel (OperationCanceledException "cancel"))
+      Expect.throwsT<OperationCanceledException> (fun () -> completion.Start workflow |> await |> ignore) "Preserve cancellation"
+      Expect.equal (completion.Start(async.Return 1) |> await) 1 "Remain usable after cancellation"
+      Expect.equal calls 0 "Cancellation must not be recovered"
+  ]
+
+[<Tests>]
 let cookies cfg =
   let runWithConfig = runWith cfg
 

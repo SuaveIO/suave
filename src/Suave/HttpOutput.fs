@@ -89,20 +89,36 @@ module ByteConstants =
   let headerHost = ReadOnlyMemory<byte>(ASCII.bytes "Host")
   let headerUpgrade = ReadOnlyMemory<byte>(ASCII.bytes "Upgrade")
   
+  /// Canonical header name bytes, looked up case-insensitively without lowercasing.
+  let knownHeaderBytes =
+    let known = Dictionary<string, ReadOnlyMemory<byte>>(StringComparer.OrdinalIgnoreCase)
+    for KeyValue (name, bytes) in
+      [ KeyValuePair("content-type", headerContentType)
+        KeyValuePair("content-length", headerContentLength)
+        KeyValuePair("connection", headerConnection)
+        KeyValuePair("location", headerLocation)
+        KeyValuePair("cache-control", headerCacheControl)
+        KeyValuePair("set-cookie", headerSetCookie)
+        KeyValuePair("accept", headerAccept)
+        KeyValuePair("user-agent", headerUserAgent)
+        KeyValuePair("host", headerHost)
+        KeyValuePair("upgrade", headerUpgrade) ] do
+      known.[name] <- bytes
+    known
+
   /// Get pre-computed header name bytes if available, otherwise convert
   let getHeaderBytes (headerName: string) =
-    match headerName.ToLowerInvariant() with
-    | "content-type" -> headerContentType
-    | "content-length" -> headerContentLength
-    | "connection" -> headerConnection
-    | "location" -> headerLocation
-    | "cache-control" -> headerCacheControl
-    | "set-cookie" -> headerSetCookie
-    | "accept" -> headerAccept
-    | "user-agent" -> headerUserAgent
-    | "host" -> headerHost
-    | "upgrade" -> headerUpgrade
-    | _ -> ASCII.bytes headerName
+    match knownHeaderBytes.TryGetValue headerName with
+    | true, bytes -> bytes
+    | false, _ -> ReadOnlyMemory(ASCII.bytes headerName)
+
+  let isAscii (value : string) =
+    let mutable ascii = true
+    let mutable i = 0
+    while ascii && i < value.Length do
+      if int value.[i] > 0x7F then ascii <- false
+      i <- i + 1
+    ascii
 
 /// Runs an Async to completion as a ValueTask, for awaiting a WebPart from the
 /// Task-based request pipeline. It behaves like `Async.StartImmediateAsTask` with the
@@ -110,12 +126,21 @@ module ByteConstants =
 /// one completion source and set of continuations instead of allocating a Task, a
 /// TaskCompletionSource and continuation closures per request. A start that overlaps
 /// a pending one falls back to `Async.StartImmediateAsTask`.
+///
+/// With `recover`, a failing computation continues with `recover ex` exactly as with
+/// `async.TryWith(computation, recover)` - including treating a failure after
+/// cancellation was requested as cancellation - without that wrapper's per-run
+/// allocations. Failures of the recovery itself are not recovered.
 [<Sealed>]
-type internal AsyncCompletion<'T>() =
+type internal AsyncCompletion<'T>(recover : (exn -> Async<'T>) option) =
   [<DefaultValue(false)>]
   val mutable private core : ManualResetValueTaskSourceCore<'T>
   [<DefaultValue(false)>]
   val mutable private pending : int
+  [<DefaultValue(false)>]
+  val mutable private recovering : bool
+  [<DefaultValue(false)>]
+  val mutable private token : CancellationToken
   [<DefaultValue(false)>]
   val mutable private onSuccess : 'T -> unit
   [<DefaultValue(false)>]
@@ -123,17 +148,40 @@ type internal AsyncCompletion<'T>() =
   [<DefaultValue(false)>]
   val mutable private onCancel : OperationCanceledException -> unit
 
+  new () = AsyncCompletion<'T>(None)
+
+  member private x.Fail (ex : exn) =
+    match recover with
+    | Some recover when not x.recovering ->
+      if x.token.IsCancellationRequested then
+        x.core.SetException(OperationCanceledException(x.token))
+      else
+        x.recovering <- true
+        match (try Choice1Of2 (recover ex) with e -> Choice2Of2 e) with
+        | Choice1Of2 recovery ->
+          Async.StartWithContinuations(recovery, x.onSuccess, x.onError, x.onCancel, x.token)
+        | Choice2Of2 e ->
+          x.core.SetException e
+    | _ ->
+      x.core.SetException ex
+
   member x.Start (computation : Async<'T>) : ValueTask<'T> =
     if Interlocked.CompareExchange(&x.pending, 1, 0) <> 0 then
+      let computation =
+        match recover with
+        | Some recover -> async.TryWith(computation, recover)
+        | None -> computation
       ValueTask<'T>(Async.StartImmediateAsTask computation)
     else
       if isNull (box x.onSuccess) then
         x.onSuccess <- fun result -> x.core.SetResult result
-        x.onError <- fun ex -> x.core.SetException ex
+        x.onError <- fun ex -> x.Fail ex
         x.onCancel <- fun ex -> x.core.SetException ex
       x.core.Reset()
+      x.recovering <- false
+      x.token <- Async.DefaultCancellationToken
       let completion = ValueTask<'T>(x, x.core.Version)
-      Async.StartWithContinuations(computation, x.onSuccess, x.onError, x.onCancel, Async.DefaultCancellationToken)
+      Async.StartWithContinuations(computation, x.onSuccess, x.onError, x.onCancel, x.token)
       completion
 
   interface IValueTaskSource<'T> with
@@ -153,10 +201,11 @@ type HttpOutput(connection: Connection, runtime: HttpRuntime) =
         ; userState = Globals.DictionaryPool.Get()
         ; response = HttpResult.empty }
 
-  let webPartCompletion = AsyncCompletion<HttpContext option>()
-
   let handleError =
     fun ex -> runtime.errorHandler ex "request failed" { HttpContext.empty with connection = connection; runtime = runtime }
+
+  // Runs web parts with `executeTask`'s error handling built in.
+  let webPartCompletion = AsyncCompletion<HttpContext option>(Some handleError)
   
   // Expose connection as a property to enable inlining of write methods
   member val Connection = connection with get
@@ -280,7 +329,51 @@ type HttpOutput(connection: Connection, runtime: HttpRuntime) =
   ///   - per-iteration closure allocations from `List.exists`.
   /// The cons cells of the input list already exist (the caller built them); we simply
   /// traverse them with no extra allocation.
-  member this.writeHeaders (exclusions : string list) (headers : (string*string) list) = task {
+  /// Write one ASCII header into lineBuffer when it fits; false (writing nothing)
+  /// otherwise, leaving it to `writeOneHeader`. Produces the same bytes.
+  member private this.tryWriteHeaderSync (name : string) (value : string) : bool =
+    let conn = this.Connection
+    let mutable nameBytes = ReadOnlyMemory<byte>.Empty
+    let known = ByteConstants.knownHeaderBytes.TryGetValue(name, &nameBytes)
+    let nameLength = if known then nameBytes.Length else name.Length
+    let needed = nameLength + ByteConstants.colonBytes.Length + value.Length + ByteConstants.EOL.Length
+    if conn.lineBufferCount + needed > conn.lineBuffer.Length
+       || not (known || ByteConstants.isAscii name)
+       || not (ByteConstants.isAscii value) then
+      false
+    else
+      if known then
+        conn.appendSpanUnsafe nameBytes.Span
+      else
+        let baseIdx = conn.lineBufferCount
+        for j = 0 to name.Length - 1 do
+          conn.lineBuffer.[baseIdx + j] <- byte name.[j]
+        conn.lineBufferCount <- baseIdx + name.Length
+      conn.appendSpanUnsafe ByteConstants.colonBytes.Span
+      let baseIdx = conn.lineBufferCount
+      for j = 0 to value.Length - 1 do
+        conn.lineBuffer.[baseIdx + j] <- byte value.[j]
+      conn.lineBufferCount <- baseIdx + value.Length
+      conn.appendSpanUnsafe ByteConstants.EOL.Span
+      true
+
+  static member val private completedUnit : Task<unit> = Task.FromResult(())
+
+  /// Write the headers synchronously while they fit in lineBuffer, which is the
+  /// common case, and hand any remainder to the task-based loop.
+  member this.writeHeaders (exclusions : string list) (headers : (string*string) list) : Task<unit> =
+    let mutable rest = headers
+    let mutable fits = true
+    while fits && not (List.isEmpty rest) do
+      let name, value = List.head rest
+      if HttpOutput.isExcluded name exclusions || this.tryWriteHeaderSync name value then
+        rest <- List.tail rest
+      else
+        fits <- false
+    if List.isEmpty rest then HttpOutput.completedUnit
+    else this.writeHeadersAsync exclusions rest
+
+  member private this.writeHeadersAsync (exclusions : string list) (headers : (string*string) list) = task {
     let mutable rest = headers
     while not (List.isEmpty rest) do
       match rest with
@@ -291,45 +384,38 @@ type HttpOutput(connection: Connection, runtime: HttpRuntime) =
         rest <- tail
     }
 
-  member this.writePreamble (response:HttpResult) = task {
+  /// Status code and reason bytes, pre-computed for common codes.
+  static member private statusBytes (status : HttpStatus) : struct (ReadOnlyMemory<byte> * ReadOnlyMemory<byte>) =
+    match status.code with
+    | 200 -> struct (ByteConstants.statusCode200, ByteConstants.reason200)
+    | 201 -> struct (ByteConstants.statusCode201, ByteConstants.reason201)
+    | 204 -> struct (ByteConstants.statusCode204, ByteConstants.reason204)
+    | 301 -> struct (ByteConstants.statusCode301, ByteConstants.reason301)
+    | 302 -> struct (ByteConstants.statusCode302, ByteConstants.reason302)
+    | 304 -> struct (ByteConstants.statusCode304, ByteConstants.reason304)
+    | 400 -> struct (ByteConstants.statusCode400, ByteConstants.reason400)
+    | 401 -> struct (ByteConstants.statusCode401, ByteConstants.reason401)
+    | 403 -> struct (ByteConstants.statusCode403, ByteConstants.reason403)
+    | 404 -> struct (ByteConstants.statusCode404, ByteConstants.reason404)
+    | 500 -> struct (ByteConstants.statusCode500, ByteConstants.reason500)
+    | 502 -> struct (ByteConstants.statusCode502, ByteConstants.reason502)
+    | 503 -> struct (ByteConstants.statusCode503, ByteConstants.reason503)
+    | code -> struct (ReadOnlyMemory(ASCII.bytes (code.ToString())), ReadOnlyMemory(ASCII.bytes status.reason))
 
-    let r = response
-    // Use pre-computed status code and reason bytes for common codes
-    let statusCodeBytes, reasonBytes =
-      match r.status.code with
-      | 200 -> ByteConstants.statusCode200, ByteConstants.reason200
-      | 201 -> ByteConstants.statusCode201, ByteConstants.reason201
-      | 204 -> ByteConstants.statusCode204, ByteConstants.reason204
-      | 301 -> ByteConstants.statusCode301, ByteConstants.reason301
-      | 302 -> ByteConstants.statusCode302, ByteConstants.reason302
-      | 304 -> ByteConstants.statusCode304, ByteConstants.reason304
-      | 400 -> ByteConstants.statusCode400, ByteConstants.reason400
-      | 401 -> ByteConstants.statusCode401, ByteConstants.reason401
-      | 403 -> ByteConstants.statusCode403, ByteConstants.reason403
-      | 404 -> ByteConstants.statusCode404, ByteConstants.reason404
-      | 500 -> ByteConstants.statusCode500, ByteConstants.reason500
-      | 502 -> ByteConstants.statusCode502, ByteConstants.reason502
-      | 503 -> ByteConstants.statusCode503, ByteConstants.reason503
-      | code -> ReadOnlyMemory(ASCII.bytes (code.ToString())), ReadOnlyMemory(ASCII.bytes (r.status.reason))
-
-    // Status line + Date header + (optional) Server header is a small, fixed-shape block.
-    // Try to write it all synchronously into lineBuffer in a single shot to avoid
-    // multiple state-machine MoveNext calls through the F# task CE.
+  /// Status line + Date header + (optional) Server header is a small, fixed-shape block.
+  /// Write it into lineBuffer in one shot when it fits; false (writing nothing) otherwise.
+  member private this.tryWriteStatusLineSync (r : HttpResult) : bool =
+    let struct (statusCodeBytes, reasonBytes) = HttpOutput.statusBytes r.status
     let conn = this.Connection
     let dateBytes = Globals.DateCache.getHttpDateBytes()
     let serverBytes = ByteConstants.serverHeaderBytes
-    // Worst-case fixed bytes:
-    //   "HTTP/1.1 " (9) + status (3) + " " (1) + reason (<=24) + "\r\nDate: " (8)
-    //   + date (~30) + "\r\n" (2) + server (~30 if present) ~= < 128 bytes
     let estimated =
       ByteConstants.httpVersionBytes.Length
       + statusCodeBytes.Length + ByteConstants.spaceBytes.Length + reasonBytes.Length
       + ByteConstants.dateBytes.Length + dateBytes.Length + ByteConstants.EOL.Length
       + (if runtime.hideHeader then 0 else serverBytes.Length)
-    if conn.lineBufferCount + estimated > conn.lineBuffer.Length then
-      do! conn.flush()
-    if conn.lineBufferCount + estimated <= conn.lineBuffer.Length then
-      // Hot path: everything fits, do all copies synchronously without further awaits.
+    if conn.lineBufferCount + estimated > conn.lineBuffer.Length then false
+    else
       conn.appendSpanUnsafe ByteConstants.httpVersionBytes.Span
       conn.appendSpanUnsafe statusCodeBytes.Span
       conn.appendSpanUnsafe ByteConstants.spaceBytes.Span
@@ -339,17 +425,29 @@ type HttpOutput(connection: Connection, runtime: HttpRuntime) =
       conn.appendSpanUnsafe ByteConstants.EOL.Span
       if not runtime.hideHeader then
         conn.appendSpanUnsafe serverBytes.Span
-    else
-      // Cold path: flushed buffer still can't hold the prefix (extremely small lineBuffer).
+      true
+
+  /// Status line when lineBuffer is too full: flush, then retry, and as a last resort
+  /// (an extremely small lineBuffer) write it piece by piece.
+  member private this.writeStatusLineAsync (r : HttpResult) = task {
+    do! this.Connection.flush()
+    if not (this.tryWriteStatusLineSync r) then
+      let struct (statusCodeBytes, reasonBytes) = HttpOutput.statusBytes r.status
       do! this.appendOrFlush ByteConstants.httpVersionBytes
       do! this.appendOrFlush statusCodeBytes
       do! this.appendOrFlush ByteConstants.spaceBytes
       do! this.appendOrFlush reasonBytes
       do! this.appendOrFlush ByteConstants.dateBytes
-      do! this.appendOrFlush (ReadOnlyMemory(dateBytes))
+      do! this.appendOrFlush (ReadOnlyMemory(Globals.DateCache.getHttpDateBytes()))
       do! this.appendOrFlush ByteConstants.EOL
       if not runtime.hideHeader then
-        do! this.appendOrFlush serverBytes
+        do! this.appendOrFlush ByteConstants.serverHeaderBytes
+    }
+
+  member this.writePreamble (response:HttpResult) = task {
+    let r = response
+    if not (this.tryWriteStatusLineSync r) then
+      do! this.writeStatusLineAsync r
 
     if runtime.hideHeader then
       do! this.writeHeaders HttpOutput.excludedWhenHidden r.headers
@@ -467,24 +565,56 @@ type HttpOutput(connection: Connection, runtime: HttpRuntime) =
         do! this.writeContent false newCtx newCtx.response.content
         }
 
-  /// Check if the web part can perform its work on the current request. If it
-  /// can't it will return None and the run method will return.
-  member this.run (request:HttpRequest) (webPart : WebPart) = 
+  static member private keepAlive (ctx : HttpContext) =
+    match ctx.request.headerOrNull "connection" with
+    | null -> ctx.request.httpVersion.Equals("HTTP/1.1")
+    | conn -> String.equalsOrdinalCI conn "keep-alive"
+
+  member private this.finishWrite (written : Task<unit>) (ctx : HttpContext) : Task<Result<bool,Error>> =
     task {
       try
-        freshContext.request <- request
-        freshContext.userState.Clear()
-        let task = webPart freshContext
-        match! webPartCompletion.Start(this.executeTask task) with
+        do! written
+        return Ok (HttpOutput.keepAlive ctx)
+      with ex ->
+        return Result.Error(Error.ConnectionError ex.Message)
+    }
+
+  member private this.finishRun (webPartResult : ValueTask<HttpContext option>) : Task<Result<bool,Error>> =
+    task {
+      try
+        match! webPartResult with
         | Some ctx ->
-          let! _ = this.writeResponse ctx
-          let keepAlive =
-            match ctx.request.headerOrNull "connection" with
-            | null -> ctx.request.httpVersion.Equals("HTTP/1.1")
-            | conn -> String.equalsOrdinalCI conn "keep-alive"
-          return Ok (keepAlive)
+          do! this.writeResponse ctx
+          return Ok (HttpOutput.keepAlive ctx)
         | None ->
           return Ok (false)
       with ex ->
         return Result.Error(Error.ConnectionError ex.Message)
-  }
+    }
+
+  /// `run` without a Task per request: completes synchronously when the web part
+  /// and the response write do, which is the common case.
+  member internal this.runValue (request:HttpRequest) (webPart : WebPart) : ValueTask<Result<bool,Error>> =
+    try
+      freshContext.request <- request
+      freshContext.userState.Clear()
+      let webPartResult = webPartCompletion.Start(webPart freshContext)
+      if not webPartResult.IsCompletedSuccessfully then
+        ValueTask<Result<bool,Error>>(this.finishRun webPartResult)
+      else
+        match webPartResult.Result with
+        | Some ctx ->
+          let written = this.writeResponse ctx
+          if written.IsCompletedSuccessfully then
+            ValueTask<Result<bool,Error>>(Ok (HttpOutput.keepAlive ctx))
+          else
+            ValueTask<Result<bool,Error>>(this.finishWrite written ctx)
+        | None ->
+          ValueTask<Result<bool,Error>>(Ok false)
+    with ex ->
+      ValueTask<Result<bool,Error>>(Result.Error(Error.ConnectionError ex.Message))
+
+  /// Check if the web part can perform its work on the current request. If it
+  /// can't it will return None and the run method will return.
+  member this.run (request:HttpRequest) (webPart : WebPart) : Task<Result<bool,Error>> =
+    (this.runValue request webPart).AsTask()

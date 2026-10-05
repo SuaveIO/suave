@@ -32,6 +32,12 @@ type SslTransport(listenSocket: Socket, certificate: X509Certificate, cancellati
   val mutable negotiatedApplicationProtocol: SslApplicationProtocol
 
   let socketLock = obj()
+  let readCompletion =
+    ReceiveCompletion(function
+      | :? IOException as ex -> Error.ConnectionError($"SSL read error: {ex.Message}")
+      | :? SocketException as ex -> Error.SocketError(ex.SocketErrorCode)
+      | :? ObjectDisposedException -> Error.ConnectionError("SSL stream has been disposed")
+      | ex -> Error.ConnectionError($"Unexpected SSL read error: {ex.Message}"))
 
   /// ALPN protocols advertised by the server, in preference order: HTTP/2 first,
   /// then HTTP/1.1. RFC 7301 / RFC 7540 §3.3.
@@ -115,7 +121,9 @@ type SslTransport(listenSocket: Socket, certificate: X509Certificate, cancellati
     let stream = lock socketLock (fun () -> this.sslStream)
     if stream = null then
       raise (ObjectDisposedException("SSL stream has been disposed"))
-    stream.ReadAsync(buf, cancellationToken)
+    // No cancellation token, as for TcpTransport: `ConnectionFacade.accept` shuts the
+    // connection down on server shutdown, which ends a pending read.
+    stream.ReadAsync(buf, CancellationToken.None)
 
   member this.writeInternal(buf: ByteSegment) =
     let stream = lock socketLock (fun () -> this.sslStream)
@@ -147,11 +155,15 @@ type SslTransport(listenSocket: Socket, certificate: X509Certificate, cancellati
     member this.read (buf : Memory<byte>) : SocketOp<int> =
       // Use ValueTask directly for zero-allocation when synchronous
       let vt = this.readInternal buf
+      let mutable pending = Unchecked.defaultof<SocketOp<int>>
       if vt.IsCompletedSuccessfully then
         // Synchronous completion - zero allocations!
         ValueTask<Result<int,Error>>(Ok vt.Result)
+      elif readCompletion.TryStart(vt, &pending) then
+        // Async path - complete through the reusable source, also without allocating
+        pending
       else
-        // Async path - wrap in task
+        // Overlapping read (not done by Suave itself) - wrap in task
         ValueTask<Result<int,Error>>(
           task {
             try
