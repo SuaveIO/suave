@@ -465,3 +465,79 @@ branch makes `HttpContext` and `HttpRequest` classes. In the socket-free probe, 
 routed WebPart through the error wrapper then takes 192 ns instead of 262 ns.
 Making `HttpResult` a class as well was slightly slower. That change is
 binary-breaking, so it is kept separate for a major version.
+
+## CPU Per Request Under the Leaderboard's Constraints (2026-10-07)
+
+After v3.6.0 shipped, the leaderboard showed Suave at ≈121k requests/second
+against ≈167k for Oxpecker and Minimal API at 64 connections, up from ≈82k with
+v3.5. Local same-host runs had shown a far smaller gap. The leaderboard's harness
+now runs `zrk` in closed-loop mode and pins the server container to 4 cores, with
+the load generator on separate cores. Without that pinning, both servers sat at
+≈600k requests/second on a large Linux host, limited by the shared load generator.
+
+### Method
+
+Pin the server to 4 cores and the load generator to the rest. On Linux:
+
+```sh
+taskset -c 0-3 dotnet benchmarks/PongServer/bin/Release/net10.0/PongServer.dll --comparison
+taskset -c 4-15 oha --no-tui --http-version 1.1 -z 15s -c 64 http://127.0.0.1:3000/
+```
+
+This reproduced a 13% throughput gap (368k vs 425k requests/second). The
+comparable figure across machines and load generators is server CPU time per
+request. `benchmarks/cpu-per-request.sh PORT` reads the server process's
+user+system CPU time (`/proc` on Linux, `ps` on macOS) around a fixed number of
+keep-alive requests:
+
+```sh
+taskset -c 4-15 bash benchmarks/cpu-per-request.sh 3000
+```
+
+For profiles, `dotnet-trace`'s sampled thread time suspends the runtime to take
+each sample, which inflates `PollGC` and lock frames. `perf` does not:
+
+```sh
+DOTNET_PerfMapEnabled=1 DOTNET_EnableWriteXorExecute=0 \
+  taskset -c 0-3 ~/.dotnet-ms/dotnet PongServer.dll --comparison
+sudo perf record -F 999 -g -p PID -o suave.perf.data -- sleep 15
+sudo perf script -f -i suave.perf.data > suave-perf.txt
+```
+
+`-f` lets `perf` read the `/tmp/perf-PID.map` file written by another user.
+Runtime frames need `libcoreclr.so` symbols, which `dotnet-symbol --symbols`
+downloads for Microsoft's builds (installed with `dotnet-install.sh`). Distribution
+builds such as Ubuntu's `/usr/lib/dotnet` are not on Microsoft's symbol server.
+
+### Findings
+
+- Suave's own JIT-compiled code cost about the same as Kestrel's, and kernel time
+  per request matched. The difference was in the runtime.
+- Uncontended locks: each request took the `Pipe` lock six times on the read side
+  and `TcpTransport`'s socket lock on every read and write. `tryReadRequestHead`
+  now takes the head with one pipe read and parses it in place. The socket field
+  is read with `Volatile.Read`.
+- Slow tail calls: `InlinedMemmoveGCRefsHelper` and `IL_STUB_CallTailCallTarget`
+  cost ≈0.36 µs/request in Suave and nothing in Minimal API. An `async`
+  continuation that receives `unit` or an `option` and tail-calls a WebPart must
+  pass the 136-byte `HttpContext` struct on the stack, so the runtime uses its
+  copying tail-call helper. An IL scan found this pattern in the router, `bind`
+  (`>=>`), `choose`, `tryThen`, `inject` and `<|>`, among others. Suave is now
+  compiled with `<Tailcalls>false</Tailcalls>`. Debug builds already were.
+- A larger gen0 budget (`DOTNET_GCgen0size=0x10000000`) saved only ≈0.14
+  µs/request, so GC collections were a small part of the gap.
+
+### Results
+
+Linux, Microsoft .NET 10.0.12 runtime, server pinned to 4 cores, three
+alternating rounds of 400,000 requests at 64 connections:
+
+| Build | CPU µs/request |
+| --- | ---: |
+| One pipe read per head, no socket lock | 9.29 |
+| Plus no `.tail` calls | 8.98 |
+| Minimal API | 8.89 |
+
+Before these changes, v3.6.0 measured ≈9.7 µs/request against ≈8.7 for Minimal
+API, but on Ubuntu's runtime build, so that comparison is approximate. Allocations
+are ≈1.22 KB/request. All rounds were within ±0.03 µs.
