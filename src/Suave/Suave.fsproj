@@ -7,6 +7,11 @@
     <IsAotCompatible>true</IsAotCompatible>
     <IsTrimmable>true</IsTrimmable>
   <OtherFlags>--warn:3 </OtherFlags>
+    <!-- No .tail calls: closures that tail-call a WebPart with the HttpContext struct
+         (bind, choose, the router) otherwise go through the runtime's slow tail-call
+         helper. Self-recursive functions still compile to loops; Async recursion is
+         trampolined by FSharp.Core. -->
+    <Tailcalls>false</Tailcalls>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" Condition="Exists('AssemblyInfo.fs')" />

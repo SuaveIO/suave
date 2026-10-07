@@ -1,3 +1,8 @@
+## Unreleased
+* Keep-alive CPU per request, measured on Linux with the server pinned to 4 cores:
+  * the request head is taken from the input with one pipe read and parsed in place, instead of three read/advance pairs; `TcpTransport` no longer takes a lock to fetch the socket on every read and write
+  * Suave is compiled without F# `.tail` calls: closures in `bind` (`>=>`), `choose`, `tryThen`, `inject`, `<|>` and the router that passed the `HttpContext` struct on as a tail call went through the runtime's slow tail-call helper, which copied the struct
+
 ## New in v3.6.0 (Released 2026-10-05)
 * Keep-alive performance: allocations per request fall from ≈5.7 KB to ≈1.24 KB for a routed empty response. In a same-host Linux comparison against ASP.NET Core Minimal API, Suave is now ahead at 256 connections and within ≈5% at 64 (#862, #864):
   * the connection's request loop waits for a complete request head, then parses the request line and headers synchronously; fragmented, oversized (beyond the 8 KiB line buffer), non-HTTP/1.x and body-carrying requests continue on the streaming parser
