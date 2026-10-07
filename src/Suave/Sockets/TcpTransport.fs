@@ -119,7 +119,9 @@ type TcpTransport(listenSocket : Socket, cancellationToken:CancellationToken) =
     }
 
   member this.readInternal (buf : ByteSegment) =
-    let socket = lock socketLock (fun () -> this.acceptSocket)
+    // A volatile read, not the lock: `shutdown` swaps the field under the lock, and a
+    // read racing it fails on the disposed socket just as it would after the lock.
+    let socket = Volatile.Read(&this.acceptSocket)
     if socket = null then
       raise (ObjectDisposedException("Socket has been disposed"))
     // No cancellation token: registering every pending receive on the server-wide
@@ -128,7 +130,7 @@ type TcpTransport(listenSocket : Socket, cancellationToken:CancellationToken) =
     socket.ReceiveAsync(buf, CancellationToken.None)
 
   member this.writeInternal (buf : ByteSegment) =
-    let socket = lock socketLock (fun () -> this.acceptSocket)
+    let socket = Volatile.Read(&this.acceptSocket)
     if socket = null then
       raise (ObjectDisposedException("Socket has been disposed"))
     socket.SendAsync(buf,cancellationToken)

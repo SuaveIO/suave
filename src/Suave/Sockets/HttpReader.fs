@@ -202,6 +202,19 @@ module internal KnownVersions =
     elif bytesEqual span v20 then v20
     else null
 
+/// Outcome of `HttpReader.tryReadRequestHead`.
+[<Struct>]
+type internal BufferedHead =
+  /// The head is not complete yet; nothing was consumed. Read more input and retry.
+  | HeadIncomplete
+  /// Not for the buffered parser (oversized, not HTTP/1.x, canceled or ended
+  /// input); nothing was consumed. Use the streaming parser.
+  | HeadStreaming
+  /// Request line and headers were parsed and consumed: (method, path, rawQuery, version).
+  | HeadParsed of line : struct (string * string * string * string)
+  /// The head was consumed but is malformed.
+  | HeadFailed of error : Error
+
 [<AllowNullLiteral>]
 type HttpReader(transport : ITransport, pipe: Pipe, cancellationToken: Threading.CancellationToken) =
 
@@ -681,6 +694,64 @@ type HttpReader(transport : ITransport, pipe: Pipe, cancellationToken: Threading
       | _ ->
         pipe.Reader.AdvanceTo(buffer.Start)
         ValueNone
+
+  /// Take a whole request head (request line, headers and the empty line) from the
+  /// buffered input with a single pipe read: the head is copied into the line
+  /// buffer once, parsed, and consumed with one advance. Heads that do not fit the
+  /// line buffer, and anything that is not an HTTP/1.x request, are left untouched
+  /// for the streaming parser (see `BufferedHead`).
+  member internal x.tryReadRequestHead (headers: List<string*string>) : BufferedHead =
+    let mutable rr = Unchecked.defaultof<ReadResult>
+    if not (pipe.Reader.TryRead(&rr)) then
+      HeadIncomplete
+    else
+      let buffer = rr.Buffer
+      if rr.IsCanceled || rr.IsCompleted || cancellationToken.IsCancellationRequested then
+        pipe.Reader.AdvanceTo(buffer.Start)
+        HeadStreaming
+      else
+        match findMarker HttpReader.EmptyLineMarker buffer with
+        | ValueSome p when p + int64 HttpReader.EmptyLineMarker.Length <= int64 readLineBuffer.Length ->
+          // The request line and header lines, each with its CRLF.
+          let headLength = int p + EOL.Length
+          buffer.Slice(0L, int64 headLength).CopyTo(Span<byte>(readLineBuffer))
+          let lineLength = ReadOnlySpan<byte>(readLineBuffer, 0, headLength).IndexOf(ReadOnlySpan<byte>(EOL))
+          match x.parseRequestLine lineLength with
+          | Ok (struct (rawMethod, path, _, httpVersion)) when
+              not (httpVersion.StartsWith("HTTP/", StringComparison.Ordinal))
+              || (rawMethod = "PRI" && path = "*") ->
+            // Invalid versions and the HTTP/2 preface are handled by the streaming path.
+            pipe.Reader.AdvanceTo(buffer.Start)
+            HeadStreaming
+          | parsedLine ->
+            pipe.Reader.AdvanceTo(buffer.GetPosition(p + int64 HttpReader.EmptyLineMarker.Length))
+            match parsedLine with
+            | Result.Error e -> HeadFailed e
+            | Ok line ->
+              let mutable failure = ValueNone
+              let mutable lineStart = lineLength + EOL.Length
+              while lineStart < headLength do
+                let length = ReadOnlySpan<byte>(readLineBuffer, lineStart, headLength - lineStart).IndexOf(ReadOnlySpan<byte>(EOL))
+                match x.parseHeaderLine lineStart length with
+                | Ok kv ->
+                  headers.Add kv
+                  lineStart <- lineStart + length + EOL.Length
+                | Result.Error e ->
+                  failure <- ValueSome e
+                  lineStart <- headLength
+              match failure with
+              | ValueSome e -> HeadFailed e
+              | ValueNone -> HeadParsed line
+        | ValueSome _ ->
+          pipe.Reader.AdvanceTo(buffer.Start)
+          HeadStreaming
+        | ValueNone ->
+          if buffer.Length >= int64 readLineBuffer.Length || x.firstLineIsNotHttp1 buffer then
+            pipe.Reader.AdvanceTo(buffer.Start)
+            HeadStreaming
+          else
+            pipe.Reader.AdvanceTo(buffer.Start, buffer.End)
+            HeadIncomplete
 
   /// Read the post data from the stream, given the number of bytes that makes up the post data.
   member x.readPostData (bytes : int) (select:ReadOnlyMemory<byte> -> int -> unit) : Task<unit> =

@@ -38,6 +38,9 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
   let multiPartFields = List<string*string>()
   let requestHeaders = List<string*string>()
   let mutable _rawForm : byte array = [||]
+  // The request head taken by `requestLoop`. A field rather than a local: assigned
+  // across awaits inside try/with, a local would be boxed into a ref cell per request.
+  let mutable pendingHead = HeadIncomplete
 
   let readFilePart boundary (headerParams : Dictionary<string,string>) fieldName contentType : SocketOp<HttpUpload option> =
     // Extract the filename from header params BEFORE opening any stream so that sink
@@ -451,42 +454,39 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
       files            = files
       multiPartFields  = multiPartFields }
 
-  member this.readRequest () : SocketOp<HttpRequest> =
-    // Clear pooled per-connection collections at the start of every request rather than
-    // allocating fresh ones. The collections live on the ConnectionFacade and are reset
-    // here, before the new request is parsed in.
+  /// Clear pooled per-connection collections at the start of every request rather than
+  /// allocating fresh ones. The collections live on the ConnectionFacade and are reset
+  /// here, before the new request is parsed in.
+  member private this.resetRequest () =
     requestHeaders.Clear()
     files.Clear()
     multiPartFields.Clear()
     _rawForm <- [||]
 
-    // Steady-state hot path: `requestLoop` waits until the request head is buffered, so
-    // the request line and headers can usually be parsed synchronously, and a request
-    // without a body or `Expect` header is then complete without any task allocation.
-    // Everything else continues on the streaming path, which behaves as before.
-    match reader.tryReadRequestLineBuffered() with
-    | ValueNone -> ValueTask<Result<HttpRequest,Error>>(this.readRequestAsync ValueNone false)
-    | ValueSome (Result.Error e) -> ValueTask<Result<HttpRequest,Error>>(Result.Error e)
-    | ValueSome (Ok (struct (rawMethod, path, rawQuery, httpVersion))) ->
-      // Allocated only when handing over to the streaming path.
-      let line () = ValueSome (rawMethod, path, rawQuery, httpVersion)
-      if not (httpVersion.StartsWith("HTTP/", StringComparison.Ordinal))
-         || ConnectionFacade.isHttp2PriorKnowledgePreface rawMethod path httpVersion then
-        ValueTask<Result<HttpRequest,Error>>(this.readRequestAsync (line ()) false)
-      else
-        match reader.tryReadHeadersBuffered requestHeaders with
-        | ValueNone -> ValueTask<Result<HttpRequest,Error>>(this.readRequestAsync (line ()) false)
-        | ValueSome (Result.Error e) -> ValueTask<Result<HttpRequest,Error>>(Result.Error e)
-        | ValueSome (Ok ()) ->
-          let header name = tryGetFirstWithComparison StringComparison.Ordinal requestHeaders name
-          match header "host" with
-          | null ->
-            ValueTask<Result<HttpRequest,Error>>(Result.Error (InputDataError (None, "Missing 'Host' header")))
-          | rawHost ->
-            if isNull (header "expect") && isNull (header "content-length") then
-              ValueTask<Result<HttpRequest,Error>>(Ok (this.buildRequest httpVersion path rawHost rawMethod rawQuery))
-            else
-              ValueTask<Result<HttpRequest,Error>>(this.readRequestAsync (line ()) true)
+  /// Finish a request from a buffered head: synchronously for a request without a body
+  /// or `Expect` header, otherwise on the streaming path, which behaves as before.
+  member private this.requestFromHead (head : BufferedHead) : SocketOp<HttpRequest> =
+    match head with
+    | HeadParsed (struct (rawMethod, path, rawQuery, httpVersion)) ->
+      let header name = tryGetFirstWithComparison StringComparison.Ordinal requestHeaders name
+      match header "host" with
+      | null ->
+        ValueTask<Result<HttpRequest,Error>>(Result.Error (InputDataError (None, "Missing 'Host' header")))
+      | rawHost ->
+        if isNull (header "expect") && isNull (header "content-length") then
+          ValueTask<Result<HttpRequest,Error>>(Ok (this.buildRequest httpVersion path rawHost rawMethod rawQuery))
+        else
+          ValueTask<Result<HttpRequest,Error>>(
+            this.readRequestAsync (ValueSome (rawMethod, path, rawQuery, httpVersion)) true)
+    | HeadFailed e ->
+      ValueTask<Result<HttpRequest,Error>>(Result.Error e)
+    | HeadStreaming
+    | HeadIncomplete ->
+      ValueTask<Result<HttpRequest,Error>>(this.readRequestAsync ValueNone false)
+
+  member this.readRequest () : SocketOp<HttpRequest> =
+    this.resetRequest()
+    this.requestFromHead (reader.tryReadRequestHead requestHeaders)
 
   member this.exitHttpLoopWithError (err:Error) = task{
       match err with
@@ -549,7 +549,9 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
   /// whose parsing, web part and response all complete synchronously completes
   /// synchronously. Everything else continues in `processRequestAsync`.
   member internal this.processRequestValue () : ValueTask<Result<bool, Error>> =
-    let reqRes = this.readRequest()
+    this.processRequestFrom (this.readRequest())
+
+  member private this.processRequestFrom (reqRes : SocketOp<HttpRequest>) : ValueTask<Result<bool, Error>> =
     if reqRes.IsCompletedSuccessfully then
       match reqRes.Result with
       | Ok request when
@@ -654,19 +656,21 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
         // allocated once per connection, rather than deep inside the parser where
         // every nested task would suspend and allocate a state machine per request.
         // A read failure ends the loop quietly, as it did when raised by the parser.
+        // The head is then taken with a single pipe read (see `tryReadRequestHead`).
+        this.resetRequest()
         try
-          let mutable waiting = not (reader.requestHeadReady())
-          while waiting do
+          pendingHead <- reader.tryReadRequestHead requestHeaders
+          while flag && pendingHead.IsHeadIncomplete do
             let! received = reader.receive()
             match! reader.commitReceived received with
-            | Ok () -> waiting <- not (reader.requestHeadReady())
-            | Result.Error _ ->
-              waiting <- false
-              flag <- false
+            | Ok () -> pendingHead <- reader.tryReadRequestHead requestHeaders
+            | Result.Error _ -> flag <- false
         with _ ->
           flag <- false
         if flag then
-          let! b = this.processRequestValue ()
+          let head = pendingHead
+          pendingHead <- HeadIncomplete
+          let! b = this.processRequestFrom (this.requestFromHead head)
           match b with
           | Ok b ->
             flag <- b
