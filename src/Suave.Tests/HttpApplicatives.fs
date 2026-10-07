@@ -45,3 +45,17 @@ let applicativeTests cfg =
       let res = runWithConfig app |> req HttpMethod.GET "/" None
       Expect.equal res ip "Should be what the config says the IP is"
     ]
+
+[<Tests>]
+let deepCompositionTests =
+  // Suave is compiled without .tail calls; `choose` recursing through its options
+  // must still not grow the stack.
+  let run (webPart : WebPart) =
+    webPart { HttpContext.empty with request = { HttpRequest.empty with rawPath = "/" } }
+    |> Async.RunSynchronously
+
+  testList "deep web part composition" [
+    testCase "choose over many non-matching options does not overflow the stack" <| fun _ ->
+      let options = List.replicate 100000 never @ [ OK "found" ]
+      Expect.isSome (run (choose options)) "The last option answers"
+  ]
