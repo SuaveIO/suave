@@ -12,6 +12,15 @@ open System.Runtime.InteropServices
 open Suave.Utils
 open Suave
 
+/// Raised by Suave's unit-returning write helpers (`Connection.asyncWriteBytes`,
+/// `Connection.writeChunk`, `EventSource.send`, `transferStream`, ...) when the
+/// transport reports that a write failed, typically because the client has
+/// disconnected. Use the `try*` variants to get a `Result` instead.
+type SocketWriteException(error : Error) =
+  inherit System.IO.IOException(sprintf "Socket write failed: %A" error)
+  /// The error reported by the transport
+  member _.Error = error
+
 /// A connection (TCP implied) is a thing that can read and write from a socket
 /// and that can be closed.
 type Connection =
@@ -105,15 +114,41 @@ type Connection =
     do! this.asyncWrite Bytes.eol
   }
 
-  /// Write the string s to the stream asynchronously from a byte array
-  member inline this.asyncWriteBytes (b : byte[]) =
+  /// Flush out whatever is in the lineBuffer, returning the transport's result
+  /// instead of ignoring a failed write.
+  member this.tryFlush () : Task<Result<unit, Error>> =
     task {
-    if b.Length > 0 then
-      let! r4 = this.transport.write (new Memory<_>(b, 0, b.Length))
-      match r4 with
+      if this.lineBufferCount = 0 then
+        return Ok ()
+      else
+        let! r = this.transport.write (new Memory<byte>(this.lineBuffer, 0, this.lineBufferCount))
+        // Clear the buffer to prevent information leakage
+        Array.Clear(this.lineBuffer, 0, this.lineBufferCount)
+        this.lineBufferCount <- 0
+        return r
+    }
+
+  /// Write the bytes straight to the transport, bypassing (and not flushing)
+  /// the line buffer. Returns `Error` when the write fails, e.g. because the
+  /// client has disconnected.
+  member this.tryWriteBytes (b : byte[]) : Task<Result<unit, Error>> =
+    task {
+      if b.Length = 0 then
+        return Ok ()
+      else
+        let! r = this.transport.write (new Memory<_>(b, 0, b.Length))
+        return r
+    }
+
+  /// Write the bytes straight to the transport, bypassing (and not flushing)
+  /// the line buffer. Raises `SocketWriteException` when the write fails.
+  member this.asyncWriteBytes (b : byte[]) =
+    task {
+      let! r = this.tryWriteBytes b
+      match r with
       | Ok () -> ()
-      | Result.Error _ -> ()
-  }
+      | Result.Error e -> raise (SocketWriteException e)
+    }
 
   member inline this.asyncWriteBufferedBytes (b : byte[]) =
     task {
@@ -228,13 +263,59 @@ type Connection =
     else
       false
 
-  member inline this.writeChunk (chunk : byte []) = task {
-    let chunkLength = chunk.Length.ToString("X")
-    do! this.asyncWriteLn chunkLength
-    do! this.asyncWriteLn (System.Text.Encoding.UTF8.GetString(chunk))
-    do! this.flush()
-    ()
-  }
+  /// Write one HTTP/1.1 chunk (size in hex, CRLF, the raw bytes, CRLF), after
+  /// flushing anything still in the line buffer (such as the blank line ending
+  /// the response headers). An empty array writes the terminating chunk
+  /// `0\r\n\r\n`; see `tryWriteLastChunk`. Returns `Error` when a write
+  /// fails, e.g. because the client has disconnected.
+  member this.tryWriteChunk (chunk : byte []) : Task<Result<unit, Error>> =
+    task {
+      let header = Encoding.ASCII.GetBytes(chunk.Length.ToString("X") + "\r\n")
+      let total = header.Length + chunk.Length + 2
+      if this.lineBufferCount + total <= this.lineBuffer.Length then
+        // Small chunk: assemble it in the line buffer and write it in one go
+        Buffer.BlockCopy(header, 0, this.lineBuffer, this.lineBufferCount, header.Length)
+        this.lineBufferCount <- this.lineBufferCount + header.Length
+        Buffer.BlockCopy(chunk, 0, this.lineBuffer, this.lineBufferCount, chunk.Length)
+        this.lineBufferCount <- this.lineBufferCount + chunk.Length
+        this.lineBuffer.[this.lineBufferCount] <- 13uy
+        this.lineBuffer.[this.lineBufferCount + 1] <- 10uy
+        this.lineBufferCount <- this.lineBufferCount + 2
+        return! this.tryFlush ()
+      else
+        let! r = this.tryFlush ()
+        match r with
+        | Result.Error _ -> return r
+        | Ok () ->
+          let! r = this.tryWriteBytes header
+          match r with
+          | Result.Error _ -> return r
+          | Ok () ->
+            let! r = this.tryWriteBytes chunk
+            match r with
+            | Result.Error _ -> return r
+            | Ok () -> return! this.tryWriteBytes Bytes.EOL
+    }
+
+  /// Write the terminating chunk `0\r\n\r\n` of a chunked response (no trailers).
+  member this.tryWriteLastChunk () : Task<Result<unit, Error>> =
+    this.tryWriteChunk [||]
+
+  /// Write one HTTP/1.1 chunk containing the raw bytes; see `tryWriteChunk`.
+  /// An empty array writes the terminating chunk. Raises
+  /// `SocketWriteException` when a write fails.
+  member this.writeChunk (chunk : byte []) =
+    task {
+      let! r = this.tryWriteChunk chunk
+      match r with
+      | Ok () -> ()
+      | Result.Error e -> raise (SocketWriteException e)
+    }
+
+  /// Write the terminating chunk `0\r\n\r\n` of a chunked response. Raises
+  /// `SocketWriteException` when the write fails.
+  member this.writeLastChunk () =
+    this.writeChunk [||]
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Connection =

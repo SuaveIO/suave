@@ -169,8 +169,12 @@ type TcpTransport(listenSocket : Socket, cancellationToken:CancellationToken) =
           })
 
     member this.write (buf : Memory<byte>) : SocketOp<unit> =
-      // Use ValueTask directly for zero-allocation when synchronous
-      let vt = this.writeInternal buf
+      // Use ValueTask directly for zero-allocation when synchronous. A write on a
+      // socket that is already shut down throws; report it as an Error like any
+      // other failed write.
+      let vt =
+        try this.writeInternal buf
+        with ex -> ValueTask<int>(Task.FromException<int> ex)
       if vt.IsCompletedSuccessfully then
         // Synchronous completion - zero allocations!
         ValueTask<Result<unit,Error>>(Ok())
