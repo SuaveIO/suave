@@ -273,7 +273,7 @@ module Http =
       /// When false, the server neither advertises <c>h2</c> via TLS ALPN nor
       /// accepts cleartext HTTP/2 (h2c upgrade or prior knowledge); every
       /// connection is served as HTTP/1.x. Defaults to true.
-      http2Enabled      : bool }
+      http2Enabled      : bool
       /// Largest WebSocket frame payload, in bytes, a client may send. Larger
       /// frames are refused with close code 1009 before any payload is read.
       webSocketMaxFrameSize : int }
