@@ -505,28 +505,63 @@ module ServeResource =
 
 module ContentRange =
   open System
+  open System.Globalization
   open System.IO
   open Suave.Utils
 
-  let parseContentRange (input:string) =
-    let contentUnit = input.Split([|' '; '='|], 2)
-    let rangeArray = contentUnit.[1].Split([|'-'|])
-    let start = int64 rangeArray.[0]
-    let finish = if Int64.TryParse (rangeArray.[1], ref 0L) then Some <| int64 rangeArray.[1] else None
-    start, finish
+  /// What a `Range` request header asks of a resource of a known length.
+  type internal RangeRequest =
+    /// No usable range: the header is absent, malformed, uses a unit other than
+    /// `bytes` or asks for several ranges. The whole resource is sent (200).
+    | NoRange
+    /// The inclusive byte range `first`-`last` of the resource (206).
+    | Satisfiable of first : int64 * last : int64
+    /// A well-formed range that lies outside the resource (416).
+    | Unsatisfiable
 
-  let (|ContentRange|_|) (context:HttpContext) =
+  let private tryParsePos (s : string) =
+    match Int64.TryParse(s, NumberStyles.None, CultureInfo.InvariantCulture) with
+    | true, v -> Some v
+    | _ -> None
+
+  /// Interprets a `Range` header value (RFC 9110 §14.1.2) for a resource of
+  /// `total` bytes. Byte positions are inclusive, so `bytes=2-5` is four bytes.
+  /// Open-ended (`bytes=5-`) and suffix (`bytes=-3`) ranges are supported;
+  /// multiple ranges are not, and are answered with the full resource.
+  let internal parseRange (input : string) (total : int64) =
+    let input = input.Trim()
+    let prefix = "bytes="
+    if not (input.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) then NoRange
+    else
+      let spec = input.Substring(prefix.Length).Trim()
+      if spec.Contains "," then NoRange
+      else
+        match spec.Split('-') with
+        | [| ""; suffix |] ->
+          match tryParsePos (suffix.Trim()) with
+          | Some 0L -> Unsatisfiable
+          | Some _ when total = 0L -> Unsatisfiable
+          | Some n -> Satisfiable (max 0L (total - n), total - 1L)
+          | None -> NoRange
+        | [| first; last |] ->
+          match tryParsePos (first.Trim()) with
+          | None -> NoRange
+          | Some first ->
+            let last =
+              match last.Trim() with
+              | "" -> Some (Int64.MaxValue)
+              | l -> tryParsePos l
+            match last with
+            | None -> NoRange
+            | Some last when last < first -> NoRange
+            | Some _ when first >= total -> Unsatisfiable
+            | Some last -> Satisfiable (first, min last (total - 1L))
+        | _ -> NoRange
+
+  let internal rangeRequest (context : HttpContext) (total : int64) =
     match context.request.header "range" with
-    | Choice1Of2 rangeValue -> Some <| parseContentRange rangeValue
-    | Choice2Of2 _ -> None
-
-  let getFileStream (ctx:HttpContext) path =
-    let fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite) :> Stream
-    match ctx with
-    | ContentRange (start, finish) ->
-      let length = finish |> Option.bind (fun finish -> Some (finish - start))
-      new RangedStream(fs, start, length, true) :> Stream, start, fs.Length, HTTP_206.status
-    | _ -> fs, 0L, fs.Length, HTTP_200.status
+    | Choice1Of2 rangeValue -> parseRange rangeValue total
+    | Choice2Of2 _ -> NoRange
 
 module Files =
 
@@ -539,43 +574,69 @@ module Files =
   open ContentRange
 
   let sendFile fileName (compression : bool) (ctx : HttpContext) =
-    let writeFile file =
-      let fs, start, total, status = getFileStream ctx file
-      fun (conn:Connection, _) -> task {
+    let fs = new FileStream(fileName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite) :> Stream
+    let total = fs.Length
+    match rangeRequest ctx total with
+    | Unsatisfiable ->
+      fs.Dispose()
+      let write (conn : Connection, _) = task {
+        do! conn.asyncWriteLn ("Content-Range: bytes */" + total.ToString())
+        do! conn.asyncWriteLn "Content-Length: 0\r\n"
+        do! conn.flush ()
+      }
+      { ctx with
+          response =
+            { ctx.response with
+                status = HTTP_416.status
+                content = SocketTask write } }
+      |> succeed
+    | Satisfiable (first, last) ->
+      // A partial response is never compressed: the range applies to the
+      // file's bytes, and a compressed copy of a slice must not be cached as
+      // the compressed copy of the whole file.
+      let length = last - first + 1L
+      let ranged = new Suave.Utils.RangedStream(fs, first, Some length, true) :> Stream
+      let write (conn : Connection, _) = task {
+        try
+          do! conn.asyncWriteLn ("Content-Range: bytes " + first.ToString() + "-" + last.ToString() + "/" + total.ToString())
+          do! conn.asyncWriteLn ("Content-Length: " + length.ToString() + "\r\n")
+          do! conn.flush ()
+          if ctx.request.``method`` <> HttpMethod.HEAD && length > 0L then
+            do! transferStream conn ranged
+        finally
+          ranged.Dispose()
+      }
+      { ctx with
+          response =
+            { ctx.response with
+                status = HTTP_206.status
+                content = SocketTask write } }
+      |> succeed
+    | NoRange ->
+      let write (conn : Connection, _) = task {
         let getLm = fun path -> FileInfo(path).LastWriteTime
-        match! Compression.transformStream file fs getLm compression ctx.runtime.compressionFolder ctx with
-        | Ok(encoding,fs) ->
-          let finish = start + fs.Length - 1L
+        match! Compression.transformStream fileName fs getLm compression ctx.runtime.compressionFolder ctx with
+        | Ok (encoding, fs) ->
           try
-            try
-              match encoding with
-              | Some n ->
-                do! conn.asyncWriteLn ("Content-Range: bytes " + start.ToString() + "-" + finish.ToString() + "/*")
-                do! conn.asyncWriteLn (String.Concat [| "Content-Encoding: "; n.ToString() |])
-                do! conn.asyncWriteLn ("Content-Length: " + (fs : Stream).Length.ToString() + "\r\n")
-                do! conn.flush ()
-                if ctx.request.``method`` <> HttpMethod.HEAD && fs.Length > 0L then
-                  do! transferStream conn fs
-              | None ->
-                do! conn.asyncWriteLn ("Content-Range: bytes " + start.ToString() + "-" + finish.ToString() + "/" + total.ToString())
-                do! conn.asyncWriteLn ("Content-Length: " + (fs : Stream).Length.ToString() + "\r\n")
-                do! conn.flush()
-                if ctx.request.``method`` <> HttpMethod.HEAD && fs.Length > 0L then
-                  do! transferStream conn fs
-            with ex ->
-              raise ex
+            match encoding with
+            | Some n ->
+              do! conn.asyncWriteLn (String.Concat [| "Content-Encoding: "; n.ToString() |])
+            | None -> ()
+            do! conn.asyncWriteLn ("Content-Length: " + (fs : Stream).Length.ToString() + "\r\n")
+            do! conn.flush ()
+            if ctx.request.``method`` <> HttpMethod.HEAD && fs.Length > 0L then
+              do! transferStream conn fs
           finally
             fs.Dispose()
         | Result.Error error ->
-          return failwith "error"
-      }, status
-    let task, status = writeFile fileName
-    { ctx with
-        response =
-          { ctx.response with
-              status = status
-              content = SocketTask task } }
-    |> succeed
+          return failwithf "%A" error
+      }
+      { ctx with
+          response =
+            { ctx.response with
+                status = HTTP_200.status
+                content = SocketTask write } }
+      |> succeed
 
 
   /// <summary>
@@ -615,7 +676,9 @@ module Files =
     then path
     else trimmed
 
-  let resolvePath (rootPath : string) (fileName : string) =
+  /// Like `resolvePath`, but answers `None` instead of throwing when the
+  /// resolved path escapes the root.
+  let tryResolvePath (rootPath : string) (fileName : string) =
     let fileName =
       if Path.DirectorySeparatorChar.Equals('/') then fileName
       else fileName.Replace('/', Path.DirectorySeparatorChar)
@@ -634,24 +697,37 @@ module Files =
     let isInsideRoot =
       String.Equals(calculatedPath, rootPath, StringComparison.Ordinal)
       || calculatedPath.StartsWith(withTrailingSeparator rootPath, StringComparison.Ordinal)
-    if isInsideRoot then
-      calculatedPath
-    else
+    if isInsideRoot then Some calculatedPath
+    else None
+
+  let resolvePath (rootPath : string) (fileName : string) =
+    match tryResolvePath rootPath fileName with
+    | Some path -> path
+    | None ->
       // Neither the resolved path nor the root is included in the message: this
       // exception can surface in an error response, and would then disclose the
       // server's directory layout to whoever crafted the request.
       raise <| Exception("The requested path resolves outside of the root directory it is served from; refusing to serve it.")
 
+  // The web parts below decline (`fail`) a path that escapes the root, exactly
+  // as they decline a file that does not exist, rather than throwing: a request
+  // such as `/../secret.txt` then gets the application's 404 instead of a 500.
+
   let browseFile rootPath fileName =
     fun ({request = r; runtime = q} as h) ->
-      file (resolvePath rootPath fileName) h
+      match tryResolvePath rootPath fileName with
+      | Some path -> file path h
+      | None -> fail
 
   let browseFileHome fileName =
     fun ({request = r; runtime = q} as h) ->
       browseFile q.homeDirectory fileName h
 
   let browse rootPath : WebPart =
-    warbler (fun ctx -> file (resolvePath rootPath ctx.request.path))
+    warbler (fun ctx ->
+      match tryResolvePath rootPath ctx.request.path with
+      | Some path -> file path
+      | None -> never)
 
   let browseHome : WebPart =
     warbler (fun ctx -> browse ctx.runtime.homeDirectory)
@@ -659,7 +735,9 @@ module Files =
   let dir rootPath (ctx : HttpContext) =
     let req = ctx.request
 
-    let dirname = resolvePath rootPath req.path
+    match tryResolvePath rootPath req.path with
+    | None -> fail
+    | Some dirname ->
     let result = new StringBuilder()
 
     let filesize  (x : FileSystemInfo) =
@@ -872,20 +950,37 @@ module EventSource =
       let! r = out.transport.write ES_EOL_S
       match r with
       | Ok () -> return ()
-      | Result.Error _ -> return ()
+      | Result.Error e -> return raise (SocketWriteException e)
     }
 
+  /// Remove CR and LF, which would end the field and start a new one.
+  let private singleLine (value : string) =
+    if isNull value then ""
+    elif value.IndexOfAny [| '\r'; '\n' |] < 0 then value
+    else value.Replace("\r", "").Replace("\n", "")
+
+  let private eolSeparators = [| "\r\n"; "\n"; "\r" |]
+
+  /// One `data:` line per line of the value, so that line breaks in the value
+  /// cannot end the event or inject other fields.
+  let private dataLines (value : string) =
+    let value = if isNull value then "" else value
+    let sb = StringBuilder()
+    for line in value.Split(eolSeparators, StringSplitOptions.None) do
+      sb.Append("data: ").Append(line).Append(ES_EOL) |> ignore
+    sb.ToString()
+
   let comment (out : Connection) (cmt : string) =
-    out <<. ": " + cmt + ES_EOL
+    out <<. ": " + singleLine cmt + ES_EOL
 
   let eventType (out : Connection) (eventType : string) =
-    out <<. "event: " + eventType + ES_EOL
+    out <<. "event: " + singleLine eventType + ES_EOL
 
   let data (out : Connection) (data : string) =
-    out <<. "data: " + data + ES_EOL
+    out <<. dataLines data
 
   let esId (out : Connection) (lastEventId : string) =
-    out <<. "id: " + lastEventId + ES_EOL
+    out <<. "id: " + singleLine lastEventId + ES_EOL
 
   let retry (out : Connection) (retry : uint32) =
     out <<. "retry: " + (string retry) + ES_EOL
@@ -905,16 +1000,21 @@ module EventSource =
     static member createType id data typ =
       { id = id; data = data; ``type`` = Some typ }
 
-  let send (out : Connection) (msg : Message) =
-    task {
-      do! esId out msg.id
+  let private formatMessage (msg : Message) =
+    let typ =
       match msg.``type`` with
-      | Some x -> do! eventType out x
-      | None   -> ()
-      do! data out msg.data
-      do! dispatch out
-      return ()
-    }
+      | Some x -> "event: " + singleLine x + ES_EOL
+      | None -> ""
+    "id: " + singleLine msg.id + ES_EOL + typ + dataLines msg.data + ES_EOL
+
+  let trySend (out : Connection) (msg : Message) =
+    out.tryWriteBytes (Encoding.UTF8.GetBytes (formatMessage msg))
+
+  let send (out : Connection) (msg : Message) =
+    out.asyncWriteBytes (Encoding.UTF8.GetBytes (formatMessage msg))
+
+  let tryComment (out : Connection) (cmt : string) =
+    out.tryWriteBytes (Encoding.UTF8.GetBytes (": " + singleLine cmt + ES_EOL))
 
   let private handShakeAux f (out : Connection, _) =
     task {
@@ -937,18 +1037,20 @@ module EventSource =
     }
 
   let handShake (fCont: Connection -> Task<unit>) (ctx : HttpContext) =
+    let has name = ctx.response.headers |> List.exists (fun (k, _) -> String.equalsOrdinalCI k name)
+    let optional name value headers = if has name then headers else (name, value) :: headers
+    let headers =
+      ctx.response.headers
+      |> List.filter (fun (k, _) -> not (String.equalsOrdinalCI k "Content-Type"))
+      // http://wiki.nginx.org/X-accel#X-Accel-Buffering – hard to find
+      // also see http://wiki.nginx.org/HttpProxyModule#proxy_buffering
+      |> optional "X-Accel-Buffering" "no"
+      |> optional "Cache-Control" "no-cache"
     { ctx with
         response =
           { ctx.response with
               status = HTTP_200.status
-              headers =
-                ("Content-Type",                "text/event-stream; charset=utf-8")
-                :: ("Cache-Control",               "no-cache")
-                :: ("Access-Control-Allow-Origin", "*")
-                // http://wiki.nginx.org/X-accel#X-Accel-Buffering – hard to find
-                // also see http://wiki.nginx.org/HttpProxyModule#proxy_buffering
-                :: ("X-Accel-Buffering",           "no")
-                :: []
+              headers = ("Content-Type", "text/event-stream; charset=utf-8") :: headers
               content = SocketTask (handShakeAux fCont)
           }
     }
@@ -961,13 +1063,22 @@ module TransferEncoding =
   let chunked (asyncWriteChunks: Connection -> System.Threading.Tasks.Task<unit>) (ctx : HttpContext) =
     let task (conn:Connection,_) = task {
       do! conn.asyncWriteLn ""
-      do! asyncWriteChunks conn
+      // Send the headers now, so writers may go straight to conn.transport
+      let! r = conn.tryFlush ()
+      match r with
+      | Ok () -> do! asyncWriteChunks conn
+      | Result.Error e -> raise (SocketWriteException e)
     }
+    // A fresh response is a 404 until something sets a status; a chunked
+    // response composed without one is meant to succeed.
+    let status =
+      if ctx.response.status.code = HTTP_404.status.code then HTTP_200.status
+      else ctx.response.status
     { ctx with
         response =
           {
             ctx.response with
-              status = ctx.response.status
+              status = status
               headers = ("Transfer-Encoding", "chunked") :: ctx.response.headers
               writePreamble = true
               content = SocketTask task
@@ -1081,7 +1192,7 @@ module CORS =
     | InclusiveOption.Some (m :: ms) ->
       let exists = m.ToString() = value || List.exists (fun m -> m.ToString() = value) ms
       if exists then
-        let header = (m.ToString()) + "," + (ms |> Seq.map (fun i -> i.ToString()) |> String.concat( ", "))
+        let header = (m :: ms) |> Seq.map (fun i -> i.ToString()) |> String.concat ", "
         Writers.setHeader AccessControlAllowMethods header
       else
         succeed
@@ -1103,6 +1214,44 @@ module CORS =
       let header = hs |> String.concat(", ")
       Writers.setHeader AccessControlExposeHeaders header
 
+  /// Responses differ by request Origin, so caches must key on it
+  let private setVaryOrigin : WebPart =
+    Writers.setHeaderValue "Vary" Origin
+
+  /// Origin and Access-Control-Request-Method of a preflight request
+  let private (|Preflight|_|) (req : HttpRequest) =
+    match req.``method`` with
+    | HttpMethod.OPTIONS ->
+      match req.header (Origin.ToLowerInvariant()), req.header (AccessControlRequestMethod.ToLowerInvariant()) with
+      | Choice1Of2 originValue, Choice1Of2 requestMethodHeaderValue ->
+        Some (originValue, requestMethodHeaderValue)
+      | _ ->
+        None
+    | _ ->
+      None
+
+  /// Adds the preflight response headers (when the origin is allowed) and
+  /// answers with 204 No Content.
+  let private preflightResponse config (req : HttpRequest) originValue requestMethodHeaderValue : WebPart =
+    // Does the request have an Access-Control-Request-Headers header? If so, validate. If not, proceed.
+    let setAccessControlRequestHeaders =
+      match Headers.getAll req.headers (AccessControlRequestHeaders.ToLowerInvariant()) with
+      | Choice1Of2 list ->
+        Writers.setHeader AccessControlAllowHeaders (list |> String.concat ", ")
+      | Choice2Of2 _ ->
+        succeed
+
+    if isAllowedOrigin config originValue then
+      setVaryOrigin
+      >=> setAllowMethodsHeader config requestMethodHeaderValue
+      >=> setAccessControlRequestHeaders
+      >=> setMaxAgeHeader config
+      >=> setAllowCredentialsHeader config
+      >=> setAllowOriginHeader originValue
+      >=> NO_CONTENT
+    else
+      setVaryOrigin >=> NO_CONTENT
+
   let cors (config : CORSConfig) : WebPart =
     fun (ctx : HttpContext) ->
       let req = ctx.request
@@ -1113,47 +1262,48 @@ module CORS =
         | HttpMethod.OPTIONS ->
           match req.header (AccessControlRequestMethod.ToLowerInvariant()) with
           | Choice1Of2 requestMethodHeaderValue -> // Preflight request
-            // Does the request have an Access-Control-Request-Headers header? If so, validate. If not, proceed.
-            let setAccessControlRequestHeaders =
-              match Headers.getAll req.headers (AccessControlRequestHeaders.ToLowerInvariant()) with
-              | Choice1Of2 list ->
-                Writers.setHeader AccessControlAllowHeaders (list |> String.concat ", ")
-              | Choice2Of2 _ ->
-                succeed
-
             if allowedOrigin then
-              let composed =
-                setAllowMethodsHeader config requestMethodHeaderValue
-                >=> setAccessControlRequestHeaders
-                >=> setMaxAgeHeader config
-                >=> setAllowCredentialsHeader config
-                >=> setAllowOriginHeader originValue
-                >=> NO_CONTENT
-              composed ctx
+              preflightResponse config req originValue requestMethodHeaderValue ctx
             else
-              succeed ctx
+              setVaryOrigin ctx
 
           | Choice2Of2 _ ->
-            succeed ctx
+            setVaryOrigin ctx
 
         | _ ->
           if allowedOrigin then
             let composed =
-              setExposeHeadersHeader config
+              setVaryOrigin
+              >=> setExposeHeadersHeader config
               >=> setAllowCredentialsHeader config
               >=> setAllowOriginHeader originValue
               >=> setAllowMethodsHeader config "*"
             composed ctx
           else
-            succeed ctx // No headers will be sent. Browser will deny.
+            setVaryOrigin ctx // No CORS headers will be sent. Browser will deny.
 
       | Choice2Of2 _ ->
-        succeed ctx // Not a CORS request
+        setVaryOrigin ctx // Not a CORS request
 
+  let corsPreflight (config : CORSConfig) : WebPart =
+    fun (ctx : HttpContext) ->
+      match ctx.request with
+      | Preflight (originValue, requestMethodHeaderValue) ->
+        preflightResponse config ctx.request originValue requestMethodHeaderValue ctx
+      | _ ->
+        fail
+
+  let withCORS (config : CORSConfig) (webPart : WebPart) : WebPart =
+    fun (ctx : HttpContext) ->
+      match ctx.request with
+      | Preflight _ ->
+        corsPreflight config ctx
+      | _ ->
+        (cors config >=> webPart) ctx
 
   let defaultCORSConfig =
     { allowedUris           = InclusiveOption.All
       allowedMethods        = InclusiveOption.All
-      allowCookies          = true
+      allowCookies          = false
       exposeHeaders         = InclusiveOption.None
       maxAge                = None }

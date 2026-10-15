@@ -2147,4 +2147,34 @@ let http2SocketTaskIntegrationTests (_ : SuaveConfig) =
         let text = head.ToString()
         Expect.stringStarts text "HTTP/1.1 101" "switching protocols"
         Expect.isFalse (text.ToLowerInvariant().Contains "content-type") (sprintf "no Content-Type in:\n%s" text))
+
+// HTTP/2 requests carry the binding they arrived on, as HTTP/1.1 requests do,
+// so `request.binding.scheme.secure` and `request.url` are right for them.
+[<Tests>]
+let http2RequestBindingTests (_ : SuaveConfig) =
+  testList "Http2 request binding" [
+    testCase "an h2c request reports the binding it arrived on" <| fun _ ->
+      let l = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0)
+      l.Start()
+      let port = (l.LocalEndpoint :?> System.Net.IPEndPoint).Port
+      l.Stop()
+      let binding = HttpBinding.create HTTP System.Net.IPAddress.Loopback (uint16 port)
+      let cts = new System.Threading.CancellationTokenSource()
+      let cfg = { defaultConfig with bindings = [ binding ]; cancellationToken = cts.Token }
+      let app = Suave.Http.context (fun c -> Suave.Successful.OK (sprintf "%s %O" c.request.httpVersion c.request.binding))
+      let ready, serverTask = Web.startWebServerAsync cfg app
+      try
+        ready |> Async.RunSynchronously |> ignore
+        use client = new System.Net.Http.HttpClient()
+        use request =
+          new System.Net.Http.HttpRequestMessage(
+            System.Net.Http.HttpMethod.Get, sprintf "http://127.0.0.1:%d/" port,
+            Version = System.Net.HttpVersion.Version20,
+            VersionPolicy = System.Net.Http.HttpVersionPolicy.RequestVersionExact)
+        use response = client.SendAsync(request).Result
+        let body = response.Content.ReadAsStringAsync().Result
+        Expect.equal body (sprintf "HTTP/2.0 %O" binding) "should report the server's binding"
+      finally
+        cts.Cancel()
+        try serverTask.Wait(System.TimeSpan.FromSeconds 5.0) |> ignore with _ -> ()
   ]

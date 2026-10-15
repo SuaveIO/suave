@@ -189,5 +189,6 @@ let main argv =
       filePartSink          = None
       acceptorCount         = 1
       http2Enabled          = true }
+      webSocketMaxFrameSize = 16 * 1024 * 1024 }
     app
   0

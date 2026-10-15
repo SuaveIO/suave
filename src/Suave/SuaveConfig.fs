@@ -89,6 +89,11 @@ type SuaveConfig =
     /// cleartext HTTP/2 (h2c upgrade and prior knowledge) on HTTP bindings.
     /// Set to false to serve every connection as HTTP/1.x.
     http2Enabled : bool }
+    /// Largest WebSocket frame payload, in bytes, a client may send. A frame
+    /// announcing a larger payload is answered with a Close frame carrying
+    /// code 1009 (message too big) and the connection is dropped, before any
+    /// buffer is allocated for it. Defaults to 16 MiB.
+    webSocketMaxFrameSize : int }
 
   member x.withBindings(v)              = { x with bindings = v }
   member x.withServerKey(v)             = { x with serverKey = v }
@@ -109,6 +114,7 @@ type SuaveConfig =
   member x.withFilePartSink(v)          = { x with filePartSink = v }
   member x.withAcceptorCount(v)         = { x with acceptorCount = v }
   member x.withHttp2Enabled(v)          = { x with http2Enabled = v }
+  member x.withWebSocketMaxFrameSize(v) = { x with webSocketMaxFrameSize = v }
 
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
@@ -132,6 +138,7 @@ module SuaveConfig =
       { createRuntime binding with
           filePartSink = config.filePartSink
           http2Enabled = config.http2Enabled }
+          webSocketMaxFrameSize = config.webSocketMaxFrameSize }
 
   /// Finds an endpoint that is configured from the given configuration. Throws
   /// an exception if the configuration has no bindings. Useful if you make

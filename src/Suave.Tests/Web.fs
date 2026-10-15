@@ -103,3 +103,28 @@ let keepAliveTests (cfg : SuaveConfig) =
     genKeepAliveTest "HTTP/1.1" (Some "Keep-Alive") false
     keepAliveUserDataLifetimeTest
   ]
+
+
+[<Tests>]
+let errorHandlerTests (cfg : SuaveConfig) =
+  // Requests come from 127.0.0.1, as they do behind a reverse proxy on the same host
+  let throwing : WebPart =
+    fun _ -> async { return failwith "secret <detail>" }
+
+  let respond config =
+    let ctx = runWith config throwing
+    reqResp HttpMethod.GET "/" "" None None DecompressionMethods.None id
+      (fun r -> statusCode r, contentString r) ctx
+
+  testList "error handlers" [
+    testCase "defaultErrorHandler does not disclose the exception to loopback clients" <| fun _ ->
+      let status, body = respond { cfg with errorHandler = defaultErrorHandler }
+      Expect.equal status HttpStatusCode.InternalServerError "should return 500"
+      Expect.equal body HTTP_500.message "should return only the status message"
+
+    testCase "developmentErrorHandler returns the HTML-encoded exception" <| fun _ ->
+      let status, body = respond { cfg with errorHandler = developmentErrorHandler }
+      Expect.equal status HttpStatusCode.InternalServerError "should return 500"
+      Expect.stringContains body "secret &lt;detail&gt;" "should contain the encoded message"
+      Expect.isFalse (body.Contains "secret <detail>") "should not contain the raw message"
+  ]

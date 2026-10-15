@@ -27,6 +27,7 @@
     <Compile Include="Pools.fs" />
     <Compile Include="AsyncSocket.fs" />
     <Compile Include="Web.fs" />
+    <Compile Include="Streaming.fs" />
     <Compile Include="Stream.fs" />
     <Compile Include="Proxy.fs" />
     <Compile Include="HttpWriters.fs" />

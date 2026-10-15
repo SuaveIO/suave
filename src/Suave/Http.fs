@@ -426,6 +426,8 @@ module Http =
       /// When false, HTTP/2 is disabled: no `h2` in TLS ALPN and no h2c
       /// (upgrade or prior knowledge). Defaults to true.
       http2Enabled      : bool }
+      /// Largest WebSocket frame payload, in bytes, a client may send.
+      webSocketMaxFrameSize : int }
   and [<Struct>] HttpContext =
     { mutable request    : HttpRequest
       runtime    : HttpRuntime
@@ -521,6 +523,7 @@ module Http =
         maxContentLength  = 1024
         filePartSink      = None
         http2Enabled      = true }
+        webSocketMaxFrameSize = 16 * 1024 * 1024 }
 
     let create serverKey errorHandler mimeTypes homeDirectory compressionFolder
            (*logger*) cookieSerialiser hideHeader hideStartupMessage maxContentLength binding =
@@ -536,6 +539,7 @@ module Http =
         maxContentLength  = maxContentLength
         filePartSink      = None
         http2Enabled      = true }
+        webSocketMaxFrameSize = 16 * 1024 * 1024 }
 
   [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
   module HttpContext =

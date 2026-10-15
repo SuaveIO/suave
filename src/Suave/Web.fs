@@ -12,13 +12,22 @@ module Web =
   open System.Text
   open Suave.Utils
 
-  /// The default error handler returns a 500 Internal Error in response to
-  /// thrown exceptions.
+  /// The default error handler returns a plain 500 Internal Error in response
+  /// to thrown exceptions, without the exception's message or stack trace.
+  /// Log the exception from your own handler, or use `developmentErrorHandler`
+  /// while developing to see it in the browser.
   let defaultErrorHandler (ex : Exception) msg (ctx : HttpContext) =
-    if ctx.isLocalTrustProxy then
-      Response.response HTTP_500 (Encoding.UTF8.GetBytes("<h1>" + ex.Message + "</h1><br/>" + ex.ToString())) ctx
-    else
-      Response.response HTTP_500 (Encoding.UTF8.GetBytes HTTP_500.message) ctx
+    Response.response HTTP_500 (Encoding.UTF8.GetBytes HTTP_500.message) ctx
+
+  /// An error handler for development: returns a 500 Internal Error whose body
+  /// contains the exception's message and stack trace (HTML-encoded) to every
+  /// client. Do not use it in production. Opt in with
+  /// <code>{ defaultConfig with errorHandler = developmentErrorHandler }</code>.
+  let developmentErrorHandler (ex : Exception) msg (ctx : HttpContext) =
+    let body =
+      "<h1>" + Net.WebUtility.HtmlEncode ex.Message + "</h1><br/><pre>"
+      + Net.WebUtility.HtmlEncode (ex.ToString()) + "</pre>"
+    Response.response HTTP_500 (Encoding.UTF8.GetBytes body) ctx
 
   /// Starts the web server asynchronously.
   ///
@@ -109,4 +118,5 @@ module Web =
       filePartSink          = None
       acceptorCount         = 1
       http2Enabled          = true
+      webSocketMaxFrameSize = 16 * 1024 * 1024 // 16 MiB
       }

@@ -65,6 +65,9 @@ val deauthenticateWithLogin : loginPage :string
 /// client re-send a request if you require authentication for it, after this
 /// web part has run.
 ///
+/// The encrypted cookie also records the client IP address and User-Agent, but
+/// they are not checked on later requests: the cookie is not bound to a client.
+///
 /// Parameters:
 ///  - `relativeExpiry`: how long does the authentication cookie last?
 /// - `secure`: HttpsOnly?

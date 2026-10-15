@@ -2,6 +2,8 @@ namespace Suave
 
 open System
 open System.Collections.Concurrent
+open System.Collections.Generic
+open System.Net
 open System.Threading
 
 /// Rate limiting module for Suave web server
@@ -55,7 +57,7 @@ module RateLimit =
     | Bucket of TokenBucketState
 
   /// Rate limiter storage
-  type private RateLimiter() =
+  type private RateLimiter(windowSize: TimeSpan) =
     let storage = ConcurrentDictionary<string, RateLimitState>()
     
     member _.Storage = storage
@@ -133,6 +135,8 @@ module RateLimit =
       | _ -> false
 
     member this.Cleanup(maxAge: TimeSpan) =
+      // Never drop state that is still inside its window
+      let maxAge = if windowSize > maxAge then windowSize else maxAge
       let now = Globals.utcNow()
       let keysToRemove = ResizeArray<string>()
       
@@ -154,12 +158,22 @@ module RateLimit =
       
       keysToRemove.Count
 
-  /// Global rate limiter instance
-  let private globalLimiter = RateLimiter()
+  /// Every limiter created by `rateLimit`, held weakly so that the cleanup
+  /// timer can visit them without keeping discarded limiters alive
+  let private limiters = ResizeArray<WeakReference<RateLimiter>>()
+  let private limitersLock = obj()
 
   /// Cleanup timer reference (ref cell for lazy initialization)
   let private cleanupTimer = ref None
   let private timerLock = obj()
+
+  let private cleanupAll (maxAge: TimeSpan) =
+    let live =
+      lock limitersLock (fun () ->
+        limiters.RemoveAll(fun wr -> match wr.TryGetTarget() with | true, _ -> false | _ -> true) |> ignore
+        limiters |> Seq.choose (fun wr -> match wr.TryGetTarget() with | true, l -> Some l | _ -> None) |> List.ofSeq)
+    for limiter in live do
+      limiter.Cleanup(maxAge) |> ignore
 
   /// Start cleanup timer lazily on first use
   let private ensureCleanupTimer() =
@@ -173,16 +187,72 @@ module RateLimit =
               let interval = TimeSpan.FromMinutes(5.0)
               let maxAge = TimeSpan.FromHours(1.0)
               let timer = new System.Threading.Timer(
-                (fun _ -> globalLimiter.Cleanup(maxAge) |> ignore),
+                (fun _ -> cleanupAll maxAge),
                 null,
                 interval,
                 interval)
               cleanupTimer := Some timer
         )
 
-  /// Default key extractor - uses client IP address
+  let private registerLimiter (limiter: RateLimiter) =
+    lock limitersLock (fun () -> limiters.Add(WeakReference<RateLimiter>(limiter)))
+
+  let private normalizeIp (ip: IPAddress) =
+    if ip.IsIPv4MappedToIPv6 then ip.MapToIPv4() else ip
+
+  /// Default key extractor - uses the address of the connection's remote end.
+  ///
+  /// X-Forwarded-For and X-Real-IP are ignored: a client can set them to any
+  /// value, so trusting them by default lets it pick a fresh key per request
+  /// and never be limited. Behind a reverse proxy every request then comes from
+  /// the proxy's address; use `trustedProxyKeyExtractor` in that case.
   let defaultKeyExtractor (ctx: HttpContext) : string =
-    ctx.clientIpTrustProxy.ToString()
+    (normalizeIp (ctx.clientIp false [])).ToString()
+
+  /// Key extractor for servers behind reverse proxies. When the connection
+  /// comes from one of `trustedProxies`, the client address is taken from
+  /// X-Forwarded-For: the right-most entry that is not itself a trusted proxy
+  /// (entries to its left were supplied by the client and are ignored). Without
+  /// X-Forwarded-For, X-Real-IP is used. Connections from any other address are
+  /// keyed by that address, as in `defaultKeyExtractor`, so forwarding headers
+  /// sent directly by clients have no effect.
+  let trustedProxyKeyExtractor (trustedProxies: IPAddress list) : HttpContext -> string =
+    let trusted = HashSet<IPAddress>(trustedProxies |> Seq.map normalizeIp)
+    let tryParse (value: string) =
+      match IPAddress.TryParse(value.Trim()) with
+      | true, ip -> Some (normalizeIp ip)
+      | false, _ -> None
+    fun (ctx: HttpContext) ->
+      let remote = normalizeIp (ctx.clientIp false [])
+      if not (trusted.Contains remote) then
+        remote.ToString()
+      else
+        let forwarded =
+          match Headers.getAll ctx.request.headers "x-forwarded-for" with
+          | Choice1Of2 (values: string seq) ->
+              values
+              |> List.ofSeq
+              |> List.collect (fun (v: string) -> v.Split(',') |> List.ofArray)
+              |> List.map tryParse
+          | Choice2Of2 _ -> []
+        let fromForwarded =
+          forwarded
+          |> List.rev
+          |> List.tryPick (function
+            | Some (ip: IPAddress) when not (trusted.Contains ip) -> Some ip
+            | _ -> None)
+        match fromForwarded with
+        | Some ip -> ip.ToString()
+        | None when not (List.isEmpty forwarded) ->
+            // Every entry was a trusted proxy (or unparseable)
+            remote.ToString()
+        | None ->
+            match ctx.request.header "x-real-ip" with
+            | Choice1Of2 value ->
+                match tryParse value with
+                | Some ip -> ip.ToString()
+                | None -> remote.ToString()
+            | Choice2Of2 _ -> remote.ToString()
 
   /// Key extractor based on user identity
   let userKeyExtractor (ctx: HttpContext) : string =
@@ -190,14 +260,17 @@ module RateLimit =
     | true, userName -> userName :?> string
     | false, _ -> defaultKeyExtractor ctx
 
-  /// Key extractor based on custom header
+  /// Key extractor based on custom header. The header is supplied by the
+  /// client, so only use this for values the client cannot choose freely
+  /// (e.g. an API key that is validated before or by the protected WebPart).
   let headerKeyExtractor (headerName: string) (ctx: HttpContext) : string =
     match ctx.request.header headerName with
     | Choice1Of2 value -> value
     | Choice2Of2 _ -> defaultKeyExtractor ctx
 
-  /// Create default rate limit configuration
-  let defaultConfig =
+  /// Default rate limit configuration: 60 requests per minute per client
+  /// address, fixed window
+  let defaultRateLimitConfig =
     { windowSize = TimeSpan.FromMinutes(1.0)
       maxRequests = 60  // 60 requests per minute
       keyExtractor = defaultKeyExtractor
@@ -205,8 +278,12 @@ module RateLimit =
       limitExceededMessage = None
       retryAfter = None }
 
+  /// Default rate limit configuration
+  [<Obsolete("Use RateLimit.defaultRateLimitConfig. After `open Suave.RateLimit` this value shadows the server's `defaultConfig`.")>]
+  let defaultConfig = defaultRateLimitConfig
+
   /// Check if request is allowed under rate limit
-  let private checkRateLimit (config: RateLimitConfig) (ctx: HttpContext) : bool =
+  let private checkRateLimit (limiter: RateLimiter) (config: RateLimitConfig) (ctx: HttpContext) : bool =
     // Ensure cleanup timer is started on first use
     ensureCleanupTimer()
     
@@ -215,17 +292,21 @@ module RateLimit =
 
     match config.strategy with
     | FixedWindow ->
-        globalLimiter.CheckFixedWindow(key, now, config)
+        limiter.CheckFixedWindow(key, now, config)
     | SlidingWindow ->
-        globalLimiter.CheckSlidingWindow(key, now, config)
+        limiter.CheckSlidingWindow(key, now, config)
     | TokenBucket refillRate ->
-        globalLimiter.CheckTokenBucket(key, now, config, refillRate)
+        limiter.CheckTokenBucket(key, now, config, refillRate)
 
-  /// Rate limiting WebPart that wraps another WebPart
+  /// Rate limiting WebPart that wraps another WebPart. Each call keeps its own
+  /// counters, so two `rateLimit` WebParts never share a limit even when their
+  /// keys are equal.
   let rateLimit (config: RateLimitConfig) (protectedPart: WebPart) : WebPart =
+    let limiter = RateLimiter(config.windowSize)
+    registerLimiter limiter
     fun (ctx: HttpContext) ->
       async {
-        let allowed = checkRateLimit config ctx
+        let allowed = checkRateLimit limiter config ctx
         
         if allowed then
           // Request allowed - call the protected WebPart
@@ -256,19 +337,19 @@ module RateLimit =
 
   /// Create a rate limiter with requests per second
   let perSecond (requests: int) =
-    { defaultConfig with
+    { defaultRateLimitConfig with
         windowSize = TimeSpan.FromSeconds(1.0)
         maxRequests = requests }
 
   /// Create a rate limiter with requests per minute
   let perMinute (requests: int) =
-    { defaultConfig with
+    { defaultRateLimitConfig with
         windowSize = TimeSpan.FromMinutes(1.0)
         maxRequests = requests }
 
   /// Create a rate limiter with requests per hour
   let perHour (requests: int) =
-    { defaultConfig with
+    { defaultRateLimitConfig with
         windowSize = TimeSpan.FromHours(1.0)
         maxRequests = requests }
 
@@ -288,11 +369,23 @@ module RateLimit =
   let withRetryAfter (seconds: int) (config: RateLimitConfig) =
     { config with retryAfter = Some seconds }
 
-  /// Get current rate limit statistics for a key
+  /// Get current rate limit statistics for a key. Every `rateLimit` WebPart
+  /// keeps its own counters; this returns the statistics of the first live
+  /// limiter that has an entry for the key.
   let getStats (keyExtractor: HttpContext -> string) (ctx: HttpContext) : Map<string, obj> option =
     let key = keyExtractor ctx
-    match globalLimiter.Storage.TryGetValue(key) with
-    | true, state ->
+    let found =
+      lock limitersLock (fun () ->
+        limiters
+        |> Seq.tryPick (fun wr ->
+          match wr.TryGetTarget() with
+          | true, limiter ->
+              match limiter.Storage.TryGetValue(key) with
+              | true, state -> Some state
+              | false, _ -> None
+          | _ -> None))
+    match found with
+    | Some state ->
         let stats =
           match state with
           | Fixed fs ->
@@ -313,4 +406,4 @@ module RateLimit =
                 "lastRefill", box bs.LastRefill
               ]
         Some stats
-    | false, _ -> None
+    | None -> None

@@ -289,6 +289,155 @@ let websocketTests cfg =
         Expect.equal (!count) amountOfMessages "received message count on websocket"
     ]
   
+  /// Tests that drive the protocol over a raw TCP socket, so they can send
+  /// frames a well-behaved client never would and see every byte Suave writes.
+  let rawSocketTests =
+    let readExactly (stream : Stream) n =
+      let buffer = Array.zeroCreate n
+      let mutable offset = 0
+      while offset < n do
+        let read = stream.Read(buffer, offset, n - offset)
+        if read = 0 then failwithf "connection closed after %d of %d bytes" offset n
+        offset <- offset + read
+      buffer
+
+    /// Everything the server writes until it closes the connection.
+    let readToEnd (stream : Stream) =
+      use rest = new MemoryStream()
+      stream.CopyTo rest
+      rest.ToArray()
+
+    /// Upgrades a fresh connection to `path` and returns the response head.
+    let upgrade (stream : Stream) path =
+      let request =
+        sprintf "GET %s HTTP/1.1\r\nHost: %s:%i\r\nConnection: Upgrade\r\nUpgrade: websocket\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n\r\n" path ip port
+        |> Encoding.ASCII.GetBytes
+      stream.Write(request, 0, request.Length)
+      // Read byte by byte so no frame bytes are swallowed with the head.
+      let head = StringBuilder()
+      while not (head.ToString().EndsWith "\r\n\r\n") do
+        head.Append(char (readExactly stream 1).[0]) |> ignore
+      head.ToString()
+
+    /// A masked client frame header announcing `length` payload bytes.
+    let frameHeader opcode (length : uint64) =
+      [| yield 0x80uy ||| opcode
+         if length < 126UL then
+           yield 0x80uy ||| byte length
+         elif length < 65536UL then
+           yield 0x80uy ||| 126uy
+           yield byte (length >>> 8)
+           yield byte length
+         else
+           yield 0x80uy ||| 127uy
+           for shift in 56 .. -8 .. 0 do yield byte (length >>> shift)
+         yield! [| 1uy; 2uy; 3uy; 4uy |] |]
+
+    let clientFrame opcode (payload : byte[]) =
+      Array.append (frameHeader opcode (uint64 payload.Length))
+                   (payload |> Array.mapi (fun i b -> b ^^^ byte (i % 4 + 1)))
+
+    /// Reads one unmasked server frame with a short payload.
+    let readServerFrame (stream : Stream) =
+      let head = readExactly stream 2
+      let length = int (head.[1] &&& 0x7Fuy)
+      Expect.isLessThan length 126 "expected a short server frame"
+      head.[0], readExactly stream length
+
+    let closeCode (payload : byte[]) = int payload.[0] * 256 + int payload.[1]
+
+    let rawTest name (config : SuaveConfig) app (f : Stream -> unit) =
+      testCase name <| fun _ ->
+        let ctx = runWith config (Filters.path "/raw" >=> handShake app)
+        withContext (fun _ ->
+          use client = new TcpClient(ip, port)
+          client.ReceiveTimeout <- 5000
+          use stream = client.GetStream()
+          let head = upgrade stream "/raw"
+          Expect.stringStarts head "HTTP/1.1 101 Switching Protocols" "should complete websocket upgrade"
+          Expect.isFalse (head.ToLowerInvariant().Contains "content-type") "101 response should carry no Content-Type"
+          f stream) ctx
+
+    /// Echoes frames read with `readIntoByteSegment`, counting buffer requests.
+    let echoApp (bufferRequests : int ref) (webSocket : WebSocket) =
+      fun _ -> SocketOp.ofTask(task {
+        let mutable continueLoop = true
+        while continueLoop do
+          let! msg = webSocket.readIntoByteSegment (fun n ->
+            Interlocked.Increment &bufferRequests.contents |> ignore
+            Memory<_>(Array.zeroCreate n))
+          match msg with
+          | Ok (Binary, data, _) ->
+            let! _ = webSocket.send Binary data true
+            ()
+          | _ -> continueLoop <- false
+        return Ok ()
+      })
+
+    testList "raw socket" [
+      let bufferRequests = ref 0
+      rawTest "frame announcing 2 GB is refused with 1009 before any buffer is requested" cfg (echoApp bufferRequests) <| fun stream ->
+        let header = frameHeader 2uy (uint64 Int32.MaxValue)
+        stream.Write(header, 0, header.Length)
+        let opcode, payload = readServerFrame stream
+        Expect.equal opcode 0x88uy "server should send a final Close frame"
+        Expect.equal (closeCode payload) 1009 "close code should be 1009 (message too big)"
+        Expect.equal (readToEnd stream) [||] "server should end the connection"
+        Expect.equal bufferRequests.Value 0 "no buffer should be requested for the oversized frame"
+
+      let limitBufferRequests = ref 0
+      rawTest "webSocketMaxFrameSize bounds accepted frames" { cfg with webSocketMaxFrameSize = 1024 } (echoApp limitBufferRequests) <| fun stream ->
+        let atLimit = Array.create 1024 7uy
+        let frame = clientFrame 2uy atLimit
+        stream.Write(frame, 0, frame.Length)
+        let echoHead = readExactly stream 4
+        Expect.equal echoHead [| 0x82uy; 126uy; 4uy; 0uy |] "frame at the limit should be echoed"
+        Expect.equal (readExactly stream 1024) atLimit "echoed payload should match"
+
+        let header = frameHeader 2uy 1025UL
+        stream.Write(header, 0, header.Length)
+        let opcode, payload = readServerFrame stream
+        Expect.equal opcode 0x88uy "server should send a final Close frame"
+        Expect.equal (closeCode payload) 1009 "close code should be 1009 (message too big)"
+        Expect.equal (readToEnd stream) [||] "server should end the connection"
+        Expect.equal limitBufferRequests.Value 1 "only the frame at the limit should get a buffer"
+
+      let throwingApp (webSocket : WebSocket) =
+        fun _ -> SocketOp.ofTask(task {
+          let! _ = webSocket.readIntoByteSegment (fun _ -> failwith "boom from length function")
+          return Ok ()
+        })
+      rawTest "handler exception closes with 1011 and writes no HTTP response" cfg throwingApp <| fun stream ->
+        let frame = clientFrame 1uy (Encoding.UTF8.GetBytes "hello")
+        stream.Write(frame, 0, frame.Length)
+        let opcode, payload = readServerFrame stream
+        Expect.equal opcode 0x88uy "server should send a final Close frame"
+        Expect.equal (closeCode payload) 1011 "close code should be 1011 (internal error)"
+        let rest = Encoding.ASCII.GetString(readToEnd stream)
+        Expect.isFalse (rest.Contains "HTTP/1.1") "no HTTP response may follow the upgrade"
+        Expect.isFalse (rest.Contains "boom") "exception text must not reach the client"
+
+      let synchronousThrowApp (_ : WebSocket) : HttpContext -> SocketOp<unit> =
+        fun _ -> failwith "boom before returning a SocketOp"
+      rawTest "synchronous handler exception closes with 1011 and writes no HTTP response" cfg synchronousThrowApp <| fun stream ->
+        let opcode, payload = readServerFrame stream
+        Expect.equal opcode 0x88uy "server should send a final Close frame"
+        Expect.equal (closeCode payload) 1011 "close code should be 1011 (internal error)"
+        let rest = Encoding.ASCII.GetString(readToEnd stream)
+        Expect.isFalse (rest.Contains "HTTP/1.1") "no HTTP response may follow the upgrade"
+
+      testCase "handShake answers a request without Upgrade with 400" <| fun _ ->
+        let ctx = runWith cfg (Filters.path "/raw" >=> handShake (fun _ _ -> SocketOp.mreturn ()))
+        withContext (fun _ ->
+          use client = new TcpClient(ip, port)
+          client.ReceiveTimeout <- 5000
+          use stream = client.GetStream()
+          let request = sprintf "GET /raw HTTP/1.1\r\nHost: %s:%i\r\nConnection: close\r\n\r\n" ip port |> Encoding.ASCII.GetBytes
+          stream.Write(request, 0, request.Length)
+          let response = Encoding.ASCII.GetString(readToEnd stream)
+          Expect.stringStarts response "HTTP/1.1 400 Bad Request" "should refuse the handshake") ctx
+    ]
+
   testList "websocket tests" [ websocketTests websocketAppUrl [||];
                                websocketTests websocketAppReusingBuffersUrl [||];
                                websocketTests websocketAppSubprotocolUrl [|websocketAppSupportSubprotocol|];
@@ -331,4 +480,5 @@ let websocketTests cfg =
 
                                    let exited = handlerExited.Wait(TimeSpan.FromSeconds 2.0)
                                    Expect.isTrue exited "handler should exit shortly after peer half-closes the socket")
-                                   ctx ]
+                                   ctx
+                               rawSocketTests ]

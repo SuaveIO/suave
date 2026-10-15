@@ -96,7 +96,20 @@ let logged path next : WebPart =
     next)</code></pre></div>
 
         <h2>Error handler</h2>
-        <p>Configure <code>SuaveConfig.errorHandler</code> to log unhandled exceptions and return a safe response to clients. See <a href="binding-config.html">Bindings &amp; configuration</a>.</p>
+        <p>Configure <code>SuaveConfig.errorHandler</code> to log unhandled exceptions and return a safe response to clients. <code>defaultErrorHandler</code> answers with a plain <code>500 Internal Server Error</code> and never includes the exception, so log it before calling it:</p>
+        <div class="code-block"><pre><code>open Suave
+
+let loggingErrorHandler : ErrorHandler =
+  fun ex msg ctx -&gt;
+    eprintfn "%s %s: %s\n%O" ctx.request.rawMethod ctx.request.path msg ex
+    defaultErrorHandler ex msg ctx
+
+let isDevelopment = System.Environment.GetEnvironmentVariable "APP_ENV" = "Development"
+
+let config =
+  { defaultConfig with
+      errorHandler = if isDevelopment then developmentErrorHandler else loggingErrorHandler }</code></pre></div>
+        <p><code>developmentErrorHandler</code> returns the exception message and stack trace to every client; use it only while developing. In Suave 3.6.1 and earlier it does not exist, and <code>defaultErrorHandler</code> itself returns the details to clients it considers local (loopback, or a loopback <code>X-Forwarded-For</code>, which any client can send). Behind a reverse proxy on the same host that is every client, so on those versions set an error handler like the one above. See <a href="binding-config.html">Bindings &amp; configuration</a>.</p>
 
         <div class="callout">
           <p>Older Suave versions exposed a pluggable <code>logger</code> on config wired to Logary adapters. Current Suave focuses on the simple <code>Logger</code> helpers plus your application’s logging stack. If you migrate from v1/v2 Logary samples, adapt them to write from WebParts or <code>errorHandler</code> rather than copying obsolete config fields.</p>
