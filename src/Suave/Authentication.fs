@@ -72,7 +72,8 @@ let StateStoreType = "Suave.Auth"
 
 let SessionIdLength = 40
 
-/// Extracts the actual session id and the mac value from the cookie's data.
+/// Extracts the session id from the cookie's data. The client IP address and
+/// User-Agent stored next to it (see `generateData`) are ignored.
 let parseData (textBlob : string) =
   match textBlob.Split '\n' with
   | [| sessionId; ipAddress; userAgent |] ->
@@ -81,7 +82,9 @@ let parseData (textBlob : string) =
   | _ ->
     failwith "internal error; should not have successfully decrypted data"
 
-/// Returns a list of the hmac data to use, from the request.
+/// Generates the cookie's data: a new session id, the client IP address and the
+/// User-Agent, separated by newlines. The IP address and User-Agent are never
+/// compared with later requests, so they do not bind the cookie to a client.
 let generateData (ctx : HttpContext) =
   let sessionId = Utils.generateReadableKey SessionIdLength
   String.concat "\n"
