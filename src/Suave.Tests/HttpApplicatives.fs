@@ -59,3 +59,32 @@ let deepCompositionTests =
       let options = List.replicate 100000 never @ [ OK "found" ]
       Expect.isSome (run (choose options)) "The last option answers"
   ]
+
+[<Tests>]
+let logFormatTests =
+  let ctx =
+    let headers = Collections.Generic.List<_>([ "x-forwarded-for", "203.0.113.9"; "x-real-ip", "203.0.113.9" ])
+    { HttpContext.empty with
+        request = { HttpRequest.empty with rawPath = "/a"; headers = headers }
+        response = { HttpContext.empty.response with status = HTTP_200.status }
+        userState = Collections.Generic.Dictionary<_,_>() }
+
+  testList "logFormat" [
+    testCase "uses the 24-hour clock and a +0000 offset" <| fun _ ->
+      let before = DateTime.UtcNow
+      let line = logFormat ctx
+      let after = DateTime.UtcNow
+      let m = Text.RegularExpressions.Regex.Match(line, @"\[\d{2}/[A-Z][a-z]{2}/\d{4}:(\d{2}):\d{2}:\d{2} \+0000\]")
+      Expect.isTrue m.Success (sprintf "timestamp should be in common log format: %s" line)
+      Expect.contains [ before.Hour; after.Hour ] (int m.Groups.[1].Value) "hour should be on the 24-hour clock"
+
+    testCase "logs the connection address, not X-Forwarded-For" <| fun _ ->
+      let line = logFormat ctx
+      Expect.stringStarts line (string ctx.connection.ipAddr + " ") "should log the connection address"
+      Expect.isFalse (line.Contains "203.0.113.9") "should not log a client-supplied address"
+
+    testCase "logFormatStructured matches logFormat" <| fun _ ->
+      let template, fields = logFormatStructured ctx
+      Expect.stringContains template "{utcNow:dd/MMM/yyyy:HH:mm:ss '+0000'}" "template should use the 24-hour clock"
+      Expect.equal fields.["clientIp"] (box ctx.connection.ipAddr) "should log the connection address"
+  ]

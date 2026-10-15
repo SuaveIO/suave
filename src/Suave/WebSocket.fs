@@ -301,17 +301,24 @@ module WebSocket =
           return Result.Error (ConnectionError ex.Message)
       })
 
+  /// The 101 response for a handshake with `webSocketKey`.
+  let internal upgradeResponse webSocketProtocol (webSocketKey : string) =
+    let webSocketHash = sha1 <| webSocketKey + magicGUID
+    let handShakeToken = Convert.ToBase64String webSocketHash
+    match webSocketProtocol with
+    | Some subprotocol -> handShakeWithSubprotocolResponse subprotocol handShakeToken
+    | None -> handShakeResponse handShakeToken
+
+  /// The context returned after an upgrade: it carries the 101 response that
+  /// was sent, so a logging WebPart sees it, but writes nothing more.
+  let internal upgradedContext webSocketProtocol webSocketKey (ctx : HttpContext) = async {
+    let! sent = upgradeResponse webSocketProtocol webSocketKey ctx
+    return! Control.CLOSE (defaultArg sent ctx)
+  }
+
   let internal handShakeAux webSocketProtocol webSocketKey continuation (ctx : HttpContext) =
     socket {
-      let webSocketHash = sha1 <| webSocketKey + magicGUID
-      let handShakeToken = Convert.ToBase64String webSocketHash
-      match webSocketProtocol with
-      | Some subprotocol ->
-        let! a = SocketOp.ofTask ((new HttpOutput(ctx.connection,ctx.runtime)).run ctx.request (handShakeWithSubprotocolResponse subprotocol handShakeToken))
-        ()
-      | None ->
-        let! a = SocketOp.ofTask ((new HttpOutput(ctx.connection,ctx.runtime)).run ctx.request (handShakeResponse handShakeToken))
-        ()
+      let! a = SocketOp.ofTask ((new HttpOutput(ctx.connection,ctx.runtime)).run ctx.request (upgradeResponse webSocketProtocol webSocketKey))
       
       // Mark connection as long-lived (WebSocket) to prevent health checker from closing it
       ctx.connection.isLongLived <- true
@@ -367,7 +374,7 @@ module WebSocket =
           do ()
         | Result.Error err ->
           do ()
-        return! Control.CLOSE ctx
+        return! upgradedContext subprotocol webSocketKey ctx
       | Choice2Of2 response -> return! response
     }
 
@@ -381,12 +388,13 @@ module WebSocket =
         do ()
       | Result.Error err ->
         Globals.writeMessage $"WebSocket disconnected {err}"
-      return! Control.CLOSE ctx
+      return! upgradedContext None webSocketKey ctx
     | Choice2Of2 response ->
       return! response
   }
 
   let handShake (continuation : WebSocket -> HttpContext -> SocketOp<unit>) (ctx : HttpContext) =
-    // Return handShakeTask's context: after an upgrade it writes nothing more,
-    // and a refused handshake carries its 400/405 response.
+    // Return handShakeTask's context: after an upgrade it carries the 101 that
+    // was sent but writes nothing more, and a refused handshake carries its
+    // 400/405 response.
     handShakeTask continuation ctx |> Async.AwaitTask

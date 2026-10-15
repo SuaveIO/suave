@@ -426,6 +426,35 @@ let websocketTests cfg =
         let rest = Encoding.ASCII.GetString(readToEnd stream)
         Expect.isFalse (rest.Contains "HTTP/1.1") "no HTTP response may follow the upgrade"
 
+      let returnedContextTest name (handShakePart : WebPart) =
+        testCase name <| fun _ ->
+          let returned = ref None
+          use logged = new ManualResetEventSlim(false)
+          let logging : WebPart = fun ctx -> async {
+            let! r = handShakePart ctx
+            returned.Value <- r |> Option.map (fun c -> c.response.status.code, c.response.headers, Filters.logFormat c)
+            logged.Set()
+            return r }
+          let ctx = runWith cfg (Filters.path "/raw" >=> logging)
+          withContext (fun _ ->
+            use client = new TcpClient(ip, port)
+            client.ReceiveTimeout <- 5000
+            use stream = client.GetStream()
+            let head = upgrade stream "/raw"
+            Expect.stringStarts head "HTTP/1.1 101 Switching Protocols" "should complete websocket upgrade"
+            Expect.equal (readToEnd stream) [||] "nothing may be written after the 101"
+            Expect.isTrue (logged.Wait 5000) "the logging WebPart should see the result") ctx
+          match returned.Value with
+          | Some (code, headers, line) ->
+            Expect.equal code 101 "returned context should carry the 101 that was sent"
+            Expect.equal (headers |> List.tryFind (fst >> (=) "Sec-WebSocket-Accept") |> Option.map snd) (Some "s3pPLMBiTxaQ9kYGzzhZRbK+xOo=") "returned context should carry the handshake headers"
+            Expect.stringContains line "\" 101 " "logFormat should log 101"
+          | None -> failtest "handShake should return a context"
+
+      returnedContextTest "handShake returns a context carrying the 101" (handShake (fun _ _ -> SocketOp.mreturn ()))
+      returnedContextTest "handShakeWithSubprotocol returns a context carrying the 101"
+        (handShakeWithSubprotocol (fun _ _ -> async.Return None) (fun _ _ -> SocketOp.mreturn ()))
+
       testCase "handShake answers a request without Upgrade with 400" <| fun _ ->
         let ctx = runWith cfg (Filters.path "/raw" >=> handShake (fun _ _ -> SocketOp.mreturn ()))
         withContext (fun _ ->
