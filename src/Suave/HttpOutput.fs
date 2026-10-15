@@ -453,6 +453,8 @@ type HttpOutput(connection: Connection, runtime: HttpRuntime) =
       do! this.writeHeaders HttpOutput.excludedWhenHidden r.headers
     else
       do! this.writeHeaders HttpOutput.excludedHeaders r.headers
+    // A 1xx response has no content (RFC 9110 §15.2), so no default
+    // Content-Type either (e.g. the h2c `101 Switching Protocols`).
     // 1xx responses have no body, so no default Content-Type either.
     if r.status.code >= 200 then
       do! this.writeContentType r.headers

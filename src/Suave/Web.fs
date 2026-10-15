@@ -117,5 +117,6 @@ module Web =
       maxConnectionAgeSeconds = 300  // Kill connections after 5 minutes (300 seconds)
       filePartSink          = None
       acceptorCount         = 1
+      http2Enabled          = true
       webSocketMaxFrameSize = 16 * 1024 * 1024 // 16 MiB
       }

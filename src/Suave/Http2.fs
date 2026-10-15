@@ -1213,6 +1213,172 @@ module Http2 =
         counter := next
         Some next
 
+  // ---------------------------------------------------------------------------
+  // SocketTask responses over HTTP/2
+  //
+  // A `SocketTask` writer (`Files.file`, `Stream.okStream`, `EventSource`,
+  // `TransferEncoding.chunked`, user code calling `conn.transport.write`, …)
+  // is written for HTTP/1.1: after the preamble it writes any remaining
+  // header lines ("Content-Length: …"), the blank line that ends the header
+  // block, and then the body — with HTTP/1.1 chunk framing when the response
+  // carries `Transfer-Encoding: chunked`. When `writePreamble` is false it
+  // writes the status line too.
+  //
+  // `ResponseParser` reads that byte stream back and yields the parts HTTP/2
+  // needs: the extra header lines (merged into the HEADERS frame) and the
+  // de-chunked body (sent as DATA frames). `Http2Connection` feeds it from a
+  // per-stream `ITransport`.
+  // ---------------------------------------------------------------------------
+  module Http1Adapter =
+
+    /// Connection-specific header fields that are meaningful only to an
+    /// HTTP/1.x connection and MUST NOT appear in an HTTP/2 message
+    /// (RFC 9113 §8.2.2).
+    let isConnectionSpecificHeader (name: string) =
+      let eq (s: string) = System.String.Equals(name, s, System.StringComparison.OrdinalIgnoreCase)
+      eq "connection" || eq "keep-alive" || eq "proxy-connection"
+      || eq "transfer-encoding" || eq "upgrade"
+
+    /// True if the headers declare `Transfer-Encoding: chunked`.
+    let isChunked (headers: (string * string) list) =
+      headers
+      |> List.exists (fun (n, v) ->
+        System.String.Equals(n, "transfer-encoding", System.StringComparison.OrdinalIgnoreCase)
+        && v.Split(',')
+           |> Array.exists (fun t ->
+             System.String.Equals(t.Trim(), "chunked", System.StringComparison.OrdinalIgnoreCase)))
+
+    /// Build the HTTP/2 response header list for `status` from HTTP/1.x style
+    /// headers: drops connection-specific fields, and `content-length` when
+    /// the body was chunked (its length was never declared).
+    let toHttp2Headers (status: int) (headers: (string * string) list) =
+      let chunked = isChunked headers
+      let keep (n: string, _) =
+        not (isConnectionSpecificHeader n)
+        && not (chunked && System.String.Equals(n, "content-length", System.StringComparison.OrdinalIgnoreCase))
+      (":status", string status) :: List.filter keep headers
+
+    /// Something the parser extracted from the HTTP/1.1 byte stream.
+    type ResponsePart =
+      /// The header block ended: the status from a status line (only when the
+      /// writer wrote one) and the header lines it contained, in order.
+      | Head of status: int option * headers: (string * string) list
+      /// Body bytes, with any chunk framing removed.
+      | Body of byte[]
+
+    type private Phase =
+      | HeadLines
+      | ChunkSize
+      | ChunkData of remaining: int64
+      | ChunkDataEnd
+      | ChunkTrailers
+      | Identity
+      | Finished
+
+    /// Cap on the header bytes a writer may emit before the blank line.
+    let maxHeadBytes = 64 * 1024
+
+    /// Incremental parser for the bytes a `SocketTask` writes. `chunked` says
+    /// whether the response headers already declare chunked encoding;
+    /// `expectStatusLine` is true when the writer also writes the status line
+    /// (`writePreamble = false`). Not thread-safe; feed it in write order.
+    /// Malformed input raises an exception.
+    type ResponseParser(chunked: bool, expectStatusLine: bool) =
+      let mutable chunked = chunked
+      let mutable phase = HeadLines
+      let mutable firstLine = true
+      let mutable status : int option = None
+      let mutable headBytes = 0
+      let headers = ResizeArray<string * string>()
+      // Holds a partial line (head, chunk size, chunk terminator or trailer).
+      let line = new System.IO.MemoryStream()
+
+      let takeLine () =
+        let bytes = line.ToArray()
+        line.SetLength 0L
+        let s = System.Text.Encoding.UTF8.GetString bytes
+        if s.EndsWith "\r" then s.Substring(0, s.Length - 1) else s
+
+      let endOfHead (parts: ResizeArray<ResponsePart>) =
+        let hs = List.ofSeq headers
+        if isChunked hs then chunked <- true
+        parts.Add(Head(status, hs))
+        phase <- if chunked then ChunkSize else Identity
+
+      let headLine (parts: ResizeArray<ResponsePart>) (s: string) =
+        if s.Length = 0 then
+          endOfHead parts
+        elif firstLine && expectStatusLine && s.StartsWith("HTTP/", System.StringComparison.Ordinal) then
+          // "HTTP/1.1 200 OK"
+          match s.Split([| ' ' |], 3, System.StringSplitOptions.RemoveEmptyEntries) with
+          | [| _; code |] | [| _; code; _ |] ->
+            match System.Int32.TryParse code with
+            | true, c -> status <- Some c
+            | _ -> failwithf "malformed status line: %s" s
+          | _ -> failwithf "malformed status line: %s" s
+        else
+          let colon = s.IndexOf ':'
+          if colon <= 0 then failwithf "malformed header line: %s" s
+          headers.Add((s.Substring(0, colon).Trim(), s.Substring(colon + 1).Trim()))
+        firstLine <- false
+
+      /// Whether the blank line ending the header block has been seen.
+      member _.HeadComplete = match phase with HeadLines -> false | _ -> true
+
+      /// Feed the next bytes written by the writer; returns what they completed.
+      member _.Feed(data: byte[]) : ResizeArray<ResponsePart> =
+        let parts = ResizeArray<ResponsePart>()
+        let mutable i = 0
+        while i < data.Length do
+          match phase with
+          | Finished ->
+            // Anything after the last chunk has nowhere to go.
+            i <- data.Length
+          | Identity ->
+            parts.Add(Body(if i = 0 then data else Array.sub data i (data.Length - i)))
+            i <- data.Length
+          | ChunkData remaining ->
+            let n = int (min remaining (int64 (data.Length - i)))
+            parts.Add(Body(Array.sub data i n))
+            i <- i + n
+            let left = remaining - int64 n
+            phase <- if left = 0L then ChunkDataEnd else ChunkData left
+          | HeadLines | ChunkSize | ChunkDataEnd | ChunkTrailers ->
+            let lf = System.Array.IndexOf(data, 10uy, i)
+            let stop = if lf < 0 then data.Length else lf
+            line.Write(data, i, stop - i)
+            if phase = HeadLines then
+              headBytes <- headBytes + (stop - i)
+              if headBytes > maxHeadBytes then
+                failwith "response header block too large"
+            i <- if lf < 0 then data.Length else lf + 1
+            if lf >= 0 then
+              let s = takeLine ()
+              match phase with
+              | HeadLines -> headLine parts s
+              | ChunkSize ->
+                let sizeText =
+                  let semi = s.IndexOf ';'
+                  (if semi >= 0 then s.Substring(0, semi) else s).Trim()
+                match System.Int64.TryParse(sizeText, System.Globalization.NumberStyles.AllowHexSpecifier, null) with
+                | true, 0L -> phase <- ChunkTrailers
+                | true, n when n > 0L -> phase <- ChunkData n
+                | _ -> failwithf "malformed chunk size: %s" s
+              | ChunkDataEnd -> phase <- ChunkSize
+              | ChunkTrailers -> if s.Length = 0 then phase <- Finished
+              | _ -> ()
+        parts
+
+      /// The writer is done. If it never ended its header block, the header
+      /// lines seen so far form the head (a writer that wrote nothing at all
+      /// yields an empty head).
+      member _.Complete() : ResizeArray<ResponsePart> =
+        let parts = ResizeArray<ResponsePart>()
+        if phase = HeadLines then
+          if line.Length > 0L then headLine parts (takeLine ())
+          if phase = HeadLines then endOfHead parts
+        parts
+
   type Message<'a> = Request of 'a | Stop
 
   // ---------------------------------------------------------------------------
@@ -1438,61 +1604,61 @@ module Http2 =
         writeMutex.Release() |> ignore
     }
 
-    /// Write a single HTTP/2 response (HEADERS + 0..n DATA + optional trailing
-    /// HEADERS) on `streamId`, respecting `peerSettings.maxFrameSize` and the
-    /// outbound flow-control windows. Setting trailers via `Trailers.set` on
-    /// the response context is honoured: when present, the final DATA frame
-    /// does NOT set END_STREAM and a trailing HEADERS frame with END_STREAM
-    /// is emitted after the body.
-    member x.writeResponseOnStream (streamId: int32) (response: HttpResult)
-                                   (trailers: (string * string) list) = async {
-      // 1. HEADERS frame with the response pseudo-header and regular headers.
-      let responseHeaderList =
-        (":status", response.status.code.ToString()) :: response.headers
-      // Encode with the full HPACK encoder against the per-connection encoder
-      // dynamic table (RFC 7541). `defaultEncodeStrategy` selects Linear/no-
-      // Huffman, which is unambiguously parseable by every compliant decoder.
-      let headersBlock = encodeHpackHeaderBlock x.encodeDynamicTable responseHeaderList
+    /// HPACK-encode `headers` and write them as one HEADERS frame. Encoding
+    /// happens under the write mutex: it mutates the connection's encoder
+    /// dynamic table, so concurrent streams must encode in the same order
+    /// their header blocks reach the wire (RFC 7541 §2.2).
+    member private x.writeHeadersSerialized (streamId: int32) (headers: (string * string) list)
+                                            (endStream: bool) = async {
+      do! Async.AwaitTask (writeMutex.WaitAsync())
+      try
+        let block = encodeHpackHeaderBlock x.encodeDynamicTable headers
+        let flags =
+          let f = setEndHeader 0uy
+          if endStream then setEndStream f else f
+        let! _ =
+          Async.AwaitTask
+            ((x.write ({ flags = flags; streamIdentifier = streamId; padding = None },
+                       Headers(None, block))).AsTask())
+        return ()
+      finally
+        writeMutex.Release() |> ignore
+    }
 
-      // Body bytes (empty for NullContent / non-Bytes content).
-      let bodyBytes =
-        match response.content with
-        | Bytes bs -> bs
-        | _ -> [||]
+    /// True while `streamId` can still carry frames from us: the connection
+    /// is alive and the stream has not been reset by either side.
+    member private x.streamWritable (streamId: int32) =
+      !alive &&
+        match streams.TryGetValue streamId with
+        | true, s -> s.state <> Closed
+        | _ -> false
 
-      let hasTrailers = not (List.isEmpty trailers)
-      let bodyHasData = bodyBytes.Length > 0
-
-      // Decide whether HEADERS itself carries END_STREAM. We can only set it
-      // when there's no body and no trailers.
-      let headersEndStream = not bodyHasData && not hasTrailers
-      let headersFlags =
-        let f = setEndHeader 0uy
-        if headersEndStream then setEndStream f else f
-      do! x.writeFrameSerialized(
-            { flags = headersFlags; streamIdentifier = streamId; padding = None },
-            Headers(None, headersBlock))
-
-      // 2. DATA frames. We chunk by the smaller of (peer.maxFrameSize) and
-      //    (outbound flow-control windows: per-connection and per-stream).
-      //    The outbound flow-control window affects DATA frames only;
-      //    HEADERS is not flow-controlled. When either window is ≤ 0 we
-      //    block on `windowSignal` until a WINDOW_UPDATE / SETTINGS change
-      //    replenishes one of them. (RFC 7540 §6.9.)
-      if bodyHasData then
+    /// Send `data` on `streamId` as DATA frames, chunked by the smaller of
+    /// the peer's SETTINGS_MAX_FRAME_SIZE and the outbound flow-control
+    /// windows (per-connection and per-stream). HEADERS are not
+    /// flow-controlled; DATA is: when either window is ≤ 0 we block on
+    /// `windowSignal` until a WINDOW_UPDATE / SETTINGS change replenishes it
+    /// (RFC 7540 §6.9). The last frame carries END_STREAM when `endStream`.
+    /// Returns false if the stream or the connection went away first.
+    member private x.sendData (streamId: int32) (data: byte[]) (endStream: bool) : Async<bool> = async {
+      if data.Length = 0 then
+        if endStream && x.streamWritable streamId then
+          do! x.writeFrameSerialized(
+                { flags = setEndStream 0uy; streamIdentifier = streamId; padding = None },
+                Data([||], true))
+          return true
+        else
+          return x.streamWritable streamId
+      else
         let maxFrameSize = max 1 peerSettings.maxFrameSize
         let mutable offset = 0
         let mutable aborted = false
-        while offset < bodyBytes.Length && not aborted do
+        while offset < data.Length && not aborted do
           // Re-resolve the per-stream send window on each iteration so a
-          // mid-body RST_STREAM (which removes the stream from the table)
-          // is detected promptly rather than continuing against a stale
-          // reference.
+          // mid-body RST_STREAM (or connection teardown) is detected promptly
+          // rather than continuing against a stale reference.
           match streams.TryGetValue streamId with
-          | false, _ ->
-            // Stream was closed under us — stop emitting silently.
-            aborted <- true
-          | true, streamData ->
+          | true, streamData when !alive && streamData.state <> Closed ->
             let streamWindow = streamData.outboundWindow
             // Capture the current signal BEFORE inspecting window state to
             // avoid a missed-wakeup race with the WindowUpdate handler.
@@ -1505,40 +1671,191 @@ module Http2 =
             if available <= 0 then
               do! Async.AwaitTask waiter.Task
             else
-              let remaining = bodyBytes.Length - offset
-              let chunkSize =
-                min remaining (min available maxFrameSize)
-              let chunk = Array.sub bodyBytes offset chunkSize
+              let chunkSize = min (data.Length - offset) (min available maxFrameSize)
+              let chunk =
+                if offset = 0 && chunkSize = data.Length then data
+                else Array.sub data offset chunkSize
               offset <- offset + chunkSize
               // Decrement both windows. They can legitimately reach 0 after
               // this; they only go negative via SETTINGS_INITIAL_WINDOW_SIZE
               // adjustments (RFC 7540 §6.9.2), not via send accounting.
               connectionOutboundWindow.available <- connectionOutboundWindow.available - chunkSize
               streamWindow.available <- streamWindow.available - chunkSize
-              let isLast = offset >= bodyBytes.Length
-              let flags =
-                if isLast && not hasTrailers then setEndStream 0uy else 0uy
+              let isLast = endStream && offset >= data.Length
               do! x.writeFrameSerialized(
-                    { flags = flags; streamIdentifier = streamId; padding = None },
-                    Data(chunk, isLast && not hasTrailers))
+                    { flags = (if isLast then setEndStream 0uy else 0uy)
+                      streamIdentifier = streamId; padding = None },
+                    Data(chunk, isLast))
+          | _ ->
+            // Stream was reset or the connection closed under us — stop
+            // emitting silently.
+            aborted <- true
+        return not aborted
+    }
 
-      // 3. Trailing HEADERS with END_STREAM, if any. Validate first; invalid
-      //    trailers are dropped rather than emitted (the caller's WebPart
-      //    bug shouldn't kill the connection).
-      if hasTrailers then
+    /// Close our side of `streamId` after the body: a trailing HEADERS frame
+    /// with END_STREAM when there are trailers, otherwise an empty DATA frame
+    /// with END_STREAM.
+    member private x.finishStream (streamId: int32) (trailers: (string * string) list) = async {
+      if not (List.isEmpty trailers) then
+        // Validate first; invalid trailers are dropped rather than emitted
+        // (the caller's WebPart bug shouldn't kill the connection).
         match Trailers.validate trailers with
-        | Ok () ->
-          let trailerBlock = encodeHpackHeaderBlock x.encodeDynamicTable trailers
-          let flags = setEndStream (setEndHeader 0uy)
-          do! x.writeFrameSerialized(
-                { flags = flags; streamIdentifier = streamId; padding = None },
-                Headers(None, trailerBlock))
+        | Ok () -> do! x.writeHeadersSerialized streamId trailers true
         | Result.Error _ ->
-          // Drop invalid trailers but still close the stream cleanly with an
-          // empty DATA frame carrying END_STREAM.
-          do! x.writeFrameSerialized(
-                { flags = setEndStream 0uy; streamIdentifier = streamId; padding = None },
-                Data([||], true))
+          let! _ = x.sendData streamId [||] true
+          ()
+      else
+        let! _ = x.sendData streamId [||] true
+        ()
+    }
+
+    /// Write a `SocketTask` response on `streamId`. The task gets its own
+    /// `Connection` whose transport parses what the HTTP/1.1-oriented writer
+    /// produces (see `Http1Adapter`): the header lines it writes join the
+    /// HEADERS frame, sent once its header block ends, and the de-chunked
+    /// body becomes flow-controlled DATA frames.
+    member private x.writeSocketTaskResponse (streamId: int32) (response: HttpResult)
+                                             (writer: Connection * HttpResult -> Task<unit>)
+                                             (trailers: (string * string) list) = async {
+      let parser =
+        Http1Adapter.ResponseParser(Http1Adapter.isChunked response.headers,
+                                    expectStatusLine = not response.writePreamble)
+      let hasTrailers = not (List.isEmpty trailers)
+      let mutable headSent = false
+      // Set once the stream can no longer be written: reset by the peer,
+      // connection gone, or the writer produced something unparseable.
+      let mutable stopped = false
+      let mutable malformed = false
+
+      let sendHead (status: int option) (extra: (string * string) list) (endStream: bool) = async {
+        let headers =
+          Http1Adapter.toHttp2Headers
+            (defaultArg status response.status.code)
+            (response.headers @ extra)
+        headSent <- true
+        if x.streamWritable streamId then
+          do! x.writeHeadersSerialized streamId headers endStream
+        else
+          stopped <- true
+      }
+
+      let emit (parts: ResizeArray<Http1Adapter.ResponsePart>) = async {
+        for part in parts do
+          if not stopped then
+            match part with
+            | Http1Adapter.Head (status, extra) ->
+              do! sendHead status extra false
+            | Http1Adapter.Body data ->
+              let! ok = x.sendData streamId data false
+              if not ok then stopped <- true
+      }
+
+      let closedError = Result.Error (ConnectionError "HTTP/2 stream is closed")
+
+      let transport =
+        { new ITransport with
+            member _.read _ =
+              ValueTask<Result<int, Error>>(Result.Error (ConnectionError "HTTP/2 response stream is write-only"))
+            member _.write (buf: Memory<byte>) =
+              if stopped then ValueTask<Result<unit, Error>>(closedError)
+              else
+                // Copy now: callers reuse their buffer (e.g. the lineBuffer)
+                // as soon as the write completes.
+                let parts =
+                  try parser.Feed(buf.ToArray())
+                  with _ ->
+                    malformed <- true
+                    stopped <- true
+                    ResizeArray()
+                if stopped then ValueTask<Result<unit, Error>>(closedError)
+                elif parts.Count = 0 then ValueTask<Result<unit, Error>>(Ok ())
+                else
+                  ValueTask<Result<unit, Error>>(
+                    task {
+                      do! emit parts
+                      return if stopped then closedError else Ok ()
+                    })
+            member _.flush () = ValueTask<Result<unit, Error>>(Ok ())
+            // Shutting down the socket would kill every stream on the
+            // connection; ending this stream's writes is the closest match.
+            member _.shutdown () = stopped <- true }
+
+      let lineBuffer = Globals.BufferPool.rent facade.Connection.lineBuffer.Length
+      let streamConnection =
+        { facade.Connection with
+            transport       = transport
+            lineBuffer      = lineBuffer
+            lineBufferCount = 0
+            utf8Encoder     = System.Text.Encoding.UTF8.GetEncoder()
+            isLongLived     = false }
+      let mutable writerFailed = false
+      try
+        try
+          do! Async.AwaitTask (writer (streamConnection, response))
+          // Push out whatever the writer left in the line buffer.
+          do! Async.AwaitTask (streamConnection.flush().AsTask())
+        with ex ->
+          writerFailed <- true
+          eprintfn "[Http2] SocketTask response on stream %d failed: %s" streamId ex.Message
+      finally
+        Globals.BufferPool.returnArray lineBuffer true
+
+      if writerFailed || malformed then
+        do! x.resetStream streamId InternalError
+      elif not stopped then
+        let rest =
+          try parser.Complete()
+          with _ ->
+            malformed <- true
+            ResizeArray()
+        if malformed then
+          do! x.resetStream streamId InternalError
+        else
+          match List.ofSeq rest with
+          | [ Http1Adapter.Head (status, extra) ] when not headSent ->
+            // The writer never got past the header block: a body-less response.
+            do! sendHead status extra (not hasTrailers)
+            if hasTrailers && not stopped then
+              do! x.finishStream streamId trailers
+          | _ ->
+            do! emit rest
+            if not stopped then
+              do! x.finishStream streamId trailers
+    }
+
+    /// Write a single HTTP/2 response (HEADERS + 0..n DATA + optional trailing
+    /// HEADERS) on `streamId`, respecting `peerSettings.maxFrameSize` and the
+    /// outbound flow-control windows. Setting trailers via `Trailers.set` on
+    /// the response context is honoured: when present, the final DATA frame
+    /// does NOT set END_STREAM and a trailing HEADERS frame with END_STREAM
+    /// is emitted after the body.
+    member x.writeResponseOnStream (streamId: int32) (response: HttpResult)
+                                   (trailers: (string * string) list) = async {
+      match response.content with
+      | SocketTask writer ->
+        do! x.writeSocketTaskResponse streamId response writer trailers
+      | content ->
+        // Body bytes (empty for NullContent).
+        let bodyBytes =
+          match content with
+          | Bytes bs -> bs
+          | _ -> [||]
+        let hasTrailers = not (List.isEmpty trailers)
+        let bodyHasData = bodyBytes.Length > 0
+
+        // HEADERS can only carry END_STREAM when there's no body and no
+        // trailers. Connection-specific headers are dropped
+        // (RFC 9113 §8.2.2).
+        let headers = Http1Adapter.toHttp2Headers response.status.code response.headers
+        do! x.writeHeadersSerialized streamId headers (not bodyHasData && not hasTrailers)
+
+        if bodyHasData then
+          let! ok = x.sendData streamId bodyBytes (not hasTrailers)
+          if ok && hasTrailers then
+            do! x.finishStream streamId trailers
+        elif hasTrailers then
+          do! x.finishStream streamId trailers
 
       // Bookkeeping: mark our send-side as closed for this stream.
       match streams.TryGetValue streamId with
@@ -1559,6 +1876,8 @@ module Http2 =
                 GoAway(highestClientStreamId, errorCode, [||]))
         with _ -> ()
         closeEvent.Set() |> ignore
+        // Release writers blocked on flow control; they see `alive` = false.
+        signalWindowUpdate ()
     }
 
     /// Reset a single stream with the given error code. Stream-level
@@ -1572,6 +1891,7 @@ module Http2 =
       match streams.TryGetValue streamId with
       | true, s -> s.state <- Closed
       | _ -> ()
+      signalWindowUpdate ()
     }
 
     /// Build an HttpRequest from a completed stream's decoded headers + body,
@@ -1853,6 +2173,7 @@ module Http2 =
           receivedGoAway <- true
           alive := false
           closeEvent.Set() |> ignore
+          signalWindowUpdate ()
         | WindowUpdate inc ->
           let target =
             if header.streamIdentifier = 0 then Some connectionOutboundWindow
@@ -1879,6 +2200,8 @@ module Http2 =
           match streams.TryGetValue header.streamIdentifier with
           | true, s -> s.state <- Closed
           | _ -> ()
+          // A writer blocked on this stream's window must notice the reset.
+          signalWindowUpdate ()
         | Priority (Some p) when p.streamIdentifier = header.streamIdentifier ->
           // RFC 7540 §5.3.1: a stream cannot depend on itself.
           do! x.resetStream header.streamIdentifier ProtocolError
@@ -2029,6 +2352,7 @@ module Http2 =
           alive := false
           shouldRun <- false
           closeEvent.Set() |> ignore
+          signalWindowUpdate ()
       return ()
     }
 

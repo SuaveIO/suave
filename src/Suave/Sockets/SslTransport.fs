@@ -45,11 +45,22 @@ type SslTransport(listenSocket: Socket, certificate: X509Certificate, cancellati
     ResizeArray<SslApplicationProtocol>(
       [| SslApplicationProtocol.Http2; SslApplicationProtocol.Http11 |])
 
+  /// ALPN protocols advertised when HTTP/2 is disabled: HTTP/1.1 only.
+  static let alpnProtocolsHttp11Only =
+    ResizeArray<SslApplicationProtocol>([| SslApplicationProtocol.Http11 |])
+
   /// Build the server authentication options used for every TLS handshake on
   /// this transport. Centralised so the inline handshake in `Tcp.runAcceptor`
   /// and `SslTransport.accept` stay in sync.
   static member buildServerAuthenticationOptions
       (certificate: X509Certificate, checkCertificateRevocation: bool) =
+    SslTransport.buildServerAuthenticationOptions(
+      certificate, checkCertificateRevocation, http2Enabled = true)
+
+  /// As above; when `http2Enabled` is false only `http/1.1` is offered via
+  /// ALPN, so clients never negotiate HTTP/2 on this connection.
+  static member buildServerAuthenticationOptions
+      (certificate: X509Certificate, checkCertificateRevocation: bool, http2Enabled: bool) =
     let opts = SslServerAuthenticationOptions()
     opts.ServerCertificate <- certificate
     opts.ClientCertificateRequired <- false
@@ -57,7 +68,8 @@ type SslTransport(listenSocket: Socket, certificate: X509Certificate, cancellati
     opts.CertificateRevocationCheckMode <-
       if checkCertificateRevocation then X509RevocationMode.Online
       else X509RevocationMode.NoCheck
-    opts.ApplicationProtocols <- alpnProtocols
+    opts.ApplicationProtocols <-
+      if http2Enabled then alpnProtocols else alpnProtocolsHttp11Only
     opts
 
   let shutdownSocket (acceptSocket: Socket) =

@@ -84,6 +84,11 @@ type SuaveConfig =
     /// on many-core machines.
     acceptorCount : int
 
+    /// Serve HTTP/2 in addition to HTTP/1.x. When true (the default) the
+    /// server advertises <c>h2</c> via TLS ALPN on HTTPS bindings and accepts
+    /// cleartext HTTP/2 (h2c upgrade and prior knowledge) on HTTP bindings.
+    /// Set to false to serve every connection as HTTP/1.x.
+    http2Enabled : bool
     /// Largest WebSocket frame payload, in bytes, a client may send. A frame
     /// announcing a larger payload is answered with a Close frame carrying
     /// code 1009 (message too big) and the connection is dropped, before any
@@ -108,6 +113,7 @@ type SuaveConfig =
   member x.withMaxConnectionAgeSeconds(v) = { x with maxConnectionAgeSeconds = v }
   member x.withFilePartSink(v)          = { x with filePartSink = v }
   member x.withAcceptorCount(v)         = { x with acceptorCount = v }
+  member x.withHttp2Enabled(v)          = { x with http2Enabled = v }
   member x.withWebSocketMaxFrameSize(v) = { x with webSocketMaxFrameSize = v }
 
 
@@ -131,6 +137,7 @@ module SuaveConfig =
     fun binding ->
       { createRuntime binding with
           filePartSink = config.filePartSink
+          http2Enabled = config.http2Enabled
           webSocketMaxFrameSize = config.webSocketMaxFrameSize }
 
   /// Finds an endpoint that is configured from the given configuration. Throws

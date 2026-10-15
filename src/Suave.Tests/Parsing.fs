@@ -601,6 +601,23 @@ let requestHeadParsingTests cfg =
       else received.Append(Encoding.ASCII.GetString(buffer, 0, n)) |> ignore
     received.ToString()
 
+  /// Send `data` in one write and collect everything until the server closes
+  /// the connection (or the receive times out).
+  let exchangeUntilClose (data : string) =
+    use socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp)
+    socket.NoDelay <- true
+    socket.ReceiveTimeout <- 5000
+    socket.Connect(IPEndPoint(ip, port))
+    socket.Send(Encoding.ASCII.GetBytes data) |> ignore
+    let received = StringBuilder()
+    let buffer = Array.zeroCreate<byte> 4096
+    let mutable closed = false
+    while not closed do
+      let n = try socket.Receive buffer with :? SocketException -> 0
+      if n = 0 then closed <- true
+      else received.Append(Encoding.ASCII.GetString(buffer, 0, n)) |> ignore
+    received.ToString()
+
   let withServer f =
     let ctx = runWith cfg app
     try f () finally disposeContext ctx
@@ -617,6 +634,28 @@ let requestHeadParsingTests cfg =
         let second = response.IndexOf("GET|/second||two|2", StringComparison.Ordinal)
         Expect.isGreaterThanOrEqual first 0 "First request parsed"
         Expect.isGreaterThan second first "Second request parsed after the first")
+
+    testCase "three pipelined requests in one packet are answered in order" <| fun _ ->
+      withServer (fun () ->
+        let response = exchange [ get "/one" "" + get "/two" "" + get "/three" "" ] 3
+        Expect.equal (countOf "HTTP/1.1 200 OK" response) 3 "All three requests are answered"
+        let one = response.IndexOf("GET|/one||-|1", StringComparison.Ordinal)
+        let two = response.IndexOf("GET|/two||-|1", StringComparison.Ordinal)
+        let three = response.IndexOf("GET|/three||-|1", StringComparison.Ordinal)
+        Expect.isGreaterThanOrEqual one 0 "First request parsed"
+        Expect.isGreaterThan two one "Second request answered after the first"
+        Expect.isGreaterThan three two "Third request answered after the second")
+
+    testCase "a pipelined Connection: close ends the connection after its response" <| fun _ ->
+      withServer (fun () ->
+        let response =
+          exchangeUntilClose (get "/first" "" + get "/last" "Connection: close\r\n" + get "/ignored" "")
+        Expect.equal (countOf "HTTP/1.1 200 OK" response) 2 "Requests up to the close are answered"
+        let first = response.IndexOf("GET|/first||-|1", StringComparison.Ordinal)
+        let last = response.IndexOf("GET|/last||-|2", StringComparison.Ordinal)
+        Expect.isGreaterThanOrEqual first 0 "First request parsed"
+        Expect.isGreaterThan last first "Closing request answered second"
+        Expect.isFalse (response.Contains "/ignored") "Request after the close is not answered")
 
     testCase "a head split across reads is parsed once complete" <| fun _ ->
       withServer (fun () ->

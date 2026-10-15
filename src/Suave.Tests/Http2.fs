@@ -6,6 +6,7 @@ open System.IO
 open Expecto
 
 open Suave
+open Suave.Operators
 open Suave.Http2
 open Suave.Hpack
 open Suave.Huffman
@@ -1803,6 +1804,350 @@ let frameValidationTests (_ : SuaveConfig) =
                    "RFC 7540 §6.5.2: unknown setting identifiers should be ignored"
   ]
 
+// ---------------------------------------------------------------------------
+// SocketTask responses over HTTP/2.
+// `SocketTask` writers produce HTTP/1.1-shaped output (extra header lines, a
+// blank line, then the body — chunk-framed under `Transfer-Encoding:
+// chunked`). `Http1Adapter.ResponseParser` turns that back into HEADERS and
+// DATA; the end-to-end tests fetch real files and streams with HttpClient
+// over h2c prior knowledge and over TLS + ALPN.
+// ---------------------------------------------------------------------------
+
+[<Tests>]
+let http1AdapterTests (_ : SuaveConfig) =
+  let ascii (s: string) = System.Text.Encoding.ASCII.GetBytes s
+  let bodyOf (parts: seq<Http1Adapter.ResponsePart>) =
+    parts
+    |> Seq.choose (function Http1Adapter.Body b -> Some b | _ -> None)
+    |> Array.concat
+    |> System.Text.Encoding.ASCII.GetString
+  let heads (parts: seq<Http1Adapter.ResponsePart>) =
+    parts |> Seq.choose (function Http1Adapter.Head (s, h) -> Some (s, h) | _ -> None) |> List.ofSeq
+  /// Feed `writes` one by one, then complete; returns every part produced.
+  let run (p: Http1Adapter.ResponseParser) (writes: string list) =
+    [ for w in writes do yield! p.Feed(ascii w)
+      yield! p.Complete() ]
+
+  testList "Http2 SocketTask adapter" [
+    testCase "header lines then body" <| fun _ ->
+      let p = Http1Adapter.ResponseParser(false, false)
+      let parts = run p [ "Content-Length: 5\r\n"; "\r\n"; "hel"; "lo" ]
+      Expect.equal (heads parts) [ None, [ "Content-Length", "5" ] ] "one head with the extra header"
+      Expect.equal (bodyOf parts) "hello" "body passes through"
+
+    testCase "head split across writes, body in the same write" <| fun _ ->
+      let p = Http1Adapter.ResponseParser(false, false)
+      let parts = run p [ "X-A: 1\r"; "\nX-B:  two \r\n\r"; "\nbody" ]
+      Expect.equal (heads parts) [ None, [ "X-A", "1"; "X-B", "two" ] ] "both headers, trimmed"
+      Expect.equal (bodyOf parts) "body" "body after the blank line"
+
+    testCase "chunk framing is removed" <| fun _ ->
+      let p = Http1Adapter.ResponseParser(true, false)
+      let parts = run p [ "\r\n"; "5\r\nhel"; "lo\r\n"; "6;ext=1\r\n world\r\n"; "0\r\n\r\n"; "ignored" ]
+      Expect.equal (heads parts) [ None, [] ] "empty head"
+      Expect.equal (bodyOf parts) "hello world" "de-chunked body"
+
+    testCase "Transfer-Encoding written by the task itself switches to chunked" <| fun _ ->
+      let p = Http1Adapter.ResponseParser(false, false)
+      let parts = run p [ "Transfer-Encoding: chunked\r\n\r\n3\r\nabc\r\n0\r\n\r\n" ]
+      Expect.equal (bodyOf parts) "abc" "de-chunked body"
+
+    testCase "status line is parsed when the task writes the preamble" <| fun _ ->
+      let p = Http1Adapter.ResponseParser(false, true)
+      let parts = run p [ "HTTP/1.1 201 Created\r\nX-A: 1\r\n\r\nok" ]
+      Expect.equal (heads parts) [ Some 201, [ "X-A", "1" ] ] "status and header"
+      Expect.equal (bodyOf parts) "ok" "body"
+
+    testCase "a task that never ends its header block still yields a head" <| fun _ ->
+      let p = Http1Adapter.ResponseParser(false, false)
+      let parts = run p [ "Content-Length: 0\r\n" ]
+      Expect.equal (heads parts) [ None, [ "Content-Length", "0" ] ] "head from Complete"
+      let empty = run (Http1Adapter.ResponseParser(false, false)) []
+      Expect.equal (heads empty) [ None, [] ] "empty head for a silent task"
+
+    testCase "malformed chunk size raises" <| fun _ ->
+      let p = Http1Adapter.ResponseParser(true, false)
+      Expect.throws (fun () -> p.Feed(ascii "\r\nzz\r\n") |> ignore) "bad hex"
+
+    testCase "toHttp2Headers drops connection-specific headers" <| fun _ ->
+      let hs =
+        Http1Adapter.toHttp2Headers 200
+          [ "Content-Type", "text/plain"; "Transfer-Encoding", "chunked"; "Connection", "keep-alive"
+            "Keep-Alive", "timeout=5"; "Proxy-Connection", "x"; "Upgrade", "h2c"; "Content-Length", "3" ]
+      Expect.equal hs [ ":status", "200"; "Content-Type", "text/plain" ]
+        "only the status and content-type survive (content-length is dropped for chunked)"
+  ]
+
+[<Tests>]
+let http2SocketTaskIntegrationTests (_ : SuaveConfig) =
+  let getFreePort () =
+    let l = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0)
+    l.Start()
+    let port = (l.LocalEndpoint :?> System.Net.IPEndPoint).Port
+    l.Stop()
+    port
+
+  let createTestCertificate () =
+    use rsa = System.Security.Cryptography.RSA.Create(2048)
+    let req =
+      System.Security.Cryptography.X509Certificates.CertificateRequest(
+        "CN=localhost", rsa,
+        System.Security.Cryptography.HashAlgorithmName.SHA256,
+        System.Security.Cryptography.RSASignaturePadding.Pkcs1)
+    let san = System.Security.Cryptography.X509Certificates.SubjectAlternativeNameBuilder()
+    san.AddIpAddress(System.Net.IPAddress.Loopback)
+    san.AddDnsName("localhost")
+    req.CertificateExtensions.Add(san.Build())
+    let cert = req.CreateSelfSigned(DateTimeOffset.UtcNow.AddMinutes(-5.0), DateTimeOffset.UtcNow.AddHours(1.0))
+    let pfx = cert.Export(System.Security.Cryptography.X509Certificates.X509ContentType.Pkcs12)
+    System.Security.Cryptography.X509Certificates.X509CertificateLoader.LoadPkcs12(pfx, (null : string))
+
+  let dir = Path.Combine(Path.GetTempPath(), "suave-h2-sockettask-" + Guid.NewGuid().ToString("N"))
+  Directory.CreateDirectory dir |> ignore
+  let smallText = "hello from a file\n"
+  let smallFile = Path.Combine(dir, "hello.txt")
+  File.WriteAllText(smallFile, smallText)
+  // Larger than the default 65,535-byte flow-control window and than the
+  // 16 KiB default frame size, so DATA must be split and window updates awaited.
+  let largeText = String.replicate 20000 "0123456789abcdef\n"
+  let largeFile = Path.Combine(dir, "large.txt")
+  File.WriteAllText(largeFile, largeText)
+  let streamText = String.replicate 500 "streamed bytes; "
+  let utf8 (s: string) = System.Text.Encoding.UTF8.GetBytes s
+  let makeStream () = async { return (new MemoryStream(utf8 streamText) :> System.IO.Stream) }
+
+  // Set once the endless SSE writer below notices its stream was reset.
+  let sseWriterStopped = new System.Threading.ManualResetEventSlim(false)
+
+  let app : WebPart =
+    Suave.WebPart.choose [
+      (Filters.path "/bytes") >=> (Successful.OK "hello from bytes\n")
+      (Filters.path "/file") >=> (Files.file smallFile)
+      (Filters.path "/large") >=> (Files.file largeFile)
+      (Filters.path "/stream") >=> (Suave.Stream.okStream (makeStream ()))
+      (Filters.path "/stream-chunked") >=> (Suave.Stream.okStreamChunked (makeStream ()))
+      (Filters.path "/te-chunked") >=> Writers.setStatus HTTP_200 >=>
+        (TransferEncoding.chunked (fun conn -> task {
+          do! conn.writeChunk (utf8 "first,")
+          do! conn.writeChunk (utf8 "second")
+          do! conn.asyncWriteLn "0"
+          do! conn.asyncWriteLn ""
+          do! conn.flush () }))
+      (Filters.path "/raw") >=>
+        (fun ctx ->
+          let write (conn: Sockets.Connection, _) = task {
+            let! _ = conn.transport.write (Memory<byte>(utf8 "Content-Length: 11\r\n\r\nraw written"))
+            () }
+          async.Return (Some { ctx with response = { ctx.response with status = HTTP_200.status; content = SocketTask write } }))
+      (Filters.path "/sse") >=>
+        (EventSource.handShake (fun out -> task {
+          for i in 1 .. 3 do
+            do! EventSource.send out (EventSource.Message.create (string i) (sprintf "event %d" i)) }))
+      (Filters.path "/sse-endless") >=>
+        (EventSource.handShake (fun out -> task {
+          do! EventSource.send out (EventSource.Message.create "1" "first")
+          let mutable running = true
+          let mutable ticks = 0
+          // Heartbeat until the write fails (the client reset the stream);
+          // give up after ~20s so a regression cannot hang the run.
+          while running && ticks < 400 do
+            do! System.Threading.Tasks.Task.Delay 50
+            let! r = out.transport.write (Memory<byte>(utf8 ": ping\n\n"))
+            ticks <- ticks + 1
+            match r with
+            | Ok () -> ()
+            | Result.Error _ -> running <- false
+          if not running then sseWriterStopped.Set() }))
+    ]
+
+  let withServer (configure: SuaveConfig -> SuaveConfig) (scheme: Protocol) (body: int -> unit) =
+    let port = getFreePort ()
+    let cts = new System.Threading.CancellationTokenSource()
+    let cfg =
+      configure
+        { defaultConfig with
+            bindings = [ HttpBinding.create scheme System.Net.IPAddress.Loopback (uint16 port) ]
+            compressedFilesFolder = Some dir
+            cancellationToken = cts.Token }
+    let ready, serverTask = Web.startWebServerAsync cfg app
+    try
+      ready |> Async.RunSynchronously |> ignore
+      body port
+    finally
+      cts.Cancel()
+      try serverTask.Wait(TimeSpan.FromSeconds 5.0) |> ignore with _ -> ()
+
+  let newClient () =
+    let handler = new System.Net.Http.SocketsHttpHandler()
+    handler.SslOptions.RemoteCertificateValidationCallback <-
+      System.Net.Security.RemoteCertificateValidationCallback(fun _ _ _ _ -> true)
+    let client = new System.Net.Http.HttpClient(handler)
+    client.Timeout <- TimeSpan.FromSeconds 20.0
+    client
+
+  /// GET `url` over exactly HTTP/2; returns (status, body bytes, response).
+  let getH2 (client: System.Net.Http.HttpClient) (url: string) =
+    use req = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Get, url)
+    req.Version <- System.Net.HttpVersion.Version20
+    req.VersionPolicy <- System.Net.Http.HttpVersionPolicy.RequestVersionExact
+    let resp = client.SendAsync(req).GetAwaiter().GetResult()
+    Expect.equal resp.Version System.Net.HttpVersion.Version20 "response must be HTTP/2"
+    let body = resp.Content.ReadAsByteArrayAsync().GetAwaiter().GetResult()
+    resp.StatusCode, body, resp
+
+  let expectText (client: System.Net.Http.HttpClient) url (expected: string) =
+    let status, body, resp = getH2 client url
+    Expect.equal status System.Net.HttpStatusCode.OK (sprintf "%s status" url)
+    Expect.equal (System.Text.Encoding.UTF8.GetString body) expected (sprintf "%s body" url)
+    resp
+
+  let h2c f = withServer id HTTP (fun port -> f (sprintf "http://127.0.0.1:%d" port))
+
+  testSequenced <| testList "Http2 SocketTask responses" [
+    testCase "Bytes content over h2c (baseline)" <| fun _ ->
+      h2c (fun baseUrl ->
+        use client = newClient ()
+        expectText client (baseUrl + "/bytes") "hello from bytes\n" |> ignore)
+
+    testCase "Files.file over h2c" <| fun _ ->
+      h2c (fun baseUrl ->
+        use client = newClient ()
+        let resp = expectText client (baseUrl + "/file") smallText
+        Expect.equal resp.Content.Headers.ContentLength (Nullable (int64 smallText.Length))
+          "Content-Length written by the file task reaches the HEADERS frame"
+        Expect.equal (string resp.Content.Headers.ContentType) "text/plain" "mime type")
+
+    testCase "Files.file larger than the flow-control window over h2c" <| fun _ ->
+      h2c (fun baseUrl ->
+        use client = newClient ()
+        expectText client (baseUrl + "/large") largeText |> ignore)
+
+    testCase "Files.file with gzip over h2c" <| fun _ ->
+      h2c (fun baseUrl ->
+        use client = newClient ()
+        client.DefaultRequestHeaders.AcceptEncoding.ParseAdd "gzip"
+        let status, body, resp = getH2 client (baseUrl + "/large")
+        Expect.equal status System.Net.HttpStatusCode.OK "status"
+        Expect.contains resp.Content.Headers.ContentEncoding "gzip" "body was gzip-encoded"
+        Expect.equal resp.Content.Headers.ContentLength (Nullable (int64 body.Length))
+          "Content-Length matches the compressed body"
+        use gz = new System.IO.Compression.GZipStream(new MemoryStream(body), System.IO.Compression.CompressionMode.Decompress)
+        use reader = new StreamReader(gz)
+        Expect.equal (reader.ReadToEnd()) largeText "decompressed body")
+
+    testCase "Stream.okStream over h2c" <| fun _ ->
+      h2c (fun baseUrl ->
+        use client = newClient ()
+        expectText client (baseUrl + "/stream") streamText |> ignore)
+
+    testCase "Stream.okStreamChunked over h2c has no chunk framing or Transfer-Encoding" <| fun _ ->
+      h2c (fun baseUrl ->
+        use client = newClient ()
+        let resp = expectText client (baseUrl + "/stream-chunked") streamText
+        Expect.isFalse (resp.Headers.TransferEncodingChunked.GetValueOrDefault false)
+          "Transfer-Encoding must not be sent over HTTP/2")
+
+    testCase "TransferEncoding.chunked over h2c" <| fun _ ->
+      h2c (fun baseUrl ->
+        use client = newClient ()
+        expectText client (baseUrl + "/te-chunked") "first,second" |> ignore)
+
+    testCase "custom SocketTask writing through transport.write over h2c" <| fun _ ->
+      h2c (fun baseUrl ->
+        use client = newClient ()
+        expectText client (baseUrl + "/raw") "raw written" |> ignore)
+
+    testCase "EventSource.handShake over h2c delivers the events" <| fun _ ->
+      h2c (fun baseUrl ->
+        use client = newClient ()
+        let _, body, resp = getH2 client (baseUrl + "/sse")
+        let text = System.Text.Encoding.UTF8.GetString body
+        Expect.equal (string resp.Content.Headers.ContentType) "text/event-stream; charset=utf-8" "content type"
+        for i in 1 .. 3 do
+          Expect.stringContains text (sprintf "id: %d\ndata: event %d\n\n" i i) (sprintf "event %d" i))
+
+    testCase "endless EventSource streams incrementally and stops when the client resets" <| fun _ ->
+      h2c (fun baseUrl ->
+        use client = newClient ()
+        sseWriterStopped.Reset()
+        use req = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Get, baseUrl + "/sse-endless")
+        req.Version <- System.Net.HttpVersion.Version20
+        req.VersionPolicy <- System.Net.Http.HttpVersionPolicy.RequestVersionExact
+        let resp = client.SendAsync(req, System.Net.Http.HttpCompletionOption.ResponseHeadersRead).GetAwaiter().GetResult()
+        let stream = resp.Content.ReadAsStreamAsync().GetAwaiter().GetResult()
+        let reader = new StreamReader(stream)
+        let mutable line = reader.ReadLine()
+        while line <> null && line <> "data: first" do
+          line <- reader.ReadLine()
+        Expect.equal line "data: first" "first event arrives while the stream is still open"
+        // Abandon the stream: HttpClient resets it with RST_STREAM.
+        resp.Dispose()
+        Expect.isTrue (sseWriterStopped.Wait(TimeSpan.FromSeconds 10.0))
+          "the writer sees failed writes once the stream is reset")
+
+    testCase "Files.file and okStreamChunked over TLS with ALPN h2" <| fun _ ->
+      let cert = createTestCertificate ()
+      withServer id (HTTPS cert) (fun port ->
+        use client = newClient ()
+        let baseUrl = sprintf "https://localhost:%d" port
+        expectText client (baseUrl + "/file") smallText |> ignore
+        expectText client (baseUrl + "/large") largeText |> ignore
+        expectText client (baseUrl + "/stream-chunked") streamText |> ignore)
+
+    testCase "http2Enabled = false: TLS negotiates HTTP/1.1" <| fun _ ->
+      let cert = createTestCertificate ()
+      withServer (fun c -> c.withHttp2Enabled false) (HTTPS cert) (fun port ->
+        use client = newClient ()
+        use req = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Get, sprintf "https://localhost:%d/file" port)
+        req.Version <- System.Net.HttpVersion.Version20
+        req.VersionPolicy <- System.Net.Http.HttpVersionPolicy.RequestVersionOrLower
+        use resp = client.SendAsync(req).GetAwaiter().GetResult()
+        Expect.equal resp.Version System.Net.HttpVersion.Version11 "ALPN must not offer h2"
+        Expect.equal (resp.Content.ReadAsStringAsync().GetAwaiter().GetResult()) smallText "body")
+
+    testCase "http2Enabled = false: h2c prior knowledge is refused" <| fun _ ->
+      withServer (fun c -> c.withHttp2Enabled false) HTTP (fun port ->
+        use client = newClient ()
+        Expect.throwsT<System.Net.Http.HttpRequestException>
+          (fun () -> getH2 client (sprintf "http://127.0.0.1:%d/bytes" port) |> ignore)
+          "an HTTP/2-only request cannot succeed")
+
+    testCase "http2Enabled = false: h2c upgrade is ignored" <| fun _ ->
+      withServer (fun c -> c.withHttp2Enabled false) HTTP (fun port ->
+        use tcp = new System.Net.Sockets.TcpClient()
+        tcp.Connect(System.Net.IPAddress.Loopback, port)
+        let s = tcp.GetStream()
+        s.ReadTimeout <- 5000
+        let request =
+          "GET /bytes HTTP/1.1\r\nHost: localhost\r\nConnection: Upgrade, HTTP2-Settings\r\n" +
+          "Upgrade: h2c\r\nHTTP2-Settings: \r\n\r\n"
+        let bytes = System.Text.Encoding.ASCII.GetBytes request
+        s.Write(bytes, 0, bytes.Length)
+        let reader = new StreamReader(s)
+        Expect.equal (reader.ReadLine()) "HTTP/1.1 200 OK" "served as plain HTTP/1.1")
+
+    testCase "h2c upgrade 101 response has no Content-Type" <| fun _ ->
+      h2c (fun baseUrl ->
+        let port = Uri(baseUrl).Port
+        use tcp = new System.Net.Sockets.TcpClient()
+        tcp.Connect(System.Net.IPAddress.Loopback, port)
+        let s = tcp.GetStream()
+        s.ReadTimeout <- 5000
+        let request =
+          "GET /bytes HTTP/1.1\r\nHost: localhost\r\nConnection: Upgrade, HTTP2-Settings\r\n" +
+          "Upgrade: h2c\r\nHTTP2-Settings: \r\n\r\n"
+        let bytes = System.Text.Encoding.ASCII.GetBytes request
+        s.Write(bytes, 0, bytes.Length)
+        // Read the HTTP/1.1 head byte by byte up to the blank line.
+        let head = System.Text.StringBuilder()
+        while not (head.ToString().EndsWith "\r\n\r\n") do
+          let b = s.ReadByte()
+          if b < 0 then failtest "connection closed before the 101 head ended"
+          head.Append(char b) |> ignore
+        let text = head.ToString()
+        Expect.stringStarts text "HTTP/1.1 101" "switching protocols"
+        Expect.isFalse (text.ToLowerInvariant().Contains "content-type") (sprintf "no Content-Type in:\n%s" text))
+  ]
 
 // HTTP/2 requests carry the binding they arrived on, as HTTP/1.1 requests do,
 // so `request.binding.scheme.secure` and `request.url` are right for them.

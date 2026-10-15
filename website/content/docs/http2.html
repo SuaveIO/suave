@@ -168,6 +168,57 @@ nghttp -nv https://localhost:8443/
 h2load -n 100 -c 1 -m 10 https://localhost:8443/</code></pre>
       </div>
 
+      <h2>Files, streams and Server-Sent Events</h2>
+      <p>
+        Responses whose content is a <code>SocketTask</code> &mdash;
+        <code>Files.file</code>, <code>Files.browse</code>,
+        <code>Stream.okStream</code>, <code>Stream.okStreamChunked</code>,
+        <code>TransferEncoding.chunked</code>, <code>EventSource.handShake</code> and
+        your own writers &mdash; are served over HTTP/2 as well. These writers were
+        written for HTTP/1.1, so the HTTP/2 writer adapts what they produce:
+      </p>
+      <ul>
+        <li>header lines the writer emits itself (for example
+            <code>Content-Length</code> or <code>Content-Encoding</code>) are added
+            to the <code>HEADERS</code> frame;</li>
+        <li>the body becomes <code>DATA</code> frames that respect the peer's
+            maximum frame size and flow-control windows, as each write happens, so
+            Server-Sent Events reach the client one event at a time;</li>
+        <li>HTTP/1.1 chunk framing is removed, and connection-specific headers
+            (<code>Connection</code>, <code>Keep-Alive</code>,
+            <code>Proxy-Connection</code>, <code>Transfer-Encoding</code>,
+            <code>Upgrade</code>) are never sent, as RFC&nbsp;9113 &sect;8.2.2
+            requires.</li>
+      </ul>
+      <p>
+        Writers may use <code>conn.asyncWriteLn</code>, <code>conn.flush</code> or
+        <code>conn.transport.write</code> as they do under HTTP/1.1. Once the client
+        resets the stream, writes return an error, so a long-running writer (an
+        endless event stream, say) can stop by checking the result of
+        <code>conn.transport.write</code>.
+      </p>
+      <div class="callout">
+        <p>
+          Suave 3.6.1 and earlier sent these responses over HTTP/2 with an empty body,
+          and the chunked ones with a <code>Transfer-Encoding</code> header that clients
+          reject. This is fixed in 3.7.0.
+        </p>
+      </div>
+
+      <h2>Disabling HTTP/2</h2>
+      <p>
+        Set <code>http2Enabled = false</code> to serve every connection as HTTP/1.x.
+        HTTPS bindings then offer only <code>http/1.1</code> via ALPN, the
+        <code>Upgrade: h2c</code> header is ignored, and a connection that opens
+        with the HTTP/2 preface is refused with <code>400 Bad Request</code>.
+      </p>
+      <div class="code-block">
+        <pre><code>startWebServer { defaultConfig with http2Enabled = false } app
+
+// or
+startWebServer (defaultConfig.withHttp2Enabled false) app</code></pre>
+      </div>
+
       <h2>Server Push</h2>
       <p>
         Use <code>Suave.Http2.Push.push</code> to record a push intent on the response.
