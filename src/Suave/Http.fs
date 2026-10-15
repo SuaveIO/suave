@@ -567,7 +567,7 @@ module Http =
 
     let addKeepAliveHeader (ctx : HttpContext) =
       match ctx.request.httpVersion, ctx.request.header "connection" with
-      | "HTTP/1.0", Choice1Of2 v when String.equalsOrdinalCI v "keep-alive" ->
+      | "HTTP/1.0", Choice1Of2 v when String.containsTokenOrdinalCI "keep-alive" v ->
         { ctx with response = { ctx.response with headers = ("Connection","Keep-Alive") :: ctx.response.headers } }
       | _ -> ctx
 
