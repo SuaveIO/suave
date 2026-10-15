@@ -269,7 +269,10 @@ module Http =
       maxContentLength  : int
       /// Optional sink factory for streaming multipart file parts without a temp file.
       /// When <c>None</c> (the default), each file part is buffered to a temporary file on disk.
-      filePartSink      : FilePartSink option }
+      filePartSink      : FilePartSink option
+      /// Largest WebSocket frame payload, in bytes, a client may send. Larger
+      /// frames are refused with close code 1009 before any payload is read.
+      webSocketMaxFrameSize : int }
 
   /// The `HttpContext` is the container of the request, runtime, user-state and
   /// response.

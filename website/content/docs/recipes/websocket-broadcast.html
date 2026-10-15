@@ -76,28 +76,65 @@
 
         <h1>Recipe: Broadcast to WebSocket clients</h1>
         <div class="recipe-meta"><p><strong>Goal:</strong> Fan-out a message to every connected socket.</p></div>
-        <p>Suave does not include a built-in bus. Track sockets yourself:</p>
-        <div class="code-block"><pre><code>open System.Collections.Concurrent
+        <p>Suave does not include a built-in bus. Keep the connected sockets in a <code>MailboxProcessor</code> hub: it handles joins, leaves and broadcasts one at a time, checks the result of every <code>send</code>, and drops clients whose send fails.</p>
+        <div class="code-block"><pre><code>open System
 open System.Text
-open System.Threading.Tasks
 open Suave
 open Suave.Filters
 open Suave.Operators
+open Suave.RequestErrors
 open Suave.WebSocket
 open Suave.Sockets
 open Suave.Sockets.Control
 
-let clients = ConcurrentDictionary&lt;System.Guid, WebSocket&gt;()
+/// Browsers send cookies with cross-site WebSocket handshakes and CORS does
+/// not apply to them, so only accept pages you serve.
+let allowedOrigins = set [ "http://localhost:8080" ]
 
-let broadcast (text : string) =
-  let data = ByteSegment (Encoding.UTF8.GetBytes text)
-  for KeyValue(_, ws) in clients do
-    // send returns SocketOp (ValueTask) — fire-and-forget fan-out
-    ws.send Text data true |&gt; ignore
+let checkOrigin : WebPart =
+  fun ctx -&gt;
+    match ctx.request.header "origin" with
+    | Choice1Of2 origin when allowedOrigins.Contains origin -&gt; succeed ctx
+    | _ -&gt; FORBIDDEN "Origin not allowed" ctx
+
+type HubMessage =
+  | Join of Guid * WebSocket
+  | Leave of Guid
+  | Broadcast of string
+
+/// Sends one frame; any failure (including an exception) counts as a dead client.
+let trySend (ws : WebSocket) (data : ByteSegment) = async {
+  try
+    let! result = ws.send Text data true |&gt; fun op -&gt; op.AsTask() |&gt; Async.AwaitTask
+    return Result.isOk result
+  with _ -&gt;
+    return false }
+
+/// The hub owns the client table, so joins, leaves and broadcasts are
+/// handled one at a time and need no locking.
+let hub =
+  MailboxProcessor&lt;HubMessage&gt;.Start(fun inbox -&gt;
+    let rec loop (clients : Map&lt;Guid, WebSocket&gt;) = async {
+      match! inbox.Receive() with
+      | Join (id, ws) -&gt; return! loop (Map.add id ws clients)
+      | Leave id -&gt; return! loop (Map.remove id clients)
+      | Broadcast text -&gt;
+          let data = ByteSegment (Encoding.UTF8.GetBytes text)
+          let! sent =
+            clients
+            |&gt; Seq.map (fun (KeyValue (id, ws)) -&gt; async {
+                 let! ok = trySend ws data
+                 return id, ok })
+            |&gt; Async.Parallel
+          // Drop every client whose send failed
+          let alive =
+            sent |&gt; Array.fold (fun m (id, ok) -&gt; if ok then m else Map.remove id m) clients
+          return! loop alive }
+    loop Map.empty)
 
 let ws (webSocket : WebSocket) (_ : HttpContext) =
-  let id = System.Guid.NewGuid()
-  clients.[id] &lt;- webSocket
+  let id = Guid.NewGuid()
+  hub.Post (Join (id, webSocket))
   socket {
     try
       let mutable loop = true
@@ -105,18 +142,25 @@ let ws (webSocket : WebSocket) (_ : HttpContext) =
         let! msg = webSocket.read()
         match msg with
         | (Text, data, true) -&gt;
-            let s = Encoding.UTF8.GetString data.Span
-            // optionally call broadcast s
-            do! webSocket.send Text data true
-        | (Close, _, _) -&gt; loop &lt;- false
+            hub.Post (Broadcast (Encoding.UTF8.GetString data.Span))
+        | (Ping, data, _) -&gt;
+            do! webSocket.send Pong data true
+        | (Close, _, _) -&gt;
+            do! webSocket.send Close (ByteSegment [||]) true
+            loop &lt;- false
         | _ -&gt; ()
     finally
-      clients.TryRemove(id) |&gt; ignore
+      hub.Post (Leave id)
   }
 
-let app = path "/ws" &gt;=&gt; handShake ws
+let app = path "/ws" &gt;=&gt; checkOrigin &gt;=&gt; handShake ws
 startWebServer defaultConfig app</code></pre></div>
-        <p>For serialized connect/disconnect/send, prefer a <code>MailboxProcessor</code>.</p>
+        <p>Notes:</p>
+        <ul>
+          <li><code>checkOrigin</code> runs before <code>handShake</code>: browsers attach cookies to cross-site WebSocket handshakes and CORS does not apply, so without it any page can open a socket as your user.</li>
+          <li>The handler answers <code>Ping</code> with <code>Pong</code> and the client's <code>Close</code> with <code>Close</code>.</li>
+          <li>A broadcast waits for every send, so one slow client delays the next message for everyone. If that matters, give each client its own queue.</li>
+        </ul>
 
       </div>
     </div>
