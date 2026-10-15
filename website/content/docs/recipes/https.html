@@ -103,6 +103,7 @@ let app = redirectToSsl (OK "Secure hello")
 startWebServer cfg app</code></pre></div>
         <p>The redirect keeps the path and query string as the client sent them, so <code>http://example.com:8080/search?q=a%20b</code> goes to <code>https://example.com:8443/search?q=a%20b</code>. <code>redirect</code> answers with <code>302 Found</code>; use <code>Redirection.moved_permanently</code> for a <code>301</code> once the setup is final.</p>
         <p>Load the certificate with <code>X509CertificateLoader</code>; the <code>X509Certificate2</code> file constructors are obsolete since .NET 9. Keep the password out of source code, for example in an environment variable.</p>
+        <p>A client has <code>Tcp.tlsHandshakeTimeout</code> (10 seconds by default) to complete the TLS handshake before Suave closes the connection. It applies to every HTTPS binding in the process; change it before starting the server with <code>Suave.Tcp.tlsHandshakeTimeout &lt;- TimeSpan.FromSeconds 5.</code></p>
         <p>Behind nginx, TLS usually ends at the proxy and every request reaches Suave over HTTP, so check the <code>X-Forwarded-Proto</code> header (<code>c.request.header "x-forwarded-proto"</code>) instead of <code>scheme.secure</code>, or let nginx do the redirect. See <a href="../binding-config.html">Bindings</a> and <a href="../deployment.html">Deployment</a>.</p>
 
       </div>

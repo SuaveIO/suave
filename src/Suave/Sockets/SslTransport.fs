@@ -50,7 +50,7 @@ type SslTransport(listenSocket: Socket, certificate: X509Certificate, cancellati
     ResizeArray<SslApplicationProtocol>([| SslApplicationProtocol.Http11 |])
 
   /// Build the server authentication options used for every TLS handshake on
-  /// this transport. Centralised so the inline handshake in `Tcp.runAcceptor`
+  /// this transport. Centralised so the handshake in `Tcp.prepareConnection`
   /// and `SslTransport.accept` stay in sync.
   static member buildServerAuthenticationOptions
       (certificate: X509Certificate, checkCertificateRevocation: bool) =
