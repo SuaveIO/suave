@@ -137,7 +137,7 @@ module SuaveConfig =
     fun binding ->
       { createRuntime binding with
           filePartSink = config.filePartSink
-          http2Enabled = config.http2Enabled }
+          http2Enabled = config.http2Enabled
           webSocketMaxFrameSize = config.webSocketMaxFrameSize }
 
   /// Finds an endpoint that is configured from the given configuration. Throws
