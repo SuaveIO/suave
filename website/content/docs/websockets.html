@@ -81,7 +81,7 @@
       <p>Implement real-time bidirectional communication with WebSocket support in Suave.</p>
 
       <h2>Basic WebSocket Handler</h2>
-      <p>Create a simple WebSocket echo server:</p>
+      <p>Create a simple WebSocket echo server. Besides data frames, a handler should answer every <code>Ping</code> with a <code>Pong</code> carrying the same payload, and answer the client's <code>Close</code> with a <code>Close</code> before it stops reading:</p>
       <div class="code-block">
         <pre><code>open Suave
 open Suave.WebSocket
@@ -90,6 +90,16 @@ open Suave.Sockets.Control
 open System.Text
 open Suave.Filters
 open Suave.Operators
+open Suave.RequestErrors
+
+/// Pages allowed to open a socket; see "Check the Origin header" below.
+let allowedOrigins = set [ "http://localhost:8080"; "https://example.com" ]
+
+let checkOrigin : WebPart =
+  fun ctx -&gt;
+    match ctx.request.header "origin" with
+    | Choice1Of2 origin when allowedOrigins.Contains origin -&gt; succeed ctx
+    | _ -&gt; FORBIDDEN "Origin not allowed" ctx
 
 let echo (webSocket: WebSocket) (context: HttpContext) =
   socket {
@@ -104,11 +114,16 @@ let echo (webSocket: WebSocket) (context: HttpContext) =
           let response = sprintf "Echo: %s" str
           let byteResponse =
             response
-            |&gt; Encoding.ASCII.GetBytes
+            |&gt; Encoding.UTF8.GetBytes
             |&gt; ByteSegment
           do! webSocket.send Text byteResponse true
 
+      | (Ping, data, _) -&gt;
+          // Answer every Ping with a Pong carrying the same payload
+          do! webSocket.send Pong data true
+
       | (Close, _, _) -&gt;
+          // Answer the client's Close with a Close, then stop reading
           do! webSocket.send Close (ByteSegment [||]) true
           loop &lt;- false
 
@@ -117,55 +132,39 @@ let echo (webSocket: WebSocket) (context: HttpContext) =
 
 let app =
   choose [
-    path "/ws" &gt;=&gt; handShake echo
+    path "/ws" &gt;=&gt; checkOrigin &gt;=&gt; handShake echo
   ]</code></pre>
       </div>
 
-      <h2>Broadcasting Messages</h2>
-      <p>Broadcast messages to multiple WebSocket clients:</p>
+      <h2>Check the Origin header</h2>
+      <p>Always check <code>Origin</code> before <code>handShake</code>. Browsers attach the user's cookies to a WebSocket handshake started by <em>any</em> page, and the same-origin policy and CORS do not apply to WebSockets, so without this check a malicious site can open a socket that is authenticated as your user and read the replies (cross-site WebSocket hijacking). The <code>checkOrigin</code> web part above answers <code>403 Forbidden</code> unless the handshake comes from a page you list. Browsers always send <code>Origin</code> on WebSocket handshakes; refusing requests without it also turns away non-browser clients, so if you need those, authenticate them some other way (for example with a token) rather than by cookie.</p>
+
+      <h2>Limits and failures</h2>
+      <p>Suave refuses any frame whose announced payload exceeds <code>SuaveConfig.webSocketMaxFrameSize</code> (16 MiB by default): it sends a <code>Close</code> frame with code 1009 (message too big) and drops the connection before allocating a buffer, and <code>read</code> returns an error. Lower the limit to what your protocol needs, and raise it per socket with <code>maxFrameSize</code> where an endpoint needs more:</p>
       <div class="code-block">
-        <pre><code>open Suave
-open Suave.WebSocket
-open System.Collections.Concurrent
-open System.Text
-open Suave.Filters
-open Suave.Operators
-open Suave.Sockets
-open Suave.Sockets.Control
+        <pre><code>let config =
+  { defaultConfig with
+      webSocketMaxFrameSize = 64 * 1024 } // 64 KiB per frame
 
-let clients = new ConcurrentDictionary&lt;string, WebSocket&gt;()
+let upload (webSocket: WebSocket) (context: HttpContext) =
+  // This endpoint takes larger frames than the rest of the server
+  webSocket.maxFrameSize &lt;- 8 * 1024 * 1024
+  echo webSocket context</code></pre>
+      </div>
+      <p>If the handler throws, Suave reports the exception through <code>Globals.writeMessage</code>, sends a <code>Close</code> frame with code 1011 (internal error) and closes the connection. Nothing is written as an HTTP response once the connection has switched protocols.</p>
 
-let broadcast (message: string) =
-  let bytes = Encoding.UTF8.GetBytes(message) |&gt; ByteSegment
-  for client in clients.Values do
-    client.send Text bytes true |&gt; ignore
-
-let chatHandler (webSocket: WebSocket) (context: HttpContext) =
-  socket {
-    let clientId = System.Guid.NewGuid().ToString()
-    clients.TryAdd(clientId, webSocket) |&gt; ignore
-    
-    let mutable loop = true
-    while loop do
-      let! msg = webSocket.read()
-
-      match msg with
-      | (Text, data, true) -&gt;
-          let str = Encoding.UTF8.GetString data.Span
-          broadcast (sprintf "%s: %s" clientId str)
-
-      | (Close, _, _) -&gt;
-          broadcast (sprintf "%s left" clientId)
-          clients.TryRemove(clientId) |&gt; ignore
-          do! webSocket.send Close (ByteSegment [||]) true
-          loop &lt;- false
-
-      | _ -&gt; ()
-  }
-
-let app =
+      <h2>Broadcasting Messages</h2>
+      <p>To fan messages out to many clients, keep the client table in a <code>MailboxProcessor</code> hub, check the result of every <code>send</code>, and drop clients whose send fails. The <a href="/docs/recipes/websocket-broadcast.html">broadcast recipe</a> has the complete hub. Any web part can then push a notification to every connected client:</p>
+      <div class="code-block">
+        <pre><code>let app =
   choose [
-    path "/chat" &gt;=&gt; handShake chatHandler
+    path "/notifications" &gt;=&gt; checkOrigin &gt;=&gt; handShake ws
+    POST &gt;=&gt; path "/notify" &gt;=&gt; fun ctx -&gt;
+      match ctx.request.formData "message" with
+      | Choice1Of2 msg -&gt;
+          hub.Post (Broadcast msg)
+          OK "Notification sent" ctx
+      | _ -&gt; BAD_REQUEST "Missing message" ctx
   ]</code></pre>
       </div>
 
@@ -192,16 +191,20 @@ let jsonWebSocket (webSocket: WebSocket) (context: HttpContext) =
 
       match msg with
       | (Text, data, true) -&gt;
-          try
-            let json = Encoding.UTF8.GetString data.Span
-            let message = JsonSerializer.Deserialize&lt;Message&gt;(json)
-            
-            let response = { message with timestamp = System.DateTime.UtcNow }
-            let responseJson = JsonSerializer.Serialize(response)
-            let responseBytes = Encoding.UTF8.GetBytes(responseJson) |&gt; ByteSegment
-            
-            do! webSocket.send Text responseBytes true
-          with _ -&gt; ()
+          let reply =
+            try
+              let json = Encoding.UTF8.GetString data.Span
+              let message = JsonSerializer.Deserialize&lt;Message&gt;(json)
+              let response = { message with timestamp = System.DateTime.UtcNow }
+              Some (JsonSerializer.Serialize(response))
+            with _ -&gt; None
+
+          match reply with
+          | Some json -&gt; do! webSocket.send Text (Encoding.UTF8.GetBytes json |&gt; ByteSegment) true
+          | None -&gt; ()
+
+      | (Ping, data, _) -&gt;
+          do! webSocket.send Pong data true
 
       | (Close, _, _) -&gt;
           do! webSocket.send Close (ByteSegment [||]) true
@@ -212,7 +215,7 @@ let jsonWebSocket (webSocket: WebSocket) (context: HttpContext) =
 
 let app =
   choose [
-    path "/json-ws" &gt;=&gt; handShake jsonWebSocket
+    path "/json-ws" &gt;=&gt; checkOrigin &gt;=&gt; handShake jsonWebSocket
   ]</code></pre>
       </div>
 
@@ -238,6 +241,9 @@ let binaryEcho (webSocket: WebSocket) (context: HttpContext) =
           // Echo binary data back
           do! webSocket.send Binary data true
 
+      | (Ping, data, _) -&gt;
+          do! webSocket.send Pong data true
+
       | (Close, _, _) -&gt;
           do! webSocket.send Close (ByteSegment [||]) true
           loop &lt;- false
@@ -247,7 +253,7 @@ let binaryEcho (webSocket: WebSocket) (context: HttpContext) =
 
 let app =
   choose [
-    path "/binary" &gt;=&gt; handShake binaryEcho
+    path "/binary" &gt;=&gt; checkOrigin &gt;=&gt; handShake binaryEcho
   ]</code></pre>
       </div>
 
@@ -294,7 +300,7 @@ let app =
       </div>
 
       <h2>Error Handling</h2>
-      <p>Handle WebSocket errors gracefully:</p>
+      <p>A failed <code>read</code> or <code>send</code> (peer gone, oversized frame, ...) ends the <code>socket</code> block with an error, which closes the connection. Handle errors in your own message processing where it happens; an exception that escapes the handler closes the socket with code 1011, as described above.</p>
       <div class="code-block">
         <pre><code>open Suave
 open Suave.WebSocket
@@ -305,64 +311,25 @@ open Suave.Sockets.Control
 
 let safeWebSocket (webSocket: WebSocket) (context: HttpContext) =
   socket {
-    try
-      let mutable loop = true
-
-      while loop do
-        try
-          let! msg = webSocket.read()
-
-          match msg with
-          | (Text, data, true) -&gt;
-              let str = System.Text.Encoding.UTF8.GetString data.Span
-              let response = sprintf "OK: %s" str |&gt; System.Text.Encoding.ASCII.GetBytes |&gt; ByteSegment
-              do! webSocket.send Text response true
-
-          | (Close, _, _) -&gt;
-              do! webSocket.send Close (ByteSegment [||]) true
-              loop &lt;- false
-
-          | _ -&gt; ()
-        with
-        | ex -&gt;
-            printfn "WebSocket error: %s" ex.Message
-            loop &lt;- false
-
-    with ex -&gt;
-      printfn "Fatal WebSocket error: %s" ex.Message
-  }
-
-let app =
-  choose [
-    path "/safe-ws" &gt;=&gt; handShake safeWebSocket
-  ]</code></pre>
-      </div>
-
-      <h2>Real-Time Notifications</h2>
-      <p>Push real-time notifications to connected clients:</p>
-      <div class="code-block">
-        <pre><code>open Suave
-open Suave.WebSocket
-open System.Collections.Concurrent
-open System.Text
-open Suave.Filters
-open Suave.Operators
-open Suave.Successful
-open Suave.RequestErrors
-open Suave.Sockets
-open Suave.Sockets.Control
-
-let notificationClients = new ConcurrentBag&lt;WebSocket&gt;()
-
-let notificationHandler (webSocket: WebSocket) (context: HttpContext) =
-  socket {
-    notificationClients.Add(webSocket)
-    
     let mutable loop = true
+
     while loop do
+      // A failed read (peer gone, oversized frame, ...) ends the socket block here
       let! msg = webSocket.read()
 
       match msg with
+      | (Text, data, true) -&gt;
+          let reply =
+            try
+              let str = System.Text.Encoding.UTF8.GetString data.Span
+              sprintf "OK: %s" str
+            with ex -&gt;
+              sprintf "Error: %s" ex.Message
+          do! webSocket.send Text (reply |&gt; System.Text.Encoding.UTF8.GetBytes |&gt; ByteSegment) true
+
+      | (Ping, data, _) -&gt;
+          do! webSocket.send Pong data true
+
       | (Close, _, _) -&gt;
           do! webSocket.send Close (ByteSegment [||]) true
           loop &lt;- false
@@ -370,22 +337,9 @@ let notificationHandler (webSocket: WebSocket) (context: HttpContext) =
       | _ -&gt; ()
   }
 
-let sendNotification (notification: string) =
-  let bytes = Encoding.UTF8.GetBytes(notification) |&gt; ByteSegment
-  for client in notificationClients do
-    try
-      client.send Text bytes true |&gt; ignore
-    with _ -&gt; ()
-
 let app =
   choose [
-    path "/notifications" &gt;=&gt; handShake notificationHandler
-    POST &gt;=&gt; path "/notify" &gt;=&gt; fun ctx -&gt;
-      match ctx.request.formData "message" with
-      | Choice1Of2 msg -&gt;
-          sendNotification msg
-          OK "Notification sent" ctx
-      | _ -&gt; RequestErrors.BAD_REQUEST "Missing message" ctx
+    path "/safe-ws" &gt;=&gt; checkOrigin &gt;=&gt; handShake safeWebSocket
   ]</code></pre>
       </div>
       </div>

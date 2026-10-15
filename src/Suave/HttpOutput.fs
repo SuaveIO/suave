@@ -453,7 +453,9 @@ type HttpOutput(connection: Connection, runtime: HttpRuntime) =
       do! this.writeHeaders HttpOutput.excludedWhenHidden r.headers
     else
       do! this.writeHeaders HttpOutput.excludedHeaders r.headers
-    do! this.writeContentType r.headers
+    // 1xx responses have no body, so no default Content-Type either.
+    if r.status.code >= 200 then
+      do! this.writeContentType r.headers
     }
 
   /// Synchronous fast path: assemble "Content-Length: N\r\n\r\n" plus the response body
