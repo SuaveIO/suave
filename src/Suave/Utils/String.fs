@@ -14,6 +14,25 @@ module String
   let equalsOrdinalCI (str1: string) (str2: string) =
     String.Equals(str1, str2, StringComparison.OrdinalIgnoreCase)
 
+  /// True if the comma-separated token list `list` (e.g. a Connection header
+  /// value, RFC 9110 §5.6.1) contains `token`, ignoring case and the optional
+  /// whitespace around each element. Does not allocate.
+  let containsTokenOrdinalCI (token: string) (list: string) =
+    let mutable found = false
+    let mutable start = 0
+    while not found && start <= list.Length do
+      let comma = list.IndexOf(',', start)
+      let stop = if comma < 0 then list.Length else comma
+      let mutable a = start
+      let mutable b = stop
+      while a < b && (list.[a] = ' ' || list.[a] = '\t') do a <- a + 1
+      while b > a && (list.[b - 1] = ' ' || list.[b - 1] = '\t') do b <- b - 1
+      if b - a = token.Length
+         && String.Compare(list, a, token, 0, token.Length, StringComparison.OrdinalIgnoreCase) = 0 then
+        found <- true
+      start <- stop + 1
+    found
+
   /// Ordinally compare two strings in constant time, bounded by the length of the
   /// longest string.
   let equalsConstantTime (str1: string) (str2: string) =
