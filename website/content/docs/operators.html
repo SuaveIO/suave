@@ -87,6 +87,8 @@
             <tr><td><code>?&lt;-</code></td><td>Assign a value for a key in a dictionary.</td></tr>
           </tbody>
         </table>
+        <p><strong>Precedence:</strong> <code>&lt;|&gt;</code> and <code>&gt;=&gt;</code> have the same precedence in F# and both associate to the left. So <code>path "/hi" &gt;=&gt; OK "hi" &lt;|&gt; path "/hello" &gt;=&gt; OK "hello"</code> parses as <code>((path "/hi" &gt;=&gt; OK "hi") &lt;|&gt; path "/hello") &gt;=&gt; OK "hello"</code>, and <code>/hi</code> responds <code>hello</code>. Parenthesize each alternative, or use <code>choose</code>:</p>
+        <div class="code-block"><pre><code>let app = (path "/hi" &gt;=&gt; OK "hi") &lt;|&gt; (path "/hello" &gt;=&gt; OK "hello")</code></pre></div>
         <h2>Example</h2>
         <div class="code-block"><pre><code>open Suave
 open Suave.Filters
