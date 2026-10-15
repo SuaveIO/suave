@@ -1611,6 +1611,7 @@ module Http2 =
         let req =
           { HttpRequest.empty with
               httpVersion = "HTTP/2.0"
+              binding     = facade.Runtime.matchedBinding
               rawMethod   = methodName
               rawPath     = rawPath
               rawQuery    = rawQuery

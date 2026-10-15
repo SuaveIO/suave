@@ -84,22 +84,26 @@ open Suave.Operators
 open Suave.Successful
 open Suave.Redirection
 
-let cert = new X509Certificate2("certificate.p12", "password")
+let cert = X509CertificateLoader.LoadPkcs12FromFile("certificate.p12", "password")
+let httpsPort = 8443
 let http  = HttpBinding.createSimple HTTP "0.0.0.0" 8080
-let https = HttpBinding.createSimple (HTTPS cert) "0.0.0.0" 8443
+let https = HttpBinding.createSimple (HTTPS cert) "0.0.0.0" httpsPort
 
 let redirectToSsl (allow : WebPart) : WebPart =
   context (fun c -&gt;
     if c.request.binding.scheme.secure then allow
     else
-      let b = UriBuilder(Scheme = Uri.UriSchemeHttps, Host = c.request.host, Path = c.request.path)
-      redirect (b.Uri.ToString()))
+      let authority = if httpsPort = 443 then c.request.host else sprintf "%s:%d" c.request.host httpsPort
+      let query = if String.IsNullOrEmpty c.request.rawQuery then "" else "?" + c.request.rawQuery
+      redirect (sprintf "https://%s%s%s" authority c.request.rawPath query))
 
 let cfg = { defaultConfig with bindings = [ http; https ] }
 let app = redirectToSsl (OK "Secure hello")
 
 startWebServer cfg app</code></pre></div>
-        <p>Behind nginx, you may check <code>x-forwarded-proto</code> instead of <code>scheme.secure</code>. See <a href="../binding-config.html">Bindings</a>.</p>
+        <p>The redirect keeps the path and query string as the client sent them, so <code>http://example.com:8080/search?q=a%20b</code> goes to <code>https://example.com:8443/search?q=a%20b</code>. <code>redirect</code> answers with <code>302 Found</code>; use <code>Redirection.moved_permanently</code> for a <code>301</code> once the setup is final.</p>
+        <p>Load the certificate with <code>X509CertificateLoader</code>; the <code>X509Certificate2</code> file constructors are obsolete since .NET 9. Keep the password out of source code, for example in an environment variable.</p>
+        <p>Behind nginx, TLS usually ends at the proxy and every request reaches Suave over HTTP, so check the <code>X-Forwarded-Proto</code> header (<code>c.request.header "x-forwarded-proto"</code>) instead of <code>scheme.secure</code>, or let nginx do the redirect. See <a href="../binding-config.html">Bindings</a> and <a href="../deployment.html">Deployment</a>.</p>
 
       </div>
     </div>
