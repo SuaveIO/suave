@@ -193,8 +193,7 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
         | Choice1Of2 x when String.startsWith "multipart/mixed" x ->
           let subboundary = "--" + parseBoundary x
           do! parseMultipartMixed fieldName subboundary
-          let a = reader.skip (boundary.Length)
-          return ()
+          do! reader.skip boundary.Length
 
         | Choice1Of2 contentType when headerParams.ContainsKey "filename" ->
           let! res = readFilePart boundary headerParams fieldName contentType

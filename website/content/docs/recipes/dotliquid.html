@@ -88,6 +88,9 @@ let app =
   path "/" &gt;=&gt; page "index.liquid" { name = "Ada" }
 
 startWebServer defaultConfig app</code></pre></div>
+        <div class="code-block"><pre><code>&lt;!-- index.liquid --&gt;
+&lt;h1&gt;Hello {{ model.name | escape }}&lt;/h1&gt;</code></pre></div>
+        <div class="callout"><p>DotLiquid does not HTML-escape output: use <code>| escape</code> on values that can contain user input. <code>page</code> sends <code>text/html</code> without a charset, and field names are snake_cased in templates (<code>totalLinks</code> → <code>total_links</code>); the guide covers both.</p></div>
         <p>Guide: <a href="../dotliquid.html">DotLiquid</a>.</p>
 
       </div>

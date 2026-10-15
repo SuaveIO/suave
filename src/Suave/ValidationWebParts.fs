@@ -108,14 +108,20 @@ module ValidationWebParts =
 
   /// Format validation errors as JSON
   let validationErrorsToJson (errors: ValidationError list) : string =
-    let q = "\""
-    let errorObjects =
-      errors
-      |> List.map (fun e ->
-        let code = match e.code with Some c -> q + "code" + q + ": " + q + c + q + "," | None -> ""
-        "{" + code + " " + q + "field" + q + ": " + q + e.field + q + ", " + q + "message" + q + ": " + q + e.message + q + "}")
-      |> String.concat ","
-    "{" + q + "errors" + q + ": [" + errorObjects + "]}"
+    use stream = new IO.MemoryStream()
+    do
+      use writer = new Text.Json.Utf8JsonWriter(stream)
+      writer.WriteStartObject()
+      writer.WriteStartArray "errors"
+      for e in errors do
+        writer.WriteStartObject()
+        e.code |> Option.iter (fun c -> writer.WriteString("code", c))
+        writer.WriteString("field", e.field)
+        writer.WriteString("message", e.message)
+        writer.WriteEndObject()
+      writer.WriteEndArray()
+      writer.WriteEndObject()
+    Text.Encoding.UTF8.GetString(stream.GetBuffer(), 0, int stream.Length)
 
   // === Helper Functions ===
 
