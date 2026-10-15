@@ -88,7 +88,7 @@ type SuaveConfig =
     /// server advertises <c>h2</c> via TLS ALPN on HTTPS bindings and accepts
     /// cleartext HTTP/2 (h2c upgrade and prior knowledge) on HTTP bindings.
     /// Set to false to serve every connection as HTTP/1.x.
-    http2Enabled : bool }
+    http2Enabled : bool
     /// Largest WebSocket frame payload, in bytes, a client may send. A frame
     /// announcing a larger payload is answered with a Close frame carrying
     /// code 1009 (message too big) and the connection is dropped, before any
