@@ -187,6 +187,7 @@ let main argv =
       healthCheckIntervalMs = 30000
       maxConnectionAgeSeconds = 300
       filePartSink          = None
-      acceptorCount         = 1}
+      acceptorCount         = 1
+      http2Enabled          = true }
     app
   0

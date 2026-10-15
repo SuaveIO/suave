@@ -82,7 +82,13 @@ type SuaveConfig =
     /// Multiple acceptors let the kernel load-balance incoming connections across
     /// independent accept threads, removing the single-listener accept bottleneck
     /// on many-core machines.
-    acceptorCount : int }
+    acceptorCount : int
+
+    /// Serve HTTP/2 in addition to HTTP/1.x. When true (the default) the
+    /// server advertises <c>h2</c> via TLS ALPN on HTTPS bindings and accepts
+    /// cleartext HTTP/2 (h2c upgrade and prior knowledge) on HTTP bindings.
+    /// Set to false to serve every connection as HTTP/1.x.
+    http2Enabled : bool }
 
   member x.withBindings(v)              = { x with bindings = v }
   member x.withServerKey(v)             = { x with serverKey = v }
@@ -102,6 +108,7 @@ type SuaveConfig =
   member x.withMaxConnectionAgeSeconds(v) = { x with maxConnectionAgeSeconds = v }
   member x.withFilePartSink(v)          = { x with filePartSink = v }
   member x.withAcceptorCount(v)         = { x with acceptorCount = v }
+  member x.withHttp2Enabled(v)          = { x with http2Enabled = v }
 
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
@@ -121,7 +128,10 @@ module SuaveConfig =
                          config.hideHeader
                          config.hideStartupMessage
                          config.maxContentLength
-    fun binding -> { createRuntime binding with filePartSink = config.filePartSink }
+    fun binding ->
+      { createRuntime binding with
+          filePartSink = config.filePartSink
+          http2Enabled = config.http2Enabled }
 
   /// Finds an endpoint that is configured from the given configuration. Throws
   /// an exception if the configuration has no bindings. Useful if you make

@@ -422,7 +422,10 @@ module Http =
       maxContentLength  : int
       /// Optional sink factory for streaming multipart file parts.
       /// When <c>None</c> (the default), each file part is buffered to a temp file on disk.
-      filePartSink      : FilePartSink option }
+      filePartSink      : FilePartSink option
+      /// When false, HTTP/2 is disabled: no `h2` in TLS ALPN and no h2c
+      /// (upgrade or prior knowledge). Defaults to true.
+      http2Enabled      : bool }
   and [<Struct>] HttpContext =
     { mutable request    : HttpRequest
       runtime    : HttpRuntime
@@ -516,7 +519,8 @@ module Http =
         hideHeader        = false
         hideStartupMessage = false
         maxContentLength  = 1024
-        filePartSink      = None }
+        filePartSink      = None
+        http2Enabled      = true }
 
     let create serverKey errorHandler mimeTypes homeDirectory compressionFolder
            (*logger*) cookieSerialiser hideHeader hideStartupMessage maxContentLength binding =
@@ -530,7 +534,8 @@ module Http =
         hideHeader        = hideHeader
         hideStartupMessage = hideStartupMessage
         maxContentLength  = maxContentLength
-        filePartSink      = None }
+        filePartSink      = None
+        http2Enabled      = true }
 
   [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
   module HttpContext =

@@ -269,7 +269,7 @@ let private runAcceptor
                   sslTransport.networkStream <- new NetworkStream(acceptedSocket, true)
                   sslTransport.sslStream <- new SslStream(sslTransport.networkStream, false)
 
-                  // Perform SSL handshake (with ALPN advertising h2, http/1.1).
+                  // Perform SSL handshake (with ALPN advertising h2 unless disabled, then http/1.1).
                   try
                     let certificate =
                       match runtime.matchedBinding.scheme with
@@ -278,7 +278,8 @@ let private runAcceptor
 
                     let opts =
                       SslTransport.buildServerAuthenticationOptions(
-                        certificate, checkCertificateRevocation = false)
+                        certificate, checkCertificateRevocation = false,
+                        http2Enabled = runtime.http2Enabled)
                     do! sslTransport.sslStream.AuthenticateAsServerAsync(
                       opts, cancellationToken)
                     sslTransport.negotiatedApplicationProtocol <-

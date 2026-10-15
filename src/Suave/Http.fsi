@@ -269,7 +269,11 @@ module Http =
       maxContentLength  : int
       /// Optional sink factory for streaming multipart file parts without a temp file.
       /// When <c>None</c> (the default), each file part is buffered to a temporary file on disk.
-      filePartSink      : FilePartSink option }
+      filePartSink      : FilePartSink option
+      /// When false, the server neither advertises <c>h2</c> via TLS ALPN nor
+      /// accepts cleartext HTTP/2 (h2c upgrade or prior knowledge); every
+      /// connection is served as HTTP/1.x. Defaults to true.
+      http2Enabled      : bool }
 
   /// The `HttpContext` is the container of the request, runtime, user-state and
   /// response.
