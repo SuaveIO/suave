@@ -1,6 +1,7 @@
 ﻿## Unreleased
 * `HttpRequest.query` returns `(key, None)` for a query key without a value (`?flag`), as documented, instead of `(key, Some "")`; `?key=` is still `(key, Some "")`. `queryFlag "flag"` is now `true` for `?flag`, and `queryParam "flag"` returns `Choice2Of2` for it. Form parsing (`form`, `formData`) is unchanged
 * `pathScan`, `pathScanCi` and `Sscanf.sscanf` no longer wrap integers that are out of range for the target type: `/items/99999999999` against `pathScan "/items/%d"` with an `int` handler now declines instead of passing `1215752191`; the same applies to `int16`, `uint16` and `uint32` (and `%x`/`%X`/`%o` values that do not fit)
+* The Suave.DotLiquid package declares `DotLiquid >= 2.3.197`; 3.6.1 and earlier declared `DotLiquid` with no lower bound (`0.0`), so NuGet picked DotLiquid 0.0.0 and the first render failed with `MissingMethodException` (`Template.set_NamingConvention`). Workaround for those versions: reference `DotLiquid` 2.3.197 explicitly. The DotLiquid docs now use `| escape` in their examples (DotLiquid does not HTML-escape output) and cover the response charset and template field naming
 
 ## New in v3.6.1 (Released 2026-10-07)
 * Keep-alive CPU per request is now within ≈1% of ASP.NET Core Minimal API on Linux with the server pinned to 4 cores (8.98 vs 8.89 µs, down from ≈9.7 µs in v3.6.0) (#865)
