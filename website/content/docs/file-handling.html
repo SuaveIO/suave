@@ -160,10 +160,13 @@ let app =
             let file = files.[0]
             let uploadDir = "./uploads"
             Directory.CreateDirectory(uploadDir) |> ignore
-            let savePath = Path.Combine(uploadDir, file.fileName)
-            // Uploads land on disk at tempFilePath; copy/move from there
-            File.Copy(file.tempFilePath, savePath, true)
-            return! OK (sprintf "File uploaded: %s" file.fileName) ctx
+            // Never build the path from file.fileName: the client controls it
+            // ("../../x" would escape uploadDir). Generate a name instead.
+            let savePath = Path.Combine(uploadDir, System.Guid.NewGuid().ToString("N"))
+            // Uploads land on disk at tempFilePath, which Suave deletes once the
+            // response has been written; move the file out to keep it.
+            File.Move(file.tempFilePath, savePath)
+            return! OK "File uploaded" ctx
         with ex ->
           return! INTERNAL_ERROR (sprintf "Upload failed: %s" ex.Message) ctx
       }

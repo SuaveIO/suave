@@ -1460,7 +1460,12 @@ module Files =
   /// <summary><para>
   /// Send a file as a response to the request
   /// </para><para>
+  /// A single <c>Range: bytes=…</c> request header is honoured with a 206 (positions
+  /// are inclusive; open-ended and suffix ranges are supported), or a 416 when the
+  /// range starts past the end of the file. Partial responses are not compressed.
   /// </para><para>
+  /// When <c>compression</c> is set but the compressed-files folder cannot be
+  /// written to, the file is sent uncompressed.
   /// </para></summary>
   /// <remarks>
   /// </remarks>
@@ -1494,6 +1499,14 @@ module Files =
   /// the resolved path escapes the root.
   /// </para></summary>
   val resolvePath : rootPath:string -> fileName:string -> string
+
+  /// <summary><para>
+  /// Like <c>resolvePath</c>, but returns <c>None</c> instead of raising when the
+  /// resolved path escapes the root. <c>browse</c>, <c>browseHome</c>,
+  /// <c>browseFile</c>, <c>browseFileHome</c> and <c>dir</c> use it, and decline
+  /// such a request the same way they decline a missing file.
+  /// </para></summary>
+  val tryResolvePath : rootPath:string -> fileName:string -> string option
 
 
   /// <summary><para>
@@ -1749,6 +1762,7 @@ module CORS =
       allowedMethods          : InclusiveOption<HttpMethod list>
 
       /// Allow cookies? This is sent in the AccessControlAllowCredentials header.
+      /// Only enable it together with an explicit list of allowedUris.
       allowCookies            : bool
 
       /// The list of response headers exposed to client. This is sent in AccessControlExposeHeaders header.
@@ -1758,12 +1772,42 @@ module CORS =
       maxAge                  : int option }
 
   /// <summary><para>
-  /// This WebPart handles CORS requests.
+  /// This WebPart adds CORS response headers for requests whose Origin is
+  /// allowed by the configuration, and always adds <c>Vary: Origin</c>.
   /// </para><para>
-  /// </para><para>
+  /// It always continues (returns <c>Some</c>), so in <c>cors cfg &gt;=&gt; handler</c>
+  /// the handler runs for preflight requests too and replaces the 204 preflight
+  /// response with its own. Use <c>withCORS cfg handler</c>, or put
+  /// <c>corsPreflight cfg</c> in front of the routes, to answer preflight
+  /// requests without running the handler.
   /// </para></summary>
-  /// <remarks>
-  /// </remarks>
   val cors : config:(CORSConfig) -> WebPart
 
+  /// <summary><para>
+  /// Answers CORS preflight requests (OPTIONS with Origin and
+  /// Access-Control-Request-Method) with 204 No Content, with the CORS headers
+  /// when the origin is allowed and without them otherwise. Fails (returns
+  /// <c>None</c>) for every other request, so it composes with <c>choose</c>:
+  /// <c>choose [ corsPreflight cfg; cors cfg &gt;=&gt; app ]</c>.
+  /// </para></summary>
+  val corsPreflight : config:(CORSConfig) -> WebPart
+
+  /// <summary><para>
+  /// Wraps a WebPart with CORS handling: preflight requests are answered by
+  /// <c>corsPreflight</c> and never reach <c>webPart</c>; other requests get the
+  /// headers from <c>cors</c> and are then handled by <c>webPart</c>.
+  /// </para></summary>
+  val withCORS : config:(CORSConfig) -> webPart:WebPart -> WebPart
+
+  /// <summary><para>
+  /// Allows any origin and any method, without credentials: the request Origin
+  /// is reflected in Access-Control-Allow-Origin, but
+  /// Access-Control-Allow-Credentials is not sent, so browsers do not attach
+  /// cookies or HTTP authentication to cross-origin requests.
+  /// </para><para>
+  /// To allow credentialed requests, list the trusted origins as well:
+  /// <c>{ defaultCORSConfig with allowedUris = InclusiveOption.Some [ "https://app.example.com" ]; allowCookies = true }</c>.
+  /// Combining <c>allowCookies = true</c> with <c>allowedUris = InclusiveOption.All</c>
+  /// lets any web site make authenticated requests on behalf of your users.
+  /// </para></summary>
   val defaultCORSConfig : CORSConfig

@@ -422,7 +422,9 @@ module Http =
       maxContentLength  : int
       /// Optional sink factory for streaming multipart file parts.
       /// When <c>None</c> (the default), each file part is buffered to a temp file on disk.
-      filePartSink      : FilePartSink option }
+      filePartSink      : FilePartSink option
+      /// Largest WebSocket frame payload, in bytes, a client may send.
+      webSocketMaxFrameSize : int }
   and [<Struct>] HttpContext =
     { mutable request    : HttpRequest
       runtime    : HttpRuntime
@@ -516,7 +518,8 @@ module Http =
         hideHeader        = false
         hideStartupMessage = false
         maxContentLength  = 1024
-        filePartSink      = None }
+        filePartSink      = None
+        webSocketMaxFrameSize = 16 * 1024 * 1024 }
 
     let create serverKey errorHandler mimeTypes homeDirectory compressionFolder
            (*logger*) cookieSerialiser hideHeader hideStartupMessage maxContentLength binding =
@@ -530,7 +533,8 @@ module Http =
         hideHeader        = hideHeader
         hideStartupMessage = hideStartupMessage
         maxContentLength  = maxContentLength
-        filePartSink      = None }
+        filePartSink      = None
+        webSocketMaxFrameSize = 16 * 1024 * 1024 }
 
   [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
   module HttpContext =

@@ -343,3 +343,86 @@ let edgeCases cfg =
           let result = contentString res
           Expect.equal result "success" (sprintf "request %d should succeed" i)
   ]
+
+// Sends a request with the given headers and returns its status code
+let statusWithHeaders resource (headers : (string * string) list) ctx =
+  use handler = createHandler DecompressionMethods.None None
+  use client = createClient handler
+  use request = createRequest HttpMethod.GET resource "" None (endpointUri ctx.suaveConfig)
+  for (name, value) in headers do
+    request.Headers.TryAddWithoutValidation(name, value) |> ignore
+  use response = request |> send client (TimeSpan.FromSeconds 5.) ctx
+  response.StatusCode
+
+[<Tests>]
+let limiterIsolation cfg =
+  let runWithConfig = runWith cfg
+
+  testList "limiter isolation" [
+    testCase "limiters with the same key keep separate counters" <| fun _ ->
+      let config = perMinute 1 |> withKeyExtractor (fun _ -> "shared-key")
+      let app =
+        choose [
+          Filters.path "/a" >=> rateLimit config (OK "a")
+          Filters.path "/b" >=> rateLimit config (OK "b") ]
+      let ctx = runWithConfig app
+
+      interaction ctx <| fun _ ->
+        Expect.equal (statusWithHeaders "/a" [] ctx) HttpStatusCode.OK "first /a allowed"
+        Expect.equal (statusWithHeaders "/b" [] ctx) HttpStatusCode.OK "first /b allowed: /a's count is not shared"
+        Expect.equal (statusWithHeaders "/a" [] ctx) HttpStatusCode.TooManyRequests "second /a limited"
+
+    testCase "limiters with different strategies on the same key both allow" <| fun _ ->
+      let app =
+        choose [
+          Filters.path "/sliding" >=> rateLimit (perMinute 5 |> withStrategy SlidingWindow) (OK "sliding")
+          Filters.path "/fixed" >=> rateLimit (perMinute 5 |> withStrategy FixedWindow) (OK "fixed")
+          Filters.path "/bucket" >=> rateLimit (perMinute 5 |> withStrategy (TokenBucket 1.0)) (OK "bucket") ]
+      let ctx = runWithConfig app
+
+      interaction ctx <| fun _ ->
+        Expect.equal (statusWithHeaders "/sliding" [] ctx) HttpStatusCode.OK "sliding allowed"
+        Expect.equal (statusWithHeaders "/fixed" [] ctx) HttpStatusCode.OK "fixed allowed after sliding"
+        Expect.equal (statusWithHeaders "/bucket" [] ctx) HttpStatusCode.OK "bucket allowed after fixed"
+  ]
+
+[<Tests>]
+let keyExtractors cfg =
+  let runWithConfig = runWith cfg
+  let loopbacks = [ IPAddress.Loopback; IPAddress.IPv6Loopback ]
+
+  testList "key extractors" [
+    testCase "default key extractor ignores X-Forwarded-For" <| fun _ ->
+      let app = rateLimit (perMinute 2) (OK "success")
+      let ctx = runWithConfig app
+
+      interaction ctx <| fun _ ->
+        Expect.equal (statusWithHeaders "/" [ "X-Forwarded-For", "203.0.113.1" ] ctx) HttpStatusCode.OK "first allowed"
+        Expect.equal (statusWithHeaders "/" [ "X-Forwarded-For", "203.0.113.2"; "X-Real-IP", "203.0.113.2" ] ctx) HttpStatusCode.OK "second allowed"
+        Expect.equal (statusWithHeaders "/" [ "X-Forwarded-For", "203.0.113.3"; "X-Real-IP", "203.0.113.3" ] ctx) HttpStatusCode.TooManyRequests "spoofed headers do not reset the limit"
+
+    testCase "trusted proxy extractor keys by forwarded client address" <| fun _ ->
+      let app = rateLimit (perMinute 1 |> withKeyExtractor (trustedProxyKeyExtractor loopbacks)) (OK "success")
+      let ctx = runWithConfig app
+
+      interaction ctx <| fun _ ->
+        Expect.equal (statusWithHeaders "/" [ "X-Forwarded-For", "203.0.113.1" ] ctx) HttpStatusCode.OK "client 1 allowed"
+        Expect.equal (statusWithHeaders "/" [ "X-Forwarded-For", "203.0.113.2" ] ctx) HttpStatusCode.OK "client 2 allowed"
+        Expect.equal (statusWithHeaders "/" [ "X-Forwarded-For", "203.0.113.1" ] ctx) HttpStatusCode.TooManyRequests "client 1 limited"
+
+    testCase "trusted proxy extractor ignores entries added by the client" <| fun _ ->
+      let app = rateLimit (perMinute 1 |> withKeyExtractor (trustedProxyKeyExtractor loopbacks)) (OK "success")
+      let ctx = runWithConfig app
+
+      interaction ctx <| fun _ ->
+        Expect.equal (statusWithHeaders "/" [ "X-Forwarded-For", "198.51.100.1, 203.0.113.9" ] ctx) HttpStatusCode.OK "first allowed"
+        Expect.equal (statusWithHeaders "/" [ "X-Forwarded-For", "198.51.100.2, 203.0.113.9" ] ctx) HttpStatusCode.TooManyRequests "keyed by the proxy-appended address"
+
+    testCase "trusted proxy extractor ignores headers from untrusted connections" <| fun _ ->
+      let app = rateLimit (perMinute 1 |> withKeyExtractor (trustedProxyKeyExtractor [ IPAddress.Parse "192.0.2.10" ])) (OK "success")
+      let ctx = runWithConfig app
+
+      interaction ctx <| fun _ ->
+        Expect.equal (statusWithHeaders "/" [ "X-Forwarded-For", "203.0.113.1" ] ctx) HttpStatusCode.OK "first allowed"
+        Expect.equal (statusWithHeaders "/" [ "X-Forwarded-For", "203.0.113.2" ] ctx) HttpStatusCode.TooManyRequests "header ignored, keyed by connection"
+  ]

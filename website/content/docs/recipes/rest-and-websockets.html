@@ -80,9 +80,20 @@
 open Suave.Filters
 open Suave.Operators
 open Suave.Successful
+open Suave.RequestErrors
 open Suave.WebSocket
 open Suave.Sockets
 open Suave.Sockets.Control
+
+// Browsers send cookies with cross-site WebSocket handshakes and CORS does
+// not apply to them, so only accept pages you serve.
+let allowedOrigins = set [ "http://localhost:8080" ]
+
+let checkOrigin : WebPart =
+  fun ctx -&gt;
+    match ctx.request.header "origin" with
+    | Choice1Of2 origin when allowedOrigins.Contains origin -&gt; succeed ctx
+    | _ -&gt; FORBIDDEN "Origin not allowed" ctx
 
 let ws (webSocket : WebSocket) (_ : HttpContext) =
   socket {
@@ -91,18 +102,21 @@ let ws (webSocket : WebSocket) (_ : HttpContext) =
       let! msg = webSocket.read()
       match msg with
       | (Text, data, true) -&gt; do! webSocket.send Text data true
-      | (Close, _, _) -&gt; loop &lt;- false
+      | (Ping, data, _) -&gt; do! webSocket.send Pong data true
+      | (Close, _, _) -&gt;
+          do! webSocket.send Close (ByteSegment [||]) true
+          loop &lt;- false
       | _ -&gt; ()
   }
 
 let app = choose [
-  path "/websocket" &gt;=&gt; handShake ws
+  path "/websocket" &gt;=&gt; checkOrigin &gt;=&gt; handShake ws
   GET &gt;=&gt; path "/api/health" &gt;=&gt; OK "ok"
-  RequestErrors.NOT_FOUND "Not found"
+  NOT_FOUND "Not found"
 ]
 
 startWebServer defaultConfig app</code></pre></div>
-        <p>Guide: <a href="../websockets.html">WebSockets</a>.</p>
+        <p>Check <code>Origin</code> before <code>handShake</code>: browsers attach cookies to cross-site WebSocket handshakes and CORS does not apply. Guide: <a href="../websockets.html">WebSockets</a>.</p>
 
       </div>
     </div>

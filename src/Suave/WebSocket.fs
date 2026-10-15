@@ -62,6 +62,7 @@ module WebSocket =
     | CLOSE_NO_STATUS
     | CLOSE_ABNORMAL
     | CLOSE_TOO_LARGE
+    | CLOSE_INTERNAL_ERROR
     member x.code =
       match x with
       | CLOSE_NORMAL -> 1000
@@ -71,6 +72,7 @@ module WebSocket =
       | CLOSE_NO_STATUS -> 1005
       | CLOSE_ABNORMAL -> 1006
       | CLOSE_TOO_LARGE -> 1009
+      | CLOSE_INTERNAL_ERROR -> 1011
 
   type FrameHeader =
     { fin     : bool
@@ -109,6 +111,12 @@ module WebSocket =
 
   let internal bytesToNetworkOrder (bytes : byte[]) =
     if BitConverter.IsLittleEndian then bytes |> Array.rev else bytes
+
+  /// The payload of a Close frame: the two-byte status code, then the UTF-8 reason.
+  let internal closePayload (code : CloseCode) (reason : string) : ByteSegment =
+    Memory
+      [| yield! BitConverter.GetBytes (uint16 code.code) |> bytesToNetworkOrder
+         yield! Encoding.UTF8.GetBytes reason |]
 
   let writeFrame (connection: Connection) (f: Frame) : SocketOp<unit> = 
     socket {
@@ -184,8 +192,14 @@ module WebSocket =
 
   let fork f = ThreadPool.QueueUserWorkItem(WaitCallback(f)) |> ignore
 
+  /// The largest frame payload, in bytes, a `WebSocket` accepts when none is
+  /// given; see `SuaveConfig.webSocketMaxFrameSize`.
+  let defaultMaxFrameSize = 16 * 1024 * 1024
+
   /// This class represents a WebSocket connection, it provides an interface to read and write to a WebSocket.
-  type WebSocket(connection : Connection, subprotocol: string option) =
+  type WebSocket(connection : Connection, subprotocol: string option, maxFrameSize : int) =
+
+    let mutable frameLimit = maxFrameSize
 
     let readExtendedLength header = socket {
       if header.length = 126 then
@@ -229,12 +243,10 @@ module WebSocket =
       assert(header.hasMask)
       let! mask = readBytes connection 4
 
-      if extendedLength > uint64 Int32.MaxValue then
-        let reason = "Frame size of " + extendedLength.ToString() + " bytes exceeds maximum accepted frame size (2 GB)"
-        let data =
-            [| yield! BitConverter.GetBytes (CloseCode.CLOSE_TOO_LARGE.code) |> bytesToNetworkOrder
-               yield! Encoding.UTF8.GetBytes reason |]
-        do! sendFrame Close (Memory(data)) true
+      // Refuse oversized frames before asking for (or allocating) a buffer.
+      if extendedLength > uint64 (max 0 frameLimit) then
+        let reason = sprintf "Frame size of %d bytes exceeds maximum of %d bytes" extendedLength frameLimit
+        do! sendFrame Close (closePayload CLOSE_TOO_LARGE reason) true
         return! SocketOp.abort (InputDataError(None, reason))
       else
         let! frame = readBytesIntoByteSegment byteSegmentForLengthFunc connection (int extendedLength)
@@ -261,6 +273,34 @@ module WebSocket =
 
     member this.subprotocol = subprotocol
 
+    /// The largest frame payload, in bytes, this socket accepts; frames that
+    /// announce more are answered with close code 1009 and end the connection.
+    /// Initialised from `SuaveConfig.webSocketMaxFrameSize`.
+    member this.maxFrameSize
+      with get () = frameLimit
+      and set v = frameLimit <- v
+
+    new (connection : Connection, subprotocol : string option) =
+      WebSocket(connection, subprotocol, defaultMaxFrameSize)
+
+  /// Runs the handler of an upgraded connection. Nothing may be written as an
+  /// HTTP response after the 101, so an exception is reported, answered with
+  /// close code 1011 and turned into an error result.
+  let internal runUpgraded (webSocket : WebSocket) (continuation : WebSocket -> HttpContext -> SocketOp<unit>) (ctx : HttpContext) : SocketOp<unit> =
+    ValueTask<Result<unit,Error>>(
+      task {
+        try
+          return! (continuation webSocket ctx).AsTask()
+        with ex ->
+          Globals.writeMessage $"WebSocket handler failed: {ex}"
+          try
+            let! _ = webSocket.send Close (closePayload CLOSE_INTERNAL_ERROR "Internal server error") true
+            ()
+          with _ ->
+            ()
+          return Result.Error (ConnectionError ex.Message)
+      })
+
   let internal handShakeAux webSocketProtocol webSocketKey continuation (ctx : HttpContext) =
     socket {
       let webSocketHash = sha1 <| webSocketKey + magicGUID
@@ -276,8 +316,8 @@ module WebSocket =
       // Mark connection as long-lived (WebSocket) to prevent health checker from closing it
       ctx.connection.isLongLived <- true
       
-      let webSocket = new WebSocket(ctx.connection, webSocketProtocol)
-      do! continuation webSocket ctx
+      let webSocket = new WebSocket(ctx.connection, webSocketProtocol, ctx.runtime.webSocketMaxFrameSize)
+      do! runUpgraded webSocket continuation ctx
     }
 
   let chooseSubprotocol (subprotocol : string) (requestSubprotocols : string []) (ctx : HttpContext) = async {
@@ -346,7 +386,7 @@ module WebSocket =
       return! response
   }
 
-  let handShake (continuation : WebSocket -> HttpContext -> SocketOp<unit>) (ctx : HttpContext) = async {
-    do! handShakeTask continuation ctx
-    return Some ctx
-  }
+  let handShake (continuation : WebSocket -> HttpContext -> SocketOp<unit>) (ctx : HttpContext) =
+    // Return handShakeTask's context: after an upgrade it writes nothing more,
+    // and a refused handshake carries its 400/405 response.
+    handShakeTask continuation ctx |> Async.AwaitTask

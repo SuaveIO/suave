@@ -409,3 +409,192 @@ let ``ETag support`` cfg =
         |> reqResp HttpMethod.GET "/" "" None None DecompressionMethods.None setIfNoneMatch statusCode
       Expect.equal status HttpStatusCode.NotModified "Wildcard If-None-Match should match any existing resource"
   ]
+
+
+[<Tests>]
+let ``byte ranges`` cfg =
+  let runWithConfig = runWith cfg
+
+  /// Serves a fresh "0123456789" file, so the compressed-file cache never has
+  /// an entry for it.
+  let withDigitsFile f =
+    let path = Path.Combine(Path.GetTempPath(), "suave-range-" + Guid.NewGuid().ToString("N") + ".txt")
+    File.WriteAllText(path, "0123456789")
+    try f path
+    finally try File.Delete path with _ -> ()
+
+  let contentRange (response : HttpResponseMessage) =
+    match response.Content.Headers.TryGetValues "Content-Range" with
+    | true, values -> Some (String.Join(",", values))
+    | _ -> None
+
+  /// Status, Content-Range, Content-Length and body of a request with `headers`.
+  let get (headers : (string * string) list) path =
+    let setHeaders (r : HttpRequestMessage) =
+      for (k, v) in headers do r.Headers.TryAddWithoutValidation(k, v) |> ignore
+      r
+    runWithConfig (Files.file path)
+    |> reqResp HttpMethod.GET "/" "" None None DecompressionMethods.None setHeaders (fun response ->
+         response.StatusCode,
+         contentRange response,
+         (let l = response.Content.Headers.ContentLength in if l.HasValue then Some l.Value else None),
+         contentString response)
+
+  let ranged range expectedRange (expectedBody : string) =
+    withDigitsFile (fun path ->
+      let status, cr, length, body = get [ "Range", range ] path
+      Expect.equal status HttpStatusCode.PartialContent "should be 206"
+      Expect.equal cr (Some expectedRange) "Content-Range"
+      Expect.equal length (Some (int64 expectedBody.Length)) "Content-Length"
+      Expect.equal body expectedBody "body")
+
+  let full range =
+    withDigitsFile (fun path ->
+      let status, cr, _, body = get [ "Range", range ] path
+      Expect.equal status HttpStatusCode.OK "should be 200"
+      Expect.isNone cr "a 200 carries no Content-Range"
+      Expect.equal body "0123456789" "the whole file")
+
+  let unsatisfiable range =
+    withDigitsFile (fun path ->
+      let status, cr, _, body = get [ "Range", range ] path
+      Expect.equal (int status) 416 "should be 416"
+      Expect.equal cr (Some "bytes */10") "Content-Range of a 416"
+      Expect.equal body "" "no body")
+
+  testList "byte ranges on `file`" [
+    testCase "a closed range is inclusive" <| fun _ -> ranged "bytes=2-5" "bytes 2-5/10" "2345"
+    testCase "a single byte" <| fun _ -> ranged "bytes=0-0" "bytes 0-0/10" "0"
+    testCase "an open-ended range runs to the end" <| fun _ -> ranged "bytes=5-" "bytes 5-9/10" "56789"
+    testCase "a suffix range is the last n bytes" <| fun _ -> ranged "bytes=-3" "bytes 7-9/10" "789"
+    testCase "a suffix longer than the file is the whole file" <| fun _ -> ranged "bytes=-30" "bytes 0-9/10" "0123456789"
+    testCase "a range past the end is clamped" <| fun _ -> ranged "bytes=8-20" "bytes 8-9/10" "89"
+    testCase "a range starting at the length is 416" <| fun _ -> unsatisfiable "bytes=10-"
+    testCase "a range starting past the end is 416" <| fun _ -> unsatisfiable "bytes=20-30"
+    testCase "an empty suffix is 416" <| fun _ -> unsatisfiable "bytes=-0"
+    testCase "an inverted range is ignored" <| fun _ -> full "bytes=5-2"
+    testCase "a malformed range is ignored" <| fun _ -> full "bytes=abc"
+    testCase "an unknown unit is ignored" <| fun _ -> full "items=0-1"
+    testCase "multiple ranges are answered with the whole file" <| fun _ -> full "bytes=0-1,4-5"
+
+    testCase "a full response carries no Content-Range" <| fun _ ->
+      withDigitsFile (fun path ->
+        let status, cr, length, body = get [] path
+        Expect.equal status HttpStatusCode.OK "should be 200"
+        Expect.isNone cr "no Content-Range on a 200"
+        Expect.equal length (Some 10L) "Content-Length"
+        Expect.equal body "0123456789" "the whole file")
+
+    testCase "a compressed response carries no Content-Range" <| fun _ ->
+      let headers =
+        runWithConfig (Files.browseFileHome "test-text-file.txt")
+        |> reqResp HttpMethod.GET "/" "" None None DecompressionMethods.None
+             (fun r -> r.Headers.TryAddWithoutValidation("Accept-Encoding", "gzip") |> ignore; r)
+             (fun response -> response.Content.Headers.ContentEncoding |> Seq.toList, contentRange response)
+      Expect.equal (fst headers) [ "gzip" ] "should be compressed"
+      Expect.isNone (snd headers) "no Content-Range on a compressed 200"
+
+    testCase "a range request is served uncompressed" <| fun _ ->
+      let path = Path.Combine(currentPath, "test-text-file.txt")
+      let expected = File.ReadAllBytes path
+      let encoding, cr, bytes =
+        runWithConfig (Files.file path)
+        |> reqResp HttpMethod.GET "/" "" None None DecompressionMethods.None
+             (fun r ->
+                r.Headers.TryAddWithoutValidation("Accept-Encoding", "gzip") |> ignore
+                r.Headers.TryAddWithoutValidation("Range", "bytes=0-9") |> ignore
+                r)
+             (fun response ->
+                response.Content.Headers.ContentEncoding |> Seq.toList,
+                contentRange response,
+                contentByteArray response)
+      Expect.equal encoding [] "a 206 is not compressed"
+      Expect.equal cr (Some (sprintf "bytes 0-9/%d" expected.Length)) "Content-Range"
+      Expect.equal bytes expected.[0..9] "the first ten bytes"
+  ]
+
+[<Tests>]
+let ``paths outside the root`` cfg =
+  let runWithConfig = runWith cfg
+  let ip, port =
+    let binding = SuaveConfig.firstBinding cfg
+    string binding.socketBinding.ip,
+    int binding.socketBinding.port
+
+  /// A root folder with a secret file next to it, in its parent.
+  let withRoot f =
+    let parent = Path.Combine(Path.GetTempPath(), "suave-root-" + Guid.NewGuid().ToString("N"))
+    let root = Path.Combine(parent, "public")
+    Directory.CreateDirectory root |> ignore
+    File.WriteAllText(Path.Combine(parent, "secret.txt"), "secret")
+    File.WriteAllText(Path.Combine(root, "index.txt"), "public")
+    try f root
+    finally try Directory.Delete(parent, true) with _ -> ()
+
+  let run (webPart : WebPart) rawPath =
+    let ctx =
+      { HttpContext.empty with
+          request = { HttpRequest.empty with rawPath = rawPath }
+          runtime = { HttpContext.empty.runtime with mimeTypesMap = Writers.defaultMimeTypesMap } }
+    webPart ctx |> Async.RunSynchronously
+
+  /// The status line of a raw request for `rawPath`, sent without the client
+  /// normalising the path away.
+  let statusLine (rawPath : string) (ctx : SuaveTestCtx) =
+    withContext (fun _ ->
+      use client = new TcpClient(ip, port)
+      let message = sprintf "GET %s HTTP/1.1\r\nHost: %s\r\nConnection: Close\r\n\r\n" rawPath ip
+      let outputData = ASCII.bytes message
+      let stream = client.GetStream()
+      stream.Write(outputData, 0, outputData.Length)
+      use streamReader = new StreamReader(stream)
+      streamReader.ReadLine()) ctx
+
+  testList "paths outside the root are declined" [
+    testCase "tryResolvePath answers None outside the root" <| fun _ ->
+      withRoot (fun root ->
+        Expect.isNone (Files.tryResolvePath root "/../secret.txt") "outside the root"
+        Expect.equal (Files.tryResolvePath root "/index.txt") (Some (Path.Combine(Path.GetFullPath root, "index.txt"))) "inside the root")
+
+    testCase "browse declines" <| fun _ ->
+      withRoot (fun root -> Expect.isNone (run (Files.browse root) "/../secret.txt") "declined")
+
+    testCase "browseFile declines" <| fun _ ->
+      withRoot (fun root -> Expect.isNone (run (Files.browseFile root "../secret.txt") "/") "declined")
+
+    testCase "dir declines" <| fun _ ->
+      withRoot (fun root -> Expect.isNone (run (Files.dir root) "/..") "declined")
+
+    testCase "browse still serves files inside the root" <| fun _ ->
+      withRoot (fun root -> Expect.isSome (run (Files.browse root) "/index.txt") "served")
+
+    testCase "a traversal request falls through to the next web part" <| fun _ ->
+      withRoot (fun root ->
+        let app = choose [ Files.browse root; RequestErrors.NOT_FOUND "nope" ]
+        let line = runWithConfig app |> statusLine "/../secret.txt"
+        Expect.equal line "HTTP/1.1 404 Not Found" "should be the fallback 404, not a 500")
+  ]
+
+[<Tests>]
+let ``unwritable compression folder`` cfg =
+  testList "unwritable compression folder" [
+    testCase "a compressible file is served uncompressed" <| fun _ ->
+      // A folder below a regular file can never be created.
+      let blocker = Path.GetTempFileName()
+      // A file nothing else has served, so the process-wide compressed-file
+      // cache cannot already hold a copy of it in some other folder.
+      let path = Path.Combine(Path.GetTempPath(), "suave-uncompressed-" + Guid.NewGuid().ToString("N") + ".txt")
+      File.WriteAllText(path, String.replicate 200 "compress me ")
+      try
+        let cfg = { cfg with compressedFilesFolder = Some (Path.Combine(blocker, "sub")) }
+        let encoding, bytes =
+          runWith cfg (Files.file path)
+          |> reqResp HttpMethod.GET "/" "" None None DecompressionMethods.None
+               (fun r -> r.Headers.TryAddWithoutValidation("Accept-Encoding", "gzip") |> ignore; r)
+               (fun response -> response.Content.Headers.ContentEncoding |> Seq.toList, contentByteArray response)
+        Expect.equal encoding [] "served without Content-Encoding"
+        Expect.equal bytes (File.ReadAllBytes path) "the file as it is"
+      finally
+        try File.Delete blocker with _ -> ()
+        try File.Delete path with _ -> ()
+  ]
