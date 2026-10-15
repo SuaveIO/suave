@@ -1,4 +1,7 @@
 ## Unreleased
+* `Validation.String` validators (`minLength`, `maxLength`, `exactLength`, `lengthBetween`, `matches`, `email`, `alphanumeric`, `alpha`, `numeric`, `contains`, `startsWith`, `endsWith`) return `Invalid` with "Value is required" for a `null` input instead of throwing `NullReferenceException`, e.g. for a field System.Text.Json left `null`; `notEmpty` is unchanged
+* `ValidationWebParts.validationErrorsToJson` writes its output with `Utf8JsonWriter`, so fields and messages containing `"`, `\` or control characters produce valid JSON; the shape is unchanged, the output is now compact (no spaces), and characters such as `'`, `<` and non-ASCII are written as `\uXXXX` escapes
+* Breaking: the `<++>` operator now preserves left-to-right order: `a <++> b` reports `a`'s errors before `b`'s and returns `a`'s value when both pass (previously the reverse). `a |> andAlso b` is unchanged
 * `pathScan`, `pathScanCi` and `Sscanf.sscanf` no longer wrap integers that are out of range for the target type: `/items/99999999999` against `pathScan "/items/%d"` with an `int` handler now declines instead of passing `1215752191`; the same applies to `int16`, `uint16` and `uint32` (and `%x`/`%X`/`%o` values that do not fit)
 
 ## New in v3.6.1 (Released 2026-10-07)
