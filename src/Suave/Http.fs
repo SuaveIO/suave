@@ -538,7 +538,7 @@ module Http =
         hideStartupMessage = hideStartupMessage
         maxContentLength  = maxContentLength
         filePartSink      = None
-        http2Enabled      = true }
+        http2Enabled      = true
         webSocketMaxFrameSize = 16 * 1024 * 1024 }
 
   [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
