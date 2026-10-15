@@ -224,6 +224,13 @@ let tryEnableReusePort (listenSocket: Socket) : bool =
 /// connection from holding shutdown up for ever.
 let mutable shutdownDrainTimeout = TimeSpan.FromSeconds 5.
 
+/// How long a client on an HTTPS binding may take to complete the TLS
+/// handshake. A connection that has not finished it by then is closed, so a
+/// client that connects and stays silent cannot hold a connection open.
+/// Applies to every HTTPS binding in the process; set it before starting the
+/// server.
+let mutable tlsHandshakeTimeout = TimeSpan.FromSeconds 10.
+
 /// Counts the connections an acceptor has handed to the thread pool and not
 /// yet seen finish. The accept loop ending does not mean the work it started
 /// has, and shutdown waits on this.
@@ -236,6 +243,68 @@ type private InflightConnections() =
   /// A connection has finished, however it finished
   member this.Leave() = Interlocked.Decrement(&count) |> ignore
 
+/// Prepare an accepted socket for `connection`: plain TCP is ready at once,
+/// HTTPS performs the TLS handshake (with ALPN advertising h2 unless disabled,
+/// then http/1.1), bounded by `tlsHandshakeTimeout`. Runs on the
+/// connection's own task, never on the accept loop, so a client that connects
+/// and then stalls the handshake holds up only its own connection.
+let private prepareConnection (acceptedSocket: Socket) (connection: ConnectionFacade)
+                              (runtime: HttpRuntime) (cancellationToken: CancellationToken) =
+  task {
+    match connection.Connection.transport with
+    | :? TcpTransport as tcpTransport ->
+        tcpTransport.acceptSocket <- acceptedSocket
+    | :? SslTransport as sslTransport ->
+        sslTransport.acceptSocket <- acceptedSocket
+        sslTransport.networkStream <- new NetworkStream(acceptedSocket, true)
+        sslTransport.sslStream <- new SslStream(sslTransport.networkStream, false)
+        let certificate =
+          match runtime.matchedBinding.scheme with
+          | HTTPS cert -> cert
+          | HTTP -> failwith "Expected HTTPS binding for SSL transport"
+        let opts =
+          SslTransport.buildServerAuthenticationOptions(
+            certificate, checkCertificateRevocation = false,
+            http2Enabled = runtime.http2Enabled)
+        use timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken)
+        timeout.CancelAfter tlsHandshakeTimeout
+        do! sslTransport.sslStream.AuthenticateAsServerAsync(opts, timeout.Token)
+        sslTransport.negotiatedApplicationProtocol <-
+          sslTransport.sslStream.NegotiatedApplicationProtocol
+    | _ -> ()
+  }
+
+/// Serve one accepted socket: prepare it, then run the connection's request
+/// loop. `connection.accept` recycles the connection to its pool when it ends;
+/// if preparing the socket fails (a TLS handshake that errors, times out or is
+/// cancelled) `accept` never runs, so the socket is closed and the connection
+/// returned to the pool here instead - exactly one of the two, on every path.
+let private serveConnection (acceptedSocket: Socket) (connection: ConnectionFacade)
+                            (connectionPool: Suave.Sockets.ConcurrentPool<ConnectionFacade>)
+                            (runtime: HttpRuntime) (cancellationToken: CancellationToken) : Task<unit> =
+  task {
+    let! prepared = task {
+      try
+        let rep = acceptedSocket.RemoteEndPoint :?> IPEndPoint
+        let binding = { ip = rep.Address; port = uint16 rep.Port }
+        do! prepareConnection acceptedSocket connection runtime cancellationToken
+        return ValueSome binding
+      with ex ->
+        if Globals.verbose then
+          Globals.writeMessage $"Connection setup failed (TLS handshake): {ex.Message}"
+        return ValueNone
+    }
+    match prepared with
+    | ValueSome binding ->
+        do! connection.accept binding
+    | ValueNone ->
+        // The transport may not own the socket yet (the failure can come
+        // before the streams are created), so close both.
+        try connection.Connection.transport.shutdown() with _ -> ()
+        try acceptedSocket.Dispose() with _ -> ()
+        connectionPool.Push(connection)
+  }
+
 /// Run a single accept loop on an already-bound, already-listening socket.
 /// `announce` is invoked once at start to report the bound endpoint to the
 /// orchestrator (only the first acceptor's announcement is forwarded to the
@@ -247,9 +316,6 @@ let private runAcceptor
       (inflight: InflightConnections)
       (cancellationToken: CancellationToken) : Task =
   task {
-    let remoteBinding (socket : Socket) =
-      let rep = socket.RemoteEndPoint :?> IPEndPoint
-      { ip = rep.Address; port = uint16 rep.Port }
     try
       while not(cancellationToken.IsCancellationRequested) do
           try
@@ -258,54 +324,23 @@ let private runAcceptor
             // Only pop a connection AFTER we have an accepted socket
             let connection : ConnectionFacade = connectionPool.Pop()
 
-            // Set the accepted socket and perform SSL handshake if needed
-            let! remoteBindingResult = task {
-              match connection.Connection.transport with
-              | :? TcpTransport as tcpTransport ->
-                  tcpTransport.acceptSocket <- acceptedSocket
-                  return Ok(remoteBinding acceptedSocket)
-              | :? SslTransport as sslTransport ->
-                  sslTransport.acceptSocket <- acceptedSocket
-                  sslTransport.networkStream <- new NetworkStream(acceptedSocket, true)
-                  sslTransport.sslStream <- new SslStream(sslTransport.networkStream, false)
-
-                  // Perform SSL handshake (with ALPN advertising h2 unless disabled, then http/1.1).
-                  try
-                    let certificate =
-                      match runtime.matchedBinding.scheme with
-                      | HTTPS cert -> cert
-                      | HTTP -> failwith "Expected HTTPS binding for SSL transport"
-
-                    let opts =
-                      SslTransport.buildServerAuthenticationOptions(
-                        certificate, checkCertificateRevocation = false,
-                        http2Enabled = runtime.http2Enabled)
-                    do! sslTransport.sslStream.AuthenticateAsServerAsync(
-                      opts, cancellationToken)
-                    sslTransport.negotiatedApplicationProtocol <-
-                      sslTransport.sslStream.NegotiatedApplicationProtocol
-                    return Ok(remoteBinding acceptedSocket)
-                  with ex ->
-                    return Result.Error(Error.ConnectionError($"SSL handshake failed: {ex.Message}"))
-              | _ ->
-                  return Ok(remoteBinding acceptedSocket)
-            }
-
-            match remoteBindingResult with
-            | Ok binding ->
-                // Fire and forget the connection handling using Task.Run;
-                // counted in and out so that shutdown can wait for the
-                // connections that are still being served.
-                inflight.Enter()
-                let connectionTask = Task.Run<unit>(Func<Task<unit>>(fun () -> connection.accept(binding)), cancellationToken)
-                connectionTask.ContinueWith(
-                  Action<Task<unit>>(fun _ -> inflight.Leave()),
-                  CancellationToken.None,
-                  TaskContinuationOptions.ExecuteSynchronously,
-                  TaskScheduler.Default) |> ignore
-            | Result.Error error ->
-                // SSL handshake failed, return connection to pool
-                connectionPool.Push(connection)
+            // The accept loop only accepts: everything that waits on the client,
+            // the TLS handshake included, happens on the connection's own task,
+            // so one slow or silent client cannot stop this listener accepting.
+            // Fire and forget, counted in and out so that shutdown can wait for
+            // the connections that are still being served. Not started on the
+            // server token: a task cancelled before it runs would never close
+            // the socket nor return the connection to the pool.
+            inflight.Enter()
+            let connectionTask =
+              Task.Run<unit>(
+                Func<Task<unit>>(fun () -> serveConnection acceptedSocket connection connectionPool runtime cancellationToken),
+                CancellationToken.None)
+            connectionTask.ContinueWith(
+              Action<Task<unit>>(fun _ -> inflight.Leave()),
+              CancellationToken.None,
+              TaskContinuationOptions.ExecuteSynchronously,
+              TaskScheduler.Default) |> ignore
           with ex ->
             if Globals.verbose then
               Globals.writeMessage $"TCP server accept exception: {ex}"

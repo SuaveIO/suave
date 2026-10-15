@@ -30,6 +30,7 @@
     <Compile Include="Streaming.fs" />
     <Compile Include="Stream.fs" />
     <Compile Include="Proxy.fs" />
+    <Compile Include="Tls.fs" />
     <Compile Include="HttpWriters.fs" />
     <Compile Include="HttpFile.fs" />
     <Compile Include="HttpEmbedded.fs" />
