@@ -95,6 +95,7 @@ let main argv =
   
 // Starts server on http://localhost:8080</code></pre>
       </div>
+      <p>If a binding cannot be bound, for example because another process already holds the port, <code>startWebServer</code> throws the <code>SocketException</code> (after retrying the bind briefly), and stops any other bindings that did start, so the program above exits with a non-zero code and a supervisor such as systemd (<code>Restart=on-failure</code>) or Docker sees the failure.</p>
 
       <h2>Custom Port</h2>
       <p>Configure the server to listen on a specific port:</p>
@@ -204,7 +205,7 @@ let main argv =
       </div>
 
       <h2>Graceful Shutdown</h2>
-      <p>Handle server shutdown gracefully:</p>
+      <p>Handle server shutdown gracefully. <code>startWebServerAsync</code> returns an <code>Async</code> that completes once every binding is listening, and the server <code>Task</code>, which completes when the server has stopped:</p>
       <div class="code-block">
         <pre><code>open Suave
 open Suave.Successful
@@ -226,11 +227,16 @@ let main argv =
     { defaultConfig with
         cancellationToken = cts.Token }
   
-  let _, shutdown = startWebServerAsync config app
+  let listening, server = startWebServerAsync config app
   
-  Async.RunSynchronously shutdown
+  // Throws if a binding cannot be bound (e.g. the port is in use)
+  listening |&gt; Async.RunSynchronously |&gt; ignore
+  printfn "Listening"
+  
+  server.Wait()
   0</code></pre>
       </div>
+      <p>When a binding fails to bind, <code>listening</code> raises the <code>SocketException</code> and the server task is faulted with it, so neither waits for ever. Cancelling the token stops the server cleanly: the task completes without an exception.</p>
 
       <h2>Compression Configuration</h2>
       <p>Enable gzip compression for responses:</p>

@@ -157,6 +157,7 @@ let main argv =
 
       <h3>Graceful shutdown</h3>
       <p>When <code>SuaveConfig.cancellationToken</code> is cancelled, Suave stops accepting connections and waits for requests in flight to finish for up to <code>Tcp.shutdownDrainTimeout</code> (5 seconds by default) before closing the remaining connections; <code>startWebServer</code> then returns. Without the <code>PosixSignalRegistration</code> above, SIGTERM ends the process straight away and drops those requests. Keep the stop timeout of your supervisor above the drain timeout (Docker waits 10 seconds by default, systemd 90 seconds).</p>
+      <p>If the server cannot bind its address, because the port is already in use for instance, <code>startWebServer</code> throws instead of returning, so the process exits with a non-zero code and <code>Restart=on-failure</code> or a Docker restart policy treats it as a failure.</p>
 
       <h2>Docker Deployment</h2>
       <p>Suave only needs the <code>runtime</code> image, not <code>aspnet</code>. The image below runs as the non-root user that the .NET images provide (<code>$APP_UID</code>), and binds to <code>0.0.0.0</code> so the published port can reach it:</p>

@@ -457,6 +457,13 @@ let runServerEx acceptorCount maxConcurrentOps bufferSize (binding: SocketBindin
         Globals.writeMessage $"TCP server runtime exception: {ex}"
         for s in listenSockets do
           if not (isNull (box s)) then stopTcp "runtime exception" s
+        // A failure before the server started listening (the bind failed after
+        // its retries, say) means it never ran: fail `listening` so that callers
+        // waiting for it get the exception instead of waiting for ever, and fault
+        // this task so that `startWebServer` throws rather than returning as if
+        // the server had run and stopped.
+        if acceptingConnections.fail ex then
+          System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(ex).Throw()
         }))
 
 /// Backwards-compatible single-acceptor entry point.
