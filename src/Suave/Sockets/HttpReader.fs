@@ -9,8 +9,10 @@ open Suave.Utils.Bytes
 open System.IO.Pipelines
 open System.Buffers
 
-[<Struct>]
-type ScanResult =
+/// Parser-internal outcome of a marker scan. Qualified access keeps its
+/// `Error` case from shadowing `Result.Error` after `open Suave`.
+[<Struct; RequireQualifiedAccess>]
+type internal ScanResult =
   NeedMore | Found of found:int64 | Error of Error
 
 [<Struct>]
@@ -347,10 +349,10 @@ type HttpReader(transport : ITransport, pipe: Pipe, cancellationToken: Threading
           match res with
           | Continue n ->
             pipe.Reader.AdvanceTo(bufferSequence.GetPosition(n + int64 marker.Length))
-            ValueSome(Result.Ok(Found n))
+            ValueSome(Result.Ok(ScanResult.Found n))
           | FailWith s ->
             pipe.Reader.AdvanceTo(bufferSequence.Start, bufferSequence.End)
-            ValueSome(Result.Ok(Error s))
+            ValueSome(Result.Ok(ScanResult.Error s))
         | ValueNone ->
           let examinePosition = bufferSequence.Length - marker.LongLength
           if examinePosition > 0L then
@@ -390,7 +392,7 @@ type HttpReader(transport : ITransport, pipe: Pipe, cancellationToken: Threading
   /// is sent to the function select. Returns synchronously when the marker is
   /// already present in the buffered data \u2014 the common case for HTTP/1.1 keep-alive
   /// where the next request's headers typically arrive in a single recv().
-  member x.scanMarker (marker: byte[]) (select : SelectFunction)
+  member internal x.scanMarker (marker: byte[]) (select : SelectFunction)
       : ValueTask<Result<ScanResult,Error>> =
     let mutable rr = Unchecked.defaultof<ReadResult>
     if pipe.Reader.TryRead(&rr) then
@@ -414,24 +416,24 @@ type HttpReader(transport : ITransport, pipe: Pipe, cancellationToken: Threading
     let scan = x.scanMarker marker select
     if scan.IsCompletedSuccessfully then
       match scan.Result with
-      | Ok(Found a) -> ValueTask<Result<int64,Error>>(Ok a)
-      | Ok(Error s) -> ValueTask<Result<int64,Error>>(Result.Error s)
-      | Ok NeedMore -> ValueTask<Result<int64,Error>>(Ok 0L)  // unreachable: scanMarker pumps internally
+      | Ok(ScanResult.Found a) -> ValueTask<Result<int64,Error>>(Ok a)
+      | Ok(ScanResult.Error s) -> ValueTask<Result<int64,Error>>(Result.Error s)
+      | Ok ScanResult.NeedMore -> ValueTask<Result<int64,Error>>(Ok 0L)  // unreachable: scanMarker pumps internally
       | Result.Error e -> ValueTask<Result<int64,Error>>(Result.Error e)
     else
       ValueTask<Result<int64,Error>>(
         task {
           match! scan with
-          | Ok(Found a) -> return Ok a
-          | Ok(Error s) -> return Result.Error s
-          | Ok NeedMore -> return Ok 0L  // unreachable
+          | Ok(ScanResult.Found a) -> return Ok a
+          | Ok(ScanResult.Error s) -> return Result.Error s
+          | Ok ScanResult.NeedMore -> return Ok 0L  // unreachable
           | Result.Error e -> return Result.Error e
         })
 
-  member x.skip n =
+  member internal x.skip n =
     task {
       let mutable rr = Unchecked.defaultof<ReadResult>
-      let mutable scanResult = Found n
+      let mutable scanResult = ScanResult.Found n
       let mutable proceed = true
       if not (pipe.Reader.TryRead(&rr)) then
         match! x.readMoreData() with
