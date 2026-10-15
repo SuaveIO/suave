@@ -239,12 +239,12 @@ open Suave.Filters
 open Suave.Writers
 open Suave.Successful
 
-let adminMiddleware =
-  setHeader "X-Admin" "true" >=>
+// Answers 401 instead of falling through when Authorization is missing
+let adminMiddleware (handler: WebPart) : WebPart =
   fun ctx ->
     match ctx.request.header "Authorization" with
-    | Choice1Of2 _ -> async { return Some ctx }
-    | _ -> async { return None }
+    | Choice1Of2 _ -> (setHeader "X-Admin" "true" >=> handler) ctx
+    | Choice2Of2 _ -> RequestErrors.UNAUTHORIZED "Authorization required" ctx
 
 let apiMiddleware =
   setHeader "Content-Type" "application/json" >=>
@@ -253,7 +253,7 @@ let apiMiddleware =
 let app =
   choose [
     // Admin routes with auth
-    path "/admin" >=> adminMiddleware >=> OK "Admin Dashboard"
+    path "/admin" >=> adminMiddleware (OK "Admin Dashboard")
 
     // API routes with JSON headers
     path "/api" >=> apiMiddleware >=> OK "{\"message\":\"API\"}"
