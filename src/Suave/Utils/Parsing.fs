@@ -16,14 +16,18 @@ let isLocalAddress (ip : string) =
   | true,  ip' -> IPAddress.IsLoopback ip'
 
 /// Parse the data in the string to a dictionary, assuming k/v pairs are separated
-/// by the ampersand character.
-let parseData (s : string) =
+/// by the ampersand character. `bareKeyValue` is the value given to a key that has
+/// no `=` at all.
+let private parseDataWith (bareKeyValue : string option) (s : string) =
   let parseArr (d : string array) =
-    let value = 
-      Array.tail d 
-      |> Array.map (fun x -> WebUtility.UrlDecode(x)) 
-      |>  fun x -> String.Join('=',x)
-    d.[0], Some (value)
+    if d.Length = 1 then
+      d.[0], bareKeyValue
+    else
+      let value =
+        Array.tail d
+        |> Array.map (fun x -> WebUtility.UrlDecode(x))
+        |>  fun x -> String.Join('=',x)
+      d.[0], Some (value)
   
   if String.IsNullOrWhiteSpace(s) then
     []
@@ -48,6 +52,15 @@ let parseData (s : string) =
         result <- (segment.Split('=') |> parseArr) :: result
     
     List.rev result
+
+/// Parse form data: a key without `=` gets an empty value, `(key, Some "")`.
+let parseData (s : string) =
+  parseDataWith (Some "") s
+
+/// Parse a query string: a key without `=` gets no value, `(key, None)`, while
+/// `key=` gets an empty value, `(key, Some "")`.
+let parseQuery (s : string) =
+  parseDataWith None s
 
 /// parse the url into its constituents and fill out the passed dictionary with
 /// query string key-value pairs

@@ -1,3 +1,6 @@
+﻿## Unreleased
+* `HttpRequest.query` returns `(key, None)` for a query key without a value (`?flag`), as documented, instead of `(key, Some "")`; `?key=` is still `(key, Some "")`. `queryFlag "flag"` is now `true` for `?flag`, and `queryParam "flag"` returns `Choice2Of2` for it. Form parsing (`form`, `formData`) is unchanged
+
 ## New in v3.6.1 (Released 2026-10-07)
 * Keep-alive CPU per request is now within ≈1% of ASP.NET Core Minimal API on Linux with the server pinned to 4 cores (8.98 vs 8.89 µs, down from ≈9.7 µs in v3.6.0) (#865)
 * Suave is compiled without F# `.tail` calls: `async` continuations in `bind` (`>=>`), `choose`, `tryThen`, `inject`, `<|>`, the router and others passed the `HttpContext` struct on as a tail call, which went through the runtime's slow, copying tail-call helper (#865)
