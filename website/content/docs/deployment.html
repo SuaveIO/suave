@@ -78,125 +78,180 @@
       </aside>
       <div class="docs-content">
 <h1>Deployment</h1>
-      <p>Deploy Suave applications to production with various hosting strategies.</p>
+      <p>Deploy Suave applications to production with various hosting strategies. The examples use an application called <code>MyApp</code>; replace <code>MyApp.dll</code> with your own assembly.</p>
 
       <h2>Building for Production</h2>
       <p>Prepare your Suave application for production deployment:</p>
       <div class="code-block">
-        <pre><code>// Build in Release mode
-dotnet build -c Release
-
-// Publish for standalone deployment
+        <pre><code># Framework-dependent publish (needs the .NET 10 runtime on the host)
 dotnet publish -c Release -o ./publish
 
-// Create self-contained deployment
+# Self-contained publish (no runtime needed on the host)
 dotnet publish -c Release -o ./publish \
   --self-contained true \
   -r linux-x64</code></pre>
       </div>
+      <p>Suave is a self-hosted server built on sockets; it does not use ASP.NET Core, so the plain .NET runtime is enough to run it.</p>
+
+      <h2>Configuring the Application</h2>
+      <p>Suave does not read any environment variables itself: <code>ASPNETCORE_URLS</code>, <code>ASPNETCORE_HTTP_PORTS</code> and <code>ASPNETCORE_ENVIRONMENT</code> have no effect, and <code>defaultConfig</code> listens on <code>127.0.0.1:8080</code>. In a container or on a machine reached directly from the network, bind to <code>0.0.0.0</code> explicitly. A common pattern is to read your own variables, such as <code>SUAVE_IP</code>, <code>SUAVE_PORT</code> and <code>APP_ENV</code> below:</p>
+      <div class="code-block">
+        <pre><code>open System
+open System.IO
+open System.Net.Http
+open System.Runtime.InteropServices
+open System.Threading
+open Suave
+open Suave.Filters
+open Suave.Operators
+open Suave.Successful
+
+let env name fallback =
+  match Environment.GetEnvironmentVariable name with
+  | null | "" -&gt; fallback
+  | v -&gt; v
+
+let ip = env "SUAVE_IP" "127.0.0.1"
+let port = int (env "SUAVE_PORT" "8080")
+let isDevelopment = env "APP_ENV" "Production" = "Development"
+
+let app =
+  choose [
+    path "/health" &gt;=&gt; OK "ok"
+    path "/" &gt;=&gt; OK "Hello World"
+  ]
+
+/// Used by the Docker HEALTHCHECK: `dotnet MyApp.dll --healthcheck`
+let healthCheck () =
+  use client = new HttpClient(Timeout = TimeSpan.FromSeconds 3.)
+  try
+    let response = client.GetAsync(sprintf "http://127.0.0.1:%d/health" port).Result
+    if response.IsSuccessStatusCode then 0 else 1
+  with _ -&gt; 1
+
+[&lt;EntryPoint&gt;]
+let main argv =
+  if argv = [| "--healthcheck" |] then healthCheck () else
+
+  // Stop gracefully on SIGTERM (docker stop, systemctl stop, Kubernetes)
+  use cts = new CancellationTokenSource()
+  use sigterm =
+    PosixSignalRegistration.Create(PosixSignal.SIGTERM, fun ctx -&gt;
+      ctx.Cancel &lt;- true // let main return instead of exiting immediately
+      cts.Cancel())
+
+  let config =
+    { defaultConfig with
+        bindings = [ HttpBinding.createSimple HTTP ip port ]
+        cancellationToken = cts.Token
+        // the application folder is often read-only (containers, non-root users)
+        compressedFilesFolder = Some (Path.GetTempPath())
+        errorHandler = if isDevelopment then developmentErrorHandler else defaultErrorHandler }
+
+  startWebServer config app
+  0</code></pre>
+      </div>
+
+      <h3>Error details</h3>
+      <p><code>defaultErrorHandler</code> answers unhandled exceptions with a plain <code>500 Internal Server Error</code> and never includes the exception. Use <code>developmentErrorHandler</code>, which returns the message and stack trace, only on your own machine. Do not enable it based on the client address: behind a reverse proxy on the same host every request comes from <code>127.0.0.1</code>. To log exceptions, write your own <code>ErrorHandler</code> that logs and then calls <code>defaultErrorHandler</code>.</p>
+
+      <h3>Graceful shutdown</h3>
+      <p>When <code>SuaveConfig.cancellationToken</code> is cancelled, Suave stops accepting connections and waits for requests in flight to finish for up to <code>Tcp.shutdownDrainTimeout</code> (5 seconds by default) before closing the remaining connections; <code>startWebServer</code> then returns. Without the <code>PosixSignalRegistration</code> above, SIGTERM ends the process straight away and drops those requests. Keep the stop timeout of your supervisor above the drain timeout (Docker waits 10 seconds by default, systemd 90 seconds).</p>
 
       <h2>Docker Deployment</h2>
-      <p>Deploy Suave in Docker containers:</p>
+      <p>Suave only needs the <code>runtime</code> image, not <code>aspnet</code>. The image below runs as the non-root user that the .NET images provide (<code>$APP_UID</code>), and binds to <code>0.0.0.0</code> so the published port can reach it:</p>
       <div class="code-block">
         <pre><code># Dockerfile
-FROM mcr.microsoft.com/dotnet/sdk:9.0 AS builder
-WORKDIR /build
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+WORKDIR /src
 COPY . .
 RUN dotnet publish -c Release -o /app/publish
 
-FROM mcr.microsoft.com/dotnet/runtime:9.0
+FROM mcr.microsoft.com/dotnet/runtime:10.0
 WORKDIR /app
-COPY --from=builder /app/publish .
+COPY --from=build /app/publish .
+ENV SUAVE_IP=0.0.0.0 \
+    SUAVE_PORT=8080
 EXPOSE 8080
-ENTRYPOINT ["dotnet", "Suave.Website.dll"]</code></pre>
+USER $APP_UID
+# The runtime image has no curl or wget, so the app checks itself
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD ["dotnet", "MyApp.dll", "--healthcheck"]
+ENTRYPOINT ["dotnet", "MyApp.dll"]</code></pre>
       </div>
+      <p>Use the exec form of <code>ENTRYPOINT</code> (as above) so that <code>dotnet</code> is PID 1 and receives SIGTERM from <code>docker stop</code>. Each health check starts a short-lived <code>dotnet</code> process; on Kubernetes, use an <code>httpGet</code> probe on <code>/health</code> instead, which needs nothing inside the image.</p>
 
       <h2>Docker Compose Setup</h2>
-      <p>Manage Suave with Docker Compose:</p>
+      <p>Run Suave behind nginx with Docker Compose. Only nginx publishes ports; the health check comes from the Dockerfile:</p>
       <div class="code-block">
-        <pre><code>version: '3.8'
-services:
+        <pre><code>services:
   suave:
     build: .
-    ports:
-      - "8080:8080"
     environment:
-      ASPNETCORE_ENVIRONMENT: Production
-      SUAVE_PORT: 8080
       SUAVE_IP: 0.0.0.0
+      SUAVE_PORT: 8080
+    expose:
+      - "8080"
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-  
+
   nginx:
-    image: nginx:latest
+    image: nginx:stable
     ports:
       - "80:80"
       - "443:443"
     volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
       - ./certs:/etc/nginx/certs:ro
     depends_on:
-      - suave</code></pre>
+      suave:
+        condition: service_healthy</code></pre>
       </div>
+      <p>In this setup, use <code>server suave:8080;</code> in the nginx upstream.</p>
 
       <h2>Linux Systemd Service</h2>
-      <p>Run Suave as a systemd service:</p>
+      <p>Run Suave as a systemd service, listening on loopback behind nginx:</p>
       <div class="code-block">
-        <pre><code"># /etc/systemd/system/suave.service
+        <pre><code># /etc/systemd/system/myapp.service
 [Unit]
-Description=Suave Web Application
+Description=MyApp (Suave)
 After=network.target
 
 [Service]
 Type=simple
 User=www-data
-WorkingDirectory=/opt/suave
-ExecStart=/usr/bin/dotnet /opt/suave/Suave.Website.dll
+WorkingDirectory=/opt/myapp
+ExecStart=/usr/bin/dotnet /opt/myapp/MyApp.dll
+Environment=SUAVE_IP=127.0.0.1
+Environment=SUAVE_PORT=8080
 Restart=always
 RestartSec=10
-StandardOutput=journal
-StandardError=journal
+# systemctl stop sends SIGTERM; give Suave time to drain connections
+KillSignal=SIGTERM
+TimeoutStopSec=15
 
 [Install]
-WantedBy=multi-user.target
-
-# Commands to manage the service
-sudo systemctl enable suave
-sudo systemctl start suave
-sudo systemctl status suave
-sudo systemctl restart suave</code></pre>
+WantedBy=multi-user.target</code></pre>
       </div>
-
-      <h2>IIS Hosting</h2>
-      <p>Host Suave on IIS with ASP.NET Core Module:</p>
       <div class="code-block">
-        <pre><code>&lt;?xml version="1.0" encoding="utf-8"?&gt;
-&lt;configuration&gt;
-  &lt;location path="." inheritInChildApplications="false"&gt;
-    &lt;system.webServer&gt;
-      &lt;handlers&gt;
-        &lt;add name="aspNetCore" path="*" verb="*" modules="AspNetCoreModuleV2" resourceType="Unspecified" /&gt;
-      &lt;/handlers&gt;
-      &lt;aspNetCore processPath="dotnet" arguments=".\Suave.Website.dll" 
-                   stdoutLogEnabled="true" 
-                   stdoutLogFile=".\logs\stdout" /&gt;
-    &lt;/system.webServer&gt;
-  &lt;/location&gt;
-&lt;/configuration&gt;</code></pre>
+        <pre><code>sudo systemctl daemon-reload
+sudo systemctl enable --now myapp
+sudo systemctl status myapp
+journalctl -u myapp -f</code></pre>
       </div>
 
       <h2>Nginx Reverse Proxy</h2>
-      <p>Use Nginx as a reverse proxy for Suave:</p>
+      <p>Use nginx as a reverse proxy for one or more Suave instances. The <code>map</code> sends <code>Connection: upgrade</code> only for WebSocket handshakes and keeps ordinary requests on reusable upstream connections:</p>
       <div class="code-block">
-        <pre><code">upstream suave {
-  server localhost:8080;
-  server localhost:8081;
-  server localhost:8082;
+        <pre><code>map $http_upgrade $connection_upgrade {
+  default upgrade;
+  ''      '';
+}
+
+upstream suave {
+  server 127.0.0.1:8080;
+  server 127.0.0.1:8081;
+  server 127.0.0.1:8082;
+  keepalive 32;
 }
 
 server {
@@ -207,35 +262,69 @@ server {
     proxy_pass http://suave;
     proxy_http_version 1.1;
     proxy_set_header Upgrade $http_upgrade;
-    proxy_set_header Connection keep-alive;
+    proxy_set_header Connection $connection_upgrade;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto $scheme;
-    proxy_cache_bypass $http_upgrade;
+
+    # WebSockets and server-sent events stay open longer than the 60 s default
+    proxy_read_timeout 1h;
+    proxy_send_timeout 1h;
   }
 
-  # WebSocket support
-  location /ws {
+  # For server-sent events, also disable response buffering
+  location /events {
     proxy_pass http://suave;
     proxy_http_version 1.1;
-    proxy_set_header Upgrade $http_upgrade;
-    proxy_set_header Connection "upgrade";
-    proxy_read_timeout 86400;
+    proxy_set_header Connection '';
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_buffering off;
+    proxy_read_timeout 1h;
   }
 }</code></pre>
       </div>
+      <p>Behind a proxy, the connection's address is the proxy's. Read the client address with <code>ctx.clientIpTrustProxy</code>, which uses <code>X-Real-IP</code> / <code>X-Forwarded-For</code>, and only when Suave is reachable from the proxy alone; for rate limiting use <code>RateLimit.trustedProxyKeyExtractor</code>. See <a href="rate-limiting.html">Rate limiting</a>.</p>
+
+      <h2>IIS Hosting</h2>
+      <p>The ASP.NET Core Module (<code>AspNetCoreModuleV2</code>) is meant for ASP.NET Core applications: in-process hosting needs the ASP.NET Core server, and Microsoft documents out-of-process hosting only for Kestrel. Do not use it for Suave. On Windows, either run Suave as a Windows service and use IIS with URL Rewrite and Application Request Routing as a reverse proxy (like the nginx setup above), or let the <a href="https://www.iis.net/downloads/microsoft/httpplatformhandler" target="_blank" rel="noopener">HttpPlatformHandler</a> module start the process and forward requests to the port it passes in <code>HTTP_PLATFORM_PORT</code>:</p>
+      <div class="code-block">
+        <pre><code>&lt;?xml version="1.0" encoding="utf-8"?&gt;
+&lt;configuration&gt;
+  &lt;system.webServer&gt;
+    &lt;handlers&gt;
+      &lt;add name="httpPlatformHandler" path="*" verb="*" modules="httpPlatformHandler" resourceType="Unspecified" /&gt;
+    &lt;/handlers&gt;
+    &lt;httpPlatform processPath=".\MyApp.exe"
+                  stdoutLogEnabled="true"
+                  stdoutLogFile=".\logs\stdout"
+                  startupTimeLimit="20"&gt;
+      &lt;environmentVariables&gt;
+        &lt;environmentVariable name="SUAVE_IP" value="127.0.0.1" /&gt;
+        &lt;environmentVariable name="SUAVE_PORT" value="%HTTP_PLATFORM_PORT%" /&gt;
+      &lt;/environmentVariables&gt;
+    &lt;/httpPlatform&gt;
+  &lt;/system.webServer&gt;
+&lt;/configuration&gt;</code></pre>
+      </div>
+      <p><code>dotnet publish</code> on Windows produces <code>MyApp.exe</code> next to <code>MyApp.dll</code>. As with any reverse proxy, every request then arrives from loopback.</p>
 
       <h2>HTTPS/SSL Configuration</h2>
-      <p>Configure HTTPS in Suave for production:</p>
+      <p>Terminating TLS in nginx or a load balancer is usually simplest. To serve HTTPS from Suave directly, load the certificate with <code>X509CertificateLoader</code> (the <code>X509Certificate2</code> file constructors are obsolete since .NET 9):</p>
       <div class="code-block">
-        <pre><code>open System.Security.Cryptography.X509Certificates
+        <pre><code>open System
+open System.Security.Cryptography.X509Certificates
 open Suave
 open Suave.Filters
 open Suave.Operators
 open Suave.Successful
 
-let cert = new X509Certificate2("/etc/ssl/certs/server.pfx", "password")
+let cert =
+  X509CertificateLoader.LoadPkcs12FromFile(
+    "/etc/myapp/server.pfx",
+    Environment.GetEnvironmentVariable "CERT_PASSWORD")
 
 let httpsConfig =
   { defaultConfig with
@@ -247,7 +336,7 @@ let httpsConfig =
 
 let app =
   choose [
-    path "/" >=> OK "Hello World"
+    path "/" &gt;=&gt; OK "Hello World"
   ]
 
 [&lt;EntryPoint&gt;]
@@ -255,153 +344,85 @@ let main argv =
   startWebServer httpsConfig app
   0</code></pre>
       </div>
-
-      <h2>Environment Configuration</h2>
-      <p>Configure Suave for different environments:</p>
-      <div class="code-block">
-        <pre><code">open Suave
-open Suave.Operators
-open System
-
-let getConfig () =
-  let env = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")
-  let port = 
-    match Environment.GetEnvironmentVariable("SUAVE_PORT") with
-    | null -> 8080
-    | p -> int p
-
-  let config =
-    { defaultConfig with
-        bindings = [HttpBinding.createSimple HTTP "0.0.0.0" port]
-    }
-  
-  match env with
-  | "Production" ->
-    { config with bufferSize = 4096; maxOps = 10000 }
-  | "Development" ->
-    { config with bufferSize = 2048 }
-  | _ -> config
-
-[&lt;EntryPoint&gt;]
-let main argv =
-  startWebServer (getConfig ()) app
-  0</code></pre>
-      </div>
+      <p>Ports below 1024 need root or <code>CAP_NET_BIND_SERVICE</code> on Linux (<code>AmbientCapabilities=CAP_NET_BIND_SERVICE</code> in the systemd unit). To redirect HTTP to HTTPS, see the <a href="recipes/https.html">HTTPS recipe</a>.</p>
 
       <h2>Load Balancing</h2>
-      <p>Scale Suave with multiple instances:</p>
+      <p>Scale Suave with multiple instances behind nginx:</p>
       <div class="code-block">
-        <pre><code"># docker-compose with load balancing
-version: '3.8'
-services:
-  suave1:
+        <pre><code>services:
+  suave:
     build: .
-    ports:
-      - "8081:8080"
     environment:
+      SUAVE_IP: 0.0.0.0
       SUAVE_PORT: 8080
-
-  suave2:
-    build: .
-    ports:
-      - "8082:8080"
-    environment:
-      SUAVE_PORT: 8080
-
-  suave3:
-    build: .
-    ports:
-      - "8083:8080"
-    environment:
-      SUAVE_PORT: 8080
+    deploy:
+      replicas: 3
 
   nginx:
-    image: nginx:latest
+    image: nginx:stable
     ports:
       - "80:80"
     volumes:
-      - ./nginx-lb.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx-lb.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
-      - suave1
-      - suave2
-      - suave3</code></pre>
+      - suave</code></pre>
       </div>
+      <p>With <code>server suave:8080;</code> in the upstream, nginx resolves the service name to the replicas' addresses when it starts. Sessions stored with <code>Suave.State.CookieStateStore</code> work across instances if they share the same <code>serverKey</code>; generate one key and give it to every instance.</p>
 
       <h2>Monitoring and Logging</h2>
-      <p>Monitor Suave applications in production:</p>
+      <p>Wrap the application to log each request with its status and duration:</p>
       <div class="code-block">
-        <pre><code">open Suave
+        <pre><code>open System.Diagnostics
+open Suave
+open Suave.Filters
 open Suave.Operators
-open System
+open Suave.Successful
 
-let monitoredConfig =
-  { defaultConfig with
-      bindings = [HttpBinding.createSimple HTTP "0.0.0.0" 8080]
-      maxOps = 1000
-  }
-
-let loggingMiddleware =
-  fun (ctx: HttpContext) ->
+let withRequestLog (app : WebPart) : WebPart =
+  fun ctx -&gt;
     async {
-      let startTime = System.DateTime.UtcNow
-      printfn "[%s] %s %s" 
-        (startTime.ToString("yyyy-MM-dd HH:mm:ss"))
-        ctx.request.method
-        ctx.request.path
-      
-      let! result = ctx.request.rawForm |> Async.AwaitTask
-      let duration = System.DateTime.UtcNow - startTime
-      printfn "[Response] %s %s - %dms" 
-        ctx.request.method
-        ctx.request.path
-        (int duration.TotalMilliseconds)
+      let sw = Stopwatch.StartNew()
+      let! result = app ctx
+      let status =
+        match result with
+        | Some c -&gt; c.response.status.code
+        | None -&gt; 404
+      printfn "%O %s -&gt; %d in %dms" ctx.request.method ctx.request.path status sw.ElapsedMilliseconds
       return result
     }
 
 let app =
   choose [
-    path "/" >=> OK "Hello World"
+    path "/" &gt;=&gt; OK "Hello World"
   ]
 
 [&lt;EntryPoint&gt;]
 let main argv =
-  startWebServer monitoredConfig (loggingMiddleware >=> app)
+  startWebServer defaultConfig (withRequestLog app)
   0</code></pre>
       </div>
+      <p>For structured logging, see <a href="logging.html">Logging</a>.</p>
 
       <h2>Performance Tuning</h2>
-      <p>Optimize Suave for high performance:</p>
+      <p>The defaults suit most applications. These settings are the ones that matter in production:</p>
       <div class="code-block">
-        <pre><code">open Suave
+        <pre><code>open Suave
 
-// Production-optimized configuration
 let productionConfig =
   { defaultConfig with
-      bindings = [HttpBinding.createSimple HTTP "0.0.0.0" 8080]
-      
-      // Increase concurrent operations
-      maxOps = 10000
-      
-      // Optimize buffer sizes
+      bindings = [ HttpBinding.createSimple HTTP "0.0.0.0" 8080 ]
+      // connection objects allocated at startup; more are created on demand (default 100)
+      maxOps = 1000
+      // socket buffer size in bytes (default 8 KiB)
       bufferSize = 8192
-      
-      // Connection settings
-      exposeServerHeader = false
-      
-      // Keep-alive timeout
-      homeFolder = Some (System.IO.Directory.GetCurrentDirectory())
-      
-      // Cancellation token timeout
-      cancellationToken = System.Threading.CancellationToken.None
-  }
+      // largest request body accepted, in bytes (default 10 MB)
+      maxContentLength = 10 * 1024 * 1024
+      // omit the Server header
+      hideHeader = true }</code></pre>
+      </div>
+      <p>See <a href="performance.html">Performance</a> for measurements and further tuning.</p>
+      </div>
 
-[&lt;EntryPoint&gt;]
-let main argv =
-  let config = productionConfig
-  startWebServer config app
-  0</code></pre>
-      </div>
-      </div>
     </div>
   </main>
 
