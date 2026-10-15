@@ -101,7 +101,85 @@ let keepAliveTests (cfg : SuaveConfig) =
     genKeepAliveTest "HTTP/1.1" None false
     genKeepAliveTest "HTTP/1.1" (Some "close") false
     genKeepAliveTest "HTTP/1.1" (Some "Keep-Alive") false
+    genKeepAliveTest "HTTP/1.0" (Some "x-foo, Keep-Alive") true
+    genKeepAliveTest "HTTP/1.0" (Some "x-foo") false
     keepAliveUserDataLifetimeTest
+  ]
+
+[<Tests>]
+let connectionPersistenceTests (cfg : SuaveConfig) =
+  let ip, port =
+    let binding = SuaveConfig.firstBinding cfg
+    binding.socketBinding.ip, int binding.socketBinding.port
+
+  let app = Successful.OK "ok"
+
+  let withServer f =
+    let ctx = runWith cfg app
+    try f () finally disposeContext ctx
+
+  let request version (connection : string option) =
+    let header = match connection with Some v -> sprintf "Connection: %s\r\n" v | None -> ""
+    sprintf "GET / %s\r\nHost: localhost\r\n%s\r\n" version header
+
+  /// Read one response (its body is "ok") and return its head and whether the
+  /// server then closed the connection. Persistence is proven by a second request
+  /// being answered on the same socket, not by waiting for a timeout.
+  let probe version connection =
+    use socket = new Sockets.Socket(Sockets.AddressFamily.InterNetwork, Sockets.SocketType.Stream, Sockets.ProtocolType.Tcp)
+    socket.ReceiveTimeout <- 5000
+    socket.Connect(IPEndPoint(ip, port))
+    let buffer = Array.zeroCreate<byte> 4096
+    let readResponse () =
+      let received = Text.StringBuilder()
+      let mutable closed = false
+      while not closed && not (received.ToString().EndsWith("\r\n\r\nok", StringComparison.Ordinal)) do
+        let n = try socket.Receive buffer with :? Sockets.SocketException -> 0
+        if n = 0 then closed <- true
+        else received.Append(Text.Encoding.ASCII.GetString(buffer, 0, n)) |> ignore
+      received.ToString(), closed
+    socket.Send(Text.Encoding.ASCII.GetBytes(request version connection)) |> ignore
+    let first, _ = readResponse ()
+    Expect.stringStarts first "HTTP/1.1 200" "first request is answered"
+    let second, closed =
+      try
+        socket.Send(Text.Encoding.ASCII.GetBytes(request version connection)) |> ignore
+        readResponse ()
+      with :? Sockets.SocketException -> "", true
+    first, closed || not (second.StartsWith("HTTP/1.1 200", StringComparison.Ordinal))
+
+  let hasConnectionClose (head : string) =
+    head.Contains("\r\nConnection: close\r\n", StringComparison.OrdinalIgnoreCase)
+
+  let staysOpen version connection =
+    let desc = match connection with Some v -> sprintf "'Connection: %s'" v | None -> "no Connection header"
+    testCase (sprintf "%s with %s keeps the connection open" version desc) <| fun _ ->
+      withServer (fun () ->
+        let head, closed = probe version connection
+        Expect.isFalse closed "the connection should persist"
+        Expect.isFalse (hasConnectionClose head) "the response should not announce a close")
+
+  let closes version connection =
+    let desc = match connection with Some v -> sprintf "'Connection: %s'" v | None -> "no Connection header"
+    testCase (sprintf "%s with %s closes the connection" version desc) <| fun _ ->
+      withServer (fun () ->
+        let head, closed = probe version connection
+        Expect.isTrue closed "the connection should be closed"
+        if version = "HTTP/1.1" then
+          Expect.isTrue (hasConnectionClose head) "the response should announce the close")
+
+  testList "connection persistence" [
+    staysOpen "HTTP/1.1" None
+    staysOpen "HTTP/1.1" (Some "x-foo")
+    staysOpen "HTTP/1.1" (Some "keep-alive, x-foo")
+    staysOpen "HTTP/1.1" (Some "x-close, closed")
+    closes "HTTP/1.1" (Some "close")
+    closes "HTTP/1.1" (Some "Close, foo")
+    closes "HTTP/1.1" (Some "foo ,  CLOSE ")
+    staysOpen "HTTP/1.0" (Some "keep-alive")
+    staysOpen "HTTP/1.0" (Some "x-foo, Keep-Alive")
+    closes "HTTP/1.0" None
+    closes "HTTP/1.0" (Some "x-foo")
   ]
 
 

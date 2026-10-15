@@ -22,6 +22,7 @@ module ByteConstants =
   let contentLengthBytes = ReadOnlyMemory<byte>(ASCII.bytes "Content-Length: ")
   let EOL    =  ReadOnlyMemory<byte>(ASCII.bytes "\r\n")
   let EOLEOL =  ReadOnlyMemory<byte>(ASCII.bytes "\r\n\r\n")
+  let connectionCloseBytes = ReadOnlyMemory<byte>(ASCII.bytes "Connection: close\r\n")
 
   /// Format an integer to ASCII bytes without allocating a string
   /// Uses Span<T> for zero-allocation number formatting
@@ -564,15 +565,30 @@ type HttpOutput(connection: Connection, runtime: HttpRuntime) =
     task{
       if newCtx.response.writePreamble then
         do! this.writePreamble newCtx.response
+        if HttpOutput.shouldAnnounceClose newCtx then
+          do! this.appendOrFlush ByteConstants.connectionCloseBytes
         do! this.writeContent true newCtx newCtx.response.content
       else
         do! this.writeContent false newCtx newCtx.response.content
         }
 
+  /// Whether the connection persists after this response (RFC 9112 §9.3).
+  /// Connection is a comma-separated list of options: an HTTP/1.1 connection
+  /// persists unless it lists "close"; an HTTP/1.0 one only if it lists "keep-alive".
   static member private keepAlive (ctx : HttpContext) =
-    match ctx.request.headerOrNull "connection" with
-    | null -> ctx.request.httpVersion.Equals("HTTP/1.1")
-    | conn -> String.equalsOrdinalCI conn "keep-alive"
+    let conn = ctx.request.headerOrNull "connection"
+    if ctx.request.httpVersion.Equals("HTTP/1.1") then
+      isNull conn || not (String.containsTokenOrdinalCI "close" conn)
+    else
+      not (isNull conn) && String.containsTokenOrdinalCI "keep-alive" conn
+
+  /// A server closing an HTTP/1.1 connection after the client sent "close"
+  /// SHOULD say so (RFC 9112 §9.6), unless the web part already set Connection.
+  static member private shouldAnnounceClose (ctx : HttpContext) =
+    ctx.response.status.code >= 200
+    && ctx.request.httpVersion.Equals("HTTP/1.1")
+    && not (HttpOutput.keepAlive ctx)
+    && not (ctx.response.headers |> List.exists (fun (k, _) -> String.equalsOrdinalCI k "connection"))
 
   member private this.finishWrite (written : Task<unit>) (ctx : HttpContext) : Task<Result<bool,Error>> =
     task {
