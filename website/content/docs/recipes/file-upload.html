@@ -77,12 +77,23 @@
         <h1>Recipe: Multipart file upload</h1>
         <div class="recipe-meta"><p><strong>Goal:</strong> Accept a file from a browser form.</p></div>
         <div class="callout warn"><p>Forms must use <code>enctype="multipart/form-data"</code> or <code>request.files</code> stays empty.</p></div>
-        <div class="code-block"><pre><code>open System.IO
+        <div class="callout warn"><p>Never build a path from <code>file.fileName</code>: it is whatever the client sent, and a name such as <code>../../app.config</code> would write outside your upload folder. Generate your own name and keep the client's name only as data.</p></div>
+        <div class="code-block"><pre><code>open System
+open System.IO
 open Suave
 open Suave.Filters
 open Suave.Operators
 open Suave.Successful
 open Suave.RequestErrors
+
+let uploadDir = Path.GetFullPath "uploads"
+
+/// The client's extension, if it is a short, plain one (".png", ".pdf").
+let safeExtension (fileName : string) =
+  let ext = Path.GetExtension(Path.GetFileName fileName)
+  if ext.Length &gt; 1 &amp;&amp; ext.Length &lt;= 10 &amp;&amp; ext |&gt; Seq.skip 1 |&gt; Seq.forall Char.IsLetterOrDigit
+  then ext.ToLowerInvariant()
+  else ""
 
 let handleUpload =
   request (fun r -&gt;
@@ -91,10 +102,13 @@ let handleUpload =
       BAD_REQUEST "No file"
     else
       let file = files.[0]
-      let dest = Path.Combine("uploads", file.fileName)
-      Directory.CreateDirectory("uploads") |&gt; ignore
-      File.Copy(file.tempFilePath, dest, true)
-      OK (sprintf "Saved %s" file.fileName))
+      Directory.CreateDirectory uploadDir |&gt; ignore
+      // A server-generated name: the client's file name never reaches the path.
+      let storedName = Guid.NewGuid().ToString("N") + safeExtension file.fileName
+      // Move the temp file out of the way; Suave deletes whatever is still at
+      // tempFilePath once the response has been written.
+      File.Move(file.tempFilePath, Path.Combine(uploadDir, storedName))
+      OK (sprintf "Saved %s as %s" (Net.WebUtility.HtmlEncode file.fileName) storedName))
 
 let app = choose [
   GET &gt;=&gt; path "/" &gt;=&gt; OK """
@@ -106,6 +120,7 @@ let app = choose [
 ]
 
 startWebServer defaultConfig app</code></pre></div>
+        <p>Each upload is written to a temp file (<code>tempFilePath</code>) before your handler runs. Suave deletes that file once the response has been written, so move or copy it during the request if you want to keep it. Streaming it back with <code>Files.sendFile file.tempFilePath</code> is fine: the response is complete before the file is removed. Uploads handled by a custom <code>filePartSink</code> are never deleted by Suave.</p>
         <p>More: <a href="../file-handling.html">File handling</a>.</p>
 
       </div>
