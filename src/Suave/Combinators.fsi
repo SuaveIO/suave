@@ -1625,6 +1625,12 @@ module Embedded =
 
 /// A module that implements the Server-Sent Event specification, which can be
 /// read at www.w3.org/TR/eventsource.
+///
+/// The unit-returning writers (`send`, `data`, `comment`, `dispatch`, ...)
+/// raise `Suave.Sockets.SocketWriteException` when a write fails, typically
+/// because the client has disconnected, which ends the event stream. Use
+/// `trySend` / `tryComment` to get a `Result` instead and stop a send loop on
+/// `Error`.
 module EventSource =
 
   /// Helper function that writes a string of data. Most often you are better
@@ -1632,6 +1638,7 @@ module EventSource =
   /// the proper framing is used. However, if you have a desire to write raw
   /// data, this function overrides the Socket.async_write function so that
   /// you will be writing UTF8 data only, as per the specification.
+  /// The data is written as is: line breaks in it are not escaped.
   val asyncWrite : out:Connection -> data:string -> Task<unit>
 
   /// Same as `async_write`; convenience function.
@@ -1642,21 +1649,23 @@ module EventSource =
   val dispatch : out:Connection -> Task<unit>
 
   /// "If the line starts with a U+003A COLON character (:) - Ignore the line."
-  /// Writes a comment to the stream
+  /// Writes a comment to the stream. CR and LF are removed from the comment.
   val comment : out:Connection -> cmt:string -> Task<unit>
 
   /// "If the field name is 'event' - Set the event type buffer to field value."
-  /// Writes the event type to the stream
+  /// Writes the event type to the stream. CR and LF are removed from the value.
   val eventType : out:Connection -> eventType:string -> Task<unit>
 
   /// "If the field name is 'data' -
   /// Append the field value to the data buffer, then append a single
   /// U+000A LINE FEED (LF) character to the data buffer."
-  /// Write a piece of data as part of the event
+  /// Write a piece of data as part of the event. The data is split on
+  /// CRLF, LF and CR and written as one `data:` line per line, so the client
+  /// receives it with its line breaks as LF.
   val data : out:Connection -> data:string -> Task<unit>
 
   /// "If the field name is 'id' - Set the last event ID buffer to the field value."
-  /// Sets the last event id in the stream.
+  /// Sets the last event id in the stream. CR and LF are removed from the value.
   val esId : out:Connection -> lastEventId:string -> Task<unit>
 
   /// Sets the option for the EventSource instance, of how long to wait in ms
@@ -1675,14 +1684,53 @@ module EventSource =
     /// Create a new message with a given type to send over SSE
     static member createType : id:string -> data:string -> typ:string -> Message
 
-  /// send a message containing data to the output stream
+  /// Send a message containing data to the output stream, framed as by
+  /// `esId`, `eventType`, `data` and `dispatch`, in a single write. Raises
+  /// `SocketWriteException` when the write fails.
   val send : out:Connection -> msg:Message -> Task<unit>
+
+  /// Send a message as `send` does, returning `Error` instead of raising when
+  /// the write fails, e.g. because the client has disconnected:
+  ///
+  ///   let rec loop i = task {
+  ///     match! EventSource.trySend out (Message.create (string i) "tick") with
+  ///     | Ok () ->
+  ///       do! Task.Delay 1000
+  ///       return! loop (i + 1)
+  ///     | Error _ -> () }
+  val trySend : out:Connection -> msg:Message -> Task<Result<unit, Error>>
+
+  /// Write a comment as `comment` does, returning `Error` instead of raising
+  /// when the write fails. Useful as a heartbeat to detect gone clients.
+  val tryComment : out:Connection -> cmt:string -> Task<Result<unit, Error>>
 
   /// This function composes the passed function f with the hand-shake required
   /// to start a new event-stream protocol session with the browser.
+  ///
+  /// The response status is set to 200 and `Content-Type` to
+  /// `text/event-stream; charset=utf-8`. Headers already on the response are
+  /// kept; `Cache-Control: no-cache` and `X-Accel-Buffering: no` are added
+  /// unless already present. No CORS header is sent: compose with e.g.
+  /// `Writers.setHeader "Access-Control-Allow-Origin" "*"` or `CORS.cors` to
+  /// allow cross-origin clients.
   val handShake : fCont:(Connection -> Task<unit>) -> WebPart
 
 module TransferEncoding =
+  /// Respond with `Transfer-Encoding: chunked`, letting the given function
+  /// write the body, typically with `Connection.writeChunk` /
+  /// `Connection.tryWriteChunk`, ending with the terminating chunk
+  /// (`Connection.writeLastChunk`).
+  ///
+  /// The response headers, including the blank line that ends them, are
+  /// written and flushed before the function is called. Anything the function
+  /// writes with the buffered `Connection` members (`asyncWrite`,
+  /// `asyncWriteLn`, `asyncWriteBufferedBytes`) must be flushed with
+  /// `flush()` before writing directly to `conn.transport`, or it is sent
+  /// out of order.
+  ///
+  /// The response status is kept, except that the initial 404 of a fresh
+  /// response becomes 200. To send a chunked 404, set the status after this
+  /// web part: `TransferEncoding.chunked write >=> Writers.setStatus HTTP_404`.
   val chunked: (Connection -> Task<unit>) -> WebPart
 
 module Control =

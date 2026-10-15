@@ -950,20 +950,37 @@ module EventSource =
       let! r = out.transport.write ES_EOL_S
       match r with
       | Ok () -> return ()
-      | Result.Error _ -> return ()
+      | Result.Error e -> return raise (SocketWriteException e)
     }
 
+  /// Remove CR and LF, which would end the field and start a new one.
+  let private singleLine (value : string) =
+    if isNull value then ""
+    elif value.IndexOfAny [| '\r'; '\n' |] < 0 then value
+    else value.Replace("\r", "").Replace("\n", "")
+
+  let private eolSeparators = [| "\r\n"; "\n"; "\r" |]
+
+  /// One `data:` line per line of the value, so that line breaks in the value
+  /// cannot end the event or inject other fields.
+  let private dataLines (value : string) =
+    let value = if isNull value then "" else value
+    let sb = StringBuilder()
+    for line in value.Split(eolSeparators, StringSplitOptions.None) do
+      sb.Append("data: ").Append(line).Append(ES_EOL) |> ignore
+    sb.ToString()
+
   let comment (out : Connection) (cmt : string) =
-    out <<. ": " + cmt + ES_EOL
+    out <<. ": " + singleLine cmt + ES_EOL
 
   let eventType (out : Connection) (eventType : string) =
-    out <<. "event: " + eventType + ES_EOL
+    out <<. "event: " + singleLine eventType + ES_EOL
 
   let data (out : Connection) (data : string) =
-    out <<. "data: " + data + ES_EOL
+    out <<. dataLines data
 
   let esId (out : Connection) (lastEventId : string) =
-    out <<. "id: " + lastEventId + ES_EOL
+    out <<. "id: " + singleLine lastEventId + ES_EOL
 
   let retry (out : Connection) (retry : uint32) =
     out <<. "retry: " + (string retry) + ES_EOL
@@ -983,16 +1000,21 @@ module EventSource =
     static member createType id data typ =
       { id = id; data = data; ``type`` = Some typ }
 
-  let send (out : Connection) (msg : Message) =
-    task {
-      do! esId out msg.id
+  let private formatMessage (msg : Message) =
+    let typ =
       match msg.``type`` with
-      | Some x -> do! eventType out x
-      | None   -> ()
-      do! data out msg.data
-      do! dispatch out
-      return ()
-    }
+      | Some x -> "event: " + singleLine x + ES_EOL
+      | None -> ""
+    "id: " + singleLine msg.id + ES_EOL + typ + dataLines msg.data + ES_EOL
+
+  let trySend (out : Connection) (msg : Message) =
+    out.tryWriteBytes (Encoding.UTF8.GetBytes (formatMessage msg))
+
+  let send (out : Connection) (msg : Message) =
+    out.asyncWriteBytes (Encoding.UTF8.GetBytes (formatMessage msg))
+
+  let tryComment (out : Connection) (cmt : string) =
+    out.tryWriteBytes (Encoding.UTF8.GetBytes (": " + singleLine cmt + ES_EOL))
 
   let private handShakeAux f (out : Connection, _) =
     task {
@@ -1015,18 +1037,20 @@ module EventSource =
     }
 
   let handShake (fCont: Connection -> Task<unit>) (ctx : HttpContext) =
+    let has name = ctx.response.headers |> List.exists (fun (k, _) -> String.equalsOrdinalCI k name)
+    let optional name value headers = if has name then headers else (name, value) :: headers
+    let headers =
+      ctx.response.headers
+      |> List.filter (fun (k, _) -> not (String.equalsOrdinalCI k "Content-Type"))
+      // http://wiki.nginx.org/X-accel#X-Accel-Buffering – hard to find
+      // also see http://wiki.nginx.org/HttpProxyModule#proxy_buffering
+      |> optional "X-Accel-Buffering" "no"
+      |> optional "Cache-Control" "no-cache"
     { ctx with
         response =
           { ctx.response with
               status = HTTP_200.status
-              headers =
-                ("Content-Type",                "text/event-stream; charset=utf-8")
-                :: ("Cache-Control",               "no-cache")
-                :: ("Access-Control-Allow-Origin", "*")
-                // http://wiki.nginx.org/X-accel#X-Accel-Buffering – hard to find
-                // also see http://wiki.nginx.org/HttpProxyModule#proxy_buffering
-                :: ("X-Accel-Buffering",           "no")
-                :: []
+              headers = ("Content-Type", "text/event-stream; charset=utf-8") :: headers
               content = SocketTask (handShakeAux fCont)
           }
     }
@@ -1039,13 +1063,22 @@ module TransferEncoding =
   let chunked (asyncWriteChunks: Connection -> System.Threading.Tasks.Task<unit>) (ctx : HttpContext) =
     let task (conn:Connection,_) = task {
       do! conn.asyncWriteLn ""
-      do! asyncWriteChunks conn
+      // Send the headers now, so writers may go straight to conn.transport
+      let! r = conn.tryFlush ()
+      match r with
+      | Ok () -> do! asyncWriteChunks conn
+      | Result.Error e -> raise (SocketWriteException e)
     }
+    // A fresh response is a 404 until something sets a status; a chunked
+    // response composed without one is meant to succeed.
+    let status =
+      if ctx.response.status.code = HTTP_404.status.code then HTTP_200.status
+      else ctx.response.status
     { ctx with
         response =
           {
             ctx.response with
-              status = ctx.response.status
+              status = status
               headers = ("Transfer-Encoding", "chunked") :: ctx.response.headers
               writePreamble = true
               content = SocketTask task
