@@ -302,7 +302,7 @@ module Http =
     member x.url = x.binding.uri x.rawPath x.rawQuery
 
     member x.query =
-      Parsing.parseData x.rawQuery
+      Parsing.parseQuery x.rawQuery
 
     member x.queryParam (key : string) =
       getFirstOpt x.query key

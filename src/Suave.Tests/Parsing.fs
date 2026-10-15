@@ -1,4 +1,4 @@
-module Suave.Tests.Parsing
+﻿module Suave.Tests.Parsing
 
 open Expecto
 open System
@@ -110,6 +110,63 @@ let parseQuery =
       let actualD = subject.[5] |> snd |> Option.get
       Expect.equal actualD "=5==" "d should be '=5=='"
 
+    ]
+
+[<Tests>]
+let queryString cfg =
+  let runWithConfig = runWith cfg
+  let withQuery q = { HttpRequest.empty with rawQuery = q }
+
+  let dump =
+    request (fun r ->
+      r.query
+      |> List.map (fun (k, v) -> k + ":" + (match v with Some v -> "Some " + v | None -> "None"))
+      |> String.concat ","
+      |> fun s -> OK (s + "|" + string (r.queryFlag "flag")))
+
+  testList "query string" [
+    testCase "a key without value is (key, None)" <| fun _ ->
+      Expect.equal (withQuery "flag").query [ "flag", None ] "bare key"
+
+    testCase "a key with empty value is (key, Some \"\")" <| fun _ ->
+      Expect.equal (withQuery "empty=").query [ "empty", Some "" ] "key="
+      Expect.equal ((withQuery "empty=").queryParamOpt "empty") (Some ("empty", Some "")) "queryParamOpt"
+
+    testCase "repeated and mixed keys" <| fun _ ->
+      Expect.equal (withQuery "tag=a&tag=b&flag&empty=").query
+        [ "tag", Some "a"; "tag", Some "b"; "flag", None; "empty", Some "" ] "query"
+      Expect.equal ((withQuery "tag=a&flag").queryParamOpt "flag") (Some ("flag", None)) "queryParamOpt"
+
+    testCase "queryFlag ?flag => true" <| fun _ ->
+      Expect.isTrue ((withQuery "flag").queryFlag "flag") "?flag"
+
+    testCase "queryFlag ?flag=true => true" <| fun _ ->
+      Expect.isTrue ((withQuery "flag=true").queryFlag "flag") "?flag=true"
+
+    testCase "queryFlag ?flag=false => false" <| fun _ ->
+      Expect.isFalse ((withQuery "flag=false").queryFlag "flag") "?flag=false"
+
+    testCase "queryFlag ?flag=apa => false" <| fun _ ->
+      Expect.isFalse ((withQuery "flag=apa").queryFlag "flag") "?flag=apa"
+
+    testCase "queryFlag ? => false" <| fun _ ->
+      Expect.isFalse ((withQuery "").queryFlag "flag") "?"
+      Expect.equal (withQuery "").query [] "empty query"
+
+    testCase "queryFlag ?flag= => false" <| fun _ ->
+      Expect.isFalse ((withQuery "flag=").queryFlag "flag") "?flag="
+
+    testCase "over the wire" <| fun _ ->
+      let actual = runWithConfig dump |> reqQuery HttpMethod.GET "/" "tag=a&tag=b&flag&empty="
+      Expect.equal actual "tag:Some a,tag:Some b,flag:None,empty:Some |True" "parsed by a live server"
+
+    testCase "over the wire, ? only" <| fun _ ->
+      let actual = runWithConfig dump |> reqQuery HttpMethod.GET "/" ""
+      Expect.equal actual "|False" "no query"
+
+    testCase "form keys without value are still (key, Some \"\")" <| fun _ ->
+      let r = { HttpRequest.empty with rawForm = Encoding.ASCII.GetBytes "a=1&b&c=" }
+      Expect.equal r.form [ "a", Some "1"; "b", Some ""; "c", Some "" ] "form"
     ]
 
 [<Tests>]

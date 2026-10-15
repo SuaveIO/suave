@@ -1,4 +1,5 @@
-## Unreleased
+﻿## Unreleased
+* `HttpRequest.query` returns `(key, None)` for a query key without a value (`?flag`), as documented, instead of `(key, Some "")`; `?key=` is still `(key, Some "")`. `queryFlag "flag"` is now `true` for `?flag`, and `queryParam "flag"` returns `Choice2Of2` for it. Form parsing (`form`, `formData`) is unchanged
 * `pathScan`, `pathScanCi` and `Sscanf.sscanf` no longer wrap integers that are out of range for the target type: `/items/99999999999` against `pathScan "/items/%d"` with an `int` handler now declines instead of passing `1215752191`; the same applies to `int16`, `uint16` and `uint32` (and `%x`/`%X`/`%o` values that do not fit)
 
 ## New in v3.6.1 (Released 2026-10-07)
