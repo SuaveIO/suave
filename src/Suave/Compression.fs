@@ -104,7 +104,15 @@ module Compression =
         let tempFileName = Path.GetRandomFileName()
         if not (Directory.Exists compressionFolder) then Directory.CreateDirectory compressionFolder |> ignore
         let newPath = Path.Combine(compressionFolder,tempFileName)
-        let! a = compress n newPath stream
+        let! a =
+          task {
+            try
+              return! compress n newPath stream
+            with ex ->
+              // Do not leave a truncated copy behind, e.g. when the disk is full.
+              try File.Delete newPath with _ -> ()
+              return raise ex
+          }
         match a with
         | Ok () ->
           return Ok (newPath)
@@ -264,6 +272,22 @@ module Compression =
   let cleanup (compressionFolder : string) : int =
     cleanupFolder compressionFolder MAX_COMPRESSED_FILE_AGE MAX_COMPRESSED_FILES
 
+  /// The compression folders a failure has already been reported for, so that
+  /// a folder that cannot be written to is reported once, not on every request.
+  let private reportedFailures = ConcurrentDictionary<string, bool>(StringComparer.Ordinal)
+
+  let private reportCompressionFailure (compressionFolder : string) (e : Error) =
+    if reportedFailures.TryAdd(compressionFolder, true) then
+      let reason =
+        match e with
+        | Error.ConnectionError msg -> msg
+        | other -> sprintf "%A" other
+      try
+        Globals.writeMessage (
+          sprintf "Suave: could not write compressed files to '%s' (%s); serving files uncompressed. Set `compressedFilesFolder` to a writable folder to enable compression."
+            compressionFolder reason)
+      with _ -> ()
+
   let transformStream (key : string) (stream : Stream) (getLast : string -> DateTime)
                       compression compressionFolder ctx =
     // The path of an up-to-date compressed copy of `key`, if the cache holds
@@ -329,6 +353,14 @@ module Compression =
             // Need to compress — do the minimal awaited work here
             let! pathResult = compressAndStoreAsync key stream n lastModified compressionFolder
             match pathResult with
+            | Result.Error e when stream.CanSeek ->
+              // The compression folder cannot be written to (for instance it
+              // defaults to AppContext.BaseDirectory, which is read-only under
+              // `dotnet fsi` or in a read-only container). Compression is only
+              // an optimisation: serve the resource as it is instead of failing.
+              reportCompressionFailure compressionFolder e
+              stream.Position <- 0L
+              return Ok(None, stream)
             | Result.Error e ->
               stream.Dispose()
               return Result.Error e
