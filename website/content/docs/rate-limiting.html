@@ -85,7 +85,12 @@ open Suave.Successful
 let app =
   rateLimit (perMinute 10) (OK "Hello")
 
-startWebServer defaultConfig app</code></pre></div>
+// Suave.RateLimit used to define its own defaultConfig, which shadows the
+// server's after `open Suave.RateLimit`; Web.defaultConfig is unambiguous.
+startWebServer Web.defaultConfig app</code></pre></div>
+        <p>The rate-limit defaults (60 requests per minute per client address, fixed window) are <code>defaultRateLimitConfig</code>. The old name <code>RateLimit.defaultConfig</code> still works but is obsolete, because it hides the server's <code>defaultConfig</code> once <code>Suave.RateLimit</code> is opened.</p>
+
+        <p>Each <code>rateLimit</code> call keeps its own counters. Two limited endpoints never share a count, even when they use the same key extractor, so a request to one does not use up the other's limit.</p>
 
         <h2>Strategies</h2>
         <div class="code-block"><pre><code>// Fixed window (simple)
@@ -100,9 +105,20 @@ perMinute 100 |&gt; withStrategy SlidingWindow
     maxRequests = 20 }          // burst capacity</code></pre></div>
 
         <h2>Key extractors</h2>
-        <p>By default limits apply per client IP. You can key by user, header, or custom logic:</p>
+        <p>By default limits apply per client address: <code>defaultKeyExtractor</code> uses the remote address of the TCP connection and ignores <code>X-Forwarded-For</code> and <code>X-Real-IP</code>. Clients can set those headers to anything, so trusting them would let a client send a new address with each request and never be limited.</p>
+        <p>You can key by user, header, or custom logic:</p>
         <div class="code-block"><pre><code>perMinute 100 |&gt; withKeyExtractor userKeyExtractor
 perMinute 100 |&gt; withKeyExtractor (headerKeyExtractor "X-API-Key")</code></pre></div>
+        <p>Request headers come from the client. Key by a header only when its value is checked, such as an API key validated before or inside the protected WebPart.</p>
+
+        <h2>Behind a reverse proxy</h2>
+        <p>Behind nginx, a load balancer or another proxy, every connection comes from the proxy, so the default extractor puts all clients under a single limit. Use <code>trustedProxyKeyExtractor</code> with your proxies' addresses:</p>
+        <div class="code-block"><pre><code>open System.Net
+
+let proxies = [ IPAddress.Parse "10.0.0.5"; IPAddress.Loopback ]
+
+perMinute 100 |&gt; withKeyExtractor (trustedProxyKeyExtractor proxies)</code></pre></div>
+        <p><code>X-Forwarded-For</code> (or, without it, <code>X-Real-IP</code>) is used only on connections from a listed proxy. The key is the right-most <code>X-Forwarded-For</code> entry that is not itself a listed proxy. Entries to its left were written by the client and are ignored. Requests that do not come from a listed proxy are keyed by their connection address.</p>
 
         <h2>Messages and Retry-After</h2>
         <div class="code-block"><pre><code>perMinute 10

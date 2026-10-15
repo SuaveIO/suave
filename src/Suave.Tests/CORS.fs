@@ -62,7 +62,7 @@ let tests cfg =
           eq "Content" "" content // Preflight request should not return content
           eq "Access-Control-Allow-Origin header" origin (result.Headers.GetValues("Access-Control-Allow-Origin") |> Seq.head)
           eq "Access-Control-Allow-Methods header" "*" (result.Headers.GetValues("Access-Control-Allow-Methods") |> Seq.head)
-          eq "Access-Control-Allow-Credentials header" "true" (result.Headers.GetValues("Access-Control-Allow-Credentials") |> Seq.head)
+          eq "Access-Control-Allow-Credentials header" false (result.Headers.Contains("Access-Control-Allow-Credentials"))
 
         runWithConfig (composedApp None) |> reqResp HttpMethod.OPTIONS "/cors" "" None None DecompressionMethods.None setHeaders asserts
 
@@ -81,14 +81,14 @@ let tests cfg =
           eq "Content" "" content // Preflight request should not return content
           eq "Access-Control-Allow-Origin header" origin (result.Headers.GetValues("Access-Control-Allow-Origin") |> Seq.head)
           eq "Access-Control-Allow-Methods header" "*" (result.Headers.GetValues("Access-Control-Allow-Methods") |> Seq.head)
-          eq "Access-Control-Allow-Credentials header" "true" (result.Headers.GetValues("Access-Control-Allow-Credentials") |> Seq.head)
+          eq "Access-Control-Allow-Credentials header" false (result.Headers.Contains("Access-Control-Allow-Credentials"))
           eq "Access-Control-Allow-Headers header" allowedHeaders (result.Headers.GetValues("Access-Control-Allow-Headers") |> Seq.head)
 
         runWithConfig (composedApp None) |> reqResp HttpMethod.OPTIONS "/cors" "" None None DecompressionMethods.None setHeaders asserts
 
       testCase "Can make valid preflight CORS request - with Access-Control-Max-Age" <| fun _ ->
 
-        let corsConfig = { defaultCORSConfig with maxAge = Some 3600; }
+        let corsConfig = { defaultCORSConfig with maxAge = Some 3600; allowedUris = InclusiveOption.Some [ origin ]; allowCookies = true }
 
         let setHeaders (request : HttpRequestMessage) =
           request.Headers.Add("Origin", origin)
@@ -132,7 +132,7 @@ let tests cfg =
           eq "Content" "Success" content
           eq "Access-Control-Allow-Origin header" origin (result.Headers.GetValues("Access-Control-Allow-Origin") |> Seq.head)
           eq "Access-Control-Allow-Methods header" "*" (result.Headers.GetValues("Access-Control-Allow-Methods") |> Seq.head)
-          eq "Access-Control-Allow-Credentials header" "true" (result.Headers.GetValues("Access-Control-Allow-Credentials") |> Seq.head)
+          eq "Access-Control-Allow-Credentials header" false (result.Headers.Contains("Access-Control-Allow-Credentials"))
 
         runWithConfig (composedApp None) |> reqResp HttpMethod.GET "/cors" "" None None DecompressionMethods.None setHeaders asserts
 
@@ -167,5 +167,151 @@ let tests cfg =
           eq "Access-Control-Expose-Headers header" "Header1, Header2" (result.Headers.GetValues("Access-Control-Expose-Headers") |> Seq.head)
 
         runWithConfig (composedApp (Some (cors corsConfig))) |> reqResp HttpMethod.GET "/cors" "" None None DecompressionMethods.None setHeaders asserts
+    ]
+
+    testList "Defaults and headers" [
+      testCase "Credentials are sent only when opted in for listed origins" <| fun _ ->
+
+        let corsConfig = { defaultCORSConfig with allowedUris = InclusiveOption.Some [ origin ]; allowCookies = true }
+
+        let setHeaders (request : HttpRequestMessage) =
+          request.Headers.Add("Origin", origin)
+          request
+
+        let asserts (result : HttpResponseMessage) =
+          eq "Access-Control-Allow-Origin header" origin (result.Headers.GetValues("Access-Control-Allow-Origin") |> Seq.head)
+          eq "Access-Control-Allow-Credentials header" "true" (result.Headers.GetValues("Access-Control-Allow-Credentials") |> Seq.head)
+
+        runWithConfig (composedApp (Some (cors corsConfig))) |> reqResp HttpMethod.GET "/cors" "" None None DecompressionMethods.None setHeaders asserts
+
+      testCase "Default config reflects any origin without credentials" <| fun _ ->
+
+        let setHeaders (request : HttpRequestMessage) =
+          request.Headers.Add("Origin", "https://evil.example")
+          request
+
+        let asserts (result : HttpResponseMessage) =
+          eq "Access-Control-Allow-Origin header" "https://evil.example" (result.Headers.GetValues("Access-Control-Allow-Origin") |> Seq.head)
+          Expect.EmptyHeader("Should not have Access-Control-Allow-Credentials header", "Access-Control-Allow-Credentials", result)
+
+        runWithConfig (composedApp None) |> reqResp HttpMethod.GET "/cors" "" None None DecompressionMethods.None setHeaders asserts
+
+      testCase "Adds Vary: Origin when reflecting the origin" <| fun _ ->
+
+        let setHeaders (request : HttpRequestMessage) =
+          request.Headers.Add("Origin", origin)
+          request
+
+        let asserts (result : HttpResponseMessage) =
+          eq "Access-Control-Allow-Origin header" origin (result.Headers.GetValues("Access-Control-Allow-Origin") |> Seq.head)
+          Expect.contains (result.Headers.Vary |> List.ofSeq) "Origin" "Vary should contain Origin"
+
+        runWithConfig (composedApp None) |> reqResp HttpMethod.GET "/cors" "" None None DecompressionMethods.None setHeaders asserts
+
+      testCase "Vary: Origin is merged with an existing Vary header" <| fun _ ->
+
+        let app = Writers.setHeader "Vary" "Accept-Encoding" >=> corsWithDefaultConfig >=> OK "Success"
+
+        let setHeaders (request : HttpRequestMessage) =
+          request.Headers.Add("Origin", origin)
+          request
+
+        let asserts (result : HttpResponseMessage) =
+          let vary = result.Headers.Vary |> List.ofSeq
+          Expect.contains vary "Origin" "Vary should contain Origin"
+          Expect.contains vary "Accept-Encoding" "Vary should keep Accept-Encoding"
+
+        runWithConfig app |> reqResp HttpMethod.GET "/" "" None None DecompressionMethods.None setHeaders asserts
+
+      testCase "Single allowed method has no trailing comma" <| fun _ ->
+
+        let corsConfig = { defaultCORSConfig with allowedMethods = InclusiveOption.Some [ HttpMethod.GET ] }
+
+        let setHeaders (request : HttpRequestMessage) =
+          request.Headers.Add("Origin", origin)
+          request.Headers.Add("Access-Control-Request-Method", "GET")
+          request
+
+        let asserts (result : HttpResponseMessage) =
+          eq "Access-Control-Allow-Methods header" "GET" (result.Headers.GetValues("Access-Control-Allow-Methods") |> String.concat ",")
+
+        runWithConfig (corsPreflight corsConfig) |> reqResp HttpMethod.OPTIONS "/" "" None None DecompressionMethods.None setHeaders asserts
+
+      testCase "Several allowed methods are comma separated" <| fun _ ->
+
+        let corsConfig = { defaultCORSConfig with allowedMethods = InclusiveOption.Some [ HttpMethod.GET; HttpMethod.POST ] }
+
+        let setHeaders (request : HttpRequestMessage) =
+          request.Headers.Add("Origin", origin)
+          request.Headers.Add("Access-Control-Request-Method", "POST")
+          request
+
+        let asserts (result : HttpResponseMessage) =
+          eq "Access-Control-Allow-Methods header" "GET, POST" (result.Headers.GetValues("Access-Control-Allow-Methods") |> String.concat ", ")
+
+        runWithConfig (corsPreflight corsConfig) |> reqResp HttpMethod.OPTIONS "/" "" None None DecompressionMethods.None setHeaders asserts
+    ]
+
+    testList "Preflight termination" [
+      let preflightHeaders (request : HttpRequestMessage) =
+        request.Headers.Add("Origin", origin)
+        request.Headers.Add("Access-Control-Request-Method", "GET")
+        request
+
+      testCase "withCORS answers preflight without running the handler" <| fun _ ->
+
+        let app = withCORS defaultCORSConfig (OK "data")
+
+        let asserts (result : HttpResponseMessage) =
+          eq "Status" HttpStatusCode.NoContent result.StatusCode
+          eq "Content" "" (result.Content.ReadAsStringAsync().Result)
+          eq "Access-Control-Allow-Origin header" origin (result.Headers.GetValues("Access-Control-Allow-Origin") |> Seq.head)
+
+        runWithConfig app |> reqResp HttpMethod.OPTIONS "/" "" None None DecompressionMethods.None preflightHeaders asserts
+
+      testCase "withCORS runs the handler for actual requests" <| fun _ ->
+
+        let app = withCORS defaultCORSConfig (OK "data")
+
+        let setHeaders (request : HttpRequestMessage) =
+          request.Headers.Add("Origin", origin)
+          request
+
+        let asserts (result : HttpResponseMessage) =
+          eq "Status" HttpStatusCode.OK result.StatusCode
+          eq "Content" "data" (result.Content.ReadAsStringAsync().Result)
+          eq "Access-Control-Allow-Origin header" origin (result.Headers.GetValues("Access-Control-Allow-Origin") |> Seq.head)
+
+        runWithConfig app |> reqResp HttpMethod.GET "/" "" None None DecompressionMethods.None setHeaders asserts
+
+      testCase "withCORS answers preflight from a disallowed origin without CORS headers" <| fun _ ->
+
+        let corsConfig = { defaultCORSConfig with allowedUris = InclusiveOption.Some [ "http://someotherdomain.com" ] }
+        let app = withCORS corsConfig (OK "data")
+
+        let asserts (result : HttpResponseMessage) =
+          eq "Status" HttpStatusCode.NoContent result.StatusCode
+          Expect.EmptyHeader("Should not have Access-Control-Allow-Origin header", "Access-Control-Allow-Origin", result)
+
+        runWithConfig app |> reqResp HttpMethod.OPTIONS "/" "" None None DecompressionMethods.None preflightHeaders asserts
+
+      testCase "corsPreflight in choose terminates preflight" <| fun _ ->
+
+        let app = choose [ corsPreflight defaultCORSConfig; cors defaultCORSConfig >=> OK "data" ]
+
+        let asserts (result : HttpResponseMessage) =
+          eq "Status" HttpStatusCode.NoContent result.StatusCode
+          eq "Content" "" (result.Content.ReadAsStringAsync().Result)
+
+        runWithConfig app |> reqResp HttpMethod.OPTIONS "/" "" None None DecompressionMethods.None preflightHeaders asserts
+
+      testCase "corsPreflight declines non-preflight requests" <| fun _ ->
+
+        let app = choose [ corsPreflight defaultCORSConfig; OK "fallthrough" ]
+
+        let asserts (result : HttpResponseMessage) =
+          eq "Content" "fallthrough" (result.Content.ReadAsStringAsync().Result)
+
+        runWithConfig app |> reqResp HttpMethod.OPTIONS "/" "" None None DecompressionMethods.None id asserts
     ]
   ]

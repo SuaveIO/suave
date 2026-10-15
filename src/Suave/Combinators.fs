@@ -1081,7 +1081,7 @@ module CORS =
     | InclusiveOption.Some (m :: ms) ->
       let exists = m.ToString() = value || List.exists (fun m -> m.ToString() = value) ms
       if exists then
-        let header = (m.ToString()) + "," + (ms |> Seq.map (fun i -> i.ToString()) |> String.concat( ", "))
+        let header = (m :: ms) |> Seq.map (fun i -> i.ToString()) |> String.concat ", "
         Writers.setHeader AccessControlAllowMethods header
       else
         succeed
@@ -1103,6 +1103,44 @@ module CORS =
       let header = hs |> String.concat(", ")
       Writers.setHeader AccessControlExposeHeaders header
 
+  /// Responses differ by request Origin, so caches must key on it
+  let private setVaryOrigin : WebPart =
+    Writers.setHeaderValue "Vary" Origin
+
+  /// Origin and Access-Control-Request-Method of a preflight request
+  let private (|Preflight|_|) (req : HttpRequest) =
+    match req.``method`` with
+    | HttpMethod.OPTIONS ->
+      match req.header (Origin.ToLowerInvariant()), req.header (AccessControlRequestMethod.ToLowerInvariant()) with
+      | Choice1Of2 originValue, Choice1Of2 requestMethodHeaderValue ->
+        Some (originValue, requestMethodHeaderValue)
+      | _ ->
+        None
+    | _ ->
+      None
+
+  /// Adds the preflight response headers (when the origin is allowed) and
+  /// answers with 204 No Content.
+  let private preflightResponse config (req : HttpRequest) originValue requestMethodHeaderValue : WebPart =
+    // Does the request have an Access-Control-Request-Headers header? If so, validate. If not, proceed.
+    let setAccessControlRequestHeaders =
+      match Headers.getAll req.headers (AccessControlRequestHeaders.ToLowerInvariant()) with
+      | Choice1Of2 list ->
+        Writers.setHeader AccessControlAllowHeaders (list |> String.concat ", ")
+      | Choice2Of2 _ ->
+        succeed
+
+    if isAllowedOrigin config originValue then
+      setVaryOrigin
+      >=> setAllowMethodsHeader config requestMethodHeaderValue
+      >=> setAccessControlRequestHeaders
+      >=> setMaxAgeHeader config
+      >=> setAllowCredentialsHeader config
+      >=> setAllowOriginHeader originValue
+      >=> NO_CONTENT
+    else
+      setVaryOrigin >=> NO_CONTENT
+
   let cors (config : CORSConfig) : WebPart =
     fun (ctx : HttpContext) ->
       let req = ctx.request
@@ -1113,47 +1151,48 @@ module CORS =
         | HttpMethod.OPTIONS ->
           match req.header (AccessControlRequestMethod.ToLowerInvariant()) with
           | Choice1Of2 requestMethodHeaderValue -> // Preflight request
-            // Does the request have an Access-Control-Request-Headers header? If so, validate. If not, proceed.
-            let setAccessControlRequestHeaders =
-              match Headers.getAll req.headers (AccessControlRequestHeaders.ToLowerInvariant()) with
-              | Choice1Of2 list ->
-                Writers.setHeader AccessControlAllowHeaders (list |> String.concat ", ")
-              | Choice2Of2 _ ->
-                succeed
-
             if allowedOrigin then
-              let composed =
-                setAllowMethodsHeader config requestMethodHeaderValue
-                >=> setAccessControlRequestHeaders
-                >=> setMaxAgeHeader config
-                >=> setAllowCredentialsHeader config
-                >=> setAllowOriginHeader originValue
-                >=> NO_CONTENT
-              composed ctx
+              preflightResponse config req originValue requestMethodHeaderValue ctx
             else
-              succeed ctx
+              setVaryOrigin ctx
 
           | Choice2Of2 _ ->
-            succeed ctx
+            setVaryOrigin ctx
 
         | _ ->
           if allowedOrigin then
             let composed =
-              setExposeHeadersHeader config
+              setVaryOrigin
+              >=> setExposeHeadersHeader config
               >=> setAllowCredentialsHeader config
               >=> setAllowOriginHeader originValue
               >=> setAllowMethodsHeader config "*"
             composed ctx
           else
-            succeed ctx // No headers will be sent. Browser will deny.
+            setVaryOrigin ctx // No CORS headers will be sent. Browser will deny.
 
       | Choice2Of2 _ ->
-        succeed ctx // Not a CORS request
+        setVaryOrigin ctx // Not a CORS request
 
+  let corsPreflight (config : CORSConfig) : WebPart =
+    fun (ctx : HttpContext) ->
+      match ctx.request with
+      | Preflight (originValue, requestMethodHeaderValue) ->
+        preflightResponse config ctx.request originValue requestMethodHeaderValue ctx
+      | _ ->
+        fail
+
+  let withCORS (config : CORSConfig) (webPart : WebPart) : WebPart =
+    fun (ctx : HttpContext) ->
+      match ctx.request with
+      | Preflight _ ->
+        corsPreflight config ctx
+      | _ ->
+        (cors config >=> webPart) ctx
 
   let defaultCORSConfig =
     { allowedUris           = InclusiveOption.All
       allowedMethods        = InclusiveOption.All
-      allowCookies          = true
+      allowCookies          = false
       exposeHeaders         = InclusiveOption.None
       maxAge                = None }
