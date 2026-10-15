@@ -128,7 +128,7 @@ let app =
       </div>
 
       <h2>Creating Middleware</h2>
-      <p>Build reusable middleware components:</p>
+      <p>Build reusable middleware components. Middleware that must run once per request, or that must answer instead of letting the request fall through, is best written as a <code>WebPart -&gt; WebPart</code> wrapper:</p>
       <div class="code-block">
         <pre><code>open Suave
 open Suave.Operators
@@ -137,18 +137,18 @@ open Suave.Successful
 open Suave.Filters
 open Suave.ServerErrors
 
-// Logging middleware
-let logRequest : WebPart =
+// Logging middleware: wraps the whole app, so each request is logged once
+let logRequest (app: WebPart) : WebPart =
   fun ctx ->
     printfn "[%s] %s %s" (System.DateTime.Now.ToString()) ctx.request.rawMethod ctx.request.path
-    async { return Some ctx }
+    app ctx
 
-// Authentication middleware
-let requireAuth : WebPart =
+// Authentication middleware: answers 401 instead of falling through
+let requireAuth (protectedPart: WebPart) : WebPart =
   fun ctx ->
     match ctx.request.header "Authorization" with
-    | Choice1Of2 auth -> async { return Some ctx }
-    | Choice2Of2 _ -> async { return None }  // Fails, try next handler
+    | Choice1Of2 _ -> protectedPart ctx
+    | Choice2Of2 _ -> RequestErrors.UNAUTHORIZED "Authorization required" ctx
 
 // Error handling middleware
 let errorHandler (ex: System.Exception) : WebPart =
@@ -158,11 +158,13 @@ let errorHandler (ex: System.Exception) : WebPart =
 
 // Use middleware
 let app =
-  choose [
-    logRequest >=> path "/public" >=> OK "Public area"
-    logRequest >=> requireAuth >=> path "/admin" >=> OK "Admin area"
-  ]</code></pre>
+  logRequest (
+    choose [
+      path "/public" >=> OK "Public area"
+      path "/admin" >=> requireAuth (OK "Admin area")
+    ])</code></pre>
       </div>
+      <p>Why wrap rather than chain? <code>choose</code> runs each branch from the start until one returns <code>Some</code>, so a <code>logRequest &gt;=&gt; ...</code> prefix repeated in every branch would log a request once for every branch tried. Likewise, a filter that returns <code>None</code> on a missing <code>Authorization</code> header does not reject the request: <code>choose</code> just moves on to later routes and the client ends up with a 404 (or a page it should not see). Place <code>requireAuth</code> after the route filter, as above, so only <code>/admin</code> answers 401.</p>
 
       <h2>Middleware Pipeline</h2>
       <p>Build complex middleware pipelines:</p>
@@ -302,7 +304,7 @@ let app =
       </div>
 
       <h2>Composing Multiple Applications</h2>
-      <p>Combine multiple applications into one:</p>
+      <p>Combine multiple applications into one. <code>path</code> compares the full request path, so each sub-application matches full paths; <code>pathStarts</code> only selects which sub-application to try. To declare routes relative to a prefix, use <code>scope</code> from the <a href="/docs/router.html">Router module</a>.</p>
       <div class="code-block">
         <pre><code>open Suave
 open Suave.Operators
@@ -312,15 +314,15 @@ open Suave.Successful
 // Sub-application 1: API
 let apiApp =
   choose [
-    path "/users" >=> OK "Users API"
-    path "/posts" >=> OK "Posts API"
+    path "/api/users" >=> OK "Users API"
+    path "/api/posts" >=> OK "Posts API"
   ]
 
 // Sub-application 2: Admin
 let adminApp =
   choose [
-    path "/dashboard" >=> OK "Admin Dashboard"
-    path "/settings" >=> OK "Settings"
+    path "/admin/dashboard" >=> OK "Admin Dashboard"
+    path "/admin/settings" >=> OK "Settings"
   ]
 
 // Sub-application 3: Public
@@ -333,8 +335,8 @@ let publicApp =
 // Combine into main app (pathStarts matches a prefix)
 let app =
   choose [
-    pathStarts "/api" >=> apiApp
-    pathStarts "/admin" >=> adminApp
+    pathStarts "/api/" >=> apiApp
+    pathStarts "/admin/" >=> adminApp
     publicApp
   ]</code></pre>
       </div>
