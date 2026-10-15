@@ -15,6 +15,7 @@ open System.Threading.Tasks
 open Expecto
 
 open Suave
+open Suave.Operators
 open Suave.Proxy
 open Suave.Testing
 
@@ -116,8 +117,8 @@ let private fixedLengthResponse (statusLine : string) (body : string) =
   sprintf "HTTP/1.1 %s\r\nContent-Type: text/plain\r\nContent-Length: %d\r\nConnection: close\r\n\r\n%s"
     statusLine body.Length body
 
-/// Bind the proxy on an ephemeral port, pointing at `upstreamPort`.
-let private startProxy (upstreamPort : int) =
+/// Bind a proxy built with `options` on an ephemeral port, pointing at `upstreamPort`.
+let private startProxyWith (options : ProxyOptions) (upstreamPort : int) =
   let listener = new TcpListener(IPAddress.Loopback, 0)
   listener.Start()
   let proxyPort = (listener.LocalEndpoint :?> IPEndPoint).Port
@@ -126,8 +127,12 @@ let private startProxy (upstreamPort : int) =
   let proxyCfg =
     { defaultConfig with
         bindings = [ HttpBinding.createSimple HTTP "127.0.0.1" proxyPort ] }
-  let proxyApp : WebPart = proxy (Uri(sprintf "http://127.0.0.1:%d" upstreamPort))
+  let proxyApp : WebPart = proxyWith options (Uri(sprintf "http://127.0.0.1:%d" upstreamPort))
   proxyPort, runWith proxyCfg proxyApp
+
+/// Bind the proxy on an ephemeral port, pointing at `upstreamPort`.
+let private startProxy (upstreamPort : int) =
+  startProxyWith defaultProxyOptions upstreamPort
 
 /// Read a full HTTP response from a raw TCP connection to `port`, driving the
 /// request `GET path HTTP/1.1` + `Connection: close`. Returns the entire
@@ -424,53 +429,42 @@ let proxyTests (_ : SuaveConfig) =
         upstreamCts.Cancel()
         disposeContext ctx
 
-    testCase "appends to an existing X-Forwarded-For chain" <| fun _ ->
-      let upstreamPort, upstreamCts = startHeaderEchoUpstream ()
-      let proxyPort, ctx = startProxy upstreamPort
-      try
-        let response =
-          rawSend proxyPort "POST" "/headers" [ "X-Forwarded-For", "203.0.113.7" ] "x"
-
-        Expect.stringContains response "X-Forwarded-For: 203.0.113.7, 127.0.0.1"
-          "the client we received the request from should be appended to the chain"
-      finally
-        upstreamCts.Cancel()
-        disposeContext ctx
-
-    // Forwarding the client's Host verbatim names the proxy rather than the
-    // origin, which breaks virtual-hosted upstreams.
-    testCase "rewrites Host to the upstream authority and preserves the client host" <| fun _ ->
-      let upstreamPort, upstreamCts = startHeaderEchoUpstream ()
-      let proxyPort, ctx = startProxy upstreamPort
-      try
-        let response =
-          rawSendWithHost proxyPort "POST" "/headers" "client.example" [] "x"
-
-        Expect.stringContains response (sprintf "Host: 127.0.0.1:%d" upstreamPort)
-          "the upstream should see its own authority in the Host header"
-        // Match on the line start so `X-Forwarded-Host` doesn't count as a hit.
-        Expect.isFalse (response.Contains "\r\nHost: client.example")
-          "the client's Host must not be forwarded verbatim"
-        Expect.stringContains response "X-Forwarded-Host: client.example"
-          "the client's Host should be preserved in X-Forwarded-Host"
-        Expect.stringContains response "X-Forwarded-Proto: http"
-          "the client's scheme should be preserved in X-Forwarded-Proto"
-      finally
-        upstreamCts.Cancel()
-        disposeContext ctx
-
-    testCase "preserves existing X-Forwarded-Host and X-Forwarded-Proto" <| fun _ ->
+    // A client can put anything in these headers, so they are only believed
+    // when the connection comes from a configured trusted proxy.
+    testCase "replaces X-Forwarded-* headers sent by an untrusted client" <| fun _ ->
       let upstreamPort, upstreamCts = startHeaderEchoUpstream ()
       let proxyPort, ctx = startProxy upstreamPort
       try
         let response =
           rawSend proxyPort "POST" "/headers"
-            [ "X-Forwarded-Host", "edge.example"; "X-Forwarded-Proto", "https" ] "x"
+            [ "X-Forwarded-For", "203.0.113.7"; "X-Forwarded-Host", "edge.example"; "X-Forwarded-Proto", "https"
+              "Forwarded", "for=203.0.113.7;proto=https"; "X-Real-IP", "203.0.113.7" ] "x"
 
-        Expect.stringContains response "X-Forwarded-Host: edge.example"
-          "an upstream proxy's X-Forwarded-Host should not be overwritten"
-        Expect.stringContains response "X-Forwarded-Proto: https"
-          "an upstream proxy's X-Forwarded-Proto should not be overwritten"
+        Expect.stringContains response "X-Forwarded-For: 127.0.0.1\r\n" "X-Forwarded-For names only the connecting client"
+        Expect.stringContains response "X-Forwarded-Host: 127.0.0.1\r\n" "X-Forwarded-Host is the Host the proxy received"
+        Expect.stringContains response "X-Forwarded-Proto: http\r\n" "X-Forwarded-Proto is the scheme the proxy received"
+        Expect.isFalse (response.Contains "203.0.113.7") "the client's address claims are dropped"
+        Expect.isFalse (response.Contains "edge.example") "the client's host claim is dropped"
+      finally
+        upstreamCts.Cancel()
+        disposeContext ctx
+
+    testCase "extends X-Forwarded-* headers from a trusted proxy" <| fun _ ->
+      let upstreamPort, upstreamCts = startHeaderEchoUpstream ()
+      let options = { defaultProxyOptions with trustedProxies = [ IPAddress.Loopback ] }
+      let proxyPort, ctx = startProxyWith options upstreamPort
+      try
+        let response =
+          rawSend proxyPort "POST" "/headers"
+            [ "X-Forwarded-For", "203.0.113.7"; "X-Forwarded-Host", "edge.example"; "X-Forwarded-Proto", "https" ] "x"
+
+        Expect.stringContains response "X-Forwarded-For: 203.0.113.7, 127.0.0.1\r\n"
+          "the client we received the request from should be appended to the chain"
+        // Suave lowercases the names of the headers it received.
+        Expect.stringContains response "x-forwarded-host: edge.example\r\n"
+          "a trusted proxy's X-Forwarded-Host should not be overwritten"
+        Expect.stringContains response "x-forwarded-proto: https\r\n"
+          "a trusted proxy's X-Forwarded-Proto should not be overwritten"
       finally
         upstreamCts.Cancel()
         disposeContext ctx
@@ -491,4 +485,161 @@ let proxyTests (_ : SuaveConfig) =
       finally
         upstreamCts.Cancel()
         shutdownProxy ()
+  ]
+
+// ---- forwarding through a Suave upstream that reports what it received ----
+
+/// A Suave server on an ephemeral loopback port; stopped on Dispose.
+type private EphemeralServer(app : WebPart) =
+  let stopping = new CancellationTokenSource()
+  let config =
+    { defaultConfig with
+        bindings = [ HttpBinding.create HTTP IPAddress.Loopback 0us ]
+        hideStartupMessage = true
+        cancellationToken = stopping.Token }
+  let listening, _ = startWebServerAsync config app
+  let port = (listening |> Async.RunSynchronously).[0].Value.binding.port
+  member _.Uri = Uri(sprintf "http://127.0.0.1:%d" port)
+  member _.Url (path : string) = sprintf "http://127.0.0.1:%d%s" port path
+  interface IDisposable with member _.Dispose() = stopping.Cancel()
+
+let private withStatus (code : int) (reason : string) : WebPart =
+  fun ctx -> succeed { ctx with response = { ctx.response with status = { code = code; reason = reason } } }
+
+let private echo : WebPart =
+  request (fun r ->
+    let headers = r.headers |> Seq.map (fun (k, v) -> k + ": " + v) |> String.concat "\n"
+    Successful.OK (sprintf "%s %s?%s\n%s\n\n%s" r.rawMethod r.rawPath r.rawQuery headers (Encoding.UTF8.GetString r.rawForm)))
+
+let private big = Array.init 1_000_000 (fun i -> byte (i % 251))
+
+let private upstreamApp =
+  let path = Filters.path
+  choose [
+    path "/teapot" >=> Successful.OK "short and stout" >=> withStatus 418 "I'm a teapot"
+    path "/multi" >=> Successful.OK "multi" >=> withStatus 207 "Multi-Status"
+    path "/big" >=> Successful.ok big
+    path "/cookies" >=> Cookie.setCookie (HttpCookie.createKV "a" "1") >=> Cookie.setCookie (HttpCookie.createKV "b" "2") >=> Successful.OK "cookies"
+    path "/slow" >=> (fun ctx -> async {
+      do! Async.Sleep 2000
+      return! Successful.OK "late" ctx })
+    path "/no-content" >=> Successful.NO_CONTENT
+    Filters.pathStarts "/api/" >=> echo
+    echo
+  ]
+
+let private httpClient = new Net.Http.HttpClient(new Net.Http.HttpClientHandler(AllowAutoRedirect = false, UseCookies = false))
+
+let private send (server : EphemeralServer) (meth : string) (path : string) (headers : (string * string) list) (body : string option) =
+  use message = new Net.Http.HttpRequestMessage(Net.Http.HttpMethod meth, server.Url path)
+  for (k, v) in headers do message.Headers.TryAddWithoutValidation(k, v) |> ignore
+  body |> Option.iter (fun b -> message.Content <- new Net.Http.StringContent(b, Encoding.UTF8, "application/json"))
+  let response = httpClient.Send(message)
+  response, response.Content.ReadAsByteArrayAsync().Result
+
+let private text (bytes : byte[]) = Encoding.UTF8.GetString bytes
+
+[<Tests>]
+let proxyForwardingTests (_ : SuaveConfig) =
+  let errors = Collections.Concurrent.ConcurrentQueue<string>()
+  let upstream = lazy (new EphemeralServer(upstreamApp))
+  let front =
+    lazy (
+      let options =
+        { defaultProxyOptions with
+            timeout = TimeSpan.FromMilliseconds 500.
+            onError = fun ctx ex -> errors.Enqueue(ctx.request.path + " " + ex.GetType().Name) }
+      new EphemeralServer(proxyWith options upstream.Value.Uri))
+  let sendFront meth path headers body = send front.Value meth path headers body
+
+  testSequenced <| testList "Proxy forwarding" [
+    testCase "the raw path and query string arrive unchanged" <| fun _ ->
+      let _, body = sendFront "GET" "/a/b%2Fc?x=1&y=two%20words" [] None
+      Expect.stringStarts (text body) "GET /a/b%2Fc?x=1&y=two%20words\n" "path and query"
+
+    testCase "the upstream's base path prefixes the forwarded path" <| fun _ ->
+      use based = new EphemeralServer(proxy (Uri(upstream.Value.Url "/api/")))
+      let _, body = send based "GET" "/users?id=1" [] None
+      Expect.stringStarts (text body) "GET /api/users?id=1\n" "base path"
+
+    testCase "dot segments cannot escape the base path" <| fun _ ->
+      use based = new EphemeralServer(proxy (Uri(upstream.Value.Url "/api")))
+      use client = new TcpClient()
+      client.Connect(IPAddress.Loopback, based.Uri.Port)
+      let s = client.GetStream()
+      let req = Encoding.ASCII.GetBytes "GET /%2E%2E/admin HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n"
+      s.Write(req, 0, req.Length)
+      use reader = new StreamReader(s)
+      Expect.stringStarts (reader.ReadToEnd()) "HTTP/1.1 400" "rejected"
+
+    testCase "end-to-end headers are forwarded, hop-by-hop ones are not" <| fun _ ->
+      let _, body =
+        sendFront "GET" "/h" [ "x-api-key", "secret"; "Cookie", "sid=abc"; "Authorization", "Bearer t"
+                               "Connection", "x-private"; "x-private", "hop"; "Proxy-Authorization", "Basic xyz" ] None
+      let received = text body
+      for expected in [ "x-api-key: secret"; "cookie: sid=abc"; "authorization: Bearer t" ] do
+        Expect.stringContains received expected expected
+      for unexpected in [ "x-private"; "proxy-authorization" ] do
+        Expect.isFalse (received.Contains unexpected) unexpected
+
+    testCase "bodies are forwarded for every method that has one" <| fun _ ->
+      for meth in [ "POST"; "PUT"; "PATCH"; "DELETE" ] do
+        let _, body = sendFront meth "/b" [] (Some """{"a":1}""")
+        Expect.stringStarts (text body) (meth + " /b?") meth
+        Expect.stringContains (text body) "content-type: application/json; charset=utf-8" (meth + " content type")
+        Expect.stringEnds (text body) """{"a":1}""" (meth + " body")
+
+    testCase "any status code passes through with its reason phrase" <| fun _ ->
+      let teapot, body = sendFront "GET" "/teapot" [] None
+      Expect.equal (int teapot.StatusCode) 418 "418"
+      Expect.equal teapot.ReasonPhrase "I'm a teapot" "reason"
+      Expect.equal (text body) "short and stout" "body"
+      let multi, _ = sendFront "GET" "/multi" [] None
+      Expect.equal (int multi.StatusCode) 207 "207"
+      let empty, _ = sendFront "GET" "/no-content" [] None
+      Expect.equal (int empty.StatusCode) 204 "204"
+
+    testCase "a large body streams through intact" <| fun _ ->
+      let response, body = sendFront "GET" "/big" [] None
+      Expect.equal response.Content.Headers.ContentLength (Nullable 1_000_000L) "length"
+      Expect.equal body big "same bytes"
+
+    testCase "every Set-Cookie survives, and Date and Server aren't doubled" <| fun _ ->
+      let response, _ = sendFront "GET" "/cookies" [] None
+      Expect.equal (response.Headers.GetValues "Set-Cookie" |> Seq.length) 2 "two cookies"
+      // NonValidated: .NET would otherwise split "Suave (https://suave.io)" into two product tokens.
+      Expect.equal (response.Headers.NonValidated.["Date"].Count) 1 "one Date"
+      Expect.equal (response.Headers.NonValidated.["Server"].Count) 1 "one Server"
+
+    testCase "HEAD gets headers and no body" <| fun _ ->
+      let response, body = sendFront "HEAD" "/big" [] None
+      Expect.equal (int response.StatusCode) 200 "status"
+      Expect.equal body.Length 0 "no body"
+
+    testCase "a slow upstream gets a 504, and the error is reported" <| fun _ ->
+      let response, _ = sendFront "GET" "/slow" [] None
+      Expect.equal (int response.StatusCode) 504 "timeout"
+      Expect.exists errors (fun e -> e.StartsWith "/slow") "onError called"
+
+    testCase "an unreachable upstream gets a 502" <| fun _ ->
+      let closed = new TcpListener(IPAddress.Loopback, 0)
+      closed.Start()
+      let port = (closed.LocalEndpoint :?> IPEndPoint).Port
+      closed.Stop()
+      use server = new EphemeralServer(proxy (Uri(sprintf "http://127.0.0.1:%d" port)))
+      let response = httpClient.GetAsync(server.Url "/x").Result
+      Expect.equal (int response.StatusCode) 502 "bad gateway"
+
+    testCase "invalid options fail at creation, not on the first request" <| fun _ ->
+      Expect.throws (fun () -> proxy (Uri "ftp://example.com") |> ignore) "ftp"
+      Expect.throws (fun () -> proxyWith { defaultProxyOptions with timeout = TimeSpan.Zero } (Uri "http://x") |> ignore) "timeout"
+
+    // Suave parses multipart bodies before any WebPart runs, so there is
+    // nothing left to forward; this documents that limitation.
+    testCase "multipart uploads are not forwarded" <| fun _ ->
+      use form = new Net.Http.MultipartFormDataContent()
+      form.Add(new Net.Http.StringContent("hello"), "file", "hello.txt")
+      let response = httpClient.PostAsync(front.Value.Url "/upload", form).Result
+      let received = response.Content.ReadAsStringAsync().Result
+      Expect.isFalse (received.Contains "hello") "the file contents are not available to forward"
   ]
