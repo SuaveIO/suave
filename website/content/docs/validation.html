@@ -119,31 +119,41 @@ let corsConfig =
       allowedUris = InclusiveOption.Some ["http://localhost:3000"; "https://example.com"] }
 
 let app =
-  choose [
-    GET &gt;=&gt; path "/api/data" &gt;=&gt; cors corsConfig &gt;=&gt; OK "CORS enabled"
-  ]</code></pre>
+  path "/api/data" &gt;=&gt; withCORS corsConfig (choose [
+    GET &gt;=&gt; OK "CORS enabled"
+    POST &gt;=&gt; OK "Created"
+  ])</code></pre>
       </div>
+      <p><code>defaultCORSConfig</code> allows every origin and method but does <strong>not</strong> allow credentials. Responses reflect the request's <code>Origin</code> and carry <code>Vary: Origin</code>, but not <code>Access-Control-Allow-Credentials</code>, so browsers do not send cookies or HTTP authentication with cross-origin requests. To allow credentialed requests, list the trusted origins as well:</p>
+      <div class="code-block">
+        <pre><code>let credentialedCors =
+  { defaultCORSConfig with
+      allowedUris  = InclusiveOption.Some [ "https://app.example.com" ]
+      allowCookies = true }</code></pre>
+      </div>
+      <p>Do not combine <code>allowCookies = true</code> with <code>allowedUris = InclusiveOption.All</code>. That lets any web site make authenticated requests as your users and read the responses.</p>
+      <p><code>withCORS config handler</code> answers preflight requests (<code>OPTIONS</code> with <code>Access-Control-Request-Method</code>) itself with <code>204 No Content</code>, and runs <code>handler</code> only for the actual requests. The lower-level <code>cors config</code> always continues, so in <code>cors config &gt;=&gt; handler</code> the handler also runs for preflights and replaces the 204. If you compose by hand, put <code>corsPreflight config</code> first: <code>choose [ corsPreflight config; cors config &gt;=&gt; app ]</code>.</p>
 
       <h2>Security Headers</h2>
-      <p>Add important security headers to responses:</p>
+      <p><code>Suave.SecurityHeaders</code> provides presets (<code>strictConfig</code>, <code>balancedConfig</code>, <code>relaxedConfig</code>) and builders for CSP, HSTS, framing, referrer and permissions policies:</p>
       <div class="code-block">
         <pre><code>open Suave
 open Suave.Operators
-open Suave.Writers
 open Suave.Filters
 open Suave.Successful
-
-let setSecurityHeaders =
-  setHeader "X-Content-Type-Options" "nosniff" &gt;=&gt;
-  setHeader "X-Frame-Options" "SAMEORIGIN" &gt;=&gt;
-  setHeader "X-XSS-Protection" "1; mode=block" &gt;=&gt;
-  setHeader "Strict-Transport-Security" "max-age=31536000; includeSubDomains"
+open Suave.SecurityHeaders
 
 let app =
   choose [
-    path "/" &gt;=&gt; setSecurityHeaders &gt;=&gt; OK "Secure content"
+    path "/" &gt;=&gt; securityHeaders balancedConfig &gt;=&gt; OK "Secure content"
   ]</code></pre>
       </div>
+      <p>Each header that <code>securityHeaders</code> sets replaces any header with the same name already on the response, so a response never carries two <code>Cache-Control</code> headers. A later <code>Writers.setHeader</code> overrides the preset for that response. Trade-offs to know:</p>
+      <ul>
+        <li>All presets send <code>X-XSS-Protection: 0</code>. Browsers have removed the XSS auditor that <code>1; mode=block</code> turned on, and the auditor could itself be abused. Use a Content-Security-Policy instead.</li>
+        <li>No preset sends HSTS <code>preload</code>. Preloading hard-codes HTTPS for the domain and <em>all</em> its subdomains into browsers, and getting a domain off the list takes months. Opt in with <code>withHSTS 31536000 true true</code> once every subdomain serves HTTPS.</li>
+        <li><code>strictConfig</code> sends <code>Cache-Control: no-store</code>. This keeps sensitive pages out of caches, but also stops caching of static assets and the back/forward cache. Apply it to sensitive routes only, or override it with <code>withSecureCache</code> or <code>{ strictConfig with cacheControl = None }</code>.</li>
+      </ul>
 
       <h2>Basic Authentication</h2>
       <p>Implement basic HTTP authentication:</p>
@@ -189,6 +199,7 @@ let app =
     path "/api/private" &gt;=&gt; limitByUser
   ]</code></pre>
       </div>
+      <p>Limits are keyed by the connection's remote address by default; <code>X-Forwarded-For</code> is ignored because clients can forge it. Behind a reverse proxy use <code>withKeyExtractor (trustedProxyKeyExtractor [ proxyAddress ])</code>. See <a href="rate-limiting.html">Rate limiting</a>.</p>
 
       <h2>Request Size Limits</h2>
       <p>Limit request body size to prevent abuse:</p>

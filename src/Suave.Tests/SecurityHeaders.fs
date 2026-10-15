@@ -154,4 +154,29 @@ let securityHeadersTests cfg =
       // Valid base64
       try System.Convert.FromBase64String(nonce1) |> ignore
       with _ -> failwith "invalid base64"
+    testCase "replaces a Cache-Control header already on the response" <| fun _ ->
+      let app = Writers.setHeader "Cache-Control" "public, max-age=60" >=> securityHeaders strictConfig >=> OK "test"
+      let ctx = runWithConfig app
+
+      reqResp HttpMethod.GET "/" "" None None DecompressionMethods.None id (fun res ->
+        let values = res.Headers.GetValues("Cache-Control") |> List.ofSeq
+        Expect.equal values [ "no-store" ] "a single Cache-Control header"
+      ) ctx
+
+    testCase "replaces headers set by an earlier securityHeaders" <| fun _ ->
+      let app = securityHeaders balancedConfig >=> securityHeaders (emptyConfig |> withFrameOptions FrameOptions.Deny) >=> OK "test"
+      let ctx = runWithConfig app
+
+      reqResp HttpMethod.GET "/" "" None None DecompressionMethods.None id (fun res ->
+        let values = res.Headers.GetValues("X-Frame-Options") |> List.ofSeq
+        Expect.equal values [ "DENY" ] "a single X-Frame-Options header"
+      ) ctx
+
+    testCase "presets disable the XSS auditor and avoid deprecated or opt-in directives" <| fun _ ->
+      for preset in [ strictConfig; balancedConfig; relaxedConfig ] do
+        Expect.equal preset.xXssProtection (Some false) "X-XSS-Protection: 0"
+      let csp = strictConfig.contentSecurityPolicy |> Option.get
+      Expect.isFalse (csp.rules |> List.exists (fun r -> r.directive = CSPDirective.BlockAllMixedContent)) "no block-all-mixed-content"
+      Expect.isFalse (strictConfig.strictTransportSecurity |> Option.get).preload "no HSTS preload by default"
+
   ]

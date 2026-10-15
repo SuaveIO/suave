@@ -32,6 +32,8 @@ module SecurityHeaders =
     | RequireTrustedTypesFor
     | TrustedTypes
     | UpgradeInsecureRequests
+    /// Deprecated: superseded by UpgradeInsecureRequests and by browsers
+    /// blocking mixed content by default
     | BlockAllMixedContent
     
     member this.Name =
@@ -254,7 +256,10 @@ module SecurityHeaders =
       xContentTypeOptions: bool
       referrerPolicy: ReferrerPolicy option
       permissionsPolicy: PermissionsRule list
-      xXssProtection: bool option  // None = don't set, Some true = "1; mode=block", Some false = "0"
+      /// None = don't set, Some true = "1; mode=block", Some false = "0".
+      /// Prefer Some false or None: the XSS auditor that "1; mode=block" enables
+      /// has been removed from browsers and could itself be abused to leak data.
+      xXssProtection: bool option
       xPermittedCrossDomainPolicies: CrossDomainPolicy option
       cacheControl: CacheControl option }
 
@@ -294,7 +299,15 @@ module SecurityHeaders =
     rng.GetBytes(bytes)
     Convert.ToBase64String(bytes)
 
-  /// Apply security headers WebPart
+  /// Sets a header, replacing any value already on the response (like Writers.setHeader)
+  let private setHeader (ctx: HttpContext) (name: string, value: string) =
+    let headers =
+      (name, value)
+      :: (ctx.response.headers |> List.filter (fun (k, _) -> not (String.Equals(k, name, StringComparison.OrdinalIgnoreCase))))
+    { ctx with response = { ctx.response with headers = headers } }
+
+  /// Apply security headers WebPart. Each configured header replaces a header
+  /// of the same name already set on the response.
   let securityHeaders (config: SecurityHeadersConfig) : WebPart =
     fun ctx ->
       let mutable ctx' = ctx
@@ -304,62 +317,72 @@ module SecurityHeaders =
       | Some csp ->
           let headerName = if csp.reportOnly then "Content-Security-Policy-Report-Only" else "Content-Security-Policy"
           let headerValue = buildCSPHeader csp
-          ctx' <- { ctx' with response = { ctx'.response with headers = (headerName, headerValue) :: ctx'.response.headers }}
+          ctx' <- setHeader ctx' (headerName, headerValue)
       | None -> ()
       
       // Strict-Transport-Security
       match config.strictTransportSecurity with
       | Some hsts ->
           let headerValue = buildHSTSHeader hsts
-          ctx' <- { ctx' with response = { ctx'.response with headers = ("Strict-Transport-Security", headerValue) :: ctx'.response.headers }}
+          ctx' <- setHeader ctx' ("Strict-Transport-Security", headerValue)
       | None -> ()
       
       // X-Frame-Options
       match config.xFrameOptions with
       | Some frameOpts ->
-          ctx' <- { ctx' with response = { ctx'.response with headers = ("X-Frame-Options", frameOpts.Value) :: ctx'.response.headers }}
+          ctx' <- setHeader ctx' ("X-Frame-Options", frameOpts.Value)
       | None -> ()
       
       // X-Content-Type-Options
       if config.xContentTypeOptions then
-        ctx' <- { ctx' with response = { ctx'.response with headers = ("X-Content-Type-Options", "nosniff") :: ctx'.response.headers }}
+        ctx' <- setHeader ctx' ("X-Content-Type-Options", "nosniff")
       
       // Referrer-Policy
       match config.referrerPolicy with
       | Some policy ->
-          ctx' <- { ctx' with response = { ctx'.response with headers = ("Referrer-Policy", policy.Value) :: ctx'.response.headers }}
+          ctx' <- setHeader ctx' ("Referrer-Policy", policy.Value)
       | None -> ()
       
       // Permissions-Policy
       if not (List.isEmpty config.permissionsPolicy) then
         let headerValue = buildPermissionsPolicyHeader config.permissionsPolicy
-        ctx' <- { ctx' with response = { ctx'.response with headers = ("Permissions-Policy", headerValue) :: ctx'.response.headers }}
+        ctx' <- setHeader ctx' ("Permissions-Policy", headerValue)
       
       // X-XSS-Protection
       match config.xXssProtection with
       | Some true -> 
-          ctx' <- { ctx' with response = { ctx'.response with headers = ("X-XSS-Protection", "1; mode=block") :: ctx'.response.headers }}
+          ctx' <- setHeader ctx' ("X-XSS-Protection", "1; mode=block")
       | Some false ->
-          ctx' <- { ctx' with response = { ctx'.response with headers = ("X-XSS-Protection", "0") :: ctx'.response.headers }}
+          ctx' <- setHeader ctx' ("X-XSS-Protection", "0")
       | None -> ()
       
       // X-Permitted-Cross-Domain-Policies
       match config.xPermittedCrossDomainPolicies with
       | Some policy ->
-          ctx' <- { ctx' with response = { ctx'.response with headers = ("X-Permitted-Cross-Domain-Policies", policy.Value) :: ctx'.response.headers }}
+          ctx' <- setHeader ctx' ("X-Permitted-Cross-Domain-Policies", policy.Value)
       | None -> ()
       
       // Cache-Control
       match config.cacheControl with
       | Some cache ->
-          ctx' <- { ctx' with response = { ctx'.response with headers = ("Cache-Control", cache.Value) :: ctx'.response.headers }}
+          ctx' <- setHeader ctx' ("Cache-Control", cache.Value)
       | None -> ()
       
       succeed ctx'
 
   // === Preset Configurations ===
 
-  /// Strict security configuration - maximum protection, may break some features
+  /// Strict security configuration - maximum protection, may break some features.
+  ///
+  /// HSTS is sent for a year with includeSubDomains but without `preload`:
+  /// preload is a request to be hard-coded into browsers for every subdomain,
+  /// and removal from the preload list takes months, so opt in deliberately
+  /// with `withHSTS 31536000 true true` once every subdomain serves HTTPS.
+  ///
+  /// `Cache-Control: no-store` keeps responses out of browser and shared caches,
+  /// which suits pages with sensitive data but also disables caching of static
+  /// assets and the back/forward cache. Apply this preset to sensitive routes only,
+  /// or override it with `withSecureCache` / `{ strictConfig with cacheControl = None }`.
   let strictConfig : SecurityHeadersConfig =
     { contentSecurityPolicy = Some {
         rules = [
@@ -373,14 +396,13 @@ module SecurityHeaders =
           { directive = CSPDirective.BaseUri; sources = [CSPSource.Self] }
           { directive = CSPDirective.FormAction; sources = [CSPSource.Self] }
           { directive = CSPDirective.UpgradeInsecureRequests; sources = [] }
-          { directive = CSPDirective.BlockAllMixedContent; sources = [] }
         ]
         reportOnly = false
       }
       strictTransportSecurity = Some {
         maxAge = 31536000  // 1 year
         includeSubDomains = true
-        preload = true
+        preload = false
       }
       xFrameOptions = Some FrameOptions.Deny
       xContentTypeOptions = true
@@ -391,9 +413,9 @@ module SecurityHeaders =
         { directive = PermissionsDirective.Geolocation; allowlist = PermissionsAllowlist.NoOrigins }
         { directive = PermissionsDirective.Payment; allowlist = PermissionsAllowlist.NoOrigins }
       ]
-      xXssProtection = Some true
+      xXssProtection = Some false
       xPermittedCrossDomainPolicies = Some CrossDomainPolicy.NonePolicy
-      cacheControl = Some CacheControl.NoStoreNoCache }
+      cacheControl = Some CacheControl.NoStore }
 
   /// Balanced security configuration - reasonable defaults for most applications
   let balancedConfig : SecurityHeadersConfig =
@@ -425,7 +447,7 @@ module SecurityHeaders =
         { directive = PermissionsDirective.Microphone; allowlist = PermissionsAllowlist.SelfOnly }
         { directive = PermissionsDirective.Geolocation; allowlist = PermissionsAllowlist.SelfOnly }
       ]
-      xXssProtection = Some true
+      xXssProtection = Some false
       xPermittedCrossDomainPolicies = Some CrossDomainPolicy.NonePolicy
       cacheControl = None }
 
@@ -448,7 +470,7 @@ module SecurityHeaders =
       xContentTypeOptions = true
       referrerPolicy = Some ReferrerPolicy.NoReferrerWhenDowngrade
       permissionsPolicy = []
-      xXssProtection = Some true
+      xXssProtection = Some false
       xPermittedCrossDomainPolicies = None
       cacheControl = None }
 
