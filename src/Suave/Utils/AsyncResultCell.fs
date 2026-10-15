@@ -16,6 +16,12 @@ type AsyncResultCell<'T>() =
   member x.complete result =
     source.TrySetResult result
 
+  /// Complete the async result cell with an error, so that awaiting it raises
+  /// `error`. Returns true if this invocation completed the cell, false if it
+  /// already had a value or an error.
+  member x.fail (error : exn) =
+    source.TrySetException error
+
   /// Await the result of the AsyncResultCell, yielding Some(:'T)
   /// after the timeout or otherwise None.
   member x.awaitResult(?timeout : TimeSpan) = async {

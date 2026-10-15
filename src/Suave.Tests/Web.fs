@@ -128,3 +128,78 @@ let errorHandlerTests (cfg : SuaveConfig) =
       Expect.stringContains body "secret &lt;detail&gt;" "should contain the encoded message"
       Expect.isFalse (body.Contains "secret <detail>") "should not contain the raw message"
   ]
+
+[<Tests>]
+let bindFailureTests (cfg : SuaveConfig) =
+  // Holds a loopback port for the duration of a test, so that Suave's bind fails
+  let withHeldPort f =
+    let held = new Sockets.TcpListener(IPAddress.Loopback, 0)
+    held.Start()
+    try
+      let port = (held.LocalEndpoint :?> IPEndPoint).Port
+      f { cfg with
+            bindings = [ HttpBinding.createSimple HTTP "127.0.0.1" port ]
+            hideStartupMessage = true }
+    finally
+      held.Stop()
+
+  // The bind is retried for a few tens of milliseconds; anything near this
+  // means the failure is not being reported
+  let timeout = TimeSpan.FromSeconds 10.
+  let completesPromptly (t : Threading.Tasks.Task) = Threading.Tasks.Task.WaitAny([| t |], timeout) = 0
+
+  let rec isSocketException (ex : exn) =
+    match ex with
+    | :? Sockets.SocketException -> true
+    | :? AggregateException as ae -> ae.InnerExceptions.Count = 1 && isSocketException ae.InnerException
+    | _ -> false
+
+  testList "when a binding cannot be bound" [
+    testCase "startWebServer throws the SocketException" <| fun _ ->
+      withHeldPort (fun config ->
+        let run = Threading.Tasks.Task.Run(fun () -> startWebServer config Successful.NO_CONTENT)
+        Expect.isTrue (completesPromptly run) "startWebServer should return promptly"
+        Expect.isTrue run.IsFaulted "startWebServer should throw"
+        Expect.isTrue (run.Exception.InnerException :? Sockets.SocketException)
+          (sprintf "should throw a SocketException, got %O" run.Exception.InnerException))
+
+    testCase "listening raises the SocketException and the server task is faulted" <| fun _ ->
+      withHeldPort (fun config ->
+        let listening, server = startWebServerAsync config Successful.NO_CONTENT
+        let started = Async.StartAsTask listening
+        Expect.isTrue (completesPromptly started) "listening should complete promptly"
+        Expect.isTrue started.IsFaulted "listening should fail"
+        Expect.isTrue (isSocketException started.Exception)
+          (sprintf "listening should raise a SocketException, got %O" started.Exception)
+        Expect.isTrue (completesPromptly server) "the server task should complete promptly"
+        Expect.isTrue server.IsFaulted "the server task should be faulted"
+        Expect.isTrue (isSocketException server.Exception)
+          (sprintf "the server task should fail with a SocketException, got %O" server.Exception))
+
+    testCase "startWebServer throws and stops the bindings that did start" <| fun _ ->
+      withHeldPort (fun config ->
+        // A port that is free: bind it, note it, release it
+        let probe = new Sockets.TcpListener(IPAddress.Loopback, 0)
+        probe.Start()
+        let freePort = (probe.LocalEndpoint :?> IPEndPoint).Port
+        probe.Stop()
+        let config =
+          { config with bindings = HttpBinding.createSimple HTTP "127.0.0.1" freePort :: config.bindings }
+        let run = Threading.Tasks.Task.Run(fun () -> startWebServer config Successful.NO_CONTENT)
+        Expect.isTrue (completesPromptly run) "startWebServer should return promptly"
+        Expect.isTrue (run.Exception.InnerException :? Sockets.SocketException)
+          (sprintf "should throw a SocketException, got %O" run.Exception)
+        // The binding that started has been stopped and its port released
+        let rebind = new Sockets.TcpListener(IPAddress.Loopback, freePort)
+        rebind.Start()
+        rebind.Stop())
+
+    testCase "a cancelled server still stops cleanly" <| fun _ ->
+      use cts = new Threading.CancellationTokenSource()
+      let config = { cfg with cancellationToken = cts.Token; hideStartupMessage = true }
+      let listening, server = startWebServerAsync config Successful.NO_CONTENT
+      listening |> Async.RunSynchronously |> ignore
+      cts.Cancel()
+      Expect.isTrue (completesPromptly server) "the server task should complete"
+      Expect.equal server.Status Threading.Tasks.TaskStatus.RanToCompletion "the server task should not be faulted"
+  ]

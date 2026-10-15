@@ -40,6 +40,9 @@ module Web =
   /// In other words: don't block on 'listening' unless you have started the server.
   /// The return value from 'listening' (first item in tuple) gives you some metrics on
   /// how quickly suave started.
+  /// If a binding cannot be bound (e.g. its port is already in use), 'listening' raises the
+  /// exception (typically a <code>SocketException</code>) and the server task is faulted with it;
+  /// the other bindings are stopped.
   let startWebServerAsync (config : SuaveConfig) (webpart : WebPart) =
     ServerKey.validate config.serverKey |> ignore
 
@@ -61,9 +64,15 @@ module Web =
     // spawn tcp listeners/web workers
     let toRuntime = SuaveConfig.toRuntime config homeFolder compressionFolder
 
+    // The servers run on a token of our own, linked to the caller's, so that
+    // a binding that fails to bind can stop the others: otherwise the server
+    // task would keep waiting on the bindings that did start, and the failure
+    // would only show once something else stopped them.
+    let stopAll = Threading.CancellationTokenSource.CreateLinkedTokenSource(config.cancellationToken)
+
     let startWebWorker runtime =
       let tcpServer =
-        (tcpServerFactory :> TcpServerFactory).create(config.maxOps, config.bufferSize, runtime.matchedBinding.socketBinding, runtime, config.cancellationToken, config.healthCheckEnabled, config.healthCheckIntervalMs, config.maxConnectionAgeSeconds, config.acceptorCount, webpart)
+        (tcpServerFactory :> TcpServerFactory).create(config.maxOps, config.bufferSize, runtime.matchedBinding.socketBinding, runtime, stopAll.Token, config.healthCheckEnabled, config.healthCheckIntervalMs, config.maxConnectionAgeSeconds, config.acceptorCount, webpart)
 
       startTcpIpServer runtime.matchedBinding.socketBinding tcpServer
 
@@ -72,6 +81,11 @@ module Web =
 
     let listening = servers |> Seq.map fst |> Async.Parallel
     let serverTasks = servers |> Seq.map snd |> Seq.toArray
+    // A server task only faults when its binding never started listening
+    for serverTask in serverTasks do
+      serverTask.ContinueWith(
+        Action<Task>(fun _ -> try stopAll.Cancel() with :? ObjectDisposedException -> ()),
+        TaskContinuationOptions.OnlyOnFaulted) |> ignore
     // The last sweep runs when every server task has finished - its acceptors
     // stopped and the connections they started drained - rather than when
     // cancellation is merely requested: a compression still in flight would
@@ -85,14 +99,17 @@ module Web =
           do! Task.WhenAll(serverTasks)
         finally
           Compression.cleanup compressionFolder |> ignore
+          stopAll.Dispose()
       } :> Task
     listening, server
 
   /// Runs the web server and blocks waiting for the asynchronous workflow to be cancelled or
   /// it returning itself.
+  /// Throws if a binding cannot be bound (e.g. a <code>SocketException</code> when the port
+  /// is already in use), so a program that only calls this exits with a non-zero code.
   let startWebServer (config : SuaveConfig) (webpart : WebPart) =
     let task = startWebServerAsync config webpart |> snd
-    Task.WaitAll task
+    task.GetAwaiter().GetResult()
 
   /// The default configuration binds on IPv4, 127.0.0.1:8080 with a regular 500 Internal Error handler,
   /// with a timeout of one minute for computations to run. Waiting for 2 seconds for the socket bind
