@@ -505,28 +505,63 @@ module ServeResource =
 
 module ContentRange =
   open System
+  open System.Globalization
   open System.IO
   open Suave.Utils
 
-  let parseContentRange (input:string) =
-    let contentUnit = input.Split([|' '; '='|], 2)
-    let rangeArray = contentUnit.[1].Split([|'-'|])
-    let start = int64 rangeArray.[0]
-    let finish = if Int64.TryParse (rangeArray.[1], ref 0L) then Some <| int64 rangeArray.[1] else None
-    start, finish
+  /// What a `Range` request header asks of a resource of a known length.
+  type internal RangeRequest =
+    /// No usable range: the header is absent, malformed, uses a unit other than
+    /// `bytes` or asks for several ranges. The whole resource is sent (200).
+    | NoRange
+    /// The inclusive byte range `first`-`last` of the resource (206).
+    | Satisfiable of first : int64 * last : int64
+    /// A well-formed range that lies outside the resource (416).
+    | Unsatisfiable
 
-  let (|ContentRange|_|) (context:HttpContext) =
+  let private tryParsePos (s : string) =
+    match Int64.TryParse(s, NumberStyles.None, CultureInfo.InvariantCulture) with
+    | true, v -> Some v
+    | _ -> None
+
+  /// Interprets a `Range` header value (RFC 9110 §14.1.2) for a resource of
+  /// `total` bytes. Byte positions are inclusive, so `bytes=2-5` is four bytes.
+  /// Open-ended (`bytes=5-`) and suffix (`bytes=-3`) ranges are supported;
+  /// multiple ranges are not, and are answered with the full resource.
+  let internal parseRange (input : string) (total : int64) =
+    let input = input.Trim()
+    let prefix = "bytes="
+    if not (input.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) then NoRange
+    else
+      let spec = input.Substring(prefix.Length).Trim()
+      if spec.Contains "," then NoRange
+      else
+        match spec.Split('-') with
+        | [| ""; suffix |] ->
+          match tryParsePos (suffix.Trim()) with
+          | Some 0L -> Unsatisfiable
+          | Some _ when total = 0L -> Unsatisfiable
+          | Some n -> Satisfiable (max 0L (total - n), total - 1L)
+          | None -> NoRange
+        | [| first; last |] ->
+          match tryParsePos (first.Trim()) with
+          | None -> NoRange
+          | Some first ->
+            let last =
+              match last.Trim() with
+              | "" -> Some (Int64.MaxValue)
+              | l -> tryParsePos l
+            match last with
+            | None -> NoRange
+            | Some last when last < first -> NoRange
+            | Some _ when first >= total -> Unsatisfiable
+            | Some last -> Satisfiable (first, min last (total - 1L))
+        | _ -> NoRange
+
+  let internal rangeRequest (context : HttpContext) (total : int64) =
     match context.request.header "range" with
-    | Choice1Of2 rangeValue -> Some <| parseContentRange rangeValue
-    | Choice2Of2 _ -> None
-
-  let getFileStream (ctx:HttpContext) path =
-    let fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite) :> Stream
-    match ctx with
-    | ContentRange (start, finish) ->
-      let length = finish |> Option.bind (fun finish -> Some (finish - start))
-      new RangedStream(fs, start, length, true) :> Stream, start, fs.Length, HTTP_206.status
-    | _ -> fs, 0L, fs.Length, HTTP_200.status
+    | Choice1Of2 rangeValue -> parseRange rangeValue total
+    | Choice2Of2 _ -> NoRange
 
 module Files =
 
@@ -539,43 +574,69 @@ module Files =
   open ContentRange
 
   let sendFile fileName (compression : bool) (ctx : HttpContext) =
-    let writeFile file =
-      let fs, start, total, status = getFileStream ctx file
-      fun (conn:Connection, _) -> task {
+    let fs = new FileStream(fileName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite) :> Stream
+    let total = fs.Length
+    match rangeRequest ctx total with
+    | Unsatisfiable ->
+      fs.Dispose()
+      let write (conn : Connection, _) = task {
+        do! conn.asyncWriteLn ("Content-Range: bytes */" + total.ToString())
+        do! conn.asyncWriteLn "Content-Length: 0\r\n"
+        do! conn.flush ()
+      }
+      { ctx with
+          response =
+            { ctx.response with
+                status = HTTP_416.status
+                content = SocketTask write } }
+      |> succeed
+    | Satisfiable (first, last) ->
+      // A partial response is never compressed: the range applies to the
+      // file's bytes, and a compressed copy of a slice must not be cached as
+      // the compressed copy of the whole file.
+      let length = last - first + 1L
+      let ranged = new Suave.Utils.RangedStream(fs, first, Some length, true) :> Stream
+      let write (conn : Connection, _) = task {
+        try
+          do! conn.asyncWriteLn ("Content-Range: bytes " + first.ToString() + "-" + last.ToString() + "/" + total.ToString())
+          do! conn.asyncWriteLn ("Content-Length: " + length.ToString() + "\r\n")
+          do! conn.flush ()
+          if ctx.request.``method`` <> HttpMethod.HEAD && length > 0L then
+            do! transferStream conn ranged
+        finally
+          ranged.Dispose()
+      }
+      { ctx with
+          response =
+            { ctx.response with
+                status = HTTP_206.status
+                content = SocketTask write } }
+      |> succeed
+    | NoRange ->
+      let write (conn : Connection, _) = task {
         let getLm = fun path -> FileInfo(path).LastWriteTime
-        match! Compression.transformStream file fs getLm compression ctx.runtime.compressionFolder ctx with
-        | Ok(encoding,fs) ->
-          let finish = start + fs.Length - 1L
+        match! Compression.transformStream fileName fs getLm compression ctx.runtime.compressionFolder ctx with
+        | Ok (encoding, fs) ->
           try
-            try
-              match encoding with
-              | Some n ->
-                do! conn.asyncWriteLn ("Content-Range: bytes " + start.ToString() + "-" + finish.ToString() + "/*")
-                do! conn.asyncWriteLn (String.Concat [| "Content-Encoding: "; n.ToString() |])
-                do! conn.asyncWriteLn ("Content-Length: " + (fs : Stream).Length.ToString() + "\r\n")
-                do! conn.flush ()
-                if ctx.request.``method`` <> HttpMethod.HEAD && fs.Length > 0L then
-                  do! transferStream conn fs
-              | None ->
-                do! conn.asyncWriteLn ("Content-Range: bytes " + start.ToString() + "-" + finish.ToString() + "/" + total.ToString())
-                do! conn.asyncWriteLn ("Content-Length: " + (fs : Stream).Length.ToString() + "\r\n")
-                do! conn.flush()
-                if ctx.request.``method`` <> HttpMethod.HEAD && fs.Length > 0L then
-                  do! transferStream conn fs
-            with ex ->
-              raise ex
+            match encoding with
+            | Some n ->
+              do! conn.asyncWriteLn (String.Concat [| "Content-Encoding: "; n.ToString() |])
+            | None -> ()
+            do! conn.asyncWriteLn ("Content-Length: " + (fs : Stream).Length.ToString() + "\r\n")
+            do! conn.flush ()
+            if ctx.request.``method`` <> HttpMethod.HEAD && fs.Length > 0L then
+              do! transferStream conn fs
           finally
             fs.Dispose()
         | Result.Error error ->
-          return failwith "error"
-      }, status
-    let task, status = writeFile fileName
-    { ctx with
-        response =
-          { ctx.response with
-              status = status
-              content = SocketTask task } }
-    |> succeed
+          return failwithf "%A" error
+      }
+      { ctx with
+          response =
+            { ctx.response with
+                status = HTTP_200.status
+                content = SocketTask write } }
+      |> succeed
 
 
   /// <summary>
@@ -615,7 +676,9 @@ module Files =
     then path
     else trimmed
 
-  let resolvePath (rootPath : string) (fileName : string) =
+  /// Like `resolvePath`, but answers `None` instead of throwing when the
+  /// resolved path escapes the root.
+  let tryResolvePath (rootPath : string) (fileName : string) =
     let fileName =
       if Path.DirectorySeparatorChar.Equals('/') then fileName
       else fileName.Replace('/', Path.DirectorySeparatorChar)
@@ -634,24 +697,37 @@ module Files =
     let isInsideRoot =
       String.Equals(calculatedPath, rootPath, StringComparison.Ordinal)
       || calculatedPath.StartsWith(withTrailingSeparator rootPath, StringComparison.Ordinal)
-    if isInsideRoot then
-      calculatedPath
-    else
+    if isInsideRoot then Some calculatedPath
+    else None
+
+  let resolvePath (rootPath : string) (fileName : string) =
+    match tryResolvePath rootPath fileName with
+    | Some path -> path
+    | None ->
       // Neither the resolved path nor the root is included in the message: this
       // exception can surface in an error response, and would then disclose the
       // server's directory layout to whoever crafted the request.
       raise <| Exception("The requested path resolves outside of the root directory it is served from; refusing to serve it.")
 
+  // The web parts below decline (`fail`) a path that escapes the root, exactly
+  // as they decline a file that does not exist, rather than throwing: a request
+  // such as `/../secret.txt` then gets the application's 404 instead of a 500.
+
   let browseFile rootPath fileName =
     fun ({request = r; runtime = q} as h) ->
-      file (resolvePath rootPath fileName) h
+      match tryResolvePath rootPath fileName with
+      | Some path -> file path h
+      | None -> fail
 
   let browseFileHome fileName =
     fun ({request = r; runtime = q} as h) ->
       browseFile q.homeDirectory fileName h
 
   let browse rootPath : WebPart =
-    warbler (fun ctx -> file (resolvePath rootPath ctx.request.path))
+    warbler (fun ctx ->
+      match tryResolvePath rootPath ctx.request.path with
+      | Some path -> file path
+      | None -> never)
 
   let browseHome : WebPart =
     warbler (fun ctx -> browse ctx.runtime.homeDirectory)
@@ -659,7 +735,9 @@ module Files =
   let dir rootPath (ctx : HttpContext) =
     let req = ctx.request
 
-    let dirname = resolvePath rootPath req.path
+    match tryResolvePath rootPath req.path with
+    | None -> fail
+    | Some dirname ->
     let result = new StringBuilder()
 
     let filesize  (x : FileSystemInfo) =

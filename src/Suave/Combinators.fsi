@@ -1460,7 +1460,12 @@ module Files =
   /// <summary><para>
   /// Send a file as a response to the request
   /// </para><para>
+  /// A single <c>Range: bytes=…</c> request header is honoured with a 206 (positions
+  /// are inclusive; open-ended and suffix ranges are supported), or a 416 when the
+  /// range starts past the end of the file. Partial responses are not compressed.
   /// </para><para>
+  /// When <c>compression</c> is set but the compressed-files folder cannot be
+  /// written to, the file is sent uncompressed.
   /// </para></summary>
   /// <remarks>
   /// </remarks>
@@ -1494,6 +1499,14 @@ module Files =
   /// the resolved path escapes the root.
   /// </para></summary>
   val resolvePath : rootPath:string -> fileName:string -> string
+
+  /// <summary><para>
+  /// Like <c>resolvePath</c>, but returns <c>None</c> instead of raising when the
+  /// resolved path escapes the root. <c>browse</c>, <c>browseHome</c>,
+  /// <c>browseFile</c>, <c>browseFileHome</c> and <c>dir</c> use it, and decline
+  /// such a request the same way they decline a missing file.
+  /// </para></summary>
+  val tryResolvePath : rootPath:string -> fileName:string -> string option
 
 
   /// <summary><para>

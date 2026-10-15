@@ -187,3 +187,47 @@ let testDELETE cfg =
       use data = new StringContent("bob")
       let actual = runWithConfig webId |> req HttpMethod.DELETE "/" (Some data)
       Expect.equal actual "bob" "expecting data to be returned" ]
+
+
+[<Tests>]
+let uploadTempFiles cfg =
+  let runWithConfig = runWith cfg
+
+  let upload (content : string) =
+    let multipart = new MultipartFormDataContent()
+    let data = new ByteArrayContent(Encoding.UTF8.GetBytes content)
+    data.Headers.ContentType <- Headers.MediaTypeHeaderValue.Parse "text/plain"
+    multipart.Add(data, "attached-file", "upload.txt")
+    multipart
+
+  /// The temp file goes once the response has been written, which can be just
+  /// after the client has read it.
+  let expectDeleted (path : string) =
+    let deadline = DateTime.UtcNow.AddSeconds 5.
+    while IO.File.Exists path && DateTime.UtcNow < deadline do
+      Threading.Thread.Sleep 20
+    Expect.isFalse (IO.File.Exists path) "the upload temp file should be deleted after the response"
+
+  testList "upload temp files" [
+    testCase "are deleted after the response" <| fun _ ->
+      let tempPath = ref null
+      let app =
+        request (fun r ->
+          tempPath.Value <- r.files[0].tempFilePath
+          OK (IO.File.ReadAllText tempPath.Value))
+      let actual = runWithConfig app |> req HttpMethod.POST "/" (Some (upload "there is no cake"))
+      Expect.equal actual "there is no cake" "the upload is readable while the request is handled"
+      Expect.isNotNull tempPath.Value "the handler saw the upload"
+      expectDeleted tempPath.Value
+
+    testCase "can be streamed back with sendFile before they are deleted" <| fun _ ->
+      let tempPath = ref null
+      let content = String.replicate 5000 "streamed "
+      let app =
+        request (fun r ->
+          tempPath.Value <- r.files[0].tempFilePath
+          Files.sendFile tempPath.Value false)
+      let actual = runWithConfig app |> req HttpMethod.POST "/" (Some (upload content))
+      Expect.equal actual content "the whole upload is streamed back"
+      expectDeleted tempPath.Value
+  ]

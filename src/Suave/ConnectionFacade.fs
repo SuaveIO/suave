@@ -35,6 +35,11 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
   // Webparts must not retain references to a request's collections beyond the request's
   // own task — Suave never has and never did promise that.
   let files = List<HttpUpload>()
+  // Temp files created by the built-in upload writer for the current request. They
+  // are deleted once the response has been written (see `deleteTempFiles`); paths
+  // produced by a user-supplied `filePartSink` are the sink's business and are not
+  // tracked here.
+  let tempFiles = List<string>()
   let multiPartFields = List<string*string>()
   let requestHeaders = List<string*string>()
   let mutable _rawForm : byte array = [||]
@@ -75,6 +80,7 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
         sink fieldName filename contentType
       | None ->
         let tempFilePath = Path.GetTempFileName()
+        tempFiles.Add tempFilePath
         let tempFile = new FileStream(tempFilePath, FileMode.Truncate) :> IO.Stream
         { stream    = tempFile
           onSuccess = fun () ->
@@ -187,8 +193,7 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
         | Choice1Of2 x when String.startsWith "multipart/mixed" x ->
           let subboundary = "--" + parseBoundary x
           do! parseMultipartMixed fieldName subboundary
-          let a = reader.skip (boundary.Length)
-          return ()
+          do! reader.skip boundary.Length
 
         | Choice1Of2 contentType when headerParams.ContainsKey "filename" ->
           let! res = readFilePart boundary headerParams fieldName contentType
@@ -454,10 +459,22 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
       files            = files
       multiPartFields  = multiPartFields }
 
+  /// Deletes the upload temp files of the current request. Called once its
+  /// response has been written, and again when the connection ends, so a web
+  /// part that wants to keep an upload must move or copy it while it handles
+  /// the request (streaming it back with `Files.sendFile` is fine: the response
+  /// is complete before the file is removed). Never throws.
+  member private this.deleteTempFiles () =
+    if tempFiles.Count > 0 then
+      for path in tempFiles do
+        try File.Delete path with _ -> ()
+      tempFiles.Clear()
+
   /// Clear pooled per-connection collections at the start of every request rather than
   /// allocating fresh ones. The collections live on the ConnectionFacade and are reset
   /// here, before the new request is parsed in.
   member private this.resetRequest () =
+    this.deleteTempFiles()
     requestHeaders.Clear()
     files.Clear()
     multiPartFields.Clear()
@@ -671,6 +688,7 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
           let head = pendingHead
           pendingHead <- HeadIncomplete
           let! b = this.processRequestFrom (this.requestFromHead head)
+          this.deleteTempFiles()
           match b with
           | Ok b ->
             flag <- b
@@ -702,6 +720,7 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
           do Console.WriteLine($"[Conn:{connectionId}] accept: Exception: {ex.Message}")
     finally
       shutdownOnCancel.Dispose()
+      this.deleteTempFiles()
       // The reader pumps the inbound transport on demand from inside the request
       // loop, so by the time requestLoop has returned there is no background
       // reader task to await \u2014 just shut the transport down and recycle.

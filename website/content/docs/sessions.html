@@ -81,186 +81,291 @@
       <p>Learn how to manage user sessions and maintain state in Suave applications.</p>
 
       <h2>Cookie-Based Sessions</h2>
-      <p>Use cookies to maintain session state:</p>
+      <p>Read request cookies with <code>ctx.request.cookies</code> and write them with <code>Cookie.setCookie</code>, both from <code>Suave.Cookie</code>. Building <code>Set-Cookie</code> headers or splitting the <code>Cookie</code> header by hand breaks as soon as the browser sends more than one cookie (<code>a=1; sessionId=xyz</code>).</p>
+      <p>Session ids must be unguessable. Take them from <code>RandomNumberGenerator</code> rather than <code>Guid.NewGuid()</code>, whose randomness is an implementation detail rather than a guarantee:</p>
       <div class="code-block">
-        <pre><code>open Suave
-open Suave.Operators
+        <pre><code>open System.Buffers.Text
+open System.Security.Cryptography
+open Suave
+open Suave.Cookie
 open Suave.Filters
+open Suave.Operators
 open Suave.Successful
-open Suave.Writers
+
+/// 256 bits from the OS random number generator, URL-safe (43 characters).
+let newSessionId () =
+  RandomNumberGenerator.GetBytes 32 |&gt; Base64Url.EncodeToString
+
+let sessionCookie (sessionId : string) =
+  { HttpCookie.createKV "sessionId" sessionId with
+      secure   = true
+      sameSite = Some Lax }
 
 let app =
   choose [
-    path "/set-session" &gt;=&gt;
-      setHeader "Set-Cookie" "session=user123; Path=/; HttpOnly" &gt;=&gt;
-      OK "Session set"
-    
-    path "/get-session" &gt;=&gt; fun ctx -&gt;
-      match ctx.request.header "Cookie" with
-      | Choice1Of2 cookies -&gt;
-          OK (sprintf "Cookies: %s" cookies) ctx
-      | Choice2Of2 _ -&gt;
-          OK "No session" ctx
+    path "/set-session" &gt;=&gt; context (fun _ -&gt;
+      setCookie (sessionCookie (newSessionId ())) &gt;=&gt; OK "Session set")
+
+    path "/get-session" &gt;=&gt; context (fun ctx -&gt;
+      match ctx.request.cookies |&gt; Map.tryFind "sessionId" with
+      | Some cookie -&gt; OK (sprintf "Session id: %s" cookie.value)
+      | None -&gt; OK "No session")
   ]</code></pre>
       </div>
+      <p><code>HttpCookie.createKV</code> sets <code>path = Some "/"</code> and <code>httpOnly = true</code>. Browsers only send <code>Secure</code> cookies over HTTPS; most make an exception for <code>http://localhost</code>. <code>Base64Url</code> needs .NET 9 or later.</p>
 
       <h2>Session Storage Patterns</h2>
-      <p>Store session data with in-memory or database backends:</p>
+      <p>Store session data with in-memory or database backends, keyed by the session id:</p>
       <div class="code-block">
-        <pre><code>open Suave
-open Suave.Operators
+        <pre><code>open System.Collections.Concurrent
+open Suave
+open Suave.Cookie
 open Suave.Filters
+open Suave.Operators
 open Suave.Successful
-open Suave.Writers
-open System.Collections.Concurrent
 open Suave.RequestErrors
+
+// newSessionId and sessionCookie as defined above
 
 type SessionData = { userId : int; username : string }
 
 // In-memory session store
-let sessions = new ConcurrentDictionary&lt;string, SessionData&gt;()
+let sessions = ConcurrentDictionary&lt;string, SessionData&gt;()
 
 let app =
   choose [
-    POST &gt;=&gt; path "/login" &gt;=&gt; fun ctx -&gt;
-      async {
-        let sessionId = System.Guid.NewGuid().ToString()
-        let sessionData = { userId = 1; username = "john" }
-        sessions.TryAdd(sessionId, sessionData) |&gt; ignore
-        
-        return!
-          (setHeader "Set-Cookie"
-            (sprintf "sessionId=%s; Path=/; HttpOnly" sessionId) &gt;=&gt;
-           OK "Session created") ctx
-      }
-    
-    path "/profile" &gt;=&gt; fun ctx -&gt;
-      match ctx.request.header "cookie" with
-      | Choice1Of2 cookie -&gt;
-          let sessionId = cookie.Split('=').[1]
-          match sessions.TryGetValue(sessionId) with
-          | true, sessionData -&gt;
-              OK (sprintf "Session data: %A" sessionData) ctx
-          | false, _ -&gt;
-              RequestErrors.UNAUTHORIZED "Invalid session" ctx
-      | Choice2Of2 _ -&gt;
-          RequestErrors.UNAUTHORIZED "No session" ctx
+    POST &gt;=&gt; path "/login" &gt;=&gt; context (fun _ -&gt;
+      // Always issue a new id on login, never reuse one the client sent
+      let sessionId = newSessionId ()
+      sessions.[sessionId] &lt;- { userId = 1; username = "john" }
+      setCookie (sessionCookie sessionId) &gt;=&gt; OK "Session created")
+
+    path "/profile" &gt;=&gt; context (fun ctx -&gt;
+      match ctx.request.cookies |&gt; Map.tryFind "sessionId" with
+      | Some cookie -&gt;
+          match sessions.TryGetValue cookie.value with
+          | true, sessionData -&gt; OK (sprintf "Session data: %A" sessionData)
+          | false, _ -&gt; UNAUTHORIZED "Invalid session"
+      | None -&gt; UNAUTHORIZED "No session")
   ]</code></pre>
       </div>
 
       <h2>Session Timeout</h2>
-      <p>Implement session expiration:</p>
+      <p>Give the cookie an expiry date. <code>HttpCookie</code> has no <code>Max-Age</code> field; <code>expires</code> is an absolute time. The browser treats it as a hint, so also enforce the timeout on the server (see <a href="#session-cleanup">Session Cleanup</a>):</p>
       <div class="code-block">
-        <pre><code>open Suave
-open Suave.Operators
-open System
+        <pre><code>open System
+open Suave
+open Suave.Cookie
 open Suave.Filters
+open Suave.Operators
 open Suave.Successful
-open Suave.Writers
 
-let sessionTimeout = TimeSpan.FromMinutes(30.0)
+// newSessionId and sessionCookie as defined above
+
+let sessionTimeout = TimeSpan.FromMinutes 30.0
 
 let app =
-  choose [
-    path "/login" &gt;=&gt;
-      setHeader "Set-Cookie" 
-        (sprintf "session=xyz; Path=/; Max-Age=%d; HttpOnly" 
-          (int sessionTimeout.TotalSeconds)) &gt;=&gt;
-      OK "Session created with 30 minute timeout"
-  ]</code></pre>
+  path "/login" &gt;=&gt; context (fun _ -&gt;
+    let cookie =
+      { sessionCookie (newSessionId ()) with
+          expires = Some (DateTimeOffset.UtcNow.Add sessionTimeout) }
+    setCookie cookie &gt;=&gt; OK "Session created with 30 minute timeout")</code></pre>
       </div>
 
       <h2>Secure Session Cookies</h2>
-      <p>Create secure session cookies for production:</p>
+      <p>Create secure session cookies for production. <code>SameSite = Lax</code> keeps the cookie off cross-site subrequests and form posts while still sending it when the user follows a link to your site; use <code>Strict</code> if even that is not wanted:</p>
       <div class="code-block">
-        <pre><code>open Suave
-open Suave.Operators
-open Suave.Writers
+        <pre><code>open System
+open Suave
+open Suave.Cookie
 open Suave.Filters
+open Suave.Operators
 open Suave.Successful
 
-let createSecureSessionCookie (sessionId: string) =
-  sprintf "session=%s; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=1800" sessionId
+// newSessionId as defined above
+
+let secureSessionCookie (sessionId : string) =
+  { HttpCookie.createKV "sessionId" sessionId with
+      // createKV already sets path = Some "/" and httpOnly = true
+      secure   = true
+      sameSite = Some Lax
+      expires  = Some (DateTimeOffset.UtcNow.AddMinutes 30.0) }
 
 let app =
-  choose [
-    path "/secure-login" &gt;=&gt;
-      setHeader "Set-Cookie" (createSecureSessionCookie "session-xyz") &gt;=&gt;
-      OK "Secure session created"
-  ]</code></pre>
+  path "/secure-login" &gt;=&gt; context (fun _ -&gt;
+    setCookie (secureSessionCookie (newSessionId ())) &gt;=&gt; OK "Secure session created")</code></pre>
       </div>
 
-      <h2>Session Cleanup</h2>
-      <p>Clean up expired sessions:</p>
+      <h2>Ending a Session</h2>
+      <p>Remove the server-side entry and expire the cookie with <code>Cookie.unsetCookie</code>:</p>
       <div class="code-block">
-        <pre><code>open Suave
-open System
-open System.Collections.Concurrent
+        <pre><code>open System
+open Suave
+open Suave.Cookie
+open Suave.Filters
+open Suave.Operators
 open Suave.Successful
 
-let sessions = new ConcurrentDictionary&lt;string, (obj * DateTime)&gt;()
+// sessions as in Session Storage Patterns
 
-let cleanupExpiredSessions () =
+let logout =
+  path "/logout" &gt;=&gt; context (fun ctx -&gt;
+    match ctx.request.cookies |&gt; Map.tryFind "sessionId" with
+    | Some cookie -&gt; sessions.TryRemove cookie.value |&gt; ignore
+    | None -&gt; ()
+    unsetCookie "sessionId" &gt;=&gt; OK "Logged out")
+
+// A cookie that was set with a narrower path...
+let setAdminCookie =
+  setCookie { HttpCookie.createKV "adminPrefs" "compact" with path = Some "/admin" }
+
+// ...is only removed by an expired cookie with the same name, path and domain
+let unsetAdminCookie =
+  setCookie
+    { HttpCookie.createKV "adminPrefs" "" with
+        path    = Some "/admin"
+        expires = Some DateTimeOffset.UnixEpoch }</code></pre>
+      </div>
+      <p><strong>Note:</strong> <code>unsetCookie</code> always sends <code>Path=/</code> and no <code>Domain</code>. Browsers identify a cookie by name, path and domain, so a cookie set with a narrower path such as <code>/admin</code> (or with a domain) is not removed by it; expire it with <code>setCookie</code> and the same path and domain, as above.</p>
+
+      <h2 id="session-cleanup">Session Cleanup</h2>
+      <p>Check the idle timeout when a session is used and remove expired sessions in the background. Keep <code>printfn</code> out of server code: hand the loop a logging function instead of writing to <code>Console</code>.</p>
+      <div class="code-block">
+        <pre><code>open System
+open System.Collections.Concurrent
+open System.Threading
+open Suave
+open Suave.Successful
+
+let idleTimeout = TimeSpan.FromMinutes 30.0
+
+// Session data and the time (UTC) the session was last used
+let sessions = ConcurrentDictionary&lt;string, obj * DateTime&gt;()
+
+/// Finds a live session and records that it was used now.
+let tryTouch sessionId =
+  match sessions.TryGetValue sessionId with
+  | true, ((data, lastUsed) as current) when DateTime.UtcNow - lastUsed &lt; idleTimeout -&gt;
+      // Fails harmlessly if another request touched it or cleanup removed it
+      sessions.TryUpdate(sessionId, (data, DateTime.UtcNow), current) |&gt; ignore
+      Some data
+  | _ -&gt; None
+
+/// Removes sessions idle for longer than idleTimeout; returns how many.
+let removeExpiredSessions () =
+  let cutoff = DateTime.UtcNow - idleTimeout
+  sessions
+  |&gt; Seq.filter (fun kvp -&gt; snd kvp.Value &lt; cutoff)
+  |&gt; Seq.toList
+  // Removes the entry only if it still holds the same value, i.e. it has
+  // not been touched since it was found to be expired
+  |&gt; List.filter (fun kvp -&gt; sessions.TryRemove kvp)
+  |&gt; List.length
+
+let cleanupLoop (log : string -&gt; unit) =
   async {
     while true do
-      do! Async.Sleep(60000) // Every minute
-      let now = DateTime.UtcNow
-      let expired = 
-        sessions 
-        |&gt; Seq.filter (fun kvp -&gt; (snd kvp.Value - now).TotalMinutes &gt; 30.0)
-        |&gt; Seq.map (fun kvp -&gt; kvp.Key)
-        |&gt; Seq.toList
-      
-      expired |&gt; List.iter (fun key -&gt; sessions.TryRemove(key) |&gt; ignore)
-      printfn "Cleaned up %d expired sessions" expired.Length
+      do! Async.Sleep (TimeSpan.FromMinutes 1.0)
+      let removed = removeExpiredSessions ()
+      if removed &gt; 0 then log (sprintf "Removed %d expired sessions" removed)
   }
 
 [&lt;EntryPoint&gt;]
 let main argv =
-  // Start cleanup task
-  Async.Start (cleanupExpiredSessions())
-  
-  let app = OK "Sessions with cleanup"
-  startWebServer defaultConfig app
+  use cts = new CancellationTokenSource()
+  // Pass your application's logger here; Globals.writeMessage goes to
+  // Globals.messageWriter when one is set
+  Async.Start (cleanupLoop Globals.writeMessage, cts.Token)
+
+  let config = { defaultConfig with cancellationToken = cts.Token }
+  startWebServer config (OK "Sessions with cleanup")
   0</code></pre>
       </div>
+
+      <h2>Encrypted Cookie State</h2>
+      <p>For small amounts of per-user state you can skip the server-side store entirely. <code>statefulForSession</code> from <code>Suave.State.CookieStateStore</code> keeps a map of values in a cookie (<code>st</code>), encrypted and authenticated with the server key, and <code>HttpContext.state</code> reads and writes it (see the <a href="recipes/sessions.html">cookie sessions recipe</a>):</p>
+      <div class="code-block">
+        <pre><code>open Suave
+open Suave.Filters
+open Suave.Operators
+open Suave.Successful
+open Suave.State.CookieStateStore
+
+let app =
+  statefulForSession &gt;=&gt; choose [
+    path "/visit" &gt;=&gt; context (fun ctx -&gt;
+      match HttpContext.state ctx with
+      | Some store -&gt;
+          let visits = defaultArg (store.get "visits") 0 + 1
+          store.set "visits" visits &gt;=&gt; OK (sprintf "Visit number %d" visits)
+      | None -&gt;
+          RequestErrors.BAD_REQUEST "no state store")
+  ]</code></pre>
+      </div>
+      <p>The client cannot read or change the state, but it can replay an old cookie, and the server cannot revoke one. <code>statefulForSession</code> is <code>stateful Session false</code>; behind HTTPS use <code>stateful Session true</code> (or a <code>MaxAge</code> lifetime) so the cookie is marked <code>Secure</code>. Keep the state small: browsers limit a cookie to about 4 KB.</p>
+
+      <h3>A stable server key</h3>
+      <p><code>defaultConfig</code> generates a random <code>serverKey</code> each time the process starts. Every state cookie, and every <code>Suave.Authentication</code> cookie, becomes unreadable after a restart, and instances behind a load balancer cannot read each other's cookies. In production, load a 32-byte key from configuration:</p>
+      <div class="code-block">
+        <pre><code>open System
+open Suave
+
+// Generate a key once and keep it in a secret store, e.g.:
+//   openssl rand -base64 32
+let config =
+  { defaultConfig with
+      serverKey = ServerKey.fromBase64 (Environment.GetEnvironmentVariable "SUAVE_SERVER_KEY") }</code></pre>
+      </div>
+      <p><code>ServerKey.fromBase64</code> throws if the value is not a 32-byte key, so a missing or malformed key fails at startup. Changing the key invalidates every existing cookie, which signs all users out.</p>
+
+      <h3>Authentication cookies</h3>
+      <p><code>Authentication.authenticated</code> stores a session id in the encrypted <code>auth</code> cookie, which <code>Authentication.HttpContext.sessionId</code> reads back. The cookie also records the client IP address and User-Agent of the login request, but Suave does not compare them on later requests, so the cookie is not bound to a client: anyone who obtains it is signed in until it expires. Pass <code>secure = true</code> behind HTTPS and prefer a short <code>MaxAge</code>.</p>
 
       <h2>CSRF Token Sessions</h2>
       <p>Protect forms with CSRF tokens in sessions:</p>
       <div class="code-block">
-        <pre><code>open Suave
-open Suave.Operators
+        <pre><code>open System.Buffers.Text
 open System.Collections.Concurrent
+open System.Security.Cryptography
+open System.Text
+open Suave
+open Suave.Cookie
 open Suave.Filters
+open Suave.Operators
 open Suave.Successful
 open Suave.RequestErrors
 
-let csrfTokens = new ConcurrentDictionary&lt;string, string&gt;()
+let csrfTokens = ConcurrentDictionary&lt;string, string&gt;()
 
 let generateCSRFToken sessionId =
-  let token = System.Guid.NewGuid().ToString()
-  csrfTokens.AddOrUpdate(sessionId, token, fun _ _ -&gt; token) |&gt; ignore
+  let token = RandomNumberGenerator.GetBytes 32 |&gt; Base64Url.EncodeToString
+  csrfTokens.[sessionId] &lt;- token
   token
 
-let validateCSRFToken sessionId token =
-  match csrfTokens.TryGetValue(sessionId) with
-  | true, storedToken -&gt; storedToken = token
+let validateCSRFToken sessionId (token : string) =
+  match csrfTokens.TryGetValue sessionId with
+  | true, storedToken -&gt;
+      CryptographicOperations.FixedTimeEquals(
+        Encoding.UTF8.GetBytes storedToken, Encoding.UTF8.GetBytes token)
   | false, _ -&gt; false
+
+let sessionId (ctx : HttpContext) =
+  ctx.request.cookies |&gt; Map.tryFind "sessionId" |&gt; Option.map (fun c -&gt; c.value)
 
 let app =
   choose [
-    GET &gt;=&gt; path "/form" &gt;=&gt; fun ctx -&gt;
-      let sessionId = "session-123"
-      let token = generateCSRFToken sessionId
-      let html = sprintf "&lt;input type='hidden' name='csrf_token' value='%s'&gt;" token
-      OK html ctx
-    
-    POST &gt;=&gt; path "/form" &gt;=&gt; fun ctx -&gt;
-      match ctx.request.formData "csrf_token" with
-      | Choice1Of2 token when validateCSRFToken "session-123" token -&gt;
-          OK "Form submitted safely" ctx
-      | _ -&gt;
-          RequestErrors.FORBIDDEN "CSRF token invalid" ctx
+    GET &gt;=&gt; path "/form" &gt;=&gt; context (fun ctx -&gt;
+      match sessionId ctx with
+      | Some sid -&gt;
+          let token = generateCSRFToken sid
+          OK (sprintf "&lt;input type='hidden' name='csrf_token' value='%s'&gt;" token)
+      | None -&gt; FORBIDDEN "No session")
+
+    POST &gt;=&gt; path "/form" &gt;=&gt; context (fun ctx -&gt;
+      match sessionId ctx, ctx.request.formData "csrf_token" with
+      | Some sid, Choice1Of2 token when validateCSRFToken sid token -&gt;
+          OK "Form submitted safely"
+      | _ -&gt; FORBIDDEN "CSRF token invalid")
   ]</code></pre>
       </div>
       </div>

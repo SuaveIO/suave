@@ -6,7 +6,7 @@ storage none
 
 nuget FSharp.Core >= 10.0.102
 nuget Microsoft.Extensions.FileProviders.Embedded
-nuget DotLiquid
+nuget DotLiquid >= 2.3.197
 nuget Websocket.Client
 nuget FsCheck
 nuget Expecto
