@@ -347,16 +347,19 @@ module Filters =
   let getUserName (ctx : HttpContext) =
     match ctx.userState.TryGetValue "userName"  with true, x -> x :?> string | false, _ -> "-"
 
+  /// Formats the request in the Apache/NCSA common log format. The address is
+  /// the connection's remote address; `X-Forwarded-For`/`X-Real-IP` are not
+  /// used because any client can set them.
   let logFormat (ctx : HttpContext) =
 
     let dash = function | "" | null -> "-" | x -> x
     let ci = Globalization.CultureInfo("en-US")
     let processId = System.Diagnostics.Process.GetCurrentProcess().Id.ToString()
-    ctx.clientIpTrustProxy.ToString() + " " +
+    (ctx.clientIp false []).ToString() + " " +
     processId + " " + //TODO: obtain connection owner via Ident protocol
                        // Authentication.UserNameKey
     (getUserName ctx) + " [" +
-    (DateTime.UtcNow.ToString("dd/MMM/yyyy:hh:mm:ss %K", ci)) + "] \"" +
+    (DateTime.UtcNow.ToString("dd/MMM/yyyy:HH:mm:ss '+0000'", ci)) + "] \"" +
     (string ctx.request.``method``) + " " +
     ctx.request.url.AbsolutePath + " " +
     ctx.request.httpVersion + "\" " +
@@ -365,9 +368,10 @@ module Filters =
     | Bytes bs -> bs.Length.ToString()
     | _ -> "0")
 
+  /// `logFormat` as a message template and its fields.
   let logFormatStructured (ctx : HttpContext) =
     let fieldList : (string*obj) list = [
-      "clientIp", box ctx.clientIpTrustProxy
+      "clientIp", box (ctx.clientIp false [])
       "processId", box (System.Diagnostics.Process.GetCurrentProcess().Id.ToString())
       "userName", box (getUserName ctx)
       "utcNow", box DateTime.UtcNow
@@ -377,7 +381,7 @@ module Filters =
       "httpStatusCode", box ctx.response.status.code
       "responseContentLength", box (match ctx.response.content with | Bytes bs -> bs.Length | _ -> 0)
     ]
-    "{clientIp} {processId} {userName} [{utcNow:dd/MMM/yyyy:hh:mm:ss %K}] \"{requestMethod} {requestUrlPath} {httpVersion}\" {httpStatusCode} {responseContentLength}", fieldList |> Map
+    "{clientIp} {processId} {userName} [{utcNow:dd/MMM/yyyy:HH:mm:ss '+0000'}] \"{requestMethod} {requestUrlPath} {httpVersion}\" {httpStatusCode} {responseContentLength}", fieldList |> Map
 
   open Suave.Sscanf
 
