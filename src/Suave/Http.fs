@@ -522,7 +522,7 @@ module Http =
         hideStartupMessage = false
         maxContentLength  = 1024
         filePartSink      = None
-        http2Enabled      = true }
+        http2Enabled      = true
         webSocketMaxFrameSize = 16 * 1024 * 1024 }
 
     let create serverKey errorHandler mimeTypes homeDirectory compressionFolder
