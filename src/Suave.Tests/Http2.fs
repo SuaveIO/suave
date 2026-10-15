@@ -2147,6 +2147,7 @@ let http2SocketTaskIntegrationTests (_ : SuaveConfig) =
         let text = head.ToString()
         Expect.stringStarts text "HTTP/1.1 101" "switching protocols"
         Expect.isFalse (text.ToLowerInvariant().Contains "content-type") (sprintf "no Content-Type in:\n%s" text))
+  ]
 
 // HTTP/2 requests carry the binding they arrived on, as HTTP/1.1 requests do,
 // so `request.binding.scheme.secure` and `request.url` are right for them.
