@@ -87,8 +87,11 @@
       <p>Put a file such as <code>templates/hello.liquid</code> next to your app:</p>
       <div class="code-block">
         <pre><code>&lt;!-- templates/hello.liquid --&gt;
-&lt;h1&gt;Hello {{ model.name }}&lt;/h1&gt;
+&lt;h1&gt;Hello {{ model.name | escape }}&lt;/h1&gt;
 &lt;p&gt;You are {{ model.age }} years old.&lt;/p&gt;</code></pre>
+      </div>
+      <div class="callout">
+        <p><strong>DotLiquid does not HTML-escape output.</strong> <code>{{ model.name }}</code> writes the value as-is, so a name of <code>&lt;b&gt;Ada&lt;/b&gt;</code> ends up as markup in the page. Add <code>| escape</code> to every value that can contain user input, or you open the page to cross-site scripting.</p>
       </div>
       <div class="code-block">
         <pre><code>open Suave
@@ -108,6 +111,26 @@ startWebServer defaultConfig app</code></pre>
       </div>
       <div class="callout">
         <p>Prefer <code>Suave.DotLiquid.page</code> over calling DotLiquid’s <code>Template.Parse</code> yourself — it wires rendering into a <code>WebPart</code> for you.</p>
+      </div>
+
+      <h2>Content type and charset</h2>
+      <p><code>page</code> responds with <code>Content-Type: text/html</code> and no <code>charset</code>; the body is UTF-8. If your templates or models contain non-ASCII text, set the header explicitly so browsers do not guess the encoding:</p>
+      <div class="code-block">
+        <pre><code>open Suave.Writers
+
+let app =
+  path "/greet"
+  &gt;=&gt; page "hello.liquid" { name = "Ada"; age = 36 }
+  &gt;=&gt; setMimeType "text/html; charset=utf-8"</code></pre>
+      </div>
+
+      <h2>Field names in templates</h2>
+      <p>Suave.DotLiquid uses DotLiquid’s Ruby naming convention, so F# member names are converted to snake_case in templates: a field <code>totalLinks</code> is <code>{{ model.total_links }}</code>, and <code>{{ model.totalLinks }}</code> renders nothing. Call <code>setCSharpNamingConvention ()</code> at startup to keep names as they are written in F#.</p>
+      <div class="code-block">
+        <pre><code>type Stats = { totalLinks : int }
+
+// templates/stats.liquid
+// &lt;p&gt;{{ model.total_links }} links&lt;/p&gt;</code></pre>
       </div>
 
       <h2>Multiple pages</h2>
