@@ -1,3 +1,6 @@
+## Unreleased
+* `pathScan`, `pathScanCi` and `Sscanf.sscanf` no longer wrap integers that are out of range for the target type: `/items/99999999999` against `pathScan "/items/%d"` with an `int` handler now declines instead of passing `1215752191`; the same applies to `int16`, `uint16` and `uint32` (and `%x`/`%X`/`%o` values that do not fit)
+
 ## New in v3.6.1 (Released 2026-10-07)
 * Keep-alive CPU per request is now within ≈1% of ASP.NET Core Minimal API on Linux with the server pinned to 4 cores (8.98 vs 8.89 µs, down from ≈9.7 µs in v3.6.0) (#865)
 * Suave is compiled without F# `.tail` calls: `async` continuations in `bind` (`>=>`), `choose`, `tryThen`, `inject`, `<|>`, the router and others passed the `HttpContext` struct on as a tail call, which went through the runtime's slow, copying tail-call helper (#865)
