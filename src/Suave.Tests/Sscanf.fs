@@ -38,6 +38,18 @@ let scanTests (_ : SuaveConfig) =
     testCase "with int, int64 and uint32 " <| fun _ ->
       let result = sscanf "%d %d %u" "100 9223372036854775807 42"
       Expect.equal (100, 9223372036854775807L, 42u) result "should parse each item correctly"
+
+    testCase "with a negative int" <| fun _ ->
+      let result : int = sscanf "/items/%d" "/items/-42"
+      Expect.equal result -42 "should parse the negative value"
+
+    testCase "with an int that overflows int32" <| fun _ ->
+      Expect.throwsT<System.OverflowException> (fun () -> sscanf "/items/%d" "/items/99999999999" |> ignore<int>)
+        "should fail rather than wrap"
+
+    testCase "with a uint that overflows uint32" <| fun _ ->
+      Expect.throwsT<System.OverflowException> (fun () -> sscanf "/items/%u" "/items/4294967296" |> ignore<uint32>)
+        "should fail rather than wrap"
     ]
 
 open Suave.Http
@@ -55,4 +67,17 @@ let moreScanTests cfg =
                    "9223372036854775807",
                    runWithConfig (pathScan "/%d" (fun (a:int64) -> OK(string a)))
                    |> req HttpMethod.GET "/9223372036854775807" None)
+
+    testCase "parse a negative integer" <| fun _ ->
+      Assert.Equal("returns -42",
+                   "-42",
+                   runWithConfig (pathScan "/items/%d" (fun (a:int) -> OK(string a)))
+                   |> req HttpMethod.GET "/items/-42" None)
+
+    testCase "decline an integer that overflows int32" <| fun _ ->
+      Assert.Equal("declines with 404",
+                   System.Net.HttpStatusCode.NotFound,
+                   runWithConfig (choose [ pathScan "/items/%d" (fun (a:int) -> OK(string a))
+                                           RequestErrors.NOT_FOUND "declined" ])
+                   |> reqStatusCode HttpMethod.GET "/items/99999999999" None)
     ]

@@ -54,20 +54,21 @@ let rec getFormatters xs =
   | x :: xr          -> getFormatters xr
   | []               -> []
 
-// Coerce integer types
+// Coerce integer types; values out of range for the target type raise an
+// OverflowException instead of wrapping
 let coerce o (v: Type) =
   //printfn "Convert %A to %s" o (v.FullName)
   match v with
   | v when v = typeof<int16> ->
-    int16 (unbox<int64> o) |> box
+    Checked.int16 (unbox<int64> o) |> box
   | v when v = typeof<int32> ->
-    int32 (unbox<int64> o) |> box
+    Checked.int32 (unbox<int64> o) |> box
   | v when v = typeof<int64> ->
     o
   | v when v = typeof<uint16> ->
-    uint16 (unbox<uint64> o) |> box
+    Checked.uint16 (unbox<uint64> o) |> box
   | v when v = typeof<uint32> ->
-    uint32 (unbox<uint64> o) |> box
+    Checked.uint32 (unbox<uint64> o) |> box
   | v when v = typeof<uint64> ->
     o
   | _ ->
