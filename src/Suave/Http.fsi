@@ -270,6 +270,10 @@ module Http =
       /// Optional sink factory for streaming multipart file parts without a temp file.
       /// When <c>None</c> (the default), each file part is buffered to a temporary file on disk.
       filePartSink      : FilePartSink option
+      /// When false, the server neither advertises <c>h2</c> via TLS ALPN nor
+      /// accepts cleartext HTTP/2 (h2c upgrade or prior knowledge); every
+      /// connection is served as HTTP/1.x. Defaults to true.
+      http2Enabled      : bool
       /// Largest WebSocket frame payload, in bytes, a client may send. Larger
       /// frames are refused with close code 1009 before any payload is read.
       webSocketMaxFrameSize : int }

@@ -573,7 +573,7 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
       match reqRes.Result with
       | Ok request when
           not (ConnectionFacade.isHttp2PriorKnowledgePreface request.rawMethod request.rawPath request.httpVersion)
-          && not (ConnectionFacade.Http2UpgradeHandler.IsSome && ConnectionFacade.isH2cUpgradeRequest request) ->
+          && not (runtime.http2Enabled && ConnectionFacade.Http2UpgradeHandler.IsSome && ConnectionFacade.isH2cUpgradeRequest request) ->
         // runValue reports failures as an Error result rather than throwing.
         httpOutput.runValue request webpart
       | _ ->
@@ -603,12 +603,12 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
         if ConnectionFacade.isHttp2PriorKnowledgePreface
              request.rawMethod request.rawPath request.httpVersion then
           match ConnectionFacade.Http2PriorKnowledgeHandler with
-          | Some handler ->
+          | Some handler when runtime.http2Enabled ->
             try
               return! handler this
             with ex ->
               return Result.Error (Error.ConnectionError ex.Message)
-          | None ->
+          | _ ->
             return! this.exitHttpLoopWithError
               (InputDataError (Some 400, "HTTP/2 prior-knowledge not supported"))
         else
@@ -623,7 +623,7 @@ type ConnectionFacade(connection: Connection, runtime: HttpRuntime, connectionPo
         // parts via the `handShake` combinator and is unaffected: we only
         // intercept requests whose `Upgrade` token is exactly `h2c`.
         match ConnectionFacade.Http2UpgradeHandler with
-        | Some handler when ConnectionFacade.isH2cUpgradeRequest request ->
+        | Some handler when runtime.http2Enabled && ConnectionFacade.isH2cUpgradeRequest request ->
           try
             return! handler this request
           with ex ->
