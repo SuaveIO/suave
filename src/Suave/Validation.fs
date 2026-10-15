@@ -119,8 +119,9 @@ module Validation =
   /// Infix operator for apply (<@>)
   let (<@>) f x = apply f x
 
-  /// Infix operator for andAlso (<++>)
-  let (<++>) = andAlso
+  /// Infix operator for andAlso (<++>): `a <++> b` runs `a` then `b` and
+  /// reports `a`'s errors before `b`'s
+  let (<++>) validator1 validator2 = andAlso validator2 validator1
 
   /// Infix operator for orElse (<//>)
   let (<//>) = orElse
@@ -128,7 +129,10 @@ module Validation =
   // === String Validators ===
 
   module String =
-    
+
+    let private required field =
+      Invalid [errorSimple field "Value is required"]
+
     /// Validate that a string is not null or empty
     let notEmpty field : Validator<string, string> =
       fun input ->
@@ -140,7 +144,9 @@ module Validation =
     /// Validate minimum length
     let minLength (min: int) field : Validator<string, string> =
       fun input ->
-        if input.Length < min then
+        if isNull input then
+          required field
+        elif input.Length < min then
           Invalid [errorSimple field ($"Value must be at least {min} characters")]
         else
           Valid input
@@ -148,7 +154,9 @@ module Validation =
     /// Validate maximum length
     let maxLength (max: int) field : Validator<string, string> =
       fun input ->
-        if input.Length > max then
+        if isNull input then
+          required field
+        elif input.Length > max then
           Invalid [errorSimple field ($"Value must be at most {max} characters")]
         else
           Valid input
@@ -156,7 +164,9 @@ module Validation =
     /// Validate exact length
     let exactLength (length: int) field : Validator<string, string> =
       fun input ->
-        if input.Length <> length then
+        if isNull input then
+          required field
+        elif input.Length <> length then
           Invalid [errorSimple field ($"Value must be exactly {length} characters")]
         else
           Valid input
@@ -171,7 +181,9 @@ module Validation =
     /// Validate against a regex pattern
     let matches (pattern: string) field message : Validator<string, string> =
       fun input ->
-        if Regex.IsMatch(input, pattern) then
+        if isNull input then
+          required field
+        elif Regex.IsMatch(input, pattern) then
           Valid input
         else
           Invalid [errorSimple field message]
@@ -205,7 +217,9 @@ module Validation =
     /// Validate that string contains a value
     let contains (substring: string) field : Validator<string, string> =
       fun input ->
-        if input.Contains(substring) then
+        if isNull input then
+          required field
+        elif input.Contains(substring) then
           Valid input
         else
           Invalid [errorSimple field ($"Value must contain '{substring}'")]
@@ -213,7 +227,9 @@ module Validation =
     /// Validate that string starts with a prefix
     let startsWith (prefix: string) field : Validator<string, string> =
       fun input ->
-        if input.StartsWith(prefix) then
+        if isNull input then
+          required field
+        elif input.StartsWith(prefix) then
           Valid input
         else
           Invalid [errorSimple field ($"Value must start with '{prefix}'")]
@@ -221,7 +237,9 @@ module Validation =
     /// Validate that string ends with a suffix
     let endsWith (suffix: string) field : Validator<string, string> =
       fun input ->
-        if input.EndsWith(suffix) then
+        if isNull input then
+          required field
+        elif input.EndsWith(suffix) then
           Valid input
         else
           Invalid [errorSimple field ($"Value must end with '{suffix}'")]
