@@ -189,6 +189,12 @@ let parsingMultipart2 cfg =
                   |> fun files -> "[" + files + "]"
                   |> OK)
 
+            path "/parts"
+              >=> request (fun r ->
+                let fields = r.multiPartFields |> Seq.map (fun (k, v) -> k + "=" + v)
+                let files = r.files |> Seq.map (fun f -> f.fileName)
+                OK (String.concat ";" (Seq.append fields files)))
+
             path "/msgid"
               >=> request (fun r ->
                 match r.multiPartFields |> Seq.tryFind (fst >> (=) "messageId") with
@@ -220,7 +226,72 @@ let parsingMultipart2 cfg =
     use streamReader = new StreamReader(stream)
     streamReader.ReadToEnd()
 
+  // A multipart/mixed part that is followed by another form-data part. After
+  // the nested parts, the parser skips the rest of the outer boundary line.
+  let mixedThenField =
+    let body =
+      String.concat "\r\n"
+        [ "--outer"
+          "Content-Type: multipart/mixed; boundary=inner"
+          "Content-Disposition: form-data; name=\"files\""
+          ""
+          "--inner"
+          "Content-Disposition: file; filename=\"file1.txt\""
+          "Content-Type: text/plain"
+          ""
+          "Hello World"
+          "--inner--"
+          "--outer"
+          "Content-Disposition: form-data; name=\"after\""
+          ""
+          "tail"
+          "--outer--"
+          "" ]
+    let head =
+      String.concat "\r\n"
+        [ "POST /parts HTTP/1.1"
+          "Content-Type: multipart/form-data; boundary=outer"
+          sprintf "Content-Length: %d" (Encoding.ASCII.GetByteCount body)
+          "Connection: close"
+          "Host: localhost"
+          ""
+          "" ]
+    head + body
+
+  let sendChunksRecv (chunks : string list) =
+    use client = new TcpClient(string ip, port)
+    use stream = client.GetStream()
+    for chunk in chunks do
+      let bytes = Encoding.ASCII.GetBytes chunk
+      stream.Write(bytes, 0, bytes.Length)
+      stream.Flush()
+      Threading.Thread.Sleep 200
+    use streamReader = new StreamReader(stream)
+    streamReader.ReadToEnd()
+
   testList "sending funky multiparts" [
+    testCase "multipart/mixed part followed by another field" <| fun _ ->
+      let ctx = runWithConfig app
+      try
+        let subject = sendChunksRecv [ mixedThenField ]
+        Expect.stringContains subject "HTTP/1.1 200 OK" "Expecting 200 OK"
+        Expect.stringContains subject "after=tail;file1.txt" "Expecting the field after the mixed part"
+      finally
+        disposeContext ctx
+
+    testCase "multipart/mixed part followed by another field, outer boundary arriving later" <| fun _ ->
+      let ctx = runWithConfig app
+      try
+        // Split right after the nested closing boundary, so skipping the rest
+        // of the outer boundary has to wait for the second chunk.
+        let splitAt = mixedThenField.IndexOf "--inner--\r\n" + "--inner--\r\n".Length
+        let subject =
+          sendChunksRecv [ mixedThenField.Substring(0, splitAt); mixedThenField.Substring splitAt ]
+        Expect.stringContains subject "HTTP/1.1 200 OK" "Expecting 200 OK"
+        Expect.stringContains subject "after=tail;file1.txt" "Expecting the field after the mixed part"
+      finally
+        disposeContext ctx
+
     testCase "sending two files under same form name" <| fun _ ->
       let ctx = runWithConfig app
       try

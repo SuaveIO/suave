@@ -430,27 +430,35 @@ type HttpReader(transport : ITransport, pipe: Pipe, cancellationToken: Threading
           | Result.Error e -> return Result.Error e
         })
 
-  member internal x.skip n =
-    task {
-      let mutable rr = Unchecked.defaultof<ReadResult>
-      let mutable scanResult = ScanResult.Found n
-      let mutable proceed = true
-      if not (pipe.Reader.TryRead(&rr)) then
-        match! x.readMoreData() with
-        | Result.Error e ->
-          scanResult <- ScanResult.Error e
-          proceed <- false
-        | Ok () ->
-          let! r = pipe.Reader.ReadAsync(readerCancellationTokenSource.Token)
-          rr <- r
-      if proceed then
-        if rr.IsCanceled then
-          scanResult <- ScanResult.Error(Error.ConnectionError "ReadAsync was canceled")
-        else
-          let bufferSequence = rr.Buffer
-          pipe.Reader.AdvanceTo(bufferSequence.GetPosition(int64 n))
-      return scanResult
-    }
+  /// Discard the next `n` bytes of input, pumping the transport as needed.
+  member internal x.skip (n : int) : SocketOp<unit> =
+    ValueTask<Result<unit,Error>>(
+      task {
+        let mutable remaining = int64 n
+        let mutable result = Ok ()
+        while remaining > 0L && Result.isOk result do
+          let mutable rr = Unchecked.defaultof<ReadResult>
+          let mutable haveData = pipe.Reader.TryRead(&rr)
+          if not haveData then
+            match! x.readMoreData() with
+            | Result.Error e ->
+              result <- Result.Error e
+            | Ok () ->
+              let! r = pipe.Reader.ReadAsync(readerCancellationTokenSource.Token)
+              rr <- r
+              haveData <- true
+          if haveData then
+            if rr.IsCanceled then
+              result <- Result.Error(Error.ConnectionError "ReadAsync was canceled")
+            else
+              let bufferSequence = rr.Buffer
+              let count = min remaining bufferSequence.Length
+              pipe.Reader.AdvanceTo(bufferSequence.GetPosition(count))
+              remaining <- remaining - count
+              if count = 0L && rr.IsCompleted then
+                result <- Result.Error(Error.ConnectionError "no more data")
+        return result
+      })
 
   /// Read a line from the stream, calling UTF8.toString on the bytes before the EOL marker
   member x.readLine () : SocketOp<string> = 
